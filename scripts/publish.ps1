@@ -89,8 +89,8 @@ try {
   $prevTag = "v0.2.$max"
   git rev-parse -q --verify "refs/tags/$prevTag" *> $null
   # seznam změn jen z commitů, které mění něco, co jde ven (ne čistě interní export-ignore cesty)
-  $public = @('--', '.', ':(exclude)scripts/private', ':(exclude).github')
-  $log = if ($LASTEXITCODE -eq 0) { @(git log --no-decorate --format='- %s' "$prevTag..HEAD" @public) } else { @(git log --no-decorate -n 30 --format='- %s' @public) }
+  $pubPaths = @('--', '.', ':(exclude)scripts/private', ':(exclude).github')
+  $log = if ($LASTEXITCODE -eq 0) { @(git log --no-decorate --format='- %s' "$prevTag..HEAD" @pubPaths) } else { @(git log --no-decorate -n 30 --format='- %s' @pubPaths) }
   foreach ($line in $log) { foreach ($d in $deny) { if ($line -match "(?i)$d") { $hits += "seznam změn: $line ~ $d" } } }
   if ($hits.Count) { $hits | ForEach-Object { "  ZAKÁZÁNO: $_" }; Fail "snapshot obsahuje zakázaná slova ($($hits.Count)) — oprav na main a vydej znovu" }
   "snapshot:   $Clone čistý (denylist $($deny.Count) vzorů)"
@@ -100,8 +100,13 @@ try {
   $uid = gh api user --jq .id
   $who = @('-c', 'user.name=jiri-hyan', '-c', "user.email=$uid+jiri-hyan@users.noreply.github.com")
   git -C $Clone add -A
-  git -C $Clone @who commit -q -m "Ledge $v" -m "Snapshot vývojového stromu (bez historie)."
-  if ($LASTEXITCODE -ne 0) { Fail 'commit snapshotu selhal (nic se nezměnilo?)' }
+  # opakovaný běh po selhání vydání: snapshot už je commitnutý a strom se nezměnil → použije se HEAD
+  git -C $Clone diff --cached --quiet HEAD 2>$null
+  if ($LASTEXITCODE -eq 0) { "snapshot:   beze změny proti veřejnému main — beru existující commit" }
+  else {
+    git -C $Clone @who commit -q -m "Ledge $v" -m "Snapshot vývojového stromu (bez historie)."
+    if ($LASTEXITCODE -ne 0) { Fail 'commit snapshotu selhal' }
+  }
   $pubHead = git -C $Clone rev-parse HEAD
 
   # ---- build (verze se zapíše jen dočasně, necommituje se) ----

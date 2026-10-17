@@ -483,7 +483,8 @@ impl Drawer {
         let Some(w) = self.window() else { return };
         if let Some(h) = hwnd_of(&w) {
             unsafe {
-                // zkratkou otevřený šuplík má dostat klávesnici
+                // zkratkou otevřený šuplík má dostat klávesnici; odkud fokus bereme, si zapamatovat
+                crate::focusreturn::remember();
                 let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
                 SetWindowLongPtrW(h, GWL_EXSTYLE, ex & !(WS_EX_NOACTIVATE.0 as isize));
                 let _ = SetForegroundWindow(h);
@@ -548,6 +549,8 @@ impl Drawer {
             s.view = View::Hidden;
             s.closed = false;
         }
+        // výslovné zavření: fokus zpět, dokud je Ledge v popředí (blur je teď no-op, view = Hidden)
+        crate::focusreturn::give_back();
         let Some(w) = self.window() else { return };
         let Some(h) = hwnd_of(&w) else { return };
         if morph {

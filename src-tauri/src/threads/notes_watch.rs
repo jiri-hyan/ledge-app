@@ -8,7 +8,6 @@ use crate::notes;
 use crate::state::{UiCmd, core, log, mark_dirty, now_ms};
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -95,7 +94,7 @@ pub(crate) fn check_reminders() {
             st.next_due = next;
             changed = true;
         }
-        if !c.fullscreen.load(Ordering::Relaxed) {
+        if !c.dead() {
             let new: Vec<String> = st.due.iter().map(notes::reminder_key).filter(|k| !st.peeked.contains(k)).collect();
             if !new.is_empty() {
                 st.peeked.extend(new);

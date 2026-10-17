@@ -12,3 +12,17 @@
 .more-idle { padding: 6px 0; }
 .hint-link { padding: var(--s2) 0 0; color: var(--violet); }
 .subag-list { padding: 0 0 6px 34px; }
+/* Doplňky schválení (sessions/PermExtra.tsx): „Vždy povolit“ s pravidlem a cílem, „Zamítnout s důvodem…“. */
+.sess-perm { display: flex; flex-direction: column; gap: var(--s1); padding: 0 0 var(--s2); min-width: 0; }
+.sess-perm-line { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); min-width: 0; }
+.sess-perm-rule { font: var(--fs-xs) var(--mono); color: var(--t1); background: var(--well-2); border-radius: var(--r-sm); padding: 2px 6px; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-perm-dest, .sess-perm-link { font: var(--fs-xs) var(--mono); color: var(--t3); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.sess-perm-dest:hover, .sess-perm-link:hover { color: var(--t1); }
+.sess-perm-link { align-self: flex-start; }
+.sess-perm-opt { font-size: var(--fs-xs); color: var(--t2); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 3px 8px; cursor: pointer; }
+.sess-perm-opt small { color: var(--t3); font-family: var(--mono); }
+.sess-perm-opt:hover { color: var(--t1); background: var(--card-2); }
+.sess-perm-opt.on { color: var(--t1); border-color: var(--focus); }
+.sess-perm-why { width: 100%; box-sizing: border-box; resize: vertical; min-height: 44px; font: var(--fs-body) var(--sans); color: var(--t1); background: var(--well-2); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 10px; }
+.sess-perm-why:focus { outline: none; border-color: var(--focus); }
+.sess-perm-count { margin-left: auto; font: var(--fs-xs) var(--mono); color: var(--t3); }

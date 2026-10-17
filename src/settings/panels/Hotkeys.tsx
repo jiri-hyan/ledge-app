@@ -10,7 +10,7 @@ import { fieldLabel } from "../labels";
 import { hotkeyCollisions, type HotkeyAction } from "../model";
 import type { PanelProps } from "../types";
 
-const ACTIONS: HotkeyAction[] = ["toggle", "note", "approve", "deny"];
+const ACTIONS: HotkeyAction[] = ["toggle", "note", "approve", "deny", "gameMode"];
 
 export default function HotkeysPanel(_p: PanelProps) {
   const c = useSettings();

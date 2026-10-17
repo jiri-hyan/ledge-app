@@ -49,7 +49,11 @@ pub(crate) struct Snapshot {
     sessions: Vec<sessions::Row>,
     /// hooky Ledge v `~/.claude/settings.json`
     hooks: hooksetup::HooksStatus,
+    /// limity Claude 5h / týden (`limitslive::view`, jen paměť)
+    limits: crate::limitslive::LimitsView,
     notes_enabled: bool,
+    /// kompaktní paleta (`palette.compact`, `src/palette/compact.ts`)
+    palette_compact: bool,
     /// karta Poznámky: nehotové připomínky do konce dneška, pak nejnovější — nejvýš `CARD_ROWS`
     notes: Vec<notes::NoteView>,
     /// kolik poznámek se do karty nevešlo (načtou se přes `note_list`)
@@ -183,7 +187,9 @@ pub(crate) fn snapshot() -> Snapshot {
         questions: c.claude.questions(),
         sessions,
         hooks: hooksetup::status_cached(cfg.claude.port),
+        limits: crate::limitslive::view(),
         notes_enabled: cfg.notes.enabled,
+        palette_compact: cfg.palette.compact,
         notes: notes_card,
         notes_more,
         reminders,

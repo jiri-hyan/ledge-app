@@ -6,7 +6,7 @@ use crate::procman::ProcEvent;
 use crate::state::{UiCmd, WeatherState, core, log, mark_dirty, now_ms};
 use crate::strip::Rgba;
 use crate::hotkeys::sync_approve_keys;
-use crate::{config, gitinfo, icons, personal, sessionlive, weather};
+use crate::{attention, config, gitinfo, icons, personal, sessionlive, weather};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
@@ -109,11 +109,13 @@ pub(crate) fn on_claude_change() {
     if c.drawer.view() == View::Full && c.claude.sessions().iter().any(|s| !s.ended && sessionlive::unseen(&s.id, s.updated_at)) {
         sessionlive::request(sessionlive::Wake::Hook);
     }
+    // puls proužku / toast při „čeká na tebe“ a „hotovo“ (`attention.rs`)
+    attention::on_change();
     // schválení i otázka Clauda → peek
     let pending = c.claude.attention();
     sync_approve_keys();
     match (pending, c.drawer.view()) {
-        (true, View::Hidden) if !c.fullscreen.load(Ordering::Relaxed) => c.send_ui(UiCmd::Show(View::Peek, Opener::Hover)),
+        (true, View::Hidden) if !c.dead() => c.send_ui(UiCmd::Show(View::Peek, Opener::Hover)),
         // peek drží i připomínka po termínu
         (false, View::Peek) if c.notes.lock().due.is_empty() => c.send_ui(UiCmd::Hide),
         _ => {}

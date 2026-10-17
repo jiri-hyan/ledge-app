@@ -4,6 +4,7 @@
 pub(crate) mod actions;
 pub(crate) mod config;
 pub(crate) mod drawer;
+pub(crate) mod limits;
 pub(crate) mod notes;
 pub(crate) mod onboarding;
 pub(crate) mod projects;

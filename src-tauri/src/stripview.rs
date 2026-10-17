@@ -7,7 +7,7 @@ use crate::i18n::tr;
 use crate::drawer::View;
 use crate::state::{FLASH, core};
 use crate::strip::{Rgba, Segment};
-use crate::{claude, procman};
+use crate::{attention, claude, procman};
 use std::sync::atomic::Ordering;
 
 // ---------- proužek ----------
@@ -99,6 +99,13 @@ pub(crate) fn refresh_strip() {
                     segs.push(seg(trf!("{unfinished}× nedokončeno", "{unfinished}× unfinished"), Rgba::AMBER, Some(Rgba::AMBER), false, true));
                 }
             }
+            config::StripItem::Limits => crate::limitslive::strip_segments(&mut segs),
+            config::StripItem::Waiting => {
+                // kolik různých session čeká na tebe (schválení / otázka); 0 = žádný segment
+                if let Some(text) = attention::waiting_text(attention::waiting_count(&pending, &asks)) {
+                    segs.push(seg(text, Rgba::AMBER, Some(Rgba::AMBER), true, true));
+                }
+            }
             config::StripItem::Repos => {
                 let git = c.git.lock();
                 let mut dirty = 0;
@@ -134,17 +141,20 @@ pub(crate) fn refresh_strip() {
         let more = if due_count > 1 { format!(" +{}", due_count - 1) } else { String::new() };
         segs.insert(0, seg(format!("🔔 {text}{more}"), Rgba::AMBER, Some(Rgba::AMBER), true, true));
     }
-    let fullscreen = c.fullscreen.load(Ordering::Relaxed);
+    // mrtvý Ledge (fullscreen hra nebo herní režim) = proužek pryč
+    let dead = c.dead();
     let drawer_open = c.drawer.view() != View::Hidden;
     // nad taby prohlížeče proužek ustoupí na tenkou linku, dokud nepřijde událost
     let retreat = c.bar_window.load(Ordering::Relaxed) && ambient.is_none();
     let line_only = !cfg.strip.enabled || retreat;
-    let visible = !fullscreen && !drawer_open && (cfg.strip.enabled || ambient.is_some());
+    let visible = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some());
     let opacity = cfg.strip.opacity;
     let look = &cfg.appearance;
     let palette = geom::palette(look.theme);
     let (style, metrics, line) = (look.strip.style, geom::strip_metrics(look.strip.style, look.strip.size), geom::line_stops(look, &palette));
     let axis2 = geom::axis2_for(&cfg, mon.rect.left, mon.rect.right, mon.dpi);
+    // puls „čeká / hotovo“ (`attention::pulse`, s termínem; animuje vlákno `strip`)
+    let pulse = attention::pulse();
     drop(cfg);
     c.strip.set(|m| {
         m.visible = visible;
@@ -159,6 +169,7 @@ pub(crate) fn refresh_strip() {
         m.palette = palette;
         m.line = line;
         m.axis2 = Some(axis2);
+        m.pulse = pulse;
     });
 }
 

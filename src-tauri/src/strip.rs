@@ -5,11 +5,14 @@
 //! `WS_EX_NOACTIVATE` → nikdy nebere fokus. Překresluje se jen při změně obsahu.
 //! Vzhled (styl `pill`/`line`/`dot`, velikost, paleta motivu, barva linky, osa u hrany) přichází
 //! v `StripModel` spočítaný čistými funkcemi `appearance::geom`.
+//! Puls „Claude čeká / hotovo“ (`StripModel.pulse`, `attention::pulse_level`) je jediná animace:
+//! časovač `WM_TIMER` běží jen po dobu pulsu (`attention::PULSE_MS`), v klidu žádný.
 
 use crate::appearance::StripStyle;
 use crate::appearance::geom::{self, Palette, StripMetrics, ink};
 use parking_lot::Mutex;
 use std::sync::Arc;
+use std::time::Instant;
 use std::sync::atomic::{AtomicIsize, Ordering};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
@@ -37,6 +40,10 @@ use windows::core::{PCWSTR, w};
 
 pub const WM_STRIP_REDRAW: u32 = WM_APP + 1;
 pub const WM_STRIP_VISIBLE: u32 = WM_APP + 2;
+/// id časovače pulsu (jen po dobu `attention::PULSE_MS`)
+const PULSE_TIMER: usize = 1;
+/// snímek pulsu (~30 fps; software D2D, 24px proužek)
+const PULSE_FRAME_MS: u32 = 33;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rgba(pub f32, pub f32, pub f32, pub f32);
@@ -83,6 +90,13 @@ pub struct StripModel {
     pub line: [Rgba; 3],
     /// dvojnásobek x osy proužku v px (`geom::anchor_c2`); `None` = střed monitoru
     pub axis2: Option<i32>,
+    /// puls linky „Claude čeká / hotovo“: barva + začátek (`attention::pulse`); po termínu nic
+    pub pulse: Option<(Rgba, Instant)>,
+}
+
+/// Jas běžícího pulsu (barva, 0–1); `None` = puls není / skončil.
+fn pulse_now(m: &StripModel) -> Option<(Rgba, f32)> {
+    m.pulse.and_then(|(c, t)| crate::attention::pulse_level(t.elapsed().as_millis() as u64).map(|l| (c, l)))
 }
 
 impl Default for StripModel {
@@ -101,6 +115,7 @@ impl Default for StripModel {
             palette: geom::palette(crate::appearance::Theme::Dark),
             line: [Rgba::VIOLET, Rgba::BLUE, Rgba::TEAL],
             axis2: None,
+            pulse: None,
         }
     }
 }
@@ -213,13 +228,25 @@ unsafe fn run(strip: Arc<Strip>) {
         let Ok(renderer) = renderer else { return };
 
         let mut shown = false;
+        let mut pulsing = false;
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
-            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE {
+            let frame = msg.message == WM_TIMER && msg.wParam.0 == PULSE_TIMER;
+            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE || frame {
                 // sloučit nahromaděné požadavky na překreslení
                 let mut peek = MSG::default();
                 while PeekMessageW(&mut peek, Some(hwnd), WM_STRIP_REDRAW, WM_STRIP_VISIBLE, PM_REMOVE).as_bool() {}
                 let model = strip.model.lock().clone();
+                // časovač jen během pulsu na viditelném proužku
+                let active = model.visible && pulse_now(&model).is_some();
+                if active != pulsing {
+                    if active {
+                        SetTimer(Some(hwnd), PULSE_TIMER, PULSE_FRAME_MS, None);
+                    } else {
+                        let _ = KillTimer(Some(hwnd), PULSE_TIMER);
+                    }
+                    pulsing = active;
+                }
                 if !model.visible {
                     if shown {
                         let _ = ShowWindow(hwnd, SW_HIDE);
@@ -236,7 +263,9 @@ unsafe fn run(strip: Arc<Strip>) {
                     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                     shown = true;
                 }
-                let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                if !frame {
+                    let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                }
                 continue;
             }
             let _ = TranslateMessage(&msg);
@@ -305,6 +334,7 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
     unsafe {
         let mt = m.metrics;
         let pal = m.palette;
+        let pulse = pulse_now(m);
         let dots_only = m.style == StripStyle::Dot;
         let scale = m.dpi as f32 / 96.0;
         let h_logical = if m.line_only { 3.0 } else if m.hot { mt.height + mt.hot_extra } else { mt.height };
@@ -401,9 +431,10 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
             if m.line_only {
                 // bez události (proužek ustoupil nad taby prohlížeče) tlumená neutrální linka,
                 // při tlačení na hranu se rozsvítí
-                let (col, a) = match m.ambient {
-                    Some(a) => (ink(a, pal.light), 1.0),
-                    None => (ink(Rgba::DIM, pal.light), if m.hot { 0.9 } else { 0.35 }),
+                let (col, a) = match (pulse, m.ambient) {
+                    (Some((p, l)), _) => (ink(p, pal.light), 0.45 + 0.55 * l),
+                    (None, Some(a)) => (ink(a, pal.light), 1.0),
+                    (None, None) => (ink(Rgba::DIM, pal.light), if m.hot { 0.9 } else { 0.35 }),
                 };
                 if let Ok(b) = t.CreateSolidColorBrush(&color(col, a), None) {
                     t.FillRoundedRectangle(&body, &b);
@@ -506,6 +537,11 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
                     (_, true) => 0.78,
                     (_, false) => 0.42,
                 };
+                // puls: linka se v rytmu roztáhne k plné šířce
+                let share = match pulse {
+                    Some((_, l)) => share + (0.94 - share) * l,
+                    None => share,
+                };
                 let lw = width * share;
                 let left = (width - lw) / 2.0;
                 let line = D2D1_ROUNDED_RECT {
@@ -514,10 +550,11 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
                     radiusY: scale,
                 };
                 let a = if m.hot { 1.0 } else { 0.55 };
-                let stops: Vec<(f32, D2D1_COLOR_F)> = match m.ambient {
-                    Some(c) => {
+                let stops: Vec<(f32, D2D1_COLOR_F)> = match pulse.map(|(c, l)| (c, 0.5 + 0.5 * l)).or(m.ambient.map(|c| (c, 1.0))) {
+                    // událost (nebo puls): plná barva uprostřed, při pulsu jas v rytmu
+                    Some((c, pa)) => {
                         let c = ink(c, pal.light);
-                        vec![(0.0, color(c, 0.0)), (0.5, color(c, 1.0)), (1.0, color(c, 0.0))]
+                        vec![(0.0, color(c, 0.0)), (0.5, color(c, pa)), (1.0, color(c, 0.0))]
                     }
                     None => {
                         let [l0, l1, l2] = m.line;

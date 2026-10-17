@@ -59,7 +59,16 @@ export interface Pending {
   summary: string;
   createdAt: number;
   expiresAt: number;
+  /** návrh „Vždy povolit“ (přesné pravidlo, `claude/rules.rs`); null = tlačítko se neukáže */
+  always: PermAlways | null;
 }
+
+export interface PermRule { toolName: string; ruleContent?: string }
+export interface PermAlways { rules: PermRule[]; label: string; fromClaude: boolean }
+/** kam Claude Code pravidlo zapíše (`destination` v `updatedPermissions`) */
+export type PermDest = "localSettings" | "userSettings" | "session";
+/** doplněk `decide`: „Vždy povolit“ do cíle (jen s allow) / důvod zamítnutí (jen bez allow) */
+export interface DecideExtra { always?: PermDest; reason?: string }
 
 export interface SubagentRun { id: string; agentType: string; since: number }
 export interface SubagentDone { agentType: string; durationMs: number | null; endedAt: number; message: string | null }
@@ -275,6 +284,8 @@ export interface Snapshot {
   sessions: SessionView[];
   hooks: HooksStatus;
   notesEnabled: boolean;
+  /** kompaktní paleta: jen pole, výsledky až při psaní (`palette.compact`, `palette/compact.ts`) */
+  paletteCompact: boolean;
   /** karta Poznámky: nehotové připomínky do konce dneška, pak nejnovější — nejvýš 8 */
   notes: NoteView[];
   /** kolik poznámek se do karty nevešlo (zbytek přes noteList) */
@@ -472,3 +483,30 @@ export interface DetectedProject {
 export interface RepoCandidate { path: string; name: string; remote?: string }
 export interface AppInfo { version: string; configPath: string; configDir: string; logPath: string }
 export type PickKind = "folder" | "file" | "exe" | "image" | "json";
+
+// --- limits ---
+// Zrcadlo `limitslive::LimitsView` / `statuslinesetup::StatusLineStatus` (Rust) — limity Claude 5h / týden.
+export interface LimitsView {
+  /** kdy vznikl vzorek (ms); null = žádná data */
+  at: number | null;
+  source: "statusLine" | "usageLog" | null;
+  fiveHour: { pct: number; resetsAt: number | null } | null;
+  sevenDay: { pct: number; resetsAt: number | null } | null;
+  /** starší vzorek UI ukáže jako „staré“ */
+  staleMs: number;
+  /** stavový řádek Ledge v settings.json; "" = ještě nečteno */
+  statusLine: "none" | "foreign" | "full" | "error" | "";
+  /** běžící připomínka resetu (peek) */
+  notice: "fiveHour" | "sevenDay" | null;
+}
+export interface StatusLineStatus {
+  state: "none" | "foreign" | "full" | "error";
+  /** příkaz, který Ledge obaluje / obalí */
+  command: string | null;
+  error: string | null;
+  path: string;
+}
+export interface Snapshot {
+  /** limity Claude (chybí jen ve starém jádře) */
+  limits?: LimitsView;
+}

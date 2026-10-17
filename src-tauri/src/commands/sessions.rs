@@ -1,14 +1,16 @@
 //! Tauri příkazy Claude: rozhodnutí o žádosti (jen klik člověka), odpověď na otázku Clauda,
 //! otevření session, hooky.
 
-use crate::claude::{Decision, Reply};
+use crate::claude::{Reply, rules};
 use crate::snapshot::session_rows;
 use crate::state::{UiCmd, core, log, mark_dirty};
 use crate::{config, hooksetup, sessions, winfocus};
 
+/// `extra` (volitelné, aditivní): „Vždy povolit“ do cíle / důvod zamítnutí (`claude::rules`). Bez něj
+/// jako dřív. Pravidlo bere Rust z čekající žádosti, z UI jde jen cíl.
 #[tauri::command]
-pub(crate) fn decide(id: Option<u64>, allow: bool) -> bool {
-    core().claude.decide(id, if allow { Decision::Allow } else { Decision::Deny })
+pub(crate) fn decide(id: Option<u64>, allow: bool, extra: Option<rules::Extra>) -> bool {
+    core().claude.decide_with(id, allow, &extra.unwrap_or_default())
 }
 
 /// Klik na session v kartě Claude: přepnout do jejího okna, nebo skončenou obnovit v terminálu.

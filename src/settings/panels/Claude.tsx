@@ -9,6 +9,7 @@ import { Confirm } from "../fields/Confirm";
 import { Num, Seg, Slider, Toggle } from "../fields/controls";
 import { PanelHead, Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
+import StatusLineSetup from "../../limits/StatusLineSetup";
 
 const HOOKS_TEXT: Record<HooksStatus["state"], [string, string]> = {
   full: ["settings.hooks.full", "Zapojené"],
@@ -85,10 +86,21 @@ export default function ClaudePanel(_p: PanelProps) {
         <Row id="claude.approvalTimeoutS" dim={!c.cfg.claude.enabled}>
           <Slider path="claude.approvalTimeoutS" min={5} max={550} step={5} label={t("settings.f.claude.approvalTimeoutS", "Jak dlouho čekat na rozhodnutí")} fmt={(v) => (v >= 60 ? `${Math.floor(v / 60)} min ${v % 60 ? `${v % 60} s` : ""}` : `${v} s`)} />
         </Row>
+        <Row id="claude.toast" dim={!c.cfg.claude.enabled}>
+          <Toggle path="claude.toast" label={t("settings.f.claude.toast", "Oznámení Windows")} />
+        </Row>
         <Row id="claude.port" dim={!c.cfg.claude.enabled}>
           <Num path="claude.port" min={1024} max={65535} label={t("settings.f.claude.port", "Port mostu")} width="84px" />
         </Row>
         <HooksSetup />
+      </Section>
+      <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
+        <Row id="claude.statusLine" stack>
+          <StatusLineSetup />
+        </Row>
+        <Row id="claude.limitsReminder">
+          <Toggle path="claude.limitsReminder" label={t("settings.f.claude.limitsReminder", "Připomenout reset limitu")} />
+        </Row>
       </Section>
       <Section title={t("settings.claude.watch", "Hlídač nedokončené práce")}>
         <Row id="claude.enforceCommit" stack>

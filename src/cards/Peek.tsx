@@ -1,10 +1,13 @@
 // Peek = malý šuplík (bez fokusu): první čekající schválení Clauda (Povolit / Zamítnout jen klikem
-// člověka), jinak otázka Clauda (`QuestionCard` — odpověď kliknutím), jinak připomínky po termínu.
+// člověka; pod tím „Vždy povolit“ a „Zamítnout s důvodem…“ z `sessions/PermExtra.tsx`), jinak otázka Clauda (`QuestionCard` — odpověď kliknutím),
+// jinak připomínka resetu limitu Claude (`LimitsPeek`), jinak připomínky po termínu.
 import { Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { IconShield } from "../icons";
 import { ReminderPeek } from "../notes/NotesCard";
 import QuestionCard from "../questions/QuestionCard";
+import PermExtra from "../sessions/PermExtra";
+import LimitsPeek from "../limits/LimitsPeek";
 import { t } from "../i18n";
 import "./peek.css";
 
@@ -20,7 +23,7 @@ export default function Peek(p: { s: Snapshot }) {
   const question = () => (first() ? undefined : p.s.questions[0]);
   return (
     <Show when={first()} fallback={
-      <Show when={question()} keyed fallback={<ReminderPeek s={p.s} />}>
+      <Show when={question()} keyed fallback={<LimitsPeek s={p.s} fallback={<ReminderPeek s={p.s} />} />}>
         {(a) => <div class="qpeek" data-anim><QuestionCard ask={a} s={p.s} /></div>}
       </Show>
     }>
@@ -30,6 +33,7 @@ export default function Peek(p: { s: Snapshot }) {
           <div class="tx">
             <b>{t("cards.peek.waiting", "Claude čeká · {where}", { where: where() ?? "" })}{more() > 0 ? ` (+${more()})` : ""}</b>
             <div class="code" title={pd().summary}>{pd().tool}: {pd().summary}</div>
+            <PermExtra pd={pd()} />
           </div>
           <button class="btn" onClick={() => api.decide(pd().id, false)}>{t("cards.peek.deny", "Zamítnout")}</button>
           <button class="btn pri" onClick={() => api.decide(pd().id, true)}>{t("cards.peek.allow", "Povolit")}</button>

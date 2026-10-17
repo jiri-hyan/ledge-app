@@ -95,6 +95,7 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
     add(s.mode === "prace"
       ? { id: "app:osobni", section: "app", order: 6, title: t("palette.app.personal", "Přepnout na Osobní"), run: () => api.setMode("osobni") }
       : { id: "app:prace", section: "app", order: 6, title: t("palette.app.work", "Přepnout na Práce"), run: () => api.setMode("prace") });
+  add({ id: "app:gamemode", section: "app", order: 7, title: t("palette.app.gameMode", "Zapnout herní režim (Ledge zmizí)"), keywords: "hra game fullscreen schovat skryt nerusit herni rezim", run: () => api.setGameMode(true) });
   add({ id: "app:close", section: "app", order: 7, title: t("palette.app.close", "Zavřít šuplík"), run: () => api.close() });
   return out;
 }

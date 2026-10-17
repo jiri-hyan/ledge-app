@@ -44,25 +44,25 @@ pub enum J {
 }
 
 impl J {
-    fn get(&self, k: &str) -> Option<&J> {
+    pub(crate) fn get(&self, k: &str) -> Option<&J> {
         match self {
             J::Obj(m) => m.iter().rev().find(|(x, _)| x == k).map(|(_, v)| v),
             _ => None,
         }
     }
-    fn get_mut(&mut self, k: &str) -> Option<&mut J> {
+    pub(crate) fn get_mut(&mut self, k: &str) -> Option<&mut J> {
         match self {
             J::Obj(m) => m.iter_mut().rev().find(|(x, _)| x == k).map(|(_, v)| v),
             _ => None,
         }
     }
-    fn str(&self, k: &str) -> Option<&str> {
+    pub(crate) fn str(&self, k: &str) -> Option<&str> {
         match self.get(k) {
             Some(J::Str(s)) => Some(s),
             _ => None,
         }
     }
-    fn obj(pairs: Vec<(&str, J)>) -> J {
+    pub(crate) fn obj(pairs: Vec<(&str, J)>) -> J {
         J::Obj(pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
     }
 }
@@ -161,7 +161,7 @@ fn want_url(port: u16, path: &str) -> String {
     format!("http://127.0.0.1:{port}{path}")
 }
 
-fn parse(text: &str) -> Result<J, String> {
+pub(crate) fn parse(text: &str) -> Result<J, String> {
     let t = text.trim_start_matches('\u{feff}');
     if t.trim().is_empty() {
         return Ok(J::Obj(vec![]));
@@ -173,7 +173,7 @@ fn parse(text: &str) -> Result<J, String> {
     }
 }
 
-fn render(v: &J, original: &str) -> String {
+pub(crate) fn render(v: &J, original: &str) -> String {
     let mut out = serde_json::to_string_pretty(v).unwrap_or_default();
     if original.is_empty() || original.ends_with('\n') {
         out.push('\n');
@@ -314,7 +314,7 @@ pub fn settings_path() -> Option<PathBuf> {
     crate::sessionlive::claude_dir().map(|d| d.join("settings.json"))
 }
 
-fn read(path: &Path) -> Result<String, String> {
+pub(crate) fn read(path: &Path) -> Result<String, String> {
     match std::fs::read_to_string(path) {
         Ok(t) => Ok(t),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),

@@ -68,6 +68,9 @@ features = [
   "Win32_UI_Shell",
   "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",
+  # toast „Claude čeká / hotovo“ (`toast.rs`, config `claude.toast`): WinRT ze stejné crate, žádná nová
+  "Data_Xml_Dom",
+  "UI_Notifications",
 ]
 
 [dev-dependencies]

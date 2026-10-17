@@ -13,21 +13,27 @@ Nastavení umí zapojit hooky Ledge do `~/.claude/settings.json`. Návod pro už
 | `src-tauri/src/winfocus.rs` | Win32: strom procesů, okna, přepnutí, `claude --resume` | `switch_to`, `launch`, `ancestors`, `pick_window`, `pid_alive`, `is_claude_desktop_image` |
 | `src-tauri/src/subagents.rs` | subagenti jedné session (čistá) | `Subagents::{start, stop, clear_running}`, `shorten`, `DONE_KEEP`, `MSG_CHARS` |
 | `src-tauri/src/hooksetup.rs` | merge/remove/status hooků nad textem + atomický zápis | `EVENTS`, `merge`, `remove`, `status`, `ours`, `apply`, `status_at`, `status_cached`, `settings_path`, `J` |
-| `src-tauri/src/claude/mod.rs` | stav session a schvalování; `handle_event` plní `Session::subagents` | `Claude`, `Session.subagents`, větve `SubagentStart`/`SubagentStop`/`SessionEnd` v `Claude::handle_event`, `handle_permission`, `decide` |
+| `src-tauri/src/claude/mod.rs` | stav session a schvalování; `handle_event` plní `Session::subagents` | `Claude`, `Session.subagents`, větve `SubagentStart`/`SubagentStop`/`SessionEnd` v `Claude::handle_event`, `handle_permission`, `decide`, `decide_with`, `decide_by`, `Decision` (`Allow`/`AllowAlways`/`Deny`/`DenyWith`/`Pass`), `Pending.always` |
+| `src-tauri/src/claude/rules.rs` | „Vždy povolit“ + důvod zamítnutí (čisté): výběr pravidla, tělo odpovědi `/permission` | `propose`, `fallback`, `Rule`, `Always`, `Destination`, `Grant`, `Extra`, `resolve`, `clean_reason`, `REASON_MAX`, `body` |
 | `src-tauri/src/claude/bridge.rs` | HTTP most 127.0.0.1 (`/permission`, `/question`, `/event`, `/status`, `/ctl`) | `serve`, `Ctl`, `respond`, `header` |
 | `src-tauri/src/claude/questions.rs` | otázky Clauda (AskUserQuestion): parsování, odpovědi, držení | `parse`, `build_answers`, `answer_body`, `MULTI_SEP`, `on_event`, `Claude::{handle_question, answer_question, release_question, questions, attention, set_question_hold}`, `Ask`, `Reply` |
 | `src-tauri/src/claude/hygiene.rs` · `paths.rs` | hlídač nedokončené práce (git) · čisté cesty a porcelain | `Track`, `git_baseline`, `git_hygiene`, `run_check`, `block_reason`, `Budgets` · `lexical`, `absolutize`, `porcelain_paths` |
 | `src-tauri/src/snapshot.rs`, `commands/sessions.rs`, `refresh.rs`, `threads/ui.rs`, `lib.rs` | lepidlo | `Snapshot.sessions` (`Vec<sessions::Row>`), `Snapshot.hooks`, `session_rows`, `session_open`, `hooks_status`/`hooks_install`/`hooks_remove`, `on_claude_change` (Wake::Hook), `UiCmd::Show` (Wake::Open), `sessionlive::start` v `run` |
-| `src/ClaudeSessions.tsx` | karta Claude | `ClaudeSessions`, `SessionRow`, `PendingRow`, `onlyQuestions` („Doplnit otázky Clauda“) |
+| `src/ClaudeSessions.tsx` | karta Claude (pod hlavičkou `LimitsRow` → [limits.md](limits.md)) | `ClaudeSessions`, `SessionRow`, `PendingRow`, `onlyQuestions` („Doplnit otázky Clauda“) |
+| `src/sessions/` | doplňky schválení pod Povolit/Zamítnout (karta i `cards/Peek.tsx`) · čistá logika (`permission.test.mjs`) | `PermExtra` · `permission.ts` (`DESTS`, `destFile`, `reasonOf`, `denyExtra`, `alwaysExtra`, `reasonKey`, `REASON_MAX`) |
 | `src/questions/` | otázka jako chat (peek `cards/Peek.tsx` + pod session) · čistá logika · panel `settings/panels/Questions.tsx` | `QuestionCard` · `model.ts` (`pick`, `toggleOther`, `answered`, `toReply`, `keyTarget`, `instant`) |
 | `src/Settings.tsx` | sekce Claude Code | `HooksSetup` |
-| `src/types.ts` · `src/api.ts` | typy · volání | `SessionView`, `HooksStatus` · `api.sessionOpen`, `api.hooks*` |
+| `src/types.ts` · `src/api.ts` | typy · volání | `SessionView`, `HooksStatus`, `Pending.always`, `PermAlways`, `PermDest`, `DecideExtra` · `api.decide(id, allow, extra?)`, `api.sessionOpen`, `api.hooks*` |
 
 ## Tok dat
 
 `claude agents --json --all` + registr → `sessionlive::Cache` → `snapshot::session_rows` →
 `sessions::merge(Live, claude.sessions(), dirs, name_of)` → `Snapshot.sessions` → `ClaudeSessions`.
 Klik → `session_open(id)` → `Row::open_action()` → `winfocus::switch_to` / `winfocus::launch` → skrýt šuplík.
+Schválení: hook `PermissionRequest` → `/permission` → `handle_permission` (`rules::propose` z
+`permission_suggestions` / vstupu → `Pending.always`) → `PendingRow`/`Peek` + `PermExtra` → `decide(id, allow,
+extra?)` → `Claude::decide_with` → `rules::resolve` → `rules::body` (allow · allow + `updatedPermissions` ·
+deny + `message`). Zkratky (`hotkeys.rs`) dál volají `decide(None, Allow/Deny)`.
 Otázka: hook `PreToolUse(AskUserQuestion)` → `/question` → `handle_question` (drží `questionHoldS`) →
 `Snapshot.questions` → `QuestionCard` → `question_answer` → `answer_body` (allow + `updatedInput` s `answers`).
 
@@ -52,6 +58,18 @@ Otázka: hook `PreToolUse(AskUserQuestion)` → `/question` → `handle_question
   Claude); `PermissionRequest` pro `AskUserQuestion` = vždy `Pass`. Vícevýběr `MULTI_SEP` („, “) sedí
   se schématem Claude Code 2.1.259 (test `multi_select_sends_every_checked_option`; UI `src/questions/model.test.mjs`). Hook `/question` má pevný timeout 600 s, držení max 550 (`MAX_HOLD_S`). Peek/proužek/Hide řídí
   `Claude::attention()` (schválení NEBO otázka); klávesy karty až po kliku (`focus_drawer` smí i v peeku).
+- **Vždy povolit:** Ledge settings.json NIKDY needituje — vrátí `updatedPermissions` (`addRules`, `behavior:"allow"`)
+  a pravidlo zapíše Claude Code. Pravidlo se vybere při příchodu žádosti a karta ho ukáže před klikem; IPC nese jen
+  cíl (`localSettings` výchozí / `userSettings` / `session`), pravidla bere Rust z `Pending` → UI nemůže poslat jiné.
+  Jen s konkrétním `id` (ne „nejstarší“), jen klikem — žádná klávesa. Z návrhů Clauda jen `addRules`+`allow` pro
+  týž nástroj (`setMode`/`addDirectories` ignorovat; destinaci návrhu přepíše volba člověka); shell nikdy bez
+  `ruleContent`; víc než 8 pravidel → nic. Bez návrhu jen Bash/PowerShell s přesným jednoduchým příkazem (bez
+  `*`, `&`, `|`, `;`, `<`, `>`, `` ` ``, `$(`, řídicích znaků, mezer na krajích, ≤ 300 znaků); Edit/Write a ostatní
+  bez návrhu = tlačítko schované. Allow z hooku nepřebije deny pravidlo Clauda.
+- **Zamítnout s důvodem:** pole až po kliku „Zamítnout s důvodem…“ (jen tehdy `focusDrawer` + fokus do pole, po
+  odeslání/zrušení `releaseFocus`). `decision.message` = „Zamítnuto v Ledge: <důvod>“; `clean_reason` ořízne,
+  zahodí řídicí znaky (kromě `
+`), strop 500 znaků; prázdný = obyčejné zamítnutí jako dřív.
 - `Row.state`/`title`/`project`/`ended` drží kompatibilitu s hlavičkou a peekem (`src/cards/Head.tsx`, `src/cards/Peek.tsx`).
 - Termíny gitu hlídače: `Budgets::default()` = 2 s (produkce); git testy volají `Claude::patient`
   (60 s), aby nezávisely na vytížení stroje — v produkci nepoužívat.
@@ -62,7 +80,8 @@ Otázka: hook `PreToolUse(AskUserQuestion)` → `/question` → `handle_question
 `spawn_throttle`), `winfocus::tests` (předci, výběr okna, cesta appky), `subagents::tests`,
 `hooksetup::tests` (merge/remove/status/apply nad tempdir, matcher otázek, `hint`),
 `claude::questions::tests` (parsování, odpovědi, držení/puštění/termín, jen ukázat), `claude::tests::subagents_from_hooks`,
-`claude::bridge::tests` (HTTP, blokace `Stop`, `/question`), `claude::hygiene::tests` (git; pomůcky v `claude/testkit.rs`).
+`claude::rules::tests` (výběr pravidla, těla odpovědí, důvod, `resolve`, IPC `Extra`), `src/sessions/permission.test.mjs`,
+`claude::bridge::tests` (HTTP, blokace `Stop`, `/question`, Vždy povolit + důvod zamítnutí end-to-end), `claude::hygiene::tests` (git; pomůcky v `claude/testkit.rs`).
 Žádný test nesahá na skutečné `~/.claude` ani nespouští `claude`.
 
 ## Co nečíst

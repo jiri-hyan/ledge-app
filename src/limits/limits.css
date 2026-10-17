@@ -1,0 +1,16 @@
+/* Limity Claude 5h / týden (LimitsRow.tsx v kartě Claude) a ikona peeku resetu (LimitsPeek.tsx). Jen tokeny. */
+.lim { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s1) 0 var(--s2); border-bottom: 1px solid var(--line-soft); margin-bottom: var(--s1); }
+.lim-row { display: grid; grid-template-columns: 3.4em 1fr 3.4em auto; align-items: center; gap: var(--s2); font: var(--fs-xs) var(--mono); color: var(--t2); min-width: 0; }
+.lim-name { color: var(--t3); }
+.lim-track { height: 6px; border-radius: var(--r-pill); background: var(--well); overflow: hidden; }
+.lim-fill { display: block; height: 100%; border-radius: var(--r-pill); background: var(--green); transition: width var(--dur-3) var(--ease); }
+.lim-fill.lim-ok { background: var(--green); }
+.lim-fill.lim-warn { background: var(--amber); }
+.lim-fill.lim-bad { background: var(--red); }
+.lim-pct { text-align: right; color: var(--t1); }
+.lim-when { color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lim-row.lim-old .lim-fill { opacity: 0.45; }
+.lim-row.lim-old .lim-pct { color: var(--t3); }
+.lim-empty { font: var(--fs-xs) var(--mono); color: var(--t3); padding: var(--s1) 0 var(--s2); }
+.lim-ico { width: 38px; height: 38px; border-radius: var(--r-md); background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); display: grid; place-items: center; flex-shrink: 0; }
+.lim-ico svg { width: 19px; height: 19px; }

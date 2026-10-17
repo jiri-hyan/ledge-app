@@ -1,13 +1,15 @@
 // Paleta příkazů (Ctrl+K v šuplíku s fokusem, nebo 🔍 v hlavičce): jedno pole, fuzzy hledání
 // přes všechno (`items.ts` + `search.ts`), šipky / Enter / Esc, nedávno použité nahoře (localStorage,
 // jen pohodlí), zvýraznění shody. Fokus si bere jen po výslovném kliku (`took` → při zavření
-// `releaseFocus`); rychlé akce s potvrzením se potvrzují přímo tady.
+// `releaseFocus`); rychlé akce s potvrzením se potvrzují přímo tady. Kompaktní režim
+// (`s.paletteCompact`): bez dotazu jen pole, seznam až při psaní / šipkou dolů (`compact.ts`).
 import { createEffect, createMemo, createSignal, For, Index, on, onMount, Show } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { IconFolder, IconLink, IconNote, IconSettings, IconShield, IconTerminal } from "../icons";
 import { ActionIcon, ConfirmAction, answerConfirm, confirmPending } from "../actions/ui";
 import { buildItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
 import { pushRecent, rank, segments, type Ranked } from "./search";
+import { arrow, shown, visible } from "./compact";
 import { t } from "../i18n";
 import "./palette.css";
 
@@ -43,6 +45,8 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   const [notes, setNotes] = createSignal<NoteView[]>([]);
   const [recent, setRecent] = createSignal(loadRecent());
   const [waiting, setWaiting] = createSignal(false);
+  /** kompaktní paleta s prázdným polem rozbalená šipkou dolů */
+  const [browsing, setBrowsing] = createSignal(false);
   let input!: HTMLInputElement;
   let list!: HTMLDivElement;
 
@@ -52,8 +56,13 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   });
 
   const items = createMemo(() => buildItems(p.s, notes(), p.nav));
-  const results = createMemo(() => rank(items(), q(), recent(), 60));
-  createEffect(on(q, () => setSel(0), { defer: true }));
+  const recentSet = createMemo(() => new Set(recent()));
+  const fold = () => ({ compact: p.s.paletteCompact, query: q(), browsing: browsing() });
+  // nedávné, které v položkách pořád jsou (smazaná akce / poznámka se nepočítá)
+  const what = createMemo(() => shown(fold(), items().filter((i) => recentSet().has(i.id)).length));
+  const results = createMemo(() => visible(rank(items(), q(), recent(), 60), what(), recentSet()));
+  // jiný dotaz = výběr nahoru; smazaný dotaz kompaktní paletu zase sbalí
+  createEffect(on(q, () => (setSel(0), setBrowsing(false)), { defer: true }));
   createEffect(on(sel, (i) => (list?.children[i] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" })));
 
   function close() {
@@ -89,18 +98,16 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
       e.preventDefault();
       if (confirmPending("palette")) answerConfirm(true);
       else choose(results()[sel()]);
-    } else if (e.key === "ArrowDown" && n) {
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      setSel((sel() + 1) % n);
-    } else if (e.key === "ArrowUp" && n) {
-      e.preventDefault();
-      setSel((sel() - 1 + n) % n);
+      const next = arrow(e.key, fold(), sel(), n);
+      setBrowsing(next.browsing);
+      setSel(next.sel);
     }
   }
 
-  const recentSet = createMemo(() => new Set(recent()));
   return (
-    <div class="card pal" data-anim onKeyDown={key}>
+    <div class="card pal" classList={{ "pal-bare": what() === "none" }} data-anim onKeyDown={key}>
       <div class="pal-input">
         <IconSearch />
         <input
@@ -116,27 +123,31 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
         />
         <kbd>Esc</kbd>
       </div>
-      <div class="pal-list" id="pal-list" ref={list} role="listbox">
-        <Index each={results()} fallback={<div class="empty">{t("palette.none", "Nic nenalezeno.")}</div>}>
-          {(r, i) => (
-            <div class="pal-row" role="option" aria-selected={i === sel()} classList={{ on: i === sel() }} onMouseMove={() => i !== sel() && setSel(i)} onClick={() => choose(r())}>
-              <span class="pal-ico">
-                <Show when={r().item.action} fallback={GLYPH[r().item.section]()}>{(a) => <ActionIcon a={a()} size={20} />}</Show>
-              </span>
-              <div class="grow">
-                <div class="name">
-                  <For each={segments(r().item.title, r().ranges)}>{(sg) => (sg.hit ? <mark>{sg.text}</mark> : sg.text)}</For>
+      <Show when={what() !== "none"}>
+        <div class="pal-list" id="pal-list" ref={list} role="listbox">
+          <Index each={results()} fallback={<div class="empty">{t("palette.none", "Nic nenalezeno.")}</div>}>
+            {(r, i) => (
+              <div class="pal-row" role="option" aria-selected={i === sel()} classList={{ on: i === sel() }} onMouseMove={() => i !== sel() && setSel(i)} onClick={() => choose(r())}>
+                <span class="pal-ico">
+                  <Show when={r().item.action} fallback={GLYPH[r().item.section]()}>{(a) => <ActionIcon a={a()} size={20} />}</Show>
+                </span>
+                <div class="grow">
+                  <div class="name">
+                    <For each={segments(r().item.title, r().ranges)}>{(sg) => (sg.hit ? <mark>{sg.text}</mark> : sg.text)}</For>
+                  </div>
+                  <Show when={r().item.sub}><div class="sub">{r().item.sub}</div></Show>
                 </div>
-                <Show when={r().item.sub}><div class="sub">{r().item.sub}</div></Show>
+                <Show when={!q() && recentSet().has(r().item.id)}><span class="pal-recent">{t("palette.recent", "nedávno")}</span></Show>
+                <span class="pill n">{t(...SECTION_LABEL[r().item.section])}</span>
               </div>
-              <Show when={!q() && recentSet().has(r().item.id)}><span class="pal-recent">{t("palette.recent", "nedávno")}</span></Show>
-              <span class="pill n">{t(...SECTION_LABEL[r().item.section])}</span>
-            </div>
-          )}
-        </Index>
-      </div>
+            )}
+          </Index>
+        </div>
+      </Show>
       <ConfirmAction where="palette" />
-      <div class="pal-foot">{t("palette.keys", "↑↓ výběr · Enter spustit · Esc zavřít")}</div>
+      <div class="pal-foot">
+        {what() === "none" ? t("palette.keysBare", "Piš pro hledání · ↓ procházet · Esc zavřít") : t("palette.keys", "↑↓ výběr · Enter spustit · Esc zavřít")}
+      </div>
     </div>
   );
 }

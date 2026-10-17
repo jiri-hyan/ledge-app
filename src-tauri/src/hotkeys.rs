@@ -4,6 +4,7 @@
 use crate::claude::Decision;
 use crate::config;
 use crate::drawer::{Opener, View};
+use crate::gamemode::{self, Trigger};
 use crate::state::{UiCmd, core, log};
 use std::sync::atomic::Ordering;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
@@ -59,20 +60,23 @@ pub(crate) fn on_shortcut(sc: &Shortcut) {
     if !hk.enabled {
         return; // vypnuto za běhu: registrace už se ruší v `sync_hotkeys`
     }
-    if parse_shortcut(&hk.toggle).as_ref() == Some(sc) {
-        if c.fullscreen.load(Ordering::Relaxed) {
-            return;
-        }
-        if c.drawer.view() == View::Full {
-            c.send_ui(UiCmd::Hide);
-        } else {
-            c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
-        }
+    // fullscreen a herní režim rozhoduje `gamemode::decide` (zkratka herního režimu platí vždy,
+    // hlavní zkratka herní režim vypne)
+    if parse_shortcut(&hk.game_mode).as_ref() == Some(sc) {
+        gamemode::handle(Trigger::GameKey, || {});
+    } else if parse_shortcut(&hk.toggle).as_ref() == Some(sc) {
+        gamemode::handle(Trigger::ToggleKey, || {
+            if c.drawer.view() == View::Full {
+                c.send_ui(UiCmd::Close);
+            } else {
+                c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
+            }
+        });
     } else if parse_shortcut(&hk.note).as_ref() == Some(sc) {
-        if c.fullscreen.load(Ordering::Relaxed) || !c.cfg.read().notes.enabled {
+        if !c.cfg.read().notes.enabled {
             return;
         }
-        c.send_ui(UiCmd::Note);
+        gamemode::handle(Trigger::NoteKey, || c.send_ui(UiCmd::Note));
     } else if parse_shortcut(&hk.approve).as_ref() == Some(sc) {
         c.claude.decide(None, Decision::Allow);
     } else if parse_shortcut(&hk.deny).as_ref() == Some(sc) {

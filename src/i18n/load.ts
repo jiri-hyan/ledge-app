@@ -7,6 +7,7 @@ import "./en-notes";
 import "./en-palette";
 import "./en-actions";
 import "./en-questions";
+import "./en-limits";
 import "../settings/en";
 import "../settings/panels/en";
 import "../onboarding/en";

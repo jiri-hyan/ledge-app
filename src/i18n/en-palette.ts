@@ -29,9 +29,11 @@ registerDict("en", {
   "palette.app.personal": "Switch to Personal",
   "palette.app.work": "Switch to Work",
   "palette.app.close": "Close drawer",
+  "palette.app.gameMode": "Turn on game mode (Ledge disappears)",
   "palette.placeholder": "Search actions, projects, notes, sessions, settings…",
   "palette.aria": "Command palette",
   "palette.none": "Nothing found.",
   "palette.recent": "recent",
   "palette.keys": "↑↓ select · Enter run · Esc close",
+  "palette.keysBare": "Type to search · ↓ browse · Esc close",
 });

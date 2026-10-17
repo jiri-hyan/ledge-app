@@ -1,7 +1,8 @@
 // Panel „Šuplík a proužek“: CHOVÁNÍ — jak se šuplík otevírá a zavírá, karty hlavní stránky, proužek (co
-// ukazuje, monitor), okna s taby nahoře (tlak na hranu), uvolnění paměti, autostart. Vzhled (pozadí,
+// ukazuje, monitor), paleta příkazů (kompaktní), okna s taby nahoře (tlak na hranu), uvolnění paměti, autostart. Vzhled (pozadí,
 // rozmazání, šířka, animace, styl a pozice proužku) je JEN v panelu „Vzhled a animace“ (`Appearance.tsx`).
 import { Show } from "solid-js";
+import { api } from "../../api";
 import { lang, t } from "../../i18n";
 import { useSettings } from "../ctx";
 import { Chips, Seg, Select, Slider, Toggle } from "../fields/controls";
@@ -16,6 +17,8 @@ const STRIP_ITEMS: { id: string; key: string; cs: string }[] = [
   { id: "running", key: "settings.strip.item.running", cs: "Běžící servery" },
   { id: "claude", key: "settings.strip.item.claude", cs: "Claude (čekající žádosti, session)" },
   { id: "repos", key: "settings.strip.item.repos", cs: "Repa s neuloženou prací" },
+  { id: "limits", key: "settings.strip.item.limits", cs: "Limity Claude 5h / týden" },
+  { id: "waiting", key: "settings.strip.item.waiting", cs: "Kolik Claude session na tebe čeká" },
 ];
 const stripLabel = (id: string) => {
   const x = STRIP_ITEMS.find((i) => i.id === id);
@@ -76,6 +79,9 @@ export default function DrawerPanel(_p: PanelProps) {
           </div>
         </Row>
         <Row id="fullscreen" />
+        <Row id="gameMode">
+          <button class="mini" onClick={() => void api.setGameMode(true)}>{t("settings.drawer.gameMode.on", "Zapnout")}</button>
+        </Row>
       </Section>
 
       <Section id="drawer.sections" title={t("settings.f.drawer.sections", "Karty na hlavní stránce")} desc={t("settings.drawer.sections.desc", "Vypnutá karta zmizí ze šuplíku; data se dál nesbírají zbytečně.")}>
@@ -96,6 +102,10 @@ export default function DrawerPanel(_p: PanelProps) {
         >
           <Toggle path="drawer.sections.notes" label={t("settings.drawer.sec.notes", "Poznámky")} />
         </Row>
+      </Section>
+
+      <Section title={t("settings.drawer.palette", "Paleta příkazů")}>
+        <Row id="palette.compact"><Toggle path="palette.compact" label={t("settings.f.palette.compact", "Kompaktní paleta příkazů")} /></Row>
       </Section>
 
       <Section title={t("settings.drawer.strip", "Proužek")}>

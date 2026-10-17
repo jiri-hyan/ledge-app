@@ -28,7 +28,7 @@ pub(crate) fn next_wake(now_ms: i64, deadlines: impl IntoIterator<Item = Option<
 }
 
 /// Termíny pro `next_wake` ze stavu jádra (jen čtení paměti).
-fn deadlines(last_git: Instant) -> [Option<i64>; 4] {
+fn deadlines(last_git: Instant) -> [Option<i64>; 5] {
     let c = core();
     let now = now_ms();
     let in_ms = |left: Duration| now + left.as_millis() as i64 + 1;
@@ -40,7 +40,7 @@ fn deadlines(last_git: Instant) -> [Option<i64>; 4] {
         // `weather::loading_live`: pokus bez odpovědi déle než 2× timeout → watchdog v `maybe_refresh_weather`
         w.attempt_ms.filter(|_| w.loading).map(|a| a + 2 * weather::TIMEOUT.as_millis() as i64 + 1)
     };
-    [reminder, flash, git, weather]
+    [reminder, flash, git, weather, crate::limitslive::next_deadline()]
 }
 
 pub(crate) fn spawn_emit_thread() {
@@ -60,6 +60,7 @@ pub(crate) fn spawn_emit_thread() {
                     }
                 }
                 check_reminders();
+                crate::limitslive::tick(now_ms());
                 // počasí na Osobní: jen porovnání času, stahuje až backoff/30 min (žádný nový interval)
                 maybe_refresh_weather(false);
                 let since = last_emit.elapsed();

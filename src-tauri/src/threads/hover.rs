@@ -50,7 +50,8 @@ pub(crate) fn spawn_hover_thread() {
                         mark_dirty();
                     }
                 }
-                if c.fullscreen.load(Ordering::Relaxed) {
+                // mrtvý Ledge (fullscreen hra nebo herní režim): myš nic, kontrola fullscreenu jede dál
+                if c.dead() {
                     zone_since = None;
                     push = edge::PushTracker::default();
                     if raw_armed {

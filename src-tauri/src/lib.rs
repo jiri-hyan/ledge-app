@@ -22,6 +22,7 @@ mod actionrun;
 mod actions;
 mod actionstate;
 mod appearance;
+mod attention;
 mod autostart;
 mod claude;
 mod cloning;
@@ -33,15 +34,20 @@ mod ctl;
 mod drawer;
 mod drawerfit;
 mod edge;
+mod focusreturn;
+mod gamemode;
 mod gitinfo;
 mod hooksetup;
 mod hotkeys;
 mod iconimg;
 mod icons;
+mod limits;
+mod limitslive;
 mod migrate;
 mod notes;
 mod notesync;
 mod onboarding;
+mod paletteconf;
 mod personal;
 mod ports;
 mod procman;
@@ -55,10 +61,13 @@ mod sessions;
 mod settings;
 mod snapshot;
 mod state;
+mod statusline;
+mod statuslinesetup;
 mod strip;
 mod stripview;
 mod subagents;
 mod threads;
+mod toast;
 mod uiconf;
 mod update;
 mod updatenet;
@@ -66,6 +75,11 @@ mod weather;
 mod winfocus;
 
 pub(crate) use state::{log, screen_glass_capable};
+
+/// `ledge.exe --statusline` (wrapper stavového řádku Claude Code) — volá `main.rs` místo `run()`.
+pub fn statusline_main() -> i32 {
+    statusline::main()
+}
 
 use claude::Claude;
 use commands::drawer::focus_in_own_popup;
@@ -102,10 +116,10 @@ pub fn run() {
         // chycený — oba by běžely vedle sebe a pral by se o port mostu 47800 (`claude.rs`, hooky
         // v `~/.claude/settings.json` na něj míří, proto se nemění). Starý Notch před startem Ledge zavři.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // druhé spuštění = otevři šuplík
+            // druhé spuštění = otevři šuplík (v herním režimu ho vypne — `gamemode::decide`)
             let _ = app;
             if let Some(c) = CORE.get() {
-                c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
+                gamemode::handle(gamemode::Trigger::Relaunch, || c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey)));
             }
         }))
         .plugin(tauri_plugin_opener::init())
@@ -151,6 +165,7 @@ pub fn run() {
                 wake: Condvar::new(),
                 flash: Mutex::new(None),
                 fullscreen: AtomicBool::new(false),
+                game_mode: AtomicBool::new(gamemode::load(&config::config_dir())),
                 bar_window: AtomicBool::new(false),
                 approve_keys: AtomicBool::new(false),
                 ui: Mutex::new(tx),
@@ -194,6 +209,7 @@ pub fn run() {
             watch_config();
             spawn_notes_watch(notes_rx, notes_tx);
             spawn_notes_sync(sync_rx);
+            limitslive::start_watch();
             if let Err(e) = autostart::apply(cfg.autostart) {
                 log(&format!("autostart: {e}"));
             }
@@ -215,6 +231,7 @@ pub fn run() {
             commands::projects::logs,
             commands::sessions::decide,
             commands::drawer::set_mode,
+            commands::drawer::set_game_mode,
             commands::drawer::report_size,
             commands::drawer::ui_ready,
             commands::drawer::anim_ack,
@@ -268,6 +285,9 @@ pub fn run() {
             commands::sessions::hooks_remove,
             commands::sessions::question_answer,
             commands::sessions::question_release,
+            commands::limits::statusline_status,
+            commands::limits::statusline_install,
+            commands::limits::statusline_remove,
             commands::actions::run_action,
             commands::actions::action_icon,
             commands::actions::action_icon_refresh,

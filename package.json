@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "test": "cd src-tauri && cargo test",
-    "test:ui": "node --experimental-strip-types --test src/theme/theme.test.mjs src/palette/search.test.mjs src/cssClasses.test.mjs src/settings/settings.test.mjs src/questions/model.test.mjs src/i18n.test.mjs"
+    "test:ui": "node --experimental-strip-types --test \"src/**/*.test.mjs\""
   },
   "license": "MIT",
   "dependencies": {

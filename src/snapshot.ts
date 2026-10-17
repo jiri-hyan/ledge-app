@@ -15,6 +15,7 @@ export const EMPTY_SNAPSHOT: Snapshot = {
   sessions: [],
   hooks: { state: "full", missing: [], error: null, path: "", hint: null },
   notesEnabled: true,
+  paletteCompact: false,
   notes: [],
   notesMore: 0,
   reminders: [],

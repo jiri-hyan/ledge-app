@@ -41,6 +41,8 @@ pub struct Config {
     pub ui: crate::uiconf::UiConfig,
     /// Průvodce prvním spuštěním (`onboarding/`): `done: false` jen u čerstvě založeného configu.
     pub onboarding: crate::onboarding::OnboardingConfig,
+    /// Paleta příkazů (`palette.compact`).
+    pub palette: crate::paletteconf::PaletteConfig,
 }
 
 impl Default for Config {
@@ -62,6 +64,7 @@ impl Default for Config {
             actions: Vec::new(),
             ui: Default::default(),
             onboarding: Default::default(),
+            palette: Default::default(),
         }
     }
 }
@@ -83,15 +86,21 @@ pub struct StripConfig {
     pub opacity: f32,
     /// Monitor: "primary" nebo index od 0 (pořadí z Windows).
     pub monitor: String,
+    /// Revize výchozích položek, které už byly do `items` jednou doplněny (`attention::upgrade_items`).
+    /// Ručně neměnit; 0 = starý config → při načtení se doplní `waiting`. Chybějící v souboru = 0
+    /// (ne výchozí hodnota struktury — ta má aktuální revizi pro nový config).
+    #[serde(default)]
+    pub items_rev: u32,
 }
 
 impl Default for StripConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            items: vec![StripItem::Mode, StripItem::Clock, StripItem::Running, StripItem::Claude, StripItem::Repos],
+            items: vec![StripItem::Mode, StripItem::Clock, StripItem::Running, StripItem::Claude, StripItem::Waiting, StripItem::Repos],
             opacity: 0.82,
             monitor: "primary".into(),
+            items_rev: crate::attention::ITEMS_REV,
         }
     }
 }
@@ -107,6 +116,10 @@ pub enum StripItem {
     Claude,
     /// kolik rep má neuložené / nepushnuté změny
     Repos,
+    /// limity Claude 5h / týden (`limitslive::strip_segments`); výchozí vypnuto
+    Limits,
+    /// kolik Claude session čeká na tebe (schválení nebo otázka); 0 = nic
+    Waiting,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -310,11 +323,17 @@ pub struct ClaudeConfig {
     /// Otázky Clauda (AskUserQuestion): jak dlouho (s) Ledge drží otázku a čeká na odpověď kliknutím;
     /// pak ji pustí do okna Claude. 0 = Ledge otázky jen ukazuje. Nejvýš 550 (hook má 600 s).
     pub question_hold_s: u64,
+    /// Připomínka resetu kvóty: když 5h nebo týdenní limit dosáhl 100 %, v čase resetu krátký peek
+    /// a bliknutí proužku (ve fullscreen nic). Data ze stavového řádku Ledge (`limitslive.rs`).
+    pub limits_reminder: bool,
+    /// Oznámení Windows (toast), když Claude čeká na schválení / otázku nebo dokončí turn. Bez fokusu,
+    /// nikdy ve fullscreen hře, v herním režimu ani při „nerušit“; stejná session + událost max 1× za 30 s.
+    pub toast: bool,
 }
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540 }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, limits_reminder: true, toast: false }
     }
 }
 
@@ -371,6 +390,8 @@ pub struct HotkeyConfig {
     pub deny: String,
     /// Rychlá poznámka: otevře šuplík (s fokusem) rovnou na zápisu poznámky.
     pub note: String,
+    /// Herní režim zapnout / vypnout (`gamemode.rs`). Prázdné = bez zkratky. Funguje i v herním režimu.
+    pub game_mode: String,
 }
 
 impl Default for HotkeyConfig {
@@ -381,6 +402,7 @@ impl Default for HotkeyConfig {
             approve: "Ctrl+Alt+Y".into(),
             deny: "Ctrl+Alt+D".into(),
             note: "Ctrl+Alt+N".into(),
+            game_mode: String::new(),
         }
     }
 }
@@ -627,6 +649,8 @@ pub fn load(path: &Path) -> Result<Option<Config>, String> {
     crate::onboarding::upgrade_loaded(&raw, &mut cfg);
     // dřívější `drawer.animationMs` → `appearance.motion` (jedno místo pro pohyb)
     crate::appearance::motion::upgrade_loaded(&raw, &mut cfg);
+    // nová položka proužku `waiting` i u stávajícího configu (jednou; odebraná zůstane odebraná)
+    crate::attention::upgrade_items(&mut cfg.strip);
     validate(&cfg)?;
     Ok(Some(cfg))
 }
@@ -755,6 +779,7 @@ fn hotkey_actions(cfg: &Config) -> Vec<(&'static str, &str)> {
     if cfg.notes.enabled {
         v.push(("note", h.note.as_str()));
     }
+    v.push(("gameMode", h.game_mode.as_str()));
     v
 }
 

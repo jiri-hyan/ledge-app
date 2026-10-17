@@ -26,7 +26,9 @@ export const FIELDS: Record<string, FieldDef> = {
   "drawer.barWindows": { panel: "suplik", label: "Okna s taby nahoře", hint: "U maximalizovaného prohlížeče by šuplík otvíralo přepínání tabů", kw: "prohlížeč taby chrome opera edge tlak hrana push procesy" },
   "drawer.keepWarmS": { panel: "suplik", label: "Uvolnit paměť při nečinnosti", hint: "Po minutě se zavřeným šuplíkem Ledge uvolní paměť (~150 MB → desítky MB); první otevření pak trvá pár sekund. S animacemi nesouvisí.", kw: "paměť ram úspora úsporný režim výkon webview" },
   autostart: { panel: "suplik", label: "Spouštět po startu Windows", kw: "start přihlášení" },
+  "palette.compact": { panel: "suplik", label: "Kompaktní paleta příkazů", hint: "Ctrl+K a 🔍 ukážou jen vyhledávací pole; výsledky se rozbalí až při psaní, nedávné šipkou dolů", kw: "paleta příkazů ctrl+k hledání powertoys malá jen pole" },
   fullscreen: { panel: "suplik", label: "Hry a video na celou obrazovku", hint: "Ledge je při nich vždy neaktivní: nic neukazuje a nebere myš ani fokus", kw: "fullscreen hra celá obrazovka" },
+  gameMode: { panel: "suplik", label: "Herní režim", hint: "Ledge zmizí jako při hře na celou obrazovku, i po restartu, dokud ho nevypneš: znovu spusť Ledge (zástupce nebo Start), nebo stiskni zkratku šuplíku či herního režimu", kw: "hra game skrýt schovat nerušit mrtvý" },
   // Vzhled a animace (panel `Appearance.tsx`; kotvy `f-…` jsou na jeho kartách a řádcích)
   "appearance.theme": { panel: "vzhled", label: "Motiv", kw: "barvy tmavý světlý kontrast nord téma" },
   "appearance.accent": { panel: "vzhled", label: "Akcent", hint: "Linka, záře a fokus", kw: "barva akcentu" },
@@ -42,6 +44,9 @@ export const FIELDS: Record<string, FieldDef> = {
   "claude.port": { panel: "claude", label: "Port mostu", hint: "Jen 127.0.0.1. Změna platí po restartu Ledge a znovu zapojených hookách", kw: "port" },
   "claude.approvalTimeoutS": { panel: "claude", label: "Jak dlouho čekat na rozhodnutí", hint: "Pak se Claude zeptá v terminálu — nikdy neschválí sám", kw: "timeout sekundy" },
   "claude.enforceCommit": { panel: "claude", label: "Nedokončené session", hint: "Soubory, které session upravila a nezacommitovala, a její nepushnuté commity", kw: "commit push hlídač" },
+  "claude.statusLine": { panel: "claude", label: "Stavový řádek pro limity", hint: "Ledge obalí stavový řádek Claude Code a čte z něj limity 5h / týden; tvůj původní poběží dál", kw: "limit kvóta 5h týden statusline" },
+  "claude.limitsReminder": { panel: "claude", label: "Připomenout reset limitu", hint: "Když limit 5h nebo týden dosáhne 100 %, v čase resetu krátce vyjede šuplík (ve hře nic)", kw: "limit kvóta reset připomínka" },
+  "claude.toast": { panel: "claude", label: "Oznámení Windows", hint: "Když Claude čeká na schválení nebo otázku, nebo dokončí práci. Nebere fokus; ve hře, v herním režimu a při Nerušit nikdy", kw: "toast oznámení notifikace upozornění hotovo" },
   "claude.hooks": { panel: "claude", label: "Hooky v Claude Code", hint: "Zapojení Ledge do ~/.claude/settings.json", kw: "settings.json zapojit odpojit" },
   // Poznámky
   "notes.enabled": { panel: "poznamky", label: "Rychlé poznámky a připomínky", hint: "Karta v šuplíku, připomínky v proužku", kw: "připomínky" },
@@ -60,6 +65,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "hotkeys.note": { panel: "zkratky", label: "Rychlá poznámka", kw: "zkratka poznámka" },
   "hotkeys.approve": { panel: "zkratky", label: "Povolit žádost Clauda", hint: "Registruje se jen, když nějaká žádost čeká", kw: "zkratka schválit" },
   "hotkeys.deny": { panel: "zkratky", label: "Zamítnout žádost Clauda", hint: "Registruje se jen, když nějaká žádost čeká", kw: "zkratka zamítnout" },
+  "hotkeys.gameMode": { panel: "zkratky", label: "Herní režim zapnout / vypnout", hint: "Platí i v herním režimu — tou se z něj dostaneš", kw: "zkratka hra game" },
   // Záloha
   "backup.export": { panel: "zaloha", label: "Exportovat nastavení", hint: "Uloží celé nastavení do souboru — třeba pro druhý počítač", kw: "záloha uložit soubor" },
   "backup.import": { panel: "zaloha", label: "Importovat nastavení", hint: "Ukáže, co se změní, a zeptá se, které části převzít", kw: "načíst soubor obnovit" },

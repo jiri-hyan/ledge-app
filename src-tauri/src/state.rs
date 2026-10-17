@@ -16,7 +16,7 @@ use crate::{icons, notesync, personal, screen, update, weather};
 use parking_lot::{Condvar, Mutex, RwLock};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
@@ -49,6 +49,9 @@ pub(crate) enum UiCmd {
     /// myš se blíží k okraji → připravit WebView2 předem
     Warm,
     Hide,
+    /// výslovné zavření (Esc, ✕, uložení poznámky, zkratka znovu): jako `Hide`, ale fokus se vrátí
+    /// oknu, odkud si ho Ledge vzal (`focusreturn`)
+    Close,
     Size(View, f64, f64),
     /// rychlá poznámka: Full s fokusem rovnou na stránce „note“
     Note,
@@ -75,6 +78,8 @@ pub(crate) struct Core {
     pub(crate) wake: Condvar,
     pub(crate) flash: Mutex<Option<(Rgba, Instant)>>,
     pub(crate) fullscreen: AtomicBool,
+    /// ruční herní režim (`gamemode.rs`) — Ledge mrtvý jako ve fullscreen, dokud se nevypne
+    pub(crate) game_mode: AtomicBool,
     /// v popředí je „lištové“ okno (maximalizovaný prohlížeč na monitoru proužku, trigger "push")
     pub(crate) bar_window: AtomicBool,
     pub(crate) approve_keys: AtomicBool,
@@ -145,6 +150,11 @@ pub(crate) fn screen_glass_capable() -> bool {
 }
 
 impl Core {
+    /// Je Ledge mrtvý? Fullscreen hra nebo herní režim (`gamemode::is_dead`).
+    pub(crate) fn dead(&self) -> bool {
+        crate::gamemode::is_dead(self.fullscreen.load(Ordering::Relaxed), self.game_mode.load(Ordering::SeqCst))
+    }
+
     /// Monitor proužku (`strip.monitor`) z cache `MonitorCache` — výčet nejvýš jednou za `MONITOR_TTL`.
     pub(crate) fn monitor(&self) -> screen::Monitor {
         let cfg = self.cfg.read();

@@ -52,6 +52,10 @@ Typické úpravy:
   Nenabízí se u dvou klonů téhož repa (nejednoznačné) ani u `appName` bez `exe`.
 - **Vypnout část šuplíku** — `drawer.sections.{projects,running,claude,notes}`, záložka Osobní
   `modes.personalEnabled`, proužek `strip.enabled`, poznámky celé `notes.enabled`.
+- **Proužek** — `strip.items` (pořadí): `mode`, `clock`, `running`, `claude`, `repos`, volitelně
+  `limits` (limity Claude 5h / týden, ve výchozím stavu vypnuto).
+- **Připomínka resetu limitu** — `claude.limitsReminder` (výchozí `true`): když 5h nebo týdenní limit
+  Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
 - **Vzhled** — sekce `appearance` (Nastavení → Vzhled a animace; chybějící sekce = dnešní vzhled):
   `theme` (`dark` výchozí, `midnight`, `graphite`, `nord`, `light`, `contrast`), `accent` (`#rrggbb`,
   prázdné = akcent motivu), `density` (`compact|normal|comfy`), `fontScale` 0.85–1.25, `radius`
@@ -66,6 +70,30 @@ Typické úpravy:
   nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Zkratky, nebo v configu:
   `hotkeys.enabled: true` + `hotkeys.toggle|approve|deny|note` (formát `Ctrl+Alt+Space`). Config bez
   `enabled` = vypnuto, i když má zkratky vypsané. Kolize zkratek se kontrolují jen při `enabled: true`.
+  Když si Ledge vezme fokus (zkratka, klik do poznámky / palety / Nastavení), výslovné zavření (Esc, ✕,
+  uložení poznámky, zkratka znovu) ho vrátí aplikaci, ve které jsi byl — jen pokud je Ledge pořád v
+  popředí a to okno ještě existuje; spuštění akce nebo projektu fokus nechá novému oknu.
+  `hotkeys.gameMode` (výchozí prázdné = bez zkratky) přepíná herní režim a platí i v něm.
+- **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Šuplík a proužek →
+  Kompaktní paleta příkazů): `Ctrl+K` / 🔍 ukáže jen vyhledávací pole, výsledky se rozbalí až při psaní,
+  s prázdným polem šipka dolů ukáže nedávné. Chybějící sekce `palette` = dnešní chování.
+- **Proužek: kolik session čeká** — položka `strip.items` `"waiting"` („2 čekají“, jantarová pilulka):
+  počet různých Claude session, které čekají na schválení nebo otázku; 0 = segment se neukáže. Nový
+  config ji má za `claude`. Starý config (bez `strip.itemsRev`) ji při načtení dostane jednou za
+  `claude` (bez `claude` ne) a `itemsRev: 1`; po uložení Nastavení odebraná položka zůstane odebraná.
+  `strip.itemsRev` ručně neměň.
+- **Upozornění Clauda** — při novém „čeká na tebe“ (schválení / otázka) nebo konci turnu (`Stop`)
+  proužek krátce pulzne (jantarová / tyrkysová linka, ~1,2 s; styl pohybu `none` nebo vypnuté
+  animace Windows = jen statické bliknutí linky). `claude.toast: true` (výchozí `false`) navíc pošle
+  oznámení Windows: bez fokusu, nikdy ve fullscreen hře, v herním režimu, při „nerušit“ (QUNS) ani při
+  otevřeném šuplíku; stejná session + událost nejvýš 1× za 30 s. Toast potřebuje nainstalovaný Ledge
+  (AppUserModelID `cz.hyan.ledge` ze zástupce ve Startu), jinak ho Windows zahodí (chyba v logu).
+- **Herní režim** — Ledge „mrtvý“ jako při fullscreen hře (šuplík zavřený, proužek pryč, myš, zkratky,
+  peek ani připomínky nic). Zapíná se v Nastavení → Šuplík a proužek, v paletě Ctrl+K („Zapnout herní
+  režim“) nebo zkratkou `hotkeys.gameMode`; stav je v `%APPDATA%\Ledge\game-mode.json` (`{"on": true}`,
+  přežije restart; smazání souboru = vypnuto po dalším startu). Vypnutí: znovu spustit Ledge
+  (zástupce / Start), hlavní zkratka `hotkeys.toggle` (vypne a otevře šuplík) nebo `hotkeys.gameMode`.
+  Ve skutečné fullscreen hře tyhle cesty herní režim jen vypnou, šuplík se neotevře.
 
 ## Rychlé akce (`actions`)
 
@@ -219,6 +247,27 @@ schválí sám sebe.
 
 Běžící session se **nikdy** neresumuje (prokládání zpráv). Okno se přepíná jen na výslovný klik.
 
+**Schvalování** (hook `PermissionRequest` → `POST /permission`, `src-tauri/src/claude/mod.rs` + `claude/rules.rs`,
+UI `PendingRow` / peek + `src/sessions/PermExtra.tsx`). Povolit jen klik člověka (nebo zkratka approve/deny).
+Odpovědi (`hookSpecificOutput.decision`, tvar podle dokumentace hooků):
+
+| klik | `decision` |
+|---|---|
+| Povolit (i zkratka) | `{"behavior":"allow"}` |
+| **Vždy povolit** (jen klik) | `{"behavior":"allow","updatedPermissions":[{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"npm run lint:*"}],"behavior":"allow","destination":"localSettings"}]}` |
+| Zamítnout (i zkratka) | `{"behavior":"deny","message":"Zamítnuto v Ledge."}` |
+| **Zamítnout s důvodem…** | `{"behavior":"deny","message":"Zamítnuto v Ledge: <důvod>"}` (≤ 500 znaků) |
+| termín / vyřízeno jinde | prázdné tělo = zeptá se terminál |
+
+„Vždy povolit“: pravidlo zapíše **Claude Code sám**, Ledge settings.json needituje. Karta před klikem ukáže přesné
+pravidlo a cíl: výchozí projekt lokálně (`localSettings` → `.claude/settings.local.json` v projektu), v rozbalení
+uživatelsky (`userSettings` → `~/.claude/settings.json`) nebo jen tato session (`session`, nic se nezapíše).
+Pravidlo = návrh Clauda (`permission_suggestions`, jen `addRules` s `behavior:"allow"` pro týž nástroj), bez návrhu
+přesný jednoduchý příkaz Bash/PowerShell (bez `*` a operátorů shellu); jinak se tlačítko neukáže (Edit/Write bez
+návrhu nikdy). Tauri `decide(id, allow, extra?)`, `extra = {always?: "localSettings"|"userSettings"|"session",
+reason?: string}` — bez `extra` jako dřív; pravidlo si Rust bere z čekající žádosti, z UI jde jen cíl. Návrh je i v
+`GET /status` (`pending[].always`).
+
 **Zapojení hooků** (Nastavení → Claude Code → „Zapojit hooky“, `src-tauri/src/hooksetup.rs`): do
 `~/.claude/settings.json` (nebo `%CLAUDE_CONFIG_DIR%`) přidá http hooky na `http://127.0.0.1:<claude.port>`:
 `PermissionRequest` → `/permission` (timeout 600 s), `PreToolUse` s `"matcher": "AskUserQuestion"` →
@@ -230,6 +279,14 @@ Hooky ze starší verze bez `PreToolUse` → `partial` s `hint` „Doplnit otáz
 Nastavení → Otázky Clauda to doplní jedním klikem). Před první změnou záloha `settings.json.bak-pred-ledge`, zápis atomicky. „Odpojit“
 odebere jen hooky Ledge. Platí pro **nově spuštěné** session. Tauri: `hooks_status`, `hooks_install`,
 `hooks_remove`; stav je i ve snapshotu (`hooks`). Ručně hooky do settings.json nepiš — použij tlačítko.
+
+**Když Ledge neběží** (hooky míří na mrtvý port): podle dokumentace je selhání http hooku neblokující
+chyba a tok oprávnění pokračuje normálně. Hlášený bug „PermissionRequest selže uzavřeně“
+(anthropics/claude-code#46193, 2.1.100, CLI) se **nereprodukoval** v desktopové appce s Claude Code
+2.1.259 (17. 10. 2026): s vypnutým Ledge se ukázal běžný dotaz na oprávnění; kontrola s testovacím
+serverem, který vracel deny, potvrdila, že se hook opravdu volá. Terminálové CLI ověřené není — sonda
+`powershell -File scripts/hookprobe.ps1` (potřebuje přihlášené CLI) porovná `claude -p` bez hooku a s hookem
+na mrtvý port; uživatelské hooky nenačítá, takže běžící Ledge nic nevidí.
 
 **Otázky Clauda** (`AskUserQuestion`, `src-tauri/src/claude/questions.rs`, UI `src/questions/`): hook
 `PreToolUse` → `POST /question`. Ledge otázku ukáže jako chat (peek bez fokusu + karta Claude pod
@@ -243,6 +300,34 @@ odpověď (= otázka v okně Claude jako dřív): „Odpovědět v Claude“ (`q
 (`UserPromptSubmit`/`Stop`/`SessionEnd`), nečitelný vstup, Ledge neběží. Session mezitím `waiting`.
 `PermissionRequest` pro `AskUserQuestion` se **vždy hned pouští** (`Pass`) — nikdy povolovací karta s JSONem.
 `GET /status` vrací otázky v `questions`. Odpovídat přes API záměrně NEJDE (stejně jako schválení).
+
+## Limity Claude 5h / týden
+
+Karta Claude ukazuje pruh 5h a týdenního limitu (procenta, čas resetu místně + „za 2 h 10 min“),
+volitelně i proužek (`strip.items` + `limits`). **Zdroj = jen lokální soubory, žádná síť, žádné tokeny:**
+
+1. **Stavový řádek Ledge** (Nastavení → Claude Code → „Zapojit stavový řádek“, `statuslinesetup.rs`):
+   klíč `statusLine` v `~/.claude/settings.json` dostane `{"type":"command","command":"<ledge.exe> --statusline"}`
+   (cesta s `/`; bez mezer bez uvozovek, jinak `"…"` pro Git Bash / `& '…'` pro PowerShell; ostatní klíče
+   objektu — `padding`, `refreshInterval` — zůstanou). Původní hodnota `statusLine` (celá, nebo „nebyla“) se
+   uloží do `%LOCALAPPDATA%\Ledge\statusline-original.json` a „Odpojit“ ji vrátí přesně. Záloha
+   `settings.json.bak-pred-ledge` a atomický zápis jako u hooků; nevalidní JSON = chyba, nic se nepřepíše.
+2. **Wrapper** `ledge.exe --statusline` (`statusline.rs`, zpracuje se v `main` před Tauri — žádné okno, žádná
+   druhá instance): přečte stdin od Claude Code, z `rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}`
+   zapíše `%LOCALAPPDATA%\Ledge\ratelimits.json` (`{"at":ms,"fiveHour":{"pct":…,"resetsAt":ms},"sevenDay":…}`,
+   tmp + rename, stejné hodnoty nejvýš 1×/min) a spustí **původní** příkaz stejně jako Claude Code (Git Bash
+   `bash -c`, když je — `CLAUDE_CODE_GIT_BASH_PATH`, `git.exe` z PATH, Program Files —, jinak
+   `powershell -NoProfile -Command`), se stejným stdin; jeho stdout vrátí byte po bytu, exit kód taky.
+   Bez původního příkazu nevypíše nic. Termín 5 s, Job Object (zrušený wrapper zabije i strom příkazu),
+   CREATE_NO_WINDOW, chyby tiše.
+3. **Záložně** `~/.claude/usage-log/latest.json` (stejný tvar), když existuje — bere se čerstvější podle `at`.
+
+Vzorek starší 15 min = „staré (před X min)“; po `resetsAt` se procenta neukazují (neznáme), jen „obnoveno“.
+**Připomínka resetu** (`claude.limitsReminder`): okno, které dosáhlo 100 %, v čase `resetsAt` krátce vysune
+peek (bez fokusu, ~15 s) a blikne proužkem zeleně; ve fullscreen nic (propadne), reset starší 30 min (PC spal)
+tiše. Ledge čte soubory na událost watcheru (`limitslive.rs`), v klidu žádné pollování; budí se jen v termínu
+resetu. Tauri: `statusline_status`, `statusline_install`, `statusline_remove`; stav ve snapshotu (`limits`).
+Mapa: `docs/codemap/limits.md`.
 
 ## Instalace a aktualizace
 

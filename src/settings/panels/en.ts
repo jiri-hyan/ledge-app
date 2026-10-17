@@ -101,6 +101,9 @@ registerDict("en", {
   "settings.strip.item.running": "Running servers",
   "settings.strip.item.claude": "Claude (pending requests, sessions)",
   "settings.strip.item.repos": "Repos with unsaved work",
+  "settings.strip.item.limits": "Claude limits 5h / week",
+  "settings.strip.item.waiting": "How many Claude sessions wait for you",
+  "settings.drawer.gameMode.on": "Turn on",
   "settings.drawer.monitor.primary": "Primary",
   "settings.drawer.monitor.n": "Monitor {n}",
   "settings.drawer.bar.trigger": "How to open the drawer there",
@@ -116,6 +119,7 @@ registerDict("en", {
   "settings.drawer.bar.procs.hint": "Process name, e.g. chrome.exe; you can also add Code.exe or WindowsTerminal.exe. Enter adds.",
   "settings.drawer.bar.procs.ph": "app.exe",
   "settings.drawer.startMem": "Startup and memory",
+  "settings.drawer.palette": "Command palette",
   "settings.drawer.lookMoved": "Set the drawer's background, blur, width and animations in the Look and animations panel.",
 
   // Vzhled a animace
@@ -230,6 +234,7 @@ registerDict("en", {
   "settings.claude.approve": "Approvals",
   "settings.claude.enabled.hint": "Claude's permission requests show up in the drawer (bridge on 127.0.0.1:{port})",
   "settings.claude.watch": "Unfinished work watch",
+  "settings.claude.limits": "Limits 5h / week",
   "settings.claude.enforce.off": "Don't watch",
   "settings.claude.enforce.notify": "Just show (recommended)",
   "settings.claude.enforce.block": "Nudge the session",

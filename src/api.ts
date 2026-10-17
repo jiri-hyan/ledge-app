@@ -2,7 +2,8 @@
 // (plain vite v prohlížeči) je obojí no-op a UI se vykreslí prázdné. Typy dat jsou v `types.ts`.
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { AppInfo, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
+import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
+import type { StatusLineStatus } from "./types";
 import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
 
 export type * from "./types";
@@ -21,8 +22,10 @@ export const api = {
   stop: (id: string) => call("stop", { id }),
   dismiss: (id: string) => call("dismiss", { id }),
   logs: (id: string) => call<string[]>("logs", { id }),
-  decide: (id: number | null, allow: boolean) => call<boolean>("decide", { id, allow }),
+  decide: (id: number | null, allow: boolean, extra?: DecideExtra) => call<boolean>("decide", { id, allow, extra: extra ?? null }),
   setMode: (mode: string) => call("set_mode", { mode }),
+  /** Herní režim: zapnutí zavře šuplík; vypíná se zkratkou nebo dalším spuštěním Ledge (Rust `gamemode.rs`). */
+  setGameMode: (on: boolean) => call("set_game_mode", { on }),
   reportSize: (view: View, w: number, h: number) => call("report_size", { view, w, h }),
   close: () => call("close_drawer"),
   /** Jen na výslovný klik do poznámky: okno otevřené najetím aktivuje (jinak by nešlo psát). */
@@ -69,6 +72,9 @@ export const api = {
   hooksStatus: () => call<HooksStatus>("hooks_status"),
   hooksInstall: () => call<HooksStatus>("hooks_install"),
   hooksRemove: () => call<HooksStatus>("hooks_remove"),
+  statuslineStatus: () => call<StatusLineStatus>("statusline_status"),
+  statuslineInstall: () => call<StatusLineStatus>("statusline_install"),
+  statuslineRemove: () => call<StatusLineStatus>("statusline_remove"),
   // --- settings ---
   /** Ověří rozpracovaný config (nic nezapisuje): první chyba s polem, `null` = v pořádku. */
   checkConfig: (cfg: any) => call<FieldError | null>("check_config", { cfg }),

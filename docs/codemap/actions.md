@@ -20,6 +20,8 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src/actions/ActionEditor.tsx` · `src/settings/panels/Actions.tsx` | editor akce · panel (seznam, přetažení, Vrátit, převod odkazů) | `ActionEditor`, `kindLabel` · `ActionsPanel` |
 | `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku) | `ActionsCard` |
 | `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné | `fold`, `score`, `segments`, `rank`, `pushRecent` |
+| `src/palette/compact.ts` | kompaktní paleta (`palette.compact`): co ukázat pod polem podle režimu a dotazu, šipky (rozbalit ↓ / sbalit ↑) | `shown`, `visible`, `arrow`, `Shown`, `Fold` |
+| `src-tauri/src/paletteconf.rs` | sekce configu `palette` → `Snapshot.palette_compact` (`paletteCompact`) | `PaletteConfig` |
 | `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems`, `PItem`, `Nav` · `Palette`, `IconSearch` · `gotoSettingsPanel`, `settingsTarget` |
 | `src/types.ts` (blok `// --- actions ---`) | typy + `Snapshot.actions` (sloučení rozhraní) | `ActionCfg`, `ActionView`, `ActionOutcome` |
 
@@ -52,6 +54,13 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
   ≤ 256 KB; nikdy periodicky. Snapshot nedělá I/O (`views` = paměť).
 - Skrytý příkaz čte stdout do konce → příkaz, který nechá běžet potomka (server), doběhne až
   termínem (zabije se strom) — na to je `terminal: true`.
+- **Kompaktní paleta** (`palette.compact`, výchozí vypnuto; Nastavení → Šuplík a proužek): bez dotazu
+  jen pole (`pal-bare`, seznam není v DOM → `ResizeObserver` v `App.tsx` šuplík přeměří sám, morf se
+  nemění); psaní = výsledky, ↓ s prázdným polem = nedávné (bez nich vše), ↑ z prvního řádku sbalí,
+  smazání dotazu sbalí. Rozhoduje `compact.ts`, `Palette.tsx` jen kreslí.
+- **Návrat fokusu**: paleta / poznámka zavřená Esc, ✕, „Zavřít šuplík“ nebo uložením (`close_drawer` →
+  `UiCmd::Close`) vrátí fokus oknu, odkud si ho Ledge vzal (`focusreturn`, viz [core.md](core.md));
+  akce / projekt / odkaz z palety, které otevírají okno, zavírají přes `UiCmd::Hide` → fokus NEvrací.
 - Paleta bere fokus jen po kliku na 🔍 (`took` → při zavření `releaseFocus`); `Ctrl+K` funguje jen
   když šuplík fokus už má. Esc v paletě zavře jen paletu.
 - Testy nesahají na `%LOCALAPPDATA%`: `Consents` i cache mají cestu parametrem; `log` se z
@@ -63,7 +72,9 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
 `actionrun::tests` (`resolve`, `shell_cmd`, `tail`, souhlasy v temp, skutečný `cmd` s termínem,
 `RunGuard`), `actionicons::tests` (spec, origin, kandidáti, disková cache, lokální ikony),
 `iconimg::tests::shell_icon_for_folder_and_file`. Frontend:
-`node --experimental-strip-types --test src/palette/search.test.mjs` (search + model, 12 testů).
+`node --experimental-strip-types --test src/palette/search.test.mjs` (search + model, 12 testů),
+`src/palette/compact.test.mjs` (kompaktní režim: `shown`/`visible`/`arrow`, tabulky). Rust:
+`paletteconf::tests` (výchozí vypnuto, serde, schéma).
 
 ## Co nečíst
 

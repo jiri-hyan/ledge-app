@@ -19,3 +19,6 @@
 .pal-ico svg { width: 16px; height: 16px; }
 .pal-recent { font-size: var(--fs-2xs); color: var(--t3); flex-shrink: 0; }
 .pal-foot { font-size: var(--fs-2xs); color: var(--t3); padding: 8px 8px 0; border-top: 1px solid var(--line-soft); margin-top: 4px; }
+/* kompaktní paleta (`palette.compact`) bez dotazu: jen pole a nápověda, žádný seznam (`compact.ts`) */
+.pal-bare .pal-input { border-bottom: 0; padding-bottom: 4px; }
+.pal-bare .pal-foot { border-top: 0; margin-top: 0; padding-top: 2px; }

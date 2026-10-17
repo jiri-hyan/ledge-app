@@ -20,6 +20,12 @@ pub(crate) fn set_mode(mode: String) {
     mark_dirty();
 }
 
+/// Herní režim (Nastavení, paleta): zapnutí zavře šuplík; vypíná se zkratkou / dalším spuštěním (`gamemode.rs`).
+#[tauri::command]
+pub(crate) fn set_game_mode(on: bool) {
+    crate::gamemode::set(on);
+}
+
 #[tauri::command]
 pub(crate) fn report_size(view: View, w: f64, h: f64) {
     core().send_ui(UiCmd::Size(view, w, h));
@@ -43,9 +49,11 @@ pub(crate) fn anim_stats(stats: drawer::AnimStats) {
     core().drawer.set_anim_stats(stats);
 }
 
+/// Výslovné zavření z UI (Esc, ✕, uložení poznámky, paleta „Zavřít“) → `UiCmd::Close`: fokus se vrátí
+/// oknu, odkud si ho Ledge vzal (`focusreturn`). Spouštění, která otevírají okno, posílají `Hide`.
 #[tauri::command]
 pub(crate) fn close_drawer() {
-    core().send_ui(UiCmd::Hide);
+    core().send_ui(UiCmd::Close);
 }
 
 /// Klik uživatele na vstup do poznámky (dlaždice, hlavička, „+ Nová“): šuplík otevřený najetím je

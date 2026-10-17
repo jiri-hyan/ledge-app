@@ -46,6 +46,10 @@ Formát souboru a pravidla pro agenty: `AGENTS.md` → „Poznámky“. Cituj sy
   obrázky jen relativní (`data-src`, data URL doplní UI; CSP `img-src 'self' data:`).
 - Šuplík je okno bez fokusu do kliknutí: stránky `note`/`notes` vstupují přes `api.focusDrawer()`, odchod
   `releaseFocus` (efekt v `App`). Výběry nejsou nativní popupy — panel `.pick-pop` je v toku lišty.
+- **Rychlý záznam vrátí fokus**: zkratka `hotkeys.note` / klik si zapamatuje okno v popředí
+  (`focusreturn::remember`); uložení nové poznámky a Esc/zahození (`api.close()` → `UiCmd::Close`) fokus
+  vrátí, jen když je Ledge pořád v popředí a okno žije (`focusreturn::decide`, [core.md](core.md)).
+  „Otevřít v editoru“ (`note_open` → `UiCmd::Hide`) fokus nevrací — dostane ho editor.
 - Snapshot neroste s počtem poznámek: těla jen přes `note_read`, výběry přes `note_query` se stropem.
 - Sync: git nikdy nečeká na prompt (`env_for`, termín na každém volání), konflikt = `rebase --abort` (nic se
   neztratí), lokální stav (`.draft/`, `.state.json`) je v `IGNORE`; do cizího repa se necommituje (`Refuse`).

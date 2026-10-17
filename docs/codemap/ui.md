@@ -45,7 +45,10 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 - **Výška okna**: `ResizeObserver(content)` + změna `view`/`page` → `report` → `api.reportSize(view, w, h − OVERLAP)`.
 - **Fokus**: šuplík je okno BEZ fokusu. Jen výslovný klik do poznámky (`startNote`/`editNote`/`allNotes`) volá
   `api.focusDrawer()`; odchod ze stránky, která chce klávesnici (`typing`), volá `api.releaseFocus()`.
-- **Klávesy** (`App`): `Ctrl+K` = paleta (jen se šuplíkem s fokusem; 🔍 klikem fokus vezme), Esc = zavřít paletu / zpět na hlavní / zavřít; `1`/`2` = Práce/Osobní (ne v polích). Na stránce `note` je
+  `api.close()` (Esc, ✕, uložení nové poznámky, paleta „Zavřít šuplík“) = `UiCmd::Close` → Rust vrátí fokus
+  aplikaci, odkud si ho vzal (`focusreturn`, [core.md](core.md)); spuštění akce/projektu zavírá bez návratu.
+- **Klávesy** (`App`): `Ctrl+K` = paleta (jen se šuplíkem s fokusem; 🔍 klikem fokus vezme; kompaktní režim
+  `palette.compact` = jen pole, seznam až při psaní / ↓ — `palette/compact.ts`), Esc = zavřít paletu / zpět na hlavní / zavřít; `1`/`2` = Práce/Osobní (ne v polích). Na stránce `note` je
   obsluhuje `NoteEditor`.
 - **Reflektor**: `pointermove` v `App` nastaví `--mx/--my` na `.card`/`.proj` (jen CSS proměnné, žádný render);
   náklon dlaždice `--rx/--ry` v `tilt`.
@@ -75,7 +78,7 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 - `OVERLAP` (motion.ts) = `--overlap` (styles.css) = přesah v `drawer.rs`; `FULL_CLIP` 26px = `--r-shell`.
 - Nic nesmí brát fokus samo: `autofocus`/`focus()` jen na stránkách, kam se jde výslovným klikem
   (`NoteEditor`, výběry v `notes/`), nikdy v kartách hlavní stránky ani v peeku.
-- Schválení Clauda (`api.decide`) jen klikem člověka — v `Peek` a `ClaudeSessions` `PendingRow`.
+- Schválení Clauda (`api.decide`) jen klikem člověka — v `Peek` a `ClaudeSessions` `PendingRow` (+ „Vždy povolit“ / „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`, fokus jen po kliku na „s důvodem…“).
 - Pořadí CSS: `styles.css` první (index.tsx), komponentové soubory ho přepisují. **Žádné natvrdo barvy,
   px písma ani délky přechodů**: barvy = token z `COLOR_KEYS` (hodnota ve všech motivech `theme/themes.ts`),
   písmo `var(--fs-*)` nebo `calc(Npx * var(--fz))`, mezery `--s*`, rohy `--r-*`, délky `--dur-1…5`

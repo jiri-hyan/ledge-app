@@ -15,12 +15,13 @@
 //! Ochrana: požadavky s hlavičkou `Origin` (prohlížeč) se odmítají; Host musí být loopback.
 //!
 //! Podmoduly: `bridge` (HTTP server), `hygiene` (hlídač nedokončené práce, git), `paths` (cesty a
-//! porcelain, čisté), `questions` (otázky Clauda). Tady stav session a schvalování. Mapa: `docs/codemap/sessions.md`.
+//! porcelain, čisté), `questions` (otázky Clauda), `rules` („Vždy povolit“ a důvod zamítnutí, čisté). Tady stav session a schvalování. Mapa: `docs/codemap/sessions.md`.
 
 mod bridge;
 mod hygiene;
 mod paths;
 mod questions;
+pub mod rules;
 #[cfg(test)]
 mod testkit;
 
@@ -39,10 +40,14 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decision {
     Allow,
+    /// Povolit + pravidlo v `updatedPermissions` — zapíše ho Claude Code sám (`rules.rs`)
+    AllowAlways(rules::Grant),
     Deny,
+    /// Zamítnout s důvodem pro Clauda (`decision.message`), už očištěný `rules::clean_reason`
+    DenyWith(String),
     /// nech to na terminálu
     Pass,
 }
@@ -58,6 +63,8 @@ pub struct Pending {
     pub summary: String,
     pub created_at: u64,
     pub expires_at: u64,
+    /// návrh „Vždy povolit“ (přesné pravidlo); `None` = tlačítko se neukáže
+    pub always: Option<rules::Always>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -150,16 +157,6 @@ pub fn summarize(tool: &str, input: &Value) -> String {
     if one_line.chars().count() > 300 { one_line.chars().take(300).collect::<String>() + "…" } else { one_line }
 }
 
-pub fn allow_body() -> String {
-    json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow"}}}).to_string()
-}
-
-pub fn deny_body() -> String {
-    json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest",
-        "decision": {"behavior": "deny", "message": "Zamítnuto v Ledge."}}})
-    .to_string()
-}
-
 /// Nejdelší čekání na schválení: hook `PermissionRequest` má timeout 600 s (`hooksetup::EVENTS`),
 /// 50 s rezerva — stejně jako `questions::MAX_HOLD_S` a posuvník v Nastavení (5–550).
 pub const MAX_APPROVAL: Duration = Duration::from_secs(550);
@@ -222,12 +219,27 @@ impl Claude {
 
     /// Rozhodnutí šéfa. `None` = nejstarší čekající.
     pub fn decide(&self, id: Option<u64>, d: Decision) -> bool {
+        self.decide_by(id, |_| Some(d))
+    }
+
+    /// Klik s doplňkem (`decide(id, allow, extra?)`): „Vždy povolit“ do cíle / důvod zamítnutí. Pravidlo
+    /// bere z čekající žádosti (to, co karta ukázala), nikdy z IPC. „Vždy“ jen pro konkrétní `id`.
+    pub fn decide_with(&self, id: Option<u64>, allow: bool, extra: &rules::Extra) -> bool {
+        if extra.always.is_some() && id.is_none() {
+            return false;
+        }
+        self.decide_by(id, |p| rules::resolve(allow, extra, p.always.as_ref()))
+    }
+
+    /// `f` z čekající žádosti udělá rozhodnutí; `None` = nic se nerozhodne, žádost čeká dál.
+    fn decide_by(&self, id: Option<u64>, f: impl FnOnce(&Pending) -> Option<Decision>) -> bool {
         let mut g = self.inner.lock();
         let idx = match id {
             Some(id) => g.pending.iter().position(|(p, _)| p.id == id),
             None => if g.pending.is_empty() { None } else { Some(0) },
         };
         let Some(i) = idx else { return false };
+        let Some(d) = f(&g.pending[i].0) else { return false };
         let (p, tx) = g.pending.remove(i);
         let _ = tx.send(d);
         if let Some(sess) = g.sessions.get_mut(&p.session_id) {
@@ -278,6 +290,7 @@ impl Claude {
                     summary: summarize(&tool, &input),
                     created_at: now,
                     expires_at: now + timeout.as_millis() as u64,
+                    always: rules::propose(&tool, &input, body.get("permission_suggestions")),
                 },
                 tx,
             ));

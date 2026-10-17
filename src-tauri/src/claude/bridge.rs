@@ -2,7 +2,7 @@
 //! `POST /ctl/<příkaz>`. Odmítá prohlížeč (`Origin`) a cizí `Host`. Každý požadavek ve vlastním
 //! vlákně; logiku dělá `Claude` (`mod.rs`), tady je jen směrování a odpovědi.
 
-use super::{Claude, Decision, allow_body, deny_body};
+use super::{Claude, rules};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
@@ -51,12 +51,9 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
                 std::thread::spawn(move || {
                     let parsed: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
                     match (method.as_str(), url.as_str()) {
-                        ("POST", "/permission") => match claude.handle_permission(&parsed) {
-                            Decision::Allow => respond(req, 200, allow_body()),
-                            Decision::Deny => respond(req, 200, deny_body()),
-                            // prázdné tělo = žádné rozhodnutí → terminál se zeptá normálně
-                            Decision::Pass => respond(req, 200, String::new()),
-                        },
+                        // allow / allow + updatedPermissions / deny (+ důvod); `Pass` = prázdné tělo →
+                        // žádné rozhodnutí, terminál se zeptá normálně (`rules::body`)
+                        ("POST", "/permission") => respond(req, 200, rules::body(&claude.handle_permission(&parsed))),
                         // otázka Clauda: tělo jen s odpovědí z Ledge, jinak prázdné = otázka v okně Claude
                         ("POST", "/question") => respond(req, 200, claude.handle_question(&parsed).unwrap_or_default()),
                         ("POST", "/event") => {
@@ -88,7 +85,7 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
 mod tests {
     use super::*;
     use super::super::testkit::{ev, git, sess, temp_repo_upstream};
-    use super::super::SessionState;
+    use super::super::{Decision, SessionState};
     use crate::config::EnforceCommit;
     use std::time::Duration;
 
@@ -143,6 +140,48 @@ mod tests {
         });
         let (_, body) = post(port, "/permission", REQ, false);
         assert!(body.contains("\"deny\""));
+    }
+
+    /// „Vždy povolit“ z karty: pravidlo z návrhu Clauda, cíl podle volby člověka (ne podle návrhu).
+    #[test]
+    fn always_allow_sends_rule_from_suggestion() {
+        let (c, port) = bridge(5000);
+        let c2 = c.clone();
+        std::thread::spawn(move || {
+            while c2.pending().is_empty() {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let p = &c2.pending()[0];
+            assert_eq!(p.always.as_ref().map(|a| a.label.as_str()), Some("Bash(npm run lint:*)"));
+            let ex = |d| rules::Extra { always: Some(d), reason: None };
+            assert!(!c2.decide_with(None, true, &ex(rules::Destination::UserSettings)), "vždy jen pro konkrétní kartu");
+            assert!(!c2.decide_with(Some(p.id), false, &ex(rules::Destination::UserSettings)), "vždy + zamítnout nedává smysl");
+            assert!(c2.decide_with(Some(p.id), true, &ex(rules::Destination::UserSettings)));
+        });
+        let req = r#"{"session_id":"s1","cwd":"C:/x","hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"npm run lint -- --fix"},
+            "permission_suggestions":[{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"npm run lint:*"}],"behavior":"allow","destination":"localSettings"},{"type":"setMode","mode":"acceptEdits","destination":"session"}]}"#;
+        let (code, body) = post(port, "/permission", req, false);
+        assert_eq!(code, 200);
+        let v: Value = serde_json::from_str(&body).unwrap();
+        let d = &v["hookSpecificOutput"]["decision"];
+        assert_eq!(d["behavior"], "allow");
+        assert_eq!(d["updatedPermissions"], json!([{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"npm run lint:*"}],"behavior":"allow","destination":"userSettings"}]));
+    }
+
+    #[test]
+    fn deny_with_reason_reaches_claude() {
+        let (c, port) = bridge(5000);
+        let c2 = c.clone();
+        std::thread::spawn(move || {
+            while c2.pending().is_empty() {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let id = c2.pending()[0].id;
+            assert!(c2.decide_with(Some(id), false, &rules::Extra { always: None, reason: Some("nasazuj jen staging \"x\"".into()) }));
+        });
+        let (_, body) = post(port, "/permission", REQ, false);
+        let v: Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["hookSpecificOutput"]["decision"], json!({"behavior": "deny", "message": "Zamítnuto v Ledge: nasazuj jen staging \"x\""}));
     }
 
     #[test]
