@@ -1,6 +1,7 @@
 // Karta Claude v šuplíku: všechny Claude Code session na PC (Rust `sessions.rs` → `Snapshot.sessions`,
 // seřazené čeká > pracuje > nečinná > skončila s prací), schvalování (`PendingRow` + „Vždy povolit“ /
-// „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`), otázky Clauda
+// „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`, náhled diffu `sessions/DiffPreview.tsx`, review plánu
+// `sessions/PlanReview.tsx`), otázky Clauda
 // (`QuestionCard` pod řádkem session), subagenti a klik = otevřít session (`api.sessionOpen`, Win32 v `winfocus.rs`). Nečinné nad 3 se sbalí do „+N nečinných“.
 import { createSignal, For, Show } from "solid-js";
 import { api, type Snapshot, type SessionView, type Pending, type SubagentDone, type Ask } from "./api";
@@ -11,6 +12,10 @@ import { t, tp } from "./i18n";
 import QuestionCard from "./questions/QuestionCard";
 import PermExtra from "./sessions/PermExtra";
 import LimitsRow from "./limits/LimitsRow";
+import DiffPreview from "./sessions/DiffPreview";
+import PlanReview from "./sessions/PlanReview";
+import { planTitle } from "./sessions/plan";
+import CostsSection from "./costs/CostsSection";
 import "./sessions.css";
 
 /** stav → barva pilulky a popisek (funkce, ať se popisek přeloží až při vykreslení) */
@@ -79,6 +84,7 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
       }>
         <div class="empty">{t("sessions.bridgeOff", "Most pro Claude je vypnutý v Nastavení — bez schvalování a subagentů.")}</div>
       </Show>
+      <CostsSection s={p.s} now={p.now} />
     </div>
   );
 }
@@ -164,13 +170,15 @@ export function PendingRow(p: { pd: Pending }) {
   return (
     <>
       <div class="row">
-        <span class="pill a">{p.pd.tool}</span>
-        <div class="grow"><div class="code" title={p.pd.summary}>{p.pd.summary}</div></div>
+        <span class="pill a">{p.pd.plan ? t("sessions.plan.pill", "Plán") : p.pd.tool}</span>
+        <div class="grow"><div class="code" title={p.pd.summary}>{p.pd.plan ? planTitle(p.pd) : p.pd.summary}</div></div>
         <span class="r">
           <button class="mini" onClick={() => api.decide(p.pd.id, false)}>{t("sessions.deny", "Zamítnout")}</button>
-          <button class="mini ok" onClick={() => api.decide(p.pd.id, true)}>{t("sessions.allow", "Povolit")}</button>
+          <button class="mini ok" onClick={() => api.decide(p.pd.id, true)}>{p.pd.plan ? t("sessions.plan.approve", "Schválit") : t("sessions.allow", "Povolit")}</button>
         </span>
       </div>
+      <Show when={p.pd.preview}>{(pv) => <DiffPreview pv={pv()} />}</Show>
+      <Show when={p.pd.plan}>{(pl) => <PlanReview pd={p.pd} plan={pl()} />}</Show>
       <PermExtra pd={p.pd} />
     </>
   );

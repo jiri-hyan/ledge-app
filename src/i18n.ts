@@ -29,6 +29,11 @@ export function t(key: string, cs: string, vars?: Record<string, string | number
   return fill(l === "cs" ? cs : (dict[l]?.[key] ?? cs), vars);
 }
 
+/** Text v konkrétním jazyce bez ohledu na jazyk UI (hledání v obou jazycích: paleta). */
+export function tIn(l: Lang, key: string, cs: string): string {
+  return l === "cs" ? cs : (dict[l]?.[key] ?? cs);
+}
+
 export type PluralForm = "one" | "few" | "other";
 
 /** Kategorie množného čísla: cs 1 / 2–4 / jinak (0, 5+, desetinná), en 1 / jinak. */

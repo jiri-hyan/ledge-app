@@ -1,23 +1,28 @@
 // Karta „Rychlé akce“ (Práce i Osobní podle `showOn`): mřížka dlaždic s ikonou, volitelně ve
 // skupinách; klik = spustit (`runAction`: potvrzení, stav běží, výsledek do hlášky / výstupu).
-// Prázdná karta se ukáže jen na Osobní (pozvánka), na Práci by jen zabírala místo.
+// Prázdná karta se ukáže jen na Osobní (pozvánka), na Práci by jen zabírala místo. Skripty ze složky
+// skriptů jsou tu jen se `scripts.inActions` (`s.scripts`); výstup skriptu spuštěného z palety se ale
+// ukáže vždy (karta se kvůli němu objeví i prázdná).
 import { For, Show } from "solid-js";
 import type { Snapshot } from "../types";
-import { isBusy, runAction } from "../actions/api";
+import { isBusy, lastResult } from "../actions/api";
+import { runAny } from "../actions/scripts";
 import { visibleGroups } from "../actions/model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../actions/ui";
 import { gotoSettingsPanel } from "../palette/goto";
 import { t } from "../i18n";
 
 export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean }) {
-  const groups = () => visibleGroups(p.s.actions ?? [], p.s.mode);
+  const groups = () => visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], p.s.mode);
   const ids = () => groups().flatMap((g) => g.items.map((a) => a.id));
+  /** výstup skriptu (i z palety, když skripty v kartě nejsou) */
+  const scriptOut = () => (lastResult()?.id.startsWith("script:") ? lastResult()!.id : null);
   const edit = () => {
     p.onSettings();
     gotoSettingsPanel("akce");
   };
   return (
-    <Show when={ids().length > 0 || p.s.mode === "osobni"}>
+    <Show when={ids().length > 0 || p.s.mode === "osobni" || scriptOut()}>
       <div class="card act-card" classList={{ wide: !!p.wide }} data-anim>
         <h4>
           <span class="ic" style="background:var(--teal)" />
@@ -26,10 +31,12 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
           <button class="mini" onClick={edit}>{t("actions.card.edit", "Upravit")}</button>
         </h4>
         <For each={groups()} fallback={
-          <div class="empty">
-            {t("actions.card.empty", "Weby, složky, aplikace i příkazy na jedno kliknutí.")}
-            <button class="mini" onClick={edit}>{t("actions.card.add", "Přidat akci")}</button>
-          </div>
+          <Show when={!scriptOut()}>
+            <div class="empty">
+              {t("actions.card.empty", "Weby, složky, aplikace i příkazy na jedno kliknutí.")}
+              <button class="mini" onClick={edit}>{t("actions.card.add", "Přidat akci")}</button>
+            </div>
+          </Show>
         }>
           {(g) => (
             <>
@@ -44,7 +51,7 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
                         classList={{ bad: !!a.problem, busy: busy() }}
                         aria-busy={busy()}
                         title={a.problem ? `${a.target}\n${a.problem}` : a.needsConfirm ? `${a.confirmText}\n${t("actions.card.asks", "Před spuštěním se zeptá.")}` : a.target}
-                        onClick={() => runAction(a, askConfirm("card"))}
+                        onClick={() => runAny(a, askConfirm("card"))}
                       >
                         <span class="act-ico">
                           <ActionIcon a={a} />
@@ -60,7 +67,7 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
           )}
         </For>
         <ConfirmAction where="card" />
-        <LastOutput ids={ids()} />
+        <LastOutput ids={scriptOut() ? [...ids(), scriptOut()!] : ids()} />
       </div>
     </Show>
   );

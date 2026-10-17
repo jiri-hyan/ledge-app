@@ -153,7 +153,7 @@ mod tests {
             }
             let p = &c2.pending()[0];
             assert_eq!(p.always.as_ref().map(|a| a.label.as_str()), Some("Bash(npm run lint:*)"));
-            let ex = |d| rules::Extra { always: Some(d), reason: None };
+            let ex = |d| rules::Extra { always: Some(d), ..Default::default() };
             assert!(!c2.decide_with(None, true, &ex(rules::Destination::UserSettings)), "vždy jen pro konkrétní kartu");
             assert!(!c2.decide_with(Some(p.id), false, &ex(rules::Destination::UserSettings)), "vždy + zamítnout nedává smysl");
             assert!(c2.decide_with(Some(p.id), true, &ex(rules::Destination::UserSettings)));
@@ -177,7 +177,7 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(10));
             }
             let id = c2.pending()[0].id;
-            assert!(c2.decide_with(Some(id), false, &rules::Extra { always: None, reason: Some("nasazuj jen staging \"x\"".into()) }));
+            assert!(c2.decide_with(Some(id), false, &rules::Extra { reason: Some("nasazuj jen staging \"x\"".into()), ..Default::default() }));
         });
         let (_, body) = post(port, "/permission", REQ, false);
         let v: Value = serde_json::from_str(&body).unwrap();

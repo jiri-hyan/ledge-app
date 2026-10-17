@@ -45,8 +45,13 @@ export type LastResult = { id: string; ok: boolean; title: string; output: strin
 const [lastResult, setLastResult] = createSignal<LastResult | null>(null);
 export { lastResult, setLastResult };
 
-/** Spustí akci: potvrzení (`needsConfirm`) přes `ask`, pak jádro, výsledek do hlášky. Vrací true = hotovo. */
-export async function runAction(a: ActionView, ask: (a: ActionView) => Promise<boolean>): Promise<boolean> {
+/** Spustí akci: potvrzení (`needsConfirm`) přes `ask`, pak jádro, výsledek do hlášky. Vrací true = hotovo.
+ *  `run` = jiný příkaz jádra se stejným tokem (skripty: `actions/scripts.ts`); výchozí `run_action`. */
+export async function runAction(
+  a: ActionView,
+  ask: (a: ActionView) => Promise<boolean>,
+  run: (confirmed: string | null) => Promise<ActionOutcome | undefined> = (confirmed) => actionsApi.run(a.id, a.target, confirmed),
+): Promise<boolean> {
   if (a.problem) {
     say(t("actions.run.problem", "{label}: {problem}", { label: a.label, problem: a.problem }), true);
     return false;
@@ -58,7 +63,7 @@ export async function runAction(a: ActionView, ask: (a: ActionView) => Promise<b
   if (a.needsConfirm && !(await ask(a))) return false;
   setBusy((s) => new Set(s).add(a.id));
   try {
-    const out = await actionsApi.run(a.id, a.target, a.needsConfirm ? a.confirmText : null);
+    const out = await run(a.needsConfirm ? a.confirmText : null);
     if (out && !out.hide) {
       say(out.message);
       setLastResult(out.output ? { id: a.id, ok: true, title: out.message, output: out.output } : null);

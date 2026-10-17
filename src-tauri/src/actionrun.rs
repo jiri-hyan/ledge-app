@@ -154,31 +154,43 @@ pub struct Outcome {
 pub fn run_hidden(a: &Action) -> Result<Outcome, String> {
     let dir = work_dir(a)?;
     let mut cmd = build(&shell_cmd(a, false), &dir);
-    let deadline = Instant::now() + Duration::from_secs(a.timeout_s.into());
-    match gitinfo::capture_tail(&mut cmd, None, true, deadline, Some(MAX_OUTPUT_BYTES)) {
+    capture(&mut cmd, &a.label, a.timeout_s, true)
+}
+
+/// Spustí `cmd` bez okna s termínem `timeout_s` (pak zabije strom), drží jen konec výstupu.
+/// `show` = výstup do `Outcome.output` (jinak jen hláška; při chybě se konec ukáže vždy).
+/// Sdílí ho skrytý příkaz akce i skript (`scripts`).
+pub fn capture(cmd: &mut Command, label: &str, timeout_s: u32, show: bool) -> Result<Outcome, String> {
+    let deadline = Instant::now() + Duration::from_secs(timeout_s.into());
+    match gitinfo::capture_tail(cmd, None, true, deadline, Some(MAX_OUTPUT_BYTES)) {
         Ok(out) => {
             let t = tail(&out.stdout, &out.stderr);
             if out.success {
-                Ok(Outcome { message: trf!("{} — hotovo", "{} — done", a.label), output: (!t.is_empty()).then_some(t), hide: false })
+                Ok(Outcome { message: trf!("{} — hotovo", "{} — done", label), output: (show && !t.is_empty()).then_some(t), hide: false })
             } else {
-                Err(if t.is_empty() { trf!("{} skončil chybou.", "{} ended with an error.", a.label) } else { trf!("{} skončil chybou:\n{t}", "{} ended with an error:\n{t}", a.label) })
+                Err(if t.is_empty() { trf!("{} skončil chybou.", "{} ended with an error.", label) } else { trf!("{} skončil chybou:\n{t}", "{} ended with an error:\n{t}", label) })
             }
         }
         Err(RunError::Timeout) => Err(trf!(
             "{} nedoběhl do {} s — ukončen. Delší příkazy pouštěj v terminálu.",
             "{} didn't finish within {} s — stopped. Run longer commands in a terminal.",
-            a.label,
-            a.timeout_s
+            label,
+            timeout_s
         )),
-        Err(RunError::Spawn(e)) => Err(trf!("{} nejde spustit: {e}", "can't run {}: {e}", a.label)),
+        Err(RunError::Spawn(e)) => Err(trf!("{} nejde spustit: {e}", "can't run {}: {e}", label)),
     }
+}
+
+/// Spustí `cmd` v novém viditelném okně konzole (výslovný klik člověka).
+pub fn spawn_console(cmd: &mut Command, label: &str) -> Result<Outcome, String> {
+    cmd.creation_flags(CREATE_NEW_CONSOLE).spawn().map_err(|e| trf!("Terminál nejde otevřít: {e}", "Can't open a terminal: {e}"))?;
+    Ok(Outcome { message: trf!("{} — běží v terminálu", "{} — running in a terminal", label), output: None, hide: true })
 }
 
 /// Příkaz ve viditelném terminálu (nové okno konzole; Windows Terminal, je-li výchozí).
 pub fn run_terminal(a: &Action) -> Result<Outcome, String> {
     let dir = work_dir(a)?;
-    build(&shell_cmd(a, true), &dir).creation_flags(CREATE_NEW_CONSOLE).spawn().map_err(|e| trf!("Terminál nejde otevřít: {e}", "Can't open a terminal: {e}"))?;
-    Ok(Outcome { message: trf!("{} — běží v terminálu", "{} — running in a terminal", a.label), output: None, hide: true })
+    spawn_console(&mut build(&shell_cmd(a, true), &dir), &a.label)
 }
 
 /// `.exe` s argumenty, přímo (bez shellu), odpojené.
@@ -206,6 +218,12 @@ impl Consents {
         Consents { path: PathBuf::new(), set: None }
     }
 
+    /// Souhlasy v jiném souboru (testy — nikdy `%LOCALAPPDATA%`).
+    #[cfg(test)]
+    pub fn at(path: PathBuf) -> Self {
+        Consents { path, set: None }
+    }
+
     fn file(&self) -> PathBuf {
         if self.path.as_os_str().is_empty() { local_dir().join("actions-consent.json") } else { self.path.clone() }
     }
@@ -218,17 +236,29 @@ impl Consents {
     }
 
     pub fn has(&mut self, a: &Action) -> bool {
-        self.loaded().contains(&actions::fingerprint(a))
+        self.has_fp(&actions::fingerprint(a))
     }
 
     /// Jen z paměti (snapshot): ještě nenačtené = bez souhlasu (ptát se).
     pub fn has_cached(&self, a: &Action) -> bool {
-        self.set.as_ref().is_some_and(|s| s.contains(&actions::fingerprint(a)))
+        self.has_cached_fp(&actions::fingerprint(a))
     }
 
     /// Uloží souhlas s přesně touhle akcí (atomicky přes dočasný soubor).
     pub fn grant(&mut self, a: &Action) -> Result<(), String> {
-        let fp = actions::fingerprint(a);
+        self.grant_fp(actions::fingerprint(a))
+    }
+
+    /// Souhlas podle otisku (akce i skript — `scripts::run::fingerprint` má vlastní prefix).
+    pub fn has_fp(&mut self, fp: &str) -> bool {
+        self.loaded().contains(fp)
+    }
+
+    pub fn has_cached_fp(&self, fp: &str) -> bool {
+        self.set.as_ref().is_some_and(|s| s.contains(fp))
+    }
+
+    pub fn grant_fp(&mut self, fp: String) -> Result<(), String> {
         let path = self.file();
         let set = self.loaded();
         if !set.insert(fp.clone()) {

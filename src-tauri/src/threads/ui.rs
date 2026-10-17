@@ -42,6 +42,9 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                             refresh_logos(false);
                             request_notes_reload();
                             send_sync(SyncMsg::Opened);
+                            if c.cfg.read().scripts.in_actions {
+                                crate::scripts::refresh_async();
+                            }
                         }
                         // počasí (jen Full na Osobní) dřív než snapshot — karta hned ukáže „načítám“
                         maybe_refresh_weather(view == View::Full);

@@ -28,6 +28,7 @@ mod claude;
 mod cloning;
 mod commands;
 mod config;
+mod costslive;
 mod configerr;
 mod configio;
 mod ctl;
@@ -56,6 +57,7 @@ mod rawpush;
 mod refresh;
 mod resolve;
 mod screen;
+mod scripts;
 mod sessionlive;
 mod sessions;
 mod settings;
@@ -70,9 +72,11 @@ mod threads;
 mod toast;
 mod uiconf;
 mod update;
+mod usage;
 mod updatenet;
 mod weather;
 mod winfocus;
+mod winsettings;
 
 pub(crate) use state::{log, screen_glass_capable};
 
@@ -288,11 +292,16 @@ pub fn run() {
             commands::limits::statusline_status,
             commands::limits::statusline_install,
             commands::limits::statusline_remove,
+            commands::costs::costs_refresh,
             commands::actions::run_action,
             commands::actions::action_icon,
             commands::actions::action_icon_refresh,
             commands::actions::action_consent,
             commands::actions::action_check,
+            commands::scripts::scripts_list,
+            commands::scripts::run_script,
+            commands::scripts::scripts_open_dir,
+            commands::scripts::win_settings_open,
             commands::onboarding::onboarding_repos,
             commands::onboarding::onboarding_apps,
             commands::onboarding::onboarding_icons,

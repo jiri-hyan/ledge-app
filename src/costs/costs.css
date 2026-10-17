@@ -1,0 +1,29 @@
+/* Útrata Claude (odhad) — rozbalitelná sekce dole v kartě Claude (CostsSection.tsx). Jen tokeny. */
+.cost { border-top: 1px solid var(--line-soft); margin-top: var(--s2); padding-top: var(--s1); }
+.cost-head { display: flex; align-items: center; gap: var(--s2); width: 100%; padding: var(--s1) 0; color: var(--t2); font: 600 var(--fs-sm) var(--sans); text-align: left; }
+.cost-head:hover { color: var(--t1); }
+.cost-chev { display: inline-block; width: 1em; color: var(--t3); transition: transform var(--dur-2) var(--ease); }
+.cost-chev.on { transform: rotate(90deg); }
+.cost-title { flex: 1; min-width: 0; }
+.cost-peek { font: var(--fs-xs) var(--mono); color: var(--t3); }
+.cost-body { display: flex; flex-direction: column; gap: var(--s1); padding-bottom: var(--s1); }
+.cost-tag { font: var(--fs-2xs) var(--sans); color: var(--amber); }
+.cost-note { font: var(--fs-xs) var(--mono); color: var(--t3); }
+.cost-note.bad { color: var(--red); }
+.cost-tabs { display: flex; gap: var(--s1); }
+.cost-tab { font: 600 var(--fs-xs) var(--sans); color: var(--t3); padding: 2px var(--s2); border-radius: var(--r-pill); background: var(--well); }
+.cost-tab.on { color: var(--t1); background: var(--well-2); }
+.cost-sum { display: flex; align-items: baseline; gap: var(--s2); }
+.cost-big { font: 700 var(--fs-body) var(--mono); color: var(--t1); }
+.cost-sub, .cost-split, .cost-foot { font: var(--fs-2xs) var(--mono); color: var(--t3); }
+.cost-bars { display: flex; align-items: flex-end; gap: 2px; height: 34px; padding-top: var(--s1); }
+.cost-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.cost-bar { display: block; width: 100%; min-height: 1px; border-radius: 2px 2px 0 0; background: var(--violet); transition: height var(--dur-3) var(--ease); }
+.cost-bar.dim { opacity: 0.35; }
+.cost-h { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: var(--s1); }
+.cost-line { display: grid; grid-template-columns: minmax(0, 1fr) 3.5em 4.2em 4.6em; align-items: center; gap: var(--s2); font: var(--fs-xs) var(--mono); color: var(--t2); }
+.cost-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--sans); }
+.cost-track { height: 4px; border-radius: var(--r-pill); background: var(--well); overflow: hidden; }
+.cost-fill { display: block; height: 100%; background: var(--violet); border-radius: var(--r-pill); }
+.cost-tok { text-align: right; color: var(--t3); }
+.cost-usd { text-align: right; color: var(--t1); }

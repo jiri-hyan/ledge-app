@@ -268,7 +268,7 @@ fn quote(x: &str) -> String {
 /// Argument pro PowerShell doslova: holé slovo jen z bezpečných znaků, jinak v apostrofech
 /// (apostrofy včetně typografických zdvojené). Ve dvojitých uvozovkách by PowerShell rozbalil
 /// `$proměnné` a zpětný apostrof; holé `#`, `@`, `,`, `;` nebo `'` by změnily význam řádky.
-fn quote_ps(x: &str) -> String {
+pub(crate) fn quote_ps(x: &str) -> String {
     if !x.is_empty() && x.chars().all(|c| c.is_alphanumeric() || r"-_./\:=+%~".contains(c)) {
         return x.to_string();
     }
@@ -281,6 +281,11 @@ fn quote_ps(x: &str) -> String {
     }
     out.push('\'');
     out
+}
+
+/// Argument pro řádku `cmd` (pravidla `quote`) — i pro skripty (`scripts::run`).
+pub(crate) fn quote_cmd(x: &str) -> String {
+    quote(x)
 }
 
 /// Příkazová řádka, jak ji uvidí člověk v potvrzení a jak ji dostane shell (argumenty podle shellu).

@@ -20,14 +20,26 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src/actions/ActionEditor.tsx` · `src/settings/panels/Actions.tsx` | editor akce · panel (seznam, přetažení, Vrátit, převod odkazů) | `ActionEditor`, `kindLabel` · `ActionsPanel` |
 | `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku) | `ActionsCard` |
 | `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné | `fold`, `score`, `segments`, `rank`, `pushRecent` |
+| `src-tauri/src/scripts/mod.rs` | Script Commands: config `scripts`, složka (`resolve_dir_with`), sken bez watcheru (stat + jen změněné, strop 200, 1 MB), pohled pro UI, stav v paměti | `ScriptsConfig`, `scan_dir`, `load_one`, `Scan`, `Script` (`fingerprint`, `confirm_text`), `ScriptView`, `view`, `problem`, `refresh`, `refresh_async`, `snapshot_views`, `fresh`, `Listing`, `MAX_SCRIPTS`, `MAX_FILE` |
+| `src-tauri/src/scripts/meta.rs` | čistá hlavička `@ledge.*` (komentáře podle jazyka, prvních 4 KB) | `parse`, `header_text`, `split_args`, `Meta`, `Mode`, `Lang`, `HEADER_BYTES` |
+| `src-tauri/src/scripts/run.rs` | interpret z PATH (bez aliasů Storu), program + argumenty, otisk souhlasu, text potvrzení | `find_on_path`, `interp`, `Interp`, `plan`, `Plan`, `fingerprint`, `confirm_text`, `sha256_hex` |
+| `src-tauri/src/scripts/tests.rs` | sken v tempdir, cache, stropy, pohled, skutečný cmd / PowerShell | — |
+| `src-tauri/src/winsettings.rs` | tvar cíle „Nastavení Windows“ (`ms-settings:` / `control:Microsoft.`), cesta k `control.exe` | `parse`, `WinTarget`, `control_exe` |
+| `src-tauri/src/commands/scripts.rs` | Tauri příkazy skriptů a nastavení Windows | `scripts_list`, `run_script`, `scripts_open_dir`, `win_settings_open` |
+| `src/actions/scripts.ts` · `ScriptsSettings.tsx` | invoke skriptů + `runAny` (akce i skript stejným tokem) · karta Skripty v panelu Rychlé akce (přepínače, složka, nalezené, formát) | `scriptsApi`, `runAny` · `ScriptsSettings` |
+| `src/palette/winsettings.ts` | statická tabulka stránek Nastavení Windows (jen dokumentované, CZ+EN slova přes `tIn`), položky jen s dotazem | `WIN_PAGES`, `winItems`, `WinPage` |
+| `src/palette/more.ts` | položky palety mimo snapshot: skripty (`scripts_list` při otevření) + Nastavení Windows | `scriptItems`, `windowsItems` |
 | `src/palette/compact.ts` | kompaktní paleta (`palette.compact`): co ukázat pod polem podle režimu a dotazu, šipky (rozbalit ↓ / sbalit ↑) | `shown`, `visible`, `arrow`, `Shown`, `Fold` |
 | `src-tauri/src/paletteconf.rs` | sekce configu `palette` → `Snapshot.palette_compact` (`paletteCompact`) | `PaletteConfig` |
 | `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems`, `PItem`, `Nav` · `Palette`, `IconSearch` · `gotoSettingsPanel`, `settingsTarget` |
-| `src/types.ts` (blok `// --- actions ---`) | typy + `Snapshot.actions` (sloučení rozhraní) | `ActionCfg`, `ActionView`, `ActionOutcome` |
+| `src/types.ts` (blok `// --- actions ---`) | typy + `Snapshot.actions`/`scripts`/`paletteWinSettings` (sloučení rozhraní) | `ActionCfg`, `ActionView`, `ScriptView`, `ScriptsListing`, `ActionOutcome` |
 
 Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.actions`),
 `settings.rs` (`apply_config` → `actionstate::refresh`), `lib.rs` (start + `generate_handler!`),
-`MainPage.tsx` (karta), `Head.tsx` (🔍), `App.tsx` (signál palety, `Ctrl+K`, `palNav`).
+`MainPage.tsx` (karta), `Head.tsx` (🔍), `App.tsx` (signál palety, `Ctrl+K`, `palNav`). Skripty:
+`config.rs` (`Config.scripts` + `scripts::validate`), `snapshot.rs` (`scripts`, `palette_win_settings`),
+`settings.rs` (změna `scripts` → `refresh_async`), `threads/ui.rs` (otevření šuplíku s `inActions` →
+`refresh_async`), `i18n.ts` (`tIn`), `i18n/load.ts` (`en-winsettings`).
 
 ## Toky
 
@@ -38,6 +50,14 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
 - **Ikony**: start, změna `actions`, „Obnovit“ → `refresh` → vlákno `action-icons` (stat, COM,
   disk) → `STORE` + `mark_dirty`; chybějící favicon → `fetch_favicon` na runtime Tauri → disk →
   `refresh` znovu (už z cache). UI: `iconKey` → `action_icon` jednou na klíč.
+- **Skript**: paleta při otevření → `scripts_list` → `refresh` (výpis složky, změněné soubory) →
+  položky „Skript“; volba → `runAny` → `runAction(…, run_script)` (potvrzení přes `ConfirmAction`
+  s `confirmNote`) → `run_script(id, confirmed)` → `fresh` (soubor znovu přečíst + SHA-256) → sedí
+  `confirm_text` (obsahuje otisk) → poprvé `Consents::grant_fp` → `plan` → `actionrun::capture`
+  (hidden/output, `RunGuard`) / `spawn_console` (terminal). Výstup `output` ukáže karta Rychlé akce
+  (`LastOutput`, i když skripty v kartě nejsou).
+- **Nastavení Windows**: s dotazem `winItems` (77 řádků tabulky) → volba → `win_settings_open(target)`
+  → `winsettings::parse` → opener (`ms-settings:`) / `control.exe /name …` → `UiCmd::Hide`.
 - **Souhlas**: editor (zaškrtnutí, jen riziková akce bez `confirm`) → uložit → `action_consent`
   (musí sedět s configem) → `Consents::grant`. `views` čte jen `has_cached` (nenačteno = ptát se).
 
@@ -66,6 +86,17 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
 - Testy nesahají na `%LOCALAPPDATA%`: `Consents` i cache mají cestu parametrem; `log` se z
   `actionrun` nevolá (píše do `%APPDATA%`).
 
+- **Skripty**: žádný watcher ani pollování — sken jen při otevření palety, otevření šuplíku
+  (s `inActions`), změně configu a „Načíst znovu“. Snapshot čte jen paměť (`snapshot_views`, jen s
+  `inActions`). Souhlas skriptu = otisk cesty + SHA-256 obsahu + režim + argumenty (prefix
+  `ledge-script`, s otiskem akce se nepotká); `run_script` vždy čte soubor znovu. Zbývá okno mezi
+  hashem a spuštěním (ms) — skript se spouští z cesty, ne z kopie (`$PSScriptRoot`, relativní importy).
+- `cmd` řádka: cesta s `%` nebo `"` se odmítne (problém skriptu); PowerShell přes `-Command "& 'cesta'"`
+  (`quote_ps`), Python/Node přímo bez shellu, `terminal` u nich přes `cmd /k`. Interpret z PATH, ne
+  `…\Microsoft\WindowsApps` (alias otevře Store).
+- **Nastavení Windows** jen s dotazem (bez něj by 77 řádků zahltilo seznam). Nový řádek tabulky jen
+  s URI z dokumentace — `winsettings.test.mjs` drží opsaný seznam a zastaralé stránky.
+
 ## Testy
 
 `actions::tests` (validace, potvrzení, otisk, řádka, serde, kompatibilita configu, schéma),
@@ -73,8 +104,12 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
 `RunGuard`), `actionicons::tests` (spec, origin, kandidáti, disková cache, lokální ikony),
 `iconimg::tests::shell_icon_for_folder_and_file`. Frontend:
 `node --experimental-strip-types --test src/palette/search.test.mjs` (search + model, 12 testů),
-`src/palette/compact.test.mjs` (kompaktní režim: `shown`/`visible`/`arrow`, tabulky). Rust:
-`paletteconf::tests` (výchozí vypnuto, serde, schéma).
+`src/palette/compact.test.mjs` (kompaktní režim: `shown`/`visible`/`arrow`, tabulky),
+`src/palette/winsettings.test.mjs` (tabulka proti dokumentaci, tvar cílů, hledání CZ/EN). Rust:
+`paletteconf::tests` (výchozí vypnuto / `winSettings` zapnuto, serde, schéma), `scripts::meta::tests`
+(styly komentářů, pole, chyby, argumenty), `scripts::run::tests` (plán příkazu, PATH bez Storu,
+otisk), `scripts::tests` (sken, cache změněných, stropy, pohled, souhlas, skutečné spuštění),
+`winsettings::tests`.
 
 ## Co nečíst
 

@@ -102,6 +102,11 @@ export default function ClaudePanel(_p: PanelProps) {
           <Toggle path="claude.limitsReminder" label={t("settings.f.claude.limitsReminder", "Připomenout reset limitu")} />
         </Row>
       </Section>
+      <Section title={t("settings.claude.costs", "Útrata (odhad v cenách API)")}>
+        <Row id="claude.costs">
+          <Toggle path="claude.costs" label={t("settings.f.claude.costs", "Útrata Claude (odhad)")} />
+        </Row>
+      </Section>
       <Section title={t("settings.claude.watch", "Hlídač nedokončené práce")}>
         <Row id="claude.enforceCommit" stack>
           <Seg

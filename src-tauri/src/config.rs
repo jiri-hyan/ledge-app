@@ -43,6 +43,8 @@ pub struct Config {
     pub onboarding: crate::onboarding::OnboardingConfig,
     /// Paleta příkazů (`palette.compact`).
     pub palette: crate::paletteconf::PaletteConfig,
+    /// Script Commands: složka skriptů s hlavičkou `@ledge.*` → paleta (`scripts/`).
+    pub scripts: crate::scripts::ScriptsConfig,
 }
 
 impl Default for Config {
@@ -65,6 +67,7 @@ impl Default for Config {
             ui: Default::default(),
             onboarding: Default::default(),
             palette: Default::default(),
+            scripts: Default::default(),
         }
     }
 }
@@ -329,11 +332,15 @@ pub struct ClaudeConfig {
     /// Oznámení Windows (toast), když Claude čeká na schválení / otázku nebo dokončí turn. Bez fokusu,
     /// nikdy ve fullscreen hře, v herním režimu ani při „nerušit“; stejná session + událost max 1× za 30 s.
     pub toast: bool,
+    /// Sekce „Útrata Claude (odhad)“ v kartě Claude: tokeny a odhad ceny v cenách API (ne účet) podle
+    /// projektu a dne z lokálních transcriptů `~/.claude/projects` (`costslive.rs`). Počítá se jen při
+    /// rozbalení sekce, nejvýš 1× za minutu. `false` = sekce zmizí a nic se nečte.
+    pub costs: bool,
 }
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, limits_reminder: true, toast: false }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, limits_reminder: true, toast: false, costs: true }
     }
 }
 
@@ -744,6 +751,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     }
     hotkey_collision(cfg)?;
     crate::actions::validate(&cfg.actions)?;
+    crate::scripts::validate(&cfg.scripts).map_err(|e| fe("scripts.dir", e))?;
     crate::appearance::validate(&cfg.appearance)?;
     Ok(())
 }

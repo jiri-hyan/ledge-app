@@ -78,4 +78,18 @@ registerDict("en", {
   "actions.card.add": "Add action",
   "actions.card.asks": "Asks before running.",
   // panel Nastavení
+  // skripty (Script Commands, `actions/ScriptsSettings.tsx`)
+  "actions.scripts.title": "Scripts",
+  "actions.scripts.reload": "Reload",
+  "actions.scripts.open": "Open scripts folder",
+  "actions.scripts.opened": "Scripts folder: {dir}",
+  "actions.scripts.intro": "Your own scripts (.ps1, .cmd, .bat, .py, .js, .mjs) from the scripts folder show up in the palette (Ctrl+K). A script is foreign code: Ledge runs it only after you confirm — the first time and again after every change to the file.",
+  "actions.scripts.noDir": "The folder doesn't exist yet — “Open scripts folder” creates it.",
+  "actions.scripts.off": "Scripts are off.",
+  "actions.scripts.none": "No script with an @ledge.title header in the folder yet.",
+  "actions.scripts.skipped.one": "{n} more file wasn't loaded (limit 200).",
+  "actions.scripts.skipped.other": "{n} more files weren't loaded (limit 200).",
+  "actions.scripts.format": "Header format",
+  "actions.scripts.example": "# @ledge.title Clean temp\n# @ledge.description Deletes temporary files older than a week\n# @ledge.icon 🧹\n# @ledge.mode output\n# @ledge.confirm\n# @ledge.args -Days 7\n# @ledge.timeout 120",
+  "actions.scripts.help": "@ledge.* lines in a comment at the start of the file (first 4 KB): # in .ps1 and .py, :: or REM in .cmd/.bat, // in .js/.mjs. Only title is required. mode: output (default, output in the drawer), hidden (just done / error), terminal (visible window). confirm = ask before every run. args = fixed arguments (spaces in quotes). timeout = seconds without a window (default 60). Python and Node must be on PATH; save a .ps1 with non-ASCII text as UTF-8 with BOM.",
 });

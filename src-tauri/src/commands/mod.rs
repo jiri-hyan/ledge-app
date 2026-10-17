@@ -3,11 +3,13 @@
 
 pub(crate) mod actions;
 pub(crate) mod config;
+pub(crate) mod costs;
 pub(crate) mod drawer;
 pub(crate) mod limits;
 pub(crate) mod notes;
 pub(crate) mod onboarding;
 pub(crate) mod projects;
+pub(crate) mod scripts;
 pub(crate) mod sessions;
 pub(crate) mod settings;
 pub(crate) mod update;

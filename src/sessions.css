@@ -26,3 +26,25 @@
 .sess-perm-why { width: 100%; box-sizing: border-box; resize: vertical; min-height: 44px; font: var(--fs-body) var(--sans); color: var(--t1); background: var(--well-2); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 10px; }
 .sess-perm-why:focus { outline: none; border-color: var(--focus); }
 .sess-perm-count { margin-left: auto; font: var(--fs-xs) var(--mono); color: var(--t3); }
+/* Náhled diffu (sessions/DiffPreview.tsx): sbalený řádek „+12 −3 · soubor“, rozbalené řádky se scrollem uvnitř. */
+.sess-diff { display: flex; flex-direction: column; gap: var(--s1); padding: 0 0 var(--s1); min-width: 0; }
+.sess-diff-head { align-self: flex-start; max-width: 100%; font: var(--fs-xs) var(--mono); color: var(--t2); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-diff-head:hover:not(:disabled) { color: var(--t1); }
+.sess-diff-head:disabled { cursor: default; color: var(--t3); }
+.sess-diff-n { color: var(--t1); }
+.sess-diff-body { max-height: min(320px, calc(var(--drawer-max-h, 720px) / 2)); overflow: auto; font: var(--fs-xs)/1.45 var(--mono); color: var(--t2); background: var(--well-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s1) 0; user-select: text; -webkit-user-select: text; }
+.sess-diff-ln { display: flex; min-width: max-content; padding: 0 var(--s2) 0 0; white-space: pre; }
+.sess-diff-no { flex-shrink: 0; width: var(--gw, 0); padding: 0 var(--s1); text-align: right; color: var(--t3); }
+.sess-diff-sg { flex-shrink: 0; width: 2ch; text-align: center; color: var(--t3); }
+.sess-diff-tx { flex: 1; }
+.sess-diff-add { background: color-mix(in srgb, var(--green) 12%, transparent); }
+.sess-diff-add .sess-diff-sg { color: var(--green); }
+.sess-diff-del { background: color-mix(in srgb, var(--red) 12%, transparent); }
+.sess-diff-del .sess-diff-sg { color: var(--red); }
+.sess-diff-gap { color: var(--t3); }
+.sess-diff-note { font: var(--fs-xs) var(--sans); color: var(--t3); }
+/* Review plánu (sessions/PlanReview.tsx): Markdown s omezenou výškou, scroll uvnitř. */
+.sess-plan { display: flex; flex-direction: column; gap: var(--s1); padding: 0 0 var(--s1); min-width: 0; }
+.sess-plan-head { align-self: flex-start; font: var(--fs-xs) var(--mono); color: var(--t3); background: none; border: 0; padding: 0; cursor: pointer; }
+.sess-plan-head:hover { color: var(--t1); }
+.sess-plan-body { max-height: min(360px, calc(var(--drawer-max-h, 720px) / 2)); overflow: auto; background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 12px; }

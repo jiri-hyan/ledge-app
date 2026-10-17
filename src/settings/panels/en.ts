@@ -235,6 +235,7 @@ registerDict("en", {
   "settings.claude.enabled.hint": "Claude's permission requests show up in the drawer (bridge on 127.0.0.1:{port})",
   "settings.claude.watch": "Unfinished work watch",
   "settings.claude.limits": "Limits 5h / week",
+  "settings.claude.costs": "Spend (estimate at API prices)",
   "settings.claude.enforce.off": "Don't watch",
   "settings.claude.enforce.notify": "Just show (recommended)",
   "settings.claude.enforce.block": "Nudge the session",

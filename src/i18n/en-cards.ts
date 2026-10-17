@@ -96,6 +96,8 @@ registerDict("en", {
   "cards.peek.waiting": "Claude is waiting · {where}",
   "cards.peek.deny": "Deny",
   "cards.peek.allow": "Allow",
+  "cards.peek.approve": "Approve",
+  "cards.peek.plan": "Plan: {title}",
   // Osobní
   "cards.clock.title": "Time",
   "cards.clock.week": "week {n}",

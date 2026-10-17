@@ -2036,6 +2036,7 @@ name = "ledge"
 version = "0.2.0"
 dependencies = [
  "chrono",
+ "memchr",
  "notify",
  "parking_lot",
  "regex",

@@ -20,6 +20,7 @@ const PANEL_FILES = {
   zkratky: ["panels/Hotkeys.tsx"],
   zaloha: ["panels/Backup.tsx"],
   oaplikaci: ["panels/About.tsx"],
+  akce: ["panels/Actions.tsx", "../actions/ScriptsSettings.tsx"],
 };
 const ALL_FILES = [...new Set(Object.values(PANEL_FILES).flat())];
 const src = Object.fromEntries(ALL_FILES.map((f) => [f, read(f)]));

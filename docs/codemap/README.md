@@ -8,6 +8,7 @@ oprav i jeho mapu (je to součást hotové práce).
 |---|---|---|
 | Claude session, subagenti, otevření, hooky | [sessions.md](sessions.md) | `sessions.rs`, `sessionlive.rs`, `winfocus.rs`, `subagents.rs`, `hooksetup.rs`, `claude/*`, `src/ClaudeSessions.tsx` |
 | Limity Claude 5h / týden: wrapper stavového řádku, zapojení, připomínka resetu | [limits.md](limits.md) | `limits.rs`, `limitslive.rs`, `statusline.rs`, `statuslinesetup.rs`, `commands/limits.rs`, `src/limits/*` |
+| Útrata Claude (odhad v cenách API): transcripty, inkrementální index, ceník, sekce v kartě Claude | [costs.md](costs.md) | `usage/*` (parse, price, index, view), `costslive.rs`, `commands/costs.rs`, `src/costs/*` |
 | Poznámky, kategorie, Markdown, výběry | [notes.md](notes.md) | `notes/*` (md, edit, store, frontmatter…), `notesync/*`, `src/notes/*` |
 | Projekty, loga, klonování, výkon snapshotu | [projects-icons-perf.md](projects-icons-perf.md) | `icons.rs`, `iconimg.rs`, `cloning.rs`, `resolve.rs`, `src/logos.ts` |
 | Nastavení: shell, panely, záloha, dialogy, strop výšky šuplíku | [settings.md](settings.md) | `src/Settings.tsx`, `src/settings/*`, `src/fit.ts`, `configerr.rs`, `configio.rs`, `projectdetect.rs`, `drawerfit.rs`, `commands/settings.rs` |

@@ -45,6 +45,7 @@ const DYNAMIC = [
   { file: "onboarding/Wizard.tsx", key: "s.key", why: "kroky průvodce STEPS — " + PAIRS },
   { file: "palette/items.ts", key: "pn.key", why: "panely z settings/registry.ts — " + PAIRS },
   { file: "palette/items.ts", key: "pn.kw[0]", why: "klíčová slova panelů z settings/registry.ts — " + PAIRS },
+  { file: "palette/winsettings.ts", key: "p.name[0]", why: "stránky Nastavení Windows WIN_PAGES — " + PAIRS },
   { file: "palette/Palette.tsx", key: "...SECTION_LABEL[r().item.section]", why: PAIRS },
   { file: "settings/catalog.ts", key: "p.key", why: "název panelu (`own()` a registry.ts) — " + PAIRS },
   { file: "settings/catalog.ts", key: "p.kw[0]", why: "klíčová slova panelu — " + PAIRS },

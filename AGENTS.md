@@ -56,6 +56,8 @@ Typické úpravy:
   `limits` (limity Claude 5h / týden, ve výchozím stavu vypnuto).
 - **Připomínka resetu limitu** — `claude.limitsReminder` (výchozí `true`): když 5h nebo týdenní limit
   Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
+- **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
+  ceny v cenách API podle projektu a dne (viz „Útrata Claude (odhad)“); `false` = sekce zmizí, nic se nečte.
 - **Vzhled** — sekce `appearance` (Nastavení → Vzhled a animace; chybějící sekce = dnešní vzhled):
   `theme` (`dark` výchozí, `midnight`, `graphite`, `nord`, `light`, `contrast`), `accent` (`#rrggbb`,
   prázdné = akcent motivu), `density` (`compact|normal|comfy`), `fontScale` 0.85–1.25, `radius`
@@ -77,6 +79,10 @@ Typické úpravy:
 - **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Šuplík a proužek →
   Kompaktní paleta příkazů): `Ctrl+K` / 🔍 ukáže jen vyhledávací pole, výsledky se rozbalí až při psaní,
   s prázdným polem šipka dolů ukáže nedávné. Chybějící sekce `palette` = dnešní chování.
+  `palette.winSettings` (výchozí `true`; tamtéž → Nastavení Windows v paletě): při psaní paleta najde
+  i stránky Nastavení Windows (`ms-settings:…`) a klasické ovládací panely (`control.exe /name
+  Microsoft.…`) — česky i anglicky, bez diakritiky. Jen cíle z dokumentace Microsoftu
+  (`src/palette/winsettings.ts`); jádro pustí jen tvar `ms-settings:<a-z0-9->` / `control:Microsoft.<Jméno>`.
 - **Proužek: kolik session čeká** — položka `strip.items` `"waiting"` („2 čekají“, jantarová pilulka):
   počet různých Claude session, které čekají na schválení nebo otázku; 0 = segment se neukáže. Nový
   config ji má za `claude`. Starý config (bez `strip.itemsRev`) ji při načtení dostane jednou za
@@ -94,6 +100,10 @@ Typické úpravy:
   přežije restart; smazání souboru = vypnuto po dalším startu). Vypnutí: znovu spustit Ledge
   (zástupce / Start), hlavní zkratka `hotkeys.toggle` (vypne a otevře šuplík) nebo `hotkeys.gameMode`.
   Ve skutečné fullscreen hře tyhle cesty herní režim jen vypnou, šuplík se neotevře.
+- **Skripty** — sekce `scripts` (Nastavení → Rychlé akce → Skripty): `enabled` (výchozí `true`, ale nic
+  se neukáže, dokud složka neexistuje), `dir` (chybí = `%USERPROFILE%\Ledge\scripts`, `%PROMĚNNÉ%` se
+  rozbalí, jinak absolutní cesta), `inActions` (výchozí `false`; `true` = i dlaždice v kartě Rychlé
+  akce). Formát skriptů viz „Skripty (Script Commands)“ níže.
 
 ## Rychlé akce (`actions`)
 
@@ -126,6 +136,46 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   `<host>.miss`); znovu jen tlačítkem „Obnovit“ v Nastavení. Nic se nestahuje periodicky.
 - Starší `personal.links` dál fungují (karta Odkazy); Nastavení → Rychlé akce nabídne převod, který
   odkazy zkopíruje (nemaže je).
+
+### Skripty (Script Commands)
+
+Soubory `.ps1`, `.cmd`/`.bat`, `.py`, `.js`/`.mjs` přímo ve složce skriptů (bez podsložek, ne skryté
+`.x`) s hlavičkou v komentáři se objeví v paletě (`Ctrl+K`) jako „Skript“. Soubor bez jediného řádku
+`@ledge.` je pomocný modul a nezobrazí se. Příklad (`vycistit-temp.ps1`):
+
+```powershell
+# @ledge.title Vyčistit temp
+# @ledge.description Smaže dočasné soubory starší než týden
+# @ledge.icon 🧹
+# @ledge.mode output
+# @ledge.args -Days 7
+param([int]$Days = 7)
+Get-ChildItem $env:TEMP | Where-Object LastWriteTime -lt (Get-Date).AddDays(-$Days) | Remove-Item -Recurse -ErrorAction SilentlyContinue
+```
+
+- Komentář: `#` (`.ps1`, `.py`; i uvnitř `<# … #>` / docstringu), `::` nebo `REM` (`.cmd`/`.bat` — jinak
+  by se řádek provedl), `//` (`.js`/`.mjs`; i uvnitř `/* … */`). Čte se jen prvních 4 KB; u opakovaného
+  klíče platí první, neznámé klíče se přeskočí.
+- Klíče: `title` (**povinný**, ≤ 80 znaků) · `description` (podtitulek) · `icon` (emoji / ≤ 8 znaků místo
+  monogramu) · `mode`: `output` (výchozí — bez okna, výstup v šuplíku jako u skryté akce), `hidden`
+  (bez okna, jen hláška hotovo / chyba), `terminal` (viditelné okno konzole, zůstane otevřené) ·
+  `confirm` (bez hodnoty / `true` = ptát se před každým spuštěním) · `args` (pevné argumenty, mezery
+  v `"…"`, bez uvozovek uvnitř; ≤ 32) · `group` (skupina v kartě, výchozí „Skripty“) · `timeout` (s bez
+  okna, 1–3600, výchozí 60 — pak se strom procesu zabije). Chybná hlavička = skript se ukáže
+  s problémem a nespustí se.
+- Spuštění (pracovní složka = složka skriptů): `.ps1` → `powershell -NoProfile -ExecutionPolicy
+  Bypass -Command "& 'cesta' 'arg'"` (politika jen pro ten proces; skript s diakritikou ulož jako
+  UTF-8 **s BOM**, Windows PowerShell 5.1 jinak čte ANSI) · `.cmd`/`.bat` → `cmd /d /s /c` · `.py` →
+  `py.exe` / `python.exe` z PATH · `.js`/`.mjs` → `node.exe` z PATH. Aliasy Microsoft Storu
+  (`…\Microsoft\WindowsApps`) se nepočítají; chybí-li interpret, skript se ukáže s problémem.
+- **Souhlas**: skript je cizí kód — první spuštění se vždy potvrzuje v šuplíku (cesta + začátek
+  SHA-256 obsahu). Potvrzení se uloží jako otisk cesty, obsahu, režimu a argumentů do
+  `%LOCALAPPDATA%\Ledge\actions-consent.json` (stejný soubor jako souhlasy akcí); **jakákoli změna
+  souboru = nové potvrzení**. Soubor se při spuštění čte a hashuje znovu (ne z cache). Agent smí
+  skripty do složky psát, ale spustit je bez potvrzení člověka nejde; soubor souhlasů nikdy nezapisuj.
+- Načítání bez watcheru: při otevření palety (a šuplíku, je-li `inActions`) jeden výpis složky,
+  hlavička + hash jen u souborů se změněným mtime / velikostí. Nejvýš 200 skriptů (podle jména),
+  soubor nad 1 MB se nespustí.
 
 ## Poznámky
 
@@ -247,8 +297,9 @@ schválí sám sebe.
 
 Běžící session se **nikdy** neresumuje (prokládání zpráv). Okno se přepíná jen na výslovný klik.
 
-**Schvalování** (hook `PermissionRequest` → `POST /permission`, `src-tauri/src/claude/mod.rs` + `claude/rules.rs`,
-UI `PendingRow` / peek + `src/sessions/PermExtra.tsx`). Povolit jen klik člověka (nebo zkratka approve/deny).
+**Schvalování** (hook `PermissionRequest` → `POST /permission`, `src-tauri/src/claude/mod.rs` + `claude/rules.rs`
++ `claude/preview.rs`/`diff.rs` + `claude/plan.rs`, UI `PendingRow` / peek + `src/sessions/PermExtra.tsx`,
+`DiffPreview.tsx`, `PlanReview.tsx`). Povolit jen klik člověka (nebo zkratka approve/deny).
 Odpovědi (`hookSpecificOutput.decision`, tvar podle dokumentace hooků):
 
 | klik | `decision` |
@@ -258,6 +309,9 @@ Odpovědi (`hookSpecificOutput.decision`, tvar podle dokumentace hooků):
 | Zamítnout (i zkratka) | `{"behavior":"deny","message":"Zamítnuto v Ledge."}` |
 | **Zamítnout s důvodem…** | `{"behavior":"deny","message":"Zamítnuto v Ledge: <důvod>"}` (≤ 500 znaků) |
 | termín / vyřízeno jinde | prázdné tělo = zeptá se terminál |
+| plán: **Schválit** (i zkratka approve) | `{"behavior":"allow"}` |
+| plán: **Schválit a povolit úpravy** (jen klik) | `{"behavior":"allow","updatedPermissions":[{"type":"setMode","mode":"acceptEdits","destination":"session"}]}` |
+| plán: **Vrátit s připomínkou…** | `{"behavior":"deny","message":"Plán vrácen z Ledge s připomínkou: <text>"}` (≤ 500 znaků; prázdná = obyčejné zamítnutí) |
 
 „Vždy povolit“: pravidlo zapíše **Claude Code sám**, Ledge settings.json needituje. Karta před klikem ukáže přesné
 pravidlo a cíl: výchozí projekt lokálně (`localSettings` → `.claude/settings.local.json` v projektu), v rozbalení
@@ -265,8 +319,22 @@ uživatelsky (`userSettings` → `~/.claude/settings.json`) nebo jen tato sessio
 Pravidlo = návrh Clauda (`permission_suggestions`, jen `addRules` s `behavior:"allow"` pro týž nástroj), bez návrhu
 přesný jednoduchý příkaz Bash/PowerShell (bez `*` a operátorů shellu); jinak se tlačítko neukáže (Edit/Write bez
 návrhu nikdy). Tauri `decide(id, allow, extra?)`, `extra = {always?: "localSettings"|"userSettings"|"session",
-reason?: string}` — bez `extra` jako dřív; pravidlo si Rust bere z čekající žádosti, z UI jde jen cíl. Návrh je i v
+reason?: string, mode?: "acceptEdits"}` — bez `extra` jako dřív; pravidlo si Rust bere z čekající žádosti, z UI jde jen cíl. Návrh je i v
 `GET /status` (`pending[].always`).
+
+**Náhled změny** (Edit/Write): karta ukáže sbalené „+12 −3 · soubor“, klik rozbalí řádkový diff (kontext 3 řádky,
+strop 400 řádků s hláškou). Rust ho sestaví **jednou při příchodu žádosti** (`preview::for_request`, ne ve snapshotu):
+aktuální soubor čte max 512 KB s termínem 1,5 s; Edit = diff celého souboru před/po nahrazení `old_string` (čísla
+řádků; `replace_all` = všechny výskyty), když `old_string` v souboru není nebo soubor nejde přečíst, jen řetězce bez
+čísel; Write = diff proti aktuálnímu obsahu, neexistující soubor = „nový soubor, N řádků“ + prvních 40 řádků;
+binární / ne-UTF-8 = „nelze zobrazit“, nad 512 KB = „příliš velké“. NotebookEdit náhled nemá. V `GET /status` jako
+`pending[].preview`.
+
+**Review plánu** (`ExitPlanMode`): když přijde `PermissionRequest` s `tool_name:"ExitPlanMode"`, karta ukáže plán
+(`tool_input.plan`, jinak obsah `planFilePath`; ≤ 64 k znaků) jako Markdown přes renderer poznámek (escapuje Rust),
+sbalitelný, se scrollem uvnitř; peek ukáže „Plán: <první nadpis>“. „Vždy povolit“ u plánu není. `extra.mode:
+"acceptEdits"` (jen u plánu, jen s `id`) = „Schválit a povolit úpravy“; jiný režim IPC odmítne. Zda Claude Code
+ExitPlanMode přes `PermissionRequest` posílá, dokumentace neříká — když ne, karta plánu se prostě neobjeví.
 
 **Zapojení hooků** (Nastavení → Claude Code → „Zapojit hooky“, `src-tauri/src/hooksetup.rs`): do
 `~/.claude/settings.json` (nebo `%CLAUDE_CONFIG_DIR%`) přidá http hooky na `http://127.0.0.1:<claude.port>`:
@@ -328,6 +396,23 @@ peek (bez fokusu, ~15 s) a blikne proužkem zeleně; ve fullscreen nic (propadne
 tiše. Ledge čte soubory na událost watcheru (`limitslive.rs`), v klidu žádné pollování; budí se jen v termínu
 resetu. Tauri: `statusline_status`, `statusline_install`, `statusline_remove`; stav ve snapshotu (`limits`).
 Mapa: `docs/codemap/limits.md`.
+
+## Útrata Claude (odhad)
+
+Sekce „Útrata Claude (odhad)“ dole v kartě Claude (rozbalovací, výchozí sbalená): dnes / 7 dní / 30 dní,
+top projekty, modely, sloupce po dnech. Je to **odhad v cenách API, ne účet** — předplatné Pro/Max se po
+tokenech neúčtuje. Zdroj = lokální transcripty Claude Code `~/.claude/projects/<slug>/**/*.jsonl`
+(`CLAUDE_CONFIG_DIR` platí), řádky `type:"assistant"` s `message.usage`; stejná odpověď API (streamované bloky,
+kopie po resume/forku) se počítá jednou podle `requestId` + `message.id`. Den = místní půlnoc, projekt podle
+`cwd` (worktree → hlavní checkout, jinak název složky).
+
+Výkon: přepočet jen po rozbalení sekce / otevření šuplíku s rozbalenou sekcí, nejvýš 1× za 60 s, ve vlákně
+s nízkou prioritou CPU i disku; v klidu nic. Index `%LOCALAPPDATA%\Ledge\usage-index.json` (per soubor offset,
+délka, mtime; agregace den × cwd × model) + `usage-index.seen` (viděné odpovědi v okně, 12 B na odpověď) —
+čtou se jen přírůstky, soubory se změnou před začátkem okna se neotevírají. Smazání obou souborů = přepočet
+od nuly. Ceník (USD / 1M tokenů, datum ověření, zdroj) je v `src-tauri/src/usage/price.rs`; model, který
+ceník nezná, ukáže tokeny a cenu „—“. Config `claude.costs` (výchozí `true`). Tauri: `costs_refresh`; stav ve
+snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
 
 ## Instalace a aktualizace
 

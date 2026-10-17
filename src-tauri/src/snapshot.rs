@@ -51,9 +51,16 @@ pub(crate) struct Snapshot {
     hooks: hooksetup::HooksStatus,
     /// limity Claude 5h / týden (`limitslive::view`, jen paměť)
     limits: crate::limitslive::LimitsView,
+    /// útrata Claude — odhad v cenách API (`costslive::view`, jen paměť)
+    costs: crate::costslive::CostsView,
     notes_enabled: bool,
     /// kompaktní paleta (`palette.compact`, `src/palette/compact.ts`)
     palette_compact: bool,
+    /// hledání stránek Nastavení Windows v paletě (`palette.winSettings`, `src/palette/winsettings.ts`)
+    palette_win_settings: bool,
+    /// skripty jako dlaždice karty Rychlé akce (`scripts.inActions`; jinak prázdné — paleta si je načte sama)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    scripts: Vec<crate::scripts::ScriptView>,
     /// karta Poznámky: nehotové připomínky do konce dneška, pak nejnovější — nejvýš `CARD_ROWS`
     notes: Vec<notes::NoteView>,
     /// kolik poznámek se do karty nevešlo (načtou se přes `note_list`)
@@ -188,8 +195,11 @@ pub(crate) fn snapshot() -> Snapshot {
         sessions,
         hooks: hooksetup::status_cached(cfg.claude.port),
         limits: crate::limitslive::view(),
+        costs: crate::costslive::view(),
         notes_enabled: cfg.notes.enabled,
         palette_compact: cfg.palette.compact,
+        palette_win_settings: cfg.palette.win_settings,
+        scripts: crate::scripts::snapshot_views(&cfg.scripts),
         notes: notes_card,
         notes_more,
         reminders,

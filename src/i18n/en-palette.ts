@@ -8,6 +8,8 @@ registerDict("en", {
   "palette.section.claude": "Claude",
   "palette.section.settings": "Settings",
   "palette.section.app": "Ledge",
+  "palette.section.script": "Script",
+  "palette.section.windows": "Windows",
   "palette.project.stop": "Stop {name}",
   "palette.project.launch": "Launch {name}",
   "palette.project.folder": "Open {name} folder",

@@ -15,11 +15,16 @@
 //! Ochrana: požadavky s hlavičkou `Origin` (prohlížeč) se odmítají; Host musí být loopback.
 //!
 //! Podmoduly: `bridge` (HTTP server), `hygiene` (hlídač nedokončené práce, git), `paths` (cesty a
-//! porcelain, čisté), `questions` (otázky Clauda), `rules` („Vždy povolit“ a důvod zamítnutí, čisté). Tady stav session a schvalování. Mapa: `docs/codemap/sessions.md`.
+//! porcelain, čisté), `questions` (otázky Clauda), `rules` („Vždy povolit“ a důvod zamítnutí, čisté),
+//! `preview` + `diff` (náhled změny Edit/Write v kartě), `plan` (review plánu ExitPlanMode). Tady stav
+//! session a schvalování. Mapa: `docs/codemap/sessions.md`.
 
 mod bridge;
+pub mod diff;
 mod hygiene;
 mod paths;
+pub mod plan;
+pub mod preview;
 mod questions;
 pub mod rules;
 #[cfg(test)]
@@ -48,6 +53,10 @@ pub enum Decision {
     Deny,
     /// Zamítnout s důvodem pro Clauda (`decision.message`), už očištěný `rules::clean_reason`
     DenyWith(String),
+    /// plán: povolit + `setMode` pro session (`plan.rs`)
+    AllowMode(plan::Mode),
+    /// plán: vrátit s připomínkou (`decision.message`), už očištěnou `rules::clean_reason`
+    ReturnPlan(String),
     /// nech to na terminálu
     Pass,
 }
@@ -65,6 +74,10 @@ pub struct Pending {
     pub expires_at: u64,
     /// návrh „Vždy povolit“ (přesné pravidlo); `None` = tlačítko se neukáže
     pub always: Option<rules::Always>,
+    /// náhled změny Edit/Write (`preview.rs`) — sestavený jednou při příchodu žádosti
+    pub preview: Option<preview::Preview>,
+    /// plán k review (`ExitPlanMode`, `plan.rs`); `Some` = karta plánu místo obyčejného schválení
+    pub plan: Option<plan::Plan>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -224,11 +237,16 @@ impl Claude {
 
     /// Klik s doplňkem (`decide(id, allow, extra?)`): „Vždy povolit“ do cíle / důvod zamítnutí. Pravidlo
     /// bere z čekající žádosti (to, co karta ukázala), nikdy z IPC. „Vždy“ jen pro konkrétní `id`.
+    /// U plánu rozhoduje `plan::resolve` (režim / připomínka; „Vždy“ ne), jinde režim nedává smysl.
     pub fn decide_with(&self, id: Option<u64>, allow: bool, extra: &rules::Extra) -> bool {
-        if extra.always.is_some() && id.is_none() {
+        if (extra.always.is_some() || extra.mode.is_some()) && id.is_none() {
             return false;
         }
-        self.decide_by(id, |p| rules::resolve(allow, extra, p.always.as_ref()))
+        self.decide_by(id, |p| match (&p.plan, extra.mode) {
+            (Some(_), _) => plan::resolve(allow, extra),
+            (None, Some(_)) => None,
+            (None, None) => rules::resolve(allow, extra, p.always.as_ref()),
+        })
     }
 
     /// `f` z čekající žádosti udělá rozhodnutí; `None` = nic se nerozhodne, žádost čeká dál.
@@ -275,6 +293,14 @@ impl Claude {
         let session_id = s(body, "session_id");
         let cwd = s(body, "cwd");
         let timeout = *self.timeout.lock();
+        // čtení souborů jen teď (1×, s limitem a termínem), mimo zámek; snapshot už jen kopíruje
+        let preview = preview::for_request(&tool, &input, &cwd);
+        let plan = if tool == plan::TOOL { plan::for_request(&input, &cwd) } else { None };
+        let summary = match &plan {
+            Some(p) if !p.title.is_empty() => p.title.clone(),
+            _ => summarize(&tool, &input),
+        };
+        let always = if plan.is_some() { None } else { rules::propose(&tool, &input, body.get("permission_suggestions")) };
         let (tx, rx) = mpsc::channel();
         let id = {
             let mut g = self.inner.lock();
@@ -287,10 +313,12 @@ impl Claude {
                     session_id: session_id.clone(),
                     cwd: cwd.clone(),
                     tool: tool.clone(),
-                    summary: summarize(&tool, &input),
+                    summary,
                     created_at: now,
                     expires_at: now + timeout.as_millis() as u64,
-                    always: rules::propose(&tool, &input, body.get("permission_suggestions")),
+                    always,
+                    preview,
+                    plan,
                 },
                 tx,
             ));
@@ -481,6 +509,70 @@ mod tests {
             assert!(c.decide(Some(p.id), Decision::Deny));
             assert_eq!(h.join().unwrap(), Decision::Deny);
         }
+    }
+
+    /// Čeká, až `handle_permission` ve vlákně vystaví žádost.
+    fn wait_pending(c: &Claude) -> Pending {
+        let t0 = std::time::Instant::now();
+        loop {
+            if let Some(p) = c.pending().pop() {
+                return p;
+            }
+            assert!(t0.elapsed() < Duration::from_secs(5));
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    /// Náhled Write se sestaví při příchodu žádosti ze skutečného souboru (tempdir) a jde se žádostí.
+    #[test]
+    fn write_request_carries_preview() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(t.path().join("a.txt"), "a\nb\n").unwrap();
+        let dir = t.path().to_string_lossy().replace('\\', "/");
+        let c = Claude::new(Arc::new(|| {}), Duration::from_secs(5));
+        let c2 = c.clone();
+        let req = json!({"session_id": "s", "cwd": dir, "tool_name": "Write", "tool_input": {"file_path": "a.txt", "content": "a\nB\n"}});
+        let h = std::thread::spawn(move || c2.handle_permission(&req));
+        let p = wait_pending(&c);
+        let pv = p.preview.expect("náhled");
+        assert_eq!((pv.added, pv.removed, pv.numbered, pv.file.as_str()), (1, 1, true, "a.txt"));
+        assert!(p.plan.is_none());
+        assert!(c.decide(Some(p.id), Decision::Deny));
+        assert_eq!(h.join().unwrap(), Decision::Deny);
+    }
+
+    /// ExitPlanMode: karta plánu (titulek, bez „Vždy povolit“), režim jen u plánu, připomínka = vrácení.
+    #[test]
+    fn plan_request_and_actions() {
+        let c = Claude::new(Arc::new(|| {}), Duration::from_secs(5));
+        let run = |c: &Claude, input: Value| {
+            let c2 = c.clone();
+            let req = json!({"session_id": "s", "cwd": "C:/p", "tool_name": "ExitPlanMode", "tool_input": input,
+                "permission_suggestions": [{"type": "addRules", "rules": [{"toolName": "ExitPlanMode"}], "behavior": "allow", "destination": "localSettings"}]});
+            std::thread::spawn(move || c2.handle_permission(&req))
+        };
+        let h = run(&c, json!({"plan": "# Oprava přihlášení\n\n1. testy"}));
+        let p = wait_pending(&c);
+        assert_eq!(p.summary, "Oprava přihlášení");
+        assert!(p.always.is_none(), "u plánu nikdy Vždy povolit");
+        assert_eq!(p.plan.as_ref().map(|x| x.title.as_str()), Some("Oprava přihlášení"));
+        let mode = rules::Extra { mode: Some(plan::Mode::AcceptEdits), ..Default::default() };
+        assert!(!c.decide_with(None, true, &mode), "režim jen s konkrétním id");
+        assert!(c.decide_with(Some(p.id), true, &mode));
+        assert_eq!(h.join().unwrap(), Decision::AllowMode(plan::Mode::AcceptEdits));
+
+        let h = run(&c, json!({"plan": "# P"}));
+        let p = wait_pending(&c);
+        assert!(c.decide_with(Some(p.id), false, &rules::Extra { reason: Some("nejdřív testy".into()), ..Default::default() }));
+        assert_eq!(h.join().unwrap(), Decision::ReturnPlan("nejdřív testy".into()));
+
+        // bez plánu (prázdný vstup) = obyčejná karta; režim tam nic nerozhodne
+        let h = run(&c, json!({}));
+        let p = wait_pending(&c);
+        assert!(p.plan.is_none());
+        assert!(!c.decide_with(Some(p.id), true, &mode));
+        assert!(c.decide(None, Decision::Allow), "zkratka dál schválí nejstarší");
+        assert_eq!(h.join().unwrap(), Decision::Allow);
     }
 
     #[test]

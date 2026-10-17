@@ -106,6 +106,7 @@ export default function DrawerPanel(_p: PanelProps) {
 
       <Section title={t("settings.drawer.palette", "Paleta příkazů")}>
         <Row id="palette.compact"><Toggle path="palette.compact" label={t("settings.f.palette.compact", "Kompaktní paleta příkazů")} /></Row>
+        <Row id="palette.winSettings"><Toggle path="palette.winSettings" label={t("settings.f.palette.winSettings", "Nastavení Windows v paletě")} /></Row>
       </Section>
 
       <Section title={t("settings.drawer.strip", "Proužek")}>

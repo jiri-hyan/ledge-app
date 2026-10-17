@@ -44,6 +44,7 @@ export function ConfirmAction(p: { where: string }) {
           <div class="grow">
             <div class="name">{t("actions.confirm.title", "Spustit „{label}“?", { label: x().a.label })}</div>
             <div class="code" title={x().a.confirmText}>{x().a.confirmText}</div>
+            <Show when={x().a.confirmNote}>{(n) => <div class="act-confirm-note">{n()}</div>}</Show>
           </div>
           <button class="mini" onClick={() => answerConfirm(false)}>{t("actions.confirm.cancel", "Zrušit")}</button>
           <button class="mini ok" onClick={() => answerConfirm(true)}>{t("actions.confirm.run", "Spustit")}</button>

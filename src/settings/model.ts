@@ -75,6 +75,7 @@ const FIELD_PANELS: [string, string][] = [
   ["onboarding", "vitejte"],
   ["ui", "vzhled"],
   ["palette", "suplik"],
+  ["scripts", "akce"],
 ];
 
 export function panelForField(field: string | null | undefined): string | null {

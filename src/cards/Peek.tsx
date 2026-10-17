@@ -1,6 +1,6 @@
 // Peek = malý šuplík (bez fokusu): první čekající schválení Clauda (Povolit / Zamítnout jen klikem
-// člověka; pod tím „Vždy povolit“ a „Zamítnout s důvodem…“ z `sessions/PermExtra.tsx`), jinak otázka Clauda (`QuestionCard` — odpověď kliknutím),
-// jinak připomínka resetu limitu Claude (`LimitsPeek`), jinak připomínky po termínu.
+// člověka; pod tím sbalený náhled diffu / plánu a „Vždy povolit“ a „Zamítnout s důvodem…“ z `sessions/PermExtra.tsx`),
+// jinak otázka Clauda (`QuestionCard` — odpověď kliknutím), jinak připomínka resetu limitu Claude (`LimitsPeek`), jinak připomínky po termínu.
 import { Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { IconShield } from "../icons";
@@ -8,6 +8,9 @@ import { ReminderPeek } from "../notes/NotesCard";
 import QuestionCard from "../questions/QuestionCard";
 import PermExtra from "../sessions/PermExtra";
 import LimitsPeek from "../limits/LimitsPeek";
+import DiffPreview from "../sessions/DiffPreview";
+import PlanReview from "../sessions/PlanReview";
+import { planTitle } from "../sessions/plan";
 import { t } from "../i18n";
 import "./peek.css";
 
@@ -32,11 +35,15 @@ export default function Peek(p: { s: Snapshot }) {
           <div class="ico"><IconShield /></div>
           <div class="tx">
             <b>{t("cards.peek.waiting", "Claude čeká · {where}", { where: where() ?? "" })}{more() > 0 ? ` (+${more()})` : ""}</b>
-            <div class="code" title={pd().summary}>{pd().tool}: {pd().summary}</div>
+            <Show when={pd().plan} fallback={<div class="code" title={pd().summary}>{pd().tool}: {pd().summary}</div>}>
+              <div class="code" title={pd().summary}>{t("cards.peek.plan", "Plán: {title}", { title: planTitle(pd()) })}</div>
+            </Show>
+            <Show when={pd().preview}>{(pv) => <DiffPreview pv={pv()} />}</Show>
+            <Show when={pd().plan}>{(pl) => <PlanReview pd={pd()} plan={pl()} open={false} />}</Show>
             <PermExtra pd={pd()} />
           </div>
           <button class="btn" onClick={() => api.decide(pd().id, false)}>{t("cards.peek.deny", "Zamítnout")}</button>
-          <button class="btn pri" onClick={() => api.decide(pd().id, true)}>{t("cards.peek.allow", "Povolit")}</button>
+          <button class="btn pri" onClick={() => api.decide(pd().id, true)}>{pd().plan ? t("cards.peek.approve", "Schválit") : t("cards.peek.allow", "Povolit")}</button>
         </div>
       )}
     </Show>

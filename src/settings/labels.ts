@@ -27,6 +27,11 @@ export const FIELDS: Record<string, FieldDef> = {
   "drawer.keepWarmS": { panel: "suplik", label: "Uvolnit paměť při nečinnosti", hint: "Po minutě se zavřeným šuplíkem Ledge uvolní paměť (~150 MB → desítky MB); první otevření pak trvá pár sekund. S animacemi nesouvisí.", kw: "paměť ram úspora úsporný režim výkon webview" },
   autostart: { panel: "suplik", label: "Spouštět po startu Windows", kw: "start přihlášení" },
   "palette.compact": { panel: "suplik", label: "Kompaktní paleta příkazů", hint: "Ctrl+K a 🔍 ukážou jen vyhledávací pole; výsledky se rozbalí až při psaní, nedávné šipkou dolů", kw: "paleta příkazů ctrl+k hledání powertoys malá jen pole" },
+  "palette.winSettings": { panel: "suplik", label: "Nastavení Windows v paletě", hint: "Při psaní v paletě najde i stránky Nastavení Windows (Bluetooth, Zvuk, Wi-Fi…) a klasické ovládací panely", kw: "windows settings ms-settings ovládací panely control bluetooth zvuk wifi" },
+  // Rychlé akce — skripty (`actions/ScriptsSettings.tsx`)
+  "scripts.enabled": { panel: "akce", label: "Skripty v paletě", hint: "Skripty ze složky skriptů jako položky palety (Ctrl+K). Dokud složka neexistuje, nic se neukáže.", kw: "script commands raycast skript powershell python node cmd bat" },
+  "scripts.dir": { panel: "akce", label: "Složka skriptů", hint: "Prázdné = Ledge\\scripts ve tvém profilu. %PROMĚNNÉ% se rozbalí.", kw: "složka cesta skripty" },
+  "scripts.inActions": { panel: "akce", label: "Skripty i v kartě Rychlé akce", hint: "Dlaždice skriptů ve skupině Skripty (jinak jen v paletě)", kw: "dlaždice karta skripty" },
   fullscreen: { panel: "suplik", label: "Hry a video na celou obrazovku", hint: "Ledge je při nich vždy neaktivní: nic neukazuje a nebere myš ani fokus", kw: "fullscreen hra celá obrazovka" },
   gameMode: { panel: "suplik", label: "Herní režim", hint: "Ledge zmizí jako při hře na celou obrazovku, i po restartu, dokud ho nevypneš: znovu spusť Ledge (zástupce nebo Start), nebo stiskni zkratku šuplíku či herního režimu", kw: "hra game skrýt schovat nerušit mrtvý" },
   // Vzhled a animace (panel `Appearance.tsx`; kotvy `f-…` jsou na jeho kartách a řádcích)
@@ -47,6 +52,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "claude.statusLine": { panel: "claude", label: "Stavový řádek pro limity", hint: "Ledge obalí stavový řádek Claude Code a čte z něj limity 5h / týden; tvůj původní poběží dál", kw: "limit kvóta 5h týden statusline" },
   "claude.limitsReminder": { panel: "claude", label: "Připomenout reset limitu", hint: "Když limit 5h nebo týden dosáhne 100 %, v čase resetu krátce vyjede šuplík (ve hře nic)", kw: "limit kvóta reset připomínka" },
   "claude.toast": { panel: "claude", label: "Oznámení Windows", hint: "Když Claude čeká na schválení nebo otázku, nebo dokončí práci. Nebere fokus; ve hře, v herním režimu a při Nerušit nikdy", kw: "toast oznámení notifikace upozornění hotovo" },
+  "claude.costs": { panel: "claude", label: "Útrata Claude (odhad)", hint: "Sekce v kartě Claude: tokeny a odhad ceny v cenách API (ne účet) podle projektu a dne z lokálních transcriptů; počítá se jen po rozbalení", kw: "útrata cena tokeny dolary náklady odhad" },
   "claude.hooks": { panel: "claude", label: "Hooky v Claude Code", hint: "Zapojení Ledge do ~/.claude/settings.json", kw: "settings.json zapojit odpojit" },
   // Poznámky
   "notes.enabled": { panel: "poznamky", label: "Rychlé poznámky a připomínky", hint: "Karta v šuplíku, připomínky v proužku", kw: "připomínky" },

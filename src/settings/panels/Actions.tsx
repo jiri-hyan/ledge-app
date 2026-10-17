@@ -8,6 +8,7 @@ import ActionEditor, { kindLabel } from "../../actions/ActionEditor";
 import { actionsApi, runAction } from "../../actions/api";
 import { linksToActions, moveItem, slugId } from "../../actions/model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../../actions/ui";
+import ScriptsSettings from "../../actions/ScriptsSettings";
 import { say, sayError } from "../../ui/toast";
 import { t, tp } from "../../i18n";
 
@@ -83,6 +84,7 @@ export default function ActionsPanel(p: PanelProps) {
   }
 
   return (
+    <>
     <div class="card wide" data-anim>
       <h4>
         <span class="ic" style="background:var(--teal)" />
@@ -169,5 +171,7 @@ export default function ActionsPanel(p: PanelProps) {
         )}
       </Show>
     </div>
+    <ScriptsSettings />
+    </>
   );
 }

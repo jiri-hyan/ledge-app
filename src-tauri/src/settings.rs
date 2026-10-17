@@ -52,6 +52,9 @@ pub(crate) fn apply_config(new: Config) {
     if old.actions != new.actions {
         crate::actionstate::refresh(None);
     }
+    if old.scripts != new.scripts {
+        crate::scripts::refresh_async();
+    }
     if old.update != new.update {
         c.updater.set_config(new.update.clone());
     }

@@ -75,6 +75,8 @@ export const api = {
   statuslineStatus: () => call<StatusLineStatus>("statusline_status"),
   statuslineInstall: () => call<StatusLineStatus>("statusline_install"),
   statuslineRemove: () => call<StatusLineStatus>("statusline_remove"),
+  /** Útrata Claude: přepočet indexu na pozadí (Rust ho pustí nejvýš 1× / 60 s); výsledek ve snapshotu. */
+  costsRefresh: () => call("costs_refresh"),
   // --- settings ---
   /** Ověří rozpracovaný config (nic nezapisuje): první chyba s polem, `null` = v pořádku. */
   checkConfig: (cfg: any) => call<FieldError | null>("check_config", { cfg }),

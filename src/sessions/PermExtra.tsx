@@ -2,6 +2,7 @@
 // „Vždy povolit“ s přesným pravidlem a cílovým souborem PŘED klikem (cíl v malém rozbalení, výchozí projekt
 // lokálně) a „Zamítnout s důvodem…“ (pole se otevře a vezme fokus až po tomto výslovném kliku).
 // Jen klik člověka — žádná klávesa pro „Vždy povolit“. Logika v `permission.ts`, pravidlo vybírá Rust.
+// U plánu (`pd.plan`, ExitPlanMode) je totéž pole „Vrátit s připomínkou…“ (Rust pošle deny + připomínku).
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { api, type DecideExtra, type Pending, type PermDest } from "../api";
 import { say, sayError } from "../ui/toast";
@@ -16,6 +17,7 @@ export default function PermExtra(p: { pd: Pending }) {
   const [why, setWhy] = createSignal<string | null>(null);
   const [took, setTook] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
+  const plan = () => p.pd.plan != null;
   let box: HTMLTextAreaElement | undefined;
   /** vrátit fokus, jen když ho vzal klik na „s důvodem…“ (a jen jednou) */
   const release = () => {
@@ -95,14 +97,14 @@ export default function PermExtra(p: { pd: Pending }) {
         )}
       </Show>
       <Show when={why() !== null} fallback={
-        <button class="sess-perm-link" disabled={busy()} onClick={openWhy}>{t("sessions.perm.denyWhy", "Zamítnout s důvodem…")}</button>
+        <button class="sess-perm-link" disabled={busy()} onClick={openWhy}>{plan() ? t("sessions.plan.return", "Vrátit s připomínkou…") : t("sessions.perm.denyWhy", "Zamítnout s důvodem…")}</button>
       }>
         <textarea
           ref={box}
           class="sess-perm-why"
           rows={2}
           maxLength={REASON_MAX}
-          placeholder={t("sessions.perm.whyPlaceholder", "Proč ne / co místo toho… (Enter odešle Claudovi, Esc zruší)")}
+          placeholder={plan() ? t("sessions.plan.placeholder", "Co v plánu změnit… (Enter pošle Claudovi, Esc zruší)") : t("sessions.perm.whyPlaceholder", "Proč ne / co místo toho… (Enter odešle Claudovi, Esc zruší)")}
           value={why() ?? ""}
           disabled={busy()}
           onInput={(e) => setWhy(e.currentTarget.value)}
@@ -110,7 +112,7 @@ export default function PermExtra(p: { pd: Pending }) {
         />
         <div class="sess-perm-line">
           <button class="mini" disabled={busy()} onClick={closeWhy}>{t("sessions.perm.cancel", "Zrušit")}</button>
-          <button class="mini" disabled={busy() || !denyExtra(why() ?? "")} onClick={() => send(false, denyExtra(why() ?? ""))}>{t("sessions.perm.denySend", "Zamítnout a poslat důvod")}</button>
+          <button class="mini" disabled={busy() || !denyExtra(why() ?? "")} onClick={() => send(false, denyExtra(why() ?? ""))}>{plan() ? t("sessions.plan.returnSend", "Vrátit plán s připomínkou") : t("sessions.perm.denySend", "Zamítnout a poslat důvod")}</button>
           <small class="sess-perm-count">{(why() ?? "").length}/{REASON_MAX}</small>
         </div>
       </Show>

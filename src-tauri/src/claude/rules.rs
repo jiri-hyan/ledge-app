@@ -87,8 +87,10 @@ pub struct Grant {
 pub struct Extra {
     /// „Vždy povolit“ do tohoto cíle (jen s `allow`)
     pub always: Option<Destination>,
-    /// důvod zamítnutí pro Clauda (jen bez `allow`)
+    /// důvod zamítnutí pro Clauda (jen bez `allow`); u plánu = připomínka
     pub reason: Option<String>,
+    /// jen plán (`plan.rs`): „Schválit a povolit úpravy“ (jen s `allow`)
+    pub mode: Option<super::plan::Mode>,
 }
 
 fn str_of<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
@@ -185,6 +187,8 @@ pub fn body(d: &Decision) -> String {
         }]})),
         Decision::Deny => wrap(json!({"behavior": "deny", "message": "Zamítnuto v Ledge."})),
         Decision::DenyWith(r) => wrap(json!({"behavior": "deny", "message": format!("Zamítnuto v Ledge: {r}")})),
+        Decision::AllowMode(m) => wrap(super::plan::allow_mode(*m)),
+        Decision::ReturnPlan(r) => wrap(json!({"behavior": "deny", "message": super::plan::return_message(r)})),
         Decision::Pass => String::new(),
     }
 }
@@ -327,7 +331,7 @@ mod tests {
     #[test]
     fn resolve_table() {
         let a = Always { rules: vec![rule("Bash", Some("ls"))], label: "Bash(ls)".into(), from_claude: false };
-        let ex = |always: Option<Destination>, reason: Option<&str>| Extra { always, reason: reason.map(str::to_string) };
+        let ex = |always: Option<Destination>, reason: Option<&str>| Extra { always, reason: reason.map(str::to_string), mode: None };
         let grant = Decision::AllowAlways(Grant { rules: a.rules.clone(), destination: Destination::Session });
         let cases: Vec<ResolveCase> = vec![
             ("povolit jako dřív", true, Extra::default(), Some(&a), Some(Decision::Allow)),

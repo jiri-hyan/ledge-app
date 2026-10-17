@@ -3,6 +3,7 @@
 // jen pohodlí), zvýraznění shody. Fokus si bere jen po výslovném kliku (`took` → při zavření
 // `releaseFocus`); rychlé akce s potvrzením se potvrzují přímo tady. Kompaktní režim
 // (`s.paletteCompact`): bez dotazu jen pole, seznam až při psaní / šipkou dolů (`compact.ts`).
+// Navíc skripty ze složky skriptů (načtou se při otevření) a s dotazem stránky Nastavení Windows (`more.ts`).
 import { createEffect, createMemo, createSignal, For, Index, on, onMount, Show } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { IconFolder, IconLink, IconNote, IconSettings, IconShield, IconTerminal } from "../icons";
@@ -10,6 +11,9 @@ import { ActionIcon, ConfirmAction, answerConfirm, confirmPending } from "../act
 import { buildItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
 import { pushRecent, rank, segments, type Ranked } from "./search";
 import { arrow, shown, visible } from "./compact";
+import { scriptItems, windowsItems } from "./more";
+import { scriptsApi } from "../actions/scripts";
+import type { ScriptView } from "../types";
 import { t } from "../i18n";
 import "./palette.css";
 
@@ -20,7 +24,7 @@ export const IconSearch = () => (
   </svg>
 );
 
-const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield };
+const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield, script: IconTerminal, windows: IconSettings };
 const RECENT_KEY = "ledge.palette.recent";
 
 function loadRecent(): string[] {
@@ -43,6 +47,7 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   const [q, setQ] = createSignal("");
   const [sel, setSel] = createSignal(0);
   const [notes, setNotes] = createSignal<NoteView[]>([]);
+  const [scripts, setScripts] = createSignal<ScriptView[]>([]);
   const [recent, setRecent] = createSignal(loadRecent());
   const [waiting, setWaiting] = createSignal(false);
   /** kompaktní paleta s prázdným polem rozbalená šipkou dolů */
@@ -53,9 +58,13 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   onMount(() => {
     requestAnimationFrame(() => input.focus());
     if (p.s.notesEnabled) api.noteList(200).then((n) => n && setNotes(n), () => {});
+    // levný sken složky skriptů (stat, jen změněné soubory); vypnuté / bez složky = prázdné
+    scriptsApi.list().then((l) => l && setScripts(l.scripts), () => {});
   });
 
-  const items = createMemo(() => buildItems(p.s, notes(), p.nav));
+  const base = createMemo(() => [...buildItems(p.s, notes(), p.nav), ...scriptItems(scripts())]);
+  // stránky Nastavení Windows jen s dotazem — přepočet při psaní nesahá na `buildItems`
+  const items = createMemo(() => [...base(), ...windowsItems(p.s, q())]);
   const recentSet = createMemo(() => new Set(recent()));
   const fold = () => ({ compact: p.s.paletteCompact, query: q(), browsing: browsing() });
   // nedávné, které v položkách pořád jsou (smazaná akce / poznámka se nepočítá)

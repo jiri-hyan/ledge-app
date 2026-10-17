@@ -78,7 +78,7 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 - `OVERLAP` (motion.ts) = `--overlap` (styles.css) = přesah v `drawer.rs`; `FULL_CLIP` 26px = `--r-shell`.
 - Nic nesmí brát fokus samo: `autofocus`/`focus()` jen na stránkách, kam se jde výslovným klikem
   (`NoteEditor`, výběry v `notes/`), nikdy v kartách hlavní stránky ani v peeku.
-- Schválení Clauda (`api.decide`) jen klikem člověka — v `Peek` a `ClaudeSessions` `PendingRow` (+ „Vždy povolit“ / „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`, fokus jen po kliku na „s důvodem…“).
+- Schválení Clauda (`api.decide`) jen klikem člověka — v `Peek` a `ClaudeSessions` `PendingRow` (+ „Vždy povolit“ / „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`, fokus jen po kliku na „s důvodem…“; u plánu „Schválit a povolit úpravy“ v `sessions/PlanReview.tsx`, náhled diffu `sessions/DiffPreview.tsx` jen rozbaluje).
 - Pořadí CSS: `styles.css` první (index.tsx), komponentové soubory ho přepisují. **Žádné natvrdo barvy,
   px písma ani délky přechodů**: barvy = token z `COLOR_KEYS` (hodnota ve všech motivech `theme/themes.ts`),
   písmo `var(--fs-*)` nebo `calc(Npx * var(--fz))`, mezery `--s*`, rohy `--r-*`, délky `--dur-1…5`

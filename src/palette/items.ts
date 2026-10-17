@@ -11,7 +11,7 @@ import type { NotePreset } from "../notes/store";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 
-export type Section = "action" | "project" | "note" | "claude" | "settings" | "app";
+export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows";
 export interface PItem extends Item {
   section: Section;
   /** rychlá akce (ikona v řádku) */
@@ -27,6 +27,8 @@ export const SECTION_LABEL: Record<Section, [string, string]> = {
   claude: ["palette.section.claude", "Claude"],
   settings: ["palette.section.settings", "Nastavení"],
   app: ["palette.section.app", "Ledge"],
+  script: ["palette.section.script", "Skript"],
+  windows: ["palette.section.windows", "Windows"],
 };
 
 export type Nav = {

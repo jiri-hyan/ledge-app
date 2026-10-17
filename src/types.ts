@@ -61,14 +61,46 @@ export interface Pending {
   expiresAt: number;
   /** návrh „Vždy povolit“ (přesné pravidlo, `claude/rules.rs`); null = tlačítko se neukáže */
   always: PermAlways | null;
+  /** náhled změny Edit/Write (`claude/preview.rs`, sestavený při příchodu žádosti); null = bez náhledu */
+  preview: EditPreview | null;
+  /** plán k review (ExitPlanMode, `claude/plan.rs`); null = obyčejné schválení */
+  plan: PlanView | null;
 }
+
+/** řádek náhledu diffu (`claude/diff.rs` `Line`); čísla 1-based, null = na té straně není */
+export interface DiffLine { kind: "ctx" | "add" | "del" | "gap"; old: number | null; new: number | null; text: string }
+/** co náhled ukazuje (`preview::Shown`) */
+export type PreviewShown = "diff" | "newFile" | "unread" | "tooBig" | "binary";
+export interface EditPreview {
+  file: string;
+  path: string;
+  shown: PreviewShown;
+  added: number;
+  removed: number;
+  lines: DiffLine[];
+  /** řádků za stropem (neukázaných) */
+  cut: number;
+  /** čísla řádků jsou ze skutečného souboru */
+  numbered: boolean;
+  replaceAll: boolean;
+  /** kolikrát je `old_string` v souboru (jen když se soubor přečetl) */
+  occurrences: number | null;
+  /** velký rozdíl ukázaný jako nahrazení bloku */
+  rough: boolean;
+  /** řádků nového obsahu (newFile / unread) */
+  total: number;
+}
+export interface PlanView { markdown: string; title: string; file: string | null; cut: boolean }
+/** režim po schválení plánu (`plan::Mode`) */
+export type PlanMode = "acceptEdits";
 
 export interface PermRule { toolName: string; ruleContent?: string }
 export interface PermAlways { rules: PermRule[]; label: string; fromClaude: boolean }
 /** kam Claude Code pravidlo zapíše (`destination` v `updatedPermissions`) */
 export type PermDest = "localSettings" | "userSettings" | "session";
-/** doplněk `decide`: „Vždy povolit“ do cíle (jen s allow) / důvod zamítnutí (jen bez allow) */
-export interface DecideExtra { always?: PermDest; reason?: string }
+/** doplněk `decide`: „Vždy povolit“ do cíle (jen s allow) / důvod zamítnutí (jen bez allow) /
+ *  u plánu režim „Schválit a povolit úpravy“ (jen s allow) */
+export interface DecideExtra { always?: PermDest; reason?: string; mode?: PlanMode }
 
 export interface SubagentRun { id: string; agentType: string; since: number }
 export interface SubagentDone { agentType: string; durationMs: number | null; endedAt: number; message: string | null }
@@ -380,6 +412,27 @@ export interface ActionView {
   confirmText: string;
   problem: string | null;
   running: boolean;
+  /** proč se ptá (skript: poprvé / po změně souboru / `@ledge.confirm`) */
+  confirmNote?: string | null;
+  /** položka je skript ze složky skriptů (`ScriptView`), ne akce z configu */
+  script?: boolean;
+}
+/** Skript ze složky skriptů (`scripts/mod.rs` → `ScriptView`): tvar akce + pár polí navíc. */
+export interface ScriptView extends ActionView {
+  script: true;
+  description: string | null;
+  mode: "hidden" | "output" | "terminal";
+  lang: "powershell" | "cmd" | "python" | "node";
+}
+/** `scripts_list`: co je ve složce (paleta, Nastavení). */
+export interface ScriptsListing {
+  enabled: boolean;
+  dir: string;
+  exists: boolean;
+  scripts: ScriptView[];
+  /** souborů nad strop 200 */
+  skipped: number;
+  error: string | null;
 }
 export interface ActionOutcome {
   message: string;
@@ -393,6 +446,10 @@ export interface ActionCheck {
 export interface Snapshot {
   /** rychlé akce (chybí jen ve starém jádře) */
   actions?: ActionView[];
+  /** skripty jako dlaždice karty (jen se `scripts.inActions`; jinak chybí) */
+  scripts?: ScriptView[];
+  /** stránky Nastavení Windows v paletě (`palette.winSettings`; chybí = staré jádro → zapnuto) */
+  paletteWinSettings?: boolean;
 }
 
 // --- appearance ---
@@ -509,4 +566,12 @@ export interface StatusLineStatus {
 export interface Snapshot {
   /** limity Claude (chybí jen ve starém jádře) */
   limits?: LimitsView;
+}
+
+// --- costs ---
+// Zrcadlo `costslive::CostsView` (Rust) — útrata Claude, odhad v cenách API (typy v `costs/model.ts`).
+export type { CostsView } from "./costs/model";
+export interface Snapshot {
+  /** útrata Claude (chybí jen ve starém jádře) */
+  costs?: import("./costs/model").CostsView;
 }
