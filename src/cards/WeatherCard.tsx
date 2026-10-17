@@ -1,6 +1,6 @@
 // Osobní: počasí z Open-Meteo (stahuje Rust `weather.rs`). Co Rust nemá, karta poctivě řekne
 // (nenastaveno / nedostupné / stará data s časem) — nic se nedopočítává.
-import { Show } from "solid-js";
+import { Show, type JSX } from "solid-js";
 import { type Snapshot } from "../api";
 import { ago, num } from "../format";
 import { t } from "../i18n";
@@ -19,13 +19,13 @@ function observedLabel(iso: string, now: number): string {
   return today ? hm : t("cards.weather.observedDay", "{d}. {m}. {time}", { d: +m[3], m: +m[2], time: hm });
 }
 
-export default function WeatherCard(p: { s: Snapshot; now: number; onSettings: () => void }) {
+export default function WeatherCard(p: { s: Snapshot; now: number; onSettings: () => void; menu?: JSX.Element }) {
   const w = () => p.s.personal.weather;
   // Rust posílá stav jen při změně — stáří dopočítat i z tiku, ať „ok“ nezůstane viset jako čerstvé
   const old = () => w().status === "stale" || (w().fetchedMs != null && p.now - w().fetchedMs! >= WX_MAX_AGE_MS);
   return (
     <div class="card" data-anim>
-      <h4><span class="ic" style="background:var(--blue)" />{t("cards.weather.title", "Počasí")} <span class="n">{w().label}</span></h4>
+      <h4><span class="ic" style="background:var(--blue)" />{t("cards.weather.title", "Počasí")} <span class="n">{w().label}</span>{p.menu}</h4>
       <Show when={w().data} fallback={
         <Show when={w().status !== "unset"} fallback={
           <div class="empty">{t("cards.weather.unset", "Nastav místo v Nastavení (zeměpisná šířka a délka). Bez něj se nic nestahuje.")} <button class="mini" onClick={p.onSettings}>{t("cards.weather.settings", "Nastavení")}</button></div>

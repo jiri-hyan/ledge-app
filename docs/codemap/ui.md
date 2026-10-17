@@ -11,14 +11,18 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 | `App.tsx` | skořápka: store snapshotu, stránky, morf, výška okna, fokus, klávesy, reflektor | `App` `apply` `prepare` `play` `closing` `report` `startNote` `editNote` `allNotes` `notesNav` |
 | `nav.ts` | stránky a navigace | `Page` `asPage` `typing` `NotesNav` |
 | `snapshot.ts` | prázdný snapshot do startu | `EMPTY_SNAPSHOT` |
-| `MainPage.tsx` | hlavní stránka: Práce (dlaždice + mřížka karet) / Osobní | `MainPage` |
+| `MainPage.tsx` | hlavní stránka: Práce (dlaždice + mřížka karet) / Osobní; viditelnost z `cards/sections.ts`, každé kartě předá `menu` (⋯), vše skryté = nápověda `page-empty` | `MainPage` |
+| `cards/sections.ts` | `drawer.sections` (zrcadlo `config::Sections`): klíče, skupiny pro Nastavení, čistá logika — co stránka ukáže, třída mřížky (`one`/`two`), změna jednoho pole configu; test `sections.test.mjs` (i shoda klíčů s config.rs) | `SECTION_KEYS` `SECTION_GROUPS` `CLAUDE_PARTS` `PERSONAL_PARTS` `mediaCardKey` `sectionOn` `visibleCards` `gridClass` `withSection` `hiddenSections` |
+| `cards/CardMenu.tsx` | ⋯ v hlavičce karty (vidět při najetí) → „Skrýt kartu“ / „Skrýt sekci: …“ (karta Claude); ukládá `get_config` → `withSection` → `save_config` (při `cfgError` ne); lišta „… skryta · Vrátit“ 6 s | `CardMenu` `HiddenNotice` `setSection` |
 | `cards/Head.tsx` | hlavička: hodiny / Zpět + název, chipy, nová verze, Práce/Osobní, nástroje | `Head` |
 | `cards/UpdatePanel.tsx` | poznámky k vydání → Instalovat (druhé potvrzení při běžících serverech) | `UpdatePanel` `install` |
 | `cards/Projects.tsx` | dlaždice, spuštění, náklon, klon, akce pod dlaždicí | `Projects` `launch` `tilt` `cloneProject` |
 | `cards/Running.tsx` · `Repos.tsx` | karta Běží (log jen rozbalený) · karta Repa (Pull jen čisté a pozadu) | `Running` `PHASE` · `Repos` `pull` |
 | `cards/Peek.tsx` | malý šuplík: první schválení Clauda, jinak `ReminderPeek` | `Peek` |
 | `cards/ActionsCard.tsx` · `palette/*` | karta Rychlé akce · paleta příkazů (Ctrl+K, 🔍) → [actions.md](actions.md) | `ActionsCard` · `Palette` `buildItems` `rank` |
-| `cards/ClockCard.tsx` · `WeatherCard.tsx` · `LinksCard.tsx` | záložka Osobní | `observedLabel` `WX_MAX_AGE_MS` `LINK_ICON` `openLink` |
+| `cards/ClockCard.tsx` · `WeatherCard.tsx` · `LinksCard.tsx` | záložka Osobní (Čas ukazuje i baterii `media/Battery.tsx`) | `observedLabel` `WX_MAX_AGE_MS` `LINK_ICON` `openLink` |
+| `timer/*` | Osobní: karta Časovač (odpočet + stopky; stav drží Rust `timer.rs`, sekundy z tiku `now`), čistá logika `model.ts` (+ `model.test.mjs`), akce `timerDo` (karta i paleta) | `TimerCard` `timerDo` `leftMs` `elapsedMs` `fmtDuration` `parseMinutes` `parsePresets` |
+| `media/*` | Osobní: Právě hraje + hlasitost, baterie, `PersonalLive` (líný start odběrů) → [media.md](media.md) | `MediaCard` `PersonalLive` `Battery` |
 | `ClaudeSessions.tsx` | karta Claude → [sessions.md](sessions.md) | |
 | `Settings.tsx` · `settings/*` · `fit.ts` | Nastavení → [settings.md](settings.md); `fit.ts` = strop výšky (`--drawer-max-h`) | `Settings` |
 | `notes/*` | poznámky → [notes.md](notes.md) | |
@@ -98,6 +102,11 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
   je `--on-light`, nejsilnější text `--t0` (ne `--white`, ta je jen na barevných logách).
 - `prefers-reduced-motion` i `appearance.motion.style = none` (`html[data-motion=none]`) vypínají CSS
   animace/přechody; WAAPI morf v `motion.ts` pak běží s délkou 0 (okamžitě, handshake stejný).
+- **Karta = `menu` slot**: karty hlavní stránky berou `menu?: JSX.Element` a vykreslí ho na konci `<h4>`; co je
+  vidět, rozhoduje jen `MainPage` přes `visibleCards` (karty, které se bez dat schovají samy — Běží, akce na
+  Práci, Přihrádka — jsou tam jako „fakta“). Sekce karty Claude (`claudeLimits/Costs/Git/Subagents`) hlídá
+  `ClaudeSessions` (`sectionOn`); skrytá útrata se nevykreslí → žádné `costs_refresh`. Nový přepínač = klíč
+  v `SECTION_KEYS` + řádek `sections!` v `config.rs` + položka `SECTION_GROUPS` (test hlídá shodu).
 - Chyby jádra jsou string v jazyce UI (`i18n::tr`/`trf!` v Rustu) → `sayError(e)`; prázdné stavy karet říkají, co udělat (žádná vymyšlená čísla).
 
 ## Ověření

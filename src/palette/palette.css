@@ -18,7 +18,10 @@
 .pal-ico { width: 22px; height: 22px; display: grid; place-items: center; color: var(--t3); flex-shrink: 0; }
 .pal-ico svg { width: 16px; height: 16px; }
 .pal-recent { font-size: var(--fs-2xs); color: var(--t3); flex-shrink: 0; }
-.pal-foot { font-size: var(--fs-2xs); color: var(--t3); padding: 8px 8px 0; border-top: 1px solid var(--line-soft); margin-top: 4px; }
+.pal-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; font-size: var(--fs-2xs); color: var(--t3); padding: 8px 8px 0; border-top: 1px solid var(--line-soft); margin-top: 4px; }
+.pal-tip { opacity: 0.85; }
+/* znak místo ikony: emoji, „=“ výpočtu, „⇄“ převodu */
+.pal-glyph { font-size: 17px; line-height: 1; color: var(--t2); }
 /* kompaktní paleta (`palette.compact`) bez dotazu: jen pole a nápověda, žádný seznam (`compact.ts`) */
 .pal-bare .pal-input { border-bottom: 0; padding-bottom: 4px; }
 .pal-bare .pal-foot { border-top: 0; margin-top: 0; padding-top: 2px; }

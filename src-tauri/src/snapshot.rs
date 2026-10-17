@@ -51,6 +51,8 @@ pub(crate) struct Snapshot {
     hooks: hooksetup::HooksStatus,
     /// limity Claude 5h / týden (`limitslive::view`, jen paměť)
     limits: crate::limitslive::LimitsView,
+    /// časovač: odpočet a stopky jako časy (sekundy si UI počítá samo) + předvolby (`timer::view`)
+    timer: crate::timer::TimerView,
     /// útrata Claude — odhad v cenách API (`costslive::view`, jen paměť)
     costs: crate::costslive::CostsView,
     notes_enabled: bool,
@@ -91,6 +93,12 @@ pub(crate) struct PersonalView {
     notes: Vec<notes::NoteView>,
     /// kolik obecných poznámek se nevešlo
     notes_more: usize,
+    /// právě hraje (`media::view`, jen paměť); `None` = nic nehraje / karta vypnutá / ještě nespuštěno
+    media: Option<crate::media::MediaView>,
+    /// hlasitost výchozího výstupu (`volume::view`); `None` = bez zařízení / vypnuto
+    volume: Option<crate::volume::VolumeView>,
+    /// baterie (`battery::view`); `None` = stroj bez baterie / vypnuto
+    battery: Option<crate::battery::BatteryView>,
 }
 
 #[derive(Serialize, Clone)]
@@ -195,6 +203,7 @@ pub(crate) fn snapshot() -> Snapshot {
         sessions,
         hooks: hooksetup::status_cached(cfg.claude.port),
         limits: crate::limitslive::view(),
+        timer: crate::timer::view(&cfg.timer),
         costs: crate::costslive::view(),
         notes_enabled: cfg.notes.enabled,
         palette_compact: cfg.palette.compact,
@@ -270,5 +279,14 @@ pub(crate) fn personal_view(cfg: &Config, (notes, notes_more): (Vec<notes::NoteV
         })
         .collect();
     drop(cache);
-    PersonalView { weather, links, notes, notes_more }
+    let sec = &cfg.drawer.sections;
+    PersonalView {
+        weather,
+        links,
+        notes,
+        notes_more,
+        media: crate::media::view().filter(|_| sec.now_playing),
+        volume: crate::volume::view().filter(|_| sec.sound),
+        battery: crate::battery::view().filter(|_| sec.battery),
+    }
 }

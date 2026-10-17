@@ -34,6 +34,8 @@ pub enum ActionKind {
     App,
     /// příkaz pro `cmd` / PowerShell — jen s potvrzením nebo uloženým souhlasem
     Command,
+    /// web ve vlastním malém okně Ledge (`webpanel.rs`): jen http/https, zavření okno zničí
+    Web,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -72,7 +74,7 @@ pub struct Action {
     /// Popisek dlaždice, povinný (nejvýš 80 znaků).
     pub label: String,
     pub kind: ActionKind,
-    /// url: `https://…`; file/folder/app: absolutní cesta (`app` i holé jméno `.exe` ze složky
+    /// url / web: `https://…`; file/folder/app: absolutní cesta (`app` i holé jméno `.exe` ze složky
     /// Windows); command: příkazová řádka (`npm run build`, `C:\skripty\zaloha.bat`).
     pub target: String,
     /// Argumenty pro `app` a `command` (každý zvlášť, bez uvozovek).
@@ -103,6 +105,12 @@ pub struct Action {
     /// Jen skrytý `command`: termín v sekundách (1–3600, výchozí 60) — pak se strom procesu zabije.
     #[serde(default = "default_timeout", skip_serializing_if = "is_default_timeout")]
     pub timeout_s: u32,
+    /// Jen `web`: šířka okna v logických px (320–3840, výchozí 480).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    /// Jen `web`: výška okna v logických px (240–2160, výchozí 720).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
 }
 
 impl Default for Action {
@@ -121,6 +129,8 @@ impl Default for Action {
             shell: Shell::Cmd,
             terminal: false,
             timeout_s: DEFAULT_TIMEOUT_S,
+            width: None,
+            height: None,
         }
     }
 }
@@ -183,6 +193,16 @@ pub fn validate_one(a: &Action) -> Result<(), String> {
             }
         }
         ActionKind::Command => {}
+        ActionKind::Web => {
+            if let Err(e) = crate::webpanel::check_url(t) {
+                return err(e);
+            }
+        }
+    }
+    if a.kind == ActionKind::Web {
+        crate::webpanel::check_size(a.width, a.height).or_else(&err)?;
+    } else if a.width.is_some() || a.height.is_some() {
+        return err(tr("šířka a výška jdou jen u okna s webem.", "width and height only work for a web window.").into());
     }
     if !a.args.is_empty() && !matches!(a.kind, ActionKind::App | ActionKind::Command) {
         return err(tr("argumenty jdou jen u aplikace a příkazu.", "arguments only work for an app or a command.").into());
@@ -355,6 +375,18 @@ mod tests {
             (Action { icon: Some(r"C:\i\logo.png".into()), ..act(ActionKind::Url, "https://x.cz") }, true),
             (Action { icon: Some(r"C:\i\logo.exe".into()), ..act(ActionKind::Url, "https://x.cz") }, false),
             (Action { timeout_s: 0, ..act(ActionKind::Command, "dir") }, false),
+            // okno s webem: jen http(s) mimo hosty Ledge, rozměry v mezích, jinde rozměry ne
+            (act(ActionKind::Web, "https://music.youtube.com"), true),
+            (act(ActionKind::Web, "http://localhost:3000"), true),
+            (act(ActionKind::Web, "file:///C:/x.html"), false),
+            (act(ActionKind::Web, "javascript:alert(1)"), false),
+            (act(ActionKind::Web, "http://tauri.localhost/"), false),
+            (act(ActionKind::Web, "https://a:b@x.cz"), false),
+            (Action { width: Some(400), height: Some(600), ..act(ActionKind::Web, "https://chatgpt.com") }, true),
+            (Action { width: Some(100), ..act(ActionKind::Web, "https://chatgpt.com") }, false),
+            (Action { height: Some(9999), ..act(ActionKind::Web, "https://chatgpt.com") }, false),
+            (Action { width: Some(400), ..act(ActionKind::Url, "https://x.cz") }, false),
+            (Action { args: vec!["-x".into()], ..act(ActionKind::Web, "https://x.cz") }, false),
         ];
         for (a, ok) in cases {
             assert_eq!(validate_one(&a).is_ok(), ok, "{a:?} → {:?}", validate_one(&a));
@@ -464,6 +496,11 @@ mod tests {
         assert_eq!(v, serde_json::json!({ "id": "w", "label": "Web", "kind": "url", "target": "https://x.cz" }));
         let c: Action = serde_json::from_str(r#"{"id":"c","label":"B","kind":"command","target":"x","showOn":"work","shell":"powershell","terminal":true,"timeoutS":5}"#).unwrap();
         assert_eq!((c.kind, c.show_on, c.shell, c.terminal, c.timeout_s), (ActionKind::Command, ShowOn::Work, Shell::Powershell, true, 5));
+        // okno s webem: `kind: "web"`, rozměry jen když jsou zadané
+        let w: Action = serde_json::from_str(r#"{"id":"yt","label":"YT Music","kind":"web","target":"https://music.youtube.com","width":420}"#).unwrap();
+        assert_eq!((w.kind, w.width, w.height), (ActionKind::Web, Some(420), None));
+        assert_eq!(serde_json::to_value(&w).unwrap(), serde_json::json!({ "id": "yt", "label": "YT Music", "kind": "web", "target": "https://music.youtube.com", "width": 420 }));
+        assert!(!w.risky() && !needs_confirm(&w, false));
     }
 
     /// Starý config bez `actions` platí beze změny; špatná akce shodí validaci celého configu.
@@ -478,6 +515,10 @@ mod tests {
         assert!(validate(&bad).unwrap_err().contains("http"));
         let schema = crate::config::schema_json();
         assert!(schema.contains("\"actions\"") && schema.contains("showOn") && schema.contains("powershell"));
+        assert!(schema.contains("\"web\"") && schema.contains("\"width\""));
+        // starý config s akcemi bez nových polí: beze změny (žádné rozměry, typ se nemění)
+        let old: Config = serde_json::from_str(r#"{"actions":[{"id":"g","label":"Gmail","kind":"url","target":"https://mail.google.com"}]}"#).unwrap();
+        assert!(validate(&old).is_ok() && old.actions[0].width.is_none() && old.actions[0].kind == ActionKind::Url);
     }
 
     #[test]

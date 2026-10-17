@@ -28,6 +28,7 @@ pub(crate) fn run_action(id: String, target: String, confirmed: Option<String>) 
     };
     let res = match launch {
         Launch::Url(u) => opened(opener.open_url(u, None::<&str>)),
+        Launch::Panel(u) => crate::webpanel::open(&c.app, &a, &u),
         Launch::Path(p) => opened(opener.open_path(p.to_string_lossy(), None::<&str>)),
         Launch::Exe(p) => actionrun::run_exe(&a, &p),
         Launch::Command if a.terminal => actionrun::run_terminal(&a),

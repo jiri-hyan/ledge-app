@@ -43,7 +43,7 @@ pub(crate) fn apply_config(new: Config) {
         let _ = c.notes_tx.lock().send(NotesMsg::Reroot);
         send_sync(SyncMsg::Config);
     }
-    if old.personal.weather.coords() != new.personal.weather.coords() || old.modes != new.modes {
+    if old.personal.weather.coords() != new.personal.weather.coords() || old.modes != new.modes || old.drawer.sections.weather != new.drawer.sections.weather {
         maybe_refresh_weather(false);
     }
     if old.personal.links != new.personal.links {
@@ -54,6 +54,16 @@ pub(crate) fn apply_config(new: Config) {
     }
     if old.scripts != new.scripts {
         crate::scripts::refresh_async();
+    }
+    if old.drawer.sections != new.drawer.sections || old.modes != new.modes {
+        // právě hraje / hlasitost / baterie: vypnutá karta = konec odběrů (`media.rs` a spol.)
+        crate::media::sync(&new);
+        crate::volume::sync(&new);
+        crate::battery::sync(&new);
+    }
+    if crate::media::strip_wants(&old) != crate::media::strip_wants(&new) {
+        // položka `media` v proužku drží odběry GSMTC i bez záložky Osobní
+        crate::media::sync(&new);
     }
     if old.update != new.update {
         c.updater.set_config(new.update.clone());

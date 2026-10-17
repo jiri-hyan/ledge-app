@@ -1,0 +1,28 @@
+/* Záložka Osobní: právě hraje + hlasitost (MediaCard), baterie v kartě Čas (Battery). Prefix `med-`, tokeny ze styles.css. */
+.med-now { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 2px 0; }
+.med-cover { width: 44px; height: 44px; border-radius: var(--r-sm); flex-shrink: 0; overflow: hidden; display: grid; place-items: center; background: var(--card-2); color: var(--t3); }
+.med-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.med-cover svg { width: 20px; height: 20px; }
+.med-text { flex: 1; min-width: 0; }
+.med-title { font-weight: 600; font-size: var(--fs-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.med-ctl { display: flex; align-items: center; gap: var(--s1); margin-top: 10px; }
+.med-state { margin-left: auto; }
+.med-ico { display: grid; place-items: center; padding: 5px 9px; color: var(--t1); }
+.med-ico svg { width: 15px; height: 15px; }
+.med-ico.on { color: var(--red); }
+.med-play { color: var(--t0); }
+
+.med-vol { display: flex; align-items: center; gap: var(--s2); margin-top: 10px; min-width: 0; }
+h4 + .med-vol { margin-top: 0; }
+.med-range { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
+.med-pct { font: var(--fs-xs) var(--mono); color: var(--t3); min-width: 4.2ch; text-align: right; font-variant-numeric: tabular-nums; }
+
+.med-bat { display: flex; align-items: center; gap: 7px; margin-top: 8px; font: var(--fs-xs) var(--mono); color: var(--t2); }
+.med-bat-icon { width: 22px; height: 11px; border: 1.5px solid currentColor; border-radius: 3px; padding: 1px; position: relative; display: block; flex-shrink: 0; }
+.med-bat-icon::after { content: ""; position: absolute; right: -4px; top: 2.5px; width: 2px; height: 3px; border-radius: 0 1px 1px 0; background: currentColor; }
+.med-bat-fill { display: block; height: 100%; border-radius: 1px; background: var(--green); }
+.med-bat-low { color: var(--red); }
+.med-bat-low .med-bat-fill { background: var(--red); }
+.med-bat-pct { color: var(--t1); font-variant-numeric: tabular-nums; }
+.med-bat-state { color: var(--t3); }

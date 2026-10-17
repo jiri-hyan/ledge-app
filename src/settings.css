@@ -60,6 +60,8 @@
 .st-sec h3 { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; }
 .st-sec-aside { margin-left: auto; }
 .st-sec-desc { margin-top: 3px; color: var(--t3); font-size: var(--fs-sm); }
+/* podnadpis skupiny řádků v sekci (Karty na hlavní stránce: Práce / Osobní / V kartě Claude) */
+.st-group-h { margin-top: var(--s3); color: var(--t2); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 
 .st-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px var(--s4); padding: 12px 0; scroll-margin: 48px; border-radius: var(--r-md); transition: background calc(0.4s / var(--speed)), box-shadow calc(0.4s / var(--speed)); }
 .st-row + .st-row { border-top: 1px solid var(--line-soft); }
@@ -225,3 +227,14 @@
 .opt + .opt { border-top: 1px solid var(--line-soft); }
 .opt small { display: block; color: var(--t3); font-size: var(--fs-sm); }
 .opt small.warn { color: var(--amber); }
+
+/* Editor proužku (panel Šuplík a proužek): náhled, „jen při dění“, barva položky, počet znaků vlastního textu */
+.st-strip-pv { margin-bottom: var(--s2); padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.st-strip-pv-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); color: var(--t3); font-size: var(--fs-sm); }
+.st-strip-pv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 8px; min-height: 28px; padding: 4px 14px; border-radius: 14px; background: var(--card-2); font-size: var(--fs-sm); color: var(--t2); }
+.st-strip-pv-seg { white-space: nowrap; }
+.st-strip-pv-empty { color: var(--t3); font-style: italic; }
+.st-strip-quiet { padding: 2px 8px; }
+.st-strip-quiet.st-strip-on { color: var(--t0); background: var(--card-3); border-color: var(--line-2); }
+.st-strip-color { max-width: 130px; }
+.st-strip-count { color: var(--t3); font: var(--fs-xs) var(--mono); margin-left: 6px; }

@@ -80,7 +80,7 @@
    v Nastavení přepisují barvy/škály inline na svém prvku a var() se vyhodnocuje tam, kde je deklarace. */
 :root, .theme-scope {
   --tint: rgb(var(--bg) / calc(0.58 * var(--glass)));
-  --tint-solid: rgb(var(--bg) / calc(0.985 * var(--glass)));
+  --tint-solid: rgb(var(--bg) / var(--glass)); /* krytí 1 = opravdu neprůhledné (0.985 nechalo prosvítat text pod šuplíkem) */
   --r-xs: calc(6px * var(--rr));
   --r-sm: calc(8px * var(--rr));
   --r-md: calc(10px * var(--rr));
@@ -176,12 +176,26 @@ input[type="text"] { width: 260px; }
 /* ---------- karty ---------- */
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); }
 .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.one { grid-template-columns: minmax(0, 1fr); }
 .grid > .wide { grid-column: 1 / -1; }
 .card { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-xl); padding: var(--pad-card); min-width: 0; }
 .card h4 { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 9px; display: flex; align-items: center; gap: var(--s2); }
 .card h4 .ic { width: 7px; height: 7px; border-radius: 50%; }
 .card h4 .n { margin-left: auto; color: var(--t2); text-transform: none; letter-spacing: 0; font-weight: 600; font-size: var(--fs-md); }
 .card h4 .mini { text-transform: none; letter-spacing: 0; font-weight: 500; }
+/* ⋯ v hlavičce karty (cards/CardMenu.tsx): vidět při najetí na kartu, s otevřeným menu nebo fokusem z klávesnice */
+.card-menu { position: relative; display: inline-flex; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.card-menu-btn { width: 22px; height: 18px; border-radius: var(--r-sm); color: var(--t3); font-size: var(--fs-md); line-height: 1; opacity: 0; transition: opacity var(--fast), background var(--fast), color var(--fast); }
+.card:hover .card-menu-btn, .card-menu.open .card-menu-btn, .card-menu-btn:focus-visible { opacity: 1; }
+.card-menu-btn:hover { background: var(--card-2); color: var(--t1); }
+.card-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 150px; background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: var(--shadow-toast); padding: var(--s1); animation: drop var(--dur-2) var(--ease); }
+.card-menu-list button { text-align: left; font-size: var(--fs-sm); color: var(--t1); padding: 6px 10px; border-radius: var(--r-sm); white-space: nowrap; }
+.card-menu-list button:hover { background: var(--card-2); }
+/* po skrytí karty: „Karta … skryta · Vrátit“ (pár sekund, místo hlášky) */
+.card-undo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: var(--raised); border: 1px solid var(--line-2); padding: 6px 8px 6px 14px; border-radius: var(--r-md); font-size: var(--fs-ui); box-shadow: var(--shadow-toast); animation: rise var(--dur-4) var(--spring); z-index: 49; white-space: nowrap; }
+/* hlavní stránka bez jediné viditelné karty (MainPage) */
+.page-empty { text-align: center; padding: var(--s4) var(--s3); }
+.page-empty .mini { margin-left: var(--s2); }
 /* reflektor pod kurzorem (--mx/--my nastavuje App, jen CSS proměnné; dlaždice v cards/projects.css) */
 .card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity var(--dur-3);
   background: radial-gradient(180px circle at var(--mx, 50%) var(--my, 50%), var(--spot), transparent 65%); }

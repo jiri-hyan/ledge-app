@@ -1,0 +1,14 @@
+/* Osobní: karta Časovač (TimerCard). Prefix `tm-`, tokeny ze styles.css. */
+.tm-cd { margin-top: 2px; }
+.tm-big { font: 600 calc(40px * var(--fz))/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 2px; display: flex; align-items: baseline; gap: 8px; }
+.tm-done .tm-big { color: var(--blue); font-size: calc(26px * var(--fz)); }
+.tm-tag { font: 500 var(--fs-xs) var(--mono); color: var(--t3); text-transform: uppercase; letter-spacing: 0.06em; }
+.tm-bar { height: 4px; border-radius: 2px; background: var(--card-2); overflow: hidden; margin-top: 10px; }
+.tm-bar span { display: block; height: 100%; background: var(--accent); transition: width var(--dur-2) linear; }
+.tm-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); margin-top: 10px; }
+.tm-end { margin-left: auto; }
+.tm-min { width: 72px; font: var(--fs-sm) var(--mono); color: var(--t1); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 4px 8px; }
+.tm-min:focus { outline: none; border-color: var(--accent); }
+.tm-sw { display: flex; align-items: center; gap: var(--s2); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.tm-label { color: var(--t2); font-size: var(--fs-sm); }
+.tm-sw-time { font: 600 var(--fs-body) var(--mono); font-variant-numeric: tabular-nums; color: var(--t1); margin-right: auto; }

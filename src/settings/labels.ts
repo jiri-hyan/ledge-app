@@ -19,9 +19,11 @@ export const FIELDS: Record<string, FieldDef> = {
   // Šuplík a proužek
   "drawer.trigger": { panel: "suplik", label: "Jak se šuplík otevírá", hint: "Myší u horního okraje obrazovky", kw: "trigger najetí hrana podržet myš" },
   "drawer.delays": { panel: "suplik", label: "Prodlevy", hint: "Jak rychle šuplík reaguje na myš a kdy se zavře", kw: "zpoždění ms rychlost zavření" },
-  "drawer.sections": { panel: "suplik", label: "Karty na hlavní stránce", hint: "Co šuplík ukazuje", kw: "sekce karty běží claude poznámky projekty" },
+  "drawer.sections": { panel: "suplik", label: "Karty na hlavní stránce", hint: "Co šuplík ukazuje", kw: "sekce karty skrýt zobrazit běží claude poznámky projekty repa akce přihrádka hodiny počasí odkazy limity útrata git subagenti" },
   "strip.enabled": { panel: "suplik", label: "Proužek nahoře", hint: "Vypnuto = zůstane jen svítící linka při událostech", kw: "lišta strip" },
-  "strip.items": { panel: "suplik", label: "Co proužek ukazuje", hint: "Zapni, co chceš vidět; pořadí změníš přetažením", kw: "položky hodiny režim běží claude repa" },
+  "strip.items": { panel: "suplik", label: "Co proužek ukazuje", hint: "Zapni, co chceš vidět; pořadí změníš přetažením (nebo Alt+šipkou). U položky barva a „jen při dění“ = v klidu skrytá.", kw: "položky hodiny režim běží claude repa barva klid událost notch vlastní text časovač" },
+  "strip.custom": { panel: "suplik", label: "Vlastní text v proužku", hint: "Krátký text nebo emoji, nejvýš 24 znaků — položka „Vlastní text“", kw: "notch text emoji popisek motto" },
+  "timer.strip": { panel: "suplik", label: "Časovač v proužku, když běží", hint: "Běžící odpočet nebo stopky se ukážou na začátku proužku i bez položky „Časovač“", kw: "časovač odpočet stopky timer proužek" },
   "strip.monitor": { panel: "suplik", label: "Monitor", hint: "Na kterém monitoru proužek a šuplík jsou. Místo u hrany (vlevo, uprostřed, vpravo) je ve Vzhledu a animacích.", kw: "obrazovka displej" },
   "drawer.barWindows": { panel: "suplik", label: "Okna s taby nahoře", hint: "U maximalizovaného prohlížeče by šuplík otvíralo přepínání tabů", kw: "prohlížeč taby chrome opera edge tlak hrana push procesy" },
   "drawer.keepWarmS": { panel: "suplik", label: "Uvolnit paměť při nečinnosti", hint: "Po minutě se zavřeným šuplíkem Ledge uvolní paměť (~150 MB → desítky MB); první otevření pak trvá pár sekund. S animacemi nesouvisí.", kw: "paměť ram úspora úsporný režim výkon webview" },
@@ -65,6 +67,8 @@ export const FIELDS: Record<string, FieldDef> = {
   // Osobní
   "modes.personalEnabled": { panel: "osobni", label: "Záložka Osobní", hint: "Čas, počasí, rychlé odkazy a obecné poznámky", kw: "režim práce" },
   "personal.weather": { panel: "osobni", label: "Místo pro počasí", hint: "Open-Meteo, bez klíče. Prázdné = nic se nestahuje (polohu podle IP Ledge nezjišťuje).", kw: "počasí souřadnice šířka délka město" },
+  "timer.presets": { panel: "osobni", label: "Předvolby časovače", hint: "Minuty oddělené čárkou (1–600, nejvýš 6) — tlačítka v kartě Časovač a příkazy v paletě", kw: "časovač odpočet minuty pomodoro focus timer" },
+  "timer.toast": { panel: "osobni", label: "Oznámení po doběhnutí", hint: "Oznámení Windows, když odpočet skončí. Nebere fokus; ve hře, při „nerušit“ a s otevřeným šuplíkem se neukáže. Proužek blikne vždy.", kw: "časovač toast oznámení notifikace konec" },
   "personal.links": { panel: "osobni", label: "Rychlé odkazy", hint: "Web (jen http/https), složka, soubor nebo aplikace — vždy bez argumentů", kw: "odkaz web aplikace složka" },
   // Zkratky
   "hotkeys.enabled": { panel: "zkratky", label: "Globální klávesové zkratky", hint: "Vypnuté = nic se neregistruje; šuplík se otevírá myší", kw: "klávesnice" },

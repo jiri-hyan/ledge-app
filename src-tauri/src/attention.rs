@@ -215,9 +215,40 @@ fn os_animations_off() -> bool {
     ok.is_ok() && !on.as_bool()
 }
 
+/// Brána reakce ze stavu jádra (systémová volání jen tehdy, když na nich něco závisí).
+fn live_gate(toast_on: bool) -> Gate {
+    use crate::drawer::View;
+    let c = crate::state::core();
+    let no_motion = c.cfg.read().appearance.motion.style == crate::appearance::MotionStyle::None;
+    let mut gate = Gate { dead: c.dead(), no_motion, toast_on, quiet: false, drawer_full: c.drawer.view() == View::Full };
+    if !gate.dead && !gate.no_motion {
+        gate.no_motion = os_animations_off();
+    }
+    if gate.toast_on && !gate.dead {
+        gate.quiet = !crate::toast::accepts_notifications();
+    }
+    gate
+}
+
+/// Upozornění proužkem barvou `color` podle `react`: bliknutí linky (`Core.flash`) a puls (`PULSE_MS`);
+/// mrtvý Ledge (fullscreen hra / herní režim) nic. Vrací, jestli smí volající ukázat toast (`toast_on`,
+/// Windows oznámení přijímá, šuplík není otevřený naplno). Fokus nikdy. Volá `on_change` i konec
+/// časovače (`timer::tick_live`).
+pub(crate) fn signal(color: Rgba, toast_on: bool) -> bool {
+    let r = react(live_gate(toast_on));
+    if r.flash {
+        *crate::state::core().flash.lock() = Some((color, Instant::now()));
+    }
+    if r.pulse {
+        let mut g = WATCH.lock();
+        let w = g.get_or_insert_with(|| Watch { seen: Seen::default(), dedup: Dedup::default(), pulse: None });
+        w.pulse = Some((color, Instant::now()));
+    }
+    r.toast
+}
+
 /// Reakce na změnu stavu mostu (volá `refresh::on_claude_change`, ten pak `mark_dirty`).
 pub(crate) fn on_change() {
-    use crate::drawer::View;
     use crate::state::core;
     let c = core();
     let pending = c.claude.pending();
@@ -235,37 +266,11 @@ pub(crate) fn on_change() {
     if events.is_empty() {
         return;
     }
-    let (no_motion, toast_on) = {
-        let cfg = c.cfg.read();
-        (cfg.appearance.motion.style == crate::appearance::MotionStyle::None, cfg.claude.toast)
-    };
-    let mut gate = Gate {
-        dead: c.dead(),
-        no_motion,
-        toast_on,
-        quiet: false,
-        drawer_full: c.drawer.view() == View::Full,
-    };
-    // systémová volání jen tehdy, když na nich něco závisí
-    if !gate.dead && !gate.no_motion {
-        gate.no_motion = os_animations_off();
-    }
-    if gate.toast_on && !gate.dead {
-        gate.quiet = !crate::toast::accepts_notifications();
-    }
+    let toast_on = c.cfg.read().claude.toast;
     // „čeká“ má přednost (barva pulsu), pak hotovo
     let first = events.iter().find(|(_, e)| *e == Event::NeedsInput).or(events.first()).cloned();
     let Some((_, ev)) = first else { return };
-    let r = react(gate);
-    if r.flash {
-        *c.flash.lock() = Some((ev.color(), Instant::now()));
-    }
-    if r.pulse
-        && let Some(w) = WATCH.lock().as_mut()
-    {
-        w.pulse = Some((ev.color(), Instant::now()));
-    }
-    if r.toast {
+    if signal(ev.color(), toast_on) {
         let cfg = c.cfg.read();
         for (sid, ev) in &events {
             let s = sessions.iter().find(|s| &s.id == sid);

@@ -10,6 +10,7 @@ import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
 import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 import type { PanelProps } from "../types";
+import { parsePresets } from "../../timer/model";
 
 const MAX_LINKS = 24;
 
@@ -98,6 +99,24 @@ export default function PersonalPanel(_p: PanelProps) {
               <For each={PLACES}>{([n, la, lo]) => <button class="mini" onClick={() => c.set("personal.weather", { lat: la, lon: lo, label: n })}>{n}</button>}</For>
             </div>
           </Row>
+        </Section>
+        <Section title={t("settings.timer.section", "Časovač")} desc={t("settings.timer.desc", "Odpočet a stopky v kartě Časovač, v paletě (Ctrl+K) a v proužku. Běží i se zavřeným šuplíkem a přes restart Ledge.")}>
+          <Row id="timer.presets">
+            <input
+              type="text"
+              class="st-text"
+              spellcheck={false}
+              aria-label={t("settings.f.timer.presets", "Předvolby časovače")}
+              placeholder={t("settings.timer.presets.ph", "5, 15, 25, 50")}
+              value={(c.cfg.timer?.presets ?? []).join(", ")}
+              onChange={(e) => {
+                const v = parsePresets(e.currentTarget.value);
+                c.set("timer.presets", v);
+                e.currentTarget.value = v.join(", ");
+              }}
+            />
+          </Row>
+          <Row id="timer.toast"><Toggle path="timer.toast" label={t("settings.f.timer.toast", "Oznámení po doběhnutí")} /></Row>
         </Section>
         <Section title={t("settings.f.personal.links", "Rychlé odkazy")} desc={t("settings.f.personal.links.hint", "Web (jen http/https), složka, soubor nebo aplikace — vždy bez argumentů")}>
           <Links />

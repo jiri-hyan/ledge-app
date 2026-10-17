@@ -109,7 +109,7 @@ export default function AppearancePanel(p: PanelProps) {
     [next[i], next[i + d]] = [next[i + d], next[i]];
     set("cards", next);
   }
-  const hidden = (id: CardId) => (id === "repos" ? false : p.cfg.drawer?.sections?.[id] === false);
+  const hidden = (id: CardId) => p.cfg.drawer?.sections?.[id] === false;
   const uiLang = (): Lang => (p.cfg.ui?.lang === "en" ? "en" : "cs");
   const setUiLang = (v: Lang) => (p.cfg.ui ? p.setCfg("ui", "lang", v) : p.setCfg("ui", { lang: v }));
 

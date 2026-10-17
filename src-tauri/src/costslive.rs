@@ -35,7 +35,9 @@ fn with<R>(f: impl FnOnce(&mut Live) -> R) -> R {
 }
 
 fn enabled() -> bool {
-    core().cfg.read().claude.costs
+    let cfg = core().cfg.read();
+    // vypnutá útrata, nebo skrytá sekce / celá karta Claude (`drawer.sections`) = nic se neindexuje
+    cfg.claude.costs && cfg.drawer.sections.claude && cfg.drawer.sections.claude_costs
 }
 
 /// Požádá o přepočet; běží-li nebo proběhl před méně než `THROTTLE`, nic. Vypnutá karta = nic.

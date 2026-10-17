@@ -121,4 +121,13 @@ registerDict("en", {
   "cards.links.empty": "Add links in Settings — a website, folder or app.",
   "cards.links.settings": "Settings",
   "cards.links.checking": "checking…",
+  "cards.hide.more": "More options",
+  "cards.hide.card": "Hide card",
+  "cards.hide.part": "Hide section: {name}",
+  "cards.hide.doneCard": "Card “{name}” hidden",
+  "cards.hide.doneSection": "Section “{name}” hidden",
+  "cards.hide.undo": "Undo",
+  "cards.hide.cfgError": "The config has an error — for now you can hide cards only in Settings.",
+  "cards.hide.allHidden": "All cards on this page are hidden.",
+  "cards.hide.restore": "Bring cards back in Settings",
 });

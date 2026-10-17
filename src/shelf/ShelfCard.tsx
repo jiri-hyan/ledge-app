@@ -3,7 +3,7 @@
 // Otevřít, Ve složce, ✕. Hlavička: kopírovat vše (oba formáty), vyprázdnit (druhým klikem). Řádek
 // jde táhnout ven (Průzkumník, terminál s Claude) — tah spustí jádro (`shelf/dragout.rs`), nic se
 // neposílá samo. Data si karta bere sama (`shelf_list`) při otevření šuplíku a po události `shelf`.
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { on } from "../api";
 import type { ViewMsg } from "../types";
 import { say, sayError } from "../ui/toast";
@@ -106,7 +106,10 @@ function Row(p: { it: ShelfItem }) {
   );
 }
 
-export default function ShelfCard(p: { wide?: boolean }) {
+/** Karta je teď vidět (přihrádka zapnutá a má položky) — pro prázdný stav hlavní stránky. */
+export const shelfShown = () => cardVisible(list());
+
+export default function ShelfCard(p: { wide?: boolean; menu?: JSX.Element }) {
   wire();
   const [confirm, setConfirm] = createSignal(false);
   const items = () => list()?.items ?? [];
@@ -129,6 +132,7 @@ export default function ShelfCard(p: { wide?: boolean }) {
           <button class="mini" title={t("cards.shelf.copyAllTip", "Všechny cesty do schránky, každá na řádek")} onClick={() => copy([], "plain")}>{t("cards.shelf.copyAll", "Kopírovat vše")}</button>
           <button class="mini" title={t("cards.shelf.copyAllClaudeTip", "Všechny jako zmínky pro Claude Code na jednom řádku")} onClick={() => copy([], "claude")}>{t("cards.shelf.copyAllClaude", "@ vše")}</button>
           <button class="mini" classList={{ warn: confirm() }} onClick={clear}>{confirm() ? t("cards.shelf.clearConfirm", "Opravdu vyprázdnit?") : t("cards.shelf.clear", "Vyprázdnit")}</button>
+          {p.menu}
         </h4>
         <div class="shelf-list">
           <For each={items()}>{(it) => <Row it={it} />}</For>

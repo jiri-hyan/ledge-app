@@ -90,7 +90,9 @@ try {
   git rev-parse -q --verify "refs/tags/$prevTag" *> $null
   # seznam změn jen z commitů, které mění něco, co jde ven (ne čistě interní export-ignore cesty)
   $pubPaths = @('--', '.', ':(exclude)scripts/private', ':(exclude).github')
-  $log = if ($LASTEXITCODE -eq 0) { @(git log --no-decorate --format='- %s' "$prevTag..HEAD" @pubPaths) } else { @(git log --no-decorate -n 30 --format='- %s' @pubPaths) }
+  # git píše UTF-8; bez tohohle ho PS 5.1 dekóduje jako OEM 852 a poznámky vydání mají rozbitou češtinu
+  [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+  $log =if ($LASTEXITCODE -eq 0) { @(git log --no-decorate --format='- %s' "$prevTag..HEAD" @pubPaths) } else { @(git log --no-decorate -n 30 --format='- %s' @pubPaths) }
   foreach ($line in $log) { foreach ($d in $deny) { if ($line -match "(?i)$d") { $hits += "seznam změn: $line ~ $d" } } }
   if ($hits.Count) { $hits | ForEach-Object { "  ZAKÁZÁNO: $_" }; Fail "snapshot obsahuje zakázaná slova ($($hits.Count)) — oprav na main a vydej znovu" }
   "snapshot:   $Clone čistý (denylist $($deny.Count) vzorů)"

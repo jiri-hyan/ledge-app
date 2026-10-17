@@ -4,6 +4,8 @@
 // `releaseFocus`); rychlé akce s potvrzením se potvrzují přímo tady. Kompaktní režim
 // (`s.paletteCompact`): bez dotazu jen pole, seznam až při psaní / šipkou dolů (`compact.ts`).
 // Navíc skripty ze složky skriptů (načtou se při otevření) a s dotazem stránky Nastavení Windows (`more.ts`).
+// Rychlé odpovědi z dotazu (`quick.ts` přes `more.ts`): výpočet / převod jednotek jako první řádek,
+// `:` → emoji místo seznamu; Enter je zkopíruje do schránky (dokud má paleta fokus) a paletu zavře.
 import { createEffect, createMemo, createSignal, For, Index, on, onMount, Show } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { IconFolder, IconLink, IconNote, IconSettings, IconShield, IconTerminal } from "../icons";
@@ -11,10 +13,11 @@ import { ActionIcon, ConfirmAction, answerConfirm, confirmPending } from "../act
 import { buildItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
 import { pushRecent, rank, segments, type Ranked } from "./search";
 import { arrow, shown, visible } from "./compact";
-import { scriptItems, windowsItems } from "./more";
+import { emojiCommand, paletteTips, quickRows, scriptItems, windowsItems } from "./more";
 import { scriptsApi } from "../actions/scripts";
 import type { ScriptView } from "../types";
-import { t } from "../i18n";
+import { lang, t } from "../i18n";
+import { say, sayError } from "../ui/toast";
 import "./palette.css";
 
 export const IconSearch = () => (
@@ -24,7 +27,7 @@ export const IconSearch = () => (
   </svg>
 );
 
-const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield, script: IconTerminal, windows: IconSettings };
+const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield, script: IconTerminal, windows: IconSettings, calc: IconSearch, convert: IconSearch, emoji: IconNote };
 const RECENT_KEY = "ledge.palette.recent";
 
 function loadRecent(): string[] {
@@ -35,6 +38,29 @@ function loadRecent(): string[] {
     return [];
   }
 }
+/**
+ * Text do schránky z palety. Paleta má vždy fokus (otevírá se klikem nebo Ctrl+K v šuplíku s fokusem),
+ * takže stačí `navigator.clipboard`; záloha `execCommand("copy")` přes skryté pole. Bez jádra.
+ */
+async function copyText(text: string, refocus: HTMLElement): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    /* záloha níž */
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;left:-9999px;opacity:0";
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand("copy");
+  ta.remove();
+  refocus.focus();
+  if (!ok) throw new Error(t("palette.copyFail", "Do schránky to nejde zapsat."));
+}
+
 function saveRecent(ids: string[]) {
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(ids));
@@ -62,14 +88,21 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
     scriptsApi.list().then((l) => l && setScripts(l.scripts), () => {});
   });
 
-  const base = createMemo(() => [...buildItems(p.s, notes(), p.nav), ...scriptItems(scripts())]);
+  const base = createMemo(() => [...buildItems(p.s, notes(), p.nav), ...scriptItems(scripts()), emojiCommand(setQ)]);
   // stránky Nastavení Windows jen s dotazem — přepočet při psaní nesahá na `buildItems`
   const items = createMemo(() => [...base(), ...windowsItems(p.s, q())]);
   const recentSet = createMemo(() => new Set(recent()));
   const fold = () => ({ compact: p.s.paletteCompact, query: q(), browsing: browsing() });
   // nedávné, které v položkách pořád jsou (smazaná akce / poznámka se nepočítá)
   const what = createMemo(() => shown(fold(), items().filter((i) => recentSet().has(i.id)).length));
-  const results = createMemo(() => visible(rank(items(), q(), recent(), 60), what(), recentSet()));
+  // výpočet / převod / emoji jen z dotazu — přepočet při psaní, nic na pozadí
+  const quick = createMemo(() => quickRows(q(), lang()));
+  const results = createMemo(() => {
+    const qr = quick();
+    if (qr.only) return qr.rows;
+    const list = visible(rank(items(), q(), recent(), 60), what(), recentSet());
+    return qr.rows.length ? [...qr.rows, ...list] : list;
+  });
   // jiný dotaz = výběr nahoru; smazaný dotaz kompaktní paletu zase sbalí
   createEffect(on(q, () => (setSel(0), setBrowsing(false)), { defer: true }));
   createEffect(on(sel, (i) => (list?.children[i] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" })));
@@ -81,6 +114,26 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
 
   async function choose(r: Ranked<PItem> | undefined) {
     if (!r || waiting()) return;
+    const copy = r.item.copy;
+    if (copy !== undefined) {
+      // kopírovat dřív, než paleta pustí fokus; do nedávných nepatří (vznikají z dotazu)
+      setWaiting(true);
+      try {
+        await copyText(copy, input);
+      } catch (e) {
+        setWaiting(false);
+        sayError(e);
+        return;
+      }
+      close();
+      say(t("palette.copied", "Zkopírováno: {value}", { value: copy }));
+      return;
+    }
+    if (r.item.stay) {
+      r.item.run();
+      input.focus();
+      return;
+    }
     const next = pushRecent(recent(), r.item.id);
     setRecent(next);
     saveRecent(next);
@@ -138,7 +191,9 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
             {(r, i) => (
               <div class="pal-row" role="option" aria-selected={i === sel()} classList={{ on: i === sel() }} onMouseMove={() => i !== sel() && setSel(i)} onClick={() => choose(r())}>
                 <span class="pal-ico">
-                  <Show when={r().item.action} fallback={GLYPH[r().item.section]()}>{(a) => <ActionIcon a={a()} size={20} />}</Show>
+                  <Show when={r().item.action} fallback={<Show when={r().item.glyph} fallback={GLYPH[r().item.section]()}>{(g) => <span class="pal-glyph">{g()}</span>}</Show>}>
+                    {(a) => <ActionIcon a={a()} size={20} />}
+                  </Show>
                 </span>
                 <div class="grow">
                   <div class="name">
@@ -155,7 +210,14 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
       </Show>
       <ConfirmAction where="palette" />
       <div class="pal-foot">
-        {what() === "none" ? t("palette.keysBare", "Piš pro hledání · ↓ procházet · Esc zavřít") : t("palette.keys", "↑↓ výběr · Enter spustit · Esc zavřít")}
+        <span>
+          {what() === "none"
+            ? t("palette.keysBare", "Piš pro hledání · ↓ procházet · Esc zavřít")
+            : results()[sel()]?.item.copy !== undefined
+              ? t("palette.keysCopy", "↑↓ výběr · Enter zkopírovat · Esc zavřít")
+              : t("palette.keys", "↑↓ výběr · Enter spustit · Esc zavřít")}
+        </span>
+        <Show when={!q()}><span class="pal-tip">{paletteTips()}</span></Show>
       </div>
     </div>
   );

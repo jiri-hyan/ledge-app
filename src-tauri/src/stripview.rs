@@ -1,4 +1,6 @@
-//! Obsah nativního proužku (`refresh_strip`): segmenty podle `strip.items`, ambientní barva,
+//! Obsah nativního proužku (`refresh_strip`): segmenty podle `strip.items` (+ časovač, když běží;
+//! právě hraje z paměti `media.rs`),
+//! „v klidu skryté“ položky a barvy (`stripconf::compose`), ambientní barva,
 //! viditelnost (fullscreen, otevřený šuplík, lištové okno), vzhled a osa z `appearance`. Kreslí `strip.rs`.
 
 use crate::appearance::geom;
@@ -7,7 +9,7 @@ use crate::i18n::tr;
 use crate::drawer::View;
 use crate::state::{FLASH, core};
 use crate::strip::{Rgba, Segment};
-use crate::{attention, claude, procman};
+use crate::{attention, claude, procman, stripconf};
 use std::sync::atomic::Ordering;
 
 // ---------- proužek ----------
@@ -40,9 +42,14 @@ pub(crate) fn refresh_strip() {
         flash
     };
     let name_of = |id: &str| cfg.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| id.to_string());
-    let mut segs = Vec::new();
     let mode = if cfg.modes.personal_enabled { c.mode.lock().clone() } else { "prace".into() };
-    for item in &cfg.strip.items {
+    let timer = crate::timer::state();
+    let now_ms = crate::state::now_ms();
+    let items = stripconf::effective_items(&cfg.strip.items, crate::timer::active(&timer), cfg.timer.strip);
+    // segmenty po položkách; „v klidu skryté“ a barvy řeší čisté `stripconf::compose`
+    let mut parts: Vec<(config::StripItem, Vec<Segment>)> = Vec::with_capacity(items.len());
+    for item in &items {
+        let mut segs = Vec::new();
         match item {
             config::StripItem::Mode => {
                 segs.push(seg(if mode == "osobni" { tr("Osobní", "Personal") } else { tr("Práce", "Work") }, Rgba::TEXT, None, true, false));
@@ -126,19 +133,28 @@ pub(crate) fn refresh_strip() {
                         }
                     }
                 }
-                let mut parts = Vec::new();
+                let mut words = Vec::new();
                 if dirty > 0 {
-                    parts.push(trf!("{dirty}× neuloženo", "{dirty}× uncommitted"));
+                    words.push(trf!("{dirty}× neuloženo", "{dirty}× uncommitted"));
                 }
                 if unpushed > 0 {
-                    parts.push(trf!("{unpushed}× nepushnuto", "{unpushed}× unpushed"));
+                    words.push(trf!("{unpushed}× nepushnuto", "{unpushed}× unpushed"));
                 }
-                if !parts.is_empty() {
-                    segs.push(seg(parts.join(" · "), Rgba::DIM, Some(Rgba::AMBER), false, false));
+                if !words.is_empty() {
+                    segs.push(seg(words.join(" · "), Rgba::DIM, Some(Rgba::AMBER), false, false));
                 }
             }
+            config::StripItem::Custom => segs.extend(stripconf::custom_segment(&cfg.strip.custom)),
+            config::StripItem::Timer => segs.extend(crate::timer::strip_segments(&timer, now_ms)),
+            // jen paměť (`media.rs` ji přepíše při události přehrávače → `mark_dirty`); nic nehraje = nic
+            config::StripItem::Media => segs.extend(crate::media::strip_now()),
         }
+        parts.push((*item, segs));
     }
+    let look = &cfg.appearance;
+    let palette = geom::palette(look.theme);
+    let accent = geom::parse_hex(&look.accent).unwrap_or(palette.accent[0]);
+    let mut segs = stripconf::compose(parts, &cfg.strip, ambient.is_some() || due_count > 0, |c| geom::readable(c.base(accent), &palette));
     if let Some(first) = due_first {
         let mut text: String = if first.is_empty() { tr("Připomínka", "Reminder").into() } else { first.chars().take(28).collect() };
         if first.chars().count() > 28 {
@@ -155,8 +171,6 @@ pub(crate) fn refresh_strip() {
     let line_only = !cfg.strip.enabled || retreat;
     let visible = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some());
     let opacity = cfg.strip.opacity;
-    let look = &cfg.appearance;
-    let palette = geom::palette(look.theme);
     let (style, metrics, line) = (look.strip.style, geom::strip_metrics(look.strip.style, look.strip.size), geom::line_stops(look, &palette));
     let axis2 = geom::axis2_for(&cfg, mon.rect.left, mon.rect.right, mon.dpi);
     // puls „čeká / hotovo“ (`attention::pulse`, s termínem; animuje vlákno `strip`)

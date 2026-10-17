@@ -82,6 +82,11 @@ export function cleanAction(a: ActionCfg): ActionCfg {
   if (a.group?.trim()) out.group = a.group.trim();
   if (a.confirm) out.confirm = true;
   if (a.showOn && a.showOn !== "both") out.showOn = a.showOn;
+  if (a.kind === "web") {
+    const w = Math.round(Number(a.width)), h = Math.round(Number(a.height));
+    if (w && w !== WEB_SIZE.w) out.width = w;
+    if (h && h !== WEB_SIZE.h) out.height = h;
+  }
   if (a.kind === "command") {
     if (a.shell === "powershell") out.shell = "powershell";
     if (a.terminal) out.terminal = true;
@@ -90,7 +95,10 @@ export function cleanAction(a: ActionCfg): ActionCfg {
   return out;
 }
 
-export type DraftError = { field: "label" | "target" | "args" | "cwd" | "icon"; key: string; cs: string };
+/** Okno s webem (`webpanel.rs`): výchozí velikost a meze (logické px). */
+export const WEB_SIZE = { w: 480, h: 720, minW: 320, maxW: 3840, minH: 240, maxH: 2160 };
+
+export type DraftError = { field: "label" | "target" | "args" | "cwd" | "icon" | "size"; key: string; cs: string };
 
 const absPath = (p: string) => /^[a-zA-Z]:[\\/]/.test(p) && !p.slice(2).includes(":");
 
@@ -98,7 +106,15 @@ const absPath = (p: string) => /^[a-zA-Z]:[\\/]/.test(p) && !p.slice(2).includes
 export function draftError(a: ActionCfg): DraftError | null {
   const t = a.target.trim();
   if (!t) return { field: "target", key: "actions.err.target", cs: "Vyplň cíl." };
-  if (a.kind === "url" && !/^https?:\/\/[^\s/]+\S*$/i.test(t)) return { field: "target", key: "actions.err.url", cs: "Web musí začínat http:// nebo https://." };
+  if ((a.kind === "url" || a.kind === "web") && !/^https?:\/\/[^\s/]+\S*$/i.test(t)) return { field: "target", key: "actions.err.url", cs: "Web musí začínat http:// nebo https://." };
+  if (a.kind === "web") {
+    const host = /^https?:\/\/([^/?#]*)/i.exec(t)?.[1] ?? "";
+    if (host.includes("@")) return { field: "target", key: "actions.err.webCreds", cs: "Adresa nesmí obsahovat jméno ani heslo." };
+    if (/\.localhost\.?(:\d+)?$/i.test(host)) return { field: "target", key: "actions.err.webLocal", cs: "Adresy *.localhost patří Ledge, okno s webem je neotevře." };
+    const bad = (v: number | undefined, lo: number, hi: number) => v != null && !(Number.isInteger(v) && v >= lo && v <= hi);
+    if (bad(a.width, WEB_SIZE.minW, WEB_SIZE.maxW) || bad(a.height, WEB_SIZE.minH, WEB_SIZE.maxH))
+      return { field: "size", key: "actions.err.size", cs: "Velikost okna: šířka 320–3840, výška 240–2160 px." };
+  }
   if ((a.kind === "file" || a.kind === "folder") && !absPath(t)) return { field: "target", key: "actions.err.abs", cs: "Zadej celou cestu (C:\\…)." };
   if (a.kind === "app" && !(/^[^\\/:"]+\.exe$/i.test(t) || (absPath(t) && ext(t) === "exe")))
     return { field: "target", key: "actions.err.exe", cs: "Aplikace musí být .exe (skript spusť jako příkaz)." };

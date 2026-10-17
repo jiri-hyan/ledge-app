@@ -1,5 +1,6 @@
 // Typy snapshotu a IPC (zrcadlo serde struktur v `src-tauri/src`) — jen tvary dat, žádná logika.
 // Volání jádra jsou v `api.ts`, který tyto typy zároveň re-exportuje (`import type { … } from "./api"`).
+import type { SectionKey } from "./cards/sections";
 
 export type View = "hidden" | "peek" | "full";
 
@@ -172,7 +173,8 @@ export interface HooksStatus {
   hint: string | null;
 }
 
-export interface Sections { projects: boolean; running: boolean; claude: boolean; notes: boolean }
+/** `drawer.sections` — přepínače viditelnosti karet a sekcí (seznam v `cards/sections.ts`). */
+export type Sections = Record<SectionKey, boolean>;
 
 /** Poznámka z `%USERPROFILE%\Ledge\notes` (jeden `.md` s frontmatter). */
 export interface NoteView {
@@ -279,6 +281,38 @@ export interface LinkView {
   problem: string | null;
 }
 
+/** Právě hraje (Rust `media::MediaView`, GSMTC). */
+export interface MediaView {
+  title: string;
+  artist: string;
+  /** čitelný název aplikace; "" = neznámá */
+  app: string;
+  status: "playing" | "paused" | "stopped" | "changing";
+  canToggle: boolean;
+  canPrev: boolean;
+  canNext: boolean;
+  /** klíč obalu pro `api.mediaCover`; null = bez obalu */
+  coverKey: string | null;
+}
+
+/** Hlasitost výchozího výstupu (Rust `volume::VolumeView`). */
+export interface VolumeView {
+  /** 0–100 */
+  level: number;
+  muted: boolean;
+  /** název zařízení; "" = nevíme */
+  device: string;
+}
+
+/** Baterie (Rust `battery::BatteryView`); jen stroj s baterií. */
+export interface BatteryView {
+  percent: number;
+  charging: boolean;
+  plugged: boolean;
+  /** odhad Windows v sekundách, jen na baterii; null = Windows neví */
+  remainingS: number | null;
+}
+
 export interface PersonalView {
   weather: WeatherView;
   /** pořadí = `personal.links` v configu (index + target pro `openLink`) */
@@ -287,6 +321,12 @@ export interface PersonalView {
   notes: NoteView[];
   /** kolik obecných poznámek se nevešlo */
   notesMore: number;
+  /** právě hraje; null = nic nehraje / karta vypnutá / odběr ještě neběží */
+  media: MediaView | null;
+  /** null = bez výstupního zařízení / vypnuto */
+  volume: VolumeView | null;
+  /** null = stroj bez baterie / vypnuto */
+  battery: BatteryView | null;
 }
 
 /** Synchronizace poznámek přes git (`notesync/`). `off` = vypnutá; `syncing` = právě běží (i první běh). */
@@ -400,7 +440,7 @@ export interface QuestionReply { labels: string[]; other: string | null }
 
 // --- actions ---
 /** Rychlá akce v configu (`actions`, zrcadlo `actions.rs`). */
-export type ActionKind = "url" | "file" | "folder" | "app" | "command";
+export type ActionKind = "url" | "file" | "folder" | "app" | "command" | "web";
 export type ShowOn = "work" | "personal" | "both";
 export interface ActionCfg {
   id: string;
@@ -417,6 +457,9 @@ export interface ActionCfg {
   shell?: "cmd" | "powershell";
   terminal?: boolean;
   timeoutS?: number;
+  /** jen `web`: velikost okna v logických px (320–3840 × 240–2160, výchozí 480 × 720) */
+  width?: number;
+  height?: number;
 }
 /** Akce ve snapshotu (dlaždice, paleta). */
 export interface ActionView {
@@ -636,4 +679,12 @@ export interface GitView {
   canPull: boolean;
   /** proč jsou destruktivní akce zablokované (živá session v té složce) */
   block: string | null;
+}
+
+// --- timer ---
+// Zrcadlo `timer::TimerView` (Rust) — odpočet a stopky jako časy (typy a logika v `timer/model.ts`).
+export type { TimerOp, TimerState, TimerView } from "./timer/model";
+export interface Snapshot {
+  /** časovač (chybí jen ve starém jádře) */
+  timer?: import("./timer/model").TimerView;
 }

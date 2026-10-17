@@ -47,6 +47,8 @@ pub struct Config {
     pub scripts: crate::scripts::ScriptsConfig,
     /// Přihrádka na soubory: tah z Průzkumníka na proužek uloží cesty (`shelf/`).
     pub shelf: crate::shelf::ShelfConfig,
+    /// Časovač: předvolby odpočtu, toast po doběhnutí, segment v proužku (`timer.rs`).
+    pub timer: crate::timer::TimerConfig,
 }
 
 impl Default for Config {
@@ -71,6 +73,7 @@ impl Default for Config {
             palette: Default::default(),
             scripts: Default::default(),
             shelf: Default::default(),
+            timer: Default::default(),
         }
     }
 }
@@ -81,52 +84,9 @@ fn default_roots() -> Vec<String> {
         .unwrap_or_default()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
-#[serde(default, rename_all = "camelCase")]
-pub struct StripConfig {
-    /// Proužek nahoře uprostřed. false = zůstane jen svítící linka při událostech.
-    pub enabled: bool,
-    /// Které informace proužek ukazuje (pořadí = pořadí v proužku).
-    pub items: Vec<StripItem>,
-    /// Neprůhlednost pozadí proužku 0–1.
-    pub opacity: f32,
-    /// Monitor: "primary" nebo index od 0 (pořadí z Windows).
-    pub monitor: String,
-    /// Revize výchozích položek, které už byly do `items` jednou doplněny (`attention::upgrade_items`).
-    /// Ručně neměnit; 0 = starý config → při načtení se doplní `waiting`. Chybějící v souboru = 0
-    /// (ne výchozí hodnota struktury — ta má aktuální revizi pro nový config).
-    #[serde(default)]
-    pub items_rev: u32,
-}
-
-impl Default for StripConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            items: vec![StripItem::Mode, StripItem::Clock, StripItem::Running, StripItem::Claude, StripItem::Waiting, StripItem::Repos],
-            opacity: 0.82,
-            monitor: "primary".into(),
-            items_rev: crate::attention::ITEMS_REV,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum StripItem {
-    Mode,
-    /// čas + den a datum
-    Clock,
-    /// běžící servery jménem a portem
-    Running,
-    Claude,
-    /// kolik rep má neuložené / nepushnuté změny
-    Repos,
-    /// limity Claude 5h / týden (`limitslive::strip_segments`); výchozí vypnuto
-    Limits,
-    /// kolik Claude session čeká na tebe (schválení nebo otázka); 0 = nic
-    Waiting,
-}
+/// Config proužku žije v `stripconf.rs` (položky, vlastní text, barvy, „v klidu skryté“); re-export,
+/// ať se importy `config::StripConfig` / `config::StripItem` jinde nemění.
+pub use crate::stripconf::{StripConfig, StripItem};
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -234,20 +194,68 @@ pub enum Glass {
     Solid,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
-#[serde(default, rename_all = "camelCase")]
-pub struct Sections {
-    pub projects: bool,
-    pub running: bool,
-    pub claude: bool,
-    /// Karta „Poznámky“ (poslední poznámky + připomínky na dnes).
-    pub notes: bool,
+/// Plochý seznam přepínačů viditelnosti (`drawer.sections`): každé pole je `bool`, výchozí `true`,
+/// chybějící pole ve starém configu = zapnuto. Nový přepínač = jeden řádek v `sections!` níže
+/// (+ zrcadlo `SECTION_KEYS` v `src/cards/sections.ts`).
+macro_rules! sections {
+    ($($(#[$doc:meta])* $field:ident,)*) => {
+        #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+        #[serde(default, rename_all = "camelCase")]
+        pub struct Sections {
+            $($(#[$doc])* pub $field: bool,)*
+        }
+
+        impl Default for Sections {
+            fn default() -> Self {
+                Self { $($field: true,)* }
+            }
+        }
+
+        #[cfg(test)]
+        impl Sections {
+            /// Názvy polí v Rustu (snake_case) — jen pro testy.
+            pub const FIELDS: &'static [&'static str] = &[$(stringify!($field)),*];
+        }
+    };
 }
 
-impl Default for Sections {
-    fn default() -> Self {
-        Self { projects: true, running: true, claude: true, notes: true }
-    }
+sections! {
+    /// Práce: dlaždice projektů nahoře.
+    projects,
+    /// Práce: karta „Běží“ (jen když Ledge něco spustil).
+    running,
+    /// Práce: karta Claude (session, schvalování). Vypnutá = čekající žádosti ukáže „Claude čeká na tebe“.
+    claude,
+    /// Karta „Poznámky“ (poslední poznámky + připomínky na dnes), Práce i Osobní.
+    notes,
+    /// Práce: karta „Repa“ (neuložená / nepushnutá práce, pozadu za remote).
+    repos,
+    /// Karta „Rychlé akce“, Práce i Osobní.
+    actions,
+    /// Karta „Přihrádka“ (soubory přetažené na proužek), Práce i Osobní. Přihrádku samu vypíná `shelf.enabled`.
+    shelf,
+    /// Osobní: karta „Čas“.
+    clock,
+    /// Osobní: karta „Časovač“ (odpočet a stopky). Skrytá karta časovač nevypíná (paleta, proužek).
+    timer,
+    /// Osobní: karta „Počasí“. Skrytá = nic se nestahuje.
+    weather,
+    /// Osobní: karta „Odkazy“.
+    links,
+    /// Karta Claude: řádek limitů 5h / týden.
+    claude_limits,
+    /// Karta Claude: sekce „Útrata (odhad)“. Skrytá = transcripty se neindexují (jako `claude.costs: false`).
+    claude_costs,
+    /// Karta Claude: panel Git u session.
+    claude_git,
+    /// Karta Claude: řádek subagentů u session.
+    claude_subagents,
+    /// Osobní: karta „Právě hraje“ (média Windows — název, interpret, ovládání; `media.rs`).
+    now_playing,
+    /// Osobní: hlasitost výchozího výstupu (posuvník + ztlumit; `volume.rs`), v kartě Právě hraje.
+    sound,
+    /// Osobní: stav baterie v kartě Čas — jen na stroji s baterií (`battery.rs`).
+    battery,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -756,6 +764,8 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     crate::actions::validate(&cfg.actions)?;
     crate::scripts::validate(&cfg.scripts).map_err(|e| fe("scripts.dir", e))?;
     crate::appearance::validate(&cfg.appearance)?;
+    crate::stripconf::validate(&cfg.strip)?;
+    crate::timer::validate(&cfg.timer)?;
     Ok(())
 }
 
@@ -991,6 +1001,36 @@ mod tests {
         let cfg: Config = serde_json::from_str(r#"{"drawer":{"barWindows":{"trigger":"hover","processes":["Code.exe"]}}}"#).unwrap();
         assert_eq!(cfg.drawer.bar_windows.trigger, BarTrigger::Hover);
         assert_eq!(cfg.drawer.bar_windows.processes, vec!["Code.exe".to_string()]);
+    }
+
+    #[test]
+    fn sections_defaults_all_on() {
+        let d = serde_json::to_value(Sections::default()).unwrap();
+        let obj = d.as_object().unwrap();
+        assert_eq!(obj.len(), Sections::FIELDS.len());
+        assert!(obj.values().all(|v| v == &serde_json::Value::Bool(true)), "{d}");
+        // (JSON drawer.sections, pole → očekávaná hodnota)
+        let cases: &[(&str, &[(&str, bool)])] = &[
+            // starý config jen se 4 poli: nová pole zapnutá
+            (r#"{"projects":true,"running":false,"claude":true,"notes":true}"#, &[("running", false), ("repos", true), ("weather", true), ("claudeCosts", true)]),
+            // úplně prázdné a chybějící sekce = vše zapnuté
+            ("{}", &[("projects", true), ("shelf", true), ("claudeSubagents", true)]),
+            // nová pole se čtou camelCase
+            (r#"{"repos":false,"claudeLimits":false,"claudeGit":false}"#, &[("repos", false), ("claudeLimits", false), ("claudeGit", false), ("claude", true)]),
+            // neznámý klíč (pole přidané novější verzí) neshodí načtení
+            (r#"{"nowPlaying":false,"clock":false}"#, &[("clock", false), ("links", true)]),
+        ];
+        for (json, want) in cases {
+            let cfg: Config = serde_json::from_str(&format!(r#"{{"drawer":{{"sections":{json}}}}}"#)).unwrap();
+            let v = serde_json::to_value(&cfg.drawer.sections).unwrap();
+            for (k, on) in *want {
+                assert_eq!(v[*k], serde_json::Value::Bool(*on), "{json} → {k}");
+            }
+        }
+        let cfg: Config = serde_json::from_str("{}").unwrap();
+        assert_eq!(cfg.drawer.sections, Sections::default());
+        let s = schema_json();
+        assert!(s.contains("claudeSubagents") && s.contains("weather"));
     }
 
     #[test]

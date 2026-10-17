@@ -24,7 +24,9 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 pub const LABEL: &str = "drawer";
 
 /// Chromium bez služeb, které šuplík nepotřebuje (sync, aktualizace komponent, crash reporter…).
-const BROWSER_ARGS: &str = concat!(
+/// Stejné argumenty (a výchozí data dir) bere i okno s webem (`webpanel.rs`) — WebView2 pak sdílí
+/// jeden proces prohlížeče; s jinými argumenty by nad stejným data direm okno vůbec nevzniklo.
+pub(crate) const BROWSER_ARGS: &str = concat!(
     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection ",
     // síťová služba v procesu prohlížeče: −1 proces, ~−10 MB private (změřeno 2026-10-17)
     "--enable-features=NetworkServiceInProcess2 ",

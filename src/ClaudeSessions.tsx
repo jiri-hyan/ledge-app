@@ -3,7 +3,7 @@
 // „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`, náhled diffu `sessions/DiffPreview.tsx`, review plánu
 // `sessions/PlanReview.tsx`), otázky Clauda
 // (`QuestionCard` pod řádkem session), subagenti, panel Git session (`sessions/GitPanel.tsx`) a klik = otevřít session (`api.sessionOpen`, Win32 v `winfocus.rs`). Nečinné nad 3 se sbalí do „+N nečinných“.
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { api, type Snapshot, type SessionView, type Pending, type SubagentDone, type Ask } from "./api";
 import { ago, uptime } from "./format";
 import { say } from "./ui/toast";
@@ -19,6 +19,7 @@ import { planTitle } from "./sessions/plan";
 import CostsSection from "./costs/CostsSection";
 import AgentActions, { BgPill } from "./sessions/AgentActions";
 import { statusPill } from "./sessions/agentview";
+import { sectionOn } from "./cards/sections";
 import "./sessions.css";
 
 /** stav → barva pilulky a popisek (funkce, ať se popisek přeloží až při vykreslení) */
@@ -38,7 +39,7 @@ const dur = (ms: number | null) => {
   return ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s` : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 };
 
-export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings: () => void }) {
+export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings: () => void; menu?: JSX.Element }) {
   const [allIdle, setAllIdle] = createSignal(false);
   const by = (st: SessionView["status"]) => p.s.sessions.filter((x) => x.status === st);
   const active = () => p.s.sessions.filter((x) => x.status === "waiting" || x.status === "working");
@@ -63,8 +64,9 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
   const row = (ss: SessionView) => <SessionRow ss={ss} s={p.s} now={p.now} pending={pendingFor(ss.id)} asks={asksFor(ss.id)} />;
   return (
     <div class="card" data-anim>
-      <h4><span class="ic" style="background:var(--violet)" />Claude <span class="n">{live() ? tp("sessions.count", live(), "{n} session") : ""}</span></h4>
-      <LimitsRow s={p.s} now={p.now} onSettings={p.onSettings} />
+      <h4><span class="ic" style="background:var(--violet)" />Claude <span class="n">{live() ? tp("sessions.count", live(), "{n} session") : ""}</span>{p.menu}</h4>
+      {/* sekce karty jdou skrýt (`drawer.sections.claude*`); skrytá útrata nespouští přepočet (`costs_refresh`) */}
+      <Show when={sectionOn(p.s.sections, "claudeLimits")}><LimitsRow s={p.s} now={p.now} onSettings={p.onSettings} /></Show>
       <For each={orphans()}>{(pd) => <PendingRow pd={pd} />}</For>
       <For each={orphanAsks()}>{(a) => <QuestionCard ask={a} s={p.s} />}</For>
       <For each={active()}>{row}</For>
@@ -87,7 +89,7 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
       }>
         <div class="empty">{t("sessions.bridgeOff", "Most pro Claude je vypnutý v Nastavení — bez schvalování a subagentů.")}</div>
       </Show>
-      <CostsSection s={p.s} now={p.now} />
+      <Show when={sectionOn(p.s.sections, "claudeCosts")}><CostsSection s={p.s} now={p.now} /></Show>
     </div>
   );
 }
@@ -143,7 +145,7 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
         <span class={`pill ${st()[0]}`}>{st()[1]()}</span>
         <span class="meta">{when()}</span>
       </div>
-      <Show when={agentLine()}>
+      <Show when={sectionOn(p.s.sections, "claudeSubagents") && agentLine()}>
         <button class="subag" onClick={() => setOpen(!open())} aria-expanded={open()}>{open() ? "▾" : "▸"} {agentLine()}</button>
         <Show when={open()}>
           <div class="subag-list">
@@ -153,7 +155,7 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
         </Show>
       </Show>
       <AgentActions ss={p.ss} />
-      <Show when={p.ss.cwd}>
+      <Show when={sectionOn(p.s.sections, "claudeGit") && p.ss.cwd}>
         <button class="subag" onClick={() => setGit(!git())} aria-expanded={git()} title={p.ss.cwd}>{git() ? "▾" : "▸"} {t("sessions.git.toggle", "Git")}</button>
         <Show when={git()}><GitPanel id={p.ss.id} status={p.ss.status} /></Show>
       </Show>

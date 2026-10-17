@@ -41,6 +41,8 @@ pub fn local_dir() -> PathBuf {
 #[derive(Debug, PartialEq)]
 pub enum Launch {
     Url(String),
+    /// web ve vlastním okně Ledge (`webpanel::open`)
+    Panel(String),
     /// složka, dokument, `.exe` bez argumentů → ShellExecute (opener)
     Path(PathBuf),
     /// `.exe` s argumenty — přímo, bez shellu
@@ -60,6 +62,7 @@ pub fn resolve(a: &Action, checked: Option<LinkTarget>) -> Result<Launch, String
     match (a.kind, checked) {
         (_, LinkTarget::Invalid(why)) => Err(why),
         (ActionKind::Url, LinkTarget::Web(u)) => Ok(Launch::Url(u)),
+        (ActionKind::Web, LinkTarget::Web(u)) => Ok(Launch::Panel(u)),
         (ActionKind::Folder, LinkTarget::Folder(p)) | (ActionKind::File, LinkTarget::File(p)) => Ok(Launch::Path(p)),
         (ActionKind::App, LinkTarget::App(p)) => Ok(if a.args.is_empty() { Launch::Path(p) } else { Launch::Exe(p) }),
         (_, LinkTarget::Web(_)) => wrong(kind_name(ActionKind::Url)),
@@ -76,6 +79,7 @@ pub fn kind_name(k: ActionKind) -> &'static str {
         ActionKind::Folder => tr("složka", "folder"),
         ActionKind::App => tr("aplikace", "app"),
         ActionKind::Command => tr("příkaz", "command"),
+        ActionKind::Web => tr("okno s webem", "web window"),
     }
 }
 
@@ -321,6 +325,9 @@ mod tests {
             (act(ActionKind::App, r"C:\a.exe"), Some(LinkTarget::App(p(r"C:\a.exe"))), ok(Launch::Path(p(r"C:\a.exe")))),
             (Action { args: vec!["-x".into()], ..act(ActionKind::App, r"C:\a.exe") }, Some(LinkTarget::App(p(r"C:\a.exe"))), ok(Launch::Exe(p(r"C:\a.exe")))),
             (act(ActionKind::Command, "dir"), None, ok(Launch::Command)),
+            (act(ActionKind::Web, "https://music.youtube.com"), Some(LinkTarget::Web("https://music.youtube.com".into())), ok(Launch::Panel("https://music.youtube.com".into()))),
+            (act(ActionKind::Web, r"C:"), Some(LinkTarget::Folder(p(r"C:"))), Err(())),
+            (act(ActionKind::Folder, "https://x.cz"), Some(LinkTarget::Web("https://x.cz".into())), Err(())),
             // typ nesedí s cílem
             (act(ActionKind::File, r"C:\a.exe"), Some(LinkTarget::App(p(r"C:\a.exe"))), Err(())),
             (act(ActionKind::Folder, r"C:\a.txt"), Some(LinkTarget::File(p(r"C:\a.txt"))), Err(())),

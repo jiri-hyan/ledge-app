@@ -173,6 +173,37 @@ pub fn line_stops(a: &AppearanceConfig, pal: &Palette) -> [Rgba; 3] {
     }
 }
 
+/// Relativní jas (WCAG) barvy bez průhlednosti.
+pub fn lum(c: Rgba) -> f32 {
+    let f = |v: f32| if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) };
+    0.2126 * f(c.0) + 0.7152 * f(c.1) + 0.0722 * f(c.2)
+}
+
+/// Kontrastní poměr dvou barev (WCAG, 1–21).
+pub fn contrast(a: Rgba, b: Rgba) -> f32 {
+    let (x, y) = (lum(a), lum(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+/// Barva textu segmentu z volby uživatele (`strip.colors`), čitelná na těle proužku: vrací barvu PŘED
+/// `ink` (kreslení ji ještě přemapuje), jejíž `ink` má na obou koncích přechodu kontrast ≥ 4.5:1. Barva,
+/// která nestačí, se po krocích míchá k bílé (tmavé motivy) / černé (světlý motiv) — odstín zůstane znát.
+pub fn readable(c: Rgba, pal: &Palette) -> Rgba {
+    let target = if pal.light { Rgba(0.0, 0.0, 0.0, c.3) } else { Rgba(1.0, 1.0, 1.0, c.3) };
+    let ok = |x: Rgba| {
+        let k = ink(x, pal.light);
+        contrast(k, pal.top) >= 4.5 && contrast(k, pal.bottom) >= 4.5
+    };
+    for step in 0..=10 {
+        let t = step as f32 / 10.0;
+        let x = Rgba(c.0 + (target.0 - c.0) * t, c.1 + (target.1 - c.1) * t, c.2 + (target.2 - c.2) * t, c.3);
+        if ok(x) {
+            return x;
+        }
+    }
+    target
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,16 +282,6 @@ mod tests {
         assert_eq!((m.height, m.radius, m.hot_extra, m.k), (crate::strip::HEIGHT, 14.0, 4.0, 1.0));
         assert!(strip_metrics(StripStyle::Dot, StripSize::Small).height < strip_metrics(StripStyle::Line, StripSize::Small).height);
         assert!(strip_metrics(StripStyle::Pill, StripSize::Large).height > m.height);
-    }
-
-    fn lum(c: Rgba) -> f32 {
-        let f = |v: f32| if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) };
-        0.2126 * f(c.0) + 0.7152 * f(c.1) + 0.0722 * f(c.2)
-    }
-
-    fn contrast(a: Rgba, b: Rgba) -> f32 {
-        let (x, y) = (lum(a), lum(b));
-        (x.max(y) + 0.05) / (x.min(y) + 0.05)
     }
 
     #[test]

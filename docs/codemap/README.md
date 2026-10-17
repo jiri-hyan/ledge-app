@@ -17,6 +17,7 @@ oprav i jeho mapu (je to součást hotové práce).
 | Vzhled a animace: motivy, tokeny, akcent, styl pohybu, vzhled a pozice proužku, panel Vzhled | [appearance.md](appearance.md) | `appearance.rs`, `appearance/geom.rs`, `src/theme/*`, `src/settings/panels/Appearance*.tsx` |
 | Průvodce prvním spuštěním, čistý config nového uživatele | [onboarding.md](onboarding.md) | `onboarding/*`, `uiconf.rs`, `commands/onboarding.rs`, `src/onboarding/*`, `src/settings/panels/Onboarding.tsx` |
 | Přihrádka na soubory: tah na proužek (OLE cíl), `shelf.json`, schránka, tah ven, karta | [shelf.md](shelf.md) | `shelf/*`, `commands/shelf.rs`, `src/shelf/*` |
+| Osobní: právě hraje (GSMTC), hlasitost (Core Audio), baterie — události, žádný polling | [media.md](media.md) | `media.rs`, `volume.rs`, `battery.rs`, `commands/media.rs`, `src/media/*` |
 | Jádro: stav, vlákna, příkazy, okna, proužek, trigger, procesy | [core.md](core.md) | `lib.rs`, `state.rs`, `snapshot.rs`, `threads/*`, `commands/*`, `drawer.rs`, `strip.rs`, `edge.rs`, `screen.rs`, `procman.rs` |
 
 Mimo mapy: `AGENTS.md` = config, formát poznámek, lokální API, instalace, pravidla (čti jen potřebnou

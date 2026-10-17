@@ -7,15 +7,17 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `lib.rs` | `mod` seznam (první `#[macro_use] mod i18n`), `run()` (`i18n::set_lang` po `load_or_seed`), re-export `crate::log` a `crate::screen_glass_capable` | `run`, `generate_handler!` |
+| `lib.rs` | `mod` seznam (první `#[macro_use] mod i18n`), `run()` (`i18n::set_lang` po `load_or_seed`), re-export `crate::log` a `crate::screen_glass_capable`; `RunEvent::ExitRequested` bez kódu (zavřené poslední okno) → `prevent_exit` | `run`, `generate_handler!` |
 | `i18n.rs` | jazyk textů jádra (hlášky, chyby, stavy ve snapshotu, proužek): globální atomic z `ui.lang` (`set_lang` při startu a v `apply_config`), výchozí čeština; text v obou jazycích na místě. Testy: jazyk per vlákno (`with_lang`) | `tr(cs, en)`, `trf!(cs, en, args)`, `lang`, `set_lang`, `with_lang` |
 | `state.rs` | sdílený stav a jeho přístup | `Core` (pole `pub(crate)`), `CORE`, `core()`, `mark_dirty`, `UiCmd`, `WeatherState`, `Core::{dead, monitor, monitor_fresh, project_dir, rebuild_index, send_ui, strip_logical}`, `MonitorCache`, `MONITOR_TTL`, `FLASH`, `now_ms`, `find_project`, `log` |
 | `snapshot.rs` | stav pro UI (`get_state`, událost `state`) — jen paměť, žádné I/O | `snapshot`, `Snapshot`, `ProjectView`, `PersonalView`, `WeatherView`, `LinkView`, `session_rows`, `personal_view`, `monogram`, `github_url` |
-| `stripview.rs` | obsah proužku podle `strip.items` (vč. `waiting`), ambient, puls, viditelnost (`Core::dead`) | `refresh_strip`, `seg`, `project_for_cwd`, `local_clock` |
-| `attention.rs` | pozornost Clauda: počet čekajících session (segment `waiting`, `upgrade_items` pro starý config), přechody „čeká na tebe“ / „hotovo“ ze snímků mostu, dedup 30 s, rozhodnutí bliknutí / puls / toast, tvar pulsu; `on_change` volá `refresh::on_claude_change` | `waiting_count`, `waiting_text`, `upgrade_items`, `ITEMS_REV`, `Seen`, `transitions`, `Dedup`, `Gate`, `react`, `pulse_level`, `PULSE_MS`, `pulse`, `on_change` |
+| `stripview.rs` | obsah proužku podle `strip.items` (vč. `waiting`, `custom`, `timer`, `media` = `media::strip_now`; časovač i automaticky), segmenty po položkách → `stripconf::compose` (klid, barvy), ambient, puls, viditelnost (`Core::dead`) | `refresh_strip`, `seg`, `project_for_cwd`, `local_clock` |
+| `stripconf.rs` | config proužku (`StripConfig`, `StripItem`, `StripColor`; re-export z `config.rs`), validace `strip.custom`, čisté skládání: vlastní text, „v klidu skryté“ (`is_event`), barva na položku, automatická položka časovače | `StripConfig`, `StripItem`, `StripColor::base`, `compose`, `is_event`, `custom_segment`, `effective_items`, `validate`, `CUSTOM_MAX` |
+| `timer.rs` | časovač: odpočet + stopky jako časy (žádný tik), akce `Op` → `apply`, `tick` (doběhnutí → `attention::signal` + toast `timer.toast`), `next_deadline` (konec, změny minuty v proužku), segment proužku, stav v `timer.json` (zápis jen při akci), config `TimerConfig` | `TimerState`, `Countdown`, `Stopwatch`, `Op`, `apply`, `tick`, `next_deadline`, `strip_segments`, `minutes_text`, `clock_text`, `act`, `tick_live`, `next_deadline_live`, `init`, `view`, `TimerView` |
+| `attention.rs` | pozornost Clauda: počet čekajících session (segment `waiting`, `upgrade_items` pro starý config), přechody „čeká na tebe“ / „hotovo“ ze snímků mostu, dedup 30 s, rozhodnutí bliknutí / puls / toast, tvar pulsu; `on_change` volá `refresh::on_claude_change`; `signal` = bliknutí + puls podle `react` i pro jiné zdroje (konec časovače) | `waiting_count`, `waiting_text`, `upgrade_items`, `ITEMS_REV`, `Seen`, `transitions`, `Dedup`, `Gate`, `react`, `signal`, `pulse_level`, `PULSE_MS`, `pulse`, `on_change` |
 | `toast.rs` | oznámení Windows přes WinRT (`windows` crate, `UI_Notifications`), krátké vlákno; QUNS „přijímá oznámení?“ | `show`, `toast_xml`, `xml_escape`, `accepts_notifications` |
 | `gamemode.rs` | herní režim: „je Ledge mrtvý?“, rozhodnutí podnětů (zkratky, druhé spuštění), stav v `game-mode.json` vedle configu | `is_dead`, `decide`, `Trigger`, `Outcome`, `handle`, `set`, `load`, `save`, `FILE` |
-| `refresh.rs` | obnovy na pozadí + reakce na události | `maybe_refresh_weather`, `reclassify_links`, `refresh_logos`, `refresh_git_async`, `on_claude_change`, `on_proc_event` |
+| `refresh.rs` | obnovy na pozadí + reakce na události (počasí jen s nezakrytou kartou `drawer.sections.weather`) | `maybe_refresh_weather`, `reclassify_links`, `refresh_logos`, `refresh_git_async`, `on_claude_change`, `on_proc_event` |
 | `hotkeys.rs` | globální zkratky | `sync_hotkeys`, `sync_approve_keys`, `on_shortcut` |
 | `settings.rs` | config za běhu + vlákno `config-watch`; nový uživatel → `onboarding::fresh_config` | `load_or_seed`, `apply_config`, `watch_config` |
 | `ctl.rs` | most `/status` doplněk a `/ctl/*` (open, close, settings, launch, stop, reload) | `status_extra`, `ctl_handler` |
@@ -31,21 +33,24 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 | `rawpush.rs` | raw myš (tlak na hranu), vlákno `rawpush`, aktivní jen u hrany | `RawPush::{start, arm, take}` |
 | `screen.rs` | monitory, DPI, kurzor, fullscreen (QUNS + okno v popředí) | `monitors`, `pick`, `fullscreen_on`, `ForegroundProbe` |
 | `procman.rs` | dev servery / appky v Job Objectu, URL z logu, porty | `ProcMan::{launch_dev, launch_app, stop, stop_all, snapshot}`, `Phase`, `ProcEvent` |
-| `config.rs` | `config.json` + schéma, validace (s polem: `validate_field` → `configerr::FieldError`), zkratky | `Config`, `load`, `save`, `validate`, `validate_field`, `active_hotkeys`, `rebind_plan`, `config_dir` |
+| `config.rs` | `config.json` + schéma, validace (s polem: `validate_field` → `configerr::FieldError`), zkratky; `Sections` (`drawer.sections`) generuje makro `sections!` — plochý seznam boolů, výchozí `true`, nové pole = jeden řádek | `Config`, `Sections`, `sections!`, `load`, `save`, `validate`, `validate_field`, `active_hotkeys`, `rebind_plan`, `config_dir` |
 | `drawerfit.rs` | strop výšky šuplíku (pracovní plocha monitoru) a širší Full pro Nastavení → [settings.md](settings.md) | `limits`, `fit_full` |
 | `autostart.rs` / `migrate.rs` | HKCU Run (míří na instalovanou kopii) / Notch → Ledge při startu | `apply`, `decide`, `install_target` / `at_startup`, `plan_notes` |
 | `update.rs` / `updatenet.rs` | nová verze (veřejné API, záložně `gh`), vlákno `update`, instalace na klik / HTTP dotaz a stažení | `Updater::{start, check_now, install, view}`, `evaluate`, `fetch_release` / `latest`, `download`, `download_ok` |
 | `actions.rs` · `actionrun.rs` · `actionicons.rs` · `actionstate.rs` | rychlé akce → [actions.md](actions.md) | `Action`, `run_action`, `actionstate::refresh`, `views` |
+| `webpanel.rs` | okno s webem `web-<id>` (rychlá akce `kind: "web"`): normální okno s rámem, sdílí WebView2 se šuplíkem, zavření = zničení → [actions.md](actions.md) | `open`, `nav_allowed`, `frame_allowed`, `place` |
 | `personal.rs` / `weather.rs` | rychlé odkazy (nedůvěryhodný cíl) / Open-Meteo | `classify_fs`, `LinkTarget` / `fetch`, `needs_fetch`, `loading_live`, `status` |
+| `media.rs` · `volume.rs` · `battery.rs` | Osobní: právě hraje, hlasitost, baterie → [media.md](media.md) | `ensure`, `sync`, `view` |
 
 ## Vlákna a buzení
 
 - `emit` spí na `Core.wake` (`mark_dirty`) s timeoutem `next_wake`: začátek další minuty (hodiny),
   `NotesState.next_due`, konec `FLASH`, git za `GIT_EVERY`, watchdog počasí, reset limitu Claude na 100 %
-  (`limitslive::next_deadline`, [limits.md](limits.md)). V klidu ~80 probuzení/h.
+  (`limitslive::next_deadline`, [limits.md](limits.md)), časovač (`timer::next_deadline_live` — jen když běží:
+  konec odpočtu a změna minuty v proužku, ~60/h navíc; pozastavený / žádný nic). V klidu ~80 probuzení/h.
   `hover` ho budí i po změně fullscreenu (peek připomínky).
 - `hover`: 16 ms u hrany / 100 ms daleko / 500 ms ve fullscreenu; co 3 s `monitor_fresh` + výčet monitorů.
-- `ui`, `notes-watch`, `notes-sync`, `config-watch`, `strip`, `rawpush`, `update`, `shelf-drop` (vznikne až
+- `ui`, `notes-watch`, `notes-sync`, `config-watch`, `strip`, `rawpush`, `update`, `media` a `volume` (vzniknou až při prvním zobrazení záložky Osobní; `media` i dřív, je-li v proužku položka `media`, [media.md](media.md)), `shelf-drop` (vznikne až
   při prvním tahu souborů na proužek, [shelf.md](shelf.md)): blokují na kanálu / událostech. `strip` má časovač (~30 fps) jen během pulsu `attention::PULSE_MS` (1,2 s), v klidu žádný;
   `toast` je jednorázové vlákno na jedno oznámení. `logos`, `links`, git (`refresh_git_async`) jsou krátká jednorázová vlákna.
 
@@ -74,12 +79,17 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 - **Paměť WebView2:** `BROWSER_ARGS` = `--disable-gpu --in-process-gpu` + `NetworkServiceInProcess2` →
   5 procesů (ledge, browser, renderer, storage, crashpad). Zavření = `set_dormant(true)`: Low cíl paměti +
   `TrySuspend` (bez nich ~330 MB WS). Argumenty zkoušej přes `scripts/argbench.ps1` (env proměnná,
-  bez rekompilace); `--single-process` WebView2 neumí (šuplík se neotevře).
+  bez rekompilace); `--single-process` WebView2 neumí (šuplík se neotevře). Okno s webem (`webpanel.rs`)
+  bere stejné `BROWSER_ARGS` a výchozí data dir → stejný proces prohlížeče; očekávaně přidá vlastní
+  renderer (izolace webů) a podle stránky utility proces (zvuk/média) — neměřeno, měř `perf.ps1`. Zavřením
+  se zničí, renderer skončí.
 
 ## Testy
 
 `attention` (počet a text čekajících, `upgrade_items` i přes `config::load`, přechody, dedup, `react`,
-tvar pulsu), `gamemode` (`is_dead`, `decide`, stav v tempdiru), `toast` (XML), `threads::emit` (`next_wake`, hodina klidu), `state` (`MonitorCache`; `monitor_cache_bench` je
+tvar pulsu), `stripconf` (serde starých/nových configů, migrace přes `config::load`, vlastní text, `is_event`,
+`compose` klid/barvy, automatický časovač, čitelnost předvoleb ve všech motivech), `timer` (akce odpočtu a
+stopek, `tick`, termíny, texty, segmenty, tvar `Op`, config, soubor v tempdiru), `gamemode` (`is_dead`, `decide`, stav v tempdiru), `toast` (XML), `threads::emit` (`next_wake`, hodina klidu), `state` (`MonitorCache`; `monitor_cache_bench` je
 `#[ignore]`), `commands::projects` (`pull_message`), `threads::notes_watch` (filtr událostí),
 `edge`, `config`, `procman`, `autostart`, `migrate`, `personal`, `weather`, `update`, `focusreturn`
 (`decide`, `keep_or_take`), `paletteconf`.

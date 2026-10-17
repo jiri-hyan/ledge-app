@@ -3,7 +3,7 @@
 // Prázdná karta se ukáže jen na Osobní (pozvánka), na Práci by jen zabírala místo. Skripty ze složky
 // skriptů jsou tu jen se `scripts.inActions` (`s.scripts`); výstup skriptu spuštěného z palety se ale
 // ukáže vždy (karta se kvůli němu objeví i prázdná).
-import { For, Show } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import type { Snapshot } from "../types";
 import { isBusy, lastResult } from "../actions/api";
 import { runAny } from "../actions/scripts";
@@ -12,7 +12,7 @@ import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../actions/ui
 import { gotoSettingsPanel } from "../palette/goto";
 import { t } from "../i18n";
 
-export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean }) {
+export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean; menu?: JSX.Element }) {
   const groups = () => visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], p.s.mode);
   const ids = () => groups().flatMap((g) => g.items.map((a) => a.id));
   /** výstup skriptu (i z palety, když skripty v kartě nejsou) */
@@ -29,6 +29,7 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
           {t("actions.card.title", "Rychlé akce")}
           <span class="n">{ids().length || ""}</span>
           <button class="mini" onClick={edit}>{t("actions.card.edit", "Upravit")}</button>
+          {p.menu}
         </h4>
         <For each={groups()} fallback={
           <Show when={!scriptOut()}>

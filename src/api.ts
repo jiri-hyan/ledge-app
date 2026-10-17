@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
-import type { StatusLineStatus } from "./types";
+import type { StatusLineStatus, TimerOp, TimerState } from "./types";
 import type { EditPreview, GitView } from "./types";
 import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
 
@@ -87,6 +87,16 @@ export const api = {
   statuslineRemove: () => call<StatusLineStatus>("statusline_remove"),
   /** Útrata Claude: přepočet indexu na pozadí (Rust ho pustí nejvýš 1× / 60 s); výsledek ve snapshotu. */
   costsRefresh: () => call("costs_refresh"),
+  /** Časovač: akce (`{ op: "start", minutes: 25 }`, pause, resume, cancel, add, swStart, swPause, swReset) → nový stav. */
+  timer: (op: TimerOp) => call<TimerState>("timer", { op }),
+  // --- Osobní: právě hraje, hlasitost, baterie (Rust `media.rs`, `volume.rs`, `battery.rs`) ---
+  /** Záložka Osobní je vidět: Rust spustí odběry událostí (líně, jen jednou). */
+  personalLive: () => call("personal_live"),
+  mediaControl: (action: "toggle" | "next" | "prev") => call("media_control", { action }),
+  /** Obal skladby jako data URL (jednou na `coverKey`); null = není / skladba se změnila. */
+  mediaCover: (key: string) => call<string | null>("media_cover", { key }),
+  volumeSet: (level: number) => call("volume_set", { level }),
+  volumeMute: (muted: boolean) => call("volume_mute", { muted }),
   // --- settings ---
   /** Ověří rozpracovaný config (nic nezapisuje): první chyba s polem, `null` = v pořádku. */
   checkConfig: (cfg: any) => call<FieldError | null>("check_config", { cfg }),

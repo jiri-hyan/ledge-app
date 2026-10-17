@@ -1,0 +1,38 @@
+// Angličtina pro časovač (`src/timer/*`: karta Časovač; `src/palette/timer.ts`: příkazy palety;
+// klíče `cards.timer.*`, `palette.timer.*`).
+import { registerDict } from "../i18n";
+
+registerDict("en", {
+  "cards.timer.title": "Timer",
+  "cards.timer.done": "Time's up",
+  "cards.timer.paused": "paused",
+  "cards.timer.pause": "Pause",
+  "cards.timer.resume": "Resume",
+  "cards.timer.plus5": "+5 min",
+  "cards.timer.dismiss": "Dismiss",
+  "cards.timer.cancel": "Cancel",
+  "cards.timer.preset": "{m} min",
+  "cards.timer.custom.ph": "min",
+  "cards.timer.custom": "Custom length in minutes",
+  "cards.timer.start": "Start",
+  "cards.timer.stopwatch": "Stopwatch",
+  "cards.timer.swStart": "Start",
+  "cards.timer.reset": "Reset",
+  "palette.timer.start": "Timer {m} min",
+  "palette.timer.started": "Timer {m} min running",
+  "palette.timer.pause": "Pause timer",
+  "palette.timer.paused": "Timer paused",
+  "palette.timer.resume": "Resume timer",
+  "palette.timer.resumed": "Timer resumed",
+  "palette.timer.plus5": "Timer +5 min",
+  "palette.timer.added": "Added 5 min",
+  "palette.timer.cancel": "Cancel timer",
+  "palette.timer.cancelled": "Timer cancelled",
+  "palette.timer.swPause": "Pause stopwatch",
+  "palette.timer.swPaused": "Stopwatch paused",
+  "palette.timer.swResume": "Resume stopwatch",
+  "palette.timer.sw": "Stopwatch",
+  "palette.timer.swStarted": "Stopwatch running",
+  "palette.timer.swReset": "Reset stopwatch",
+  "palette.timer.swDone": "Stopwatch reset",
+});

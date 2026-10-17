@@ -1,15 +1,17 @@
 // Panel „Šuplík a proužek“: CHOVÁNÍ — jak se šuplík otevírá a zavírá, karty hlavní stránky, proužek (co
 // ukazuje, monitor), paleta příkazů (kompaktní), okna s taby nahoře (tlak na hranu), uvolnění paměti, autostart. Vzhled (pozadí,
 // rozmazání, šířka, animace, styl a pozice proužku) je JEN v panelu „Vzhled a animace“ (`Appearance.tsx`).
-import { Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { api } from "../../api";
 import { lang, t } from "../../i18n";
 import { useSettings } from "../ctx";
-import { Chips, Seg, Select, Slider, Toggle } from "../fields/controls";
+import { Chips, Seg, Select, Slider, Text, Toggle } from "../fields/controls";
 import { PanelHead, Row, Section } from "../fields/Row";
 import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 import type { PanelProps } from "../types";
+import { hiddenSections, SECTION_GROUPS, SECTION_KEYS, type SectionKey } from "../../cards/sections";
+import { clipCustom, COLOR_VAR, CUSTOM_MAX, customLen, previewSegments, QUIETABLE, STRIP_COLORS, withColor, withQuiet, type StripColorId } from "../strip";
 
 const STRIP_ITEMS: { id: string; key: string; cs: string }[] = [
   { id: "mode", key: "settings.strip.item.mode", cs: "Režim (Práce / Osobní)" },
@@ -19,7 +21,38 @@ const STRIP_ITEMS: { id: string; key: string; cs: string }[] = [
   { id: "repos", key: "settings.strip.item.repos", cs: "Repa s neuloženou prací" },
   { id: "limits", key: "settings.strip.item.limits", cs: "Limity Claude 5h / týden" },
   { id: "waiting", key: "settings.strip.item.waiting", cs: "Kolik Claude session na tebe čeká" },
+  { id: "custom", key: "settings.strip.item.custom", cs: "Vlastní text" },
+  { id: "timer", key: "settings.strip.item.timer", cs: "Časovač (odpočet, stopky)" },
+  { id: "media", key: "settings.strip.item.media", cs: "Právě hraje (skladba · interpret)" },
 ];
+
+/** Název předvolby barvy (literály kvůli hlídači překladů). */
+const colorLabel = (id: StripColorId): string =>
+  ({
+    accent: t("settings.strip.color.accent", "Akcent motivu"),
+    text: t("settings.strip.color.text", "Jasná"),
+    muted: t("settings.strip.color.muted", "Tlumená"),
+    violet: t("settings.strip.color.violet", "Fialová"),
+    blue: t("settings.strip.color.blue", "Modrá"),
+    teal: t("settings.strip.color.teal", "Tyrkysová"),
+    green: t("settings.strip.color.green", "Zelená"),
+    amber: t("settings.strip.color.amber", "Jantarová"),
+    red: t("settings.strip.color.red", "Červená"),
+  })[id];
+
+/** Ukázkové texty náhledu (ne skutečná data — náhled je označený „Ukázka“). Prázdné = položka by se neukázala. */
+const sampleTexts = (custom: string, busy: boolean): Record<string, string> => ({
+  mode: t("settings.strip.sample.mode", "Práce"),
+  clock: t("settings.strip.sample.clock", "08:31 · st 15. 10."),
+  running: busy ? t("settings.strip.sample.running", "web :5173") : "",
+  claude: busy ? t("settings.strip.sample.claude", "Claude 1× pracuje") : "",
+  repos: t("settings.strip.sample.repos", "2× neuloženo"),
+  limits: t("settings.strip.sample.limits", "5h 42 %"),
+  waiting: busy ? t("settings.strip.sample.waiting", "1 čeká") : "",
+  custom: clipCustom(custom).trim(),
+  timer: busy ? t("settings.strip.sample.timer", "⏱ 18 min") : "",
+  media: busy ? t("settings.strip.sample.media", "♪ Skladba · Interpret") : "",
+});
 const stripLabel = (id: string) => {
   const x = STRIP_ITEMS.find((i) => i.id === id);
   return x ? t(x.key, x.cs) : id;
@@ -46,6 +79,19 @@ export default function DrawerPanel(_p: PanelProps) {
   };
   const stripOn = (id: string) => (c.cfg.strip.items ?? []).includes(id);
   const setStrip = (all: string[], on: (id: string) => boolean) => c.set("strip.items", all.filter(on));
+  const quiet = (id: string) => (c.cfg.strip.quiet ?? []).includes(id);
+  const [pvMode, setPvMode] = createSignal<"calm" | "busy">("calm");
+
+  // karty: „Zobrazit vše“ zapne každý přepínač v draftu (uloží až Uložit); proč je karta i zapnutá neviditelná
+  const showAll = () => SECTION_KEYS.forEach((k) => d().sections?.[k] === false && c.set(`drawer.sections.${k}`, true));
+  const offWhy = (k: SectionKey): string => {
+    if (k === "notes" && c.cfg.notes?.enabled === false) return t("settings.drawer.sec.notes.off", "Poznámky jsou vypnuté celé (panel Poznámky) — karta se neukáže");
+    if (k === "shelf" && c.cfg.shelf?.enabled === false) return t("settings.drawer.sec.shelf.off", "Přihrádka je vypnutá celá (Proužek níže) — karta se neukáže");
+    if (k === "claudeCosts" && c.cfg.claude?.costs === false) return t("settings.drawer.sec.claudeCosts.off", "Útrata je vypnutá v panelu Claude — sekce se neukáže");
+    if (k.startsWith("claude") && k !== "claude" && d().sections?.claude === false) return t("settings.drawer.sec.claudeOff", "Karta Claude je skrytá — sekce se neukáže");
+    if (["clock", "weather", "links"].includes(k) && c.cfg.modes?.personalEnabled === false) return t("settings.drawer.sec.personalOff", "Záložka Osobní je vypnutá — karta se neukáže");
+    return "";
+  };
 
   return (
     <>
@@ -84,24 +130,26 @@ export default function DrawerPanel(_p: PanelProps) {
         </Row>
       </Section>
 
-      <Section id="drawer.sections" title={t("settings.f.drawer.sections", "Karty na hlavní stránce")} desc={t("settings.drawer.sections.desc", "Vypnutá karta zmizí ze šuplíku; data se dál nesbírají zbytečně.")}>
-        <Row id="drawer.sections.projects" label={t("settings.drawer.sec.projects", "Projekty")} hint={t("settings.drawer.sec.projects.hint", "Dlaždice projektů nahoře")}>
-          <Toggle path="drawer.sections.projects" label={t("settings.drawer.sec.projects", "Projekty")} />
-        </Row>
-        <Row id="drawer.sections.running" label={t("settings.drawer.sec.running", "Běžící servery")} hint={t("settings.drawer.sec.running.hint", "Ukáže se, jen když Ledge něco spustil")}>
-          <Toggle path="drawer.sections.running" label={t("settings.drawer.sec.running", "Běžící servery")} />
-        </Row>
-        <Row id="drawer.sections.claude" label={t("settings.drawer.sec.claude", "Claude")} hint={t("settings.drawer.sec.claude.hint", "Session, subagenti a žádosti o schválení")}>
-          <Toggle path="drawer.sections.claude" label={t("settings.drawer.sec.claude", "Claude")} />
-        </Row>
-        <Row
-          id="drawer.sections.notes"
-          label={t("settings.drawer.sec.notes", "Poznámky")}
-          dim={c.cfg.notes?.enabled === false}
-          hint={c.cfg.notes?.enabled === false ? t("settings.drawer.sec.notes.off", "Poznámky jsou vypnuté celé (panel Poznámky) — karta se neukáže") : t("settings.drawer.sec.notes.hint", "Poslední poznámky a připomínky na dnes")}
-        >
-          <Toggle path="drawer.sections.notes" label={t("settings.drawer.sec.notes", "Poznámky")} />
-        </Row>
+      <Section
+        id="drawer.sections"
+        title={t("settings.f.drawer.sections", "Karty na hlavní stránce")}
+        desc={t("settings.drawer.sections.desc", "Skrytá karta zmizí ze šuplíku a její data se zbytečně nesbírají. Kartu skryješ i přímo v šuplíku: ⋯ v její hlavičce.")}
+        aside={<button class="mini" disabled={hiddenSections(d().sections).length === 0} onClick={showAll}>{t("settings.drawer.sections.showAll", "Zobrazit vše")}</button>}
+      >
+        <For each={SECTION_GROUPS}>
+          {(g) => (
+            <>
+              <div class="st-group-h">{t(g.key, g.cs)}</div>
+              <For each={g.items}>
+                {(it) => (
+                  <Row id={`drawer.sections.${it.k}`} label={t(it.key, it.cs)} dim={!!offWhy(it.k)} hint={offWhy(it.k) || t(it.hint[0], it.hint[1])}>
+                    <Toggle path={`drawer.sections.${it.k}`} label={t(it.key, it.cs)} />
+                  </Row>
+                )}
+              </For>
+            </>
+          )}
+        </For>
       </Section>
 
       <Section title={t("settings.drawer.palette", "Paleta příkazů")}>
@@ -114,6 +162,28 @@ export default function DrawerPanel(_p: PanelProps) {
         <Row id="shelf.enabled"><Toggle path="shelf.enabled" label={t("settings.f.shelf.enabled", "Přihrádka na soubory")} /></Row>
         <Show when={c.cfg.strip.enabled}>
           <Row id="strip.items" stack>
+            <div class="st-strip-pv">
+              <div class="st-strip-pv-head">
+                <span>{t("settings.strip.preview", "Ukázka")}</span>
+                <Seg
+                  value={pvMode()}
+                  onChange={setPvMode}
+                  label={t("settings.strip.preview", "Ukázka")}
+                  options={[
+                    { v: "calm", label: t("settings.strip.preview.calm", "V klidu") },
+                    { v: "busy", label: t("settings.strip.preview.busy", "Když se něco děje") },
+                  ]}
+                />
+              </div>
+              <div class="st-strip-pv-bar">
+                <For
+                  each={previewSegments(c.cfg.strip, sampleTexts(c.cfg.strip.custom ?? "", pvMode() === "busy"), pvMode() === "busy").filter((x) => !x.hidden)}
+                  fallback={<span class="st-strip-pv-empty">{t("settings.strip.preview.empty", "prázdný proužek")}</span>}
+                >
+                  {(x) => <span class="st-strip-pv-seg" style={{ color: x.color ? COLOR_VAR[x.color as StripColorId] : undefined }}>{x.text}</span>}
+                </For>
+              </div>
+            </div>
             <SortList
               items={stripAll()}
               label={t("settings.f.strip.items", "Co proužek ukazuje")}
@@ -122,7 +192,33 @@ export default function DrawerPanel(_p: PanelProps) {
               {(id, _i, handle) => (
                 <div class="st-item" classList={{ dim: !stripOn(id) }}>
                   {handle()}
-                  <span class="grow">{stripLabel(id)}</span>
+                  <span class="grow">
+                    {stripLabel(id)}
+                    <Show when={stripOn(id) && !QUIETABLE.includes(id)}><small>{t("settings.strip.eventOnly", "jen když se něco děje")}</small></Show>
+                  </span>
+                  <Show when={stripOn(id) && QUIETABLE.includes(id)}>
+                    <button
+                      class="mini st-strip-quiet"
+                      classList={{ "st-strip-on": quiet(id) }}
+                      aria-pressed={quiet(id)}
+                      title={t("settings.strip.quiet.hint", "V klidu skryté — ukáže se, jen když se něco děje (běží server, Claude, časovač, připomínka)")}
+                      onClick={() => c.set("strip.quiet", withQuiet(c.cfg.strip.quiet, id, !quiet(id)))}
+                    >
+                      {t("settings.strip.quiet", "Jen při dění")}
+                    </button>
+                  </Show>
+                  <Show when={stripOn(id)}>
+                    <select
+                      class="st-strip-color"
+                      aria-label={t("settings.strip.color", "Barva: {item}", { item: stripLabel(id) })}
+                      value={c.cfg.strip.colors?.[id] ?? ""}
+                      style={{ color: c.cfg.strip.colors?.[id] ? COLOR_VAR[c.cfg.strip.colors[id] as StripColorId] : undefined }}
+                      onChange={(e) => c.set("strip.colors", withColor(c.cfg.strip.colors, id, e.currentTarget.value || null))}
+                    >
+                      <option value="">{t("settings.strip.color.default", "Výchozí barva")}</option>
+                      <For each={STRIP_COLORS}>{(k) => <option value={k}>{colorLabel(k)}</option>}</For>
+                    </select>
+                  </Show>
                   <Toggle
                     value={stripOn(id)}
                     onChange={(v) => setStrip(stripAll(), (x) => (x === id ? v : stripOn(x)))}
@@ -132,6 +228,18 @@ export default function DrawerPanel(_p: PanelProps) {
               )}
             </SortList>
           </Row>
+          <Show when={stripOn("custom")}>
+            <Row id="strip.custom">
+              <Text
+                value={c.cfg.strip.custom ?? ""}
+                onChange={(v) => c.set("strip.custom", clipCustom(v ?? ""))}
+                label={t("settings.f.strip.custom", "Vlastní text v proužku")}
+                placeholder={t("settings.strip.custom.ph", "🎯 Hluboká práce")}
+              />
+              <small class="st-strip-count">{customLen(c.cfg.strip.custom ?? "")}/{CUSTOM_MAX}</small>
+            </Row>
+          </Show>
+          <Row id="timer.strip"><Toggle path="timer.strip" label={t("settings.f.timer.strip", "Časovač v proužku, když běží")} /></Row>
         </Show>
         <Row id="strip.monitor">
           <Select

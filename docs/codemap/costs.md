@@ -32,7 +32,8 @@ podle `cwd` → `Live.summary` → `Snapshot.costs` → `CostsSection`. Vlákno 
 ## Invarianty a pasti
 
 - **Žádný sken v klidu:** přepočet jen na žádost UI s rozbalenou sekcí v otevřeném šuplíku, nejvýš 1× za
-  `THROTTLE` (60 s), nikdy dva naráz; vypnuté `claude.costs` = nic se nečte a sekce zmizí. V paměti zůstane
+  `THROTTLE` (60 s), nikdy dva naráz; vypnuté `claude.costs` nebo skrytá sekce/karta (`drawer.sections.claudeCosts`
+  / `.claude`, `costslive::enabled`) = nic se nečte a sekce zmizí. V paměti zůstane
   jen hotový `Summary` (pár kB); index, množina viděných i výpis souborů se po běhu zahodí.
 - **Inkrement:** soubor s mtime před místní půlnocí začátku okna se neotevře (stat z výpisu složky) a vypadne
   z indexu; nezměněný (délka + mtime) se neotevře; změněný se čte od `FileEntry.off` jen do délky z výpisu a

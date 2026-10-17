@@ -41,7 +41,7 @@ pub fn spec(a: &Action) -> Spec {
     }
     let t = a.target.trim();
     match a.kind {
-        ActionKind::Url => origin(t).map_or(Spec::Monogram, |(origin, key)| Spec::Favicon { origin, key }),
+        ActionKind::Url | ActionKind::Web => origin(t).map_or(Spec::Monogram, |(origin, key)| Spec::Favicon { origin, key }),
         ActionKind::File | ActionKind::Folder => personal::normalize(t).map_or(Spec::Monogram, |n| Spec::Shell(PathBuf::from(n))),
         ActionKind::App => Spec::Exe(t.to_string()),
         ActionKind::Command => Spec::Monogram,
@@ -228,6 +228,7 @@ mod tests {
             (act(ActionKind::File, r"C:\a.txt. ", None), Spec::Shell(r"C:\a.txt".into())),
             (act(ActionKind::App, "notepad.exe", None), Spec::Exe("notepad.exe".into())),
             (act(ActionKind::Command, "dir", None), Spec::Monogram),
+            (act(ActionKind::Web, "https://music.youtube.com/", None), fav("https://music.youtube.com", "music.youtube.com")),
         ];
         for (a, want) in cases {
             assert_eq!(spec(&a), want, "{a:?}");

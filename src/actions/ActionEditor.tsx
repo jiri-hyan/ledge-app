@@ -1,12 +1,12 @@
 // Editor jedné rychlé akce (panel Nastavení → Rychlé akce): typ → průvodce polem, „Vybrat…“
 // přes systémový dialog (`pick_path`), argumenty a složka u aplikace/příkazu, shell a okno u
-// příkazu, ikona, skupina, záložka, potvrzení a výslovný souhlas s příkazem. Okamžitá kontrola
+// příkazu, velikost okna u okna s webem, ikona, skupina, záložka, potvrzení a výslovný souhlas s příkazem. Okamžitá kontrola
 // tvaru (`draftError`) + ověření na disku v jádře (`action_check`, s prodlevou).
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { createStore, unwrap } from "solid-js/store";
 import type { ActionCfg, ActionKind, ActionView } from "../types";
 import { actionsApi, runAction } from "./api";
-import { cleanAction, draftError } from "./model";
+import { cleanAction, draftError, WEB_SIZE } from "./model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "./ui";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
@@ -15,6 +15,7 @@ type PickKind = "file" | "folder" | "exe" | "image";
 // `ph` je funkce, ať se nápověda přeloží až při vykreslení
 const KINDS: { kind: ActionKind; key: string; cs: string; ph: () => string; pick: PickKind | null }[] = [
   { kind: "url", key: "actions.kind.url", cs: "Web", ph: () => "https://…", pick: null },
+  { kind: "web", key: "actions.kind.web", cs: "Okno s webem", ph: () => "https://music.youtube.com", pick: null },
   { kind: "folder", key: "actions.kind.folder", cs: "Složka", ph: () => t("actions.kind.folderPh", "C:\\Users\\…\\Dokumenty"), pick: "folder" },
   { kind: "file", key: "actions.kind.file", cs: "Soubor", ph: () => t("actions.kind.filePh", "C:\\…\\dokument.pdf"), pick: "file" },
   { kind: "app", key: "actions.kind.app", cs: "Aplikace", ph: () => t("actions.kind.appPh", "C:\\…\\aplikace.exe  nebo  notepad.exe"), pick: "exe" },
@@ -53,6 +54,7 @@ export default function ActionEditor(p: {
   /** prázdný popisek se při uložení doplní z cíle — kontrola tedy s ním */
   const err = () => draftError({ ...d, label: d.label.trim() || labelFrom(d.target) });
   const dirty = () => JSON.stringify(cleanAction(d)) !== JSON.stringify(cleanAction(p.initial));
+  const isWeb = () => d.kind === "url" || d.kind === "web";
   const iconMode = () => (!d.icon || d.icon === "auto" ? "auto" : d.icon === "monogram" ? "monogram" : "image");
 
   // ověření na disku v jádře (cesta existuje, typ sedí) — s prodlevou, starší odpovědi se zahodí
@@ -110,7 +112,7 @@ export default function ActionEditor(p: {
         </div>
       </div>
       <div class="act-field">
-        <label>{d.kind === "url" ? t("actions.edit.url", "Adresa") : d.kind === "command" ? t("actions.edit.command", "Příkaz") : t("actions.edit.path", "Cesta")}</label>
+        <label>{isWeb() ? t("actions.edit.url", "Adresa") : d.kind === "command" ? t("actions.edit.command", "Příkaz") : t("actions.edit.path", "Cesta")}</label>
         <div class="ctl">
           <div class="line">
             <input type="text" value={d.target} placeholder={meta().ph()} spellcheck={false} onInput={(e) => setD("target", e.currentTarget.value)} />
@@ -118,6 +120,7 @@ export default function ActionEditor(p: {
           </div>
           <ErrLine f="target" />
           <Show when={!fieldErr("target") && warn()}><small class="warn">{warn()}</small></Show>
+          <Show when={d.kind === "web"}><small>{t("actions.edit.webHint", "Otevře se v malém okně Ledge (přihlášení zůstane). Zavřením okna se paměť uvolní; odkazy do nového okna jdou do prohlížeče.")}</small></Show>
           <Show when={d.kind === "command"}><small>{t("actions.edit.commandHint", "Spustí se v cmd nebo PowerShellu na tvém PC — jako bys ho napsal do terminálu.")}</small></Show>
         </div>
       </div>
@@ -144,6 +147,21 @@ export default function ActionEditor(p: {
               <button class="mini" onClick={() => pick("folder", "cwd")}>{t("actions.edit.pick", "Vybrat…")}</button>
             </div>
             <ErrLine f="cwd" />
+          </div>
+        </div>
+      </Show>
+      <Show when={d.kind === "web"}>
+        <div class="act-field">
+          <label>{t("actions.edit.size", "Velikost okna")}</label>
+          <div class="ctl">
+            <div class="line">
+              <input type="number" min={WEB_SIZE.minW} max={WEB_SIZE.maxW} value={d.width ?? ""} placeholder={String(WEB_SIZE.w)} onInput={(e) => setD("width", e.currentTarget.value ? Number(e.currentTarget.value) : undefined)} />
+              <small>×</small>
+              <input type="number" min={WEB_SIZE.minH} max={WEB_SIZE.maxH} value={d.height ?? ""} placeholder={String(WEB_SIZE.h)} onInput={(e) => setD("height", e.currentTarget.value ? Number(e.currentTarget.value) : undefined)} />
+              <small>{t("actions.edit.sizeUnit", "px (prázdné = 480 × 720)")}</small>
+            </div>
+            <ErrLine f="size" />
+            <small>{t("actions.edit.sizeHint", "Posunuté nebo zvětšené okno si Ledge pamatuje; změna velikosti tady ho vrátí na výchozí místo.")}</small>
           </div>
         </div>
       </Show>
@@ -181,14 +199,14 @@ export default function ActionEditor(p: {
               <button classList={{ on: iconMode() === "monogram" }} onClick={() => setD("icon", "monogram")}>{t("actions.edit.iconMono", "Písmena")}</button>
               <button classList={{ on: iconMode() === "image" }} onClick={() => pick("image", "icon")}>{t("actions.edit.iconImage", "Obrázek…")}</button>
             </div>
-            <Show when={p.saved && d.kind === "url" && iconMode() === "auto"}>
+            <Show when={p.saved && isWeb() && iconMode() === "auto"}>
               <button class="mini" onClick={() => actionsApi.iconRefresh(d.id).then(() => say(t("actions.edit.iconRefreshing", "Ikona webu se stáhne znovu…")))}>{t("actions.edit.iconRefresh", "Obnovit")}</button>
             </Show>
           </div>
           <Show when={iconMode() === "image"}><small class="code">{d.icon}</small></Show>
           <ErrLine f="icon" />
           <Show when={iconMode() === "auto"}>
-            <small>{d.kind === "url" ? t("actions.edit.iconFav", "Ikona webu se stáhne jednou a uloží; jindy Ledge na síť nesahá.") : d.kind === "command" ? t("actions.edit.iconCmd", "U příkazu písmena v barvě.") : t("actions.edit.iconFile", "Ikona, jakou má soubor ve Windows.")}</small>
+            <small>{isWeb() ? t("actions.edit.iconFav", "Ikona webu se stáhne jednou a uloží; jindy Ledge na síť nesahá.") : d.kind === "command" ? t("actions.edit.iconCmd", "U příkazu písmena v barvě.") : t("actions.edit.iconFile", "Ikona, jakou má soubor ve Windows.")}</small>
           </Show>
         </div>
       </div>

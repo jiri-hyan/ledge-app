@@ -50,10 +50,44 @@ Typické úpravy:
   `gh repo clone <owner/repo>` (jiný hostitel než GitHub: `git clone <url>`) do první složky z `roots`
   (kolize jména → `<repo>-<owner>`, `<repo>-2`…), bez okna, termín 15 min, pak se projekt dohledá sám.
   Nenabízí se u dvou klonů téhož repa (nejednoznačné) ani u `appName` bez `exe`.
-- **Vypnout část šuplíku** — `drawer.sections.{projects,running,claude,notes}`, záložka Osobní
-  `modes.personalEnabled`, proužek `strip.enabled`, poznámky celé `notes.enabled`.
-- **Proužek** — `strip.items` (pořadí): `mode`, `clock`, `running`, `claude`, `repos`, volitelně
-  `limits` (limity Claude 5h / týden, ve výchozím stavu vypnuto).
+- **Skrýt karty a sekce šuplíku** — `drawer.sections` je plochý seznam přepínačů (všechny `bool`, výchozí
+  `true`; chybějící pole ve starém configu = zapnuto). Práce: `projects`, `running`, `claude`, `repos`;
+  Osobní: `clock`, `timer` (karta Časovač; skrytá karta časovač nevypne), `weather`, `links`, `nowPlaying`, `sound` (hlasitost v kartě Právě hraje), `battery`
+  (v kartě Čas); obě záložky: `notes`, `actions`, `shelf`; sekce v kartě Claude:
+  `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents`. Skrytá karta nic nepočítá, kde to jde:
+  skryté počasí se nestahuje, skrytá útrata (nebo celá karta Claude) neindexuje transcripty, skrytý Git panel
+  ani subagenti se nenačítají, skryté Právě hraje / hlasitost / baterie zruší odběry událostí Windows
+  (viz „Právě hraje, hlasitost, baterie“). Kartu skryje i ⋯ v její hlavičce v šuplíku (uloží jen to jedno pole, pár sekund
+  jde „Vrátit“); vrátit vše: Nastavení → Šuplík a proužek → Karty na hlavní stránce → „Zobrazit vše“. Celé
+  funkce dál vypínají `modes.personalEnabled` (záložka Osobní), `strip.enabled`, `notes.enabled`,
+  `shelf.enabled`, `claude.costs`.
+- **Proužek** — `strip.items` (pořadí): `mode`, `clock`, `running`, `claude`, `waiting`, `repos`, volitelně
+  `limits` (limity Claude 5h / týden), `custom` (vlastní text), `timer` (časovač) a `media` (právě hraje:
+  „♪ Název · Interpret“ jen při přehrávání, pauza / nic = žádný segment) — ve výchozím stavu vypnuté. Config proužku žije v `src-tauri/src/stripconf.rs` (re-export z `config.rs`). Další pole:
+  - `strip.custom` — text položky `custom`: krátký text a/nebo emoji, nejvýš 24 znaků (víc = chyba
+    validace); prázdný = položka nic neukáže. Emoji kreslí proužek jednobarevně (DirectWrite bez barevných fontů).
+  - `strip.colors` — barva textu položky, `{"clock": "teal", "custom": "accent"}`; předvolby `accent`
+    (akcent motivu nebo `appearance.accent`), `text`, `muted`, `violet`, `blue`, `teal`, `green`, `amber`,
+    `red`. Volný hex záměrně není: barva se v každém motivu dorovná na kontrast ≥ 4.5:1 (zesvětlí /
+    ztmaví, `appearance::geom::readable`). Tečka stavu (zelená = běží…) zůstává.
+  - `strip.quiet` — položky skryté „v klidu“, ukážou se jen, když se něco děje: běží server, Claude
+    pracuje / čeká / je hotový, běží časovač, hraje hudba (`media`), limity ≥ 70 %, připomínka po termínu nebo barevná linka
+    (neuložená repa se jako událost nepočítají — je to trvalý stav). Smysl má u `mode`, `clock`, `custom`,
+    `limits`; `running`, `claude`, `waiting`, `repos`, `timer`, `media` se v klidu neukazují samy. Výchozí `[]`.
+  - Nastavení → Šuplík a proužek → Proužek: řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
+    náhled s ukázkovými texty (přepínač „V klidu / Když se něco děje“).
+- **Časovač** — sekce `timer` (Nastavení → Osobní → Časovač, `src-tauri/src/timer.rs`): `presets`
+  (minuty, 1–600, nejvýš 6; výchozí `[5, 15, 25, 50]`), `toast` (výchozí `true`: oznámení Windows po
+  doběhnutí odpočtu — bez fokusu, ne ve hře / herním režimu / při „nerušit“ / s otevřeným šuplíkem), `strip`
+  (výchozí `true`: běžící časovač se ukáže na začátku proužku i bez položky `timer`; přepínač je i v Nastavení →
+  Šuplík a proužek). Odpočet (předvolby, vlastní minuty, pauza, +5 min, zrušit) a stopky (start, pauza,
+  reset) v kartě Časovač na záložce Osobní a v paletě Ctrl+K („Časovač 25 min“, „Stopky“, „Zrušit
+  časovač“…). Proužek ukazuje „⏱ 18 min“ (zbývá, zaokrouhleno nahoru), stopky „⏱ 0:42“ (h:mm), pauza „⏸“,
+  konec „⏱ čas vypršel“ (10 min, pak zmizí); překresluje se jen po minutách, sekundy počítá otevřený šuplík.
+  Konec odpočtu = modré bliknutí + puls proužku (jako upozornění Clauda) a volitelný toast; ve fullscreen
+  hře nic. Stav (časy, ne tik) je v `%APPDATA%\Ledge\timer.json` — zapisuje se jen při akci, takže běžící
+  odpočet přežije restart Ledge (aktualizace); doběhl-li mezitím, ukáže se jen tiše „čas vypršel“. Smazání
+  souboru = nic neběží po dalším startu.
 - **Připomínka resetu limitu** — `claude.limitsReminder` (výchozí `true`): když 5h nebo týdenní limit
   Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
 - **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
@@ -83,6 +117,9 @@ Typické úpravy:
   i stránky Nastavení Windows (`ms-settings:…`) a klasické ovládací panely (`control.exe /name
   Microsoft.…`) — česky i anglicky, bez diakritiky. Jen cíle z dokumentace Microsoftu
   (`src/palette/winsettings.ts`); jádro pustí jen tvar `ms-settings:<a-z0-9->` / `control:Microsoft.<Jméno>`.
+  Paleta navíc bez configu počítá (`12*(3+4)`, `2^10`, `15 % z 340`, `sqrt(2)`), převádí jednotky
+  (`10 km na mi`, `100 °F na °C`, `3 GB v MB`; měny ne) a s prefixem `:` hledá emoji (`:srdce`) —
+  Enter výsledek zkopíruje do schránky. Jen UI (`src/palette/calc.ts`, `units.ts`, `emoji.ts`), žádná síť.
 - **Proužek: kolik session čeká** — položka `strip.items` `"waiting"` („2 čekají“, jantarová pilulka):
   počet různých Claude session, které čekají na schválení nebo otázku; 0 = segment se neukáže. Nový
   config ji má za `claude`. Starý config (bez `strip.itemsRev`) ji při načtení dostane jednou za
@@ -112,6 +149,25 @@ Typické úpravy:
   rozbalí, jinak absolutní cesta), `inActions` (výchozí `false`; `true` = i dlaždice v kartě Rychlé
   akce). Formát skriptů viz „Skripty (Script Commands)“ níže.
 
+## Právě hraje, hlasitost, baterie (záložka Osobní)
+
+- **Právě hraje** (`drawer.sections.nowPlaying`) — aktuální mediální session Windows (GSMTC: Spotify,
+  prohlížeč s YouTube, Media Player, VLC…): název, interpret, aplikace (z AUMID, `media::app_name`), hraje/pauza,
+  tlačítka předchozí / přehrát-pauza / další (jen na klik), malý obal (WIC ≤ 128 px, načte se až s otevřeným
+  šuplíkem, jednou na skladbu). Nic nehraje + hlasitost skrytá = karta zmizí; s hlasitostí řekne „Nic nehraje“.
+- **Hlasitost** (`drawer.sections.sound`) — výchozí výstup (Core Audio): posuvník 0–100 (při tahu nejvýš
+  ~20 změn/s), ztlumit, název zařízení v tooltipu; změna klávesou / mixérem se ukáže hned (callback).
+- **Baterie** (`drawer.sections.battery`) — pod hodinami v kartě Čas: procenta, nabíjí se / v síti / na baterii,
+  zbývající čas jen když ho Windows odhadne. Stroj bez baterie (desktop) neukazuje nic a nic neodebírá.
+- **Výkon:** nic nepolluje. Odběry vzniknou až při prvním zobrazení záložky Osobní (Tauri `personal_live`;
+  GSMTC navíc hned při startu / uložení configu, když je v zapnutém proužku položka `media`):
+  vlákna `media` a `volume` pak jen čekají na události (pozice skladby se záměrně neodebírá), baterie je
+  callback `PowerSettingRegisterNotification` bez vlákna a okna. Skrytá karta / vypnutá záložka Osobní odběry
+  zruší (GSMTC jen tehdy, když `media` není ani v proužku). Tauri: `personal_live`, `media_control` (`toggle|next|prev`), `media_cover`, `volume_set`, `volume_mute`.
+- Proužek: položka `strip.items` `media` (výchozí vypnutá) — `media::strip_segment` nad `strip_text` (jen při
+  přehrávání, „♪ Název · Interpret“, text ≤ 36 znaků). Změna skladby / pauza → událost GSMTC → `mark_dirty` →
+  překreslení; nic netiká. Ve fullscreen hře / herním režimu je proužek pryč jako vždy.
+
 ## Rychlé akce (`actions`)
 
 Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a položky palety příkazů
@@ -123,14 +179,17 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   { "id": "mapy", "label": "Mapy", "kind": "url", "target": "https://mapy.cz", "showOn": "personal" },
   { "id": "faktury", "label": "Faktury", "kind": "folder", "target": "C:\\Users\\x\\Documents\\Faktury" },
   { "id": "build", "label": "Build webu", "kind": "command", "target": "npm run build",
-    "cwd": "C:\\Users\\x\\Desktop\\web", "group": "Dev", "showOn": "work", "confirm": true }
+    "cwd": "C:\\Users\\x\\Desktop\\web", "group": "Dev", "showOn": "work", "confirm": true },
+  { "id": "yt-music", "label": "YouTube Music", "kind": "web", "target": "https://music.youtube.com",
+    "width": 420, "height": 640 }
 ]
 ```
 
 - `kind`: `url` (jen http/https) · `file` (dokumenty/média — allowlist jako odkazy Osobní; skripty ne)
   · `folder` · `app` (`.exe` absolutně nebo jen jméno ze složky Windows; `args` = s argumenty) ·
   `command` (`cmd /c`, nebo `"shell": "powershell"` = `-NoProfile`; `"terminal": true` = viditelné
-  okno, jinak bez okna s termínem `timeoutS` (výchozí 60 s) a výstupem do hlášky / karty).
+  okno, jinak bez okna s termínem `timeoutS` (výchozí 60 s) a výstupem do hlášky / karty) ·
+  `web` (http/https ve vlastním malém okně Ledge, viz níže).
 - Volitelné: `args` (pole, bez uvozovek), `cwd` (absolutní; výchozí domovská složka), `icon`
   (chybí/`"auto"` = favicon webu nebo ikona souboru, `"monogram"`, nebo cesta k png/ico/jpg/svg),
   `group`, `confirm` (ptát se před každým spuštěním), `showOn` (`work`/`personal`/`both`).
@@ -141,6 +200,17 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   přesného příkazu). Ten soubor nikdy nezapisuj; změna cíle/argumentů/složky souhlas zneplatní.
 - Favicon se stáhne jednou (při přidání akce, `%LOCALAPPDATA%\Ledge\icons\<host>.png`, neúspěch
   `<host>.miss`); znovu jen tlačítkem „Obnovit“ v Nastavení. Nic se nestahuje periodicky.
+- **Okno s webem** (`kind: "web"`, Nastavení → Rychlé akce → typ „Okno s webem“): `target` = http/https
+  adresa (ne `*.localhost` — tak Tauri podává UI Ledge —, bez jména/hesla v adrese), volitelně `width`
+  (320–3840) a `height` (240–2160) v logických px, výchozí 480 × 720; titulek okna = `label`. Klik otevře
+  normální okno s rámem pod proužkem u kurzoru (fokus dostane — je to výslovný klik); druhý klik okno jen
+  přenese dopředu (nezavře — rozehraná hudba / rozepsaný mail). Křížek okno **zničí** (žádné skrývání,
+  žádný časovač; zavřené okno nic nestojí). Okno sdílí se šuplíkem proces prohlížeče WebView2 i data dir
+  (`%LOCALAPPDATA%\cz.hyan.ledge\EBWebView`), takže přihlášení přežije zavření. Stránka nemá žádné IPC
+  (okno `web-<id>` není v capabilities, vzdálený původ Tauri odmítne), navigace mimo http/https se zahodí,
+  `window.open` / odkazy do nového okna jdou do výchozího prohlížeče. Poloha a velikost per akce v
+  `%LOCALAPPDATA%\Ledge\web-panels.json` (zapíše se při zavření; změna `width`/`height` ji zahodí). Ve
+  fullscreen hře / herním režimu se nic neotevře. Ikona `auto` = favicon webu jako u `url`.
 - Starší `personal.links` dál fungují (karta Odkazy); Nastavení → Rychlé akce nabídne převod, který
   odkazy zkopíruje (nemaže je).
 
@@ -467,7 +537,8 @@ s nízkou prioritou CPU i disku; v klidu nic. Index `%LOCALAPPDATA%\Ledge\usage-
 délka, mtime; agregace den × cwd × model) + `usage-index.seen` (viděné odpovědi v okně, 12 B na odpověď) —
 čtou se jen přírůstky, soubory se změnou před začátkem okna se neotevírají. Smazání obou souborů = přepočet
 od nuly. Ceník (USD / 1M tokenů, datum ověření, zdroj) je v `src-tauri/src/usage/price.rs`; model, který
-ceník nezná, ukáže tokeny a cenu „—“. Config `claude.costs` (výchozí `true`). Tauri: `costs_refresh`; stav ve
+ceník nezná, ukáže tokeny a cenu „—“. Config `claude.costs` (výchozí `true`); skrytá sekce
+`drawer.sections.claudeCosts` nebo celá karta `drawer.sections.claude` = taky nic se nečte. Tauri: `costs_refresh`; stav ve
 snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
 
 ## Instalace a aktualizace

@@ -11,12 +11,19 @@ import type { NotePreset } from "../notes/store";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { canBgLaunch, openBgLaunch } from "../sessions/BgLaunch";
+import { timerItems } from "./timer";
 
-export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows";
+export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows" | "calc" | "convert" | "emoji";
 export interface PItem extends Item {
   section: Section;
   /** rychlá akce (ikona v řádku) */
   action?: ActionView;
+  /** znak místo ikony (emoji, „=“) */
+  glyph?: string;
+  /** Enter / klik zkopíruje tenhle text do schránky (výpočet, převod, emoji) — `run` se nevolá, do nedávných nejde */
+  copy?: string;
+  /** po spuštění paleta zůstane otevřená (příkaz „Emoji…“ jen přepne dotaz) */
+  stay?: boolean;
   /** spustí položku (paleta počká, než doběhne případné potvrzení uvnitř) */
   run: () => unknown;
 }
@@ -30,6 +37,9 @@ export const SECTION_LABEL: Record<Section, [string, string]> = {
   app: ["palette.section.app", "Ledge"],
   script: ["palette.section.script", "Skript"],
   windows: ["palette.section.windows", "Windows"],
+  calc: ["palette.section.calc", "Výpočet"],
+  convert: ["palette.section.convert", "Převod"],
+  emoji: ["palette.section.emoji", "Emoji"],
 };
 
 export type Nav = {
@@ -99,6 +109,7 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
     add(s.mode === "prace"
       ? { id: "app:osobni", section: "app", order: 6, title: t("palette.app.personal", "Přepnout na Osobní"), run: () => api.setMode("osobni") }
       : { id: "app:prace", section: "app", order: 6, title: t("palette.app.work", "Přepnout na Práce"), run: () => api.setMode("prace") });
+  for (const x of timerItems(s)) add(x);
   add({ id: "app:gamemode", section: "app", order: 7, title: t("palette.app.gameMode", "Zapnout herní režim (Ledge zmizí)"), keywords: "hra game fullscreen schovat skryt nerusit herni rezim", run: () => api.setGameMode(true) });
   add({ id: "app:close", section: "app", order: 7, title: t("palette.app.close", "Zavřít šuplík"), run: () => api.close() });
   return out;

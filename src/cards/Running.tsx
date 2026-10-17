@@ -1,6 +1,6 @@
 // Karta Běží: procesy spuštěné Ledge (`Snapshot.procs`) — fáze, uptime, log (posledních 60 řádků
 // přes `api.logs`, jen u rozbaleného), Otevřít / Stop / Zavřít.
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show, type JSX } from "solid-js";
 import { api, type ProcView, type Snapshot } from "../api";
 import { uptime } from "../format";
 import { t, tp } from "../i18n";
@@ -15,7 +15,7 @@ const PHASE: Record<string, [string, () => string]> = {
   failed: ["r", () => t("cards.running.failed", "pád")],
 };
 
-export default function Running(p: { s: Snapshot; now: number }) {
+export default function Running(p: { s: Snapshot; now: number; menu?: JSX.Element }) {
   const [open, setOpen] = createSignal<string | null>(null);
   const [lines, setLines] = createSignal<string[]>([]);
   const name = (id: string) => p.s.projects.find((x) => x.id === id)?.name ?? id;
@@ -27,7 +27,7 @@ export default function Running(p: { s: Snapshot; now: number }) {
   });
   return (
     <div class="card" data-anim>
-      <h4><span class="ic" style="background:var(--green)" />{t("cards.running.title", "Běží")} <span class="n">{p.s.procs.filter((x) => x.phase !== "exited" && x.phase !== "failed").length}</span></h4>
+      <h4><span class="ic" style="background:var(--green)" />{t("cards.running.title", "Běží")} <span class="n">{p.s.procs.filter((x) => x.phase !== "exited" && x.phase !== "failed").length}</span>{p.menu}</h4>
       <For each={p.s.procs} fallback={<div class="empty">{t("cards.running.empty", "Nic neběží. Klikni na projekt nahoře.")}</div>}>
         {(pc: ProcView) => {
           const ph = (): [string, () => string] => PHASE[pc.phase] ?? ["n", () => pc.phase];

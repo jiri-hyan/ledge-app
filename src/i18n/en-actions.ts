@@ -5,6 +5,7 @@ import { registerDict } from "../i18n";
 registerDict("en", {
   // typy akce
   "actions.kind.url": "Website",
+  "actions.kind.web": "Web window",
   "actions.kind.folder": "Folder",
   "actions.kind.folderPh": "C:\\Users\\…\\Documents",
   "actions.kind.file": "File",
@@ -19,6 +20,10 @@ registerDict("en", {
   "actions.edit.path": "Path",
   "actions.edit.pick": "Choose…",
   "actions.edit.commandHint": "Runs in cmd or PowerShell on your PC — as if you typed it in a terminal.",
+  "actions.edit.webHint": "Opens in a small Ledge window (you stay signed in). Closing the window frees the memory; links that open a new window go to your browser.",
+  "actions.edit.size": "Window size",
+  "actions.edit.sizeUnit": "px (empty = 480 × 720)",
+  "actions.edit.sizeHint": "Ledge remembers where you moved or resized the window; changing the size here puts it back in the default spot.",
   "actions.edit.label": "Label",
   "actions.edit.labelPh": "What the tile is called",
   "actions.edit.args": "Arguments",
@@ -66,6 +71,9 @@ registerDict("en", {
   "actions.err.args": "Arguments without quotes (one per line).",
   "actions.err.cwd": "The working folder must be a full path (C:\\…).",
   "actions.err.icon": "The icon must be an image (png, ico, jpg, svg…) with a full path.",
+  "actions.err.webCreds": "The address must not contain a user name or password.",
+  "actions.err.webLocal": "*.localhost addresses belong to Ledge; a web window won't open them.",
+  "actions.err.size": "Window size: width 320–3840, height 240–2160 px.",
   "actions.confirm.aria": "Confirm action",
   "actions.confirm.title": "Run “{label}”?",
   "actions.confirm.cancel": "Cancel",

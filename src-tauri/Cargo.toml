@@ -80,6 +80,16 @@ features = [
   # toast „Claude čeká / hotovo“ (`toast.rs`, config `claude.toast`): WinRT ze stejné crate, žádná nová
   "Data_Xml_Dom",
   "UI_Notifications",
+  # záložka Osobní (`media.rs`, `volume.rs`, `battery.rs`): právě hraje (GSMTC, WinRT + obal přes
+  # Storage.Streams), hlasitost výchozího výstupu (Core Audio), baterie (stav + oznámení o změně)
+  "Foundation",
+  "Media_Control",
+  "Storage_Streams",
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_System_Power",
+  "Win32_System_Variant",
+  "Win32_UI_Shell_PropertiesSystem",
 ]
 
 [dev-dependencies]

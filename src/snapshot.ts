@@ -1,12 +1,13 @@
 // Prázdný snapshot do startu: tvar `Snapshot` z Rustu, dokud nepřijde `get_state` / událost `state`.
 import type { Snapshot } from "./types";
+import { allSectionsOn } from "./cards/sections";
 
 export const EMPTY_SNAPSHOT: Snapshot = {
   mode: "prace",
   personalEnabled: false,
   view: "hidden",
   cfgError: null,
-  sections: { projects: true, running: true, claude: true, notes: true },
+  sections: allSectionsOn(),
   claudeEnabled: true,
   projects: [],
   procs: [],
@@ -23,7 +24,7 @@ export const EMPTY_SNAPSHOT: Snapshot = {
   noteKinds: [],
   notesKindCounts: {},
   notesRev: 0,
-  personal: { weather: { status: "idle", label: "", data: null, fetchedMs: null, error: null, loading: false }, links: [], notes: [], notesMore: 0 },
+  personal: { weather: { status: "idle", label: "", data: null, fetchedMs: null, error: null, loading: false }, links: [], notes: [], notesMore: 0, media: null, volume: null, battery: null },
   notesSync: { state: "off", lastOkMs: null, message: null, files: [], root: null },
   update: { state: "off", current: "", repo: "", checking: false, checkedMs: null, installing: false, installError: null },
 };

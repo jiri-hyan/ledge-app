@@ -3,10 +3,12 @@
 param([int]$Seconds = 30)
 
 function Get-Tree([int]$root) {
-  $all = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name
+  $all = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name, CreationDate
+  $born = @{}; foreach ($p in $all) { $born[[int]$p.ProcessId] = $p.CreationDate }
   $ids = @($root); $frontier = @($root)
   while ($frontier.Count) {
-    $next = @($all | Where-Object { $frontier -contains $_.ParentProcessId } | ForEach-Object { $_.ProcessId })
+    # Dítě musí být mladší než rodič — jinak je to cizí proces, jehož mrtvý rodič měl recyklované PID.
+    $next = @($all | Where-Object { $frontier -contains $_.ParentProcessId -and $_.CreationDate -ge $born[[int]$_.ParentProcessId] } | ForEach-Object { $_.ProcessId })
     $ids += $next; $frontier = $next
   }
   $ids | Select-Object -Unique

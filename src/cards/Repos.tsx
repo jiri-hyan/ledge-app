@@ -1,12 +1,12 @@
 // Karta Repa: projekty s neuloženou / nepushnutou prací nebo pozadu za remote (z `ProjectView.git`);
 // Pull jen u čistého repa, které je pozadu.
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { api, type ProjectView, type Snapshot } from "../api";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 
 /** Repa s neuloženou / nepushnutou prací a ta, co zaostávají za remote. */
-export default function Repos(p: { s: Snapshot }) {
+export default function Repos(p: { s: Snapshot; menu?: JSX.Element }) {
   const [busy, setBusy] = createSignal<string | null>(null);
   const list = () =>
     p.s.projects
@@ -25,7 +25,7 @@ export default function Repos(p: { s: Snapshot }) {
   }
   return (
     <div class="card" data-anim>
-      <h4><span class="ic" style="background:var(--amber)" />{t("cards.repos.title", "Repa")} <span class="n">{list().length || ""}</span></h4>
+      <h4><span class="ic" style="background:var(--amber)" />{t("cards.repos.title", "Repa")} <span class="n">{list().length || ""}</span>{p.menu}</h4>
       <For each={list()} fallback={<div class="empty">{p.s.projects.some((x) => x.git) ? t("cards.repos.empty", "Všechna repa čistá a srovnaná s remote.") : t("cards.repos.none", "Žádný projekt zatím není git repo.")}</div>}>
         {(pr) => (
           <div class="row">

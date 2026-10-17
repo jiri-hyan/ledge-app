@@ -16,11 +16,12 @@ use windows::core::{Error, Interface, Result};
 /// Strana výstupu: dlaždice má 56 CSS px, při 200 % DPI 112 px.
 pub const MAX_PX: u32 = 128;
 
-/// COM pro aktuální vlákno; `S_FALSE` (už inicializováno) se párově odinicializuje taky.
-struct Com(bool);
+/// COM (MTA) pro aktuální vlákno; `S_FALSE` (už inicializováno) se párově odinicializuje taky.
+/// Používají ho i vlákna `media` a `volume`.
+pub(crate) struct Com(bool);
 
 impl Com {
-    fn init() -> Self {
+    pub(crate) fn init() -> Self {
         Com(unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok())
     }
 }

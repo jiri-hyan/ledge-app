@@ -12,6 +12,8 @@
 //! - `shelf-drop` — cíl přetažení přihrádky (OLE); vznikne až při prvním tahu souborů na proužek
 //! - `claude-bridge` — HTTP pro hooky
 //! - `notes-watch` — sleduje složku poznámek (události, žádný poll) a přepočítá připomínky
+//! - `media` / `volume` (záložka Osobní) — vzniknou až při prvním zobrazení záložky (`personal_live`),
+//!   pak jen čekají na události GSMTC / Core Audio; baterie = callback Windows, žádné vlákno
 //! - počasí (záložka Osobní) — žádné vlákno navíc: jedno stažení na runtime Tauri, jen při otevření
 //!   šuplíku na Osobní a datech starších 30 min
 
@@ -27,6 +29,7 @@ mod agentview;
 mod appearance;
 mod attention;
 mod autostart;
+mod battery;
 mod claude;
 mod cloning;
 mod commands;
@@ -47,6 +50,7 @@ mod iconimg;
 mod icons;
 mod limits;
 mod limitslive;
+mod media;
 mod migrate;
 mod notes;
 mod notesync;
@@ -71,15 +75,19 @@ mod state;
 mod statusline;
 mod statuslinesetup;
 mod strip;
+mod stripconf;
 mod stripview;
 mod subagents;
 mod threads;
+mod timer;
 mod toast;
 mod uiconf;
 mod update;
 mod usage;
+mod volume;
 mod updatenet;
 mod weather;
+mod webpanel;
 mod winfocus;
 mod winsettings;
 
@@ -150,6 +158,8 @@ pub fn run() {
             }
             let (cfg, cfg_err) = load_or_seed();
             i18n::set_lang(cfg.ui.lang);
+            // běžící odpočet / stopky z minula (`timer.json`; zapisuje se jen při akci uživatele)
+            timer::init(&config::config_dir());
             let (tx, rx) = mpsc::channel();
             let (notes_tx, notes_rx) = mpsc::channel();
             let (sync_tx, sync_rx) = mpsc::channel();
@@ -219,6 +229,8 @@ pub fn run() {
             spawn_notes_watch(notes_rx, notes_tx);
             spawn_notes_sync(sync_rx);
             limitslive::start_watch();
+            // právě hraje v proužku (`strip.items` + `media`): odběry GSMTC hned, ne až po záložce Osobní
+            media::sync(&core().cfg.read());
             if let Err(e) = autostart::apply(cfg.autostart) {
                 log(&format!("autostart: {e}"));
             }
@@ -307,7 +319,13 @@ pub fn run() {
             commands::limits::statusline_status,
             commands::limits::statusline_install,
             commands::limits::statusline_remove,
+            commands::timer::timer,
             commands::costs::costs_refresh,
+            commands::media::personal_live,
+            commands::media::media_control,
+            commands::media::media_cover,
+            commands::media::volume_set,
+            commands::media::volume_mute,
             commands::actions::run_action,
             commands::shelf::shelf_list,
             commands::shelf::shelf_icon,
@@ -336,6 +354,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("ledge: start selhal")
         .run(|_app, ev| {
+            // zavřené poslední okno (okno s webem, když šuplík úsporně neexistuje) Ledge neukončí;
+            // výslovné `exit(kód)` (aktualizace) má kód a projde
+            if let tauri::RunEvent::ExitRequested { code: None, api, .. } = &ev {
+                api.prevent_exit();
+            }
             if let tauri::RunEvent::Exit = ev
                 && let Some(c) = CORE.get()
             {

@@ -2,7 +2,7 @@
 // „Vše“ bere řádky ze snapshotu (pořadí a strop dělá Rust `notes::card`); jiná záložka je dotaz
 // `note_query` obnovený při změně `notesRev`. Klik na řádek = úprava v Ledge (`onOpen`).
 
-import { createResource, For, Show } from "solid-js";
+import { createResource, For, Show, type JSX } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { ago } from "../format";
 import { IconBell } from "../icons";
@@ -84,6 +84,8 @@ export function NotesCard(p: {
   onOpen: (n: NoteView) => void;
   onAll: () => void;
   personal?: boolean;
+  /** ⋯ „Skrýt kartu“ z hlavní stránky (`cards/CardMenu.tsx`) */
+  menu?: JSX.Element;
 }) {
   const tabs = () => (p.personal ? [] : tabsOf(p.s));
   // uložená záložka bez nehotových poznámek → Vše (volba zůstane zapamatovaná)
@@ -101,6 +103,7 @@ export function NotesCard(p: {
       <h4>
         <span class="ic" style="background:var(--blue)" />{t("notes.card.title", "Poznámky")} <span class="n">{open() || ""}</span>
         <button class="mini" onClick={() => p.onNew(newKind())} title={newKind() ? t("notes.card.newKind", "Nová: {kind}", { kind: kindOf(p.s.noteKinds, newKind()!).label }) : t("notes.card.newNote", "Nová poznámka")}>{t("notes.card.new", "+ Nová")}</button>
+        {p.menu}
       </h4>
       <Show when={tabs().length > 2}>
         <Tabs tabs={tabs()} value={cur()} onChange={setTab} />
