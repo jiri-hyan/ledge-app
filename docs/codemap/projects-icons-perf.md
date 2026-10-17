@@ -10,7 +10,7 @@
 | `src-tauri/src/iconimg.rs` | rastry přes WIC: dekódování, největší snímek ICO, zmenšení ≤ 128 px, PNG; ikona z exe; ikona souboru/složky ze shellu (rychlé akce, [actions.md](actions.md)) | `to_png`, `exe_png`, `shell_png`, `fit`, `MAX_PX`, `encode` |
 | `src-tauri/src/cloning.rs` | „Naklonovat“: kdy, kam, čím, spuštění | `clonable`, `target_in`, `folder_name`, `command`, `run`, `Busy`, `is_busy`, `TIMEOUT` |
 | `src-tauri/src/resolve.rs` | repo index podle remote, appka podle jména | `RepoIndex::build`/`resolve`/`clones`, `parse_remote`, `owner_repo_raw`, `installed_app_exe` |
-| `src-tauri/src/state.rs`, `refresh.rs`, `snapshot.rs`, `commands/projects.rs` | lepidlo | `Core.logos`, `Core::rebuild_index`, `refresh_logos`, `snapshot` (blok `projects`), `ProjectView`, `github_url`, příkazy `project_logo`, `clone_project`, `launch` |
+| `src-tauri/src/state.rs`, `refresh.rs`, `snapshot.rs`, `commands/projects.rs` | lepidlo | `Core.logos`, `Core::rebuild_index`, `refresh_logos`, `snapshot` (blok `projects`), `ProjectView`, `github_url`, příkazy `project_logo`, `clone_project`, `launch`, `open_in` → `open_dir` (sdílí panel Git session) |
 | `src-tauri/src/onboarding/repos.rs` | návrh projektů z rep na disku (průvodce) — viz [onboarding.md](onboarding.md) | `discover`, `suggest` |
 | `src/cards/Projects.tsx` · `src/logos.ts` | dlaždice · cache log | `Projects`, `cloneProject`, `launch` · `logoSrc`, `logoUrls` |
 | `src/api.ts` | typy + IPC | `ProjectView` (`logoKey`, `clonable`, `cloning`), `api.projectLogo`, `api.cloneProject` |

@@ -52,9 +52,11 @@ pub(crate) fn waiting_text(n: usize) -> Option<String> {
     }
 }
 
-/// Počet čekajících session z reálného stavu mostu.
-pub(crate) fn waiting_count(pending: &[Pending], asks: &[Ask]) -> usize {
-    waiting_sessions(pending.iter().map(|p| p.session_id.as_str()).chain(asks.iter().map(|a| a.session_id.as_str())))
+/// Počet čekajících session z reálného stavu mostu + session, které podle Agent View čekají i bez hooků Ledge
+/// (`sessions::waiting_ids`: `status: waiting` / `waitingFor` / `state: blocked`). Session, kterou už
+/// hlásí hook (stejné `sessionId`), se počítá jednou.
+pub(crate) fn waiting_count_all(pending: &[Pending], asks: &[Ask], live: &[&str]) -> usize {
+    waiting_sessions(pending.iter().map(|p| p.session_id.as_str()).chain(asks.iter().map(|a| a.session_id.as_str())).chain(live.iter().copied()))
 }
 
 /// Revize výchozích položek proužku (`strip.itemsRev`): 1 = přibyla `waiting`.
@@ -305,6 +307,9 @@ mod tests {
         for (ids, want) in cases {
             assert_eq!(waiting_sessions(ids.iter().copied()), *want, "{ids:?}");
         }
+        // Agent View bez hooků: jen živý seznam, duplicity jednou
+        assert_eq!(waiting_count_all(&[], &[], &["bg", "bg", "cli"]), 2);
+        assert_eq!(waiting_count_all(&[], &[], &[]), 0);
     }
 
     #[test]

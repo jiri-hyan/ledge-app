@@ -37,6 +37,8 @@ sha2 = "0.10"
 memchr = "2"
 winreg = "0.55"
 windows-numerics = "0.3"
+# makro `#[implement]` (COM objekty přihrádky `shelf/drop.rs`) chce `windows_core` v kořeni — už je ve stromu přes `windows`
+windows-core = "0.62"
 webview2-com = "0.39"
 
 [dependencies.windows]
@@ -58,6 +60,11 @@ features = [
   "Win32_Storage_FileSystem",
   "Win32_System_Com",
   "Win32_System_Com_StructuredStorage",
+  # přihrádka (`shelf/`): cíl přetažení na proužku a přetažení ven (OLE), text do schránky
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_Ole",
+  "Win32_System_SystemServices",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_JobObjects",
   "Win32_System_LibraryLoader",

@@ -146,7 +146,7 @@ fn backtrack(trace: &[Vec<isize>], n: isize, m: isize) -> Vec<Op> {
     out
 }
 
-fn clip(s: &str) -> String {
+pub(crate) fn clip(s: &str) -> String {
     if s.chars().count() > LINE_CHARS { s.chars().take(LINE_CHARS).collect::<String>() + "…" } else { s.to_string() }
 }
 

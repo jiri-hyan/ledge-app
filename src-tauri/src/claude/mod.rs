@@ -22,7 +22,7 @@
 mod bridge;
 pub mod diff;
 mod hygiene;
-mod paths;
+pub(crate) mod paths;
 pub mod plan;
 pub mod preview;
 mod questions;
@@ -390,8 +390,8 @@ impl Claude {
                     let title = s(body, "session_title");
                     let prompt = s(body, "prompt");
                     let t = if !title.is_empty() { title } else { prompt };
-                    if !t.is_empty() && sess.title.is_none() {
-                        let t: String = t.split_whitespace().collect::<Vec<_>>().join(" ");
+                    // bez `<system-reminder>` a podobných bloků; samé bloky = titulek zatím žádný
+                    if let Some(t) = crate::sessions::clean_preview(&t).filter(|_| sess.title.is_none()) {
                         sess.title = Some(if t.chars().count() > 60 { t.chars().take(60).collect::<String>() + "…" } else { t });
                     }
                 }
@@ -479,6 +479,12 @@ mod tests {
         c.handle_event(&json!({"hook_event_name":"UserPromptSubmit","session_id":"a","cwd":"C:/p","prompt":"oprav   přihlášení\na testy"}));
         assert_eq!(c.sessions()[0].state, SessionState::Working);
         assert_eq!(c.sessions()[0].title.as_deref(), Some("oprav přihlášení a testy"));
+        // prompt jen ze systémových bloků titulek nezaloží; další skutečný ano, bez bloků
+        c.handle_event(&json!({"hook_event_name":"UserPromptSubmit","session_id":"b","cwd":"C:/p","prompt":"<system-reminder>\nLinked sessions now</system-reminder>"}));
+        assert_eq!(c.sessions().iter().find(|s| s.id == "b").unwrap().title, None);
+        c.handle_event(&json!({"hook_event_name":"UserPromptSubmit","session_id":"b","cwd":"C:/p","prompt":"<system-reminder>x</system-reminder>\nnasaď build"}));
+        assert_eq!(c.sessions().iter().find(|s| s.id == "b").unwrap().title.as_deref(), Some("nasaď build"));
+        c.handle_event(&json!({"hook_event_name":"SessionEnd","session_id":"b"}));
         c.handle_event(&json!({"hook_event_name":"Stop","session_id":"a"}));
         assert_eq!(c.sessions()[0].state, SessionState::Idle);
         c.handle_event(&json!({"hook_event_name":"SessionEnd","session_id":"a"}));

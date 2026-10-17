@@ -2,7 +2,7 @@
 // seřazené čeká > pracuje > nečinná > skončila s prací), schvalování (`PendingRow` + „Vždy povolit“ /
 // „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`, náhled diffu `sessions/DiffPreview.tsx`, review plánu
 // `sessions/PlanReview.tsx`), otázky Clauda
-// (`QuestionCard` pod řádkem session), subagenti a klik = otevřít session (`api.sessionOpen`, Win32 v `winfocus.rs`). Nečinné nad 3 se sbalí do „+N nečinných“.
+// (`QuestionCard` pod řádkem session), subagenti, panel Git session (`sessions/GitPanel.tsx`) a klik = otevřít session (`api.sessionOpen`, Win32 v `winfocus.rs`). Nečinné nad 3 se sbalí do „+N nečinných“.
 import { createSignal, For, Show } from "solid-js";
 import { api, type Snapshot, type SessionView, type Pending, type SubagentDone, type Ask } from "./api";
 import { ago, uptime } from "./format";
@@ -14,8 +14,11 @@ import PermExtra from "./sessions/PermExtra";
 import LimitsRow from "./limits/LimitsRow";
 import DiffPreview from "./sessions/DiffPreview";
 import PlanReview from "./sessions/PlanReview";
+import GitPanel from "./sessions/GitPanel";
 import { planTitle } from "./sessions/plan";
 import CostsSection from "./costs/CostsSection";
+import AgentActions, { BgPill } from "./sessions/AgentActions";
+import { statusPill } from "./sessions/agentview";
 import "./sessions.css";
 
 /** stav → barva pilulky a popisek (funkce, ať se popisek přeloží až při vykreslení) */
@@ -91,9 +94,11 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
 
 function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pending[]; asks: Ask[] }) {
   const [open, setOpen] = createSignal(false);
+  const [git, setGit] = createSignal(false);
   const proj = () => p.s.projects.find((x) => x.id === p.ss.projectId);
   const logo = () => { const pr = proj(); return pr ? logoSrc(pr) : undefined; };
-  const st = () => STATUS[p.ss.status];
+  // Agent View ví víc (na co čeká, selhala / zastavena) → přesnější pilulka, jinak obecná
+  const st = (): [string, () => string] => { const o = statusPill(p.ss); return o ? [o[0], () => o[1]] : STATUS[p.ss.status]; };
   const when = () => {
     if (p.ss.status === "ended") return t("sessions.ended", "ukončena");
     if (p.ss.status === "idle") return ago(p.ss.since ?? p.ss.updatedAt, p.now);
@@ -134,6 +139,7 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
         <Show when={p.ss.unpushed > 0}>
           <span class="pill a" title={t("sessions.unpushed", "Commity session, které nejsou na žádném remote")}>↑{p.ss.unpushed}</span>
         </Show>
+        <BgPill ss={p.ss} />
         <span class={`pill ${st()[0]}`}>{st()[1]()}</span>
         <span class="meta">{when()}</span>
       </div>
@@ -145,6 +151,11 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
             <For each={done()}>{(d: SubagentDone) => <div class="sub" title={d.message ?? ""}>✓ {d.agentType}{d.durationMs != null ? ` · ${dur(d.durationMs)}` : ""}{d.message ? ` · ${d.message}` : ""}</div>}</For>
           </div>
         </Show>
+      </Show>
+      <AgentActions ss={p.ss} />
+      <Show when={p.ss.cwd}>
+        <button class="subag" onClick={() => setGit(!git())} aria-expanded={git()} title={p.ss.cwd}>{git() ? "▾" : "▸"} {t("sessions.git.toggle", "Git")}</button>
+        <Show when={git()}><GitPanel id={p.ss.id} status={p.ss.status} /></Show>
       </Show>
       <For each={p.pending}>{(pd) => <PendingRow pd={pd} />}</For>
       <For each={p.asks}>{(a) => <QuestionCard ask={a} s={p.s} inSession />}</For>

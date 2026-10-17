@@ -92,6 +92,8 @@ pub struct StripModel {
     pub axis2: Option<i32>,
     /// puls linky „Claude čeká / hotovo“: barva + začátek (`attention::pulse`); po termínu nic
     pub pulse: Option<(Rgba, Instant)>,
+    /// přihrádka: tah souborů nad proužkem / právě puštěno (`shelf::overlay`)
+    pub shelf: crate::shelf::Hint,
 }
 
 /// Jas běžícího pulsu (barva, 0–1); `None` = puls není / skončil.
@@ -116,6 +118,7 @@ impl Default for StripModel {
             line: [Rgba::VIOLET, Rgba::BLUE, Rgba::TEAL],
             axis2: None,
             pulse: None,
+            shelf: crate::shelf::Hint::None,
         }
     }
 }
@@ -236,7 +239,8 @@ unsafe fn run(strip: Arc<Strip>) {
                 // sloučit nahromaděné požadavky na překreslení
                 let mut peek = MSG::default();
                 while PeekMessageW(&mut peek, Some(hwnd), WM_STRIP_REDRAW, WM_STRIP_VISIBLE, PM_REMOVE).as_bool() {}
-                let model = strip.model.lock().clone();
+                let mut model = strip.model.lock().clone();
+                crate::shelf::overlay(&mut model, crate::state::CORE.get().is_none_or(|c| c.dead()));
                 // časovač jen během pulsu na viditelném proužku
                 let active = model.visible && pulse_now(&model).is_some();
                 if active != pulsing {

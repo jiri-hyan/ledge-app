@@ -111,6 +111,7 @@ export default function DrawerPanel(_p: PanelProps) {
 
       <Section title={t("settings.drawer.strip", "Proužek")}>
         <Row id="strip.enabled"><Toggle path="strip.enabled" label={t("settings.f.strip.enabled", "Proužek nahoře")} /></Row>
+        <Row id="shelf.enabled"><Toggle path="shelf.enabled" label={t("settings.f.shelf.enabled", "Přihrádka na soubory")} /></Row>
         <Show when={c.cfg.strip.enabled}>
           <Row id="strip.items" stack>
             <SortList

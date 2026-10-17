@@ -10,6 +10,7 @@ import { EXTERNAL_PANELS } from "../settings/registry";
 import type { NotePreset } from "../notes/store";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
+import { canBgLaunch, openBgLaunch } from "../sessions/BgLaunch";
 
 export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows";
 export interface PItem extends Item {
@@ -65,6 +66,7 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
       const url = pr.github;
       add({ id: `gh:${pr.id}`, section: "project", order: 3, title: t("palette.project.github", "GitHub: {name}", { name: pr.name }), sub: url, keywords: kw, run: () => report(api.openUrl(url) as Promise<unknown>) });
     }
+    if (canBgLaunch(s, pr) && s.mode === "prace") add({ id: `bgclaude:${pr.id}`, section: "claude", order: 3, title: t("palette.project.bgClaude", "Claude na pozadí v {name}…", { name: pr.name }), keywords: `${kw} claude bg background agent pozadi`, run: () => openBgLaunch(pr.id) });
     if (s.notesEnabled) add({ id: `pnote:${pr.id}`, section: "note", order: 4, title: t("palette.project.note", "Poznámka k {name}", { name: pr.name }), keywords: kw, run: () => nav.onNote({ project: pr.id }) });
   }
 

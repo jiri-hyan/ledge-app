@@ -1,0 +1,28 @@
+/* Panel Git pod řádkem session (sessions/GitPanel.tsx): větev, soubory, diff, commit, potvrzení. */
+.sess-git { display: flex; flex-direction: column; gap: var(--s1); padding: 0 0 var(--s2) 34px; min-width: 0; }
+.sess-git-line { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); min-width: 0; }
+.sess-git-branch { font: 600 var(--fs-xs) var(--mono); color: var(--t1); }
+.sess-git-meta { font: var(--fs-xs) var(--mono); color: var(--t3); overflow-wrap: anywhere; }
+.sess-git-note { font: var(--fs-xs) var(--sans); color: var(--t3); }
+.sess-git-link { font: var(--fs-xs) var(--mono); color: var(--t3); background: none; border: 0; padding: 0; cursor: pointer; }
+.sess-git-link:hover:not(:disabled) { color: var(--t1); }
+.sess-git-link:disabled { cursor: default; opacity: 0.55; }
+.sess-git-link.on { color: var(--t1); text-decoration: underline; }
+.sess-git-files { display: flex; flex-direction: column; max-height: min(260px, calc(var(--drawer-max-h, 720px) / 3)); overflow: auto; }
+.sess-git-file { display: flex; align-items: center; gap: var(--s2); min-width: 0; padding: 1px 0; }
+.sess-git-pick { margin: 0; flex-shrink: 0; }
+.sess-git-badge { flex-shrink: 0; width: 2ch; text-align: center; font: 600 var(--fs-xs) var(--mono); color: var(--amber); }
+.sess-git-badge.sess-git-add { color: var(--green); }
+.sess-git-badge.sess-git-del { color: var(--red); }
+.sess-git-badge.sess-git-conf { color: var(--red); }
+.sess-git-path { flex: 1; min-width: 0; font: var(--fs-xs) var(--mono); color: var(--t2); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-git-path:hover { color: var(--t1); }
+.sess-git-n { flex-shrink: 0; font: var(--fs-xs) var(--mono); color: var(--t3); }
+.sess-git-diff { display: flex; flex-direction: column; gap: var(--s1); padding: 0 0 var(--s1) calc(2ch + var(--s2)); min-width: 0; }
+.sess-git-msg { width: 100%; box-sizing: border-box; resize: vertical; min-height: 56px; font: var(--fs-body) var(--sans); color: var(--t1); background: var(--well-2); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 10px; }
+.sess-git-msg:focus { outline: none; border-color: var(--focus); }
+.sess-git-confirm { display: flex; flex-direction: column; gap: var(--s2); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 10px; }
+.sess-git-confirm.sess-git-warn { border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.sess-git-ctext { font: var(--fs-xs) var(--sans); color: var(--t1); overflow-wrap: anywhere; }
+.sess-git-danger { color: var(--on-light); background: var(--red); border-color: transparent; }
+.sess-git-err { margin: 0; max-height: 160px; overflow: auto; font: var(--fs-xs) var(--mono); color: var(--red); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }

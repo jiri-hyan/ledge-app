@@ -21,12 +21,12 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 | `ctl.rs` | most `/status` doplněk a `/ctl/*` (open, close, settings, launch, stop, reload) | `status_extra`, `ctl_handler` |
 | `threads/ui.rs` | vlákno `ui`: sériově `UiCmd` → `Drawer` | `spawn_ui_thread` |
 | `threads/emit.rs` | vlákno `emit`: stav do šuplíku, proužek, připomínky, git | `spawn_emit_thread`, `next_wake`, `GIT_EVERY` |
-| `threads/hover.rs` | vlákno `hover`: myš, fullscreen, lištové okno, tlak → otevřít/zavřít | `spawn_hover_thread` |
+| `threads/hover.rs` | vlákno `hover`: myš, fullscreen, lištové okno, tlak → otevřít/zavřít; tah souborů na proužek → `shelf::Arm` / `shelf::drop::set_armed` ([shelf.md](shelf.md)) | `spawn_hover_thread` |
 | `threads/notes_watch.rs`, `notes_sync.rs` | vlákna poznámek (watcher, git sync) — viz [notes.md](notes.md) | `NotesState`, `reload_notes`, `check_reminders`, `SyncMsg`, `spawn_notes_sync` |
 | `commands/*.rs` | Tauri příkazy po oblastech: `drawer` (stav, režim, fokus, odkazy), `projects` (launch, open_in, `git_pull`, klon), `notes`, `sessions` (decide, hooky), `config`, `update` | `git_pull` + `pull_message`, `focus_in_own_popup`, `open_link`, `update_install` |
 | `focusreturn.rs` | návrat fokusu do předchozí aplikace: `remember` v `Drawer::focus` (těsně před převzetím), `give_back` v `Drawer::hide` / po Full → peek; jen po `UiCmd::Close`, jinak `on_close(false)` zapomene. Čisté `decide`/`keep_or_take` (tabulky) | `remember`, `on_close`, `give_back`, `decide`, `keep_or_take`, `Remembered`, `Probe` |
 | `drawer.rs` | okno šuplíku (WebView2), argumenty Chromia, handshake morfu, suspend, sklo, pozice u hrany (`appearance`) | `Drawer::{show, hide, warm, ack, set_dormant, take_focus, release_focus, destroy_if_idle, set_anchor}`, `BROWSER_ARGS`, `View`, `Opener`, `LABEL` |
-| `strip.rs` | nativní proužek: vrstvené okno, D2D, click-through, vlákno `strip`; vzhled z `appearance::geom` ([appearance.md](appearance.md)); puls (`StripModel.pulse`) animuje `WM_TIMER` jen po dobu pulsu | `Strip::{start, set}`, `StripModel`, `Segment`, `Rgba`, `pulse_now`, `PULSE_TIMER` |
+| `strip.rs` | nativní proužek: vrstvené okno, D2D, click-through, vlákno `strip`; vzhled z `appearance::geom` ([appearance.md](appearance.md)); puls (`StripModel.pulse`) animuje `WM_TIMER` jen po dobu pulsu; překryv přihrádky `StripModel.shelf` → `shelf::overlay` ([shelf.md](shelf.md)) | `Strip::{start, set}`, `StripModel`, `Segment`, `Rgba`, `pulse_now`, `PULSE_TIMER` |
 | `edge.rs` | čistá logika „otevřít myší?“ (tabulkové testy) | `armed`, `PushTracker`, `BarLatch`, `is_bar_window`, `edge_passes_through`, `Delays` |
 | `rawpush.rs` | raw myš (tlak na hranu), vlákno `rawpush`, aktivní jen u hrany | `RawPush::{start, arm, take}` |
 | `screen.rs` | monitory, DPI, kurzor, fullscreen (QUNS + okno v popředí) | `monitors`, `pick`, `fullscreen_on`, `ForegroundProbe` |
@@ -45,8 +45,8 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
   (`limitslive::next_deadline`, [limits.md](limits.md)). V klidu ~80 probuzení/h.
   `hover` ho budí i po změně fullscreenu (peek připomínky).
 - `hover`: 16 ms u hrany / 100 ms daleko / 500 ms ve fullscreenu; co 3 s `monitor_fresh` + výčet monitorů.
-- `ui`, `notes-watch`, `notes-sync`, `config-watch`, `strip`, `rawpush`, `update`: blokují na kanálu /
-  událostech. `strip` má časovač (~30 fps) jen během pulsu `attention::PULSE_MS` (1,2 s), v klidu žádný;
+- `ui`, `notes-watch`, `notes-sync`, `config-watch`, `strip`, `rawpush`, `update`, `shelf-drop` (vznikne až
+  při prvním tahu souborů na proužek, [shelf.md](shelf.md)): blokují na kanálu / událostech. `strip` má časovač (~30 fps) jen během pulsu `attention::PULSE_MS` (1,2 s), v klidu žádný;
   `toast` je jednorázové vlákno na jedno oznámení. `logos`, `links`, git (`refresh_git_async`) jsou krátká jednorázová vlákna.
 
 ## Invarianty a pasti

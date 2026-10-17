@@ -17,6 +17,8 @@ import ClockCard from "./cards/ClockCard";
 import WeatherCard from "./cards/WeatherCard";
 import LinksCard from "./cards/LinksCard";
 import ActionsCard from "./cards/ActionsCard";
+import ShelfCard from "./shelf/ShelfCard";
+import BgLaunch from "./sessions/BgLaunch";
 
 export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
   // prázdná karta Běží jen zabírá sloupec — ukáže se, až Ledge něco spustí (dlaždice stav ukazují samy)
@@ -43,14 +45,17 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         <WeatherCard s={p.s} now={p.now} onSettings={p.onSettings} />
         <LinksCard s={p.s} onSettings={p.onSettings} />
         <ActionsCard s={p.s} onSettings={p.onSettings} wide />
+        <ShelfCard wide />
         <Show when={notes()}><NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal /></Show>
       </div>
     </>}>
       <Show when={!p.s.sections.claude}><ClaudeInbox s={p.s} /></Show>
+      <BgLaunch s={p.s} />
       <Show when={p.s.sections.projects}>
         <Projects s={p.s} onNote={p.onNote} />
       </Show>
       <ActionsCard s={p.s} onSettings={p.onSettings} />
+      <ShelfCard />
       <div class={`grid ${cards() === 2 ? "two" : ""}`}>
         <For each={cardOrder(savedAppearance().cards)}>{card}</For>
       </div>

@@ -138,6 +138,28 @@ export interface SessionView {
   canOpen: boolean;
   /** co udělá klik (nebo proč nejde) */
   openHint: string;
+  /** Agent View (`agentview.rs`): `kind: background` */
+  background: boolean;
+  /** session na pozadí s krátkým id: stav úlohy a akce, které Rust nabízí */
+  job: JobView | null;
+  /** na co čeká (`waitingFor`), jen ve stavu „čeká“; neznámá hodnota = null */
+  waitingFor: WaitFor | null;
+}
+
+/** Agent View — session na pozadí (`claude agents --json`, Rust `agentview.rs`). */
+export type JobState = "working" | "blocked" | "done" | "failed" | "stopped";
+export type JobAction = "attach" | "logs" | "stop" | "remove" | "respawn";
+export type WaitFor = "permission" | "input" | "sandbox" | "worker" | "dialog";
+export interface JobView {
+  /** krátké id (`claude attach|logs|stop <id>`) */
+  id: string;
+  state: JobState | null;
+  actions: JobAction[];
+}
+/** Výsledek `agent_action`: výstup logů (konec, strop 32 KB) nebo krátká zpráva CLI. */
+export interface AgentOut {
+  text: string;
+  cut: boolean;
 }
 
 /** Hooky Ledge v `~/.claude/settings.json`. */
@@ -574,4 +596,44 @@ export type { CostsView } from "./costs/model";
 export interface Snapshot {
   /** útrata Claude (chybí jen ve starém jádře) */
   costs?: import("./costs/model").CostsView;
+}
+/** panel Git v kartě Claude (`sessiongit/`, `src/sessions/GitPanel.tsx`) — soubor ze `git status` */
+export interface GitFileView {
+  /** relativně ke kořeni repa, s `/` */
+  path: string;
+  /** původní cesta u přejmenování */
+  orig: string | null;
+  kind: "changed" | "renamed" | "conflict" | "untracked";
+  /** index / pracovní složka: `.` beze změny, `?` nesledovaný, jinak písmeno gitu (M A D R U…) */
+  x: string;
+  y: string;
+  inHead: boolean;
+  /** řádky proti HEAD; null = nevíme */
+  added: number | null;
+  removed: number | null;
+  /** text druhého potvrzení zahození; null = zahodit nejde */
+  discard: string | null;
+}
+export type GitPushPlan =
+  | { kind: "upstream"; target: string; count: number }
+  | { kind: "setUpstream"; remote: string; branch: string; count: number | null }
+  | { kind: "no"; why: string };
+export interface GitView {
+  root: string;
+  /** null = odpojená HEAD */
+  branch: string | null;
+  initial: boolean;
+  upstream: string | null;
+  ahead: number;
+  behind: number;
+  files: GitFileView[];
+  /** všech změněných souborů (files je nejvýš 200) */
+  total: number;
+  /** cwd je přidaný worktree */
+  worktree: { path: string; branch: string | null; main: string; mainBranch: string | null; locked: boolean; remove: string | null } | null;
+  push: GitPushPlan;
+  pushText: string | null;
+  canPull: boolean;
+  /** proč jsou destruktivní akce zablokované (živá session v té složce) */
+  block: string | null;
 }

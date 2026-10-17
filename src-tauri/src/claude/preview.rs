@@ -218,7 +218,7 @@ fn fill(p: &mut Preview, before: &str, after: &str) {
     (p.added, p.removed, p.cut, p.lines) = (r.added, r.removed, r.cut, r.lines);
 }
 
-fn head(p: &mut Preview, shown: Shown, content: &str) {
+pub(crate) fn head(p: &mut Preview, shown: Shown, content: &str) {
     let b: Vec<&str> = content.lines().collect();
     let shown_n = b.len().min(NEW_HEAD);
     let ops = vec![diff::Op::Add; shown_n];

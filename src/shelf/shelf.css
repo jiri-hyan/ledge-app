@@ -1,0 +1,11 @@
+/* Karta Přihrádka (`ShelfCard.tsx`): řádky souborů s ikonou ze shellu, tah ven. Jen tokeny ze styles.css. */
+.shelf-card:not(.wide) { margin-bottom: var(--gap-section); }
+.shelf-card h4 .warn { color: var(--amber); }
+.shelf-list { max-height: calc(260px * var(--fz)); overflow-y: auto; }
+.shelf-row { cursor: grab; }
+.shelf-row:active { cursor: grabbing; }
+.shelf-row.missing { cursor: default; }
+.shelf-row.missing .shelf-ico { opacity: 0.4; filter: grayscale(1); }
+.shelf-ico { width: 24px; height: 24px; flex-shrink: 0; display: grid; place-items: center; }
+.shelf-ico img { width: 24px; height: 24px; object-fit: contain; display: block; }
+.shelf-blank { width: 18px; height: 22px; border-radius: var(--r-xs); background: var(--well); border: 1px solid var(--line); }

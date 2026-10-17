@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
 import type { StatusLineStatus } from "./types";
+import type { EditPreview, GitView } from "./types";
 import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
 
 export type * from "./types";
@@ -69,6 +70,15 @@ export const api = {
   updateInstall: (confirmed: string[]) => call<InstallOutcome>("update_install", { confirmed }),
   /** Klik na session: přepnout do jejího okna / skončenou obnovit v terminálu. Chyba = česky. */
   sessionOpen: (id: string) => call("session_open", { id }),
+  /** Panel Git session (jen na klik; null = cwd není v gitu). Destruktivní akce Rust znovu ověří. */
+  sessionGit: (id: string) => call<GitView | null>("session_git", { id }),
+  sessionGitDiff: (id: string, path: string, staged: boolean) => call<EditPreview>("session_git_diff", { id, path, staged }),
+  sessionGitCommit: (id: string, message: string, paths: string[]) => call<string>("session_git_commit", { id, message, paths }),
+  sessionGitPush: (id: string) => call<string>("session_git_push", { id }),
+  sessionGitPull: (id: string) => call<string>("session_git_pull", { id }),
+  sessionGitDiscard: (id: string, path: string) => call("session_git_discard", { id, path }),
+  sessionGitRemoveWorktree: (id: string) => call<string>("session_git_remove_worktree", { id }),
+  sessionGitOpen: (id: string, target: "terminal" | "folder") => call("session_git_open", { id, target }),
   hooksStatus: () => call<HooksStatus>("hooks_status"),
   hooksInstall: () => call<HooksStatus>("hooks_install"),
   hooksRemove: () => call<HooksStatus>("hooks_remove"),

@@ -2055,6 +2055,7 @@ dependencies = [
  "tiny_http",
  "webview2-com",
  "windows",
+ "windows-core",
  "windows-numerics",
  "winreg 0.55.0",
 ]

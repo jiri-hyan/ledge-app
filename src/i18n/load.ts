@@ -3,6 +3,7 @@
 import "./en-main";
 import "./en-cards";
 import "./en-sessions";
+import "./en-sessiongit";
 import "./en-notes";
 import "./en-palette";
 import "./en-actions";
@@ -10,6 +11,8 @@ import "./en-winsettings";
 import "./en-questions";
 import "./en-limits";
 import "./en-costs";
+import "./en-shelf";
+import "./en-agentview";
 import "../settings/en";
 import "../settings/panels/en";
 import "../onboarding/en";

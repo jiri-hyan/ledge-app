@@ -100,6 +100,13 @@ Typické úpravy:
   přežije restart; smazání souboru = vypnuto po dalším startu). Vypnutí: znovu spustit Ledge
   (zástupce / Start), hlavní zkratka `hotkeys.toggle` (vypne a otevře šuplík) nebo `hotkeys.gameMode`.
   Ve skutečné fullscreen hře tyhle cesty herní režim jen vypnou, šuplík se neotevře.
+- **Přihrádka na soubory** — `shelf.enabled` (výchozí `true`; Nastavení → Šuplík a proužek → Přihrádka
+  na soubory). Soubory přetažené z Průzkumníka na proužek nahoře se uloží jako odkazy (jen cesty, nic se
+  nekopíruje) do `%APPDATA%\Ledge\shelf.json` (`{"items":[{"path":"C:\\Users\\…","addedMs":…}]}`, nejnovější
+  nahoře, nejvýš 50, stejná cesta bez ohledu na velikost písmen jen jednou). Karta „Přihrádka“: Cesta /
+  @ (zmínka pro Claude Code `@C:\…`, s mezerou `@"C:\… …"`) do schránky, Otevřít, Ve složce, ✕, Kopírovat
+  vše, Vyprázdnit, tah řádku ven (Průzkumník, terminál). Chybějící soubor = „chybí“, sám se nemaže.
+  Nic se neposílá do session samo. Ve fullscreen hře / herním režimu nic. Mapa `docs/codemap/shelf.md`.
 - **Skripty** — sekce `scripts` (Nastavení → Rychlé akce → Skripty): `enabled` (výchozí `true`, ale nic
   se neukáže, dokud složka neexistuje), `dir` (chybí = `%USERPROFILE%\Ledge\scripts`, `%PROMĚNNÉ%` se
   rozbalí, jinak absolutní cesta), `inActions` (výchozí `false`; `true` = i dlaždice v kartě Rychlé
@@ -293,9 +300,58 @@ schválí sám sebe.
 | běží v desktopové appce Claude | přepne do okna appky (konkrétní záložku vybrat neumíme — deep link není dokumentovaný) |
 | běží v CLI | přepne do okna předka s viditelným oknem (Windows Terminal / konzole / VS Code) |
 | skončila | `wt -d <cwd> cmd /c claude --resume <id>`, bez `wt` přes `cmd /c start` |
-| běží na pozadí / neznámý proces | nic, UI řekne proč |
+| běží na pozadí (`kind: background`) | nic — jen tlačítko **Připojit** pod řádkem (níže) |
+| neznámý proces | nic, UI řekne proč |
 
 Běžící session se **nikdy** neresumuje (prokládání zpráv). Okno se přepíná jen na výslovný klik.
+Podtitul a jméno session jdou přes `sessions::clean_preview`: bloky `<system-reminder>`, `<command-*>`,
+`<local-command-*>`, `<task-notification>`… (i escapované) se zahodí i s obsahem; nic nezbude = bez textu.
+
+**Agent View — session na pozadí** (`src-tauri/src/agentview.rs` čistá logika, `agentrun.rs` I/O,
+`commands/agents.rs`; UI `src/sessions/AgentActions.tsx`, `BgLaunch.tsx`, `agentview.ts`). Z `claude agents --json`
+Ledge bere navíc `kind`, `id` (krátké id úlohy), `state` (working/blocked/done/failed/stopped) a `waitingFor`;
+neznámé hodnoty ignoruje. Karta ukáže pilulku „na pozadí“, „čeká: oprávnění / vstup / sandbox / worker / dialog“
+a u skončených úloh „selhala / zastavena / hotovo“ (skončená úloha na pozadí zůstává v kartě, dokud ji někdo
+neodebere; `done` s živým procesem = nečinná). Session, která podle seznamu čeká, se počítá do segmentu proužku
+„N čeká“ i bez hooků Ledge (stejné `sessionId` jako žádost z hooku = jedna); peek/`Claude::attention()` ji **ne**zapíná
+(seznam se obnovuje jen při otevřeném šuplíku → peek by mohl viset na starých datech a nic v něm nejde vyřídit).
+
+Akce pod session na pozadí (jen s platným id — písmena/číslice/`-`/`_`, 4–64 znaků, ne pomlčka na začátku; jen klikem):
+
+| tlačítko | příkaz | kdy | potvrzení |
+|---|---|---|---|
+| Připojit | `claude attach <id>` v novém okně (`wt -d <cwd> cmd /c …`, bez `wt` přes `cmd /c start`) | vždy | ne |
+| Logy | `claude logs <id>` bez okna, termín 15 s, konec výstupu 32 KB bez ANSI do rozbalení | vždy | ne |
+| Restartovat | `claude respawn <id>` | proces žije nebo `stopped` | ano |
+| Zastavit | `claude stop <id>` | proces žije nebo `working`/`blocked` | ano |
+| Odebrat ze seznamu | `claude rm <id>` (smaže i worktree session; přepis zůstane pro `claude --resume`) | `done`/`failed`/`stopped` | ano |
+
+Rust znovu najde řádek a akci ověří proti `job.actions`; měnící akce bez `confirmed` odmítne. **Claude na pozadí…**
+(tlačítko pod dlaždicí projektu, paleta „Claude na pozadí v …“): pole úkolu (fokus po kliku, Ctrl+Enter, Esc) +
+nepovinné jméno → `claude --bg [--name N] "<úkol>"` ve složce projektu, termín 45 s. CLI se spouští **bez shellu**
+(`claude.exe` z PATH, u npm instalace binárka za `claude.cmd`; jinak `claude.cmd` s escapováním Rustu), s
+`CREATE_NO_WINDOW` a **bez** Job Objectu (ten by session na pozadí zabil). Poslat zprávu do běžící session z shellu
+docs neuvádějí → Ledge to nedělá (odpověď = Připojit). Nic se nečte z `~/.claude/jobs` (není stabilní rozhraní).
+
+**Panel Git session** (řádek „▸ Git“ pod session; `src/sessions/GitPanel.tsx`, Rust `src-tauri/src/sessiongit/`,
+příkazy `session_git*` v `commands/sessiongit.rs`): pro cwd v git repu větev, upstream ↑/↓ (podle posledního
+fetch), worktree + hlavní checkout, změněné soubory (strop 200) s diffem po kliku (`git diff` / `--cached`,
+nesledovaný = začátek obsahu, nad 512 KB / 1 MB výstupu „příliš velké“). Stav se čte jen při rozbalení, po akci
+a po ↻ — **žádné pollování**. Config nemá žádné nové pole.
+
+| akce | git | pravidla |
+|---|---|---|
+| Commit… | `add` + `commit -m <zpráva>` jen vybraných cest (pathspecy na stdin, `--pathspec-file-nul`) | hooky gitu běží (nikdy `--no-verify`), chyba hooku se ukáže celá; jiné připravené soubory do commitu nejdou |
+| Push… | `push` (s upstreamem), bez upstreamu a s jediným remote `push -u <remote> refs/heads/<b>:refs/heads/<b>` | potvrzení s cílem a počtem commitů; **force se nenabízí vůbec** |
+| Pull | `pull --ff-only` | jen s upstreamem |
+| Zahodit… | `restore --source=HEAD --staged --worktree -- <soubor>` | jen sledovaný soubor z HEAD; druhé potvrzení vypíše, co se ztratí |
+| Odstranit worktree… | `worktree remove <cesta>` z hlavního checkoutu | bez `--force` (s rozdělanými soubory git odmítne a chyba se ukáže); zamčený = ne |
+| Terminál / Složka | `open_dir` jako u projektů | kořen repa |
+
+Destruktivní akce blokuje (Rust i UI) session, která v té složce **pracuje nebo čeká** (`working`/`waiting`);
+u nečinné potvrzení odstranění upozorní, že Windows složku nemusí smazat. Git vždy bez okna, s termínem
+(čtení 10 s, commit 5 min, síť 2 min), argumenty jako pole, `GIT_LITERAL_PATHSPECS=1`, `GIT_TERMINAL_PROMPT=0`,
+`core.fsmonitor=false`; UI posílá jen id session a cestu, kterou Rust ověří proti čerstvému `git status`.
 
 **Schvalování** (hook `PermissionRequest` → `POST /permission`, `src-tauri/src/claude/mod.rs` + `claude/rules.rs`
 + `claude/preview.rs`/`diff.rs` + `claude/plan.rs`, UI `PendingRow` / peek + `src/sessions/PermExtra.tsx`,

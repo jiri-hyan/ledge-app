@@ -28,6 +28,8 @@ pub struct Agent {
     pub status: Option<String>,
     pub state: Option<String>,
     pub waiting_for: Option<String>,
+    /// krátké id session na pozadí (`attach`/`logs`/`stop`…), jen u `kind: background`
+    pub job_id: Option<String>,
 }
 
 /// Soubor registru `~/.claude/sessions/<pid>.json` (formát se může změnit — vše volitelné).
@@ -72,6 +74,7 @@ pub fn parse_agents(out: &str) -> Option<Vec<Agent>> {
                     status: st(v, &["status"]),
                     state: st(v, &["state"]),
                     waiting_for: st(v, &["waitingFor"]),
+                    job_id: st(v, &["id"]),
                 })
             })
             .collect(),
@@ -111,7 +114,9 @@ pub enum Status {
 /// `status` z CLI/registru (busy/idle/waiting…), `state` z docs (working|blocked|done|failed|stopped).
 pub fn live_status(status: Option<&str>, state: Option<&str>, waiting_for: Option<&str>) -> Status {
     let is = |v: Option<&str>, set: &[&str]| v.is_some_and(|v| set.iter().any(|s| v.eq_ignore_ascii_case(s)));
-    if is(state, &["done", "failed", "stopped", "completed"]) || is(status, &["done", "failed", "stopped", "completed", "exited"]) {
+    // `done` = turn doběhl a session čeká na další prompt; s živým procesem (`status`) je to nečinná, ne konec
+    let done_alive = is(state, &["done"]) && status.is_some();
+    if (is(state, &["done", "failed", "stopped", "completed"]) && !done_alive) || is(status, &["done", "failed", "stopped", "completed", "exited"]) {
         Status::Ended
     } else if waiting_for.is_some() || is(state, &["blocked"]) || is(status, &["waiting", "blocked", "needs_input"]) {
         Status::Waiting
@@ -138,7 +143,8 @@ pub enum OpenAction {
 pub fn decide_open(entrypoint: Option<&str>, kind: Option<&str>, alive: Option<bool>, pid: Option<u32>) -> OpenAction {
     let background = kind.is_some_and(|k| k.eq_ignore_ascii_case("background"));
     match (alive, pid) {
-        (Some(true), _) if background => OpenAction::Unavailable(tr("Session běží na pozadí bez okna.", "The session runs in the background without a window.")),
+        // na pozadí: okno nemá a `--resume` by vedle běžící úlohy založil druhou → jen „Připojit“ (agentview)
+        _ if background => OpenAction::Unavailable(tr("Session běží na pozadí bez okna — připoj se tlačítkem Připojit.", "The session runs in the background without a window — use Attach.")),
         (Some(true), Some(pid)) if pid > 0 && entrypoint == Some("claude-desktop") => OpenAction::SwitchDesktop { pid },
         (Some(true), Some(pid)) if pid > 0 => OpenAction::SwitchTerminal { pid },
         (Some(true), _) => OpenAction::Unavailable(tr("Nevím, ve kterém procesu session běží.", "I don't know which process the session runs in.")),
@@ -192,6 +198,12 @@ pub struct Row {
     pub open_hint: String,
     #[serde(skip)]
     pub kind: Option<String>,
+    /// `kind: background` (Agent View)
+    pub background: bool,
+    /// session na pozadí s krátkým id: stav úlohy a akce, které Ledge nabídne (`agentview`)
+    pub job: Option<crate::agentview::Job>,
+    /// na co čeká (`waitingFor`), jen když je stav „čeká“
+    pub waiting_for: Option<crate::agentview::WaitFor>,
 }
 
 impl Row {
@@ -205,6 +217,62 @@ pub struct Live<'a> {
     pub agents: Option<&'a [Agent]>,
     pub fetched_at: u64,
     pub registry: &'a [Reg],
+}
+
+/// Systémové bloky, které Claude Code vkládá do textu promptu / přepisu (hook `UserPromptSubmit` je pošle
+/// v `prompt`) — do náhledu v kartě nepatří.
+const SYSTEM_TAGS: &[&str] = &[
+    "system-reminder",
+    "command-name",
+    "command-message",
+    "command-args",
+    "command-contents",
+    "local-command-stdout",
+    "local-command-stderr",
+    "local-command-caveat",
+    "task-notification",
+    "user-prompt-submit-hook",
+    "bash-input",
+    "bash-stdout",
+    "bash-stderr",
+];
+
+/// Text pro náhled (podtitul / jméno session): bez bloků `SYSTEM_TAGS` i s obsahem (i v HTML escapované
+/// podobě `&lt;tag&gt;`), neuzavřený blok = zbytek pryč, osamocená uzavírací značka pryč, mezery sloučené.
+/// `None` = nic nezbylo.
+pub fn clean_preview(s: &str) -> Option<String> {
+    let mut s = s.to_string();
+    for tag in SYSTEM_TAGS {
+        if s.contains("&lt;") {
+            s = s.replace(&format!("&lt;/{tag}&gt;"), &format!("</{tag}>")).replace(&format!("&lt;{tag}&gt;"), &format!("<{tag}>")).replace(&format!("&lt;{tag} "), &format!("<{tag} "));
+        }
+    }
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s.as_str();
+    while let Some(i) = rest.find('<') {
+        let after = &rest[i + 1..];
+        let (closing, name) = match after.strip_prefix('/') {
+            Some(n) => (true, n),
+            None => (false, after),
+        };
+        let tag = SYSTEM_TAGS.iter().find(|t| name.strip_prefix(**t).is_some_and(|r| r.starts_with(['>', ' ', '\n', '\r', '\t', '/'])));
+        let Some(tag) = tag else {
+            out.push_str(&rest[..=i]);
+            rest = after;
+            continue;
+        };
+        out.push_str(&rest[..i]);
+        out.push(' ');
+        rest = if closing {
+            after.find('>').map_or("", |j| &after[j + 1..])
+        } else {
+            let close = format!("</{tag}>");
+            after.find(&close).map_or("", |j| &after[j + close.len()..])
+        };
+    }
+    out.push_str(rest);
+    let t = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!t.is_empty()).then_some(t)
 }
 
 fn last_segment(cwd: &str) -> String {
@@ -221,11 +289,13 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
         let waiting = h.as_ref().is_some_and(|h| h.state == SessionState::Waiting);
         let status = if waiting && base.status != Status::Ended { Status::Waiting } else { base.status };
         let unfinished = h.as_ref().is_some_and(Session::unfinished);
-        if status == Status::Ended && !unfinished {
-            return; // skončená bez rozdělané práce nikoho nezajímá
+        // skončená bez rozdělané práce nikoho nezajímá — kromě úlohy na pozadí (je v seznamu, dokud ji nikdo neodebere)
+        if status == Status::Ended && !unfinished && base.job.is_none() {
+            return;
         }
-        let title = h.as_ref().and_then(|h| h.title.clone());
-        let name = base.name.or_else(|| r.and_then(|r| r.name.clone())).or_else(|| title.clone()).unwrap_or_else(|| last_segment(&cwd));
+        // náhledy textu bez systémových bloků Claude Code (`<system-reminder>`…) — prázdné = žádný text
+        let title = h.as_ref().and_then(|h| h.title.as_deref()).and_then(clean_preview);
+        let name = base.name.as_deref().and_then(clean_preview).or_else(|| r.and_then(|r| r.name.as_deref()).and_then(clean_preview)).or_else(|| title.clone()).unwrap_or_else(|| last_segment(&cwd));
         let project_id = crate::notes::project_for_cwd(dirs, &cwd).map(str::to_string).or_else(|| {
             // session ve worktree (`atlas-v2`) patří projektu hlavního checkoutu
             let main = crate::resolve::main_checkout(std::path::Path::new(&cwd))?;
@@ -236,6 +306,8 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
         let pid = base.pid.or(r.map(|r| r.pid));
         let entrypoint = r.and_then(|r| r.entrypoint.clone());
         let kind = base.kind.or_else(|| r.and_then(|r| r.kind.clone()));
+        let background = kind.as_deref().is_some_and(|k| k.eq_ignore_ascii_case("background"));
+        let waiting_for = base.waiting_for.filter(|_| status == Status::Waiting);
         let action = decide_open(entrypoint.as_deref(), kind.as_deref(), alive, pid);
         let (uncommitted, unpushed, subagents) = h.map(|h| (h.uncommitted, h.unpushed, h.subagents)).unwrap_or_default();
         rows.push(Row {
@@ -264,25 +336,29 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
             unpushed,
             subagents,
             kind,
+            background,
+            job: base.job,
+            waiting_for,
         });
     };
     for a in live.agents.unwrap_or_default() {
         let h = hooks.remove(&a.session_id);
         let r = reg.get(a.session_id.as_str()).copied();
-        // registr je čerstvější, když se změnil po posledním spawnu
-        let status = match r.filter(|r| r.status.is_some() && r.status_at.is_some_and(|t| t > live.fetched_at)) {
-            Some(r) => live_status(r.status.as_deref(), None, None),
-            None => live_status(a.status.as_deref(), a.state.as_deref(), a.waiting_for.as_deref()),
-        };
+        let status = agent_status(a, r, live.fetched_at);
+        let background = a.kind.as_deref().is_some_and(|k| k.eq_ignore_ascii_case("background"));
+        // pid/status jen dokud proces žije (docs); úloha na pozadí je v seznamu i bez procesu
+        let proc_alive = a.pid > 0 || a.status.is_some();
         let base = Base {
             status,
             name: a.name.clone(),
             started_at: a.started_at,
             since: r.and_then(|r| r.status_at).or(a.started_at),
-            alive: Some(true),
+            alive: Some(!background || proc_alive),
             pid: (a.pid > 0).then_some(a.pid),
             kind: a.kind.clone(),
             hooked: h.is_some(),
+            job: if background { crate::agentview::job(a.job_id.as_deref(), a.state.as_deref(), proc_alive) } else { None },
+            waiting_for: crate::agentview::wait_for(a.waiting_for.as_deref()),
         };
         let cwd = if a.cwd.is_empty() { h.as_ref().map(|h| h.cwd.clone()).unwrap_or_default() } else { a.cwd.clone() };
         push(&a.session_id, cwd, base, h);
@@ -312,6 +388,8 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
             pid: None,
             kind: None,
             hooked: true,
+            job: None,
+            waiting_for: None,
         };
         let (id, cwd) = (h.id.clone(), h.cwd.clone());
         push(&id, cwd, base, Some(h));
@@ -330,6 +408,29 @@ struct Base {
     pid: Option<u32>,
     kind: Option<String>,
     hooked: bool,
+    job: Option<crate::agentview::Job>,
+    waiting_for: Option<crate::agentview::WaitFor>,
+}
+
+/// Stav položky živého seznamu; registr je čerstvější, když se změnil po posledním spawnu.
+pub fn agent_status(a: &Agent, r: Option<&Reg>, fetched_at: u64) -> Status {
+    match r.filter(|r| r.status.is_some() && r.status_at.is_some_and(|t| t > fetched_at)) {
+        Some(r) => live_status(r.status.as_deref(), None, None),
+        None => live_status(a.status.as_deref(), a.state.as_deref(), a.waiting_for.as_deref()),
+    }
+}
+
+/// Session, které podle živého seznamu (Agent View, `status: waiting` / `waitingFor` / `blocked`) čekají
+/// na člověka — i bez hooků Ledge. Pro čítač proužku (`attention::waiting_count_all`), který je sloučí
+/// se session hlášenými hookem (stejné `sessionId` = jedna).
+pub fn waiting_ids<'a>(live: &Live<'a>) -> Vec<&'a str> {
+    let reg: HashMap<&str, &Reg> = live.registry.iter().map(|r| (r.session_id.as_str(), r)).collect();
+    live.agents
+        .unwrap_or_default()
+        .iter()
+        .filter(|a| agent_status(a, reg.get(a.session_id.as_str()).copied(), live.fetched_at) == Status::Waiting)
+        .map(|a| a.session_id.as_str())
+        .collect()
 }
 
 /// Bezpečné id session pro příkazovou řádku (UUID a podobné).
@@ -374,7 +475,7 @@ mod tests {
     fn parse_agents_defensive() {
         let a = parse_agents(&format!("varování CLI\n{AGENTS}\n")).unwrap();
         assert_eq!(a.len(), 3, "položka bez id se zahodí");
-        assert_eq!(a[0], Agent { pid: 12148, session_id: "s-desk".into(), cwd: r"C:\Users\x\Desktop\atlas-v2".into(), kind: Some("interactive".into()), started_at: Some(1000), name: Some("Review commitů".into()), status: Some("idle".into()), state: None, waiting_for: None });
+        assert_eq!(a[0], Agent { pid: 12148, session_id: "s-desk".into(), cwd: r"C:\Users\x\Desktop\atlas-v2".into(), kind: Some("interactive".into()), started_at: Some(1000), name: Some("Review commitů".into()), status: Some("idle".into()), state: None, waiting_for: None, job_id: None });
         assert_eq!(a[1].name, None, "prázdné jméno = žádné");
         assert_eq!((a[2].session_id.as_str(), a[2].pid, a[2].waiting_for.as_deref()), ("s-bg", 0, Some("permission prompt")));
         for bad in ["", "nejsem json", "{\"a\":1}", "[1,2"] {
@@ -408,6 +509,9 @@ mod tests {
             (None, Some("working"), None, Working),
             (None, Some("blocked"), None, Waiting),
             (None, Some("done"), None, Ended),
+            // done s živým procesem = čeká na další prompt (nečinná), ne konec
+            (Some("idle"), Some("done"), None, Idle),
+            (Some("busy"), Some("done"), None, Working),
             (Some("busy"), Some("failed"), None, Ended),
             (Some("STOPPED"), None, None, Ended),
             (Some("neznámý"), None, None, Idle),
@@ -427,7 +531,9 @@ mod tests {
             (desk, Some("interactive"), Some(true), Some(5), SwitchDesktop { pid: 5 }),
             (Some("cli"), Some("interactive"), Some(true), Some(5), SwitchTerminal { pid: 5 }),
             (None, None, Some(true), Some(5), SwitchTerminal { pid: 5 }),
-            (desk, Some("background"), Some(true), Some(5), Unavailable("Session běží na pozadí bez okna.")),
+            (desk, Some("background"), Some(true), Some(5), Unavailable("Session běží na pozadí bez okna — připoj se tlačítkem Připojit.")),
+            // na pozadí ani skončená neresumuje (vedle úlohy by vznikla druhá session)
+            (None, Some("background"), Some(false), None, Unavailable("Session běží na pozadí bez okna — připoj se tlačítkem Připojit.")),
             (desk, None, Some(true), None, Unavailable("Nevím, ve kterém procesu session běží.")),
             (desk, None, Some(true), Some(0), Unavailable("Nevím, ve kterém procesu session běží.")),
             // skončená → resume, i desktopová (deep link do appky není dokumentovaný)
@@ -442,7 +548,7 @@ mod tests {
         assert_eq!(open_hint(&SwitchDesktop { pid: 1 }, "Review"), "Přepne do Claude — session: Review");
         crate::i18n::with_lang(crate::uiconf::Lang::En, || {
             assert_eq!(open_hint(&SwitchDesktop { pid: 1 }, "Review"), "Switches to Claude — session: Review");
-            assert_eq!(open_hint(&decide_open(None, Some("background"), Some(true), Some(7)), "x"), "The session runs in the background without a window.");
+            assert_eq!(open_hint(&decide_open(None, Some("background"), Some(true), Some(7)), "x"), "The session runs in the background without a window — use Attach.");
         });
     }
 
@@ -467,6 +573,84 @@ mod tests {
         for (cwd, sid) in [(r"C:\p", "x & calc"), (r"C:\p", "kratke"), (r#"C:\p" & calc"#, id), (r"C:\%PATH%", id), ("  ", id), (r"C:\a|b", id)] {
             assert_eq!(resume_command(true, cwd, sid), None, "{cwd} {sid}");
         }
+    }
+
+    #[test]
+    fn clean_preview_table() {
+        let cases: &[(&str, Option<&str>)] = &[
+            ("oprav testy", Some("oprav testy")),
+            ("<system-reminder>\nLinked sessions now (s…)\n</system-reminder>\noprav testy", Some("oprav testy")),
+            ("oprav <system-reminder>x</system-reminder> testy <system-reminder>y</system-reminder>", Some("oprav testy")),
+            ("&lt;system-reminder&gt; Linked sessions &lt;/system-reminder&gt; ahoj", Some("ahoj")),
+            ("<command-name>/clear</command-name>\n<command-message>clear</command-message>\n<command-args></command-args>", None),
+            ("<local-command-stdout>hotovo</local-command-stdout>", None),
+            ("<task-notification>\n<task-id>a1</task-id>\n</task-notification>", None),
+            ("<system-reminder>\r\nx</system-reminder>\r\nok", Some("ok")),
+            ("<system-reminder data=\"1\">x</system-reminder>zbytek", Some("zbytek")),
+            // neuzavřený blok (oříznutý text) = zbytek je systémový
+            ("úkol <system-reminder> Linked sessions now (s…", Some("úkol")),
+            ("</system-reminder> po", Some("po")),
+            ("<system-reminder>jen systém</system-reminder>", None),
+            // jiné značky a nerovnosti z textu uživatele zůstávají
+            ("oprav <div> a a < b &lt;x&gt;", Some("oprav <div> a a < b &lt;x&gt;")),
+            ("<system-reminders>není náš</system-reminders>", Some("<system-reminders>není náš</system-reminders>")),
+            ("   ", None),
+        ];
+        for (inp, want) in cases {
+            assert_eq!(clean_preview(inp).as_deref(), *want, "{inp:?}");
+        }
+        // řádek karty: titulek z hooku i jméno ze seznamu jdou přes filtr
+        let agents = parse_agents(r#"[{"pid":3,"sessionId":"s1","cwd":"C:/x/WorkSpace","status":"busy","name":"<system-reminder>a</system-reminder>"}]"#).unwrap();
+        let mut h = hook("s1", "", SessionState::Working, 1);
+        h.title = Some("<system-reminder> Linked sessions now (s…".into());
+        let rows = merge(&Live { agents: Some(&agents), fetched_at: 0, registry: &[] }, vec![h], &[], &|_| None, 2);
+        assert_eq!((rows[0].name.as_str(), rows[0].title.as_deref()), ("WorkSpace", None));
+    }
+
+    #[test]
+    fn agent_view_rows() {
+        use crate::agentview::{JobAction::*, JobState, WaitFor};
+        let json = r#"[
+          {"id":"7c5dcf5d","sessionId":"u-failed","kind":"background","state":"failed","cwd":"C:/p","startedAt":1},
+          {"id":"aa11bb22","sessionId":"u-done","kind":"background","state":"done","pid":5,"status":"idle","cwd":"C:/p","startedAt":2},
+          {"id":"bad id!","sessionId":"u-badid","kind":"background","state":"working","pid":6,"status":"busy","cwd":"C:/p","startedAt":3},
+          {"pid":7,"sessionId":"u-input","kind":"interactive","status":"waiting","waitingFor":"input needed","cwd":"C:/q","startedAt":4},
+          {"pid":8,"sessionId":"u-new","kind":"interactive","status":"waiting","waitingFor":"něco nového","cwd":"C:/q","startedAt":5},
+          {"pid":9,"sessionId":"u-stale","kind":"interactive","status":"waiting","waitingFor":"permission prompt","cwd":"C:/q","startedAt":6},
+          {"id":"cc33dd44","sessionId":"u-blocked","kind":"background","state":"blocked","waitingFor":"sandbox request","cwd":"C:/p","startedAt":7}
+        ]"#;
+        let agents = parse_agents(json).unwrap();
+        assert_eq!((agents[0].job_id.as_deref(), agents[3].job_id.as_deref()), (Some("7c5dcf5d"), None));
+        // registr po posledním spawnu: u-stale už pracuje (odpověď padla v terminálu)
+        let registry = vec![parse_registry(r#"{"pid":9,"sessionId":"u-stale","status":"busy","statusUpdatedAt":200}"#).unwrap()];
+        let live = Live { agents: Some(&agents), fetched_at: 100, registry: &registry };
+        let rows = merge(&live, vec![], &[], &|_| None, 300);
+        let by = |id: &str| rows.iter().find(|r| r.id == id).unwrap_or_else(|| panic!("{id}"));
+        // skončená úloha na pozadí zůstává (jde odebrat), bez otevření
+        let f = by("u-failed");
+        assert_eq!((f.status, f.background, f.can_open), (Status::Ended, true, false));
+        assert_eq!(f.job.as_ref().map(|j| (j.id.as_str(), j.state, j.actions.clone())), Some(("7c5dcf5d", Some(JobState::Failed), vec![Attach, Logs, Remove])));
+        // done s živým procesem = nečinná, jde zastavit, restartovat i odebrat
+        let d = by("u-done");
+        assert_eq!((d.status, d.job.as_ref().unwrap().actions.clone()), (Status::Idle, vec![Attach, Logs, Stop, Respawn, Remove]));
+        // neplatné id → žádné akce, řádek zůstává
+        assert_eq!((by("u-badid").job.is_none(), by("u-badid").background, by("u-badid").status), (true, true, Status::Working));
+        // interaktivní čekající: přeložitelný důvod; neznámá hodnota = čeká bez důvodu
+        assert_eq!((by("u-input").status, by("u-input").waiting_for, by("u-input").job.is_none()), (Status::Waiting, Some(WaitFor::Input), true));
+        assert_eq!((by("u-new").status, by("u-new").waiting_for), (Status::Waiting, None));
+        // čerstvější registr přebije starý waitingFor
+        assert_eq!((by("u-stale").status, by("u-stale").waiting_for), (Status::Working, None));
+        let b = by("u-blocked");
+        assert_eq!((b.status, b.waiting_for, b.job.as_ref().unwrap().actions.clone()), (Status::Waiting, Some(WaitFor::Sandbox), vec![Attach, Logs, Stop]));
+        let json_row = serde_json::to_value(b).unwrap();
+        assert_eq!((json_row["background"].as_bool(), json_row["waitingFor"].as_str(), json_row["job"]["state"].as_str()), (Some(true), Some("sandbox"), Some("blocked")));
+        assert_eq!(json_row["job"]["actions"], serde_json::json!(["attach", "logs", "stop"]));
+
+        // čítač proužku: čekající podle Agent View, ne ty, které registr mezitím posunul
+        let mut w = waiting_ids(&live);
+        w.sort_unstable();
+        assert_eq!(w, ["u-blocked", "u-input", "u-new"]);
+        assert!(waiting_ids(&Live { agents: None, fetched_at: 0, registry: &[] }).is_empty());
     }
 
     fn hook(id: &str, cwd: &str, state: SessionState, updated_at: u64) -> Session {

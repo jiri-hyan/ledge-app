@@ -7,6 +7,7 @@ import { logoSrc } from "../logos";
 import type { NotePreset } from "../notes/store";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
+import { BgTileButton } from "../sessions/BgLaunch";
 import "./projects.css";
 
 async function launch(pr: ProjectView) {
@@ -94,6 +95,7 @@ export default function Projects(p: { s: Snapshot; onNote: (preset: NotePreset) 
                   <button title={t("cards.projects.terminal", "Terminál")} aria-label={t("cards.projects.terminalIn", "Terminál v {name}", { name: pr.name })} onClick={() => api.openIn(pr.id, "terminal")}><IconTerminal /></button>
                   <button title={t("cards.projects.folder", "Složka")} aria-label={t("cards.projects.folderOf", "Složka {name}", { name: pr.name })} onClick={() => api.openIn(pr.id, "folder")}><IconFolder /></button>
                 </Show>
+                <BgTileButton s={p.s} pr={pr} />
                 <Show when={pr.clonable}>
                   <button title={t("cards.projects.cloneTitle", "Naklonovat do první složky z roots (gh repo clone)")} disabled={pr.cloning} onClick={() => cloneProject(pr)}><IconFolder />{pr.cloning ? t("cards.projects.cloningBtn", "Klonuji…") : t("cards.projects.clone", "Naklonovat")}</button>
                 </Show>

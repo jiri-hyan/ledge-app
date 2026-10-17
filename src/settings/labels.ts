@@ -27,6 +27,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "drawer.keepWarmS": { panel: "suplik", label: "Uvolnit paměť při nečinnosti", hint: "Po minutě se zavřeným šuplíkem Ledge uvolní paměť (~150 MB → desítky MB); první otevření pak trvá pár sekund. S animacemi nesouvisí.", kw: "paměť ram úspora úsporný režim výkon webview" },
   autostart: { panel: "suplik", label: "Spouštět po startu Windows", kw: "start přihlášení" },
   "palette.compact": { panel: "suplik", label: "Kompaktní paleta příkazů", hint: "Ctrl+K a 🔍 ukážou jen vyhledávací pole; výsledky se rozbalí až při psaní, nedávné šipkou dolů", kw: "paleta příkazů ctrl+k hledání powertoys malá jen pole" },
+  "shelf.enabled": { panel: "suplik", label: "Přihrádka na soubory", hint: "Přetáhni soubory z Průzkumníka na proužek nahoře — uloží se jen odkazy (cesty) do karty Přihrádka. Kopírování cesty pro Claude Code, otevření, tah ven.", kw: "shelf přihrádka soubory přetáhnout drag drop cesta schránka claude" },
   "palette.winSettings": { panel: "suplik", label: "Nastavení Windows v paletě", hint: "Při psaní v paletě najde i stránky Nastavení Windows (Bluetooth, Zvuk, Wi-Fi…) a klasické ovládací panely", kw: "windows settings ms-settings ovládací panely control bluetooth zvuk wifi" },
   // Rychlé akce — skripty (`actions/ScriptsSettings.tsx`)
   "scripts.enabled": { panel: "akce", label: "Skripty v paletě", hint: "Skripty ze složky skriptů jako položky palety (Ctrl+K). Dokud složka neexistuje, nic se neukáže.", kw: "script commands raycast skript powershell python node cmd bat" },

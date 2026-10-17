@@ -1,0 +1,16 @@
+/* Agent View v kartě Claude (`AgentActions.tsx`) a formulář „Claude na pozadí…“ (`BgLaunch.tsx`). Jen tokeny. */
+.sess-av { display: flex; flex-direction: column; gap: var(--s1); padding: 0 0 var(--s2); min-width: 0; }
+.sess-av-acts, .sess-av-ask { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); min-width: 0; }
+.sess-av-q { font-size: var(--fs-xs); color: var(--t1); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sess-av-note { font: var(--fs-xs) var(--sans); color: var(--t3); }
+.sess-av-log { margin: 0; max-height: min(320px, calc(var(--drawer-max-h, 720px) / 2)); overflow: auto; font: var(--fs-xs)/1.45 var(--mono); color: var(--t2); background: var(--well-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: var(--s1) var(--s2); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.sess-av-link { align-self: flex-start; font: var(--fs-xs) var(--mono); color: var(--t3); background: none; border: 0; padding: 0; cursor: pointer; }
+.sess-av-link:hover:not(:disabled) { color: var(--t1); }
+
+.sess-bg { display: flex; flex-direction: column; gap: var(--s2); }
+.sess-bg-where { font: var(--fs-xs) var(--mono); color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-bg-prompt, .sess-bg-name { width: 100%; box-sizing: border-box; font: var(--fs-body) var(--sans); color: var(--t1); background: var(--well-2); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) var(--s3); }
+.sess-bg-prompt { resize: vertical; min-height: 64px; }
+.sess-bg-prompt:focus, .sess-bg-name:focus { outline: none; border-color: var(--focus); }
+.sess-bg-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--s2); }
+.sess-bg-err { margin-right: auto; font-size: var(--fs-xs); color: var(--red); }

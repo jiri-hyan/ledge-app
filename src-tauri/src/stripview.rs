@@ -102,7 +102,13 @@ pub(crate) fn refresh_strip() {
             config::StripItem::Limits => crate::limitslive::strip_segments(&mut segs),
             config::StripItem::Waiting => {
                 // kolik různých session čeká na tebe (schválení / otázka); 0 = žádný segment
-                if let Some(text) = attention::waiting_text(attention::waiting_count(&pending, &asks)) {
+                // + čekající podle Agent View (i bez hooků Ledge; seznam z posledního otevření šuplíku + registr)
+                let live: Vec<String> = crate::sessionlive::with_cache(|c| {
+                    let live = crate::sessions::Live { agents: c.agents.as_deref(), fetched_at: c.fetched_at, registry: &c.registry };
+                    crate::sessions::waiting_ids(&live).into_iter().map(str::to_string).collect()
+                });
+                let live: Vec<&str> = live.iter().map(String::as_str).collect();
+                if let Some(text) = attention::waiting_text(attention::waiting_count_all(&pending, &asks, &live)) {
                     segs.push(seg(text, Rgba::AMBER, Some(Rgba::AMBER), true, true));
                 }
             }

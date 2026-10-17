@@ -8,7 +8,9 @@ Nastavení umí zapojit hooky Ledge do `~/.claude/settings.json`. Návod pro už
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `src-tauri/src/sessions.rs` | čistá logika: parsování zdrojů, sloučení, stav, co udělá klik, strop spawnů | `parse_agents`, `parse_registry`, `is_registry_file`, `live_status`, `Status`, `merge`, `Live`, `Row`, `decide_open`, `OpenAction`, `open_hint`, `spawn_wait`, `resume_command`, `Launch` |
+| `src-tauri/src/sessions.rs` | čistá logika: parsování zdrojů, sloučení, stav, co udělá klik, strop spawnů, náhled textu | `parse_agents` (`Agent.job_id` z `id`), `parse_registry`, `is_registry_file`, `live_status`, `agent_status`, `waiting_ids`, `Status`, `merge`, `Live`, `Row` (`background`, `job`, `waiting_for`), `decide_open`, `OpenAction`, `open_hint`, `spawn_wait`, `resume_command`, `Launch`, `clean_preview`, `SYSTEM_TAGS` |
+| `src-tauri/src/agentview.rs` | Agent View (čistá): stav úlohy, `waitingFor`, které akce, validace id, argumenty `attach/logs/stop/rm/respawn` a `--bg`, úklid výstupu, nalezení `claude` | `JobState`, `job_state`, `WaitFor`, `wait_for`, `JobAction` (`needs_confirm`, `wait`), `Job`, `job`, `actions`, `valid_job_id`, `cli_args`, `attach_command`, `clean_prompt`, `clean_name`, `bg_args`, `for_batch`, `backgrounded_id`, `clean_output`, `Program`, `resolve_claude`, `LOG_MAX`, `PROMPT_MAX`, `NAME_MAX` |
+| `src-tauri/src/agentrun.rs` · `commands/agents.rs` | I/O Agent View: běh `claude` bez okna a bez Job Objectu (termín, strop výstupu), `attach` v terminálu · Tauri příkazy | `program`, `run`, `Out`, `attach` · `agent_action(id, action, confirmed)`, `agent_spawn(projectId, prompt, name)`, `AgentOut` |
 | `src-tauri/src/sessionlive.rs` | I/O: vlákno `sessions` (spawn `claude agents`), watcher registru, cache | `start`, `request`, `Wake`, `with_cache`, `Cache`, `unseen`, `claude_dir`, `fetch_agents`, `reload_registry`, `registry_fallback` |
 | `src-tauri/src/winfocus.rs` | Win32: strom procesů, okna, přepnutí, `claude --resume` | `switch_to`, `launch`, `ancestors`, `pick_window`, `pid_alive`, `is_claude_desktop_image` |
 | `src-tauri/src/subagents.rs` | subagenti jedné session (čistá) | `Subagents::{start, stop, clear_running}`, `shorten`, `DONE_KEEP`, `MSG_CHARS` |
@@ -21,9 +23,13 @@ Nastavení umí zapojit hooky Ledge do `~/.claude/settings.json`. Návod pro už
 | `src-tauri/src/claude/bridge.rs` | HTTP most 127.0.0.1 (`/permission`, `/question`, `/event`, `/status`, `/ctl`) | `serve`, `Ctl`, `respond`, `header` |
 | `src-tauri/src/claude/questions.rs` | otázky Clauda (AskUserQuestion): parsování, odpovědi, držení | `parse`, `build_answers`, `answer_body`, `MULTI_SEP`, `on_event`, `Claude::{handle_question, answer_question, release_question, questions, attention, set_question_hold}`, `Ask`, `Reply` |
 | `src-tauri/src/claude/hygiene.rs` · `paths.rs` | hlídač nedokončené práce (git) · čisté cesty a porcelain | `Track`, `git_baseline`, `git_hygiene`, `run_check`, `block_reason`, `Budgets` · `lexical`, `absolutize`, `porcelain_paths` |
+| `src-tauri/src/sessiongit/` (`mod.rs` · `parse.rs` · `plan.rs` · `tests.rs`) | panel Git session: I/O s termíny · rozbor `status --porcelain=v2 -z`, `worktree list --porcelain`, numstat, unified diff → `Preview` · argumenty, plán pushe, blokace, texty potvrzení, výběr ke commitu | `read_repo`, `Repo` (`linked`, `push_plan`), `view`, `View`, `FileView`, `WorktreeView`, `file_diff`, `commit`, `push`, `pull`, `discard`, `remove_worktree`, `Waits` · `status_z`, `Porcelain`, `GitFile`, `FileKind`, `numstat_z`, `worktrees`, `unified` · `PushPlan`, `push_plan`, `push_args`, `push_text`, `statuses_in`, `destructive_block`, `discardable`, `discard_text`, `remove_text`, `clean_message`, `selection`, `ENV`, `MAX_FILES` |
+| `src-tauri/src/commands/sessiongit.rs` | Tauri příkazy panelu (id session → cwd → repo; blokace znovu v Rustu) | `session_git`, `session_git_diff`, `session_git_commit`, `session_git_push`, `session_git_pull`, `session_git_discard`, `session_git_remove_worktree`, `session_git_open` (→ `commands::projects::open_dir`) |
 | `src-tauri/src/snapshot.rs`, `commands/sessions.rs`, `refresh.rs`, `threads/ui.rs`, `lib.rs` | lepidlo | `Snapshot.sessions` (`Vec<sessions::Row>`), `Snapshot.hooks`, `session_rows`, `session_open`, `hooks_status`/`hooks_install`/`hooks_remove`, `on_claude_change` (Wake::Hook), `UiCmd::Show` (Wake::Open), `sessionlive::start` v `run` |
-| `src/ClaudeSessions.tsx` | karta Claude (pod hlavičkou `LimitsRow` → [limits.md](limits.md), dole `CostsSection` → [costs.md](costs.md)) | `ClaudeSessions`, `SessionRow`, `PendingRow`, `onlyQuestions` („Doplnit otázky Clauda“) |
+| `src/ClaudeSessions.tsx` | karta Claude (pod hlavičkou `LimitsRow` → [limits.md](limits.md), dole `CostsSection` → [costs.md](costs.md)) | `ClaudeSessions`, `SessionRow` (pilulka `statusPill` / `BgPill`, pod řádkem `AgentActions`), `PendingRow`, `onlyQuestions` („Doplnit otázky Clauda“) |
+| `src/sessions/AgentActions.tsx` · `BgLaunch.tsx` · `agentview.ts` · `agentApi.ts` · `agentview.css` | Agent View v UI: akce pod session na pozadí (potvrzení v kartě, logy do rozbalení) · „Claude na pozadí…“ (formulář na `MainPage`, tlačítko pod dlaždicí `cards/Projects.tsx`, položka palety `palette/items.ts`) · čistá logika (`agentview.test.mjs`) · IPC | `AgentActions`, `BgPill` · `BgLaunch`, `BgTileButton`, `openBgLaunch`, `canBgLaunch` · `waitText`, `statusPill`, `shownActions`, `needsConfirm`, `actionLabel`, `actionHint`, `confirmText`, `promptProblem`, `nameProblem`, `bgKey` · `agentApi.{action, spawn}`; slovník `src/i18n/en-agentview.ts` (`sessions.av.*`) |
 | `src/sessions/` | doplňky schválení pod Povolit/Zamítnout (karta i `cards/Peek.tsx`) · náhled diffu · review plánu · čistá logika (`permission.test.mjs`, `diff.test.mjs`, `plan.test.mjs`) | `PermExtra` (u plánu „Vrátit s připomínkou…“) · `DiffPreview` · `PlanReview` (Markdown přes `notes/Markdown.tsx`) · `permission.ts` (`DESTS`, `destFile`, `reasonOf`, `denyExtra`, `alwaysExtra`, `reasonKey`, `REASON_MAX`) · `diff.ts` (`counts`, `headKind`, `expandable`, `sign`, `gutter`, `gutterWidth`) · `plan.ts` (`planDecide`, `planTitle`) |
+| `src/sessions/GitPanel.tsx` · `git.ts` · `git.css` | panel Git pod session („▸ Git“ v `SessionRow`): větev, ahead/behind, worktree, soubory + diff (`DiffPreview open`), Commit…/Push…/Pull/Zahodit…/Odstranit worktree… · čistá logika (`git.test.mjs`) | `GitPanel` · `badge`, `defaultPicked`, `togglePicked`, `commitReady`, `diffModes`, `messageKey`, `hiddenFiles`, `canPush` · typy `GitView`, `GitFileView`, `GitPushPlan` (`types.ts`), `api.sessionGit*` |
 | `src/questions/` | otázka jako chat (peek `cards/Peek.tsx` + pod session) · čistá logika · panel `settings/panels/Questions.tsx` | `QuestionCard` · `model.ts` (`pick`, `toggleOther`, `answered`, `toReply`, `keyTarget`, `instant`) |
 | `src/Settings.tsx` | sekce Claude Code | `HooksSetup` |
 | `src/types.ts` · `src/api.ts` | typy · volání | `SessionView`, `HooksStatus`, `Pending.always`/`preview`/`plan`, `PermAlways`, `PermDest`, `DecideExtra` (`mode`), `EditPreview`, `DiffLine`, `PlanView`, `PlanMode` · `api.decide(id, allow, extra?)`, `api.sessionOpen`, `api.hooks*` |
@@ -33,6 +39,11 @@ Nastavení umí zapojit hooky Ledge do `~/.claude/settings.json`. Návod pro už
 `claude agents --json --all` + registr → `sessionlive::Cache` → `snapshot::session_rows` →
 `sessions::merge(Live, claude.sessions(), dirs, name_of)` → `Snapshot.sessions` → `ClaudeSessions`.
 Klik → `session_open(id)` → `Row::open_action()` → `winfocus::switch_to` / `winfocus::launch` → skrýt šuplík.
+Agent View: `parse_agents` (`kind`/`id`/`state`/`waitingFor`) → `merge` → `Row.job` (`agentview::job` → `actions`) +
+`waiting_for` → `AgentActions` → `agent_action(id, akce, confirmed)` → znovu `session_rows` + kontrola `job.actions` →
+`agentrun::run` (`cli_args`) / `agentrun::attach` → `sessionlive::request(Wake::Open)`. Nová: `BgLaunch` → `agent_spawn` →
+`bg_args` → `agentrun::run` ve složce projektu. Proužek: `stripview` (segment `waiting`) → `sessions::waiting_ids` +
+`attention::waiting_count_all` (sjednocení se `sessionId` z hooků).
 Schválení: hook `PermissionRequest` → `/permission` → `handle_permission` (`rules::propose` z
 `permission_suggestions` / vstupu → `Pending.always`; mimo zámek `preview::for_request` → `Pending.preview`,
 u `ExitPlanMode` `plan::for_request` → `Pending.plan` + titulek do `summary`) → `PendingRow`/`Peek` + `DiffPreview`
@@ -82,6 +93,24 @@ Otázka: hook `PreToolUse(AskUserQuestion)` → `/question` → `handle_question
   s konkrétním `id`; u jiné karty = nic se nerozhodne. Zkratky dál jen Allow/Deny (nejstarší). Markdown jde přes
   `note_render` (Rust escapuje) — žádné vlastní innerHTML. Že ExitPlanMode chodí přes `PermissionRequest`, není
   v dokumentaci ověřené (lead ověří živě); když nepřijde, nic se nemění.
+- **Agent View:** jen dokumentované pole a příkazy (`claude <příkaz> --help` v 2.1.259 + docs agent-view); zprávu do
+  běžící session Ledge neposílá (docs to z shellu neuvádějí), `~/.claude/jobs` nečte. Akce jen s `valid_job_id`, jen
+  klikem, měnící (`stop`/`rm`/`respawn`) s potvrzením v kartě a `confirmed` v IPC; `rm` jen u done/failed/stopped.
+  **Nikdy `gitinfo::capture`** pro `claude` akce: Job Object s KILL_ON_JOB_CLOSE by zabil session, kterou `--bg` /
+  `respawn` nechává běžet; `agentrun::run` zabije při termínu jen přímého potomka a na konec roury čeká max 500 ms.
+  Žádný shell s uživatelským textem: `claude.exe` přímo, `claude.cmd` jen s escapováním Rustu (`for_batch` = bez
+  nového řádku). Úkol/jméno nesmí začínat `-`. Logy jen na klik (žádné pollování), konec 32 KB, `clean_output`
+  (bez ANSI), do DOM jen jako text. Background row: klik na řádek nic neotevře (`--resume` vedle živé úlohy by
+  založil druhou session) → Připojit. `waiting_ids` jen pro segment proužku, ne pro `Claude::attention()` (peek).
+- Podtitul / jméno přes `clean_preview` (titulek z hooku se filtruje už v `handle_event` před zkrácením na 60 znaků).
+- **Panel Git:** git jen na klik (rozbalení, akce, ↻, změna `status` session) — žádné pollování; bez okna, termíny
+  `Waits` (čtení 10 s, commit 5 min kvůli hookům, síť 2 min), argumenty jako pole, `GIT_LITERAL_PATHSPECS=1`,
+  `GIT_TERMINAL_PROMPT=0`, `core.fsmonitor=false`, čtení s `GIT_OPTIONAL_LOCKS=0`. Nikdy `--force`, `--no-verify`,
+  `reset --hard`, `+refspec`. UI posílá jen id session + cestu; Rust ji ověří proti čerstvému statusu (`selection`,
+  `Repo::file`), cestu worktree bere z `worktree list`. Destruktivní (zahodit / odstranit worktree) blokuje
+  `destructive_block` (session `working`/`waiting` s cwd v kořeni repa, `statuses_in`) v Rustu i v UI; zahodit jen
+  `discardable` (sledovaný soubor v HEAD — nový/nesledovaný by se smazal). Commit pathspecem = `--only` (jiné
+  připravené soubory zůstanou), u přejmenování i původní cesta. Fokus do pole zprávy jen po kliku „Commit…“.
 - `Row.state`/`title`/`project`/`ended` drží kompatibilitu s hlavičkou a peekem (`src/cards/Head.tsx`, `src/cards/Peek.tsx`).
 - Termíny gitu hlídače: `Budgets::default()` = 2 s (produkce); git testy volají `Claude::patient`
   (60 s), aby nezávisely na vytížení stroje — v produkci nepoužívat.
@@ -97,6 +126,13 @@ Otázka: hook `PreToolUse(AskUserQuestion)` → `/question` → `handle_question
 (čtení s limitem, Edit/Write nad tempdir: existuje/neexistuje/velký/binární/CRLF/replace_all), `claude::plan::tests`
 (titulek, plán ze vstupu/souboru, tělo tří akcí, IPC `mode`), `claude::tests::{write_request_carries_preview,
 plan_request_and_actions}`, `src/sessions/diff.test.mjs`, `src/sessions/plan.test.mjs`,
+`sessions::tests::{agent_view_rows, clean_preview_table}`, `agentview::tests` (stavy, waitingFor, akce podle
+stavu, id, argumenty, attach, `--bg`, výpis, úklid výstupu, nalezení `claude`), `attention::tests::waiting_counts_distinct_sessions`,
+`src/sessions/agentview.test.mjs`,
+`sessiongit::parse::tests` (porcelain v2 -z, worktree list, numstat, unified diff), `sessiongit::plan::tests` (argumenty bez
+metaznaků, plán pushe, blokace, texty, výběr), `sessiongit::tests` (git nad tempdir: diffy, commit jen výběru + doslovné
+pathspecy, chyba hooku, přejmenování, push -u / push / pull --ff-only s bare remotem, zahození, worktree bez force),
+`src/sessions/git.test.mjs`,
 `claude::bridge::tests` (HTTP, blokace `Stop`, `/question`, Vždy povolit + důvod zamítnutí end-to-end), `claude::hygiene::tests` (git; pomůcky v `claude/testkit.rs`).
 Žádný test nesahá na skutečné `~/.claude` ani nespouští `claude`.
 

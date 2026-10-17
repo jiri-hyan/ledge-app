@@ -66,11 +66,18 @@ pub(crate) fn open_in(id: String, target: String) -> Result<(), String> {
     let c = core();
     let p = find_project(&id)?;
     let dir = c.project_dir(&p).ok_or_else(|| tr("Složka projektu nenalezena.", "Project folder not found."))?;
+    open_dir(&dir, &target)
+}
+
+/// Otevře `dir` v terminálu (`wt`, záložně `cmd`) nebo v Průzkumníku a schová šuplík. Sdílí karta
+/// projektů/Repa (`open_in`) a panel Git v kartě Claude (`commands/sessiongit.rs`).
+pub(crate) fn open_dir(dir: &Path, target: &str) -> Result<(), String> {
+    let c = core();
     let detached = 0x0000_0008u32; // DETACHED_PROCESS
     let no_window = 0x0800_0000u32;
-    let res = match target.as_str() {
+    let res = match target {
         "terminal" => {
-            let wt = std::process::Command::new("wt").arg("-d").arg(&dir).creation_flags(detached).spawn();
+            let wt = std::process::Command::new("wt").arg("-d").arg(dir).creation_flags(detached).spawn();
             match wt {
                 Ok(c) => Ok(c),
                 Err(_) => std::process::Command::new("cmd")
@@ -79,7 +86,7 @@ pub(crate) fn open_in(id: String, target: String) -> Result<(), String> {
                     .spawn(),
             }
         }
-        "folder" => std::process::Command::new("explorer").arg(&dir).spawn(),
+        "folder" => std::process::Command::new("explorer").arg(dir).spawn(),
         _ => return Err(tr("Neznámý cíl.", "Unknown target.").into()),
     };
     res.map(|_| ()).map_err(|e| e.to_string())?;

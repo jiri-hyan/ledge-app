@@ -1,4 +1,4 @@
-// Náhled změny Edit/Write v kartě schválení (`PendingRow` i `cards/Peek.tsx`): sbalený řádek
+// Náhled změny Edit/Write v kartě schválení (`PendingRow` i `cards/Peek.tsx`) a diff souboru v panelu Git (`GitPanel.tsx`): sbalený řádek
 // „+12 −3 · soubor.rs“, klik rozbalí řádkový diff (kontext, čísla řádků ze souboru, strop s hláškou).
 // Data spočítal Rust jednou při příchodu žádosti (`claude/preview.rs` + `claude/diff.rs`); tady jen
 // vykreslení — text řádků jde jako textový uzel (žádné innerHTML). Logika v `diff.ts`.
@@ -8,8 +8,9 @@ import { t, tp } from "../i18n";
 import { counts, expandable, gutter, gutterWidth, headKind, sign } from "./diff";
 import "../sessions.css";
 
-export default function DiffPreview(p: { pv: EditPreview }) {
-  const [open, setOpen] = createSignal(false);
+/** `open` = začít rozbalený (panel Git: diff se načte až po kliku na soubor). */
+export default function DiffPreview(p: { pv: EditPreview; open?: boolean }) {
+  const [open, setOpen] = createSignal(p.open ?? false);
   const can = () => expandable(p.pv);
   const head = () => {
     switch (headKind(p.pv)) {

@@ -45,6 +45,8 @@ pub struct Config {
     pub palette: crate::paletteconf::PaletteConfig,
     /// Script Commands: složka skriptů s hlavičkou `@ledge.*` → paleta (`scripts/`).
     pub scripts: crate::scripts::ScriptsConfig,
+    /// Přihrádka na soubory: tah z Průzkumníka na proužek uloží cesty (`shelf/`).
+    pub shelf: crate::shelf::ShelfConfig,
 }
 
 impl Default for Config {
@@ -68,6 +70,7 @@ impl Default for Config {
             onboarding: Default::default(),
             palette: Default::default(),
             scripts: Default::default(),
+            shelf: Default::default(),
         }
     }
 }

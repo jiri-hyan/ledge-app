@@ -27,6 +27,7 @@ pub(crate) fn spawn_hover_thread() {
             let mut latch = edge::BarLatch::default();
             let raw = rawpush::RawPush::start();
             let mut raw_armed = false;
+            let mut shelf_arm = crate::shelf::Arm::default();
             let mut others = screen::monitors().iter().map(|m| m.rect).collect::<Vec<_>>();
             let own_pid = std::process::id();
             let t0 = Instant::now();
@@ -53,6 +54,8 @@ pub(crate) fn spawn_hover_thread() {
                 // mrtvý Ledge (fullscreen hra nebo herní režim): myš nic, kontrola fullscreenu jede dál
                 if c.dead() {
                     zone_since = None;
+                    shelf_arm = crate::shelf::Arm::default();
+                    crate::shelf::drop::set_armed(None);
                     push = edge::PushTracker::default();
                     if raw_armed {
                         raw.arm(false);
@@ -104,6 +107,7 @@ pub(crate) fn spawn_hover_thread() {
                 c.drawer.destroy_if_idle(Duration::from_secs(keep_warm));
                 let Some(p) = screen::cursor() else {
                     push = edge::PushTracker::default();
+                    crate::shelf::drop::set_armed(None);
                     if raw_armed {
                         raw.arm(false);
                         raw_armed = false;
@@ -115,6 +119,12 @@ pub(crate) fn spawn_hover_thread() {
                 let in_x = p.x >= zl && p.x <= zr;
                 let at_edge = in_x && p.y <= mon.rect.top + 1 && p.y >= mon.rect.top - 2;
                 let on_strip = in_x && p.y >= mon.rect.top && p.y < zb;
+                // přihrádka: tah souborů na proužek (šuplík zavřený / peek) → neviditelný cíl přetažení
+                // nad zónou (`shelf::drop`); tlačítko a kurzor se čtou jen s kurzorem v zóně
+                let shelf_zone = (view != View::Full && c.cfg.read().shelf.enabled).then(|| crate::shelf::zone(zl, zr, zb, mon.rect.top, scale));
+                let dropping = shelf_arm.step(shelf_zone, p.x, p.y, || screen::primary_button_down() && crate::shelf::drop::ole_drag_likely());
+                crate::shelf::drop::set_armed(dropping);
+                let dropping = dropping.is_some();
                 // tlak na hranu (lištová okna): raw myš jen pár px u hrany v zóně, jinak v klidu žádné WM_INPUT
                 let bar_push = c.bar_window.load(Ordering::Relaxed);
                 let want_raw = bar_push
@@ -164,6 +174,8 @@ pub(crate) fn spawn_hover_thread() {
                         let delays = edge::Delays { edge: edge_ms, dwell: dwell_ms, hover: hover_ms };
                         let armed = edge::armed(trigger, bar_push, at_edge, on_strip, push_state, &delays);
                         let (armed, full) = edge::hover_open(armed, peek_hover, dwell_ms, c.claude.attention());
+                        // tah na přihrádku šuplík neotevírá
+                        let armed = if dropping { None } else { armed };
                         // při tlačení proužek (linka) „nažhaví“ už během nabíjení
                         let pushing = bar_push && trigger != Trigger::Off && push_state != edge::Push::Idle;
                         let hot = (armed.is_some() || pushing) && !peek_hover;

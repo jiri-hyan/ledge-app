@@ -9,6 +9,7 @@
 //!   se budí jen na začátku minuty (hodiny) a v nejbližším termínu (`threads::emit::next_wake`)
 //! - `strip`   — vlastní smyčka zpráv nativního proužku
 //! - `rawpush` — raw myš (tlak na horní hranu), zaregistrovaná jen u hrany nad prohlížečem
+//! - `shelf-drop` — cíl přetažení přihrádky (OLE); vznikne až při prvním tahu souborů na proužek
 //! - `claude-bridge` — HTTP pro hooky
 //! - `notes-watch` — sleduje složku poznámek (události, žádný poll) a přepočítá připomínky
 //! - počasí (záložka Osobní) — žádné vlákno navíc: jedno stažení na runtime Tauri, jen při otevření
@@ -21,6 +22,8 @@ mod actionicons;
 mod actionrun;
 mod actions;
 mod actionstate;
+mod agentrun;
+mod agentview;
 mod appearance;
 mod attention;
 mod autostart;
@@ -58,9 +61,11 @@ mod refresh;
 mod resolve;
 mod screen;
 mod scripts;
+mod sessiongit;
 mod sessionlive;
 mod sessions;
 mod settings;
+mod shelf;
 mod snapshot;
 mod state;
 mod statusline;
@@ -284,16 +289,34 @@ pub fn run() {
             commands::update::update_check_now,
             commands::update::update_install,
             commands::sessions::session_open,
+            commands::sessiongit::session_git,
+            commands::sessiongit::session_git_diff,
+            commands::sessiongit::session_git_commit,
+            commands::sessiongit::session_git_push,
+            commands::sessiongit::session_git_pull,
+            commands::sessiongit::session_git_discard,
+            commands::sessiongit::session_git_remove_worktree,
+            commands::sessiongit::session_git_open,
             commands::sessions::hooks_status,
             commands::sessions::hooks_install,
             commands::sessions::hooks_remove,
             commands::sessions::question_answer,
             commands::sessions::question_release,
+            commands::agents::agent_action,
+            commands::agents::agent_spawn,
             commands::limits::statusline_status,
             commands::limits::statusline_install,
             commands::limits::statusline_remove,
             commands::costs::costs_refresh,
             commands::actions::run_action,
+            commands::shelf::shelf_list,
+            commands::shelf::shelf_icon,
+            commands::shelf::shelf_copy,
+            commands::shelf::shelf_open,
+            commands::shelf::shelf_reveal,
+            commands::shelf::shelf_remove,
+            commands::shelf::shelf_clear,
+            commands::shelf::shelf_drag_out,
             commands::actions::action_icon,
             commands::actions::action_icon_refresh,
             commands::actions::action_consent,
