@@ -1,0 +1,86 @@
+/* Panel Vzhled (Appearance.tsx) a jeho živý náhled (AppearancePreview.tsx). Jen tokeny ze styles.css;
+   náhledy jsou `.theme-scope` s proměnnými rozpracovaného vzhledu inline. */
+.ap { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+.ap .card { display: flex; flex-direction: column; gap: 2px; }
+.ap .ap-top { grid-column: 1 / -1; gap: var(--s3); }
+.ap .ap-lang { grid-column: 1 / -1; }
+.ap-bar { display: flex; gap: var(--s2); align-items: center; justify-content: flex-end; }
+.ap-state { margin-right: auto; font-size: var(--fs-md); color: var(--t3); }
+.ap-state.warn { color: var(--amber); }
+
+/* slider s hodnotou */
+.ap-range { display: inline-flex; align-items: center; gap: var(--s2); }
+.ap-range input { width: 150px; accent-color: var(--accent); }
+.ap-range output { font: var(--fs-sm) var(--mono); color: var(--t2); min-width: 54px; text-align: right; }
+
+/* galerie motivů */
+.ap-themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); margin-bottom: var(--s2); }
+.ap-tile { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--well); text-align: left; transition: border-color var(--dur-1), transform var(--dur-2) var(--spring); }
+.ap-tile:hover { border-color: var(--line-2); }
+.ap-tile:active { transform: scale(0.97); }
+.ap-tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ap-swatch { position: relative; display: block; height: 54px; border-radius: var(--r-md); background: var(--tint-solid); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.ap-swatch i { position: absolute; left: 10px; height: 5px; border-radius: 3px; }
+.ap-swatch .l1 { top: 11px; width: 46%; background: var(--t1); }
+.ap-swatch .l2 { top: 22px; width: 62%; background: var(--t2); }
+.ap-swatch .l3 { top: 33px; width: 36%; background: var(--t3); }
+.ap-swatch .acc { left: 22%; right: 22%; bottom: 0; top: auto; height: 3px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); }
+.ap-name { font-size: var(--fs-md); font-weight: 600; color: var(--t2); padding: 0 2px; }
+.ap-tile.on .ap-name { color: var(--t1); }
+
+/* akcent: předvolby + vlastní barva */
+.ap-accents { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.ap-acc { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--line-2); position: relative; cursor: pointer; transition: transform var(--dur-2) var(--spring); }
+.ap-acc:hover { transform: scale(1.12); }
+.ap-acc.on { box-shadow: 0 0 0 2px var(--tint-solid), 0 0 0 4px var(--t1); }
+.ap-acc.def { background: conic-gradient(var(--violet), var(--blue), var(--teal), var(--violet)); }
+.ap-acc.own { background: conic-gradient(var(--red), var(--amber), var(--green), var(--blue), var(--violet), var(--red)); overflow: hidden; }
+.ap-acc.own input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.ap-acc.own:has(:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ap-move { display: inline-flex; gap: var(--s1); }
+
+/* ---------- živý náhled ---------- */
+.ap-preview { position: relative; display: flex; flex-direction: column; gap: var(--s2); color: var(--t1); font-size: var(--fs-body); }
+.ap-screen { position: relative; display: flex; justify-content: center; padding-bottom: var(--s3); border-radius: var(--r-lg); overflow: hidden;
+  /* ilustrační tapeta „plochy“ (stejná ve všech motivech, aby šlo porovnat krytí) */
+  background: linear-gradient(135deg, #3b4a6b, #6b4a7a 45%, #2f6f73); box-shadow: inset 0 0 0 1px var(--line); }
+.ap-screen[data-pos="left"] { justify-content: flex-start; padding-left: 3%; }
+.ap-screen[data-pos="right"] { justify-content: flex-end; padding-right: 3%; }
+.ap-axis { width: 64%; display: flex; flex-direction: column; align-items: center; }
+
+.ap-strip { --k: 1; --so: 0.82; position: relative; display: inline-flex; align-items: center; gap: calc(10px * var(--k));
+  height: calc(32px * var(--k)); padding: 0 calc(14px * var(--k)); font-size: calc(12px * var(--k)); white-space: nowrap;
+  background: rgb(var(--bg) / var(--so)); border: 1px solid var(--line-2); border-top: 0; border-radius: 0 0 calc(14px * var(--k)) calc(14px * var(--k));
+}
+.ap-strip.line { height: calc(26px * var(--k)); border-radius: 0 0 calc(3px * var(--k)) calc(3px * var(--k)); }
+.ap-strip.dot { height: calc(22px * var(--k)); gap: calc(4px * var(--k)); padding: 0 calc(9px * var(--k)); border-radius: 0 0 calc(11px * var(--k)) calc(11px * var(--k)); }
+.ap-strip b { font-weight: 600; }
+.ap-dim { color: var(--t2); }
+.ap-sep { width: 1px; height: 12px; background: var(--line-2); }
+.ap-pillseg { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--green) 16%, transparent); }
+.ap-dot { width: calc(7px * var(--k, 1)); height: calc(7px * var(--k, 1)); border-radius: 50%; display: inline-block; }
+.ap-sig { position: absolute; left: 29%; right: 29%; bottom: 0; height: 2px; border-radius: 1px; opacity: 0.8; }
+.ap-strip.line .ap-sig { left: 3%; right: 3%; }
+
+.ap-drawer { position: relative; width: 100%; margin-top: var(--s3); border-radius: 0 0 var(--r-shell) var(--r-shell); overflow: hidden;
+  background:
+    radial-gradient(220px 100px at 8% 0%, color-mix(in srgb, var(--accent) var(--glow-1), transparent), transparent 70%),
+    radial-gradient(220px 110px at 96% 4%, color-mix(in srgb, var(--accent-2) var(--glow-2), transparent), transparent 70%),
+    var(--tint-solid);
+  box-shadow: inset 0 -1px 0 var(--shell-edge), inset 1px 0 0 var(--shell-side), inset -1px 0 0 var(--shell-side); }
+.ap-drawer.blur { backdrop-filter: blur(10px); }
+.ap-drawer::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 0; height: 2px; border-radius: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 70%, transparent), color-mix(in srgb, var(--accent-2) 70%, transparent), transparent); }
+.ap-body { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3) var(--s4) var(--s4); }
+.ap-head { display: flex; align-items: center; justify-content: space-between; font: 600 calc(15px * var(--fz)) var(--display); }
+.ap-head .seg button { padding: 3px 10px; }
+.ap-body .card { gap: 0; }
+.ap-actions { display: flex; gap: var(--s2); justify-content: flex-end; align-items: center; }
+.ap-replay { align-self: flex-start; }
+
+@media (max-width: 760px) {
+  .ap { grid-template-columns: 1fr; }
+  .ap-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* zvýraznění volby z hledání (stejné jako `.st-row.hit` v settings.css) */
+.ap .hit { background: color-mix(in srgb, var(--violet) 14%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--violet) 14%, transparent); }

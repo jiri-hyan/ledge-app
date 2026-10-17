@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+# veřejný snapshot (scripts/publish.ps1 → git archive) tyhle cesty vynechá
+scripts/private/ export-ignore
+.github/ export-ignore

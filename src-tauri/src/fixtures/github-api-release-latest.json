@@ -1,0 +1,31 @@
+{
+  "url": "https://api.github.com/repos/jiri-hyan/ledge-app/releases/1",
+  "html_url": "https://github.com/jiri-hyan/ledge-app/releases/tag/v0.2.14",
+  "id": 1,
+  "tag_name": "v0.2.14",
+  "target_commitish": "main",
+  "name": "Ledge 0.2.14",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-10-16T09:59:00Z",
+  "published_at": "2026-10-16T10:00:05Z",
+  "assets": [
+    {
+      "url": "https://api.github.com/repos/jiri-hyan/ledge-app/releases/assets/1",
+      "id": 1,
+      "name": "Ledge_0.2.14_x64-setup.exe",
+      "label": "",
+      "content_type": "application/x-msdownload",
+      "state": "uploaded",
+      "size": 3145728,
+      "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "download_count": 0,
+      "created_at": "2026-10-16T10:00:00Z",
+      "updated_at": "2026-10-16T10:00:01Z",
+      "browser_download_url": "https://github.com/jiri-hyan/ledge-app/releases/download/v0.2.14/Ledge_0.2.14_x64-setup.exe"
+    }
+  ],
+  "tarball_url": "https://api.github.com/repos/jiri-hyan/ledge-app/tarball/v0.2.14",
+  "zipball_url": "https://api.github.com/repos/jiri-hyan/ledge-app/zipball/v0.2.14",
+  "body": "SHA256 (Ledge_0.2.14_x64-setup.exe) = 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08\n\n- feat(core): kontrola nové verze\n- fix(ui): chip v hlavičce"
+}

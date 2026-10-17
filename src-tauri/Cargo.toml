@@ -1,0 +1,85 @@
+[package]
+name = "ledge"
+version = "0.2.0"
+description = "Ledge — šuplík u horního okraje obrazovky: projekty, servery, schvalování pro Claude Code"
+authors = ["Jiří Hyan"]
+edition = "2024"
+
+[lib]
+name = "ledge_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-global-shortcut = "2"
+# nativní výběr složky/souboru/exe a „Uložit jako“ v Nastavení (volá se jen z Rustu)
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+notify = "8"
+tiny_http = "0.12"
+regex = "1"
+# čas s lokálním offsetem pro poznámky/připomínky (už je ve stromu přes tauri)
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+parking_lot = "0.12"
+# počasí (Open-Meteo): reqwest už je ve stromu přes tauri (stejná verze, bez TLS) — přidává se jen
+# TLS přes systémový SChannel (native-tls), žádný rustls/ring v binárce; async běží na runtime Tauri
+reqwest = { version = "0.13", default-features = false, features = ["native-tls-no-alpn"] }
+# SHA256 staženého instalátoru (update.rs) — sha2 už je ve stromu přes tauri-codegen
+sha2 = "0.10"
+winreg = "0.55"
+windows-numerics = "0.3"
+webview2-com = "0.39"
+
+[dependencies.windows]
+version = "0.62"
+features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Direct2D",
+  "Win32_Graphics_Direct2D_Common",
+  "Win32_Graphics_DirectWrite",
+  "Win32_Graphics_Dxgi_Common",
+  # loga projektů: dekódování/zmenšení/PNG přes WIC (součást Windows — žádná crate navíc)
+  "Win32_Graphics_Imaging",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_Networking_WinSock",
+  "Win32_Security",
+  # rychlé akce: ikona souboru/složky (SHGetFileInfo + seznam ikon 48 px), výběr cesty (IFileOpenDialog); průvodce: IShellLinkW::GetPath
+  "Win32_Storage_FileSystem",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_JobObjects",
+  "Win32_System_LibraryLoader",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Input",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Controls",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+  "Win32_UI_WindowsAndMessaging",
+]
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+# unwind: panika v jednom vlákně (hover, procman) nesmí shodit celý Ledge
+panic = "unwind"
+strip = true

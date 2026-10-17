@@ -1,0 +1,488 @@
+//! Most pro hooky Claude Code (jen 127.0.0.1).
+//!
+//! - `POST /permission` ← hook `PermissionRequest` (typ http). Ledge požadavek podrží, dokud šéf
+//!   nerozhodne. **Povolit jen explicitně** (klik / zkratka). Timeout, chyba nebo vyřízení jinde
+//!   → prázdná 2xx odpověď = Claude Code se zeptá normálně v terminálu. Nikdy auto-allow.
+//! - `POST /event` ← hooky SessionStart / UserPromptSubmit / PostToolUse / Stop / SessionEnd /
+//!   Notification / SubagentStart / SubagentStop → stav sessions (pracuje / čeká / hotovo) a jejich
+//!   subagenti (`subagents.rs`). Při `Stop` navíc hlídač nedokončené práce (`claude.enforceCommit`):
+//!   v režimu `block` může odpovědět `{"decision":"block","reason":…}`.
+//! - `POST /question` ← hook `PreToolUse` (matcher `AskUserQuestion`): otázku ukáže jako chat a
+//!   odpověď z Ledge vrátí Claudovi (`questions.rs`). `PermissionRequest` pro `AskUserQuestion` se
+//!   hned pouští (`Pass`) — nikdy povolovací karta s JSONem.
+//! - `GET /status` → JSON pro Clauda a skripty.
+//!
+//! Ochrana: požadavky s hlavičkou `Origin` (prohlížeč) se odmítají; Host musí být loopback.
+//!
+//! Podmoduly: `bridge` (HTTP server), `hygiene` (hlídač nedokončené práce, git), `paths` (cesty a
+//! porcelain, čisté), `questions` (otázky Clauda). Tady stav session a schvalování. Mapa: `docs/codemap/sessions.md`.
+
+mod bridge;
+mod hygiene;
+mod paths;
+mod questions;
+#[cfg(test)]
+mod testkit;
+
+pub use bridge::{Ctl, serve};
+pub use questions::{Ask, Reply};
+
+use crate::config::EnforceCommit;
+use crate::subagents::Subagents;
+use hygiene::{BASELINE_ATTEMPTS, Budgets, Track, edited_path, fingerprint, git_baseline};
+use paths::absolutize;
+use parking_lot::Mutex;
+use serde::Serialize;
+use serde_json::{Value, json};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Decision {
+    Allow,
+    Deny,
+    /// nech to na terminálu
+    Pass,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Pending {
+    pub id: u64,
+    pub session_id: String,
+    pub cwd: String,
+    pub tool: String,
+    /// lidsky čitelné shrnutí (příkaz, soubor, URL…)
+    pub summary: String,
+    pub created_at: u64,
+    pub expires_at: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SessionState {
+    Working,
+    Waiting,
+    Idle,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Session {
+    pub id: String,
+    pub cwd: String,
+    pub state: SessionState,
+    pub title: Option<String>,
+    pub updated_at: u64,
+    /// Soubory, které session SAMA upravila (Edit/Write/MultiEdit/NotebookEdit), nejsou zacommitované
+    /// a od její poslední úpravy na ně nikdo jiný nesáhl — relativně ke kořeni repa.
+    pub uncommitted: Vec<String>,
+    /// Commity od startu session (`baseline..HEAD`) na jejích souborech, které nejsou na žádném remote.
+    /// Jen když má větev upstream — bez něj je push nesplnitelný požadavek → 0.
+    pub unpushed: u32,
+    /// Session skončila (`SessionEnd`), ale drží se v seznamu, protože práci nedokončila.
+    pub ended: bool,
+    /// běžící a nedávno dokončení subagenti (hooky `SubagentStart` / `SubagentStop`)
+    pub subagents: Subagents,
+}
+
+impl Session {
+    fn new(id: &str, cwd: &str, state: SessionState, now: u64) -> Self {
+        Self { id: id.to_string(), cwd: cwd.to_string(), state, title: None, updated_at: now, uncommitted: vec![], unpushed: 0, ended: false, subagents: Subagents::default() }
+    }
+
+    /// Nedokončená práce: nezacommitované vlastní soubory nebo nepushnuté vlastní commity.
+    pub fn unfinished(&self) -> bool {
+        !self.uncommitted.is_empty() || self.unpushed > 0
+    }
+}
+
+pub type OnChange = Arc<dyn Fn() + Send + Sync>;
+
+struct Inner {
+    next_id: u64,
+    pending: Vec<(Pending, mpsc::Sender<Decision>)>,
+    sessions: HashMap<String, Session>,
+    track: HashMap<String, Track>,
+    /// otázky Clauda (`questions.rs`); `None` sender = jen ukázaná (`questionHoldS` 0)
+    asks: Vec<questions::Held>,
+}
+
+#[derive(Clone)]
+pub struct Claude {
+    inner: Arc<Mutex<Inner>>,
+    on_change: OnChange,
+    timeout: Arc<Mutex<Duration>>,
+    /// jak dlouho drží otázku Clauda (`claude.questionHoldS`); 0 = jen ukázat
+    question_hold: Arc<Mutex<Duration>>,
+    enforce: Arc<Mutex<EnforceCommit>>,
+    /// testy: práce „na pozadí“ běží hned ve volajícím vlákně (deterministicky)
+    inline: bool,
+    /// termíny gitu hlídače (testy je prodlouží)
+    budgets: Budgets,
+}
+
+fn now_ms() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+fn s(v: &Value, k: &str) -> String {
+    v.get(k).and_then(Value::as_str).unwrap_or("").to_string()
+}
+
+/// Krátké shrnutí toho, co chce Claude udělat.
+pub fn summarize(tool: &str, input: &Value) -> String {
+    let pick = |k: &str| input.get(k).and_then(Value::as_str).map(str::to_string);
+    let text = match tool {
+        "Bash" | "PowerShell" => pick("command"),
+        "Edit" | "Write" | "Read" | "NotebookEdit" => pick("file_path").or_else(|| pick("notebook_path")),
+        "WebFetch" => pick("url"),
+        "WebSearch" => pick("query"),
+        _ => None,
+    }
+    .unwrap_or_else(|| {
+        let t = input.to_string();
+        if t == "null" { String::new() } else { t }
+    });
+    let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if one_line.chars().count() > 300 { one_line.chars().take(300).collect::<String>() + "…" } else { one_line }
+}
+
+pub fn allow_body() -> String {
+    json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow"}}}).to_string()
+}
+
+pub fn deny_body() -> String {
+    json!({"hookSpecificOutput": {"hookEventName": "PermissionRequest",
+        "decision": {"behavior": "deny", "message": "Zamítnuto v Ledge."}}})
+    .to_string()
+}
+
+/// Nejdelší čekání na schválení: hook `PermissionRequest` má timeout 600 s (`hooksetup::EVENTS`),
+/// 50 s rezerva — stejně jako `questions::MAX_HOLD_S` a posuvník v Nastavení (5–550).
+pub const MAX_APPROVAL: Duration = Duration::from_secs(550);
+
+impl Claude {
+    pub fn new(on_change: OnChange, timeout: Duration) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(Inner { next_id: 1, pending: vec![], sessions: HashMap::new(), track: HashMap::new(), asks: vec![] })),
+            on_change,
+            timeout: Arc::new(Mutex::new(timeout.min(MAX_APPROVAL))),
+            question_hold: Arc::new(Mutex::new(Duration::from_secs(questions::MAX_HOLD_S))),
+            enforce: Arc::new(Mutex::new(EnforceCommit::default())),
+            inline: false,
+            budgets: Budgets::default(),
+        }
+    }
+
+    #[cfg(test)]
+    fn inline(mut self) -> Self {
+        self.inline = true;
+        self
+    }
+
+    /// Testy: git smí trvat dlouho — výsledek pak nezávisí na vytížení stroje.
+    #[cfg(test)]
+    fn patient(mut self) -> Self {
+        let long = Duration::from_secs(60);
+        self.budgets = Budgets { baseline: long, hygiene: long };
+        self
+    }
+
+    fn background(&self, f: impl FnOnce(&Claude) + Send + 'static) {
+        if self.inline {
+            f(self);
+        } else {
+            let me = self.clone();
+            std::thread::spawn(move || f(&me));
+        }
+    }
+
+    pub fn set_enforce(&self, mode: EnforceCommit) {
+        *self.enforce.lock() = mode;
+    }
+
+    /// Strop `MAX_APPROVAL`: ručně zapsaný `approvalTimeoutS` nad timeoutem hooku by nechal v Ledge
+    /// viset kartu „Povolit“, na kterou Claude už nečeká (a obří číslo by přeteklo `expires_at`).
+    pub fn set_timeout(&self, t: Duration) {
+        *self.timeout.lock() = t.min(MAX_APPROVAL);
+    }
+
+    pub fn pending(&self) -> Vec<Pending> {
+        self.inner.lock().pending.iter().map(|(p, _)| p.clone()).collect()
+    }
+
+    pub fn sessions(&self) -> Vec<Session> {
+        let mut v: Vec<Session> = self.inner.lock().sessions.values().cloned().collect();
+        v.sort_by_key(|s| std::cmp::Reverse(s.updated_at));
+        v
+    }
+
+    /// Rozhodnutí šéfa. `None` = nejstarší čekající.
+    pub fn decide(&self, id: Option<u64>, d: Decision) -> bool {
+        let mut g = self.inner.lock();
+        let idx = match id {
+            Some(id) => g.pending.iter().position(|(p, _)| p.id == id),
+            None => if g.pending.is_empty() { None } else { Some(0) },
+        };
+        let Some(i) = idx else { return false };
+        let (p, tx) = g.pending.remove(i);
+        let _ = tx.send(d);
+        if let Some(sess) = g.sessions.get_mut(&p.session_id) {
+            sess.state = SessionState::Working;
+            sess.updated_at = now_ms();
+        }
+        drop(g);
+        (self.on_change)();
+        true
+    }
+
+    /// Obslouží PermissionRequest — blokuje volající vlákno do rozhodnutí/timeoutu.
+    pub fn handle_permission(&self, body: &Value) -> Decision {
+        let tool = s(body, "tool_name");
+        if tool.is_empty() {
+            // nečitelný požadavek → žádná prázdná karta v UI, rozhodne terminál
+            return Decision::Pass;
+        }
+        if tool == questions::TOOL {
+            // otázka už je v okně Claude (Ledge ji pustil, nebo hook otázek chybí) → tam se odpoví
+            let (sid, cwd, now) = (s(body, "session_id"), s(body, "cwd"), now_ms());
+            if !sid.is_empty() {
+                let mut g = self.inner.lock();
+                let sess = g.sessions.entry(sid.clone()).or_insert_with(|| Session::new(&sid, &cwd, SessionState::Waiting, now));
+                sess.state = SessionState::Waiting;
+                sess.updated_at = now;
+                drop(g);
+                (self.on_change)();
+            }
+            return Decision::Pass;
+        }
+        let input = body.get("tool_input").cloned().unwrap_or(Value::Null);
+        let session_id = s(body, "session_id");
+        let cwd = s(body, "cwd");
+        let timeout = *self.timeout.lock();
+        let (tx, rx) = mpsc::channel();
+        let id = {
+            let mut g = self.inner.lock();
+            let id = g.next_id;
+            g.next_id += 1;
+            let now = now_ms();
+            g.pending.push((
+                Pending {
+                    id,
+                    session_id: session_id.clone(),
+                    cwd: cwd.clone(),
+                    tool: tool.clone(),
+                    summary: summarize(&tool, &input),
+                    created_at: now,
+                    expires_at: now + timeout.as_millis() as u64,
+                },
+                tx,
+            ));
+            let sess = g
+                .sessions
+                .entry(session_id.clone())
+                .or_insert_with(|| Session::new(&session_id, &cwd, SessionState::Waiting, now));
+            sess.state = SessionState::Waiting;
+            sess.updated_at = now;
+            id
+        };
+        (self.on_change)();
+        let d = rx.recv_timeout(timeout).unwrap_or(Decision::Pass);
+        // timeout → uklidit (decide() už položku odebralo, pokud rozhodl šéf)
+        let mut g = self.inner.lock();
+        let before = g.pending.len();
+        g.pending.retain(|(p, _)| p.id != id);
+        let removed = g.pending.len() != before;
+        drop(g);
+        if removed {
+            (self.on_change)();
+        }
+        d
+    }
+
+    /// Hook události mimo schvalování → stav session. Vrací tělo odpovědi (`Some` jen když `Stop`
+    /// v režimu `block` vrací session do práce), jinak `None` = prázdná 200.
+    ///
+    /// Git (baseline, hygiena) nikdy pod zámkem stavu. Synchronně jen `Stop` v režimu `block`
+    /// (odpověď na něm závisí); jinak běží na pozadí a výsledek přijde přes `on_change`.
+    pub fn handle_event(&self, body: &Value) -> Option<String> {
+        let ev = s(body, "hook_event_name");
+        let sid = s(body, "session_id");
+        if sid.is_empty() {
+            return None;
+        }
+        let mode = *self.enforce.lock();
+        let body_cwd = s(body, "cwd");
+        let now = now_ms();
+        let mut g = self.inner.lock();
+        // Šéf odpověděl v terminálu → čekající žádost téže session je vyřízená jinde.
+        if matches!(ev.as_str(), "PostToolUse" | "UserPromptSubmit" | "Stop" | "SessionEnd") {
+            let mut i = 0;
+            while i < g.pending.len() {
+                if g.pending[i].0.session_id == sid {
+                    let (_, tx) = g.pending.remove(i);
+                    let _ = tx.send(Decision::Pass);
+                } else {
+                    i += 1;
+                }
+            }
+        }
+        questions::on_event(&mut g, &ev, &sid, &s(body, "tool_name"), now);
+        let mut baseline_cwd = None;
+        let mut check = false;
+        if ev != "SessionEnd" || g.sessions.contains_key(&sid) {
+            let Inner { sessions, track, .. } = &mut *g;
+            let sess = sessions.entry(sid.clone()).or_insert_with(|| Session::new(&sid, &body_cwd, SessionState::Idle, now));
+            let tr = track.entry(sid.clone()).or_default();
+            if !body_cwd.is_empty() {
+                sess.cwd = body_cwd;
+            }
+            sess.updated_at = now;
+            // resume pod stejným session_id → už není ukončená
+            sess.ended = ev == "SessionEnd";
+            match ev.as_str() {
+                "UserPromptSubmit" => {
+                    sess.state = SessionState::Working;
+                    let title = s(body, "session_title");
+                    let prompt = s(body, "prompt");
+                    let t = if !title.is_empty() { title } else { prompt };
+                    if !t.is_empty() && sess.title.is_none() {
+                        let t: String = t.split_whitespace().collect::<Vec<_>>().join(" ");
+                        sess.title = Some(if t.chars().count() > 60 { t.chars().take(60).collect::<String>() + "…" } else { t });
+                    }
+                }
+                "PostToolUse" => {
+                    sess.state = SessionState::Working;
+                    let input = body.get("tool_input").unwrap_or(&Value::Null);
+                    if let Some(p) = edited_path(&s(body, "tool_name"), input) {
+                        let abs = absolutize(&p, &sess.cwd);
+                        let fp = fingerprint(&abs);
+                        tr.record(abs, fp);
+                    }
+                }
+                "PreToolUse" => sess.state = SessionState::Working,
+                "SubagentStart" => {
+                    sess.state = SessionState::Working;
+                    sess.subagents.start(&s(body, "agent_id"), &s(body, "agent_type"), now);
+                }
+                "SubagentStop" => sess.subagents.stop(&s(body, "agent_id"), &s(body, "agent_type"), &s(body, "last_assistant_message"), now),
+                "Stop" => sess.state = SessionState::Idle,
+                "SessionEnd" => {
+                    sess.state = SessionState::Idle;
+                    sess.subagents.clear_running();
+                }
+                "Notification" if s(body, "notification_type") == "idle_prompt" => sess.state = SessionState::Idle,
+                "SessionStart" => sess.state = SessionState::Idle,
+                _ => {}
+            }
+            if mode == EnforceCommit::Off {
+                if matches!(ev.as_str(), "Stop" | "SessionEnd") {
+                    sess.uncommitted.clear();
+                    sess.unpushed = 0;
+                }
+            } else {
+                // baseline při prvním eventu (SessionStart hooknutý není); při selhání znovu, max. 3×
+                if ev != "SessionEnd" && !tr.baseline_ok && !tr.baseline_busy && tr.baseline_attempts < BASELINE_ATTEMPTS {
+                    tr.baseline_busy = true;
+                    tr.baseline_attempts += 1;
+                    baseline_cwd = Some(sess.cwd.clone());
+                }
+                // bez známého repa (a bez baseline v běhu) není co kontrolovat → rozhodne se hned
+                check = matches!(ev.as_str(), "Stop" | "SessionEnd") && (tr.repo.is_some() || baseline_cwd.is_some());
+            }
+        }
+        // ukončená session bez nedokončené práce pryč hned (kontrola ji případně odebere i později)
+        if ev == "SessionEnd" && !check && g.sessions.get(&sid).is_some_and(|x| !x.unfinished()) {
+            g.sessions.remove(&sid);
+        }
+        // staré nečinné sessions pryč (12 h)
+        g.sessions.retain(|_, s| now.saturating_sub(s.updated_at) < 12 * 3600 * 1000);
+        let Inner { sessions, track, .. } = &mut *g;
+        track.retain(|k, _| sessions.contains_key(k));
+        drop(g);
+        (self.on_change)();
+
+        let is_stop = ev == "Stop";
+        let active = body.get("stop_hook_active").and_then(Value::as_bool).unwrap_or(false);
+        let work = move |c: &Claude| {
+            if let Some(cwd) = baseline_cwd {
+                c.store_baseline(&sid, git_baseline(&cwd, c.budgets.baseline));
+            }
+            if check { c.run_check(&sid, is_stop, mode, active) } else { None }
+        };
+        if is_stop && mode == EnforceCommit::Block {
+            work(self)
+        } else {
+            self.background(move |c| {
+                work(c);
+            });
+            None
+        }
+    }
+
+    pub fn status_json(&self) -> Value {
+        json!({ "pending": self.pending(), "questions": self.questions(), "sessions": self.sessions() })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_lifecycle() {
+        let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1));
+        c.handle_event(&json!({"hook_event_name":"UserPromptSubmit","session_id":"a","cwd":"C:/p","prompt":"oprav   přihlášení\na testy"}));
+        assert_eq!(c.sessions()[0].state, SessionState::Working);
+        assert_eq!(c.sessions()[0].title.as_deref(), Some("oprav přihlášení a testy"));
+        c.handle_event(&json!({"hook_event_name":"Stop","session_id":"a"}));
+        assert_eq!(c.sessions()[0].state, SessionState::Idle);
+        c.handle_event(&json!({"hook_event_name":"SessionEnd","session_id":"a"}));
+        assert!(c.sessions().is_empty());
+    }
+
+    /// Ručně zapsaný `approvalTimeoutS` nad timeoutem hooku (600 s) / obří číslo: karta v Ledge
+    /// nesmí čekat déle, než Claude čeká na odpověď, a `expires_at` nesmí přetéct.
+    #[test]
+    fn approval_timeout_is_capped_below_hook_timeout() {
+        for secs in [551, 3600, u64::MAX] {
+            let c = Claude::new(Arc::new(|| {}), Duration::from_secs(secs));
+            assert_eq!(*c.timeout.lock(), MAX_APPROVAL, "new {secs}");
+            c.set_timeout(Duration::from_secs(5));
+            c.set_timeout(Duration::from_secs(secs));
+            assert_eq!(*c.timeout.lock(), MAX_APPROVAL, "set {secs}");
+            let c2 = c.clone();
+            let h = std::thread::spawn(move || c2.handle_permission(&json!({"session_id": "s", "cwd": "C:/p", "tool_name": "Bash", "tool_input": {"command": "ls"}})));
+            let t0 = std::time::Instant::now();
+            let p = loop {
+                if let Some(p) = c.pending().pop() {
+                    break p;
+                }
+                assert!(t0.elapsed() < Duration::from_secs(5));
+                std::thread::sleep(Duration::from_millis(5));
+            };
+            assert_eq!(p.expires_at - p.created_at, MAX_APPROVAL.as_millis() as u64);
+            assert!(c.decide(Some(p.id), Decision::Deny));
+            assert_eq!(h.join().unwrap(), Decision::Deny);
+        }
+    }
+
+    #[test]
+    fn subagents_from_hooks() {
+        let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1));
+        c.handle_event(&json!({"hook_event_name":"SubagentStart","session_id":"a","cwd":"C:/p","agent_id":"x1","agent_type":"Explore"}));
+        c.handle_event(&json!({"hook_event_name":"SubagentStart","session_id":"a","agent_id":"x2","agent_type":"general-purpose"}));
+        let s = &c.sessions()[0];
+        assert_eq!(s.state, SessionState::Working);
+        assert_eq!(s.subagents.running.iter().map(|r| r.agent_type.as_str()).collect::<Vec<_>>(), ["Explore", "general-purpose"]);
+        c.handle_event(&json!({"hook_event_name":"SubagentStop","session_id":"a","agent_id":"x1","agent_type":"Explore","last_assistant_message":"Našel jsem to.","stop_hook_active":false}));
+        let s = &c.sessions()[0];
+        assert_eq!(s.subagents.running.len(), 1);
+        assert_eq!(s.subagents.done[0].message.as_deref(), Some("Našel jsem to."));
+        c.handle_event(&json!({"hook_event_name":"Stop","session_id":"a"}));
+        assert_eq!(c.sessions()[0].subagents.running.len(), 1, "Stop hlavní session subagenty na pozadí neukončí");
+    }
+}

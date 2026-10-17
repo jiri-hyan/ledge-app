@@ -1,0 +1,41 @@
+{
+  "$schema": "./config.schema.json",
+  "strip": { "enabled": true, "items": ["mode", "clock", "running", "claude", "repos"], "opacity": 0.82, "monitor": "primary" },
+  "claude": { "enabled": true, "port": 47800, "approvalTimeoutS": 45, "enforceCommit": "notify" },
+  "notes": {
+    "enabled": true,
+    "root": "",
+    "sync": { "enabled": true, "remote": "https://github.com/acme/notes.git", "intervalMin": 5 }
+  },
+  "roots": ["C:\\Users\\someone\\Desktop"],
+  "autostart": true,
+  "update": { "check": true, "repo": "acme/ledge", "intervalH": 6 },
+  "projects": [
+    {
+      "id": "acme-app",
+      "name": "Acme App",
+      "enabled": true,
+      "kind": "dev",
+      "remote": "acme/app",
+      "run": "npm run dev",
+      "port": 5210,
+      "passPort": true,
+      "openBrowser": true,
+      "args": [],
+      "accent": "#e0a13a",
+      "links": []
+    },
+    {
+      "id": "acme-studio",
+      "name": "Acme Studio",
+      "enabled": true,
+      "kind": "app",
+      "remote": "acme/studio",
+      "passPort": false,
+      "openBrowser": false,
+      "appName": "Acme Studio",
+      "args": [],
+      "links": [{ "label": "Vydání", "url": "https://github.com/acme/studio/releases" }]
+    }
+  ]
+}

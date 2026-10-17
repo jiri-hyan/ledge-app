@@ -1,0 +1,26 @@
+{
+  "name": "ledge",
+  "version": "0.2.0",
+  "description": "Ledge — šuplík u horního okraje obrazovky",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "tauri": "tauri",
+    "test": "cd src-tauri && cargo test",
+    "test:ui": "node --experimental-strip-types --test src/theme/theme.test.mjs src/palette/search.test.mjs src/cssClasses.test.mjs src/settings/settings.test.mjs src/questions/model.test.mjs src/i18n.test.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "solid-js": "^1.9.3",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-solid": "^2.11.12",
+    "@tauri-apps/cli": "^2"
+  }
+}

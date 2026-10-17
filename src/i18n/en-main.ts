@@ -1,0 +1,30 @@
+// Angličtina pro společné části hlavního UI: formátování času (`src/format.ts`, `format.*`),
+// hlášky (`src/ui/*`, `ui.*`). Názvy motivů (`appearance.theme.*`) jsou v `settings/panels/en.ts`.
+import { registerDict } from "../i18n";
+
+registerDict("en", {
+  "format.day.sun": "Sunday",
+  "format.day.mon": "Monday",
+  "format.day.tue": "Tuesday",
+  "format.day.wed": "Wednesday",
+  "format.day.thu": "Thursday",
+  "format.day.fri": "Friday",
+  "format.day.sat": "Saturday",
+  "format.month.jan": "January",
+  "format.month.feb": "February",
+  "format.month.mar": "March",
+  "format.month.apr": "April",
+  "format.month.may": "May",
+  "format.month.jun": "June",
+  "format.month.jul": "July",
+  "format.month.aug": "August",
+  "format.month.sep": "September",
+  "format.month.oct": "October",
+  "format.month.nov": "November",
+  "format.month.dec": "December",
+  "format.date": "{dow}, {month} {d}",
+  "format.now": "now",
+  "format.agoMin": "{n} min ago",
+  "format.agoH": "{n} h ago",
+  "ui.error.generic": "Something went wrong.",
+});

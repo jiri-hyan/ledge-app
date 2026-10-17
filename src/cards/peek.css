@@ -1,0 +1,7 @@
+/* Peek (malý šuplík): čekající schválení Clauda. Připomínky po termínu sdílí stejné třídy. */
+.peek { padding: var(--s3) 14px var(--s3) var(--s4); display: flex; align-items: center; gap: 14px; }
+.peek .ico { width: 38px; height: 38px; border-radius: var(--r-md); background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); display: grid; place-items: center; flex-shrink: 0; box-shadow: 0 0 24px -4px color-mix(in srgb, var(--amber) 50%, transparent); animation: breathe 2.2s ease-in-out infinite; }
+.peek .ico svg { width: 19px; height: 19px; }
+.peek .tx { flex: 1; min-width: 0; }
+.peek .tx b { font-weight: 650; font-size: calc(13.5px * var(--fz)); display: block; margin-bottom: 2px; }
+@keyframes breathe { 50% { opacity: 0.55; } }

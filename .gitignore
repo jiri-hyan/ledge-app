@@ -1,0 +1,6 @@
+node_modules
+src-tauri/target
+src-tauri/gen/schemas
+.claude/settings.local.json
+dist
+src-tauri/target-agents

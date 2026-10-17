@@ -1,0 +1,21 @@
+/* Záložka Osobní: hodiny (ClockCard), počasí (WeatherCard), odkazy (LinksCard). Tokeny ze styles.css. */
+.big-time { font: 600 calc(46px * var(--fz))/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.big-time .sec { font-size: calc(18px * var(--fz)); font-weight: 500; color: var(--t3); margin-left: 5px; }
+.big-date { font-size: var(--fs-body); color: var(--t2); margin-top: 9px; }
+
+.wx { display: flex; align-items: center; gap: 11px; padding: 2px 0; min-width: 0; }
+.wx .grow { flex: 1; min-width: 0; }
+.wx .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wx-ico { font-size: calc(30px * var(--fz)); line-height: 1; }
+.wx-temp { font: 600 calc(34px * var(--fz))/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.wx-foot { display: flex; align-items: center; gap: var(--s2); margin-top: 10px; }
+.wx-foot .meta { font: var(--fs-xs) var(--mono); color: var(--t3); margin-left: auto; white-space: nowrap; }
+
+.link-row { width: 100%; text-align: left; border-radius: var(--r-sm); }
+.link-row:hover .name { color: var(--t0); }
+.link-row:hover .lmono { background: var(--card-3); }
+.link-row.bad { opacity: 0.55; cursor: default; }
+.link-row.wait { opacity: 0.7; cursor: progress; }
+.lmono { width: 28px; height: 28px; border-radius: var(--r-sm); display: grid; place-items: center; flex-shrink: 0; font: 650 var(--fs-xs) var(--display); background: var(--card-2); color: var(--t1); transition: background var(--fast); }
+.lkind { color: var(--t3); flex-shrink: 0; display: grid; }
+.lkind svg { width: 15px; height: 15px; }

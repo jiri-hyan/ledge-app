@@ -1,0 +1,48 @@
+/* Dlaždice projektů (Projects.tsx): náklon za kurzorem (--rx/--ry z `tilt`), reflektor (--mx/--my
+   z App), prstenec běhu kolem loga a akce pod dlaždicí. Tokeny ze styles.css. */
+.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: var(--s2); margin-bottom: var(--gap-section); }
+.proj { --a: #64748b; --rx: 0deg; --ry: 0deg; position: relative; transform-style: preserve-3d; border-radius: var(--r-xl); padding: 14px 6px 11px; display: flex; flex-direction: column; align-items: center; gap: 7px; text-align: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--a) 13%, transparent), color-mix(in srgb, var(--a) 4%, transparent));
+  border: 1px solid color-mix(in srgb, var(--a) 22%, transparent);
+  transition: transform var(--dur-3) var(--spring), border-color var(--dur-2), box-shadow var(--dur-3), background var(--dur-2); }
+.proj:hover { transform: perspective(520px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(-3px); border-color: color-mix(in srgb, var(--a) 55%, transparent); box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--a) 60%, transparent); }
+.proj:active { transform: perspective(520px) rotateX(var(--rx)) rotateY(var(--ry)) scale(0.96); transition-duration: calc(0.08s / var(--speed)); }
+.proj.missing .proj-hit { opacity: 0.4; filter: grayscale(0.6); }
+.proj.live { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+.proj::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity var(--dur-3);
+  background: radial-gradient(180px circle at var(--mx, 50%) var(--my, 50%), var(--spot), transparent 65%); }
+.proj:hover::before { opacity: 1; }
+.proj-hit { display: flex; flex-direction: column; align-items: center; gap: 7px; width: 100%; border-radius: var(--r-lg); }
+.live-port { color: var(--green); font-weight: 600; }
+
+.logo { width: 56px; height: 56px; border-radius: var(--r-xl); display: grid; place-items: center; font: 650 calc(18px * var(--fz)) var(--display); color: var(--white); position: relative; box-shadow: var(--ring-logo), 0 6px 18px -6px var(--logo-shadow); transition: transform var(--dur-5) var(--spring); }
+.logo img { width: 36px; height: 36px; object-fit: contain; }
+.logo.has-img { background: var(--logo-plate) !important; }
+.proj:hover .logo { transform: translateZ(18px) scale(1.06); }
+/* běžící projekt: rotující prstenec kolem loga */
+.ring { position: absolute; inset: -5px; border-radius: calc(var(--r-xl) + 4px); padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--r, 0deg), var(--c), transparent 40%, var(--c) 80%, transparent);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.ring.ready, .ring.running { --c: var(--green); }
+.ring.starting, .ring.preparing { --c: var(--amber); animation: spin 1.2s linear infinite; }
+.ring.failed { --c: var(--red); }
+.ring.exited { --c: var(--t3); }
+@property --r { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes spin { to { --r: 360deg; } }
+.nm { font-size: var(--fs-ui); font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 var(--s1); }
+.br { font: var(--fs-2xs) var(--mono); color: var(--t3); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; min-height: 14px; }
+.br .dirty { color: var(--amber); }
+.br .ahead { color: var(--blue); }
+
+/* akce pod dlaždicí: na hover i na fokus z klávesnice (focus-within) */
+.acts { position: absolute; left: 50%; top: calc(100% - 6px); transform: translate(-50%, -4px); display: flex; gap: 2px; background: var(--pop); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s1); opacity: 0; pointer-events: none; transition: opacity var(--dur-1), transform var(--dur-2) var(--ease); z-index: 10; box-shadow: var(--shadow-pop); }
+.proj:hover .acts, .proj:focus-within .acts { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.acts button { height: 28px; min-width: 30px; padding: 0 var(--s2); display: inline-flex; gap: 5px; align-items: center; justify-content: center; border-radius: var(--r-xs); color: var(--t2); font-size: var(--fs-sm); white-space: nowrap; }
+.acts button:hover { background: var(--card-2); color: var(--t1); }
+.acts button:disabled { opacity: 0.55; cursor: progress; }
+.acts svg { width: 15px; height: 15px; }
+
+/* bez náklonu a „vyskočení“ loga, když systém chce méně pohybu */
+@media (prefers-reduced-motion: reduce) {
+  .proj:hover, .proj:active, .proj:hover .logo { transform: none; }
+}

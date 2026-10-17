@@ -1,0 +1,67 @@
+# Codemapa: průvodce prvním spuštěním a čistý start
+
+Nový uživatel (jiné PC, jiná repa) dostane prázdný config a při prvním otevření šuplíku průvodce.
+Autorův existující config se chová beze změny. Cituj symbolem, ne číslem řádku.
+
+## Soubory
+
+| soubor | odpovědnost | klíčové symboly |
+|---|---|---|
+| `src-tauri/src/onboarding/mod.rs` | sekce `onboarding`, čistý config, dorovnání starého configu při `config::load` | `OnboardingConfig` (výchozí `done: true`), `fresh_config`, `upgrade_loaded`, `legacy_notes_sync`, `legacy_update_repo` (`jiri-hyan/ledge` → `jiri-hyan/ledge-app`) |
+| `src-tauri/src/uiconf.rs` | sekce `ui` (jazyk) | `UiConfig`, `Lang` (`cs`/`en`) |
+| `onboarding/repos.rs` | mělký sken rep (hloubka ≤ 2) + návrh projektu | `default_roots`, `scan`, `facts`/`Facts`, `suggest`, `dev_port`, `cargo_name`, `slug`, `reflog_last_ms`, `discover`, `FoundRepo` |
+| `onboarding/apps.rs` | Start menu `.lnk` → exe přes `IShellLinkW` | `start_menu_dirs`, `read_lnk`, `keep`, `dedupe`, `split_args`, `discover`, `FoundApp` |
+| `onboarding/claude.rs` | `claude` na PATH / `~\.local\bin`, `~\.claude`, verze | `find_exe`, `parse_version`, `detect`, `ClaudeInfo` |
+| `onboarding/dialog.rs` | výběr složky (`IFileOpenDialog`, STA vlákno, vlastník = šuplík) | `pick_folder` |
+| `onboarding/themes.rs` | motivy `appearance.theme` ze schématu configu | `theme_options`, `ThemeOption` |
+| `onboarding/apply.rs` | zápis výběru do configu (čistá funkce) | `Patch`, `Applied`, `apply`, `same_project`, `unique_id`, `add_links` |
+| `src-tauri/src/commands/onboarding.rs` | Tauri příkazy (skeny ve `spawn_blocking`) | `onboarding_repos`, `onboarding_apps`, `onboarding_icons`, `onboarding_claude`, `onboarding_pick_folder`, `onboarding_themes`, `onboarding_apply`, `KNOWN` |
+| `src/onboarding/state.ts` | kdy se průvodce ukáže, jazyk z configu | `checkFirstRun`, `startWizard`, `closeWizard`, `wizardOpen` |
+| `src/onboarding/store.ts` | stav průvodce, načítání, ukládání po krocích | `wiz`, `prefetch`, `loadRepos`, `addFolder`, `loadIcons`, `applyStep`, `pending`, `finish` |
+| `src/onboarding/logic.ts` · `api.ts` · `en.ts` | čisté pomůcky (kroky, výběr, URL) · IPC · anglický slovník | `STEPS`, `defaultRepoSelection`, `appProject`, `normalizeUrl`, `LINK_SUGGESTIONS` · `ob` |
+| `src/onboarding/Wizard.tsx` + `steps/*` | stránka `welcome`: hlavička s postupem, kroky, patička | `Wizard`, `WelcomeStep`, `ProjectsStep`, `AppsStep`, `ClaudeStep`, `LinksStep`, `LookStep`, `DoneStep`, `parts` (`Logo`, `CheckRow`, `Skeleton`, `Preview`) |
+| `src/settings/panels/Onboarding.tsx` | panel Nastavení → Průvodce (ruční spuštění) | `OnboardingPanel` |
+
+Lepidlo: `settings::load_or_seed` (soubor chybí → `fresh_config`), `config::load` (→ `upgrade_loaded`),
+`App.tsx` (2 efekty: `checkFirstRun` při `view === "full"`, `wizardOpen` → stránka `welcome`; `Head`
+se na ní neukazuje), `nav.ts` (`Page` + `typing` obsahují `welcome`).
+
+## Tok
+
+1. Šuplík `full` → `checkFirstRun` (1× za život WebView): `ui.lang` → `setLang`; `onboarding.done === false`
+   → `wizardOpen`. Zavření šuplíku průvodce nezruší (stav v modulu `store.ts`), další otevření pokračuje.
+2. `Wizard` při mountu `prefetch`: config (`actions`? → kam odkazy, `drawer.trigger` → tip), motivy,
+   repa → Claude → aplikace na pozadí. Ikony jen pro viditelné položky (`onboarding_icons`, ≤ 48).
+3. „Uložit a pokračovat“ = `applyStep` → `onboarding_apply` → `apply::apply` → `config::save` +
+   `apply_config`. Konec / Přeskočit průvodce = `{ done: true }`.
+
+## Invarianty a pasti
+
+- **Kompatibilita:** chybějící `onboarding` = `done: true`; čistý config se ukládá celý (vč. `done:false`).
+  Starý config bez `notes.sync.remote` → `origin` pracovní kopie poznámek (`resolve::read_origin`), bez
+  ní sync vypnutý; výslovný `remote` se nemění nikdy. Nic se při načtení nezapisuje.
+- **Bez autorova světa:** v kódu žádná výchozí repa; `resolve::OWNER_ALIASES` je prázdné (přejmenovaný
+  vlastník se najde přes jednoznačné jméno repa); testy používají `acme/*`.
+- `apply`: duplicita = stejná složka (`repos::norm`), remote (`parse_remote`) nebo **absolutní** exe;
+  relativní `electron.exe` duplicitu nedělá. Id z názvu (`slug`, bez diakritiky), kolize `-2…`.
+- Odkazy jen http(s); do `actions` (`{id,label,kind:"url",target}`, strop `MAX_ACTIONS`, id ≤ 56 znaků
+  slugu, popisek ≤ `MAX_LABEL`), když config sekci má, jinak do `personal.links` (`{name,target}`, strop `MAX_LINKS`). Motiv jen když `appearance` existuje
+  (`themeSaved: false` jinak) — krok Vzhled se bez motivů ve schématu neukáže.
+- `onboarding_icons` čte disk jen pro klíče, které vrátil sken (`KNOWN`) — UI nemůže podstrčit cestu.
+- Fokus: šuplík otevřený najetím nemá klávesnici — vstupy volají `api.focusDrawer()` na `pointerdown`
+  (výslovný klik); „Přidat složku…“ taky, aby dialog (vlastník = šuplík) šuplík nezavřel.
+- `claude --version` jen v appce (bez okna, 8 s), nikdy v testech. Aplikace ze Storu (bez `.lnk`) chybí.
+
+## Testy
+
+`onboarding::tests` (čistý config, round-trip existujícího configu `fixtures/config-existing-user.json`,
+`legacy_notes_sync` a `legacy_update_repo` tabulky, `origin` z kopie poznámek, převod repa vydání při `load`
+bez zápisu), `onboarding::repos::tests` (hloubka, přeskakování,
+worktree, `suggest` tabulka, Rust/.NET, `facts` z disku, slug, reflog), `onboarding::apps::tests` (skutečný
+`.lnk` vyrobený přes `IShellLinkW` v tempu, `keep`, `split_args`, `dedupe`), `onboarding::claude::tests`,
+`onboarding::themes::tests`, `onboarding::apply::tests`, `uiconf::tests`.
+
+## Co nečíst
+
+`update*.rs` (aktualizace — [core.md](core.md)), `icons.rs`/`iconimg.rs` (jen `resolve`/`exe_png`),
+`hooksetup.rs` (průvodce volá jen `hooks_status`/`hooks_install`).
