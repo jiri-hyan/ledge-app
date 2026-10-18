@@ -1,19 +1,30 @@
-// Registr panelů Nastavení: pořadí v postranním menu, id (kotva, hledání) a komponenta. Panely, které
-// dodávají jiné oblasti, žijí v `panels/*`; shell je jen vykreslí.
-import type { Component } from "solid-js";
-import type { PanelProps } from "./types";
-import OnboardingPanel from "./panels/Onboarding";
-import AppearancePanel from "./panels/Appearance";
-import ActionsPanel from "./panels/Actions";
-import QuestionsPanel from "./panels/Questions";
+// Panely Nastavení bez komponent (levný import i pro paletu): pořadí v postranní navigaci, id (kotva,
+// hledání, skok odjinud), název a klíčová slova. Komponenty k nim přiřadí `catalog.ts`.
+// Struktura od vlny 6 (8 + Poznámky): Začínáme · Šuplík a karty · Vzhled · Projekty, akce a odkazy ·
+// Claude · Osobní · Poznámky · Chování · Záloha a aplikace. Klíčová slova nesou i STARÉ názvy panelů
+// a voleb, ať je hledání najde („okna s taby“, „uvolnit paměť“, „otázky“, „rychlé akce“…).
 
 /** `kw` = klíčová slova pro hledání jako pár [klíč, čeština] (en ve slovníku `settings.nav.<id>.kw`). */
-export type PanelEntry = { id: string; key: string; cs: string; kw: readonly [string, string]; component: Component<PanelProps> };
+export type PanelMeta = { id: string; key: string; cs: string; kw: readonly [string, string] };
 
-/** Panely z ostatních oblastí kola 3; vlastní panely shellu (projekty, Claude, poznámky…) přidá shell. */
-export const EXTERNAL_PANELS: PanelEntry[] = [
-  { id: "vitejte", key: "settings.nav.welcome", cs: "Průvodce", kw: ["settings.nav.welcome.kw", "průvodce první spuštění onboarding"], component: OnboardingPanel },
-  { id: "vzhled", key: "settings.nav.appearance", cs: "Vzhled a animace", kw: ["settings.nav.appearance.kw", "motiv barva akcent animace průhlednost písmo hustota proužek"], component: AppearancePanel },
-  { id: "akce", key: "settings.nav.actions", cs: "Rychlé akce", kw: ["settings.nav.actions.kw", "akce odkaz web aplikace příkaz paleta"], component: ActionsPanel },
-  { id: "otazky", key: "settings.nav.questions", cs: "Otázky Clauda", kw: ["settings.nav.questions.kw", "claude otázka odpověď askuserquestion"], component: QuestionsPanel },
+export const PANEL_META: PanelMeta[] = [
+  { id: "zaciname", key: "settings.nav.zaciname", cs: "Začínáme", kw: ["settings.nav.zaciname.kw", "průvodce první spuštění onboarding tipy novinky co je nového nápověda vítejte"] },
+  { id: "suplik", key: "settings.nav.suplik", cs: "Šuplík a karty", kw: ["settings.nav.suplik.kw", "záložky karty rozložení pořadí velikost části karet upravit šuplík přihrádka"] },
+  { id: "vzhled", key: "settings.nav.vzhled", cs: "Vzhled", kw: ["settings.nav.vzhled.kw", "styl motiv barva akcent animace průhlednost písmo hustota šířka proužek jazyk vzhled a animace"] },
+  { id: "akce", key: "settings.nav.akce", cs: "Projekty, akce a odkazy", kw: ["settings.nav.akce.kw", "projekt dlaždice repo složka rychlé akce odkaz odkazy web aplikace příkaz skripty paleta"] },
+  { id: "claude", key: "settings.nav.claude", cs: "Claude", kw: ["settings.nav.claude.kw", "claude code hooky schvalování otázky clauda limity útrata hlídač commit"] },
+  { id: "osobni", key: "settings.nav.osobni", cs: "Osobní", kw: ["settings.nav.osobni.kw", "osobní počasí kalendář přehrávač hudba časovač schránka historie"] },
+  { id: "poznamky", key: "settings.nav.poznamky", cs: "Poznámky", kw: ["settings.nav.poznamky.kw", "poznámky připomínky kategorie synchronizace git"] },
+  { id: "chovani", key: "settings.nav.chovani", cs: "Chování", kw: ["settings.nav.chovani.kw", "otevírání šuplíku zkratky klávesnice paleta herní režim hra paměť spouštění po startu okna s taby prohlížeč"] },
+  { id: "aplikace", key: "settings.nav.aplikace", cs: "Záloha a aplikace", kw: ["settings.nav.aplikace.kw", "záloha obnova export import výchozí reset config.json verze aktualizace log o aplikaci"] },
 ];
+
+/** Id panelů před vlnou 6 → nové (skoky z karet, palety a starých návodů vedou dál na správné místo). */
+export const PANEL_ALIASES: Record<string, string> = {
+  vitejte: "zaciname",
+  projekty: "akce",
+  otazky: "claude",
+  zkratky: "chovani",
+  zaloha: "aplikace",
+  oaplikaci: "aplikace",
+};

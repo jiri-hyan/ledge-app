@@ -13,7 +13,8 @@ import {
   setActive, setCfg, setDirty, setFieldError, setHit, snapshotDraft, undoMsg,
 } from "./settings/ctx";
 import { IconSearch, PanelIcon } from "./settings/icons";
-import { canon, cleanDraft, highlight, panelForField, search, type SearchItem } from "./settings/model";
+import { canon, cleanDraft, highlight, panelForField, resolveTarget, search, type SearchItem } from "./settings/model";
+import { PANEL_ALIASES } from "./settings/registry";
 import { narrowOut, widenIn } from "./settings/widen";
 import { FIELDS } from "./settings/labels";
 import { setSettingsTarget, settingsTarget } from "./palette/goto";
@@ -150,16 +151,14 @@ export default function Settings(p: { update: UpdateView; s: Snapshot }) {
   }
   // skok odjinud (karta, paleta, hlavička — `palette/goto.ts` `gotoSettingsPanel`): id panelu, nebo kotva
   // `f-<pole>` → panel toho pole (`labels.ts`, jinak podle cesty) + posun a zvýraznění
+  // (staré id panelů před vlnou 6 vedou přes `PANEL_ALIASES` na nové)
   createEffect(() => {
     const id = settingsTarget();
     if (!id) return;
     setSettingsTarget(null);
-    if (PANELS.some((x) => x.id === id)) return setActive(id);
-    if (!id.startsWith("f-")) return;
-    const field = id.slice(2);
-    const target = FIELDS[field]?.panel ?? panelForField(field);
-    if (target) setActive(target);
-    reveal(field, main);
+    const to = resolveTarget(id, PANELS.map((x) => x.id), PANEL_ALIASES, (f) => FIELDS[f]?.panel ?? panelForField(f));
+    if (to.panel) setActive(to.panel);
+    if (to.anchor) reveal(to.anchor, main);
   });
   const searchKey = (e: KeyboardEvent) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {

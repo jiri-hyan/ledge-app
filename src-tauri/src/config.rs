@@ -689,6 +689,8 @@ pub fn load(path: &Path) -> Result<Option<Config>, String> {
     // bez `layout`: rozložení ze `drawer.sections` + `appearance.cards`; pak odvozená pole z rozložení
     crate::layout::upgrade_loaded(&raw, &mut cfg);
     crate::layout::derive(&mut cfg);
+    // `personal.links` → akce (odkaz = akce, která něco otevře); co neprojde, zůstane odkazem
+    crate::linkmigrate::migrate(&mut cfg);
     validate(&cfg)?;
     Ok(Some(cfg))
 }

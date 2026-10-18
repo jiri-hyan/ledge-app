@@ -1,4 +1,4 @@
-// Nastavení Script Commands (panel „Rychlé akce“): zapnutí, složka, dlaždice v kartě, „Otevřít složku
+// Nastavení Script Commands (panel „Projekty, akce a odkazy“, sekce pod akcemi): zapnutí, složka, dlaždice v kartě, „Otevřít složku
 // skriptů“ (založí ji), co Ledge ve složce našel (s problémy) a formát hlavičky `@ledge.*`.
 // Config přes `useSettings()` (`Toggle`/`PathPick` s `path`), seznam z `scripts_list` (sken jen na
 // otevření panelu a na „Načíst znovu“).

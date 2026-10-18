@@ -9,9 +9,14 @@ bez UI. Architektura je v hlavičkách souborů `src-tauri/src/*.rs`.
 
 ## Konfigurace = jeden soubor
 
-**Všechno jde nastavit klikem v Nastavení** (ozubené kolo v šuplíku): projekty (přidání ze složky
-s autodetekcí, pořadí přetažením), chování šuplíku a proužku, Claude Code a hooky, poznámky a sync,
-Osobní, zkratky, záloha (export / import s výběrem částí / obnova výchozích) a aktualizace. Ruční
+**Všechno jde nastavit klikem v Nastavení** (ozubené kolo v šuplíku). Panely (od vlny 6, id v
+`src/settings/registry.ts`; staré id vedou dál): **Začínáme** (průvodce, tipy, novinky) · **Šuplík a karty**
+(záložky, karty, přihrádka) · **Vzhled** (styl, barvy, šířka, animace, celý proužek, jazyk) · **Projekty,
+akce a odkazy** (projekty se autodetekcí ze složky, jeden seznam akcí — odkaz je akce —, skripty) · **Claude**
+(schvalování, otázky, limity, útrata, hlídač, hooky) · **Osobní** (počasí, kalendář, přehrávač, časovač,
+historie schránky) · **Poznámky** (i sync) · **Chování** (otevírání, zkratky, paleta, herní režim, šuplík nad
+prohlížečem, spouštění po startu, šetřit paměť) · **Záloha a aplikace** (export / import s výběrem částí /
+obnova výchozích, verze, aktualizace). Hledání (Ctrl+F) najde i staré názvy voleb. Ruční
 úprava souboru níže je pro pokročilé a pro agenty; Nastavení ukáže chybu validace přímo u pole.
 
 `%APPDATA%\Ledge\config.json`, vedle něj `config.schema.json` (generované z Rust struktur — přesný
@@ -25,7 +30,7 @@ vedle jako `config.json.broken-<unix s>` — rozbitý config se tak nikdy potich
 s prázdným `remote`, `update.repo` = `jiri-hyan/ledge-app` (veřejné repo), `onboarding.done: false`. Šuplík
 pak při prvním otevření ukáže **průvodce** (jazyk `ui.lang`, repa na disku, aplikace ze Start menu,
 hooky Claude Code, odkazy, motiv) — každý krok se hned ukládá, nic nemaže, duplicity přeskočí.
-Ručně: Nastavení → Průvodce. **Existující config se nemění:** chybějící `onboarding` = `done: true`
+Ručně: Nastavení → Začínáme → Spustit průvodce. **Existující config se nemění:** chybějící `onboarding` = `done: true`
 (průvodce se neukáže); chybějící `notes.sync.remote` se při načtení vezme z `origin` pracovní kopie
 poznámek (kde sync běžel, běží dál), jinak zůstane sync vypnutý; `update.repo` = dřívější
 `jiri-hyan/ledge` se při načtení převede na `jiri-hyan/ledge-app` (zapíše se až dalším uložením).
@@ -71,7 +76,7 @@ Typické úpravy:
   karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude), `nowPlaying`, `sound`
   (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (přetáhnout, ⇔ velikost, × do katalogu,
   „+ Přidat kartu“, vlastní záložky; Hotovo uloží jen `layout`), ⋯ na kartě (skrýt kartu / sekci), nebo
-  Nastavení → Šuplík a proužek → Záložky a karty. **`drawer.sections` a `modes.personalEnabled` jsou od
+  Nastavení → Šuplík a karty → Záložky a karty. **`drawer.sections` a `modes.personalEnabled` jsou od
   vlny 6 odvozené** z `layout` (při načtení, uložení i aplikaci; ruční změna se přepíše) — čtou je moduly
   podle karty a starší Ledge. Starý config bez `layout` se při načtení převede beze ztráty: viditelnost
   z `drawer.sections`, pořadí karet Práce z dřívějšího `appearance.cards`, záložka Osobní jen při
@@ -90,13 +95,13 @@ Typické úpravy:
     pracuje / čeká / je hotový, běží časovač, hraje hudba (`media`), limity ≥ 70 %, připomínka po termínu nebo barevná linka
     (neuložená repa se jako událost nepočítají — je to trvalý stav). Smysl má u `mode`, `clock`, `custom`,
     `limits`; `running`, `claude`, `waiting`, `repos`, `timer`, `media` se v klidu neukazují samy. Výchozí `[]`.
-  - Nastavení → Šuplík a proužek → Proužek: řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
+  - Nastavení → Vzhled → Co proužek ukazuje (celý proužek je v panelu Vzhled): řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
     náhled s ukázkovými texty (přepínač „V klidu / Když se něco děje“).
 - **Časovač** — sekce `timer` (Nastavení → Osobní → Časovač, `src-tauri/src/timer.rs`): `presets`
   (minuty, 1–600, nejvýš 6; výchozí `[5, 15, 25, 50]`), `toast` (výchozí `true`: oznámení Windows po
   doběhnutí odpočtu — bez fokusu, ne ve hře / herním režimu / při „nerušit“ / s otevřeným šuplíkem), `strip`
   (výchozí `true`: běžící časovač se ukáže na začátku proužku i bez položky `timer`; přepínač je i v Nastavení →
-  Šuplík a proužek). Odpočet (předvolby, vlastní minuty, pauza, +5 min, zrušit) a stopky (start, pauza,
+  Vzhled → Co proužek ukazuje). Odpočet (předvolby, vlastní minuty, pauza, +5 min, zrušit) a stopky (start, pauza,
   reset) v kartě Časovač na záložce Osobní a v paletě Ctrl+K („Časovač 25 min“, „Stopky“, „Zrušit
   časovač“…). Proužek ukazuje „⏱ 18 min“ (zbývá, zaokrouhleno nahoru), stopky „⏱ 0:42“ (h:mm), pauza „⏸“,
   konec „⏱ čas vypršel“ (10 min, pak zmizí); překresluje se jen po minutách, sekundy počítá otevřený šuplík.
@@ -122,7 +127,7 @@ Typické úpravy:
   Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
 - **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
   ceny v cenách API podle projektu a dne (viz „Útrata Claude (odhad)“); `false` = sekce zmizí, nic se nečte.
-- **Vzhled** — sekce `appearance` (Nastavení → Vzhled a animace; chybějící sekce = dnešní vzhled):
+- **Vzhled** — sekce `appearance` (Nastavení → Vzhled; chybějící sekce = dnešní vzhled):
   `theme` (`dark` výchozí, `midnight`, `graphite`, `nord`, `light`, `contrast`, `terminal`, `paper`, `neon`, `brutal`, `pastel`), `accent` (`#rrggbb`,
   prázdné = akcent motivu), `density` (`compact|normal|comfy`), `fontScale` 0.85–1.25, `radius`
   (`sharp|normal|round`), `glass.opacity` 0.25–1 (krytí pozadí; rozmazání je `drawer.glass: "acrylic"`),
@@ -142,14 +147,14 @@ Typické úpravy:
   `bounce`, `fade`, `notch`; tvary proužku navíc `term`, `tag`, `glow`, `block`, `drop`. Systémové „omezit
   pohyb“ (Windows → Efekty animace) vypíná animace i vysunutí okna. Tabulka stylů: `src/theme/looks.ts`.
 - **Zkratky** — globální zkratky jsou ve výchozím stavu **vypnuté** (nic se neregistruje, v UI se
-  nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Zkratky, nebo v configu:
+  nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Chování → Klávesové zkratky, nebo v configu:
   `hotkeys.enabled: true` + `hotkeys.toggle|approve|deny|note` (formát `Ctrl+Alt+Space`). Config bez
   `enabled` = vypnuto, i když má zkratky vypsané. Kolize zkratek se kontrolují jen při `enabled: true`.
   Když si Ledge vezme fokus (zkratka, klik do poznámky / palety / Nastavení), výslovné zavření (Esc, ✕,
   uložení poznámky, zkratka znovu) ho vrátí aplikaci, ve které jsi byl — jen pokud je Ledge pořád v
   popředí a to okno ještě existuje; spuštění akce nebo projektu fokus nechá novému oknu.
   `hotkeys.gameMode` (výchozí prázdné = bez zkratky) přepíná herní režim a platí i v něm.
-- **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Šuplík a proužek →
+- **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Chování →
   Kompaktní paleta příkazů): `Ctrl+K` / 🔍 ukáže jen vyhledávací pole, výsledky se rozbalí až při psaní,
   s prázdným polem šipka dolů ukáže nedávné. Chybějící sekce `palette` = dnešní chování.
   `palette.winSettings` (výchozí `true`; tamtéž → Nastavení Windows v paletě): při psaní paleta najde
@@ -171,19 +176,19 @@ Typické úpravy:
   otevřeném šuplíku; stejná session + událost nejvýš 1× za 30 s. Toast potřebuje nainstalovaný Ledge
   (AppUserModelID `cz.hyan.ledge` ze zástupce ve Startu), jinak ho Windows zahodí (chyba v logu).
 - **Herní režim** — Ledge „mrtvý“ jako při fullscreen hře (šuplík zavřený, proužek pryč, myš, zkratky,
-  peek ani připomínky nic). Zapíná se v Nastavení → Šuplík a proužek, v paletě Ctrl+K („Zapnout herní
+  peek ani připomínky nic). Zapíná se v Nastavení → Chování → Hry a celá obrazovka, v paletě Ctrl+K („Zapnout herní
   režim“) nebo zkratkou `hotkeys.gameMode`; stav je v `%APPDATA%\Ledge\game-mode.json` (`{"on": true}`,
   přežije restart; smazání souboru = vypnuto po dalším startu). Vypnutí: znovu spustit Ledge
   (zástupce / Start), hlavní zkratka `hotkeys.toggle` (vypne a otevře šuplík) nebo `hotkeys.gameMode`.
   Ve skutečné fullscreen hře tyhle cesty herní režim jen vypnou, šuplík se neotevře.
-- **Přihrádka na soubory** — `shelf.enabled` (výchozí `true`; Nastavení → Šuplík a proužek → Přihrádka
+- **Přihrádka na soubory** — `shelf.enabled` (výchozí `true`; Nastavení → Šuplík a karty → Přihrádka
   na soubory). Soubory přetažené z Průzkumníka na proužek nahoře se uloží jako odkazy (jen cesty, nic se
   nekopíruje) do `%APPDATA%\Ledge\shelf.json` (`{"items":[{"path":"C:\\Users\\…","addedMs":…}]}`, nejnovější
   nahoře, nejvýš 50, stejná cesta bez ohledu na velikost písmen jen jednou). Karta „Přihrádka“: Cesta /
   @ (zmínka pro Claude Code `@C:\…`, s mezerou `@"C:\… …"`) do schránky, Otevřít, Ve složce, ✕, Kopírovat
   vše, Vyprázdnit, tah řádku ven (Průzkumník, terminál). Chybějící soubor = „chybí“, sám se nemaže.
   Nic se neposílá do session samo. Ve fullscreen hře / herním režimu nic. Mapa `docs/codemap/shelf.md`.
-- **Historie schránky** — sekce `clipboard` (Nastavení → Šuplík a proužek → Historie schránky; zapnout
+- **Historie schránky** — sekce `clipboard` (Nastavení → Osobní → Historie schránky; zapnout
   jde i přímo z palety): `enabled` (výchozí **`false`** — nic se neposlouchá ani neukládá), `max` (1–200,
   výchozí 25 nepřipnutých), `skipSecrets` (výchozí `true`: neukládat tvary `sk-…`, `ghp_…`/`github_pat_…`,
   `glpat-…`, `AKIA…`, `AIza…`, `xox?-…`, `sk_live_…`, JWT, PEM soukromý klíč), `excludeApps` (exe, ze kterých
@@ -201,7 +206,7 @@ Typické úpravy:
   proužek ukáže skladbu i bez položky `media` v `strip.items`); `stripTime` = čas skladby v proužku po minutách
   („1/4 min“): `auto` (výchozí, jen u `strip`), `on`, `off`; `equalizer` (výchozí `true`, jen u `strip`) =
   ozdoba ekvalizéru — jen dekorace, neukazuje skutečný zvuk. Starý config bez `media` = `card`, beze změny.
-- **Skripty** — sekce `scripts` (Nastavení → Rychlé akce → Skripty): `enabled` (výchozí `true`, ale nic
+- **Skripty** — sekce `scripts` (Nastavení → Projekty, akce a odkazy → Skripty): `enabled` (výchozí `true`, ale nic
   se neukáže, dokud složka neexistuje), `dir` (chybí = `%USERPROFILE%\Ledge\scripts`, `%PROMĚNNÉ%` se
   rozbalí, jinak absolutní cesta), `inActions` (výchozí `false`; `true` = i dlaždice v kartě Rychlé
   akce). Formát skriptů viz „Skripty (Script Commands)“ níže.
@@ -263,7 +268,7 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   přesného příkazu). Ten soubor nikdy nezapisuj; změna cíle/argumentů/složky souhlas zneplatní.
 - Favicon se stáhne jednou (při přidání akce, `%LOCALAPPDATA%\Ledge\icons\<host>.png`, neúspěch
   `<host>.miss`); znovu jen tlačítkem „Obnovit“ v Nastavení. Nic se nestahuje periodicky.
-- **Okno s webem** (`kind: "web"`, Nastavení → Rychlé akce → typ „Okno s webem“): `target` = http/https
+- **Okno s webem** (`kind: "web"`, Nastavení → Projekty, akce a odkazy → typ „Okno s webem“): `target` = http/https
   adresa (ne `*.localhost` — tak Tauri podává UI Ledge —, bez jména/hesla v adrese), volitelně `width`
   (320–3840) a `height` (240–2160) v logických px, výchozí 480 × 720; titulek okna = `label`. Klik otevře
   normální okno s rámem pod proužkem u kurzoru (fokus dostane — je to výslovný klik); druhý klik okno jen
@@ -274,8 +279,19 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   `window.open` / odkazy do nového okna jdou do výchozího prohlížeče. Poloha a velikost per akce v
   `%LOCALAPPDATA%\Ledge\web-panels.json` (zapíše se při zavření; změna `width`/`height` ji zahodí). Ve
   fullscreen hře / herním režimu se nic neotevře. Ikona `auto` = favicon webu jako u `url`.
-- Starší `personal.links` dál fungují (karta Odkazy); Nastavení → Rychlé akce nabídne převod, který
-  odkazy zkopíruje (nemaže je).
+- **Odkazy = akce** (od vlny 6): odkaz je akce, která jen něco otevře — `kind` `url`, `web`, `folder`
+  nebo `file`. Karta „Odkazy“ ukazuje právě tyhle akce (viditelné na své záložce podle `showOn`, v pořadí
+  pole `actions`, ikona = favicon / ikona souboru); karta „Rychlé akce“ je na záložce s kartou Odkazy
+  vynechá (žádné dvojí dlaždice). Nový odkaz = nová akce (Nastavení → Projekty, akce a odkazy → „Přidat
+  akci nebo odkaz“; průvodce zapisuje odkazy taky do `actions`).
+- **Starší `personal.links`** (`[{ "name", "target" }]`) se při každém načtení configu (a při uložení
+  z Nastavení, třeba po importu staré zálohy) převedou na akce (`src-tauri/src/linkmigrate.rs`):
+  `id` z názvu (bez diakritiky, jednoznačné), `label` = `name`, `kind` podle cíle bez disku (http(s) →
+  `url`, `.exe` → `app`, dokument z allowlistu → `file`, jinak `folder`), `showOn: "personal"`. Cíl, který
+  už má akce viditelná na Osobní, se jen odebere. Převod je idempotentní a beze ztráty: odkaz, který by
+  jako akce neprošel validací (relativní cesta, plný seznam 64 akcí), **zůstane** v `personal.links`
+  (karta Odkazy ho ukáže pod akcemi, Nastavení ho nabídne k opravě). Na disk se nový tvar zapíše až
+  příštím uložením. Nové odkazy do `personal.links` nepiš.
 
 ### Skripty (Script Commands)
 
@@ -540,7 +556,7 @@ Cesta `PermissionRequest` s `tool_name:"ExitPlanMode"` zůstává (docs neříka
 karta:** druhá kopie téhož `PreToolUse` (session + `tool_use_id`, jinak obsah) se hned pustí; `PermissionRequest`
 plánu téže session, na který čeká karta z `/plan` nebo který Ledge před < 2 min pustil do Claude, kartu nezaloží (`Pass`).
 
-**Zapojení hooků** (Nastavení → Claude Code → „Zapojit hooky“, `src-tauri/src/hooksetup.rs`): do
+**Zapojení hooků** (Nastavení → Claude → „Zapojit hooky“, `src-tauri/src/hooksetup.rs`): do
 `~/.claude/settings.json` (nebo `%CLAUDE_CONFIG_DIR%`) přidá http hooky na `http://127.0.0.1:<claude.port>`:
 `PermissionRequest` → `/permission` (timeout 600 s), `PreToolUse` s `"matcher": "AskUserQuestion"` →
 `/question` (timeout 600 s), `PreToolUse` s `"matcher": "ExitPlanMode"` → `/plan` (timeout 600 s), `SessionStart`, `UserPromptSubmit`, `PostToolUse`,
@@ -549,7 +565,7 @@ Idempotentní, pořadí klíčů a cizí hooky (i cizí `PreToolUse`) zachová, 
 (`127.0.0.1|localhost:<port>/permission|/event|/question|/plan`; starý port nahradí) a u `/question` a `/plan` i podle
 matcheru (oba žijí pod `PreToolUse` vedle sebe). Hooky ze starší verze bez otázek → `partial`, `missing:["PreToolUse"]`
 s `hint` „Doplnit otázky Clauda“; bez review plánu → `missing:["PreToolUse(ExitPlanMode)"]` s „Doplnit review plánu“
-(karta Claude to doplní jedním klikem, panel Nastavení → Otázky Clauda otázky). Před první změnou záloha `settings.json.bak-pred-ledge`, zápis atomicky. „Odpojit“
+(karta Claude to doplní jedním klikem, v Nastavení → Claude → Otázky Clauda otázky). Před první změnou záloha `settings.json.bak-pred-ledge`, zápis atomicky. „Odpojit“
 odebere jen hooky Ledge. Platí pro **nově spuštěné** session. Tauri: `hooks_status`, `hooks_install`,
 `hooks_remove`; stav je i ve snapshotu (`hooks`). Ručně hooky do settings.json nepiš — použij tlačítko.
 
@@ -579,7 +595,7 @@ odpověď (= otázka v okně Claude jako dřív): „Odpovědět v Claude“ (`q
 Karta Claude ukazuje pruh 5h a týdenního limitu (procenta, čas resetu místně + „za 2 h 10 min“),
 volitelně i proužek (`strip.items` + `limits`). **Zdroj = jen lokální soubory, žádná síť, žádné tokeny:**
 
-1. **Stavový řádek Ledge** (Nastavení → Claude Code → „Zapojit stavový řádek“, `statuslinesetup.rs`):
+1. **Stavový řádek Ledge** (Nastavení → Claude → „Zapojit stavový řádek“, `statuslinesetup.rs`):
    klíč `statusLine` v `~/.claude/settings.json` dostane `{"type":"command","command":"<ledge.exe> --statusline"}`
    (cesta s `/`; bez mezer bez uvozovek, jinak `"…"` pro Git Bash / `& '…'` pro PowerShell; ostatní klíče
    objektu — `padding`, `refreshInterval` — zůstanou). Původní hodnota `statusLine` (celá, nebo „nebyla“) se
@@ -642,7 +658,7 @@ snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
   (bez okna); obě odpovědi čte tatáž `update::evaluate`. Stavy ve `Snapshot.update`: `off` · `neovereno`
   · `aktualni` · `dostupna` · `nelze_overit {duvod}` (offline / repo nenalezeno / limit API, s chybou
   zálohy přes gh). Hlavička ukazuje **jen** `dostupna` (chip „Nová verze X“), zbytek Nastavení →
-  Aktualizace (+ „Zkontrolovat teď“). **Nikdy neinstaluje sám:** klik → poznámky → Instalovat → stažení
+  Záloha a aplikace → Aktualizace (+ „Zkontrolovat teď“). **Nikdy neinstaluje sám:** klik → poznámky → Instalovat → stažení
   přes HTTPS jen z `https://github.com/<repo>/releases/download/<tag>/<asset>` (`updatenet::download_ok`,
   strop 200 MB; záložně `gh release download`) do `%TEMP%\ledge-update\<tag>`, SHA256 se musí shodovat
   s poznámkami (a s `digest` GitHubu) — jinak
@@ -678,7 +694,7 @@ přihlášení tu kopii nevidí: Run „v bublině“ nic nespustí, config, dat
 - **Detekce** (`src-tauri/src/pkgctx.rs`, jednou při startu, řádek `pkgctx:` v `ledge.log`): identita
   z `GetCurrentPackageFullName`, jinak **sonda** — malý soubor do kořene `%LOCALAPPDATA%`, hledá se jeho
   kopie v `Packages\*\LocalCache\Local` (rodina = jméno složky), hned se smaže.
-- **Autostart v bublině** (`autostart::gate`): Run se nezapisuje ani nemaže; Nastavení → Šuplík a proužek →
+- **Autostart v bublině** (`autostart::gate`): Run se nezapisuje ani nemaže; Nastavení → Chování →
   Spouštění a paměť to říká u přepínače. Instance mimo bublinu Run zapíše při startu.
 - **Restartovat mimo** (stejné místo v Nastavení; v hlavičce tlumený chip „V bublině Claude“ → klik otevře
   Nastavení): jednorázová úloha Plánovače `Ledge-outside-relaunch` (`outside.rs`: `InteractiveToken`, bez

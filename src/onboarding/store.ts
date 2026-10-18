@@ -17,8 +17,6 @@ export interface Wiz {
   dir: 1 | -1;
   busy: boolean;
   lang: Lang;
-  /** config má sekci `actions` (rychlé akce) — jinak odkazy jdou do `personal.links` */
-  hasActions: boolean;
   trigger: string;
   repos: FoundRepo[];
   reposState: Load;
@@ -47,7 +45,6 @@ const fresh = (): Wiz => ({
   dir: 1,
   busy: false,
   lang: "cs",
-  hasActions: false,
   trigger: "hover",
   repos: [],
   reposState: "idle",
@@ -81,7 +78,7 @@ export function resetWizard() {
 export async function prefetch() {
   const cfg = await api.getConfig().catch(() => null);
   if (cfg) {
-    setWiz({ hasActions: Array.isArray(cfg.actions), trigger: cfg.drawer?.trigger ?? "hover", lang: cfg.ui?.lang === "en" ? "en" : "cs", theme: cfg.appearance?.theme ?? null });
+    setWiz({ trigger: cfg.drawer?.trigger ?? "hover", lang: cfg.ui?.lang === "en" ? "en" : "cs", theme: cfg.appearance?.theme ?? null });
   }
   void loadThemes();
   await loadRepos();

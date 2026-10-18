@@ -1,10 +1,10 @@
 //! Zápis výběru z průvodce do configu: projekty (bez duplicit podle složky / remote / exe, unikátní
-//! id), jazyk, odkazy (do `actions`, když config sekci má, jinak do `personal.links`), motiv
+//! id), jazyk, odkazy (vždy do `actions` — odkaz je akce typu web, `linkmigrate.rs`), motiv
 //! (`appearance.theme`, jen když sekce existuje) a příznak `onboarding.done`. Čistá funkce [`apply`];
 //! uložení a aplikaci dělá příkaz `onboarding_apply`.
 
 use crate::actions::{MAX_ACTIONS, MAX_LABEL};
-use crate::config::{Config, MAX_LINKS, Project, validate};
+use crate::config::{Config, Project, validate};
 use crate::onboarding::repos::{norm, slug};
 use crate::uiconf::Lang;
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub struct Applied {
     /// názvy přeskočených projektů (už v Ledge)
     pub skipped: Vec<String>,
     pub links_added: usize,
-    /// kam šly odkazy: `actions` nebo `personal.links`
+    /// kam šly odkazy: vždy `actions` (dřív i `personal.links`; UI pole čte dál)
     pub links_to: Option<&'static str>,
     /// motiv: uložen / config sekci `appearance` nemá (`None` = motiv se neměnil)
     pub theme_saved: Option<bool>,
@@ -115,36 +115,23 @@ fn add_links(v: &mut Value, links: &[NewLink], out: &mut Applied) -> Result<(), 
     if let Some(bad) = links.iter().find(|l| !web_url(&l.url) || l.label.trim().is_empty()) {
         return Err(trf!("Odkaz „{}“ chce název a adresu http(s)://…", "Link “{}” needs a name and an http(s):// address…", bad.label));
     }
-    if let Some(actions) = v.get_mut("actions").and_then(Value::as_array_mut) {
-        out.links_to = Some("actions");
-        for l in links {
-            // plný seznam akcí by shodil validaci celého kroku (jako strop `personal.links` níže)
-            if actions.len() >= MAX_ACTIONS {
-                break;
-            }
-            if actions.iter().any(|a| a.get("target").and_then(Value::as_str) == Some(l.url.trim())) {
-                continue;
-            }
-            let taken: Vec<String> = actions.iter().filter_map(|a| a.get("id").and_then(Value::as_str).map(String::from)).collect();
-            // id akce má nejvýš 64 znaků (`actions::validate`); rezerva na `-2…`
-            let base: String = slug(&l.label).chars().take(56).collect();
-            let id = unique_id(&taken, base.trim_end_matches('-'));
-            let label: String = l.label.trim().chars().take(MAX_LABEL).collect();
-            actions.push(json!({ "id": id, "label": label.trim_end(), "kind": "url", "target": l.url.trim() }));
-            out.links_added += 1;
-        }
-        return Ok(());
-    }
-    let list = v.pointer_mut("/personal/links").and_then(Value::as_array_mut).ok_or("config nemá personal.links")?;
-    out.links_to = Some("personal.links");
+    let obj = v.as_object_mut().ok_or("config není objekt")?;
+    let actions = obj.entry("actions").or_insert_with(|| json!([])).as_array_mut().ok_or("config: actions není seznam")?;
+    out.links_to = Some("actions");
     for l in links {
-        if list.len() >= MAX_LINKS {
+        // plný seznam akcí by shodil validaci celého kroku
+        if actions.len() >= MAX_ACTIONS {
             break;
         }
-        if list.iter().any(|a| a.get("target").and_then(Value::as_str) == Some(l.url.trim())) {
+        if actions.iter().any(|a| a.get("target").and_then(Value::as_str) == Some(l.url.trim())) {
             continue;
         }
-        list.push(json!({ "name": l.label.trim(), "target": l.url.trim() }));
+        let taken: Vec<String> = actions.iter().filter_map(|a| a.get("id").and_then(Value::as_str).map(String::from)).collect();
+        // id akce má nejvýš 64 znaků (`actions::validate`); rezerva na `-2…`
+        let base: String = slug(&l.label).chars().take(56).collect();
+        let id = unique_id(&taken, base.trim_end_matches('-'));
+        let label: String = l.label.trim().chars().take(MAX_LABEL).collect();
+        actions.push(json!({ "id": id, "label": label.trim_end(), "kind": "url", "target": l.url.trim() }));
         out.links_added += 1;
     }
     Ok(())
@@ -218,19 +205,19 @@ mod tests {
     }
 
     #[test]
-    fn links_go_to_actions_or_personal() {
+    fn links_go_to_actions() {
         let links = vec![NewLink { label: "Gmail".into(), url: "https://mail.google.com".into() }, NewLink { label: "Gmail".into(), url: "https://mail.google.com".into() }];
         let (next, out) = apply(&Config::default(), &Patch { links: links.clone(), ..Default::default() }).unwrap();
-        // sekce `actions` v tomhle configu (zatím) není → rychlé odkazy záložky Osobní
-        let v = serde_json::to_value(&next).unwrap();
-        if v.get("actions").is_some() {
-            assert_eq!(out.links_to, Some("actions"));
-        } else {
-            assert_eq!(out.links_to, Some("personal.links"));
-            assert_eq!(next.personal.links.len(), 1);
-            assert_eq!((next.personal.links[0].name.as_str(), next.personal.links[0].target.as_str()), ("Gmail", "https://mail.google.com"));
-        }
-        assert_eq!(out.links_added, 1);
+        // odkaz = akce typu web; do `personal.links` už nic nejde
+        assert_eq!((out.links_to, out.links_added), (Some("actions"), 1));
+        assert!(next.personal.links.is_empty());
+        assert_eq!((next.actions[0].label.as_str(), next.actions[0].target.as_str()), ("Gmail", "https://mail.google.com"));
+        // sekce `actions` v JSON chybí (ručně psaný config) → založí se
+        let mut v = json!({ "personal": { "links": [] } });
+        let mut o = Applied::default();
+        add_links(&mut v, &links[..1], &mut o).unwrap();
+        assert_eq!(v["actions"][0]["target"], json!("https://mail.google.com"));
+        assert_eq!(v["personal"]["links"], json!([]));
         for bad in ["javascript:alert(1)", "file:///C:/x", "https://", "mail.google.com"] {
             let p = Patch { links: vec![NewLink { label: "x".into(), url: bad.into() }], ..Default::default() };
             assert!(apply(&Config::default(), &p).is_err(), "{bad}");

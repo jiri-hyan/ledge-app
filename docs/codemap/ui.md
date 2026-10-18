@@ -20,7 +20,7 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 | `cards/Running.tsx` · `Repos.tsx` | karta Běží (log jen rozbalený) · karta Repa (Pull jen čisté a pozadu) | `Running` `PHASE` · `Repos` `pull` |
 | `cards/Peek.tsx` | malý šuplík: první schválení Clauda, jinak `ReminderPeek` | `Peek` |
 | `cards/ActionsCard.tsx` · `palette/*` | karta Rychlé akce · paleta příkazů (Ctrl+K, 🔍) → [actions.md](actions.md) | `ActionsCard` · `Palette` `buildItems` `rank` |
-| `cards/ClockCard.tsx` · `WeatherCard.tsx` · `LinksCard.tsx` | záložka Osobní (Čas ukazuje i baterii `media/Battery.tsx`) | `observedLabel` `WX_MAX_AGE_MS` `LINK_ICON` `openLink` |
+| `cards/ClockCard.tsx` · `WeatherCard.tsx` · `LinksCard.tsx` | záložka Osobní (Čas ukazuje i baterii `media/Battery.tsx`; Odkazy = akce typu web/složka/soubor → [actions.md](actions.md)) | `observedLabel` `WX_MAX_AGE_MS` `LINK_ICON` `linkActions` `openLink` |
 | `timer/*` | Osobní: karta Časovač (odpočet + stopky; stav drží Rust `timer.rs`, sekundy z tiku `now`), čistá logika `model.ts` (+ `model.test.mjs`), akce `timerDo` (karta i paleta) | `TimerCard` `timerDo` `leftMs` `elapsedMs` `fmtDuration` `parseMinutes` `parsePresets` |
 | `media/*` | Osobní: Právě hraje + hlasitost, baterie, `PersonalLive` (líný start odběrů) → [media.md](media.md) | `MediaCard` `PersonalLive` `Battery` |
 | `ClaudeSessions.tsx` | karta Claude → [sessions.md](sessions.md) | |

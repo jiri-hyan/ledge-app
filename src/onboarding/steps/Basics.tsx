@@ -50,7 +50,7 @@ export function LookStep() {
     <div class="ob-center">
       <div class="ob-lead">
         <h3>{t("onboarding.look.title", "Vzhled")}</h3>
-        <p>{t("onboarding.look.lead", "Vyber si motiv. Barvy, animace a další drobnosti doladíš v Nastavení → Vzhled a animace.")}</p>
+        <p>{t("onboarding.look.lead", "Vyber si motiv. Styl, barvy, animace a další drobnosti doladíš v Nastavení → Vzhled.")}</p>
       </div>
       <div class="ob-themes">
         <For each={wiz.themes}>
@@ -81,7 +81,7 @@ function openTip(trigger: string): string {
     case "dwell":
       return t("onboarding.done.tipDwell", "Šuplík otevřeš tak, že myš chvíli podržíš na proužku nahoře uprostřed.");
     case "off":
-      return t("onboarding.done.tipOff", "Otevírání myší je vypnuté — šuplík otevřeš zkratkou (Nastavení → Zkratky).");
+      return t("onboarding.done.tipOff", "Otevírání myší je vypnuté — šuplík otevřeš zkratkou (Nastavení → Chování).");
     default:
       return t("onboarding.done.tipHover", "Šuplík otevřeš najetím myší na proužek nahoře uprostřed obrazovky.");
   }
@@ -89,7 +89,7 @@ function openTip(trigger: string): string {
 
 export function DoneStep() {
   const s = () => wiz.sum;
-  const linksWhere = () => (s().linksTo === "actions" ? t("onboarding.done.inActions", "v rychlých akcích") : t("onboarding.done.inPersonal", "na záložce Osobní"));
+  const linksWhere = () => t("onboarding.done.inActions", "v kartě Odkazy");
   return (
     <div class="ob-center">
       <div class="ob-lead">
@@ -128,7 +128,7 @@ export function DoneStep() {
       <ul class="ob-bullets">
         <li>{t("onboarding.done.tipBrowser", "V prohlížeči nebo maximalizovaném okně přitlač myš k hornímu okraji — šuplík vyjede i přes ně.")}</li>
         <li>{t("onboarding.done.tipLayout", "Uprav si šuplík — ✎ v hlavičce: přetáhni karty, změň jejich velikost, přidej je z katalogu nebo si založ vlastní záložku.")}</li>
-        <li>{t("onboarding.done.tipAgain", "Průvodce kdykoli znovu: Nastavení → Průvodce. Všechno ostatní najdeš tamtéž.")}</li>
+        <li>{t("onboarding.done.tipAgain", "Průvodce kdykoli znovu: Nastavení → Začínáme. Všechno ostatní najdeš tamtéž.")}</li>
       </ul>
     </div>
   );

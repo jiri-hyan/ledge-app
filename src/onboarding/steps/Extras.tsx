@@ -69,7 +69,7 @@ export function LinksStep() {
     ...wiz.custom.map((c) => ({ key: c.url, name: c.label })),
   ];
   const where = () =>
-    wiz.hasActions ? t("onboarding.links.toActions", "Uloží se mezi rychlé akce (Nastavení → Rychlé akce).") : t("onboarding.links.toPersonal", "Uloží se jako rychlé odkazy na záložce Osobní.");
+    t("onboarding.links.toActions", "Uloží se mezi odkazy — v kartě Odkazy a v Nastavení → Projekty, akce a odkazy.");
   const focus = () => api.focusDrawer();
   return (
     <div class="ob-split">

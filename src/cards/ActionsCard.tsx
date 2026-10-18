@@ -7,13 +7,15 @@ import { For, Show, type JSX } from "solid-js";
 import type { Snapshot } from "../types";
 import { isBusy, lastResult } from "../actions/api";
 import { runAny } from "../actions/scripts";
-import { visibleGroups } from "../actions/model";
+import { isLink, visibleGroups } from "../actions/model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../actions/ui";
 import { gotoSettingsPanel } from "../palette/goto";
 import { t } from "../i18n";
 
-export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean; menu?: JSX.Element }) {
-  const groups = () => visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], p.s.mode);
+export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean; skipLinks?: boolean; menu?: JSX.Element }) {
+  /** `skipLinks`: na záložce je i karta Odkazy → weby, složky a soubory jsou jen tam (žádné dvojí dlaždice) */
+  const own = () => (p.skipLinks ? (p.s.actions ?? []).filter((a) => !isLink(a)) : (p.s.actions ?? []));
+  const groups = () => visibleGroups([...own(), ...(p.s.scripts ?? [])], p.s.mode);
   const ids = () => groups().flatMap((g) => g.items.map((a) => a.id));
   /** výstup skriptu (i z palety, když skripty v kartě nejsou) */
   const scriptOut = () => (lastResult()?.id.startsWith("script:") ? lastResult()!.id : null);

@@ -11,7 +11,6 @@ import { t, tp } from "../i18n";
 import { rich } from "../ui/rich";
 import { bubble } from "../pkgctx/BubbleNotice";
 import { gotoSettingsPanel } from "../palette/goto";
-import { setActive } from "../settings/ctx";
 import Tabs from "../layout/Tabs";
 import { beginEdit, editing, finishEdit } from "../layout/edit";
 import "./head.css";
@@ -55,7 +54,7 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
           </Show>
           <Show when={bubble()}>
             {(b) => (
-              <button class="chip dim" title={t("cards.pkg.chipTitle", "Ledge běží uvnitř aplikace {app} (balíček MSIX): nastavení, data a spouštění po startu jdou do její izolované kopie. Klik = Nastavení → Restartovat mimo.", { app: b().app })} onClick={() => { setActive("suplik"); p.onSettings(); gotoSettingsPanel("f-autostart"); }}>
+              <button class="chip dim" title={t("cards.pkg.chipTitle", "Ledge běží uvnitř aplikace {app} (balíček MSIX): nastavení, data a spouštění po startu jdou do její izolované kopie. Klik = Nastavení → Restartovat mimo.", { app: b().app })} onClick={() => { p.onSettings(); gotoSettingsPanel("f-autostart"); }}>
                 <span class="d" />{t("cards.pkg.chip", "V bublině {app}", { app: b().app })}
               </button>
             )}

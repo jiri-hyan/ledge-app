@@ -1,4 +1,4 @@
-// Editor rozložení v Nastavení (panel Šuplík a proužek): stejný model jako režim úprav v šuplíku —
+// Editor rozložení v Nastavení (panel Šuplík a karty): stejný model jako režim úprav v šuplíku —
 // záložky (pořadí tažením, název, ikona, smazat), karty na nich (pořadí, velikost, přesun na jinou
 // záložku, odebrat, přidat z katalogu) a skryté části karet. Mění jen draft Nastavení (`c.set("layout")`),
 // zapíše společná lišta Uložit. Velké tlačítko „Upravit přímo v šuplíku“ = režim úprav (`askEdit`).

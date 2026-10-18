@@ -7,6 +7,7 @@ import { dayNames, fmtTime } from "../format";
 import { t } from "../i18n";
 import { bar, left, level, otherDay, pctText, winState, type LimitWindow } from "./model";
 import "./limits.css";
+import { gotoSettingsPanel } from "../palette/goto";
 
 /** „za 2 h 10 min“ / „za 3 d 4 h“ / „za 5 min“ */
 export function leftText(resetsAt: number | null | undefined, now: number): string {
@@ -70,7 +71,7 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
               <div class="lim-empty">{t("sessions.limits.waiting", "Limity 5h / týden: — (čekám na první odpověď Clauda)")}</div>
             </Show>
           }>
-            <button class="hint-link" onClick={p.onSettings}>{t("sessions.limits.connect", "Zapojit stavový řádek pro limity 5h / týden")}</button>
+            <button class="hint-link" onClick={() => { p.onSettings(); gotoSettingsPanel("f-claude.statusLine"); }}>{t("sessions.limits.connect", "Zapojit stavový řádek pro limity 5h / týden")}</button>
           </Show>
         }>
           <div class="lim">

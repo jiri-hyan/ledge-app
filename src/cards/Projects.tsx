@@ -57,7 +57,7 @@ export default function Projects(p: { s: Snapshot; onNote: (preset: NotePreset) 
   const procOf = (id: string) => p.s.procs.find((x) => x.id === id);
   return (
     <div class="projects">
-      <For each={p.s.projects} fallback={<div class="empty" data-anim>{t("cards.projects.empty", "Žádné projekty. Přidej je v config.json (Nastavení → Otevřít config).")}</div>}>
+      <For each={p.s.projects} fallback={<div class="empty" data-anim>{t("cards.projects.empty", "Žádné projekty. Přidej je v Nastavení → Projekty, akce a odkazy.")}</div>}>
         {(pr) => {
           const proc = createMemo(() => procOf(pr.id));
           const live = () => ["ready", "running", "starting", "preparing"].includes(proc()?.phase ?? "");

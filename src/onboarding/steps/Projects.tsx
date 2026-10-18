@@ -79,7 +79,7 @@ export default function ProjectsStep() {
         title={t("onboarding.preview.title", "Náhled v šuplíku")}
         items={selected().map((r) => ({ key: r.path, name: r.name, src: wiz.icons[`repo:${r.path}`] }))}
         empty={t("onboarding.projects.previewEmpty", "Zatím nic — zaškrtni projekty vlevo.")}
-        note={t("onboarding.projects.note", "Příkaz, port i logo jde kdykoli upravit v Nastavení → Projekty.")}
+        note={t("onboarding.projects.note", "Příkaz, port i logo jde kdykoli upravit v Nastavení → Projekty, akce a odkazy.")}
       />
     </div>
   );

@@ -73,7 +73,7 @@
 .st-row.stack .st-ctl { flex-direction: column; align-items: stretch; justify-self: stretch; }
 .st-row.stack .st-seg { align-self: flex-start; }
 .st-row.dim .st-lbl, .st-row.dim .st-ctl { opacity: 0.55; }
-.st-row.hit, .st-sec.hit, .st-phead.hit { background: color-mix(in srgb, var(--violet) 14%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--violet) 14%, transparent); }
+.st-row.hit, .st-sec.hit, .st-phead.hit, .act-add.hit { background: color-mix(in srgb, var(--violet) 14%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--violet) 14%, transparent); }
 .st-row.bad .st-name { color: var(--red); }
 .st-err { grid-column: 1 / -1; display: flex; gap: 6px; align-items: baseline; color: var(--red); font-size: var(--fs-sm); }
 .st-err::before { content: "!"; display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--red); color: var(--on-light); font-weight: 700; font-size: var(--fs-2xs); flex-shrink: 0; }
@@ -241,3 +241,13 @@
 .st-strip-quiet.st-strip-on { color: var(--t0); background: var(--card-3); border-color: var(--line-2); }
 .st-strip-color { max-width: 130px; }
 .st-strip-count { color: var(--t3); font: var(--fs-xs) var(--mono); margin-left: 6px; }
+
+/* Začínáme: tipy a novinky (`panels/Start.tsx`) */
+.st-tips { list-style: none; margin: 0; padding: 4px 0 var(--s3); display: grid; gap: 2px; }
+.st-tips li { display: flex; align-items: center; gap: var(--s3); padding: 8px 0; }
+.st-tips li + li { border-top: 1px solid var(--line-soft); }
+.st-tips kbd { min-width: 52px; text-align: center; flex-shrink: 0; }
+.st-tips .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.st-tips strong { color: var(--t1); font-weight: 600; }
+.st-tips small { color: var(--t3); font-size: var(--fs-sm); }
+.act-add { display: inline-flex; border-radius: var(--r-md); }

@@ -1,12 +1,13 @@
-// Panel Nastavení „Vzhled a animace“: nahoře galerie design stylů (`AppearanceStyles.tsx`), živý
+// Panel Nastavení „Vzhled“: nahoře galerie design stylů (`AppearanceStyles.tsx`), živý
 // náhled, barvy (motiv + akcent), šířka a rozložení (`AppearanceLayout.tsx`), animace s ukázkami
-// (`AppearanceMotion.tsx`), proužek (styl, velikost, pozice, linka, krytí), rozbalovací „Upravit
-// detaily“ (písmo, materiál, hustota, rohy, pozadí), jazyk. Pořadí a velikost karet je v `layout` (panel Šuplík a proužek). Každá změna se hned náhledově aplikuje na celý šuplík (`applyAppearance`);
+// (`AppearanceMotion.tsx`), CELÝ proužek — vzhled (styl, velikost, pozice, linka, krytí) a hned pod ním
+// co ukazuje (`StripSettings.tsx`: položky, barvy, klid, vlastní text, monitor) —, rozbalovací „Upravit
+// detaily“ (písmo, materiál, hustota, rohy, pozadí), jazyk. Pořadí a velikost karet je v `layout` (panel Šuplík a karty). Každá změna se hned náhledově aplikuje na celý šuplík (`applyAppearance`);
 // odchod bez uložení vrátí uložený vzhled. Ukládá JEN společná lišta Nastavení (Uložit / Zahodit, jako
 // všechny panely — vlastní tlačítko tu není) → Rust pošle `appearance` a překreslí
 // proužek. Logika (normalizace, proměnné) je v `theme/appearance.ts`. Pozadí (`drawer.glass`),
 // šířka (`drawer.width`) a animace (`appearance.motion`, řídí i vysunutí okna v Rustu) se nastavují JEN
-// tady — panel Šuplík a proužek má jen chování. Kotvy hledání `f-<id>` = klíče z `labels.ts`.
+// tady — panel Chování má jen chování. Kotvy hledání `f-<id>` = klíče z `labels.ts`.
 // Jazyk rozhraní (`ui.lang`) je tu taky: patří k tomu, jak UI vypadá (jako motiv a písmo), samostatný
 // panel „Obecné“ pro jednu volbu nemáme. Přepne se po Uložit (`ctx.loadBase` → `setLang`).
 import { For, Show, createEffect, onCleanup } from "solid-js";
@@ -20,6 +21,7 @@ import { fieldHint, fieldLabel } from "../labels";
 import AppearancePreview from "./AppearancePreview";
 import AppearanceStyles from "./AppearanceStyles";
 import AppearanceMotion from "./AppearanceMotion";
+import StripSettings from "./StripSettings";
 import { DetailsCard, LayoutCard } from "./AppearanceLayout";
 import { Seg, Slider, lit, pct, type Ap } from "./apUi";
 import "./appearance.css";
@@ -150,6 +152,7 @@ export default function AppearancePanel(p: PanelProps) {
         </div>
         <Slider label={t("appearance.strip.opacity", "Krytí proužku")} min={0.3} max={1} step={0.05} value={stripOpacity()} fmt={pct} set={(v) => p.setCfg("strip", "opacity", +v.toFixed(2))} />
       </div>
+      <div class="ap-wide"><StripSettings /></div>
 
       <DetailsCard ap={ap} />
 

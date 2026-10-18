@@ -1,4 +1,4 @@
-// Panel „Záloha a obnova“: export uloženého nastavení do souboru, import se souhrnem změn po sekcích
+// Sekce „Záloha a obnova“ (panel Záloha a aplikace, `AppPanel.tsx`): export uloženého nastavení do souboru, import se souhrnem změn po sekcích
 // (rizikové sekce nezaškrtnuté), obnova výchozích po sekcích s potvrzením. Import i obnova jdou jen
 // do ROZPRACOVANÝCH změn (Vrátit / Zahodit) — zapíše je až Uložit, po ověření v Rustu.
 import { createResource, createSignal, For, Show } from "solid-js";
@@ -7,7 +7,7 @@ import { t } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
 import { dirty, offerUndo, snapshotDraft, useSettings } from "../ctx";
 import { Confirm } from "../fields/Confirm";
-import { PanelHead, Row, Section } from "../fields/Row";
+import { Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
 
 /** Lidské názvy sekcí configu; neznámá sekce (nová oblast) = klíč. */
@@ -168,8 +168,7 @@ export default function BackupPanel(_p: PanelProps) {
   }
   return (
     <>
-      <PanelHead title={t("settings.nav.zaloha", "Záloha a obnova")} desc={t("settings.backup.desc", "Přenes nastavení na jiný počítač, nebo se vrať k výchozímu.")} />
-      <Section>
+      <Section title={t("settings.backup.title", "Záloha a obnova")}>
         <Row id="backup.export" hint={dirty() ? t("settings.backup.export.dirty", "Exportuje se uložené nastavení — rozpracované změny nejdřív ulož.") : undefined}>
           <button class="mini" disabled={busy()} onClick={exportCfg}>{t("settings.backup.export.btn", "Exportovat…")}</button>
         </Row>

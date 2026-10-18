@@ -26,7 +26,7 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 | `src/layout/Deck.tsx` · `layout.css` | mřížka záložky `.deck` > `.deck-item[data-size][data-card]` (rozhraní pro styly: `--deck-cols`, výchozí 4), v úpravách úchyt ⠿ (pointer, i na záložku), ⇔, ×, zástupce karty bez dat, „+ Přidat kartu“, rozvlnění | `Deck` |
 | `src/layout/Tabs.tsx` | záložky v hlavičce (N), v úpravách přejmenovat dvojklikem, smazat, pořadí tažením, nová záložka s ikonou; cíl tažení karty (`data-tab`) | `Tabs` |
 | `src/layout/Catalog.tsx` · `EditBar.tsx` | katalog karet (název, popis, kde je) · lišta úprav (Zrušit / Hotovo) + Vrátit | |
-| `src/layout/LayoutEditor.tsx` | editor stejného modelu v Nastavení (panel Šuplík a proužek, `SortList`), části karet, „Upravit přímo v šuplíku“ | |
+| `src/layout/LayoutEditor.tsx` | editor stejného modelu v Nastavení (panel Šuplík a karty, `SortList`), části karet, „Upravit přímo v šuplíku“ | |
 | `src/layout/text.ts` | lidské názvy z párů v modelu (překlad až při vykreslení) | `tx` `cardName` `partName` `pageName` |
 
 ## Toky
@@ -39,7 +39,7 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
   (`focusDrawer`; šuplík nezavře odjetí myši) → změny jen v draftu → Hotovo: `get_config` → `withLayout` →
   `save_config` → `set_mode(záložka)`; Zrušit / Esc / zavření šuplíku / jiná stránka = zahodit.
 - **Klávesy**: 1–9 = záložka (App), v úpravách Esc = Zrušit, Alt+šipky na úchytu = přesun karty.
-- **Nastavení**: panel Šuplík a proužek → `LayoutEditor` mění draft Nastavení (`c.set("layout")`), uloží
+- **Nastavení**: panel Šuplík a karty → `LayoutEditor` mění draft Nastavení (`c.set("layout")`), uloží
   společná lišta. Pořadí karet ve Vzhledu už není.
 
 ## Invarianty a pasti

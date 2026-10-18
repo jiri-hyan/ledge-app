@@ -53,31 +53,57 @@ export function getPath(obj: any, path: string): any {
 }
 
 /** Prefix cesty v configu → panel Nastavení; vyhrává nejdelší shoda (`drawer.glass` dřív než `drawer`).
- *  Neznámé pole = null (chyba se ukáže v liště). Pole vzhledu mimo sekci `appearance` edituje panel Vzhled. */
+ *  Neznámé pole = null (chyba se ukáže v liště). Pole vzhledu mimo sekci `appearance` (i celý proužek)
+ *  edituje panel Vzhled, chování šuplíku panel Chování, odkazy (`personal.links`) panel akcí. */
 const FIELD_PANELS: [string, string][] = [
-  ["projects", "projekty"],
-  ["roots", "projekty"],
-  ["drawer", "suplik"],
-  ["layout", "suplik"],
+  ["projects", "akce"],
+  ["roots", "akce"],
+  ["actions", "akce"],
+  ["scripts", "akce"],
+  ["personal.links", "akce"],
+  ["drawer", "chovani"],
   ["drawer.glass", "vzhled"],
   ["drawer.width", "vzhled"],
-  ["strip", "suplik"],
-  ["strip.opacity", "vzhled"],
-  ["autostart", "suplik"],
+  ["drawer.sections", "suplik"],
+  ["layout", "suplik"],
+  ["shelf", "suplik"],
+  ["strip", "vzhled"],
+  ["timer.strip", "vzhled"],
+  ["autostart", "chovani"],
+  ["hotkeys", "chovani"],
+  ["palette", "chovani"],
+  ["fullscreen", "chovani"],
+  ["gameMode", "chovani"],
   ["modes", "osobni"],
   ["personal", "osobni"],
+  ["timer", "osobni"],
+  ["media", "osobni"],
+  ["clipboard", "osobni"],
   ["claude", "claude"],
+  ["questions", "claude"],
   ["notes", "poznamky"],
-  ["hotkeys", "zkratky"],
-  ["update", "oaplikaci"],
+  ["update", "aplikace"],
   ["appearance", "vzhled"],
-  ["actions", "akce"],
-  ["questions", "otazky"],
-  ["onboarding", "vitejte"],
+  ["onboarding", "zaciname"],
   ["ui", "vzhled"],
-  ["palette", "suplik"],
-  ["scripts", "akce"],
 ];
+
+/** Kam vede skok odjinud (`palette/goto.ts` `gotoSettingsPanel`): id panelu (i staré id před vlnou 6 přes
+ *  `aliases`) → ten panel; kotva `f-<pole>` → panel toho pole (`fieldPanel`: `labels.ts`, jinak podle cesty)
+ *  a řádek. Cokoli jiného = nikam (`panel: null`). */
+export function resolveTarget(
+  id: string,
+  panels: readonly string[],
+  aliases: Record<string, string>,
+  fieldPanel: (field: string) => string | null,
+): { panel: string | null; anchor: string | null } {
+  const real = aliases[id] ?? id;
+  if (panels.includes(real)) return { panel: real, anchor: null };
+  if (!id.startsWith("f-")) return { panel: null, anchor: null };
+  const field = id.slice(2);
+  const p = fieldPanel(field);
+  return { panel: p && panels.includes(p) ? p : null, anchor: field };
+}
 
 export function panelForField(field: string | null | undefined): string | null {
   if (!field) return null;

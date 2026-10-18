@@ -1,5 +1,6 @@
-// Panel „Claude Code“: most pro schvalování (zapnutí, port, jak dlouho čekat), hlídač nedokončených
-// session a zapojení hooků Ledge do `~/.claude/settings.json` (`HooksSetup` → Rust `hooksetup.rs`).
+// Panel „Claude“: most pro schvalování (zapnutí, port, jak dlouho čekat), otázky Clauda (`Questions.tsx`,
+// dřív samostatný panel), limity, útrata, hlídač nedokončených session a zapojení hooků Ledge do
+// `~/.claude/settings.json` (`HooksSetup` → Rust `hooksetup.rs`).
 import { createSignal, onMount, Show } from "solid-js";
 import { api, type HooksStatus } from "../../api";
 import { t } from "../../i18n";
@@ -10,6 +11,8 @@ import { Num, Seg, Slider, Toggle } from "../fields/controls";
 import { PanelHead, Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
 import StatusLineSetup from "../../limits/StatusLineSetup";
+import { fieldLabel } from "../labels";
+import QuestionsSection from "./Questions";
 
 const HOOKS_TEXT: Record<HooksStatus["state"], [string, string]> = {
   full: ["settings.hooks.full", "Zapojené"],
@@ -74,44 +77,45 @@ function HooksSetup() {
   );
 }
 
-export default function ClaudePanel(_p: PanelProps) {
+export default function ClaudePanel(p: PanelProps) {
   const c = useSettings();
   return (
     <>
-      <PanelHead title={t("settings.nav.claude", "Claude Code")} desc={t("settings.claude.desc", "Ledge ukazuje session Claude Code a jejich žádosti o povolení. Povolit smí vždy jen člověk.")} />
+      <PanelHead title={t("settings.nav.claude", "Claude")} desc={t("settings.claude.desc", "Ledge ukazuje session Claude Code a jejich žádosti o povolení. Povolit smí vždy jen člověk.")} />
       <Section title={t("settings.claude.approve", "Schvalování")}>
         <Row id="claude.enabled" hint={t("settings.claude.enabled.hint", "Žádosti Clauda o povolení se objeví v šuplíku (most na 127.0.0.1:{port})", { port: c.cfg.claude.port })}>
-          <Toggle path="claude.enabled" label={t("settings.f.claude.enabled", "Schvalování z Ledge")} />
+          <Toggle path="claude.enabled" label={fieldLabel("claude.enabled")} />
         </Row>
         <Row id="claude.approvalTimeoutS" dim={!c.cfg.claude.enabled}>
-          <Slider path="claude.approvalTimeoutS" min={5} max={550} step={5} label={t("settings.f.claude.approvalTimeoutS", "Jak dlouho čekat na rozhodnutí")} fmt={(v) => (v >= 60 ? `${Math.floor(v / 60)} min ${v % 60 ? `${v % 60} s` : ""}` : `${v} s`)} />
+          <Slider path="claude.approvalTimeoutS" min={5} max={550} step={5} label={fieldLabel("claude.approvalTimeoutS")} fmt={(v) => (v >= 60 ? `${Math.floor(v / 60)} min ${v % 60 ? `${v % 60} s` : ""}` : `${v} s`)} />
         </Row>
         <Row id="claude.toast" dim={!c.cfg.claude.enabled}>
-          <Toggle path="claude.toast" label={t("settings.f.claude.toast", "Oznámení Windows")} />
+          <Toggle path="claude.toast" label={fieldLabel("claude.toast")} />
         </Row>
         <Row id="claude.port" dim={!c.cfg.claude.enabled}>
-          <Num path="claude.port" min={1024} max={65535} label={t("settings.f.claude.port", "Port mostu")} width="84px" />
+          <Num path="claude.port" min={1024} max={65535} label={fieldLabel("claude.port")} width="84px" />
         </Row>
         <HooksSetup />
       </Section>
+      <QuestionsSection s={p.s} />
       <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
         <Row id="claude.statusLine" stack>
           <StatusLineSetup />
         </Row>
         <Row id="claude.limitsReminder">
-          <Toggle path="claude.limitsReminder" label={t("settings.f.claude.limitsReminder", "Připomenout reset limitu")} />
+          <Toggle path="claude.limitsReminder" label={fieldLabel("claude.limitsReminder")} />
         </Row>
       </Section>
       <Section title={t("settings.claude.costs", "Útrata (odhad v cenách API)")}>
         <Row id="claude.costs">
-          <Toggle path="claude.costs" label={t("settings.f.claude.costs", "Útrata Claude (odhad)")} />
+          <Toggle path="claude.costs" label={fieldLabel("claude.costs")} />
         </Row>
       </Section>
       <Section title={t("settings.claude.watch", "Hlídač nedokončené práce")}>
         <Row id="claude.enforceCommit" stack>
           <Seg
             path="claude.enforceCommit"
-            label={t("settings.f.claude.enforceCommit", "Nedokončené session")}
+            label={fieldLabel("claude.enforceCommit")}
             options={[
               { v: "off", label: t("settings.claude.enforce.off", "Nehlídat") },
               { v: "notify", label: t("settings.claude.enforce.notify", "Jen ukázat (doporučeno)") },

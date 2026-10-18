@@ -1,4 +1,4 @@
-// Nastavení → Šuplík a proužek → Historie schránky (`clipboard.*`): lidsky popsané volby (co se ukládá,
+// Nastavení → Osobní → Historie schránky (`clipboard.*`): lidsky popsané volby (co se ukládá,
 // kde, co ne), vyloučené aplikace s lidskými názvy a „Přidat běžící program“ (výběr, ne psaní exe),
 // „Vymazat historii teď“. Popisky voleb jsou v `settings/labels.ts` (hledání v Nastavení).
 import { createEffect, createSignal, For, Show } from "solid-js";

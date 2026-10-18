@@ -20,7 +20,7 @@ Autorův existující config se chová beze změny. Cituj symbolem, ne číslem 
 | `src/onboarding/store.ts` | stav průvodce, načítání, ukládání po krocích | `wiz`, `prefetch`, `loadRepos`, `addFolder`, `loadIcons`, `applyStep`, `pending`, `finish` |
 | `src/onboarding/logic.ts` · `api.ts` · `en.ts` | čisté pomůcky (kroky, výběr, URL) · IPC · anglický slovník | `STEPS`, `defaultRepoSelection`, `appProject`, `normalizeUrl`, `LINK_SUGGESTIONS` · `ob` |
 | `src/onboarding/Wizard.tsx` + `steps/*` | stránka `welcome`: hlavička s postupem, kroky, patička | `Wizard`, `WelcomeStep`, `ProjectsStep`, `AppsStep`, `ClaudeStep`, `LinksStep`, `LookStep`, `DoneStep`, `parts` (`Logo`, `CheckRow`, `Skeleton`, `Preview`) |
-| `src/settings/panels/Onboarding.tsx` | panel Nastavení → Průvodce (ruční spuštění) | `OnboardingPanel` |
+| `src/settings/panels/Start.tsx` | panel Nastavení → Začínáme (ruční spuštění průvodce, tipy, novinky) | `StartPanel` |
 
 Lepidlo: `settings::load_or_seed` (soubor chybí → `fresh_config`), `config::load` (→ `upgrade_loaded`),
 `App.tsx` (2 efekty: `checkFirstRun` při `view === "full"`, `wizardOpen` → stránka `welcome`; `Head`
@@ -45,7 +45,7 @@ se na ní neukazuje), `nav.ts` (`Page` + `typing` obsahují `welcome`).
 - `apply`: duplicita = stejná složka (`repos::norm`), remote (`parse_remote`) nebo **absolutní** exe;
   relativní `electron.exe` duplicitu nedělá. Id z názvu (`slug`, bez diakritiky), kolize `-2…`.
 - Odkazy jen http(s); do `actions` (`{id,label,kind:"url",target}`, strop `MAX_ACTIONS`, id ≤ 56 znaků
-  slugu, popisek ≤ `MAX_LABEL`), když config sekci má, jinak do `personal.links` (`{name,target}`, strop `MAX_LINKS`). Motiv jen když `appearance` existuje
+  slugu, popisek ≤ `MAX_LABEL`) — vždy, chybějící sekci založí (do `personal.links` už nic; starý tvar převádí `linkmigrate.rs`). Motiv jen když `appearance` existuje
   (`themeSaved: false` jinak) — krok Vzhled se bez motivů ve schématu neukáže.
 - `onboarding_icons` čte disk jen pro klíče, které vrátil sken (`KNOWN`) — UI nemůže podstrčit cestu.
 - Fokus: šuplík otevřený najetím nemá klávesnici — vstupy volají `api.focusDrawer()` na `pointerdown`

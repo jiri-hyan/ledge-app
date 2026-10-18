@@ -1,13 +1,13 @@
-// Angličtina pro Nastavení, část 2: texty panelů (Projekty, Šuplík a proužek, Vzhled a animace, Rychlé
-// akce, Claude Code, Otázky Clauda, Poznámky, Osobní, Zkratky, Záloha, O aplikaci). Popisky voleb
-// z `labels.ts` a skořápka jsou v `../en.ts`; panel Průvodce má texty v `onboarding/en.ts`.
+// Angličtina pro Nastavení, část 2: texty panelů (Začínáme, Šuplík a karty, Vzhled i proužek, Projekty,
+// akce a odkazy, Claude i otázky, Osobní, Poznámky, Chování i zkratky, Záloha a aplikace). Popisky voleb
+// z `labels.ts` a skořápka jsou v `../en.ts`; texty průvodce (`settings.welcome.*`) v `onboarding/en.ts`.
 import { registerDict } from "../../i18n";
 
 registerDict("en", {
   // Projekty
-  "settings.proj.desc": "Tiles on the drawer's main page: start a dev server or an app with one click.",
+  "settings.proj.desc": "Everything that opens in one click: projects (dev server or app), quick actions and links to websites, folders and files.",
   "settings.proj.fromRepos": "From cloned repos",
-  "settings.proj.fromFolder": "Add from folder…",
+  "settings.proj.fromFolder": "Add a project from a folder…",
   "settings.proj.cands": "Cloned repos that aren't in projects yet",
   "settings.proj.cands.filter": "Filter…",
   "settings.proj.cands.none": "Nothing matches the filter.",
@@ -70,8 +70,8 @@ registerDict("en", {
   "settings.proj.link.label": "Label",
   "settings.proj.link.add": "Add link",
 
-  // Šuplík a proužek
-  "settings.drawer.desc": "How Ledge behaves at the top edge of the screen.",
+  // Šuplík a karty, Chování, proužek (Vzhled)
+  "settings.drawer.desc": "What the drawer shows: tabs, the cards on them, their order and size. It's quicker right in the drawer via ✎.",
   "settings.drawer.open": "Opening and closing",
   "settings.drawer.trigger.hover": "Hover over the strip",
   "settings.drawer.trigger.edge": "Push against the edge",
@@ -85,7 +85,6 @@ registerDict("en", {
   "settings.drawer.edgeDelay": "Push",
   "settings.drawer.dwellDelay": "Hold",
   "settings.drawer.closeDelay": "Close after the mouse leaves",
-  "settings.drawer.strip": "Strip",
   "settings.strip.item.mode": "Tab (Work, Personal or your own)",
   "settings.strip.item.clock": "Time and date",
   "settings.strip.item.running": "Running servers",
@@ -110,7 +109,6 @@ registerDict("en", {
   "settings.drawer.bar.procs.ph": "app.exe",
   "settings.drawer.startMem": "Startup and memory",
   "settings.drawer.palette": "Command palette",
-  "settings.drawer.lookMoved": "Set the drawer's background, blur, width and animations in the Look and animations panel.",
 
   // Vzhled a animace
   "appearance.state.saved": "Matches the saved look.",
@@ -189,19 +187,14 @@ registerDict("en", {
   "appearance.preview.replay": "▶ Play animation",
 
   // Rychlé akce
-  "actions.panel.title": "Quick actions",
-  "actions.panel.add": "Add action",
+  "actions.panel.title": "Actions and links",
+  "actions.panel.add": "Add an action or link",
   "actions.panel.added": "Action “{label}” added — save it in the bar below.",
   "actions.panel.saved": "Changed — save it in the bar below.",
   "actions.panel.unsaved": "Save first (bar below) — then it runs in this form",
-  "actions.panel.intro": "Websites, folders, files, apps and commands in one click — the Quick actions card on the Work / Personal tab and the palette (Ctrl+K or 🔍).",
-  "actions.panel.links.one": "You have {n} link on the Personal tab that isn't here yet.",
-  "actions.panel.links.other": "You have {n} links on the Personal tab that aren't here yet.",
-  "actions.panel.convert": "Convert to actions",
-  "actions.panel.converted": "Converted {n} links. They stayed in the Links card — you can delete them there.",
+  "actions.panel.intro": "Websites, folders, files, apps and commands in one click — the Quick actions card, the Links card (websites, folders and files) and the palette (Ctrl+K or 🔍).",
   "actions.panel.deleted": "Action “{label}” deleted.",
-  "actions.panel.empty": "No actions yet. Start with a favourite website or your projects folder.",
-  "actions.panel.drag": "Drag to reorder",
+  "actions.panel.empty": "No actions or links yet. Start with a favourite website or your projects folder.",
   "actions.panel.run": "Run",
   "actions.panel.edit": "Edit",
   "actions.panel.delete": "Delete",
@@ -238,9 +231,7 @@ registerDict("en", {
   // Otázky Clauda
   "questions.hooksAdded": "Claude's questions connected — they apply to newly started sessions",
   "questions.panel.title": "Claude's questions",
-  "questions.panel.what": "What it does",
   "questions.panel.explain": "When Claude Code asks (the AskUserQuestion tool), Ledge shows the question with its options like in the chat and you answer with a click. If you don't answer in time or choose “Answer in Claude”, the question shows in the Claude window as before.",
-  "questions.panel.toggle": "Answer questions from Ledge",
   "questions.panel.onHint": "Claude waits for your answer in Ledge",
   "questions.panel.offHint": "Ledge only shows the question; you answer in the Claude window",
   "questions.panel.hold": "Wait for an answer",
@@ -307,8 +298,8 @@ registerDict("en", {
   "settings.layout.parts.desc": "A hidden part is neither drawn nor computed (hidden spend doesn't read transcripts). You can also do it right in the drawer: ⋯ in the card header.",
   "settings.layout.partOf": "In the {card} card",
   // Osobní
-  "settings.personal.desc": "A tab for everyday things outside work: time, weather, quick links and general notes.",
-  "settings.personal.layoutNote": "Which card is on which tab (and whether there is a Personal tab at all) you change in the Drawer and strip panel, or right in the drawer via ✎.",
+  "settings.personal.desc": "Things outside work: weather, calendar, music, timer and clipboard history.",
+  "settings.personal.layoutNote": "Which card sits on which tab (and whether the Personal tab exists at all) is set in the Drawer and cards panel or right in the drawer via ✎. Links are in the Projects, actions and links panel.",
   "settings.personal.place": "Location",
   "settings.personal.place.hint": "The name is only a label on the card. Find coordinates on a map site, e.g. mapy.cz (right-click the place).",
   "settings.personal.label": "Location name",
@@ -319,7 +310,6 @@ registerDict("en", {
   "settings.personal.clear": "Clear",
   "settings.links.pick": "Link target",
   "settings.links.removed": "Link “{n}” removed",
-  "settings.links.empty": "No links yet. Add a website, folder or app you open often.",
   "settings.links.name": "Name",
   "settings.links.target": "Target",
   "settings.links.target.ph": "https://… · C:\\path · app.exe",
@@ -327,7 +317,6 @@ registerDict("en", {
   "settings.links.folder": "Folder",
   "settings.links.pick.file": "Choose a file or app",
   "settings.links.file": "File",
-  "settings.links.add": "Add link",
   "settings.strip.item.custom": "Custom text",
   "settings.strip.item.timer": "Timer (countdown, stopwatch)",
   "settings.strip.item.media": "Now playing (track · artist)",
@@ -362,7 +351,6 @@ registerDict("en", {
   "settings.timer.section": "Timer",
   "settings.timer.desc": "Countdown and stopwatch in the Timer card, palette (Ctrl+K) and strip. Keeps running with the drawer closed and across a Ledge restart.",
   "settings.timer.presets.ph": "5, 15, 25, 50",
-  "settings.links.max": "At most {n} links",
 
   // Zkratky
   "settings.hotkeys.desc": "Keyboard shortcuts work across Windows. Without them the drawer opens with the mouse and a note with a button.",
@@ -372,7 +360,7 @@ registerDict("en", {
   "settings.hotkeys.clash": "The same shortcut is set for “{o}”",
 
   // Záloha a obnova
-  "settings.backup.desc": "Move your settings to another computer, or go back to the defaults.",
+  "settings.backup.desc": "Move your settings to another computer, go back to the defaults, or check which version of Ledge you have.",
   "settings.backup.export.btn": "Export…",
   "settings.backup.export.file": "ledge-settings-{d}.json",
   "settings.backup.export.done": "Settings saved to {p}",
@@ -412,4 +400,43 @@ registerDict("en", {
   "settings.about.openDir": "Open folder",
   "settings.about.log": "Diagnostic log",
   "settings.about.openLog": "Open log",
+  "settings.drawer.shelf": "File shelf",
+  "settings.proj.title": "Projects",
+  "settings.backup.title": "Backup and restore",
+  "settings.about.title": "About",
+  "settings.behavior.desc": "How Ledge opens, which keys it listens to and when it hides.",
+  "settings.behavior.games": "Games and full screen",
+  "settings.hotkeys.title": "Keyboard shortcuts",
+  "settings.links.legacy": "Older links that weren't converted",
+  "settings.links.legacy.desc": "These links can't be saved as actions (for example a path without a drive letter). Fix the target to a full path (C:\\…) and save — they convert on their own. The Links card still shows them.",
+  "settings.links.legacy.list": "Links",
+  "settings.strip.what": "What the strip shows",
+  "settings.strip.whatDesc": "The strip is the thin bar at the top edge — turn on what you want to see on it.",
+  "settings.start.desc": "A quick start, a few tips and what's new in Ledge. Settings on the left are split by what you want to change.",
+  "settings.start.tip.palette": "Command palette",
+  "settings.start.tip.palette.text": "Ctrl+K or 🔍 in the header: finds projects, actions, notes and Settings options, works out sums and converts units.",
+  "settings.start.tip.edit": "Editing right in the drawer",
+  "settings.start.tip.edit.text": "The pencil in the drawer header: drag cards around, resize them, add from the catalogue and create your own tabs.",
+  "settings.start.tip.card": "Card menu",
+  "settings.start.tip.card.text": "The three dots in the corner of every card: hide the card or just a part of it, or go straight to editing the drawer.",
+  "settings.start.tip.search": "Searching Settings",
+  "settings.start.tip.search.text": "Finds every option without accents — even by the old names from earlier versions.",
+  "settings.start.new.styles": "Design styles",
+  "settings.start.new.styles.text": "Ready-made looks in one click, previewed on the whole drawer.",
+  "settings.start.new.motion": "New opening animations",
+  "settings.start.new.motion.text": "Choose how the drawer slides out — or no animation at all.",
+  "settings.start.new.layout": "Cards your way",
+  "settings.start.new.layout.text": "Your own tabs, card sizes and dragging right in the drawer.",
+  "settings.start.new.media": "A player in several looks",
+  "settings.start.new.media.text": "The Now playing card as a row, a card, a big cover or a vinyl.",
+  "settings.start.new.settings": "Clearer Settings",
+  "settings.start.new.settings.text": "Links are actions now (one list), the whole strip is in Look and everything about behaviour is in the Behaviour panel.",
+  "settings.start.show": "Show",
+  "settings.start.editNow": "Edit the drawer",
+  "settings.start.editNow.dirty": "Save or discard your unsaved changes first (bar at the bottom).",
+  "settings.start.editNow.hint": "Switches to the drawer in edit mode — save what you do there with Done.",
+  "settings.start.editNow.btn": "Edit",
+  "settings.start.tips": "Tips",
+  "settings.start.news": "What's new",
+  "actions.panel.order": "Drag the handle (or Alt+arrow) to reorder — cards and the palette use this order.",
 });

@@ -1,44 +1,40 @@
-// Katalog Nastavení: panely v pořadí navigace (vlastní + `EXTERNAL_PANELS` z registru) a seznam
-// všeho, co jde najít (panely + volby z `labels.ts`).
+// Katalog Nastavení: panely z `registry.ts` (pořadí, názvy) s komponentami a seznam všeho, co jde
+// najít (panely + volby z `labels.ts`). Panel = složení sekcí z `panels/*` (jedna volba = jedno místo,
+// hlídá `settings.test.mjs`).
 import type { Component } from "solid-js";
 import { lang, t } from "../i18n";
-import { EXTERNAL_PANELS, type PanelEntry } from "./registry";
+import { PANEL_META, type PanelMeta } from "./registry";
 import type { SearchItem } from "./model";
 import type { PanelProps } from "./types";
 import { FIELDS, fieldAnchor, fieldCs, fieldHint, fieldKw, fieldLabel } from "./labels";
-import ProjectsPanel from "./panels/Projects";
+import StartPanel from "./panels/Start";
 import DrawerPanel from "./panels/Drawer";
+import AppearancePanel from "./panels/Appearance";
+import ProjectsActionsPanel from "./panels/ProjectsActions";
 import ClaudePanel from "./panels/Claude";
-import NotesPanel from "./panels/Notes";
 import PersonalPanel from "./panels/Personal";
-import HotkeysPanel from "./panels/Hotkeys";
-import BackupPanel from "./panels/Backup";
-import AboutPanel from "./panels/About";
+import NotesPanel from "./panels/Notes";
+import BehaviorPanel from "./panels/Behavior";
+import AppPanel from "./panels/AppPanel";
 
-type Pair = readonly [string, string];
-const own = (id: string, name: Pair, kw: Pair, component: Component<PanelProps>): PanelEntry => ({ id, key: name[0], cs: name[1], kw, component });
+export type PanelEntry = PanelMeta & { component: Component<PanelProps> };
 
-const ext = (id: string) => EXTERNAL_PANELS.find((p) => p.id === id);
+const COMPONENTS: Record<string, Component<PanelProps>> = {
+  zaciname: StartPanel,
+  suplik: DrawerPanel,
+  vzhled: AppearancePanel,
+  akce: ProjectsActionsPanel,
+  claude: ClaudePanel,
+  osobni: PersonalPanel,
+  poznamky: NotesPanel,
+  chovani: BehaviorPanel,
+  aplikace: AppPanel,
+};
 
-/** Pořadí v postranní navigaci. Panel z registru, který chybí, se přeskočí. */
-export const PANELS: PanelEntry[] = [
-  ext("vitejte"),
-  own("projekty", ["settings.nav.projekty", "Projekty"], ["settings.nav.projekty.kw", "projekt dlaždice repo složka"], ProjectsPanel),
-  own("suplik", ["settings.nav.suplik", "Šuplík a proužek"], ["settings.nav.suplik.kw", "chování otevírání proužek monitor prohlížeč"], DrawerPanel),
-  ext("vzhled"),
-  ext("akce"),
-  own("claude", ["settings.nav.claude", "Claude Code"], ["settings.nav.claude.kw", "claude hooky schvalování commit"], ClaudePanel),
-  ext("otazky"),
-  own("poznamky", ["settings.nav.poznamky", "Poznámky"], ["settings.nav.poznamky.kw", "poznámky kategorie synchronizace git"], NotesPanel),
-  own("osobni", ["settings.nav.osobni", "Osobní"], ["settings.nav.osobni.kw", "osobní počasí odkazy záložka"], PersonalPanel),
-  own("zkratky", ["settings.nav.zkratky", "Zkratky"], ["settings.nav.zkratky.kw", "klávesové zkratky klávesnice"], HotkeysPanel),
-  own("zaloha", ["settings.nav.zaloha", "Záloha a obnova"], ["settings.nav.zaloha.kw", "export import záloha výchozí reset config.json"], BackupPanel),
-  own("oaplikaci", ["settings.nav.oaplikaci", "Aktualizace a o aplikaci"], ["settings.nav.oaplikaci.kw", "verze aktualizace log o aplikaci"], AboutPanel),
-  // panely z registru, které katalog ještě nezná (přidané později), na konec
-  ...EXTERNAL_PANELS.filter((p) => !["vitejte", "vzhled", "akce", "otazky"].includes(p.id)),
-].filter((p): p is PanelEntry => !!p);
+/** Pořadí v postranní navigaci. */
+export const PANELS: PanelEntry[] = PANEL_META.map((m) => ({ ...m, component: COMPONENTS[m.id] }));
 
-export const panelLabel = (p: PanelEntry) => t(p.key, p.cs);
+export const panelLabel = (p: PanelMeta) => t(p.key, p.cs);
 
 /** V jiném jazyce než češtině se hledá i v české podobě (návod, starší zvyk, smíšené UI). */
 const csToo = (cs: string) => (lang() === "cs" ? "" : ` ${cs}`);

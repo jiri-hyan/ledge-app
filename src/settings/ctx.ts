@@ -17,7 +17,7 @@ const [base, setBaseSig] = createSignal("");
 const [rev, setRev] = createSignal(0);
 const [fieldError, setFieldError] = createSignal<FieldError | null>(null);
 const [hit, setHit] = createSignal<string | null>(null);
-const [active, setActive] = createSignal("projekty");
+const [active, setActive] = createSignal("zaciname");
 /** rozpracovaná verze se liší od uložené (počítá shell po každé změně, s debounce) */
 const [dirty, setDirty] = createSignal(false);
 const [undoMsg, setUndoMsg] = createSignal<{ text: string; restore: () => void } | null>(null);

@@ -2,7 +2,7 @@
 
 Historie zkopírovaného textu v paletě (`Ctrl+K`, prefix `v:` nebo příkaz „Historie schránky…“).
 Soukromí napřed: **výchozí vypnuto**, jen text (`CF_UNICODETEXT`), jen paměť, hesla ze správců hesel
-a prohlížeče se neukládají. Config `clipboard.*` (Nastavení → Šuplík a proužek → Historie schránky,
+a prohlížeče se neukládají. Config `clipboard.*` (Nastavení → Osobní → Historie schránky,
 zapnutí i přímo z palety). Cituj symbolem, ne číslem řádku.
 
 ## Soubory
@@ -16,13 +16,13 @@ zapnutí i přímo z palety). Cituj symbolem, ne číslem řádku.
 | `src-tauri/src/cliphist/tests.rs` | historie, náhled, připnuté v tempdiru, config, validace | |
 | `src-tauri/src/commands/cliphist.rs` | Tauri: `clip_list` (jen náhledy), `clip_paste`, `clip_pin`, `clip_remove`, `clip_clear`, `clip_enable` (z palety), `clip_apps` | |
 | `src/cliphist/model.ts` | čistá logika palety: `CLIP_PREFIX`, `clipQuery`, `clipRows` (vypnuto + Zapnout / prázdno / položky / Vymazat / Nastavení), `clipSub`, `clampSel` — test `model.test.mjs` | |
-| `src/cliphist/api.ts` · `ClipSettings.tsx` · `cliphist.css` | most k jádru · sekce v panelu Šuplík a proužek (lidsky popsané volby, vyloučené aplikace s lidskými názvy, výběr běžícího programu, „Přidat běžné správce hesel“, Vymazat) · styly `ch-*` | `clipApi` `ClipSettings` |
+| `src/cliphist/api.ts` · `ClipSettings.tsx` · `cliphist.css` | most k jádru · sekce v panelu Osobní (lidsky popsané volby, vyloučené aplikace s lidskými názvy, výběr běžícího programu, „Přidat běžné správce hesel“, Vymazat) · styly `ch-*` | `clipApi` `ClipSettings` |
 | `src/palette/Palette.tsx` · `more.ts` · `items.ts` | režim `v:` (seznam místo běžných výsledků), Enter / Ctrl+P / Ctrl+Del, patička se zkratkami · `clipCommand`, `clipItems` · `Section` `"clip"`, `PItem.clip` | `chooseClip` `clipKey` |
 | `src/i18n/en-cliphist.ts` | angličtina `palette.clip.*`, `settings.clip.*`, `settings.f.clipboard.*` | |
 
 Lepidlo: `config.rs` (`Config.clipboard` + `cliphist::validate`), `settings.rs` (změna `clipboard` →
 `cliphist::sync`), `lib.rs` (start `cliphist::sync`, `generate_handler!`), `Cargo.toml` (feature
-`Win32_System_RemoteDesktop`), `settings/labels.ts` (`clipboard.*`), `panels/Drawer.tsx` (`<ClipSettings />`),
+`Win32_System_RemoteDesktop`), `settings/labels.ts` (`clipboard.*`), `panels/Personal.tsx` (`<ClipSettings />`),
 `settings/settings.test.mjs` (panel `suplik` vykresluje i `ClipSettings.tsx`), `i18n/load.ts`.
 
 ## Toky

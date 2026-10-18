@@ -60,7 +60,7 @@ registerDict("en", {
   "cards.layout.desc.timer": "Countdown and stopwatch",
   "cards.layout.desc.weather": "Temperature and outlook; fetched only while visible",
   "cards.layout.desc.calendar": "Today and tomorrow from an ICS link (Google, Outlook)",
-  "cards.layout.desc.links": "Quick links to websites, folders and apps",
+  "cards.layout.desc.links": "Websites, folders and files from your actions, with the site icon",
   "cards.layout.desc.media": "Song or video from any app, and the volume",
   "cards.layout.part.claudeLimits": "5h / weekly limits",
   "cards.layout.part.claudeCosts": "Spend (estimate)",

@@ -7,7 +7,7 @@ import type { Item } from "./search";
 import type { ClipRow } from "../cliphist/model";
 import { runAction } from "../actions/api";
 import { askConfirm } from "../actions/ui";
-import { EXTERNAL_PANELS } from "../settings/registry";
+import { PANEL_META } from "../settings/registry";
 import type { NotePreset } from "../notes/store";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
@@ -105,7 +105,7 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
   }
 
   add({ id: "settings:", section: "settings", order: 5, title: t("palette.settings.open", "Otevřít Nastavení"), keywords: "nastaveni config", run: () => nav.onSettings() });
-  for (const pn of EXTERNAL_PANELS) {
+  for (const pn of PANEL_META) {
     add({ id: `settings:${pn.id}`, section: "settings", order: 5, title: t("palette.settings.panel", "Nastavení: {name}", { name: t(pn.key, pn.cs) }), keywords: `${t(pn.kw[0], pn.kw[1])} ${pn.kw[1]}`, run: () => nav.onSettings(pn.id) });
   }
 

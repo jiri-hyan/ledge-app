@@ -1,5 +1,5 @@
-// Čistá logika rychlých akcí pro UI (bez DOM a Solid): id z popisku, přesun v seznamu, převod
-// odkazů Osobní, viditelné skupiny podle záložky, úklid před uložením a rychlá kontrola pole.
+// Čistá logika rychlých akcí pro UI (bez DOM a Solid): id z popisku, přesun v seznamu, odkazy
+// (akce, které jen otevírají), viditelné skupiny podle záložky, úklid před uložením a rychlá kontrola pole.
 // Autoritou je Rust (`actions.rs` validate, příkaz `action_check`); tohle je okamžitá zpětná vazba.
 // Testy: `src/palette/search.test.mjs`. Texty chyb vrací jako {key, cs} — přeloží je volající `t()`.
 import type { ActionCfg, ActionKind, ShowOn } from "../types";
@@ -40,30 +40,28 @@ export function guessKind(target: string): ActionKind {
   return FILE_EXT.includes(e) ? "file" : "folder";
 }
 
-/** Odkazy z `personal.links` jako akce na záložce Osobní. Nic nemaže; cíl, který už akce má, přeskočí. */
-export function linksToActions(links: { name: string; target: string }[], existing: ActionCfg[]): ActionCfg[] {
-  const targets = new Set(existing.map((a) => a.target.trim().toLowerCase()));
-  const ids = existing.map((a) => a.id);
-  const out: ActionCfg[] = [];
-  for (const l of links) {
-    const target = l.target.trim();
-    if (!target || targets.has(target.toLowerCase())) continue;
-    targets.add(target.toLowerCase());
-    const label = l.name.trim() || target;
-    const id = slugId(label, ids);
-    ids.push(id);
-    out.push({ id, label, kind: guessKind(target), target, showOn: "personal" });
-  }
-  return out;
+/** Odkaz = akce, která jen něco otevře (web, okno s webem, složka, soubor) — ukazuje je karta Odkazy.
+ *  Starý `personal.links` převádí na akce Rust (`linkmigrate.rs`) při načtení configu. */
+export const LINK_KINDS: readonly ActionKind[] = ["url", "web", "folder", "file"];
+export const isLink = (a: { kind: ActionKind; script?: boolean }) => !a.script && LINK_KINDS.includes(a.kind);
+
+/** Patří akce na záložku `mode`? Práce = pro práci, Osobní = pro osobní, vlastní záložka = všechny. */
+export function onPage(a: { showOn: ShowOn }, mode: string): boolean {
+  const want: ShowOn | null = mode === "osobni" ? "personal" : mode === "prace" ? "work" : null;
+  return !want || a.showOn === "both" || a.showOn === want;
+}
+
+/** Odkazy (akce `isLink`) viditelné na záložce `mode`, v pořadí seznamu akcí (karta Odkazy). */
+export function linkActions<T extends { kind: ActionKind; showOn: ShowOn; script?: boolean }>(list: readonly T[], mode: string): T[] {
+  return list.filter((a) => isLink(a) && onPage(a, mode));
 }
 
 /** Akce viditelné na záložce `mode` (id z `layout`) ve skupinách; bez skupiny první, jinak pořadí výskytu.
  *  Práce = akce pro práci, Osobní = pro osobní, vlastní záložka = všechny. */
 export function visibleGroups<T extends { showOn: ShowOn; group: string | null }>(list: readonly T[], mode: string): { group: string | null; items: T[] }[] {
-  const want: ShowOn | null = mode === "osobni" ? "personal" : mode === "prace" ? "work" : null;
   const groups = new Map<string | null, T[]>([[null, []]]);
   for (const a of list) {
-    if (want && a.showOn !== "both" && a.showOn !== want) continue;
+    if (!onPage(a, mode)) continue;
     const g = a.group?.trim() || null;
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g)!.push(a);

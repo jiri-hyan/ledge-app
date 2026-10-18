@@ -1,4 +1,4 @@
-// Editor proužku v Nastavení (panel Šuplík a proužek): čistá logika nad `strip` z configu (zrcadlo
+// Editor proužku v Nastavení (panel Vzhled, `panels/StripSettings.tsx`): čistá logika nad `strip` z configu (zrcadlo
 // `stripconf.rs`) — které položky jde skrýt „v klidu“, změna barvy a „v klidu skryté“ jednoho pole,
 // náhled (ukázkové texty, ne skutečná data — v UI označené jako ukázka). Bez importů za běhu (`strip.test.mjs`).
 

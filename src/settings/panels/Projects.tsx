@@ -1,4 +1,4 @@
-// Panel „Projekty“: seznam dlaždic s logy (řazení přetažením, zapnout/vypnout, upravit, smazat
+// Sekce Projekty (první část panelu „Projekty, akce a odkazy“, `ProjectsActions.tsx`): seznam dlaždic s logy (řazení přetažením, zapnout/vypnout, upravit, smazat
 // s potvrzením a Vrátit), přidání ze složky nebo z naklonovaných rep (návrh z Rust `projectdetect.rs`)
 // a `roots` — složky, kde hledat repa. Editor projektu je v `ProjectEditor.tsx`.
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
@@ -10,6 +10,7 @@ import { base, fieldError, offerUndo, useSettings } from "../ctx";
 import { Confirm } from "../fields/Confirm";
 import { Toggle } from "../fields/controls";
 import { PanelHead, Row, Section } from "../fields/Row";
+import { fieldLabel } from "../labels";
 import { SortList } from "../fields/SortList";
 import { inRoots, moveItem, norm } from "../model";
 import type { PanelProps } from "../types";
@@ -173,19 +174,19 @@ export default function ProjectsPanel(p: PanelProps) {
 
   return (
     <>
-      <PanelHead id="projects.add" title={t("settings.nav.projekty", "Projekty")} desc={t("settings.proj.desc", "Dlaždice na hlavní stránce šuplíku: spuštění dev serveru nebo aplikace jedním klikem.")}>
+      <PanelHead id="projects.add" title={t("settings.nav.akce", "Projekty, akce a odkazy")} desc={t("settings.proj.desc", "Všechno, co se otevírá jedním klikem: projekty (dev server nebo aplikace), rychlé akce a odkazy na weby, složky a soubory.")}>
         <button class="mini" disabled={busy()} onClick={() => setCands(!cands())} aria-expanded={cands()}>{t("settings.proj.fromRepos", "Z naklonovaných rep")}</button>
-        <button class="mini ok" disabled={busy()} onClick={fromFolder}>+ {t("settings.proj.fromFolder", "Přidat ze složky…")}</button>
+        <button class="mini ok" disabled={busy()} onClick={fromFolder}>+ {t("settings.proj.fromFolder", "Přidat projekt ze složky…")}</button>
       </PanelHead>
       <Show when={cands()}>
         <Section title={t("settings.proj.cands", "Naklonovaná repa, která ještě nejsou v projektech")}>
           <Candidates onPick={(x) => addFrom(x.path)} onClose={() => setCands(false)} />
         </Section>
       </Show>
-      <Section>
+      <Section title={t("settings.proj.title", "Projekty")}>
         <Row id="projects" stack>
           <Show when={list().length} fallback={<p class="st-empty">{t("settings.proj.empty", "Zatím žádné projekty. Přidej složku s repem — Ledge sám pozná, jestli je to web nebo aplikace, a navrhne příkaz i port.")}</p>}>
-            <SortList items={list()} label={t("settings.f.projects", "Projekty v šuplíku")} onMove={(a, b) => { setOpen(null); c.set("projects", moveItem(list(), a, b)); }}>
+            <SortList items={list()} label={fieldLabel("projects")} onMove={(a, b) => { setOpen(null); c.set("projects", moveItem(list(), a, b)); }}>
               {(pr, i, handle) => (
                 <div class="st-item-wrap" classList={{ open: open() === i() }}>
                   <div class="st-item st-projrow" classList={{ dim: !pr.enabled }}>

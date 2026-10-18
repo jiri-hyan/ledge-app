@@ -1,5 +1,5 @@
-// Skok do Nastavení odjinud (paleta, karty, hlavička): id panelu z `settings/catalog.ts` (`osobni`, `akce`…)
-// nebo kotva pole `f-<pole>` (`f-personal.links`, `f-autostart`). Skořápka `Settings.tsx` čte
+// Skok do Nastavení odjinud (paleta, karty, hlavička): id panelu z `settings/registry.ts` (`osobni`, `akce`…; i staré id)
+// nebo kotva pole `f-<pole>` (`f-actions.add`, `f-autostart`). Skořápka `Settings.tsx` čte
 // `settingsTarget`: přepne panel (u kotvy panel toho pole), posune na řádek, zvýrazní ho a cíl vynuluje.
 // Ostatní id (prvek mimo Nastavení) jen posune do pohledu; vždy jde i událost `ledge:settings-panel`.
 import { createSignal } from "solid-js";

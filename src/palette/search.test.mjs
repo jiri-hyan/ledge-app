@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fold, score, segments, rank, pushRecent } from "./search.ts";
-import { slugId, moveItem, linksToActions, visibleGroups, cleanAction, draftError } from "../actions/model.ts";
+import { slugId, moveItem, isLink, linkActions, onPage, visibleGroups, cleanAction, draftError } from "../actions/model.ts";
 
 test("fold: bez diakritiky, malá písmena, stejná délka", () => {
   for (const [a, b] of [["Příliš žluťoučký", "prilis zlutoucky"], ["ÚČTY", "ucty"], ["abc", "abc"], ["Ř-ž_ů", "r-z_u"]]) {
@@ -87,21 +87,15 @@ test("model: moveItem přesune a nemění vstup", () => {
   assert.deepEqual(src, ["a", "b", "c", "d"]);
 });
 
-test("model: převod odkazů Osobní na akce (nic nemaže, duplicity přeskočí)", () => {
-  const links = [
-    { name: "Mapy", target: "https://mapy.cz" },
-    { name: "Fotky", target: "C:\\Users\\x\\Fotky" },
-    { name: "Nákup", target: "C:\\Users\\x\\nakup.txt" },
-    { name: "Poznámkový blok", target: "notepad.exe" },
-    { name: "Už je", target: "https://x.cz" },
-  ];
-  const out = linksToActions(links, [{ id: "x", label: "X", kind: "url", target: "https://x.cz" }]);
-  assert.deepEqual(out.map((a) => [a.kind, a.id, a.showOn]), [
-    ["url", "mapy", "personal"],
-    ["folder", "fotky", "personal"],
-    ["file", "nakup", "personal"],
-    ["app", "poznamkovy-blok", "personal"],
-  ]);
+test("model: odkaz = akce, která jen otevírá; karta Odkazy v pořadí akcí podle záložky", () => {
+  const v = (id, kind, showOn = "both", script = false) => ({ id, kind, showOn, group: null, script });
+  const list = [v("mapy", "url"), v("build", "command"), v("fotky", "folder", "personal"), v("prace", "url", "work"), v("calc", "app"), v("panel", "web"), v("doc", "file", "work"), v("skript", "url", "both", true)];
+  assert.deepEqual(list.filter(isLink).map((a) => a.id), ["mapy", "fotky", "prace", "panel", "doc"]);
+  assert.deepEqual(linkActions(list, "osobni").map((a) => a.id), ["mapy", "fotky", "panel"]);
+  assert.deepEqual(linkActions(list, "prace").map((a) => a.id), ["mapy", "prace", "panel", "doc"]);
+  assert.deepEqual(linkActions(list, "vlastni-1").map((a) => a.id), ["mapy", "fotky", "prace", "panel", "doc"]);
+  assert.equal(onPage({ showOn: "work" }, "osobni"), false);
+  assert.equal(onPage({ showOn: "work" }, "moje"), true);
 });
 
 test("model: viditelné skupiny podle záložky", () => {

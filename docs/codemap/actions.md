@@ -1,6 +1,6 @@
 # Codemapa: rychlé akce a paleta příkazů
 
-Config `actions` → karta „Rychlé akce“, panel Nastavení „akce“ a paleta (`Ctrl+K` / 🔍). Formát pro
+Config `actions` → karta „Rychlé akce“, karta „Odkazy“ (akce, které jen otevírají), panel Nastavení „akce“ (Projekty, akce a odkazy) a paleta (`Ctrl+K` / 🔍). Formát pro
 agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 
 ## Soubory
@@ -16,11 +16,13 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src-tauri/src/commands/actions.rs` | Tauri příkazy | `run_action`, `action_icon`, `action_icon_refresh`, `action_consent`, `action_check`, `pick_path` |
 | `src-tauri/src/iconimg.rs` | + ikona souboru/složky ze shellu (48 px) | `shell_png` |
 | `src/actions/api.ts` | invoke, cache ikon podle `iconKey`, spuštění s potvrzením a výsledkem | `actionsApi`, `actionIconSrc`, `runAction`, `isBusy`, `lastResult` |
-| `src/actions/model.ts` | čistá logika UI | `slugId`, `moveItem`, `guessKind`, `linksToActions`, `visibleGroups`, `cleanAction`, `draftError`, `WEB_SIZE` |
+| `src/actions/model.ts` | čistá logika UI | `slugId`, `moveItem`, `guessKind`, `LINK_KINDS`, `isLink`, `onPage`, `linkActions`, `visibleGroups`, `cleanAction`, `draftError`, `WEB_SIZE` |
 | `src/actions/ui.tsx` | ikona/monogram, potvrzení v šuplíku, výstup příkazu | `ActionIcon`, `askConfirm`, `ConfirmAction`, `answerConfirm`, `confirmPending`, `LastOutput` |
 | `src/ui/iconTone.ts` | tón ikony (čistá `toneOf` z pixelů, `measureTone` 1× na URL přes 16×16 canvas, `useTone`): tmavá/světlá kresba na průhledném → třída `tone-dark`/`tone-light`; CSS ji podloží barvou textu jen při stejném tónu jako motiv (`:root[data-scheme]`) — ikony akcí (`.act-img`) i loga v Nastavení (`.st-logo`); test `iconTone.test.mjs` | `toneOf`, `measureTone`, `useTone`, `Tone` |
-| `src/actions/ActionEditor.tsx` · `src/settings/panels/Actions.tsx` | editor akce · panel (seznam, přetažení, Vrátit, převod odkazů) | `ActionEditor`, `kindLabel` · `ActionsPanel` |
-| `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku) | `ActionsCard` |
+| `src/actions/ActionEditor.tsx` · `src/settings/panels/Actions.tsx` | editor akce · sekce „Akce a odkazy“ (jeden seznam, `SortList` tah + Alt+šipky, Vrátit) | `ActionEditor`, `kindLabel` · `ActionsPanel` |
+| `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku; `skipLinks` = na záložce s kartou Odkazy bez odkazů) | `ActionsCard` |
+| `src/cards/LinksCard.tsx` | karta Odkazy: `linkActions` záložky (favicon `ActionIcon`, klik `runAction`) + nepřevedené `personal.links` postaru (`openLink`) | `LinksCard` |
+| `src-tauri/src/linkmigrate.rs` | `personal.links` → akce při načtení configu a při `save_config` (idempotentní, co neprojde validací, zůstane odkazem) | `migrate`, `guess_kind` |
 | `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné | `fold`, `score`, `segments`, `rank`, `pushRecent` |
 | `src-tauri/src/scripts/mod.rs` | Script Commands: config `scripts`, složka (`resolve_dir_with`), sken bez watcheru (stat + jen změněné, strop 200, 1 MB), pohled pro UI, stav v paměti | `ScriptsConfig`, `scan_dir`, `load_one`, `Scan`, `Script` (`fingerprint`, `confirm_text`), `ScriptView`, `view`, `problem`, `refresh`, `refresh_async`, `snapshot_views`, `fresh`, `Listing`, `MAX_SCRIPTS`, `MAX_FILE` |
 | `src-tauri/src/scripts/meta.rs` | čistá hlavička `@ledge.*` (komentáře podle jazyka, prvních 4 KB) | `parse`, `header_text`, `split_args`, `Meta`, `Mode`, `Lang`, `HEADER_BYTES` |
@@ -28,7 +30,7 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src-tauri/src/scripts/tests.rs` | sken v tempdir, cache, stropy, pohled, skutečný cmd / PowerShell | — |
 | `src-tauri/src/winsettings.rs` | tvar cíle „Nastavení Windows“ (`ms-settings:` / `control:Microsoft.`), cesta k `control.exe` | `parse`, `WinTarget`, `control_exe` |
 | `src-tauri/src/commands/scripts.rs` | Tauri příkazy skriptů a nastavení Windows | `scripts_list`, `run_script`, `scripts_open_dir`, `win_settings_open` |
-| `src/actions/scripts.ts` · `ScriptsSettings.tsx` | invoke skriptů + `runAny` (akce i skript stejným tokem) · karta Skripty v panelu Rychlé akce (přepínače, složka, nalezené, formát) | `scriptsApi`, `runAny` · `ScriptsSettings` |
+| `src/actions/scripts.ts` · `ScriptsSettings.tsx` | invoke skriptů + `runAny` (akce i skript stejným tokem) · sekce Skripty v panelu Projekty, akce a odkazy (přepínače, složka, nalezené, formát) | `scriptsApi`, `runAny` · `ScriptsSettings` |
 | `src/palette/winsettings.ts` | statická tabulka stránek Nastavení Windows (jen dokumentované, CZ+EN slova přes `tIn`), položky jen s dotazem | `WIN_PAGES`, `winItems`, `WinPage` |
 | `src/palette/more.ts` | položky palety mimo snapshot: skripty (`scripts_list` při otevření) + Nastavení Windows + rychlé odpovědi z dotazu (řádky s `copy`) + příkaz „Emoji…“ + nápověda | `scriptItems`, `windowsItems`, `quickRows`, `emojiCommand`, `paletteTips` |
 | `src/palette/quick.ts` | co z dotazu vznikne bez snapshotu: `:` → emoji (místo seznamu), převod, výpočet (jeden řádek nahoře), jinak nic | `quick`, `Quick` |
@@ -105,7 +107,7 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
   ≤ 256 KB; nikdy periodicky. Snapshot nedělá I/O (`views` = paměť).
 - Skrytý příkaz čte stdout do konce → příkaz, který nechá běžet potomka (server), doběhne až
   termínem (zabije se strom) — na to je `terminal: true`.
-- **Kompaktní paleta** (`palette.compact`, výchozí vypnuto; Nastavení → Šuplík a proužek): bez dotazu
+- **Kompaktní paleta** (`palette.compact`, výchozí vypnuto; Nastavení → Chování): bez dotazu
   jen pole (`pal-bare`, seznam není v DOM → `ResizeObserver` v `App.tsx` šuplík přeměří sám, morf se
   nemění); psaní = výsledky, ↓ s prázdným polem = nedávné (bez nich vše), ↑ z prvního řádku sbalí,
   smazání dotazu sbalí. Rozhoduje `compact.ts`, `Palette.tsx` jen kreslí.

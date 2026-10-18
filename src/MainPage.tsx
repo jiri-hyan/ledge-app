@@ -24,7 +24,7 @@ import ShelfCard, { shelfShown } from "./shelf/ShelfCard";
 import BgLaunch from "./sessions/BgLaunch";
 import CardMenu, { HiddenNotice } from "./cards/CardMenu";
 import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
-import { visibleGroups } from "./actions/model";
+import { isLink, visibleGroups } from "./actions/model";
 import { lastResult } from "./actions/api";
 import Deck from "./layout/Deck";
 import Catalog from "./layout/Catalog";
@@ -43,7 +43,8 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const facts = () => ({
     procs: p.s.procs.length,
     notesEnabled: p.s.notesEnabled,
-    actions: visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], page().id).reduce((n, g) => n + g.items.length, 0),
+    // odkazy (akce, které jen otevírají) ukazuje na záložce s kartou Odkazy jen ona
+    actions: visibleGroups([...(p.s.actions ?? []).filter((a) => !(has("links") && isLink(a))), ...(p.s.scripts ?? [])], page().id).reduce((n, g) => n + g.items.length, 0),
     scriptOut: !!lastResult()?.id.startsWith("script:"),
     shelf: shelfShown(),
     media: !!((on("nowPlaying") && p.s.personal.media) || (on("sound") && p.s.personal.volume)),
@@ -71,7 +72,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         // Osobní = obecné poznámky; Práce a vlastní záložky = po projektech (reaktivně — karta zůstává při přepnutí záložky)
         return <Show when={kind() === "personal"} fallback={<NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} />}><NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>;
       case "actions":
-        return <ActionsCard s={p.s} onSettings={p.onSettings} wide menu={menu("actions")} />;
+        return <ActionsCard s={p.s} onSettings={p.onSettings} wide skipLinks={has("links")} menu={menu("actions")} />;
       case "shelf":
         return <ShelfCard wide menu={menu("shelf")} />;
       case "clock":
@@ -83,7 +84,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       case "calendar":
         return <CalendarCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("calendar")} />;
       case "links":
-        return <LinksCard s={p.s} onSettings={p.onSettings} menu={menu("links")} />;
+        return <LinksCard s={p.s} mode={page().id} onSettings={p.onSettings} menu={menu("links")} />;
       case "media":
         return <MediaCard s={p.s} menu={menu("media", on("nowPlaying") && on("sound") && p.s.personal.volume ? ["sound"] : [])} />;
     }

@@ -59,7 +59,7 @@ const DYNAMIC = [
   { file: "layout/text.ts", key: "x[0]", why: "názvy karet, částí a záložek z layout/model.ts (CARD_INFO, PART_INFO, builtinName) — " + PAIRS },
   { file: "settings/panels/Backup.tsx", key: "n[0]", why: "názvy sekcí SECTION_NAMES — " + PAIRS },
   { file: "settings/panels/Claude.tsx", key: "...HOOKS_TEXT[h().state]", why: PAIRS },
-  { file: "settings/panels/Drawer.tsx", key: "x.key", why: "položky proužku STRIP_ITEMS — " + PAIRS },
+  { file: "settings/panels/StripSettings.tsx", key: "x.key", why: "položky proužku STRIP_ITEMS — " + PAIRS },
   { file: "settings/panels/Notes.tsx", key: "...(SYNC_TEXT[st().state] ?? [\"\", st().state])", why: PAIRS },
 ];
 

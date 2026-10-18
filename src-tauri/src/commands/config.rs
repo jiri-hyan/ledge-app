@@ -11,7 +11,9 @@ pub(crate) fn get_config() -> Config {
 }
 
 #[tauri::command]
-pub(crate) fn save_config(cfg: Config) -> Result<(), String> {
+pub(crate) fn save_config(mut cfg: Config) -> Result<(), String> {
+    // import staré zálohy nebo starý draft: odkazy z `personal.links` jako akce (jako při načtení)
+    crate::linkmigrate::migrate(&mut cfg);
     config::save(&config::config_path(), &cfg)?;
     apply_config(cfg);
     Ok(())

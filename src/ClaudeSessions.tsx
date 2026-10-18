@@ -21,6 +21,7 @@ import AgentActions, { BgPill } from "./sessions/AgentActions";
 import { statusPill } from "./sessions/agentview";
 import { sectionOn } from "./cards/sections";
 import "./sessions.css";
+import { gotoSettingsPanel } from "./palette/goto";
 
 /** stav → barva pilulky a popisek (funkce, ať se popisek přeloží až při vykreslení) */
 const STATUS: Record<SessionView["status"], [string, () => string]> = {
@@ -82,7 +83,7 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
       <Show when={!p.s.claudeEnabled} fallback={
         <Show when={needHooks()}>
           <Show when={onlyAddons()} fallback={
-            <button class="hint-link" onClick={p.onSettings} title={p.s.hooks.missing.length ? t("sessions.hooksMissing", "Chybí: {list}", { list: p.s.hooks.missing.join(", ") }) : undefined}>{t("sessions.connectHooks", "Zapojit hooky pro schvalování a subagenty")}</button>
+            <button class="hint-link" onClick={() => { p.onSettings(); gotoSettingsPanel("f-claude.hooks"); }} title={p.s.hooks.missing.length ? t("sessions.hooksMissing", "Chybí: {list}", { list: p.s.hooks.missing.join(", ") }) : undefined}>{t("sessions.connectHooks", "Zapojit hooky pro schvalování a subagenty")}</button>
           }>
             <button class="hint-link" onClick={addQuestions} title={p.s.hooks.hint ?? undefined}>
               {p.s.hooks.missing.includes("PreToolUse") ? t("questions.addHook", "Doplnit otázky Clauda (odpovídat na ně v Ledge)") : t("sessions.plan.addHook", "Doplnit review plánu (schvalovat plány v Ledge)")}

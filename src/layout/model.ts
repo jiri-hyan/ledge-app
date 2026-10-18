@@ -46,7 +46,7 @@ export const CARD_INFO: Record<CardId, { name: Text; desc: Text; size: CardSize 
   timer: { name: ["cards.layout.card.timer", "Časovač"], desc: ["cards.layout.desc.timer", "Odpočet a stopky"], size: "s" },
   weather: { name: ["cards.layout.card.weather", "Počasí"], desc: ["cards.layout.desc.weather", "Teplota a výhled; stahuje se, jen když je vidět"], size: "s" },
   calendar: { name: ["cards.layout.card.calendar", "Kalendář"], desc: ["cards.layout.desc.calendar", "Dnes a zítra z odkazu ICS (Google, Outlook)"], size: "s" },
-  links: { name: ["cards.layout.card.links", "Odkazy"], desc: ["cards.layout.desc.links", "Rychlé odkazy na weby, složky a aplikace"], size: "m" },
+  links: { name: ["cards.layout.card.links", "Odkazy"], desc: ["cards.layout.desc.links", "Weby, složky a soubory z tvých akcí, s ikonou webu"], size: "m" },
   media: { name: ["cards.layout.card.media", "Právě hraje"], desc: ["cards.layout.desc.media", "Skladba nebo video z libovolné aplikace a hlasitost"], size: "m" },
 };
 export const PART_INFO: Record<PartKey, Text> = {

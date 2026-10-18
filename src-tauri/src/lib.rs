@@ -54,6 +54,7 @@ mod icons;
 mod limits;
 mod layout;
 mod limitslive;
+mod linkmigrate;
 mod media;
 mod mediaconf;
 mod mediatime;

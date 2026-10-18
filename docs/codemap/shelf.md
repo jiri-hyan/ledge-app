@@ -3,7 +3,7 @@
 Soubory přetažené z Průzkumníka na proužek u horní hrany se uloží do přihrádky — jen **odkazy**
 (cesty), nic se nekopíruje ani nepřesouvá. V šuplíku karta „Přihrádka“: kopírovat cestu (prostá /
 zmínka pro Claude Code), otevřít, ukázat ve složce, odebrat, vyprázdnit, přetáhnout ven. Config
-`shelf.enabled` (výchozí `true`, Nastavení → Šuplík a proužek). Cituj symbolem, ne číslem řádku.
+`shelf.enabled` (výchozí `true`, Nastavení → Šuplík a karty). Cituj symbolem, ne číslem řádku.
 
 ## Soubory
 

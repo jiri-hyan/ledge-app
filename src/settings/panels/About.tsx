@@ -1,4 +1,4 @@
-// Panel „Aktualizace a o aplikaci“: verze, stav kontroly nové verze (Rust `update.rs`, jen čte
+// Sekce „O aplikaci“ a „Aktualizace“ (panel Záloha a aplikace, `AppPanel.tsx`): verze, stav kontroly nové verze (Rust `update.rs`, jen čte
 // snapshot), nastavení kontroly, odkaz na repo, diagnostický log a cesta ke configu.
 import { createResource, Show } from "solid-js";
 import { api, type UpdateView } from "../../api";
@@ -7,7 +7,7 @@ import { t } from "../../i18n";
 import { sayError } from "../../ui/toast";
 import { useSettings } from "../ctx";
 import { Slider, Text, Toggle } from "../fields/controls";
-import { PanelHead, Row, Section } from "../fields/Row";
+import { Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
 
 /** Stav poslední kontroly nové verze — jen tady (hlavička ukazuje jen „dostupná“). */
@@ -32,8 +32,7 @@ export default function AboutPanel(_p: PanelProps) {
   const repoUrl = () => (/^[\w.-]+\/[\w.-]+$/.test(c.cfg.update.repo ?? "") ? `https://github.com/${c.cfg.update.repo}` : null);
   return (
     <>
-      <PanelHead title={t("settings.nav.oaplikaci", "Aktualizace a o aplikaci")} />
-      <Section>
+      <Section title={t("settings.about.title", "O aplikaci")}>
         <Row id="about.version" hint={t("settings.about.version.hint", "Ledge — šuplík u horního okraje obrazovky")}>
           <strong class="st-version">{info()?.version ?? u().current ?? "—"}</strong>
         </Row>
