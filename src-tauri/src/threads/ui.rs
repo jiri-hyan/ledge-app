@@ -48,6 +48,7 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                         }
                         // počasí (jen Full na Osobní) dřív než snapshot — karta hned ukáže „načítám“
                         maybe_refresh_weather(view == View::Full);
+                        crate::calendar::live::maybe_refresh(view == View::Full);
                         // stav do šuplíku dřív, než vyjede
                         let _ = c.app.emit_to(drawer::LABEL, "state", snapshot());
                         c.drawer.show(view, opener, &mon, width, anim, c.strip_logical(&mon));

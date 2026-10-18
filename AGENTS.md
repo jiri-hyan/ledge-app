@@ -52,10 +52,10 @@ Typické úpravy:
   Nenabízí se u dvou klonů téhož repa (nejednoznačné) ani u `appName` bez `exe`.
 - **Skrýt karty a sekce šuplíku** — `drawer.sections` je plochý seznam přepínačů (všechny `bool`, výchozí
   `true`; chybějící pole ve starém configu = zapnuto). Práce: `projects`, `running`, `claude`, `repos`;
-  Osobní: `clock`, `timer` (karta Časovač; skrytá karta časovač nevypne), `weather`, `links`, `nowPlaying`, `sound` (hlasitost v kartě Právě hraje), `battery`
+  Osobní: `clock`, `timer` (karta Časovač; skrytá karta časovač nevypne), `weather`, `calendar` (karta Kalendář), `links`, `nowPlaying`, `sound` (hlasitost v kartě Právě hraje), `battery`
   (v kartě Čas); obě záložky: `notes`, `actions`, `shelf`; sekce v kartě Claude:
   `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents`. Skrytá karta nic nepočítá, kde to jde:
-  skryté počasí se nestahuje, skrytá útrata (nebo celá karta Claude) neindexuje transcripty, skrytý Git panel
+  skryté počasí ani kalendář se nestahují, skrytá útrata (nebo celá karta Claude) neindexuje transcripty, skrytý Git panel
   ani subagenti se nenačítají, skryté Právě hraje / hlasitost / baterie zruší odběry událostí Windows
   (viz „Právě hraje, hlasitost, baterie“). Kartu skryje i ⋯ v její hlavičce v šuplíku (uloží jen to jedno pole, pár sekund
   jde „Vrátit“); vrátit vše: Nastavení → Šuplík a proužek → Karty na hlavní stránce → „Zobrazit vše“. Celé
@@ -88,6 +88,20 @@ Typické úpravy:
   hře nic. Stav (časy, ne tik) je v `%APPDATA%\Ledge\timer.json` — zapisuje se jen při akci, takže běžící
   odpočet přežije restart Ledge (aktualizace); doběhl-li mezitím, ukáže se jen tiše „čas vypršel“. Smazání
   souboru = nic neběží po dalším startu.
+- **Kalendář (jen čtení, bez přihlášení)** — `personal.calendars` (Nastavení → Osobní → Kalendáře; kód
+  `src-tauri/src/calendar/`, mapa `docs/codemap/calendar.md`): seznam `{ "name", "url", "color", "enabled" }`
+  (nejvýš 8). `url` = **tajná adresa ve formátu iCal** (Google: Nastavení kalendáře → Integrovat kalendář;
+  Outlook: Nastavení → Kalendář → Sdílené kalendáře → Publikovat kalendář → ICS), jen `https://`
+  (`webcal://` se bere jako https, `http://` neprojde validací). Adresa je tajemství: Ledge ji neloguje, v chybách
+  ani v UI ji neukazuje (jen doménu), cache `%LOCALAPPDATA%\Ledge\calendar-cache.json` je klíčovaná otiskem
+  SHA-256; export zálohy configu ji obsahuje (jako zbytek configu). `name` prázdné = název z feedu
+  (`X-WR-CALNAME`), `color` `#rrggbb` nebo `null` (podle pořadí), `enabled` výchozí `true`. Přidání v Nastavení:
+  vložit odkaz → Přidat (jedno zkušební stažení, Tauri `calendar_test`). Karta Kalendář na Osobní: Dnes (bez
+  skončených), Zítra, a když obojí chybí, nejbližší další den do 14 dní; celodenní nahoře, probíhající
+  zvýrazněná; patička = kalendáře (klik vypne/zapne). Stahuje se jen při otevřeném šuplíku na Osobní se
+  zapnutou kartou, když jsou data starší 15 min (po pokusu 2 min pauza), odpověď nejvýš 5 MB / 15 s; v klidu
+  nic. Opakování (RRULE běžné tvary, EXDATE, RECURRENCE-ID) a pásma (VTIMEZONE z feedu, běžné IANA
+  i Windows názvy; neznámé = místní čas, karta ho označí „≈“).
 - **Připomínka resetu limitu** — `claude.limitsReminder` (výchozí `true`): když 5h nebo týdenní limit
   Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
 - **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
@@ -144,6 +158,18 @@ Typické úpravy:
   @ (zmínka pro Claude Code `@C:\…`, s mezerou `@"C:\… …"`) do schránky, Otevřít, Ve složce, ✕, Kopírovat
   vše, Vyprázdnit, tah řádku ven (Průzkumník, terminál). Chybějící soubor = „chybí“, sám se nemaže.
   Nic se neposílá do session samo. Ve fullscreen hře / herním režimu nic. Mapa `docs/codemap/shelf.md`.
+- **Historie schránky** — sekce `clipboard` (Nastavení → Šuplík a proužek → Historie schránky; zapnout
+  jde i přímo z palety): `enabled` (výchozí **`false`** — nic se neposlouchá ani neukládá), `max` (1–200,
+  výchozí 25 nepřipnutých), `skipSecrets` (výchozí `true`: neukládat tvary `sk-…`, `ghp_…`/`github_pat_…`,
+  `glpat-…`, `AKIA…`, `AIza…`, `xox?-…`, `sk_live_…`, JWT, PEM soukromý klíč), `excludeApps` (exe, ze kterých
+  se nic neukládá; výchozí `KeePass.exe`, `KeePassXC.exe`, `1Password.exe`, `Bitwarden.exe`),
+  `clearOnLock` (výchozí `true`: Win+L smaže nepřipnuté), `savePins` (výchozí `true`: připnuté do
+  `%LOCALAPPDATA%\Ledge\clip-pins.json` = `{"pins":[{"text":"…","atMs":…}]}`; `false` soubor smaže).
+  Jen text (`CF_UNICODETEXT`), jen paměť, nic přes síť. Nikdy se neuloží obsah se značkou
+  `ExcludeClipboardContentFromMonitorProcessing` / `Clipboard Viewer Ignore` / `CanIncludeInClipboardHistory=0`
+  / `CanUploadToCloudClipboard=0` (správci hesel, hesla z Chromu/Edge), prázdný, jen bílé znaky, delší než
+  64 KB (neořezává se). Paleta: `v:` (+ hledání), Enter = zpět do schránky (nový záznam nevznikne),
+  Ctrl+P připnout, Ctrl+Delete smazat, řádek „Vymazat historii“. Mapa `docs/codemap/clipboard.md`.
 - **Skripty** — sekce `scripts` (Nastavení → Rychlé akce → Skripty): `enabled` (výchozí `true`, ale nic
   se neukáže, dokud složka neexistuje), `dir` (chybí = `%USERPROFILE%\Ledge\scripts`, `%PROMĚNNÉ%` se
   rozbalí, jinak absolutní cesta), `inActions` (výchozí `false`; `true` = i dlaždice v kartě Rychlé
@@ -339,6 +365,7 @@ ručně „Synchronizovat teď“ v Nastavení. Cyklus: `add -A` → commit `led
 | `POST /ctl/reload` | znovu načte config |
 | `POST /permission` | **jen pro hook `PermissionRequest`** |
 | `POST /question` | **jen pro hook `PreToolUse` s matcherem `AskUserQuestion`** (otázky Clauda) |
+| `POST /plan` | **jen pro hook `PreToolUse` s matcherem `ExitPlanMode`** (review plánu) |
 | `POST /event` | hooky SessionStart/UserPromptSubmit/PostToolUse/Stop/SessionEnd/Notification/SubagentStart/SubagentStop |
 
 Požadavky s hlavičkou `Origin` (prohlížeč) se odmítají.
@@ -456,21 +483,36 @@ aktuální soubor čte max 512 KB s termínem 1,5 s; Edit = diff celého souboru
 binární / ne-UTF-8 = „nelze zobrazit“, nad 512 KB = „příliš velké“. NotebookEdit náhled nemá. V `GET /status` jako
 `pending[].preview`.
 
-**Review plánu** (`ExitPlanMode`): když přijde `PermissionRequest` s `tool_name:"ExitPlanMode"`, karta ukáže plán
-(`tool_input.plan`, jinak obsah `planFilePath`; ≤ 64 k znaků) jako Markdown přes renderer poznámek (escapuje Rust),
-sbalitelný, se scrollem uvnitř; peek ukáže „Plán: <první nadpis>“. „Vždy povolit“ u plánu není. `extra.mode:
-"acceptEdits"` (jen u plánu, jen s `id`) = „Schválit a povolit úpravy“; jiný režim IPC odmítne. Zda Claude Code
-ExitPlanMode přes `PermissionRequest` posílá, dokumentace neříká — když ne, karta plánu se prostě neobjeví.
+**Review plánu** (`ExitPlanMode`, `claude/plan.rs` + `claude/planhook.rs`): hlavní cesta je zdokumentovaný hook
+`PreToolUse` s matcherem `ExitPlanMode` → `POST /plan` (Claude Code do `tool_input` vloží `plan` a `planFilePath`).
+Karta ukáže plán (`tool_input.plan`, jinak obsah `planFilePath`; ≤ 64 k znaků) jako Markdown přes renderer poznámek
+(escapuje Rust), sbalitelný, se scrollem uvnitř; peek ukáže „Plán: <první nadpis>“. „Vždy povolit“ u plánu není.
+Odpovědi `/plan` (`hookSpecificOutput`, `hookEventName:"PreToolUse"`):
+
+| klik | odpověď |
+|---|---|
+| **Schválit** (i zkratka approve) | `"permissionDecision":"allow"` + `updatedInput` = vstup beze změny (u ExitPlanMode povinné) |
+| **Vrátit s připomínkou…** | `"permissionDecision":"deny"`, `"permissionDecisionReason":"Plán vrácen z Ledge s připomínkou: <text>"` |
+| Zamítnout (i zkratka) | `"deny"`, důvod „Zamítnuto v Ledge.“ |
+| **Vybrat režim v Claude** / termín / Ledge neběží | prázdné tělo (nebo chyba spojení) = Claude ukáže svůj dialog s volbou režimu |
+
+`PreToolUse` režim po schválení nastavit neumí (docs: jen `permissionDecision`, `updatedInput`, `additionalContext`)
+→ „Schválit a povolit úpravy“ (`extra.mode:"acceptEdits"`, allow + `setMode`) je jen u karty z `PermissionRequest`;
+u karty z `/plan` (`pending[].via:"preToolUse"`) je místo něj `extra.inClaude:true` (jen s `id`) = Ledge nerozhodne.
+Cesta `PermissionRequest` s `tool_name:"ExitPlanMode"` zůstává (docs neříkají, že chodí). **Jeden plán = jedna
+karta:** druhá kopie téhož `PreToolUse` (session + `tool_use_id`, jinak obsah) se hned pustí; `PermissionRequest`
+plánu téže session, na který čeká karta z `/plan` nebo který Ledge před < 2 min pustil do Claude, kartu nezaloží (`Pass`).
 
 **Zapojení hooků** (Nastavení → Claude Code → „Zapojit hooky“, `src-tauri/src/hooksetup.rs`): do
 `~/.claude/settings.json` (nebo `%CLAUDE_CONFIG_DIR%`) přidá http hooky na `http://127.0.0.1:<claude.port>`:
 `PermissionRequest` → `/permission` (timeout 600 s), `PreToolUse` s `"matcher": "AskUserQuestion"` →
-`/question` (timeout 600 s), `SessionStart`, `UserPromptSubmit`, `PostToolUse`,
+`/question` (timeout 600 s), `PreToolUse` s `"matcher": "ExitPlanMode"` → `/plan` (timeout 600 s), `SessionStart`, `UserPromptSubmit`, `PostToolUse`,
 `Stop`, `SessionEnd`, `Notification`, `SubagentStart`, `SubagentStop` → `/event` (timeout 5 s).
 Idempotentní, pořadí klíčů a cizí hooky (i cizí `PreToolUse`) zachová, své pozná podle URL
-(`127.0.0.1|localhost:<port>/permission|/event|/question`; starý port nahradí) a u `/question` i podle matcheru.
-Hooky ze starší verze bez `PreToolUse` → `partial` s `hint` „Doplnit otázky Clauda“ (karta Claude i panel
-Nastavení → Otázky Clauda to doplní jedním klikem). Před první změnou záloha `settings.json.bak-pred-ledge`, zápis atomicky. „Odpojit“
+(`127.0.0.1|localhost:<port>/permission|/event|/question|/plan`; starý port nahradí) a u `/question` a `/plan` i podle
+matcheru (oba žijí pod `PreToolUse` vedle sebe). Hooky ze starší verze bez otázek → `partial`, `missing:["PreToolUse"]`
+s `hint` „Doplnit otázky Clauda“; bez review plánu → `missing:["PreToolUse(ExitPlanMode)"]` s „Doplnit review plánu“
+(karta Claude to doplní jedním klikem, panel Nastavení → Otázky Clauda otázky). Před první změnou záloha `settings.json.bak-pred-ledge`, zápis atomicky. „Odpojit“
 odebere jen hooky Ledge. Platí pro **nově spuštěné** session. Tauri: `hooks_status`, `hooks_install`,
 `hooks_remove`; stav je i ve snapshotu (`hooks`). Ručně hooky do settings.json nepiš — použij tlačítko.
 
@@ -582,10 +624,40 @@ snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
   kopie, míří Run **vždy na ni** — i když běží vývojový release z `target\release`, ten Run na sebe
   nepřepíše, takže dev build nemusí zastavovat „produkční“ Ledge. Bez instalace míří na běžící exe.
   Vypnutí maže hodnotu jen, když patří Ledge. Ladicí build a testy registr nikdy nemění. Odinstalace
-  hodnotu Run maže sama.
+  hodnotu Run maže sama. V bublině MSIX (Ledge spuštěný z Claude desktop) se Run nemění — viz níže.
 - **Dev vedle instalované kopie:** stejný `identifier` → `tauri_plugin_single_instance`; druhý spuštěný
   Ledge jen předá argumenty první instanci (otevře šuplík) a skončí. Release build ale pořád selže,
   když běží právě binárka z `target\release` (zamčené exe) — skript to hlásí předem.
+
+### Instalace z Claude session / bublina MSIX
+
+Claude desktop je balíček MSIX (`Claude_pzs8sxrjxfjjc`). Co se spustí z jeho session (terminál, instalátor,
+Ledge), zapisuje do **virtualizovaného** `%APPDATA%`, `%LOCALAPPDATA%` a HKCU — fyzicky
+`%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\{Roaming,Local}` a soukromý hive. Explorer při
+přihlášení tu kopii nevidí: Run „v bublině“ nic nespustí, config, data i `ledge.exe` žijí jen tam.
+**Změřeno 18. 10. 2026:** procesy z Claude Code session NEMAJÍ identitu balíčku (`GetCurrentPackageFullName`
+→ 15700), a přesto jsou virtualizované.
+
+- **Detekce** (`src-tauri/src/pkgctx.rs`, jednou při startu, řádek `pkgctx:` v `ledge.log`): identita
+  z `GetCurrentPackageFullName`, jinak **sonda** — malý soubor do kořene `%LOCALAPPDATA%`, hledá se jeho
+  kopie v `Packages\*\LocalCache\Local` (rodina = jméno složky), hned se smaže.
+- **Autostart v bublině** (`autostart::gate`): Run se nezapisuje ani nemaže; Nastavení → Šuplík a proužek →
+  Spouštění a paměť to říká u přepínače. Instance mimo bublinu Run zapíše při startu.
+- **Restartovat mimo** (stejné místo v Nastavení; v hlavičce tlumený chip „V bublině Claude“ → klik otevře
+  Nastavení): jednorázová úloha Plánovače `Ledge-outside-relaunch` (`outside.rs`: `InteractiveToken`, bez
+  limitu běhu, i na baterii, normální priorita) spustí Ledge s `--after-pid <pid>` — nová instance počká,
+  až stará skončí (jinak by ji chytil single-instance). Úloha se smaže, jakmile naběhne. Záloha:
+  `explorer.exe "<exe>"` (bez argumentů; předtím se uvolní zámek single-instance). Běžící servery chtějí
+  druhé potvrzení (Job Object). Běží-li Ledge z virtualizované cesty, spustí se jeho fyzická kopie v bublině.
+  Config z bubliny se **nepřenáší** — Nastavení ukáže obě cesty.
+- **Aktualizace v bublině** (`update.rs`): instalátor jde přes Plánovač (`Ledge-outside-update`) s `/S /R`
+  → tichá instalace do skutečného `%LOCALAPPDATA%` a šablona Tauri po ní sama spustí nainstalovaný Ledge
+  (`/R`). Úlohu uklidí příští start Ledge (`outside::cleanup_stale`, jen když už neběží).
+- **Instalace z Claude session:** `powershell -NoProfile -File scripts/install-local.ps1 [-Setup <setup.exe>]
+  [-Start]` — nejnovější `src-tauri\target\release\bundle\nsis\Ledge_*_x64-setup.exe` tiše (`/S`) přes WMI
+  `Win32_Process.Create` (mimo bublinu, bez okna, čeká na PID), ověří skutečnou instalaci (`CIM_DataFile`)
+  a skutečný `Uninstall`/`Run` (`StdRegProv`). `-Start` spustí Ledge mimo bublinu jednorázovou úlohou
+  Plánovače s `--autostart` a Run ověří znovu. Run sám nezapisuje (zapíše ho Ledge).
 
 ## Migrace z Notche
 

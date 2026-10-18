@@ -8,12 +8,12 @@ Vzhled, Rychlé akce, Otázky) jen vykresluje shell — jejich mapy jsou u nich.
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
 | `src/Settings.tsx` | skořápka: navigace, hledání, panel, lišta Uložit/Zahodit, konflikt, ověření | `Settings` `save` `check` `jump` `reveal` `go` `navKey` |
-| `src/settings/ctx.ts` | rozpracovaný config (store na úrovni modulu), `base`, chyba, hit, Vrátit, kontext pro pole | `cfg` `loadBase` `discard` `setCfg` `makeCtx` `useSettings` `offerUndo` `dirty` `active` |
+| `src/settings/ctx.ts` | rozpracovaný config (store na úrovni modulu), `base`, chyba, hit, Vrátit, úkoly po uložení, kontext pro pole | `cfg` `loadBase` `discard` `setCfg` `makeCtx` `useSettings` `offerUndo` `afterSave` `runAfterSave` `dirty` `active` |
 | `src/settings/catalog.ts` · `labels.ts` | pořadí panelů (vlastní + `EXTERNAL_PANELS`) · popisky voleb (JEDINÝ zdroj pro `Row` i hledání; i volby panelu Vzhled) | `PANELS` `searchItems` · `FIELDS` `fieldLabel` `fieldHint` `fieldKw` `fieldCs` `fieldAnchor` |
 | `src/settings/en.ts` · `panels/en.ts` | angličtina (`registerDict`, načítá `src/i18n/load.ts`): skořápka, nav, volby `settings.f.<id>`/`.hint`/`.kw`, sekce configu · texty panelů (vč. `appearance.*`, `actions.panel.*`, `questions.panel.*`); Průvodce má `settings.welcome.*` v `onboarding/en.ts` | |
 | `src/settings/model.ts` | čistá logika: hledání bez diakritiky, cesty, chyba→panel (nejdelší prefix: `drawer.glass`/`drawer.width`/`strip.opacity` → vzhled), přesuny, zkratky, porovnání | `search` `highlight` `panelForField` `moveItem` `dropIndex` `normalizeHotkey` `hotkeyFromEvent` `hotkeyCollisions` `canon` `cleanDraft` `inRoots` `relativeTo` |
 | `src/settings/fields/*` | `Row`/`Section`/`PanelHead`/`FieldErr` (`id` = kotva `f-<id>` i u sekce a hlavičky), ovládání (`controls.tsx`), `SortList` (pointer drag + Alt+šipky), `HotkeyInput`, `Confirm` | |
-| `src/settings/panels/*` | Projects (+`ProjectEditor`, `ProjectLogo`), Drawer (jen CHOVÁNÍ: otevírání, karty — všechny přepínače `drawer.sections` po skupinách z `cards/sections.ts` `SECTION_GROUPS` + „Zobrazit vše“, proužek — editor s náhledem, barvou a „Jen při dění“ nad čistou logikou `settings/strip.ts` (+ `strip.test.mjs`), vlastní text, `timer.strip` —, okna s taby, autostart, uvolnění paměti), Claude (`HooksSetup`), Notes, Personal (+ sekce Časovač: `timer.presets`, `timer.toast`), Hotkeys, Backup, About | |
+| `src/settings/panels/*` | Projects (+`ProjectEditor`, `ProjectLogo`), Drawer (jen CHOVÁNÍ: otevírání, karty — všechny přepínače `drawer.sections` po skupinách z `cards/sections.ts` `SECTION_GROUPS` + „Zobrazit vše“, proužek — editor s náhledem, barvou a „Jen při dění“ nad čistou logikou `settings/strip.ts` (+ `strip.test.mjs`), vlastní text, `timer.strip` —, okna s taby, autostart + upozornění na bublinu MSIX `src/pkgctx/BubbleNotice.tsx` (Restartovat mimo, nápověda u přepínače; logika `pkgctx/model.ts` + `model.test.mjs`), uvolnění paměti), Claude (`HooksSetup`), Notes, Personal (+ sekce Časovač: `timer.presets`, `timer.toast`), Hotkeys, Backup, About | |
 | `src/settings/widen.ts` | širší šuplík pro Nastavení a přechod podle stylu pohybu (`theme/appearance.ts` `widenMotion`; none / omezit pohyb = okamžitě) | `SETTINGS_WIDE` `wantWidth` `holdWide` `widenIn` `narrowOut` |
 | `src/fit.ts` · `fit.css` | `ViewMsg.maxH` → `--drawer-max-h`; tělo stránky se posouvá uvnitř (všechny stránky) | |
 | `src-tauri/src/commands/settings.rs` | příkazy Nastavení | `check_config` `config_defaults` `config_export` `config_import_preview` `pick_path` `pick_save` `project_detect` `project_candidates` `logo_preview` `app_info` `open_app_file` |
@@ -27,7 +27,12 @@ Vzhled, Rychlé akce, Otázky) jen vykresluje shell — jejich mapy jsou u nich.
 - **Úprava**: pole → `ctx.set(path)` → `touch` → `check` (250 ms): `canon(draft) != canon(base)` = neuloženo,
   `check_config` → `FieldError` → `Row`/`FieldErr` u pole, tečka u panelu v navigaci.
 - **Uložení** (`save`): `get_config` ≠ `base` → konflikt (Načíst nové / Přesto uložit) → `check_config` →
-  `save_config` (String chyba, zpětně kompatibilní) → `loadBase(get_config)`.
+  `save_config` (String chyba, zpětně kompatibilní) → `runAfterSave` (odložené úkoly panelů) → `loadBase(get_config)`.
+- **Jedno chování ukládání ve všech panelech:** panel mění jen draft, zapisuje JEN lišta shellu (Uložit / Ctrl+S,
+  Zahodit, Vrátit v liště přes `offerUndo`). `PanelProps` nemá `save` — žádné vlastní „Uložit vzhled“ ani okamžité
+  ukládání (Vzhled, Rychlé akce, Otázky Clauda). Co jádro přijme až pro uloženou verzi (souhlas s příkazem akce
+  `action_consent`), panel odloží `afterSave(fn)`; `loadBase` (Zahodit, Načíst nové) frontu zahodí. Rychlé akce:
+  „Spustit“ jen pro akci uloženou přesně v tomhle tvaru (`isSaved` proti `base`), editor akce má „Hotovo“ (do draftu).
 - **Import**: `pick_path(json)` → `config_import_preview` (ověří celý soubor) → výběr sekcí (rizikové
   nezaškrtnuté) → do draftu + Vrátit → zapíše až Uložit. **Reset**: `config_defaults()[sekce]` (ne `projects`).
 - **Jazyk** (`ui.lang`, přepínač v panelu Vzhled — kotva `f-ui.lang`): draft → Uložit → `loadBase` → `setLang`

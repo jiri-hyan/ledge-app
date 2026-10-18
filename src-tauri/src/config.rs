@@ -49,6 +49,8 @@ pub struct Config {
     pub shelf: crate::shelf::ShelfConfig,
     /// Časovač: předvolby odpočtu, toast po doběhnutí, segment v proužku (`timer.rs`).
     pub timer: crate::timer::TimerConfig,
+    /// Historie schránky v paletě (`cliphist/`): výchozí vypnuto, jen text, jen paměť.
+    pub clipboard: crate::cliphist::ClipboardConfig,
 }
 
 impl Default for Config {
@@ -74,6 +76,7 @@ impl Default for Config {
             scripts: Default::default(),
             shelf: Default::default(),
             timer: Default::default(),
+            clipboard: Default::default(),
         }
     }
 }
@@ -240,6 +243,8 @@ sections! {
     timer,
     /// Osobní: karta „Počasí“. Skrytá = nic se nestahuje.
     weather,
+    /// Osobní: karta „Kalendář“ (odkazy ICS z `personal.calendars`). Skrytá = nic se nestahuje.
+    calendar,
     /// Osobní: karta „Odkazy“.
     links,
     /// Karta Claude: řádek limitů 5h / týden.
@@ -281,6 +286,9 @@ pub struct PersonalConfig {
     /// Rychlé odkazy (nejvýš `MAX_LINKS`): web (jen http/https), složka, dokument/obrázek/médium
     /// (allowlist přípon) nebo aplikace (.exe bez argumentů).
     pub links: Vec<PersonalLink>,
+    /// Kalendáře z tajného odkazu ICS (Google, Outlook — jen čtení, bez přihlášení), karta Kalendář.
+    /// Adresa je tajemství: Ledge ji neloguje a v UI ukazuje jen doménu (`calendar/conf.rs`).
+    pub calendars: Vec<crate::calendar::conf::CalendarFeed>,
 }
 
 /// Nejvíc rychlých odkazů na záložce Osobní.
@@ -729,6 +737,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
             return Err(fe(format!("personal.links.{i}.target"), trf!("Odkaz „{}“: cíl je delší než {MAX_LINK_TARGET} znaků.", "Link “{}”: the target is longer than {MAX_LINK_TARGET} characters.", l.name)));
         }
     }
+    crate::calendar::conf::validate(&cfg.personal.calendars).map_err(|(path, msg)| fe(path, msg))?;
     validate_note_kinds(&cfg.notes.kinds)?;
     let sync = &cfg.notes.sync;
     if !(1..=120).contains(&sync.interval_min) {
@@ -766,6 +775,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     crate::appearance::validate(&cfg.appearance)?;
     crate::stripconf::validate(&cfg.strip)?;
     crate::timer::validate(&cfg.timer)?;
+    crate::cliphist::validate(&cfg.clipboard)?;
     Ok(())
 }
 

@@ -30,6 +30,14 @@ export const FIELDS: Record<string, FieldDef> = {
   autostart: { panel: "suplik", label: "Spouštět po startu Windows", kw: "start přihlášení" },
   "palette.compact": { panel: "suplik", label: "Kompaktní paleta příkazů", hint: "Ctrl+K a 🔍 ukážou jen vyhledávací pole; výsledky se rozbalí až při psaní, nedávné šipkou dolů", kw: "paleta příkazů ctrl+k hledání powertoys malá jen pole" },
   "shelf.enabled": { panel: "suplik", label: "Přihrádka na soubory", hint: "Přetáhni soubory z Průzkumníka na proužek nahoře — uloží se jen odkazy (cesty) do karty Přihrádka. Kopírování cesty pro Claude Code, otevření, tah ven.", kw: "shelf přihrádka soubory přetáhnout drag drop cesta schránka claude" },
+  // Historie schránky (`cliphist/ClipSettings.tsx`)
+  "clipboard.enabled": { panel: "suplik", label: "Historie schránky v paletě", hint: "Ctrl+K a v: ukáže, co jsi naposled zkopíroval. Výchozí vypnuto.", kw: "schránka clipboard historie kopírovat vložit win+v paste" },
+  "clipboard.max": { panel: "suplik", label: "Kolik položek si pamatovat", hint: "Starší se samy zapomenou. Text delší než 64 KB se neuloží vůbec.", kw: "počet položek historie schránka" },
+  "clipboard.skipSecrets": { panel: "suplik", label: "Neukládat přístupové klíče a tokeny", hint: "Text, který vypadá jako API klíč, token GitHubu nebo AWS, přihlašovací token (JWT) nebo soukromý klíč, se neuloží", kw: "tajemství heslo token klíč api github aws jwt schránka" },
+  "clipboard.clearOnLock": { panel: "suplik", label: "Zapomenout při zamčení počítače", hint: "Win+L smaže všechno kromě připnutých", kw: "zamknout zámek win+l smazat schránka soukromí" },
+  "clipboard.savePins": { panel: "suplik", label: "Připnuté si pamatovat i po restartu", hint: "Připnuté položky (Ctrl+P v paletě) se uloží do souboru ve tvém profilu (%LOCALAPPDATA%\\Ledge\\clip-pins.json). Vypnutím se soubor smaže.", kw: "připnout uložit disk restart schránka" },
+  "clipboard.excludeApps": { panel: "suplik", label: "Z těchto aplikací nic neukládat", hint: "Co v nich zkopíruješ, Ledge nikdy neuloží — hodí se pro správce hesel a bankovnictví", kw: "vyloučit aplikace správce hesel keepass bitwarden 1password schránka" },
+  "clipboard.clear": { panel: "suplik", label: "Vymazat historii teď", hint: "Smaže z paměti všechno kromě připnutých položek", kw: "smazat vyčistit schránka historie" },
   "palette.winSettings": { panel: "suplik", label: "Nastavení Windows v paletě", hint: "Při psaní v paletě najde i stránky Nastavení Windows (Bluetooth, Zvuk, Wi-Fi…) a klasické ovládací panely", kw: "windows settings ms-settings ovládací panely control bluetooth zvuk wifi" },
   // Rychlé akce — skripty (`actions/ScriptsSettings.tsx`)
   "scripts.enabled": { panel: "akce", label: "Skripty v paletě", hint: "Skripty ze složky skriptů jako položky palety (Ctrl+K). Dokud složka neexistuje, nic se neukáže.", kw: "script commands raycast skript powershell python node cmd bat" },
@@ -66,6 +74,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "notes.sync.intervalMin": { panel: "poznamky", label: "Jak často synchronizovat", hint: "Navíc 10 s po změně a při otevření šuplíku", kw: "interval minuty" },
   // Osobní
   "modes.personalEnabled": { panel: "osobni", label: "Záložka Osobní", hint: "Čas, počasí, rychlé odkazy a obecné poznámky", kw: "režim práce" },
+  "personal.calendars": { panel: "osobni", label: "Kalendáře", hint: "Google nebo Outlook z tajného odkazu ICS — jen čtení, bez přihlášení. Vlož odkaz a klikni na Přidat.", kw: "kalendář google outlook ics ical webcal události schůzky" },
   "personal.weather": { panel: "osobni", label: "Místo pro počasí", hint: "Open-Meteo, bez klíče. Prázdné = nic se nestahuje (polohu podle IP Ledge nezjišťuje).", kw: "počasí souřadnice šířka délka město" },
   "timer.presets": { panel: "osobni", label: "Předvolby časovače", hint: "Minuty oddělené čárkou (1–600, nejvýš 6) — tlačítka v kartě Časovač a příkazy v paletě", kw: "časovač odpočet minuty pomodoro focus timer" },
   "timer.toast": { panel: "osobni", label: "Oznámení po doběhnutí", hint: "Oznámení Windows, když odpočet skončí. Nebere fokus; ve hře, při „nerušit“ a s otevřeným šuplíkem se neukáže. Proužek blikne vždy.", kw: "časovač toast oznámení notifikace konec" },

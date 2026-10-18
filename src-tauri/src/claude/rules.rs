@@ -91,6 +91,8 @@ pub struct Extra {
     pub reason: Option<String>,
     /// jen plán (`plan.rs`): „Schválit a povolit úpravy“ (jen s `allow`)
     pub mode: Option<super::plan::Mode>,
+    /// jen plán: „Vybrat režim v Claude“ — Ledge nerozhodne, Claude ukáže svůj dialog (jen s `allow`)
+    pub in_claude: bool,
 }
 
 fn str_of<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
@@ -331,7 +333,7 @@ mod tests {
     #[test]
     fn resolve_table() {
         let a = Always { rules: vec![rule("Bash", Some("ls"))], label: "Bash(ls)".into(), from_claude: false };
-        let ex = |always: Option<Destination>, reason: Option<&str>| Extra { always, reason: reason.map(str::to_string), mode: None };
+        let ex = |always: Option<Destination>, reason: Option<&str>| Extra { always, reason: reason.map(str::to_string), mode: None, in_claude: false };
         let grant = Decision::AllowAlways(Grant { rules: a.rules.clone(), destination: Destination::Session });
         let cases: Vec<ResolveCase> = vec![
             ("povolit jako dřív", true, Extra::default(), Some(&a), Some(Decision::Allow)),

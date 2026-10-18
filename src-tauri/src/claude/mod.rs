@@ -10,13 +10,15 @@
 //! - `POST /question` ← hook `PreToolUse` (matcher `AskUserQuestion`): otázku ukáže jako chat a
 //!   odpověď z Ledge vrátí Claudovi (`questions.rs`). `PermissionRequest` pro `AskUserQuestion` se
 //!   hned pouští (`Pass`) — nikdy povolovací karta s JSONem.
+//! - `POST /plan` ← hook `PreToolUse` (matcher `ExitPlanMode`): karta „Plán“ (`planhook.rs`); případný
+//!   `PermissionRequest` téhož plánu kartu nezaloží znovu.
 //! - `GET /status` → JSON pro Clauda a skripty.
 //!
 //! Ochrana: požadavky s hlavičkou `Origin` (prohlížeč) se odmítají; Host musí být loopback.
 //!
 //! Podmoduly: `bridge` (HTTP server), `hygiene` (hlídač nedokončené práce, git), `paths` (cesty a
 //! porcelain, čisté), `questions` (otázky Clauda), `rules` („Vždy povolit“ a důvod zamítnutí, čisté),
-//! `preview` + `diff` (náhled změny Edit/Write v kartě), `plan` (review plánu ExitPlanMode). Tady stav
+//! `preview` + `diff` (náhled změny Edit/Write v kartě), `plan` + `planhook` (review plánu ExitPlanMode). Tady stav
 //! session a schvalování. Mapa: `docs/codemap/sessions.md`.
 
 mod bridge;
@@ -24,6 +26,7 @@ pub mod diff;
 mod hygiene;
 pub(crate) mod paths;
 pub mod plan;
+mod planhook;
 pub mod preview;
 mod questions;
 pub mod rules;
@@ -78,6 +81,11 @@ pub struct Pending {
     pub preview: Option<preview::Preview>,
     /// plán k review (`ExitPlanMode`, `plan.rs`); `Some` = karta plánu místo obyčejného schválení
     pub plan: Option<plan::Plan>,
+    /// odkud karta přišla (`/permission` nebo `/plan`) — tvar odpovědi a nabídka akcí plánu
+    pub via: plan::Via,
+    /// `tool_use_id` z `PreToolUse` (deduplikace karet plánu); `PermissionRequest` ho nemá
+    #[serde(skip)]
+    pub tool_use_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -128,6 +136,8 @@ struct Inner {
     track: HashMap<String, Track>,
     /// otázky Clauda (`questions.rs`); `None` sender = jen ukázaná (`questionHoldS` 0)
     asks: Vec<questions::Held>,
+    /// plány z `PreToolUse`, které Ledge pustil do Claude (`planhook.rs`, deduplikace)
+    released: Vec<planhook::Released>,
 }
 
 #[derive(Clone)]
@@ -177,7 +187,7 @@ pub const MAX_APPROVAL: Duration = Duration::from_secs(550);
 impl Claude {
     pub fn new(on_change: OnChange, timeout: Duration) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Inner { next_id: 1, pending: vec![], sessions: HashMap::new(), track: HashMap::new(), asks: vec![] })),
+            inner: Arc::new(Mutex::new(Inner { next_id: 1, pending: vec![], sessions: HashMap::new(), track: HashMap::new(), asks: vec![], released: vec![] })),
             on_change,
             timeout: Arc::new(Mutex::new(timeout.min(MAX_APPROVAL))),
             question_hold: Arc::new(Mutex::new(Duration::from_secs(questions::MAX_HOLD_S))),
@@ -239,13 +249,14 @@ impl Claude {
     /// bere z čekající žádosti (to, co karta ukázala), nikdy z IPC. „Vždy“ jen pro konkrétní `id`.
     /// U plánu rozhoduje `plan::resolve` (režim / připomínka; „Vždy“ ne), jinde režim nedává smysl.
     pub fn decide_with(&self, id: Option<u64>, allow: bool, extra: &rules::Extra) -> bool {
-        if (extra.always.is_some() || extra.mode.is_some()) && id.is_none() {
+        let plan_only = extra.mode.is_some() || extra.in_claude;
+        if (extra.always.is_some() || plan_only) && id.is_none() {
             return false;
         }
-        self.decide_by(id, |p| match (&p.plan, extra.mode) {
-            (Some(_), _) => plan::resolve(allow, extra),
-            (None, Some(_)) => None,
-            (None, None) => rules::resolve(allow, extra, p.always.as_ref()),
+        self.decide_by(id, |p| match (&p.plan, plan_only) {
+            (Some(_), _) => plan::resolve(allow, extra, p.via),
+            (None, true) => None,
+            (None, false) => rules::resolve(allow, extra, p.always.as_ref()),
         })
     }
 
@@ -258,9 +269,11 @@ impl Claude {
         };
         let Some(i) = idx else { return false };
         let Some(d) = f(&g.pending[i].0) else { return false };
+        let pass = d == Decision::Pass;
         let (p, tx) = g.pending.remove(i);
         let _ = tx.send(d);
-        if let Some(sess) = g.sessions.get_mut(&p.session_id) {
+        // „Vybrat režim v Claude“ = dál čeká, jen v okně Claude
+        if !pass && let Some(sess) = g.sessions.get_mut(&p.session_id) {
             sess.state = SessionState::Working;
             sess.updated_at = now_ms();
         }
@@ -292,40 +305,38 @@ impl Claude {
         let input = body.get("tool_input").cloned().unwrap_or(Value::Null);
         let session_id = s(body, "session_id");
         let cwd = s(body, "cwd");
-        let timeout = *self.timeout.lock();
         // čtení souborů jen teď (1×, s limitem a termínem), mimo zámek; snapshot už jen kopíruje
         let preview = preview::for_request(&tool, &input, &cwd);
-        let plan = if tool == plan::TOOL { plan::for_request(&input, &cwd) } else { None };
+        let is_plan = tool == plan::TOOL;
+        let plan = if is_plan { plan::for_request(&input, &cwd) } else { None };
         let summary = match &plan {
             Some(p) if !p.title.is_empty() => p.title.clone(),
             _ => summarize(&tool, &input),
         };
         let always = if plan.is_some() { None } else { rules::propose(&tool, &input, body.get("permission_suggestions")) };
+        let (key, sid) = (plan.as_ref().map(planhook::key), session_id.clone());
+        let p = Pending { id: 0, session_id, cwd, tool, summary, created_at: 0, expires_at: 0, always, preview, plan, via: plan::Via::Permission, tool_use_id: None };
+        // plán už řeší / řešila karta z `PreToolUse` → žádná druhá karta, rozhodne okno Claude
+        self.hold(p, |g, now| is_plan && planhook::duplicate(g, &sid, key, now)).unwrap_or(Decision::Pass)
+    }
+
+    /// Vystaví kartu (doplní `id` a časy, session → čeká) a blokuje do rozhodnutí šéfa / termínu
+    /// (`Pass`). `reject` pod týmž zámkem: `true` = karta nevznikne → `None`.
+    fn hold(&self, mut p: Pending, reject: impl FnOnce(&mut Inner, u64) -> bool) -> Option<Decision> {
+        let timeout = *self.timeout.lock();
         let (tx, rx) = mpsc::channel();
         let id = {
             let mut g = self.inner.lock();
+            let now = now_ms();
+            if reject(&mut g, now) {
+                return None;
+            }
             let id = g.next_id;
             g.next_id += 1;
-            let now = now_ms();
-            g.pending.push((
-                Pending {
-                    id,
-                    session_id: session_id.clone(),
-                    cwd: cwd.clone(),
-                    tool: tool.clone(),
-                    summary,
-                    created_at: now,
-                    expires_at: now + timeout.as_millis() as u64,
-                    always,
-                    preview,
-                    plan,
-                },
-                tx,
-            ));
-            let sess = g
-                .sessions
-                .entry(session_id.clone())
-                .or_insert_with(|| Session::new(&session_id, &cwd, SessionState::Waiting, now));
+            (p.id, p.created_at, p.expires_at) = (id, now, now + timeout.as_millis() as u64);
+            let (sid, cwd) = (p.session_id.clone(), p.cwd.clone());
+            g.pending.push((p, tx));
+            let sess = g.sessions.entry(sid.clone()).or_insert_with(|| Session::new(&sid, &cwd, SessionState::Waiting, now));
             sess.state = SessionState::Waiting;
             sess.updated_at = now;
             id
@@ -341,7 +352,7 @@ impl Claude {
         if removed {
             (self.on_change)();
         }
-        d
+        Some(d)
     }
 
     /// Hook události mimo schvalování → stav session. Vrací tělo odpovědi (`Some` jen když `Stop`

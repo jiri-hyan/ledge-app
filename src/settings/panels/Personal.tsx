@@ -11,6 +11,7 @@ import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 import type { PanelProps } from "../types";
 import { parsePresets } from "../../timer/model";
+import CalendarSettings from "../../calendar/CalendarSettings";
 
 const MAX_LINKS = 24;
 
@@ -99,6 +100,9 @@ export default function PersonalPanel(_p: PanelProps) {
               <For each={PLACES}>{([n, la, lo]) => <button class="mini" onClick={() => c.set("personal.weather", { lat: la, lon: lo, label: n })}>{n}</button>}</For>
             </div>
           </Row>
+        </Section>
+        <Section id="personal.calendars" title={t("settings.f.personal.calendars", "Kalendáře")} desc={t("settings.f.personal.calendars.hint", "Google nebo Outlook z tajného odkazu ICS — jen čtení, bez přihlášení. Vlož odkaz a klikni na Přidat.")}>
+          <CalendarSettings />
         </Section>
         <Section title={t("settings.timer.section", "Časovač")} desc={t("settings.timer.desc", "Odpočet a stopky v kartě Časovač, v paletě (Ctrl+K) a v proužku. Běží i se zavřeným šuplíkem a přes restart Ledge.")}>
           <Row id="timer.presets">

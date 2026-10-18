@@ -11,6 +11,8 @@ import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 import type { PanelProps } from "../types";
 import { hiddenSections, SECTION_GROUPS, SECTION_KEYS, type SectionKey } from "../../cards/sections";
+import { ClipSettings } from "../../cliphist/ClipSettings";
+import BubbleNotice, { bubble } from "../../pkgctx/BubbleNotice";
 import { clipCustom, COLOR_VAR, CUSTOM_MAX, customLen, previewSegments, QUIETABLE, STRIP_COLORS, withColor, withQuiet, type StripColorId } from "../strip";
 
 const STRIP_ITEMS: { id: string; key: string; cs: string }[] = [
@@ -157,6 +159,8 @@ export default function DrawerPanel(_p: PanelProps) {
         <Row id="palette.winSettings"><Toggle path="palette.winSettings" label={t("settings.f.palette.winSettings", "Nastavení Windows v paletě")} /></Row>
       </Section>
 
+      <ClipSettings />
+
       <Section title={t("settings.drawer.strip", "Proužek")}>
         <Row id="strip.enabled"><Toggle path="strip.enabled" label={t("settings.f.strip.enabled", "Proužek nahoře")} /></Row>
         <Row id="shelf.enabled"><Toggle path="shelf.enabled" label={t("settings.f.shelf.enabled", "Přihrádka na soubory")} /></Row>
@@ -278,7 +282,10 @@ export default function DrawerPanel(_p: PanelProps) {
       </Section>
 
       <Section title={t("settings.drawer.startMem", "Spouštění a paměť")} desc={t("settings.drawer.lookMoved", "Pozadí, rozmazání, šířku a animace šuplíku nastavíš v panelu Vzhled a animace.")}>
-        <Row id="autostart"><Toggle path="autostart" label={t("settings.f.autostart", "Spouštět po startu Windows")} /></Row>
+        <Row id="autostart" hint={bubble() ? t("settings.pkg.autostartBlocked", "Teď nelze — Ledge běží uvnitř balíčku {family}; Windows by zápis při přihlášení neviděl. Po restartu mimo se zapíše sám.", { family: bubble()!.family }) : undefined}>
+          <Toggle path="autostart" label={t("settings.f.autostart", "Spouštět po startu Windows")} />
+        </Row>
+        <BubbleNotice />
         <Row id="drawer.keepWarmS">
           <Toggle value={d().keepWarmS > 0} onChange={(v) => c.set("drawer.keepWarmS", v ? 60 : 0)} label={t("settings.f.drawer.keepWarmS", "Uvolnit paměť při nečinnosti")} />
         </Row>

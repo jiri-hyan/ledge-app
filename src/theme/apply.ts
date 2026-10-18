@@ -32,6 +32,8 @@ export function applyAppearance(raw: unknown) {
   root.dataset.theme = a.theme;
   root.dataset.motion = motion;
   root.style.colorScheme = THEMES[a.theme].light ? "light" : "dark";
+  // pro CSS, které potřebuje tón motivu (podklad ikon opačného tónu, `ui/iconTone.ts`)
+  root.dataset.scheme = THEMES[a.theme].light ? "light" : "dark";
   setMotion(motion, a.motion.speed);
   setShellRadius(26 * RADIUS[a.radius]);
   setStripRadius(stripShape(a.strip.style, a.strip.size).r);

@@ -41,6 +41,8 @@ export default function ActionEditor(p: {
   groups: string[];
   /** uložená verze ve snapshotu (ikona, „Spustit teď“) */
   saved?: ActionView;
+  /** akce je v configu uložená přesně v tvaru `initial` (jinak by „Spustit teď“ pustilo starou verzi) */
+  runnable?: boolean;
   onSave: (a: ActionCfg, consent: boolean) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -243,13 +245,13 @@ export default function ActionEditor(p: {
         <span class="msg">{p.isNew ? "" : dirty() ? t("actions.edit.dirty", "Neuložené změny") : ""}</span>
         <Show when={p.isNew ? undefined : p.saved}>
           {(v) => (
-            <button class="mini" disabled={dirty()} title={dirty() ? t("actions.edit.saveFirst", "Nejdřív ulož") : v().target} onClick={() => runAction(v(), askConfirm("panel"))}>
+            <button class="mini" disabled={dirty() || p.runnable === false} title={dirty() || p.runnable === false ? t("actions.edit.saveFirst", "Nejdřív ulož") : v().target} onClick={() => runAction(v(), askConfirm("panel"))}>
               {t("actions.edit.runNow", "Spustit teď")}
             </button>
           )}
         </Show>
         <button class="btn" onClick={p.onCancel}>{t("actions.edit.cancel", "Zrušit")}</button>
-        <button class="btn pri" disabled={!!err() || saving()} onClick={save}>{p.isNew ? t("actions.edit.add", "Přidat") : t("actions.edit.save", "Uložit")}</button>
+        <button class="btn pri" disabled={!!err() || saving()} onClick={save}>{p.isNew ? t("actions.edit.add", "Přidat") : t("actions.edit.apply", "Hotovo")}</button>
       </div>
       <ConfirmAction where="panel" />
       <LastOutput ids={p.saved ? [p.saved.id] : []} />

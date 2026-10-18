@@ -268,10 +268,22 @@ test("žádné osiřelé anglické klíče", () => {
   assert.deepEqual(orphan, [], "klíč už v kódu není — smaž ho ze slovníku (nebo je překlep)");
 });
 
+/** Slovníky načítané líně se svými daty (samostatný chunk) → importuje je jen ten modul, nikdy `load.ts`. */
+const LAZY_DICTS = [{ dict: "i18n/en-emoji.ts", by: "palette/emojidata.ts", why: "jména emoji jen s tabulkou (dynamický import v palette/emoji.ts)" }];
+
 test("všechny slovníky se načtou dřív než UI (i18n/load.ts v App.tsx)", () => {
   const load = readFileSync(join(SRC, "i18n", "load.ts"), "utf8");
   const imported = new Set([...load.matchAll(/^import "(.+)";$/gm)].map((m) => rel(join(SRC, "i18n", m[1] + ".ts"))));
-  assert.deepEqual([...DICT_FILES].filter((f) => !imported.has(f)).sort(), [], "slovník chybí v src/i18n/load.ts");
+  const lazy = new Set(LAZY_DICTS.map((x) => x.dict));
+  assert.deepEqual([...DICT_FILES].filter((f) => !imported.has(f) && !lazy.has(f)).sort(), [], "slovník chybí v src/i18n/load.ts");
+  for (const x of LAZY_DICTS) {
+    assert.ok(DICT_FILES.has(x.dict) && !imported.has(x.dict), `${x.dict}: líný slovník nesmí být v load.ts`);
+    const name = x.dict.split("/").pop();
+    assert.ok(readFileSync(join(SRC, x.by), "utf8").includes(`import "../i18n/${name}";`), `${x.by} musí importovat ${x.dict}`);
+    const stem = name.replace(/\.ts$/, "");
+    const others = FILES.filter((f) => f.file !== x.by && f.file !== x.dict && readFileSync(join(SRC, f.file), "utf8").includes(`/${stem}`)).map((f) => f.file);
+    assert.deepEqual(others, [], `${x.dict} importuje jen ${x.by} (${x.why})`);
+  }
   const app = readFileSync(join(SRC, "App.tsx"), "utf8");
   assert.match(app, /^import "\.\/i18n\/load";$/m);
   assert.ok(app.indexOf('import "./i18n/load";') < app.indexOf("import {"), "load musí být první import App.tsx");

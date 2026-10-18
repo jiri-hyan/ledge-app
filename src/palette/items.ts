@@ -4,6 +4,7 @@
 import { api, type NoteView, type Snapshot } from "../api";
 import type { ActionView } from "../types";
 import type { Item } from "./search";
+import type { ClipRow } from "../cliphist/model";
 import { runAction } from "../actions/api";
 import { askConfirm } from "../actions/ui";
 import { EXTERNAL_PANELS } from "../settings/registry";
@@ -13,7 +14,7 @@ import { t } from "../i18n";
 import { canBgLaunch, openBgLaunch } from "../sessions/BgLaunch";
 import { timerItems } from "./timer";
 
-export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows" | "calc" | "convert" | "emoji";
+export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows" | "calc" | "convert" | "emoji" | "clip";
 export interface PItem extends Item {
   section: Section;
   /** rychlá akce (ikona v řádku) */
@@ -22,6 +23,8 @@ export interface PItem extends Item {
   glyph?: string;
   /** Enter / klik zkopíruje tenhle text do schránky (výpočet, převod, emoji) — `run` se nevolá, do nedávných nejde */
   copy?: string;
+  /** řádek historie schránky (`v:`) — Enter / klávesy obsluhuje `Palette.tsx` (`cliphist/model.ts`) */
+  clip?: ClipRow;
   /** po spuštění paleta zůstane otevřená (příkaz „Emoji…“ jen přepne dotaz) */
   stay?: boolean;
   /** spustí položku (paleta počká, než doběhne případné potvrzení uvnitř) */
@@ -40,6 +43,7 @@ export const SECTION_LABEL: Record<Section, [string, string]> = {
   calc: ["palette.section.calc", "Výpočet"],
   convert: ["palette.section.convert", "Převod"],
   emoji: ["palette.section.emoji", "Emoji"],
+  clip: ["palette.section.clip", "Schránka"],
 };
 
 export type Nav = {

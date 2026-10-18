@@ -18,6 +18,14 @@
 //! shody se nic nespustí → odpojený `cmd` počká ~2 s, pustí tichý instalátor `/S` a pak nainstalovaný
 //! `ledge.exe`; volající (lib.rs) mezitím Ledge ukončí. Běžící dev servery (Job Object) by s Ledge
 //! umřely — proto `update_install` v lib.rs chce u nich druhé potvrzení.
+//!
+//! **V bublině MSIX** (`pkgctx.rs`, Ledge spuštěný z Claude desktop) by `cmd` i instalátor zdědily
+//! kontext balíčku → instalace i Run by skončily jen v jeho soukromé kopii. Proto se tam instalátor
+//! spouští MIMO bublinu přes Plánovač úloh (`outside.rs`) s `/S /R`: tichá instalace do skutečného
+//! `%LOCALAPPDATA%` a po ní šablona Tauri sama spustí nainstalovaný Ledge (`/R` → `RunAsUser`, ověřeno
+//! v `installer.nsi` z `@tauri-apps/cli` 2.12.3). Nová instance tak běží mimo bublinu a zapíše skutečný
+//! Run. Starý Ledge se ukončí sám (jinak ho instalátor v tichém režimu zavře přes Restart Manager).
+//! Plánovač nedostupný → chyba s cestou k instalátoru (žádná instalace do bubliny).
 
 use crate::config::UpdateConfig;
 use crate::gitinfo::{self, RunError};
@@ -315,10 +323,18 @@ pub fn installer_command(setup: &Path, exe: &Path) -> Result<String, String> {
     Ok(format!("/d /s /c \"ping -n 3 127.0.0.1 >nul & \"{}\" /S & start \"\" \"{}\"\"", setup.display(), exe.display()))
 }
 
+/// Argumenty instalátoru spuštěného mimo bublinu: tiše a po instalaci spustit Ledge (`/R`).
+pub const OUTSIDE_ARGS: &str = "/S /R";
+
 /// Spustí instalaci odpojeně od Ledge: vlastní skupina procesů, skrytá konzole (CREATE_NO_WINDOW —
 /// ne DETACHED_PROCESS, s ním by si `ping` otevřel viditelné okno konzole) a mimo případný Job Object
 /// rodiče (CREATE_BREAKAWAY_FROM_JOB, když ho job nedovolí, tak bez něj).
 fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
+    if crate::pkgctx::current().is_some() {
+        let dir = setup.parent().unwrap_or(Path::new(""));
+        return crate::outside::run_task(crate::outside::TASK_UPDATE, setup, OUTSIDE_ARGS, dir, crate::outside::After::Keep)
+            .map_err(|e| trf!("Instalátor nejde spustit mimo balíček ({e}). Spusť ho ručně z Průzkumníka: {}", "Can't run the installer outside the package ({e}). Run it yourself from Explorer: {}", setup.display()));
+    }
     let line = installer_command(setup, exe)?;
     let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
     let cmd_exe = root.join("System32").join("cmd.exe");

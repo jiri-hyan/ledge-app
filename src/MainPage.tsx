@@ -17,6 +17,7 @@ import Repos from "./cards/Repos";
 import ClockCard from "./cards/ClockCard";
 import TimerCard from "./timer/TimerCard";
 import WeatherCard from "./cards/WeatherCard";
+import CalendarCard from "./calendar/CalendarCard";
 import LinksCard from "./cards/LinksCard";
 import MediaCard, { PersonalLive } from "./media/MediaCard";
 import ActionsCard from "./cards/ActionsCard";
@@ -74,6 +75,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
           <Show when={shows("clock")}><ClockCard now={p.now} battery={battery()} menu={<CardMenu k="clock" parts={battery() ? ["battery"] : []} cfgError={p.s.cfgError} />} /></Show>
           <Show when={shows("timer")}><TimerCard s={p.s} now={p.now} menu={menu("timer")} /></Show>
           <Show when={shows("weather")}><WeatherCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("weather")} /></Show>
+          <Show when={shows("calendar")}><CalendarCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("calendar")} /></Show>
           <Show when={shows(mediaCardKey(p.s.sections))}>
             <MediaCard s={p.s} menu={<CardMenu k={mediaCardKey(p.s.sections)} parts={mediaCardKey(p.s.sections) === "nowPlaying" && on("sound") && p.s.personal.volume ? ["sound"] : []} cfgError={p.s.cfgError} />} />
           </Show>

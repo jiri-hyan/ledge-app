@@ -1,0 +1,8 @@
+/* Upozornění „běží v bublině MSIX“ (BubbleNotice.tsx) — jen tokeny motivu. */
+.pkg-note { display: grid; gap: 6px; margin: 4px 0 var(--s2, 8px); padding: 10px 13px; border-radius: var(--r-lg); font-size: var(--fs-ui); color: var(--t1); background: color-mix(in srgb, var(--amber) 9%, transparent); border: 1px solid color-mix(in srgb, var(--amber) 26%, transparent); }
+.pkg-note p { margin: 0; }
+.pkg-path { color: var(--t3); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.pkg-path code { color: var(--t2); font: var(--fs-sm) var(--mono); user-select: text; -webkit-user-select: text; }
+.pkg-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+.pkg-warn { flex: 1 1 auto; color: var(--amber-ink); }
+.pkg-upd { margin: 0; font-size: var(--fs-md); color: var(--amber-ink); }

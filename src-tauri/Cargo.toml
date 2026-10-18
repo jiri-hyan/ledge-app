@@ -64,7 +64,12 @@ features = [
   "Win32_System_DataExchange",
   "Win32_System_Memory",
   "Win32_System_Ole",
+  # historie schránky (`cliphist/`): smazat nepřipnuté při zamčení stanice (WTSRegisterSessionNotification)
+  "Win32_System_RemoteDesktop",
   "Win32_System_SystemServices",
+  # bublina MSIX (`pkgctx.rs`: GetCurrentPackageFullName) a spuštění mimo ni (`outside.rs`: Plánovač úloh)
+  "Win32_Storage_Packaging_Appx",
+  "Win32_System_TaskScheduler",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_JobObjects",
   "Win32_System_LibraryLoader",

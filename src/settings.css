@@ -174,6 +174,9 @@
 
 .st-logo { display: grid; place-items: center; flex-shrink: 0; overflow: hidden; border-radius: var(--r-sm); background: color-mix(in srgb, var(--acc) 22%, var(--card)); box-shadow: var(--ring-logo); }
 .st-logo img { width: 80%; height: 80%; object-fit: contain; }
+/* kresba stejného tónu jako motiv (`ui/iconTone.ts`) → podklad barvou textu, jako u ikon akcí */
+:root[data-scheme="dark"] .st-logo img.tone-dark, :root[data-scheme="light"] .st-logo img.tone-light {
+  width: 100%; height: 100%; padding: 12%; box-sizing: border-box; background: color-mix(in srgb, var(--t1) 92%, transparent); }
 .st-logo .mono-l { color: var(--acc); font: 700 var(--fs-md) var(--display); text-transform: uppercase; }
 .st-tag { padding: 1px 7px; color: var(--t3); font-size: var(--fs-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid var(--line-2); border-radius: var(--r-pill); white-space: nowrap; }
 .st-tag.dev { color: var(--blue); }

@@ -1,6 +1,7 @@
 // Panel Nastavení „Otázky Clauda“: odpovídat na AskUserQuestion z Ledge (`claude.questionHoldS`, 0 = jen
 // ukázat), vysvětlení a stav hooku PreToolUse(AskUserQuestion) s tlačítkem doplnit / zapojit
-// (Rust `hooksetup.rs`, příkaz `hooks_install`). Změna se ukládá hned přes `save()` shellu.
+// (Rust `hooksetup.rs`, příkaz `hooks_install`). Volba jde do draftu a uloží ji společná lišta (Uložit),
+// jako ve všech panelech; zapojení hooku je akce (zápis do ~/.claude), ne volba configu.
 import { createSignal, Show } from "solid-js";
 import { api } from "../../api";
 import { t } from "../../i18n";
@@ -19,10 +20,7 @@ export default function QuestionsPanel(p: PanelProps) {
   const hooks = () => p.s.hooks;
   const qMissing = () => hooks().state === "none" || hooks().missing.includes("PreToolUse");
 
-  async function setHold(v: number) {
-    p.setCfg("claude", "questionHoldS", v);
-    await p.save();
-  }
+  const setHold = (v: number) => p.setCfg("claude", "questionHoldS", v);
 
   async function install() {
     setAsk(false);
@@ -61,7 +59,7 @@ export default function QuestionsPanel(p: PanelProps) {
           {t("questions.panel.toggle", "Odpovídat na otázky z Ledge")}
           <small>{on() ? t("questions.panel.onHint", "Claude počká na tvou odpověď v Ledge") : t("questions.panel.offHint", "Ledge otázku jen ukáže, odpovídáš v okně Claude")}</small>
         </span>
-        <button class="switch" classList={{ on: on() }} role="switch" aria-checked={on()} aria-label={t("questions.panel.toggle", "Odpovídat na otázky z Ledge")} onClick={() => void setHold(on() ? 0 : DEFAULT_HOLD)} />
+        <button class="switch" classList={{ on: on() }} role="switch" aria-checked={on()} aria-label={t("questions.panel.toggle", "Odpovídat na otázky z Ledge")} onClick={() => setHold(on() ? 0 : DEFAULT_HOLD)} />
       </div>
       <Show when={on()}>
         <div class="opt">
@@ -70,7 +68,7 @@ export default function QuestionsPanel(p: PanelProps) {
             <small>{t("questions.panel.holdHint", "Pak otázka přejde do okna Claude (nejvýš {max} s)", { max: MAX_HOLD })}</small>
           </span>
           <span>
-            <input type="number" min={MIN_HOLD} max={MAX_HOLD} value={hold()} onChange={(e) => void setHold(Math.min(MAX_HOLD, Math.max(MIN_HOLD, Math.round(+e.currentTarget.value) || DEFAULT_HOLD)))} /> s
+            <input type="number" min={MIN_HOLD} max={MAX_HOLD} value={hold()} onChange={(e) => setHold(Math.min(MAX_HOLD, Math.max(MIN_HOLD, Math.round(+e.currentTarget.value) || DEFAULT_HOLD)))} /> s
           </span>
         </div>
       </Show>

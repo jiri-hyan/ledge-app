@@ -18,6 +18,7 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src/actions/api.ts` | invoke, cache ikon podle `iconKey`, spuštění s potvrzením a výsledkem | `actionsApi`, `actionIconSrc`, `runAction`, `isBusy`, `lastResult` |
 | `src/actions/model.ts` | čistá logika UI | `slugId`, `moveItem`, `guessKind`, `linksToActions`, `visibleGroups`, `cleanAction`, `draftError`, `WEB_SIZE` |
 | `src/actions/ui.tsx` | ikona/monogram, potvrzení v šuplíku, výstup příkazu | `ActionIcon`, `askConfirm`, `ConfirmAction`, `answerConfirm`, `confirmPending`, `LastOutput` |
+| `src/ui/iconTone.ts` | tón ikony (čistá `toneOf` z pixelů, `measureTone` 1× na URL přes 16×16 canvas, `useTone`): tmavá/světlá kresba na průhledném → třída `tone-dark`/`tone-light`; CSS ji podloží barvou textu jen při stejném tónu jako motiv (`:root[data-scheme]`) — ikony akcí (`.act-img`) i loga v Nastavení (`.st-logo`); test `iconTone.test.mjs` | `toneOf`, `measureTone`, `useTone`, `Tone` |
 | `src/actions/ActionEditor.tsx` · `src/settings/panels/Actions.tsx` | editor akce · panel (seznam, přetažení, Vrátit, převod odkazů) | `ActionEditor`, `kindLabel` · `ActionsPanel` |
 | `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku) | `ActionsCard` |
 | `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné | `fold`, `score`, `segments`, `rank`, `pushRecent` |
@@ -33,7 +34,8 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src/palette/quick.ts` | co z dotazu vznikne bez snapshotu: `:` → emoji (místo seznamu), převod, výpočet (jeden řádek nahoře), jinak nic | `quick`, `Quick` |
 | `src/palette/calc.ts` | kalkulačka: lexer + rekurzivní sestup (žádné `eval`/`Function`), procenta (`200 + 10%`, `15 % z 340`), funkce, konstanty; číslo podle jazyka bez float šumu | `evaluate`, `lex`, `formatNum` |
 | `src/palette/units.ts` | převody „číslo jednotka na/v/do/to/in jednotka“: délka, hmotnost, teplota (posun), objem, plocha, data (1000 i 1024, bity), čas, rychlost; měny ne | `UNITS`, `convert`, `conversionText`, `unitIndex`, `unitKey`, `unitSym` |
-| `src/palette/emoji.ts` · `emojidata.ts` | emoji: prefix `:`, hledání cs+en bez diakritiky (`search.ts`), shoda celého jména vyhrává remízu · statická tabulka ~480 emoji (`cs` + en jméno v `i18n/en-quick.ts`, `kw` ASCII) | `emojiQuery`, `searchEmoji`, `emojiItems` · `EMOJI` |
+| `src/palette/emoji.ts` · `emojidata.ts` | emoji: prefix `:`, hledání cs+en bez diakritiky (`search.ts`), shoda celého jména vyhrává remízu, **líné načtení** tabulky (dynamický `import()` = samostatný chunk ~51 kB při prvním `:` dotazu; `Palette.tsx` signál `emojiOk`, mezitím řádek „Načítám emoji…“) · tabulka ~480 emoji (`cs` + en jméno v `i18n/en-emoji.ts` — líný slovník, importuje ho jen `emojidata.ts`, `i18n.test.mjs` `LAZY_DICTS`; `kw` ASCII) | `emojiQuery`, `searchEmoji`, `emojiItems`, `loadEmoji`, `emojiLoaded` · `EMOJI` |
+| `src/cliphist/model.ts` | historie schránky v paletě (`v:`) → [clipboard.md](clipboard.md) | `clipQuery`, `clipRows` |
 | `src/palette/compact.ts` | kompaktní paleta (`palette.compact`): co ukázat pod polem podle režimu a dotazu, šipky (rozbalit ↓ / sbalit ↑) | `shown`, `visible`, `arrow`, `Shown`, `Fold` |
 | `src-tauri/src/paletteconf.rs` | sekce configu `palette` → `Snapshot.palette_compact` (`paletteCompact`) | `PaletteConfig` |
 | `src/palette/timer.ts` | příkazy časovače: „Časovač N min“ z předvoleb, pauza / pokračovat / +5 min / zrušit podle stavu, stopky; přes `timer/TimerCard.timerDo` | `timerItems` |
@@ -45,7 +47,7 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
 `MainPage.tsx` (karta), `Head.tsx` (🔍), `App.tsx` (signál palety, `Ctrl+K`, `palNav`). Skripty:
 `config.rs` (`Config.scripts` + `scripts::validate`), `snapshot.rs` (`scripts`, `palette_win_settings`),
 `settings.rs` (změna `scripts` → `refresh_async`), `threads/ui.rs` (otevření šuplíku s `inActions` →
-`refresh_async`), `i18n.ts` (`tIn`), `i18n/load.ts` (`en-winsettings`, `en-quick`).
+`refresh_async`), `i18n.ts` (`tIn`), `i18n/load.ts` (`en-winsettings`, `en-quick`; `en-emoji` ne — líně s tabulkou).
 
 ## Toky
 
@@ -77,7 +79,8 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
   dotaz na `:` a vrátí fokus poli.
 - **Nastavení Windows**: s dotazem `winItems` (77 řádků tabulky) → volba → `win_settings_open(target)`
   → `winsettings::parse` → opener (`ms-settings:`) / `control.exe /name …` → `UiCmd::Hide`.
-- **Souhlas**: editor (zaškrtnutí, jen riziková akce bez `confirm`) → uložit → `action_consent`
+- **Souhlas**: editor (zaškrtnutí, jen riziková akce bez `confirm`) → „Hotovo“ (do draftu) + `afterSave` → Uložit v liště →
+  `action_consent`
   (musí sedět s configem) → `Consents::grant`. `views` čte jen `has_cached` (nenačteno = ptát se).
 
 ## Invarianty a pasti

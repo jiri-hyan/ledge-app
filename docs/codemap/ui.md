@@ -14,8 +14,8 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 | `MainPage.tsx` | hlavní stránka: Práce (dlaždice + mřížka karet) / Osobní; viditelnost z `cards/sections.ts`, každé kartě předá `menu` (⋯), vše skryté = nápověda `page-empty` | `MainPage` |
 | `cards/sections.ts` | `drawer.sections` (zrcadlo `config::Sections`): klíče, skupiny pro Nastavení, čistá logika — co stránka ukáže, třída mřížky (`one`/`two`), změna jednoho pole configu; test `sections.test.mjs` (i shoda klíčů s config.rs) | `SECTION_KEYS` `SECTION_GROUPS` `CLAUDE_PARTS` `PERSONAL_PARTS` `mediaCardKey` `sectionOn` `visibleCards` `gridClass` `withSection` `hiddenSections` |
 | `cards/CardMenu.tsx` | ⋯ v hlavičce karty (vidět při najetí) → „Skrýt kartu“ / „Skrýt sekci: …“ (karta Claude); ukládá `get_config` → `withSection` → `save_config` (při `cfgError` ne); lišta „… skryta · Vrátit“ 6 s | `CardMenu` `HiddenNotice` `setSection` |
-| `cards/Head.tsx` | hlavička: hodiny / Zpět + název, chipy, nová verze, Práce/Osobní, nástroje | `Head` |
-| `cards/UpdatePanel.tsx` | poznámky k vydání → Instalovat (druhé potvrzení při běžících serverech) | `UpdatePanel` `install` |
+| `cards/Head.tsx` | hlavička: hodiny / Zpět + název, chipy (vč. tlumeného „V bublině Claude“ z `pkgctx/BubbleNotice.tsx` `bubble` → klik = Nastavení u autostartu), nová verze, Práce/Osobní, nástroje | `Head` |
+| `cards/UpdatePanel.tsx` | poznámky k vydání → Instalovat (druhé potvrzení při běžících serverech; v bublině MSIX řádek, že instalátor poběží mimo ni) | `UpdatePanel` `install` |
 | `cards/Projects.tsx` | dlaždice, spuštění, náklon, klon, akce pod dlaždicí | `Projects` `launch` `tilt` `cloneProject` |
 | `cards/Running.tsx` · `Repos.tsx` | karta Běží (log jen rozbalený) · karta Repa (Pull jen čisté a pozadu) | `Running` `PHASE` · `Repos` `pull` |
 | `cards/Peek.tsx` | malý šuplík: první schválení Clauda, jinak `ReminderPeek` | `Peek` |

@@ -8,6 +8,7 @@ import { useSettings } from "../ctx";
 import { Chips, Color, Num, PathPick, Seg, Text, Toggle } from "../fields/controls";
 import { FieldErr } from "../fields/Row";
 import { relativeTo } from "../model";
+import { useTone } from "../../ui/iconTone";
 
 /** Logo projektu: z dlaždice (snapshot), když se pole loga nezměnila; jinak náhled z jádra. */
 export function ProjectLogo(p: { project: any; savedLogo?: string; size?: number }) {
@@ -25,9 +26,10 @@ export function ProjectLogo(p: { project: any; savedLogo?: string; size?: number
   const [preview] = createResource(() => (p.savedLogo ? null : debounced()), () => api.logoPreview(JSON.parse(JSON.stringify(p.project))).catch(() => null));
   const src = () => p.savedLogo ?? preview() ?? undefined;
   const mono = () => (p.project.monogram || p.project.name || "?").slice(0, 2);
+  const tone = useTone(src);
   return (
     <span class="st-logo" style={{ "--acc": p.project.accent || "var(--violet)", width: `${p.size ?? 30}px`, height: `${p.size ?? 30}px` }}>
-      <Show when={src()} fallback={<span class="mono-l">{mono()}</span>}>{(s) => <img src={s()} alt="" />}</Show>
+      <Show when={src()} fallback={<span class="mono-l">{mono()}</span>}>{(s) => <img classList={{ "tone-dark": tone() === "dark", "tone-light": tone() === "light" }} src={s()} alt="" />}</Show>
     </span>
   );
 }

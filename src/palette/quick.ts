@@ -6,17 +6,18 @@ import type { Lang } from "../i18n.ts";
 import type { Ranked } from "./search.ts";
 import { evaluate, formatNum } from "./calc.ts";
 import { convert, conversionText } from "./units.ts";
-import { emojiQuery, searchEmoji, type EmojiItem } from "./emoji.ts";
+import { emojiLoaded, emojiQuery, searchEmoji, type EmojiItem } from "./emoji.ts";
 
 export type Quick =
-  | { kind: "emoji"; rows: Ranked<EmojiItem>[] }
+  /** `loading` = tabulka emoji se ještě načítá (líný chunk) — `rows` jsou prázdné */
+  | { kind: "emoji"; rows: Ranked<EmojiItem>[]; loading: boolean }
   /** `title` k zobrazení, `copy` = co jde do schránky (číslo bez oddělovače tisíců) */
   | { kind: "calc" | "convert"; title: string; copy: string }
   | null;
 
 export function quick(query: string, lang: Lang): Quick {
   const em = emojiQuery(query);
-  if (em !== null) return { kind: "emoji", rows: searchEmoji(em, lang) };
+  if (em !== null) return { kind: "emoji", rows: searchEmoji(em, lang), loading: !emojiLoaded() };
   if (!query.trim()) return null;
   const c = convert(query);
   if (c) return { kind: "convert", ...conversionText(c, lang) };

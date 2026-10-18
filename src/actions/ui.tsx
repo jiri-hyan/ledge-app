@@ -5,14 +5,17 @@ import { createSignal, Show } from "solid-js";
 import type { ActionView } from "../types";
 import { actionIconSrc, lastResult, setLastResult } from "./api";
 import { t } from "../i18n";
+import { useTone } from "../ui/iconTone";
 import "./actions.css";
 
 export function ActionIcon(p: { a: Pick<ActionView, "id" | "iconKey" | "monogram" | "color">; size?: number }) {
   const src = () => actionIconSrc(p.a);
   const px = () => `${p.size ?? 30}px`;
+  // tmavá / světlá kresba (favicon GitHubu) dostane podklad, když by splynula s motivem (`ui/iconTone.ts`)
+  const tone = useTone(src);
   return (
     <Show when={src()} fallback={<span class="act-mono" style={{ "--c": p.a.color, width: px(), height: px() }}>{p.a.monogram}</span>}>
-      {(s) => <img class="act-img" src={s()} alt="" style={{ width: px(), height: px() }} draggable={false} />}
+      {(s) => <img class="act-img" classList={{ "tone-dark": tone() === "dark", "tone-light": tone() === "light" }} src={s()} alt="" style={{ width: px(), height: px() }} draggable={false} />}
     </Show>
   );
 }

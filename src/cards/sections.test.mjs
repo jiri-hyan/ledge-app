@@ -62,13 +62,14 @@ test("co stránka ukáže", () => {
     [facts({ sec: off("projects", "claude", "repos", "notes") }), []],
     [facts({ sec: off("projects", "claude", "repos", "notes"), procs: 1 }), ["running"]],
     // Osobní: prázdné akce zvou k přidání (karta je vidět i bez akcí)
-    [facts({ mode: "osobni" }), ["clock", "timer", "weather", "links", "actions", "notes"]],
-    [facts({ mode: "osobni", sec: off("clock", "weather"), shelf: true }), ["timer", "links", "actions", "shelf", "notes"]],
-    [facts({ mode: "osobni", sec: off("clock", "timer", "weather", "links", "actions", "notes", "shelf"), shelf: true }), []],
+    [facts({ mode: "osobni" }), ["clock", "timer", "weather", "calendar", "links", "actions", "notes"]],
+    [facts({ mode: "osobni", sec: off("clock", "weather"), shelf: true }), ["timer", "calendar", "links", "actions", "shelf", "notes"]],
+    [facts({ mode: "osobni", sec: off("calendar") }), ["clock", "timer", "weather", "links", "actions", "notes"]],
+    [facts({ mode: "osobni", sec: off("clock", "timer", "weather", "calendar", "links", "actions", "notes", "shelf"), shelf: true }), []],
     // Právě hraje: jen s daty (skladba nebo hlasitost); se skrytou skladbou je to karta „Zvuk“
-    [facts({ mode: "osobni", media: true }), ["clock", "timer", "weather", "links", "nowPlaying", "actions", "notes"]],
-    [facts({ mode: "osobni", media: true, sec: off("nowPlaying") }), ["clock", "timer", "weather", "links", "sound", "actions", "notes"]],
-    [facts({ mode: "osobni", media: true, sec: off("nowPlaying", "sound") }), ["clock", "timer", "weather", "links", "actions", "notes"]],
+    [facts({ mode: "osobni", media: true }), ["clock", "timer", "weather", "calendar", "links", "nowPlaying", "actions", "notes"]],
+    [facts({ mode: "osobni", media: true, sec: off("nowPlaying") }), ["clock", "timer", "weather", "calendar", "links", "sound", "actions", "notes"]],
+    [facts({ mode: "osobni", media: true, sec: off("nowPlaying", "sound") }), ["clock", "timer", "weather", "calendar", "links", "actions", "notes"]],
     // sekce karty Claude nejsou karty stránky
     [facts({ sec: off("claudeLimits", "claudeCosts", "claudeGit", "claudeSubagents") }), ["projects", "claude", "repos", "notes"]],
   ];

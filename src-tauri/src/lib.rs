@@ -10,6 +10,7 @@
 //! - `strip`   — vlastní smyčka zpráv nativního proužku
 //! - `rawpush` — raw myš (tlak na horní hranu), zaregistrovaná jen u hrany nad prohlížečem
 //! - `shelf-drop` — cíl přetažení přihrádky (OLE); vznikne až při prvním tahu souborů na proužek
+//! - `cliphist` — historie schránky: jen se zapnutým `clipboard.enabled`, spí do `WM_CLIPBOARDUPDATE`
 //! - `claude-bridge` — HTTP pro hooky
 //! - `notes-watch` — sleduje složku poznámek (události, žádný poll) a přepočítá připomínky
 //! - `media` / `volume` (záložka Osobní) — vzniknou až při prvním zobrazení záložky (`personal_live`),
@@ -29,8 +30,10 @@ mod agentview;
 mod appearance;
 mod attention;
 mod autostart;
+mod calendar;
 mod battery;
 mod claude;
+mod cliphist;
 mod cloning;
 mod commands;
 mod config;
@@ -55,8 +58,10 @@ mod migrate;
 mod notes;
 mod notesync;
 mod onboarding;
+mod outside;
 mod paletteconf;
 mod personal;
+mod pkgctx;
 mod ports;
 mod procman;
 mod projectdetect;
@@ -128,6 +133,9 @@ pub fn run() {
     if ["LEDGE_NO_GUI", "NOTCH_NO_GUI"].iter().any(|k| std::env::var(k).as_deref() == Ok("1")) {
         return;
     }
+    // „Restartovat mimo“ (bublina MSIX, `pkgctx.rs`): počkat, až stará instance skončí — jinak by ji
+    // single-instance chytil a tahle by hned skončila
+    pkgctx::wait_for_predecessor();
     tauri::Builder::default()
         // Jedna instance podle `identifier` (`cz.hyan.ledge`). Starý Notch (`cz.hyan.notch`) tím NENÍ
         // chycený — oba by běžely vedle sebe a pral by se o port mostu 47800 (`claude.rs`, hooky
@@ -158,6 +166,9 @@ pub fn run() {
             }
             let (cfg, cfg_err) = load_or_seed();
             i18n::set_lang(cfg.ui.lang);
+            // bublina MSIX (Ledge spuštěný z Claude desktop): zalogovat; zbylé jednorázové úlohy uklidit
+            log(&pkgctx::startup_line(pkgctx::ctx()));
+            outside::cleanup_later();
             // běžící odpočet / stopky z minula (`timer.json`; zapisuje se jen při akci uživatele)
             timer::init(&config::config_dir());
             let (tx, rx) = mpsc::channel();
@@ -231,6 +242,9 @@ pub fn run() {
             limitslive::start_watch();
             // právě hraje v proužku (`strip.items` + `media`): odběry GSMTC hned, ne až po záložce Osobní
             media::sync(&core().cfg.read());
+            // historie schránky: listener jen se zapnutou funkcí (výchozí vypnuto)
+            let clip = core().cfg.read().clipboard.clone();
+            cliphist::sync(&clip);
             if let Err(e) = autostart::apply(cfg.autostart) {
                 log(&format!("autostart: {e}"));
             }
@@ -279,6 +293,8 @@ pub fn run() {
             commands::settings::logo_preview,
             commands::settings::app_info,
             commands::settings::open_app_file,
+            commands::pkgctx::pkg_context,
+            commands::pkgctx::relaunch_outside,
             commands::notes::note_create,
             commands::notes::note_list,
             commands::notes::note_done,
@@ -326,6 +342,7 @@ pub fn run() {
             commands::media::media_cover,
             commands::media::volume_set,
             commands::media::volume_mute,
+            commands::calendar::calendar_test,
             commands::actions::run_action,
             commands::shelf::shelf_list,
             commands::shelf::shelf_icon,
@@ -335,6 +352,13 @@ pub fn run() {
             commands::shelf::shelf_remove,
             commands::shelf::shelf_clear,
             commands::shelf::shelf_drag_out,
+            commands::cliphist::clip_list,
+            commands::cliphist::clip_paste,
+            commands::cliphist::clip_pin,
+            commands::cliphist::clip_remove,
+            commands::cliphist::clip_clear,
+            commands::cliphist::clip_enable,
+            commands::cliphist::clip_apps,
             commands::actions::action_icon,
             commands::actions::action_icon_refresh,
             commands::actions::action_consent,

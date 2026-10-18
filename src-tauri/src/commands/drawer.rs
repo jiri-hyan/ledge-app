@@ -17,6 +17,7 @@ pub(crate) fn get_state() -> Snapshot {
 pub(crate) fn set_mode(mode: String) {
     *core().mode.lock() = if mode == "osobni" { mode } else { "prace".into() };
     maybe_refresh_weather(false);
+    crate::calendar::live::maybe_refresh(false);
     mark_dirty();
 }
 

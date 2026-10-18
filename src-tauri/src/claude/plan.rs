@@ -1,13 +1,18 @@
-//! Review plánu: `PermissionRequest` s `tool_name == "ExitPlanMode"` (Claude chce opustit plan mode).
+//! Review plánu `ExitPlanMode` (Claude chce opustit plan mode). Dvě cesty (`Via`):
+//! - **`PreToolUse`** (matcher `ExitPlanMode`, `POST /plan`, `planhook.rs`) — zdokumentovaná: Claude Code
+//!   do `tool_input` vloží `plan` a `planFilePath`; `allow` musí nést `updatedInput` (docs hooků).
+//! - **`PermissionRequest`** (`POST /permission`) — dokumentace neříká, že pro ExitPlanMode chodí; zůstává
+//!   pro jistotu, `planhook` hlídá, aby jeden plán neudělal dvě karty.
+//!
 //! Čisté kromě `from_request` (případné čtení `planFilePath`).
 //!
 //! - Plán = `tool_input.plan` (Markdown); prázdný → zkusí soubor `planFilePath` (stejné limity jako
 //!   náhled diffu). Nic → `None` a karta je obyčejné schválení jako dřív.
-//! - Tři akce karty: **Schválit** = `allow`; **Schválit a povolit úpravy** = `allow` + `updatedPermissions:
-//!   [{type:"setMode", mode:"acceptEdits", destination:"session"}]`; **Vrátit s připomínkou** = `deny` +
-//!   `message`. „Vždy povolit“ u plánu není (`resolve` ho odmítne).
-//! - Zda Claude Code ExitPlanMode přes `PermissionRequest` posílá, dokumentace neříká — když nepřijde,
-//!   nic z toho se nespustí.
+//! - Akce karty: **Schválit** = `allow`; **Vrátit s připomínkou** = `deny` + důvod. **Schválit a povolit
+//!   úpravy** (`updatedPermissions: [{type:"setMode", mode:"acceptEdits", destination:"session"}]`) jen
+//!   u `PermissionRequest` — `PreToolUse` režim nastavit neumí (docs: jen `permissionDecision` /
+//!   `updatedInput` / `additionalContext`), tam místo toho **Vybrat režim v Claude** (`in_claude` → `Pass`:
+//!   hook vrátí prázdno a Claude ukáže svůj dialog s volbou režimu). „Vždy povolit“ u plánu není.
 //!
 //! Mapa: `docs/codemap/sessions.md` → Schvalování.
 
@@ -34,6 +39,17 @@ pub struct Plan {
     pub file: Option<String>,
     /// plán byl delší než `PLAN_MAX`
     pub cut: bool,
+}
+
+/// Odkud karta přišla — rozhoduje o tvaru odpovědi a o tom, které akce plánu dávají smysl.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Via {
+    /// `POST /permission` (všechny obyčejné karty)
+    #[default]
+    Permission,
+    /// `POST /plan` — hook `PreToolUse(ExitPlanMode)` (`planhook.rs`)
+    PreToolUse,
 }
 
 /// Režim po schválení plánu — z karty jde jen tenhle (jiné hodnoty IPC odmítne).
@@ -102,13 +118,18 @@ pub fn for_request(input: &Value, cwd: &str) -> Option<Plan> {
     from_request(input, cwd, |p| read_with_deadline(PathBuf::from(p), READ_MAX, READ_WAIT))
 }
 
-/// Klik na kartě plánu. `None` = nesmyslná kombinace (Vždy povolit, režim + vrátit) → karta zůstane.
-pub fn resolve(allow: bool, extra: &Extra) -> Option<Decision> {
+/// Klik na kartě plánu. `None` = nesmyslná kombinace (Vždy povolit, režim + vrátit, režim přes
+/// `PreToolUse`, „v Claude“ s čímkoli dalším) → karta zůstane.
+pub fn resolve(allow: bool, extra: &Extra, via: Via) -> Option<Decision> {
     if extra.always.is_some() {
         return None;
     }
+    if extra.in_claude {
+        return (allow && extra.mode.is_none() && extra.reason.is_none()).then_some(Decision::Pass);
+    }
     match (allow, extra.mode) {
         (true, None) => Some(Decision::Allow),
+        (true, Some(_)) if via == Via::PreToolUse => None,
         (true, Some(m)) => Some(Decision::AllowMode(m)),
         (false, Some(_)) => None,
         (false, None) => Some(match extra.reason.as_deref().and_then(clean_reason) {
@@ -181,20 +202,42 @@ mod tests {
             v["hookSpecificOutput"]["decision"].clone()
         };
         let ex = |mode: Option<Mode>, reason: Option<&str>| Extra { mode, reason: reason.map(str::to_string), ..Extra::default() };
-        assert_eq!(dec(resolve(true, &ex(None, None))), json!({"behavior": "allow"}), "Schválit");
+        let p = Via::Permission;
+        assert_eq!(dec(resolve(true, &ex(None, None), p)), json!({"behavior": "allow"}), "Schválit");
         assert_eq!(
-            dec(resolve(true, &ex(Some(Mode::AcceptEdits), None))),
+            dec(resolve(true, &ex(Some(Mode::AcceptEdits), None), p)),
             json!({"behavior": "allow", "updatedPermissions": [{"type": "setMode", "mode": "acceptEdits", "destination": "session"}]}),
             "Schválit a povolit úpravy"
         );
         assert_eq!(
-            dec(resolve(false, &ex(None, Some("  nejdřív testy \"x\" ")))),
+            dec(resolve(false, &ex(None, Some("  nejdřív testy \"x\" ")), p)),
             json!({"behavior": "deny", "message": "Plán vrácen z Ledge s připomínkou: nejdřív testy \"x\""}),
             "Vrátit s připomínkou"
         );
-        assert_eq!(dec(resolve(false, &ex(None, Some("  ")))), json!({"behavior": "deny", "message": "Zamítnuto v Ledge."}), "prázdná připomínka = zamítnout");
-        assert_eq!(resolve(false, &ex(Some(Mode::AcceptEdits), None)), None, "režim + vrátit = nic");
-        assert_eq!(resolve(true, &Extra { always: Some(Destination::Session), ..Extra::default() }), None, "Vždy povolit u plánu ne");
+        assert_eq!(dec(resolve(false, &ex(None, Some("  ")), p)), json!({"behavior": "deny", "message": "Zamítnuto v Ledge."}), "prázdná připomínka = zamítnout");
+        assert_eq!(resolve(false, &ex(Some(Mode::AcceptEdits), None), p), None, "režim + vrátit = nic");
+        assert_eq!(resolve(true, &Extra { always: Some(Destination::Session), ..Extra::default() }, p), None, "Vždy povolit u plánu ne");
+    }
+
+    /// Cesta `PreToolUse`: režim nastavit nejde (docs) → `None`; „Vybrat režim v Claude“ = `Pass` (jen samotné).
+    #[test]
+    fn resolve_by_via() {
+        let pre = Via::PreToolUse;
+        let ex = |in_claude: bool, mode: Option<Mode>, reason: Option<&str>| Extra { in_claude, mode, reason: reason.map(str::to_string), ..Extra::default() };
+        let cases: Vec<(&str, bool, Extra, Via, Option<Decision>)> = vec![
+            ("schválit", true, ex(false, None, None), pre, Some(Decision::Allow)),
+            ("režim přes PreToolUse ne", true, ex(false, Some(Mode::AcceptEdits), None), pre, None),
+            ("vrátit", false, ex(false, None, Some("jinak")), pre, Some(Decision::ReturnPlan("jinak".into()))),
+            ("zamítnout", false, ex(false, None, None), pre, Some(Decision::Deny)),
+            ("v Claude", true, ex(true, None, None), pre, Some(Decision::Pass)),
+            ("v Claude i u PermissionRequest", true, ex(true, None, None), Via::Permission, Some(Decision::Pass)),
+            ("v Claude + zamítnout ne", false, ex(true, None, None), pre, None),
+            ("v Claude + režim ne", true, ex(true, Some(Mode::AcceptEdits), None), pre, None),
+            ("v Claude + důvod ne", true, ex(true, None, Some("x")), pre, None),
+        ];
+        for (what, allow, extra, via, want) in cases {
+            assert_eq!(resolve(allow, &extra, via), want, "{what}");
+        }
     }
 
     #[test]
@@ -202,5 +245,8 @@ mod tests {
         let e: Extra = serde_json::from_value(json!({"mode": "acceptEdits"})).unwrap();
         assert_eq!(e.mode, Some(Mode::AcceptEdits));
         assert!(serde_json::from_value::<Extra>(json!({"mode": "bypassPermissions"})).is_err(), "jiný režim z karty nejde");
+        let e: Extra = serde_json::from_value(json!({"inClaude": true})).unwrap();
+        assert!(e.in_claude);
+        assert!(!serde_json::from_value::<Extra>(json!({})).unwrap().in_claude, "chybí = jako dřív");
     }
 }

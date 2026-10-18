@@ -12,7 +12,7 @@ const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 /** panel id → soubory, které ho vykreslují */
 const PANEL_FILES = {
   projekty: ["panels/Projects.tsx", "panels/ProjectEditor.tsx"],
-  suplik: ["panels/Drawer.tsx"],
+  suplik: ["panels/Drawer.tsx", "../cliphist/ClipSettings.tsx"],
   vzhled: ["panels/Appearance.tsx"],
   claude: ["panels/Claude.tsx"],
   poznamky: ["panels/Notes.tsx"],

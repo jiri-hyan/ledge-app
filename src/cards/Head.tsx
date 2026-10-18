@@ -9,6 +9,9 @@ import type { Page } from "../nav";
 import { IconSearch } from "../palette/Palette";
 import { t, tp } from "../i18n";
 import { rich } from "../ui/rich";
+import { bubble } from "../pkgctx/BubbleNotice";
+import { gotoSettingsPanel } from "../palette/goto";
+import { setActive } from "../settings/ctx";
 import "./head.css";
 
 export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: () => void; onSettings: () => void; onBack: () => void; onUpdate: () => void; onPalette?: () => void }) {
@@ -47,6 +50,13 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
           </Show>
           <Show when={dirty() + unpushed() > 0}>
             <span class="chip amber"><span class="d" />{rich(t("cards.head.dirty", "<b>{n}</b> neuloženo", { n: dirty() }))}{unpushed() ? t("cards.head.unpushed", " · {n} nepushnuto", { n: unpushed() }) : ""}</span>
+          </Show>
+          <Show when={bubble()}>
+            {(b) => (
+              <button class="chip dim" title={t("cards.pkg.chipTitle", "Ledge běží uvnitř aplikace {app} (balíček MSIX): nastavení, data a spouštění po startu jdou do její izolované kopie. Klik = Nastavení → Restartovat mimo.", { app: b().app })} onClick={() => { setActive("suplik"); p.onSettings(); gotoSettingsPanel("f-autostart"); }}>
+                <span class="d" />{t("cards.pkg.chip", "V bublině {app}", { app: b().app })}
+              </button>
+            )}
           </Show>
         </Show>
       </div>

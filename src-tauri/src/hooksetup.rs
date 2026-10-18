@@ -1,8 +1,10 @@
 //! Zapojení hooků Ledge do `~/.claude/settings.json` (Nastavení → Claude Code → „Zapojit hooky“).
 //! Čisté `merge` / `remove` / `status` nad textem (pořadí klíčů zachováno — vlastní `J`, serde_json
 //! bez `preserve_order` by klíče přeřadil), cizí klíče i hooky nechá být, své pozná podle URL
-//! `http://127.0.0.1|localhost:<port>/permission|/event|/question`; skupina s matcherem (otázky Clauda)
-//! se porovnává i podle `matcher`. Zápis: záloha `settings.json.bak-pred-ledge`
+//! `http://127.0.0.1|localhost:<port>/permission|/event|/question|/plan`; skupina s matcherem (otázky
+//! Clauda, review plánu) se porovnává i podle `matcher`. Víc hooků Ledge pod jednou událostí (PreToolUse:
+//! `/question` + `/plan`) se navzájem neodebírá — `merge` odebere jen náš hook, který žádnému řádku
+//! `EVENTS` té události nesedí (jiný port, jiný matcher, neznámá cesta). Zápis: záloha `settings.json.bak-pred-ledge`
 //! (jen jednou), atomicky (tmp + rename), odsazení 2 mezery. Testy jen nad řetězci a dočasnými soubory.
 
 use serde::de::{Deserializer, MapAccess, SeqAccess, Visitor};
@@ -10,12 +12,14 @@ use serde::ser::{SerializeMap, SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-/// Událost → cesta mostu → timeout (s) → matcher. PermissionRequest čeká na šéfa (`approvalTimeoutS`
-/// ≤ 550), PreToolUse(AskUserQuestion) na odpověď (`questionHoldS` ≤ 550; pevných 600 s, ať změna
-/// držení nevyžaduje přepis settings.json); ostatní jen ohlásí stav; Stop v `block` stihne git do 4 s.
+/// Událost → cesta mostu → timeout (s) → matcher. PermissionRequest a PreToolUse(ExitPlanMode) čekají na
+/// šéfa (`approvalTimeoutS` ≤ 550), PreToolUse(AskUserQuestion) na odpověď (`questionHoldS` ≤ 550; pevných
+/// 600 s, ať změna držení nevyžaduje přepis settings.json); ostatní jen ohlásí stav; Stop v `block`
+/// stihne git do 4 s.
 pub const EVENTS: &[(&str, &str, u32, Option<&str>)] = &[
     ("PermissionRequest", "/permission", 600, None),
     ("PreToolUse", "/question", 600, Some("AskUserQuestion")),
+    ("PreToolUse", "/plan", 600, Some("ExitPlanMode")),
     ("SessionStart", "/event", 5, None),
     ("UserPromptSubmit", "/event", 5, None),
     ("PostToolUse", "/event", 5, None),
@@ -28,6 +32,16 @@ pub const EVENTS: &[(&str, &str, u32, Option<&str>)] = &[
 
 /// Hook otázek Clauda — chybí-li jen ten (Ledge starší verze), UI nabídne „Doplnit otázky Clauda“.
 pub const QUESTIONS_EVENT: &str = "PreToolUse";
+/// Hook review plánu v `missing` (jméno pro UI; otázky zůstávají „PreToolUse“ kvůli starším UI).
+pub const PLAN_EVENT: &str = "PreToolUse(ExitPlanMode)";
+
+/// Jméno řádku `EVENTS` v `missing`: událost, u jiného matcheru než otázek „událost(matcher)“.
+fn label(ev: &str, m: Option<&str>) -> String {
+    match m {
+        Some(m) if m != "AskUserQuestion" => format!("{ev}({m})"),
+        _ => ev.to_string(),
+    }
+}
 
 const BACKUP: &str = "settings.json.bak-pred-ledge";
 
@@ -153,7 +167,7 @@ pub fn ours(hook: &J) -> Option<(u16, &str)> {
     let rest = hook.str("url")?.strip_prefix("http://")?;
     let rest = rest.strip_prefix("127.0.0.1:").or_else(|| rest.strip_prefix("localhost:"))?;
     let (port, path) = rest.split_at(rest.find('/')?);
-    matches!(path, "/permission" | "/event" | "/question").then_some(())?;
+    matches!(path, "/permission" | "/event" | "/question" | "/plan").then_some(())?;
     Some((port.parse().ok()?, path))
 }
 
@@ -230,7 +244,9 @@ pub fn merge(text: &str, port: u16) -> Result<(String, bool), String> {
         let Some((_, J::Arr(groups))) = hooks.iter_mut().rev().find(|(k, _)| k == ev) else {
             return Err(trf!("hooks.{ev} v settings.json není pole — uprav ho ručně.", "hooks.{ev} in settings.json isn't an array — fix it by hand."));
         };
-        strip(groups, &|gm, h| ours(h).is_some() && (h.str("url") != Some(url.as_str()) || gm != *m));
+        // náš hook, který nesedí žádnému řádku téhle události (jiný port / matcher / cesta) → pryč
+        let wanted: Vec<(String, Option<&str>)> = EVENTS.iter().filter(|(e, ..)| e == ev).map(|(_, p, _, wm)| (want_url(port, p), *wm)).collect();
+        strip(groups, &|gm, h| ours(h).is_some() && !wanted.iter().any(|(u, wm)| h.str("url") == Some(u.as_str()) && gm == *wm));
         if !has_hook(groups, &url, *m) {
             let hook = J::obj(vec![("type", J::Str("http".into())), ("url", J::Str(url)), ("timeout", J::Num((*timeout).into()))]);
             let mut group = m.map(|m| vec![("matcher", J::Str(m.into()))]).unwrap_or_default();
@@ -289,6 +305,20 @@ pub fn hint(missing: &[String]) -> Option<String> {
                 .into(),
             )
         }
+        [one] if one == PLAN_EVENT => Some(
+            crate::i18n::tr(
+                "Chybí hook pro review plánu (zapojený starší verzí Ledge) — klikni „Doplnit review plánu“.",
+                "The hook for plan review is missing (connected by an older Ledge) — click “Add plan review”.",
+            )
+            .into(),
+        ),
+        [a, b] if [a, b].iter().all(|x| *x == QUESTIONS_EVENT || *x == PLAN_EVENT) => Some(
+            crate::i18n::tr(
+                "Chybí hooky pro otázky Clauda a review plánu (zapojené starší verzí Ledge) — klikni „Doplnit otázky a review plánu“.",
+                "The hooks for Claude's questions and plan review are missing (connected by an older Ledge) — click “Add questions and plan review”.",
+            )
+            .into(),
+        ),
         _ if missing.len() == EVENTS.len() => None,
         _ => Some(trf!("Chybí: {}", "Missing: {}", missing.join(", "))),
     }
@@ -299,7 +329,7 @@ pub fn status(text: &str, port: u16) -> (&'static str, Vec<String>) {
     let has = |ev: &str, path: &str, m: Option<&str>| {
         matches!(root.get("hooks").and_then(|h| h.get(ev)), Some(J::Arr(gs)) if has_hook(gs, &want_url(port, path), m))
     };
-    let missing: Vec<String> = EVENTS.iter().filter(|(ev, p, _, m)| !has(ev, p, *m)).map(|(ev, ..)| ev.to_string()).collect();
+    let missing: Vec<String> = EVENTS.iter().filter(|(ev, p, _, m)| !has(ev, p, *m)).map(|(ev, _, _, m)| label(ev, *m)).collect();
     let state = match missing.len() {
         0 => "full",
         n if n == EVENTS.len() => "none",
@@ -471,6 +501,8 @@ mod tests {
         let j = v(&out);
         assert_eq!(j["hooks"]["PreToolUse"][0], json!({"matcher":"Bash","hooks":[{"type":"command","command":"guard.sh"}]}), "cizí PreToolUse zůstane");
         assert_eq!(j["hooks"]["PreToolUse"][1], json!({"matcher":"AskUserQuestion","hooks":[{"type":"http","url":"http://127.0.0.1:47800/question","timeout":600}]}));
+        assert_eq!(j["hooks"]["PreToolUse"][2], json!({"matcher":"ExitPlanMode","hooks":[{"type":"http","url":"http://127.0.0.1:47800/plan","timeout":600}]}));
+        assert_eq!(j["hooks"]["PreToolUse"].as_array().unwrap().len(), 3, "otázky a plán se navzájem neodebraly");
         assert!(out.find("\"AskUserQuestion\"").unwrap() < out.find("/question").unwrap(), "matcher před hooks");
         assert_eq!(status(&out, 47800), ("full", vec![]));
         assert!(!merge(&out, 47800).unwrap().1, "idempotentní");
@@ -480,6 +512,7 @@ mod tests {
         let j = v(&merge(moved, 47800).unwrap().0);
         assert_eq!(j["hooks"]["PreToolUse"][0], json!({"matcher":"Bash","hooks":[{"type":"command","command":"guard.sh"}]}));
         assert_eq!(j["hooks"]["PreToolUse"][1]["matcher"], "AskUserQuestion");
+        assert_eq!(j["hooks"]["PreToolUse"][2]["matcher"], "ExitPlanMode");
         // remove vezme jen náš, cizí PreToolUse nechá
         let j = v(&remove(&out).unwrap().0);
         assert_eq!(j["hooks"]["PreToolUse"], json!([{"matcher":"Bash","hooks":[{"type":"command","command":"guard.sh"}]}]));
@@ -489,7 +522,7 @@ mod tests {
     fn old_install_without_questions_is_partial_with_hint() {
         let full = merge("{}", 47800).unwrap().0;
         let mut j: Value = v(&full);
-        j["hooks"].as_object_mut().unwrap().remove("PreToolUse");
+        j["hooks"]["PreToolUse"].as_array_mut().unwrap().retain(|g| g["matcher"] != "AskUserQuestion");
         let old = serde_json::to_string(&j).unwrap();
         let (st, missing) = status(&old, 47800);
         assert_eq!((st, missing.as_slice()), ("partial", ["PreToolUse".to_string()].as_slice()));
@@ -506,6 +539,49 @@ mod tests {
         assert_eq!(hint(&all), None, "nezapojené = žádná zvláštní hláška");
     }
 
+    /// Přechod z Ledge bez review plánu: settings.json s hooky vlny 4 (otázky ano, plán ne) + cizí PreToolUse.
+    /// `merge` doplní jen skupinu `ExitPlanMode`, nic jiného nepohne, podruhé nic; `remove` vezme obě naše.
+    #[test]
+    fn upgrade_adds_plan_hook_safely() {
+        let v4 = r#"{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "guard.sh" }] },
+      { "matcher": "AskUserQuestion", "hooks": [{ "type": "http", "url": "http://127.0.0.1:47800/question", "timeout": 600 }] }
+    ]
+  }
+}
+"#;
+        let mut j: Value = v(&merge("{}", 47800).unwrap().0);
+        j["hooks"]["PreToolUse"] = v(v4)["hooks"]["PreToolUse"].clone();
+        let old = serde_json::to_string_pretty(&j).unwrap();
+        let (st, missing) = status(&old, 47800);
+        assert_eq!((st, missing.as_slice()), ("partial", [PLAN_EVENT.to_string()].as_slice()));
+        assert!(hint(&missing).unwrap().contains("Doplnit review plánu"));
+        let (out, changed) = merge(&old, 47800).unwrap();
+        assert!(changed);
+        let pre = v(&out)["hooks"]["PreToolUse"].clone();
+        assert_eq!(pre[0], v(v4)["hooks"]["PreToolUse"][0], "cizí hook netknutý");
+        assert_eq!(pre[1], v(v4)["hooks"]["PreToolUse"][1], "otázky netknuté");
+        assert_eq!(pre[2], json!({"matcher":"ExitPlanMode","hooks":[{"type":"http","url":"http://127.0.0.1:47800/plan","timeout":600}]}));
+        assert_eq!(status(&out, 47800), ("full", vec![]));
+        assert!(!merge(&out, 47800).unwrap().1, "idempotentní");
+        // jiný port: obě naše skupiny přepsané na nový port, žádná navíc
+        let moved = v(&merge(&out, 47801).unwrap().0)["hooks"]["PreToolUse"].clone();
+        assert_eq!(moved.as_array().unwrap().len(), 3);
+        assert_eq!((moved[1]["hooks"][0]["url"].as_str(), moved[2]["hooks"][0]["url"].as_str()), (Some("http://127.0.0.1:47801/question"), Some("http://127.0.0.1:47801/plan")));
+        // náš /plan pod špatným matcherem → přesune se pod ExitPlanMode
+        let wrong = out.replace("\"ExitPlanMode\"", "\"Edit\"");
+        assert_eq!(status(&wrong, 47800).1, vec![PLAN_EVENT.to_string()]);
+        let fixed = v(&merge(&wrong, 47800).unwrap().0)["hooks"]["PreToolUse"].clone();
+        assert_eq!((fixed.as_array().unwrap().len(), fixed[2]["matcher"].as_str()), (3, Some("ExitPlanMode")));
+        // remove: jen cizí zůstane
+        assert_eq!(v(&remove(&out).unwrap().0)["hooks"]["PreToolUse"], json!([{"matcher":"Bash","hooks":[{"type":"command","command":"guard.sh"}]}]));
+        // hlášky ke chybějícím doplňkům PreToolUse
+        let both = vec![QUESTIONS_EVENT.to_string(), PLAN_EVENT.to_string()];
+        assert!(hint(&both).unwrap().contains("otázky a review plánu"));
+    }
+
     #[test]
     fn ours_table() {
         let h = |t: &str, u: &str| J::obj(vec![("type", J::Str(t.into())), ("url", J::Str(u.into()))]);
@@ -513,6 +589,7 @@ mod tests {
             (h("http", "http://127.0.0.1:47800/event"), Some((47800, "/event"))),
             (h("http", "http://localhost:1/permission"), Some((1, "/permission"))),
             (h("http", "http://127.0.0.1:47800/question"), Some((47800, "/question"))),
+            (h("http", "http://127.0.0.1:47800/plan"), Some((47800, "/plan"))),
             (h("http", "http://127.0.0.1:47800/jine"), None),
             (h("http", "http://example.com:47800/event"), None),
             (h("http", "https://127.0.0.1:47800/event"), None),

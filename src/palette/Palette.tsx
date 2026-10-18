@@ -6,14 +6,19 @@
 // Navíc skripty ze složky skriptů (načtou se při otevření) a s dotazem stránky Nastavení Windows (`more.ts`).
 // Rychlé odpovědi z dotazu (`quick.ts` přes `more.ts`): výpočet / převod jednotek jako první řádek,
 // `:` → emoji místo seznamu; Enter je zkopíruje do schránky (dokud má paleta fokus) a paletu zavře.
-import { createEffect, createMemo, createSignal, For, Index, on, onMount, Show } from "solid-js";
-import { api, type NoteView, type Snapshot } from "../api";
+// Historie schránky (`v:`, `cliphist/model.ts`): seznam z jádra při vstupu do režimu a po události
+// `cliphist`; Enter = položka zpět do schránky (jádro, vlastní zápis), Ctrl+P připnout, Ctrl+Del smazat.
+import { createEffect, createMemo, createSignal, For, Index, on, onCleanup, onMount, Show } from "solid-js";
+import { api, on as onEvent, type NoteView, type Snapshot } from "../api";
 import { IconFolder, IconLink, IconNote, IconSettings, IconShield, IconTerminal } from "../icons";
 import { ActionIcon, ConfirmAction, answerConfirm, confirmPending } from "../actions/ui";
 import { buildItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
 import { pushRecent, rank, segments, type Ranked } from "./search";
 import { arrow, shown, visible } from "./compact";
-import { emojiCommand, paletteTips, quickRows, scriptItems, windowsItems } from "./more";
+import { clipCommand, clipItems, emojiCommand, paletteTips, quickRows, scriptItems, windowsItems } from "./more";
+import { clampSel, clipQuery, clipRows, type ClipList, type ClipRow } from "../cliphist/model";
+import { clipApi } from "../cliphist/api";
+import { emojiLoaded, emojiQuery, loadEmoji } from "./emoji";
 import { scriptsApi } from "../actions/scripts";
 import type { ScriptView } from "../types";
 import { lang, t } from "../i18n";
@@ -27,7 +32,7 @@ export const IconSearch = () => (
   </svg>
 );
 
-const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield, script: IconTerminal, windows: IconSettings, calc: IconSearch, convert: IconSearch, emoji: IconNote };
+const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield, script: IconTerminal, windows: IconSettings, calc: IconSearch, convert: IconSearch, emoji: IconNote, clip: IconNote };
 const RECENT_KEY = "ledge.palette.recent";
 
 function loadRecent(): string[] {
@@ -78,6 +83,8 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   const [waiting, setWaiting] = createSignal(false);
   /** kompaktní paleta s prázdným polem rozbalená šipkou dolů */
   const [browsing, setBrowsing] = createSignal(false);
+  /** historie schránky (`v:`); `undefined` = ještě nenačtená */
+  const [clip, setClip] = createSignal<ClipList>();
   let input!: HTMLInputElement;
   let list!: HTMLDivElement;
 
@@ -86,18 +93,35 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
     if (p.s.notesEnabled) api.noteList(200).then((n) => n && setNotes(n), () => {});
     // levný sken složky skriptů (stat, jen změněné soubory); vypnuté / bez složky = prázdné
     scriptsApi.list().then((l) => l && setScripts(l.scripts), () => {});
+    // změna historie (nový text, připnutí, zamčení) — jen s otevřeným režimem `v:`
+    const un = onEvent("cliphist", () => clipText() !== null && loadClip());
+    onCleanup(() => void un.then((f) => f(), () => {}));
   });
 
-  const base = createMemo(() => [...buildItems(p.s, notes(), p.nav), ...scriptItems(scripts()), emojiCommand(setQ)]);
+  const clipText = createMemo(() => clipQuery(q()));
+  const loadClip = () => clipApi.list().then((l) => setClip(l ?? { enabled: false, items: [] }), () => setClip({ enabled: false, items: [] }));
+  createEffect(on(() => clipText() !== null, (inClip) => inClip && void loadClip()));
+
+  const base = createMemo(() => [...buildItems(p.s, notes(), p.nav), ...scriptItems(scripts()), emojiCommand(setQ), clipCommand(setQ)]);
   // stránky Nastavení Windows jen s dotazem — přepočet při psaní nesahá na `buildItems`
   const items = createMemo(() => [...base(), ...windowsItems(p.s, q())]);
   const recentSet = createMemo(() => new Set(recent()));
   const fold = () => ({ compact: p.s.paletteCompact, query: q(), browsing: browsing() });
   // nedávné, které v položkách pořád jsou (smazaná akce / poznámka se nepočítá)
   const what = createMemo(() => shown(fold(), items().filter((i) => recentSet().has(i.id)).length));
+  // emoji tabulka je líný chunk (`emoji.ts` `loadEmoji`): načte se až při prvním `:` dotazu, pak přepočet
+  const [emojiOk, setEmojiOk] = createSignal(emojiLoaded());
+  createEffect(() => {
+    if (!emojiOk() && emojiQuery(q()) !== null) loadEmoji().then(() => setEmojiOk(true), sayError);
+  });
   // výpočet / převod / emoji jen z dotazu — přepočet při psaní, nic na pozadí
-  const quick = createMemo(() => quickRows(q(), lang()));
+  const quick = createMemo(() => {
+    emojiOk();
+    return quickRows(q(), lang());
+  });
   const results = createMemo(() => {
+    const ct = clipText();
+    if (ct !== null) return clipItems(clipRows(clip(), ct, Date.now()));
     const qr = quick();
     if (qr.only) return qr.rows;
     const list = visible(rank(items(), q(), recent(), 60), what(), recentSet());
@@ -105,6 +129,8 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   });
   // jiný dotaz = výběr nahoru; smazaný dotaz kompaktní paletu zase sbalí
   createEffect(on(q, () => (setSel(0), setBrowsing(false)), { defer: true }));
+  // smazaná položka historie: výběr zůstane na místě (nejvýš poslední řádek)
+  createEffect(on(() => results().length, (n) => setSel((i) => clampSel(i, n)), { defer: true }));
   createEffect(on(sel, (i) => (list?.children[i] as HTMLElement | undefined)?.scrollIntoView({ block: "nearest" })));
 
   function close() {
@@ -112,8 +138,63 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
     p.onClose();
   }
 
+  /** Řádek historie schránky: položka zpět do schránky / zapnout / vymazat / Nastavení. */
+  async function chooseClip(row: ClipRow) {
+    if (row.kind === "entry" && row.entry) {
+      setWaiting(true);
+      try {
+        await clipApi.paste(row.entry.id);
+      } catch (e) {
+        setWaiting(false);
+        sayError(e);
+        return;
+      }
+      close();
+      say(t("palette.clip.pasted", "Ve schránce — vlož ho Ctrl+V"));
+      return;
+    }
+    if (row.kind === "settings") {
+      close();
+      p.nav.onSettings("f-clipboard.enabled");
+      return;
+    }
+    if (row.kind === "off") {
+      try {
+        await clipApi.enable();
+        say(t("palette.clip.enabled", "Historie schránky je zapnutá — od teď si pamatuje zkopírovaný text"));
+      } catch (e) {
+        sayError(e);
+      }
+      await loadClip();
+    } else if (row.kind === "clear") {
+      await clipApi.clear().catch(sayError);
+      await loadClip();
+    }
+    input.focus();
+  }
+
+  /** Ctrl+P připnout / odepnout, Ctrl+Delete smazat vybranou položku historie. */
+  function clipKey(e: KeyboardEvent): boolean {
+    const row = results()[sel()]?.item.clip;
+    if (row?.kind !== "entry" || !row.entry || !e.ctrlKey) return false;
+    const id = row.entry.id;
+    if (e.key === "p" || e.key === "P") {
+      e.preventDefault();
+      // připnutá jde nahoru — výběr jde s ní
+      clipApi.pin(id, !row.entry.pinned).then(() => loadClip().then(() => setSel(Math.max(0, results().findIndex((r) => r.item.clip?.entry?.id === id)))), sayError);
+      return true;
+    }
+    if (e.key === "Delete") {
+      e.preventDefault();
+      clipApi.remove(id).then(loadClip, sayError);
+      return true;
+    }
+    return false;
+  }
+
   async function choose(r: Ranked<PItem> | undefined) {
     if (!r || waiting()) return;
+    if (r.item.clip) return chooseClip(r.item.clip);
     const copy = r.item.copy;
     if (copy !== undefined) {
       // kopírovat dřív, než paleta pustí fokus; do nedávných nepatří (vznikají z dotazu)
@@ -151,6 +232,7 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
 
   function key(e: KeyboardEvent) {
     const n = results().length;
+    if (clipKey(e)) return;
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
@@ -213,7 +295,9 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
         <span>
           {what() === "none"
             ? t("palette.keysBare", "Piš pro hledání · ↓ procházet · Esc zavřít")
-            : results()[sel()]?.item.copy !== undefined
+            : results()[sel()]?.item.clip?.kind === "entry"
+              ? t("palette.clip.keys", "↑↓ výběr · Enter do schránky · Ctrl+P připnout · Ctrl+Del smazat · Esc zavřít")
+              : results()[sel()]?.item.copy !== undefined
               ? t("palette.keysCopy", "↑↓ výběr · Enter zkopírovat · Esc zavřít")
               : t("palette.keys", "↑↓ výběr · Enter spustit · Esc zavřít")}
         </span>

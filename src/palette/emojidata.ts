@@ -3,6 +3,9 @@
 // (`src/i18n/en-emoji.ts`, podle Unicode CLDR); `kw` = další hledaná slova česky bez diakritiky a
 // anglicky (hledá se v obou jazycích bez ohledu na jazyk UI). Data v repu, nic se nestahuje.
 // Nové emoji: řádek sem + jméno do en-emoji.ts; `emoji.test.mjs` hlídá jedinečnost a tvar.
+// **Jen dynamický `import()`** z `emoji.ts` (`loadEmoji`) — tabulka + anglická jména jsou samostatný chunk
+// a načtou se až při prvním emoji dotazu. Statický import odjinud by je vrátil do hlavního balíku.
+import "../i18n/en-emoji.ts";
 
 export type EmojiRow = { e: string; key: string; cs: string; kw: string };
 

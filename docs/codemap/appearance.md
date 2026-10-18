@@ -19,7 +19,7 @@ Cituj symbolem, ne číslem řádku.
 | `settings.rs` (`apply_config`) | změna `appearance` → událost `appearance` do šuplíku; proužek přes `mark_dirty` | |
 | `src/theme/themes.ts` | 6 motivů jako úplné sady tokenů (`COLOR_KEYS`); `dark` = `styles.css` | `THEMES` `THEME_IDS` `COLOR_KEYS` |
 | `src/theme/appearance.ts` | čistá logika: proměnné, normalizace, akcent, pořadí karet, tvar proužku, presety pružin, přechod rozšíření Nastavení | `appearanceVars` `normalizeAppearance` `accentPair` `cardOrder` `stripShape` `springPreset` `effectiveMotion` `widenMotion` |
-| `src/theme/apply.ts` | DOM: proměnné na `<html>`, `data-theme`/`data-motion`, motion.ts; událost + `get_config` | `applyAppearance` `initAppearance` `savedAppearance` `scopeStyle` |
+| `src/theme/apply.ts` | DOM: proměnné na `<html>`, `data-theme`/`data-motion`/`data-scheme` (light/dark — podklad ikon `ui/iconTone.ts`), motion.ts; událost + `get_config` | `applyAppearance` `initAppearance` `savedAppearance` `scopeStyle` |
 | `src/motion.ts` | styl/rychlost mění jen parametry pružin a délky; `FULL_CLIP` a rádius proužku sledují vzhled | `setMotion` `motionNow` `dur` `setShellRadius` `shellRadius` `setStripRadius` |
 | `src/settings/panels/Appearance.tsx` · `AppearancePreview.tsx` · `appearance.css` | panel s náhledem (živě na celý šuplík, odchod bez uložení = zpět); JEDINÉ místo pro pozadí/akryl, šířku a animace; kotvy hledání `f-<klíč z labels.ts>` | `AppearancePanel` `Seg` `Slider` `lit` |
 | `src/MainPage.tsx` | pořadí karet Práce z `savedAppearance().cards` | `card` |
@@ -29,7 +29,7 @@ Cituj symbolem, ne číslem řádku.
 - **Start**: `App` → `initAppearance()` → `api.getConfig()` → `applyAppearance` (CSS proměnné inline na
   `<html>`). Do té doby platí `:root` ze `styles.css` (= motiv dark).
 - **Náhled**: panel `createEffect(() => applyAppearance(rozpracovaný))`, `onCleanup` → `savedAppearance()`.
-- **Uložení**: `p.save()` → `save_config` → `apply_config` → `emit("appearance")` → `commit` (uložený signál
+- **Uložení**: společná lišta Nastavení (Uložit; panel vlastní tlačítko nemá) → `save_config` → `apply_config` → `emit("appearance")` → `commit` (uložený signál
   + aplikace) a `mark_dirty` → `refresh_strip` (styl, paleta, linka, osa).
 - **Osa u hrany**: `anchor_c2` = dvojnásobek x osy podle pozice a šířky velkého šuplíku; proužek, peek
   i šuplík jsou na ní vystředěné (`span_x`) → morf (`collapsedClip` je středový) zůstává souměrný.

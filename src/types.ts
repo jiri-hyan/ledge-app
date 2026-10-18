@@ -66,7 +66,10 @@ export interface Pending {
   preview: EditPreview | null;
   /** plán k review (ExitPlanMode, `claude/plan.rs`); null = obyčejné schválení */
   plan: PlanView | null;
+  /** odkud karta přišla (`plan::Via`): hook PermissionRequest, nebo PreToolUse(ExitPlanMode) — ten režim nastavit neumí */
+  via: PendingVia;
 }
+export type PendingVia = "permission" | "preToolUse";
 
 /** řádek náhledu diffu (`claude/diff.rs` `Line`); čísla 1-based, null = na té straně není */
 export interface DiffLine { kind: "ctx" | "add" | "del" | "gap"; old: number | null; new: number | null; text: string }
@@ -101,7 +104,7 @@ export interface PermAlways { rules: PermRule[]; label: string; fromClaude: bool
 export type PermDest = "localSettings" | "userSettings" | "session";
 /** doplněk `decide`: „Vždy povolit“ do cíle (jen s allow) / důvod zamítnutí (jen bez allow) /
  *  u plánu režim „Schválit a povolit úpravy“ (jen s allow) */
-export interface DecideExtra { always?: PermDest; reason?: string; mode?: PlanMode }
+export interface DecideExtra { always?: PermDest; reason?: string; mode?: PlanMode; inClaude?: boolean }
 
 export interface SubagentRun { id: string; agentType: string; since: number }
 export interface SubagentDone { agentType: string; durationMs: number | null; endedAt: number; message: string | null }
@@ -327,6 +330,58 @@ export interface PersonalView {
   volume: VolumeView | null;
   /** null = stroj bez baterie / vypnuto */
   battery: BatteryView | null;
+  /** karta Kalendář (Rust `calendar::live::view`); starý snapshot bez pole = nic */
+  calendar?: CalendarView;
+}
+
+/** Výskyt události na kartě Kalendář (Rust `calendar::view::Item`). */
+export interface CalendarItem {
+  /** ms epochy; u celodenní půlnoc data jako UTC — čas se neukazuje */
+  start: number;
+  end: number;
+  allDay: boolean;
+  title: string;
+  location: string;
+  /** index v `CalendarView.calendars` (= `personal.calendars`) */
+  cal: number;
+  ongoing: boolean;
+  /** pásmo události Ledge nezná → čas brán jako místní */
+  tzGuess: boolean;
+}
+
+export interface CalendarDay {
+  kind: "today" | "tomorrow" | "later";
+  /** místní datum YYYY-MM-DD */
+  date: string;
+  items: CalendarItem[];
+}
+
+/** Jeden kalendář z configu — adresa nikdy celá, jen doména. */
+export interface CalendarInfo {
+  name: string;
+  color: string | null;
+  domain: string;
+  enabled: boolean;
+  status: "off" | "invalid" | "ok" | "stale" | "loading" | "unavailable" | "idle";
+  error: string | null;
+  fetchedMs: number | null;
+  events: number;
+}
+
+export interface CalendarView {
+  status: "off" | "unset" | "ok" | "stale" | "loading" | "unavailable" | "idle";
+  days: CalendarDay[];
+  more: number;
+  calendars: CalendarInfo[];
+  loading: boolean;
+}
+
+/** Výsledek `calendar_test` (Nastavení: přidání / Otestovat). */
+export interface CalendarTest {
+  events: number;
+  upcoming: number;
+  /** název z feedu; "" = feed ho nemá */
+  name: string;
 }
 
 /** Synchronizace poznámek přes git (`notesync/`). `off` = vypnutá; `syncing` = právě běží (i první běh). */

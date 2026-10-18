@@ -5,6 +5,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
 import type { StatusLineStatus, TimerOp, TimerState } from "./types";
 import type { EditPreview, GitView } from "./types";
+import type { CalendarTest } from "./types";
 import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
 
 export type * from "./types";
@@ -97,6 +98,8 @@ export const api = {
   mediaCover: (key: string) => call<string | null>("media_cover", { key }),
   volumeSet: (level: number) => call("volume_set", { level }),
   volumeMute: (muted: boolean) => call("volume_mute", { muted }),
+  /** Kalendář: jedno zkušební stažení odkazu ICS (nic se neukládá); chyba = lidská věta bez adresy. */
+  calendarTest: (url: string) => call<CalendarTest>("calendar_test", { url }),
   // --- settings ---
   /** Ověří rozpracovaný config (nic nezapisuje): první chyba s polem, `null` = v pořádku. */
   checkConfig: (cfg: any) => call<FieldError | null>("check_config", { cfg }),

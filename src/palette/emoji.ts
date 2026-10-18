@@ -2,9 +2,11 @@
 // seznam ze statické tabulky `emojidata.ts`. Hledá se přes `search.ts` (bez diakritiky, fuzzy) v
 // českém i anglickém jméně a klíčových slovech; zvýrazní se jméno v jazyce UI. Bez dotazu (jen `:`)
 // tabulka v pořadí oblíbenosti. Čistá logika bez DOM — `emoji.test.mjs`.
+// Tabulka (+ anglická jména) se načítá líně (`loadEmoji`, dynamický `import()` = samostatný chunk) až
+// při prvním emoji dotazu; do té doby `searchEmoji` vrací prázdno a `emojiLoaded()` = false („Načítám…“).
 import { tIn, type Lang } from "../i18n.ts";
 import { fold, rank, type Item, type Ranked } from "./search.ts";
-import { EMOJI } from "./emojidata.ts";
+import type { EmojiRow } from "./emojidata.ts";
 
 export const EMOJI_PREFIX = ":";
 export const EMOJI_LIMIT = 60;
@@ -19,12 +21,33 @@ export function emojiQuery(query: string): string | null {
   return q.startsWith(EMOJI_PREFIX) ? q.slice(EMOJI_PREFIX.length) : null;
 }
 
+let table: readonly EmojiRow[] | null = null;
+let loading: Promise<void> | null = null;
+
+/** Načte tabulku emoji (jednou; další volání vrátí týž slib). Selhání = příště zkusí znovu. */
+export function loadEmoji(): Promise<void> {
+  loading ??= import("./emojidata.ts").then(
+    (m) => {
+      table = m.EMOJI;
+    },
+    (e) => {
+      loading = null;
+      throw e;
+    },
+  );
+  return loading;
+}
+
+/** Je tabulka načtená? */
+export const emojiLoaded = (): boolean => table !== null;
+
 let cache: { lang: Lang; items: EmojiItem[] } | null = null;
 
-/** Položky tabulky v jazyce UI (jednou na jazyk — tabulka je statická). */
+/** Položky tabulky v jazyce UI (jednou na jazyk — tabulka je statická). Nenačtená = prázdno. */
 export function emojiItems(lang: Lang): EmojiItem[] {
+  if (!table) return [];
   if (cache?.lang === lang) return cache.items;
-  const items = EMOJI.map((x) => ({
+  const items = table.map((x) => ({
     id: `emoji:${x.key}`,
     emoji: x.e,
     title: tIn(lang, x.key, x.cs),

@@ -6,6 +6,7 @@ import { IconShield } from "../icons";
 import { fmtTime } from "../format";
 import { say, sayError } from "../ui/toast";
 import { t, tp } from "../i18n";
+import { bubble } from "../pkgctx/BubbleNotice";
 import "./head.css";
 
 export default function UpdatePanel(p: { u: UpdateView & { state: "dostupna" }; onClose: () => void }) {
@@ -32,6 +33,7 @@ export default function UpdatePanel(p: { u: UpdateView & { state: "dostupna" }; 
     <div class="card upd-panel" data-anim>
       <h4>Ledge {p.u.verze}<Show when={published()}><span class="n">{t("cards.update.published", "vydáno {date} · teď {current}", { date: published(), current: p.u.current })}</span></Show></h4>
       <pre class="upd-notes">{p.u.poznamky || t("cards.update.noNotes", "Bez poznámek k vydání.")}</pre>
+      <Show when={bubble()}>{(b) => <p class="pkg-upd">{t("cards.update.outside", "Ledge běží v bublině {app} — instalátor se spustí mimo ni (Plánovač úloh), nainstaluje Ledge naostro a spustí ho odtamtud.", { app: b().app })}</p>}</Show>
       <Show when={p.u.installError}><div class="banner"><IconShield /> <span>{p.u.installError}</span></div></Show>
       <Show when={running()} fallback={
         <div class="upd-bar">

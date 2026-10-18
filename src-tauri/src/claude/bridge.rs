@@ -1,4 +1,4 @@
-//! HTTP most na 127.0.0.1 (`tiny_http`): `POST /permission`, `POST /question`, `POST /event`, `GET /status`,
+//! HTTP most na 127.0.0.1 (`tiny_http`): `POST /permission`, `POST /question`, `POST /plan`, `POST /event`, `GET /status`,
 //! `POST /ctl/<příkaz>`. Odmítá prohlížeč (`Origin`) a cizí `Host`. Každý požadavek ve vlastním
 //! vlákně; logiku dělá `Claude` (`mod.rs`), tady je jen směrování a odpovědi.
 
@@ -56,6 +56,8 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
                         ("POST", "/permission") => respond(req, 200, rules::body(&claude.handle_permission(&parsed))),
                         // otázka Clauda: tělo jen s odpovědí z Ledge, jinak prázdné = otázka v okně Claude
                         ("POST", "/question") => respond(req, 200, claude.handle_question(&parsed).unwrap_or_default()),
+                        // plán (PreToolUse ExitPlanMode): allow + updatedInput / deny + důvod, jinak prázdné = dialog v Claude
+                        ("POST", "/plan") => respond(req, 200, claude.handle_plan(&parsed).unwrap_or_default()),
                         ("POST", "/event") => {
                             // prázdné tělo = žádné rozhodnutí; JSON jen u Stop v režimu block
                             let reply = claude.handle_event(&parsed);
@@ -263,6 +265,35 @@ mod tests {
         assert_eq!(post(port, "/permission", &perm, false), (200, String::new()));
         assert!(t0.elapsed() < Duration::from_secs(2) && c.pending().is_empty());
         assert_eq!(post(port, "/question", ASK, true).0, 403, "prohlížeč ne");
+    }
+
+    /// Plán přes `PreToolUse(ExitPlanMode)`: karta „Plán“, schválení = allow + celý vstup; termín = prázdno
+    /// a následný `PermissionRequest` téhož plánu kartu nezaloží.
+    #[test]
+    fn plan_over_http_one_card() {
+        const PLAN: &str = r##"{"session_id":"s1","cwd":"C:/x","hook_event_name":"PreToolUse","tool_name":"ExitPlanMode","tool_use_id":"toolu_01","tool_input":{"plan":"# Plán A\n- krok","planFilePath":"C:/x/.claude/plans/a.md"}}"##;
+        let (c, port) = bridge(5000);
+        let c2 = c.clone();
+        std::thread::spawn(move || {
+            while c2.pending().is_empty() {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let p = &c2.pending()[0];
+            assert_eq!((p.summary.as_str(), p.via), ("Plán A", super::super::plan::Via::PreToolUse));
+            c2.decide(Some(p.id), Decision::Allow);
+        });
+        let (code, body) = post(port, "/plan", PLAN, false);
+        assert_eq!(code, 200);
+        let out = &serde_json::from_str::<Value>(&body).unwrap()["hookSpecificOutput"];
+        assert_eq!((out["hookEventName"].as_str(), out["permissionDecision"].as_str()), (Some("PreToolUse"), Some("allow")));
+        assert_eq!(out["updatedInput"], serde_json::from_str::<Value>(PLAN).unwrap()["tool_input"]);
+
+        let (c, port) = bridge(200);
+        assert_eq!(post(port, "/plan", PLAN, false), (200, String::new()), "termín = dialog v Claude");
+        let perm = PLAN.replace("PreToolUse", "PermissionRequest");
+        let t0 = std::time::Instant::now();
+        assert_eq!(post(port, "/permission", &perm, false), (200, String::new()));
+        assert!(t0.elapsed() < Duration::from_secs(2) && c.pending().is_empty(), "druhá karta nevznikla");
     }
 
     #[test]

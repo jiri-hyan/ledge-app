@@ -21,6 +21,11 @@
 //! **Přejmenování Notch → Ledge (0.2.0).** Starý produkt zapisoval hodnotu Run `Notch`. [`apply`] ji
 //! smaže, když míří na `notch.exe` (rozhodnutí [`drop_legacy_run`]) — jinak by po přihlášení startoval
 //! i starý Notch a oba by chtěly port mostu 47800. Klíč Uninstall starého Notche nechává být.
+//!
+//! **Bublina MSIX** (`pkgctx.rs`): běží-li Ledge uvnitř cizího balíčku (spuštěný z Claude desktop),
+//! zápis do Run by šel do soukromého hivu balíčku a Explorer by ho při přihlášení neviděl — [`gate`]
+//! pak registr nechá být (nic nezapíše ani nesmaže). Nastavení to ukáže u přepínače a nabídne
+//! „Restartovat mimo“; instance mimo bublinu pak Run zapíše při startu.
 
 use std::path::{Path, PathBuf};
 
@@ -169,11 +174,40 @@ pub(crate) fn install_target() -> Option<PathBuf> {
     })
 }
 
+/// Smí [`apply`] sáhnout do registru?
+#[derive(Debug, PartialEq, Eq)]
+pub enum Gate {
+    Registry,
+    /// ladicí build / testy — registr nikdy
+    DebugBuild,
+    /// uvnitř balíčku MSIX (plné jméno) — zápis by šel do bubliny, Explorer by ho neviděl
+    InPackage(String),
+}
+
+/// Politika „sáhnout do registru?“ — čistá funkce. Ladicí build vyhrává (testy nikdy nezapisují).
+pub fn gate(debug: bool, package: Option<&str>) -> Gate {
+    if debug {
+        Gate::DebugBuild
+    } else if let Some(p) = package {
+        Gate::InPackage(p.to_string())
+    } else {
+        Gate::Registry
+    }
+}
+
 pub fn apply(enabled: bool) -> Result<(), String> {
     // ladicí build (tauri dev) ani testy se do registru nikdy nedostanou — rozhoduje profil, ne cesta:
     // testy ze sdíleného `target-agents\debug` cestou `\target\debug\` neprošly a přepsaly šéfův autostart
-    if cfg!(debug_assertions) || cfg!(test) {
-        return Ok(());
+    let debug = cfg!(debug_assertions) || cfg!(test);
+    // ladicí build ani balíček nezjišťuje (sonda by v testech zapsala do skutečného %LOCALAPPDATA%)
+    let package = if debug { None } else { crate::pkgctx::current().map(|p| p.full.as_str()) };
+    match gate(debug, package) {
+        Gate::Registry => {}
+        Gate::DebugBuild => return Ok(()),
+        Gate::InPackage(p) => {
+            crate::log(&format!("autostart: běží uvnitř balíčku {p} — Run nezapisuji ani nemažu (Explorer by ho neviděl)"));
+            return Ok(());
+        }
     }
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let installed = installed_exe();
@@ -312,6 +346,20 @@ mod tests {
         ];
         for (name, current, want) in cases {
             assert_eq!(drop_legacy_run(current), want, "{name}");
+        }
+    }
+
+    #[test]
+    fn gate_table() {
+        #[rustfmt::skip]
+        let cases: Vec<(&str, bool, Option<&str>, Gate)> = vec![
+            ("release mimo balíček",   false, None,                             Gate::Registry),
+            ("release v bublině",      false, Some("Claude_1_x64__pzs8sxrjxfjjc"), Gate::InPackage("Claude_1_x64__pzs8sxrjxfjjc".into())),
+            ("debug mimo",             true,  None,                             Gate::DebugBuild),
+            ("debug v bublině",        true,  Some("Claude_1_x64__p"),          Gate::DebugBuild),
+        ];
+        for (name, debug, pkg, want) in cases {
+            assert_eq!(gate(debug, pkg), want, "{name}");
         }
     }
 

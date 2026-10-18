@@ -4,9 +4,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EMOJI } from "./emojidata.ts";
-import { EMOJI_LIMIT, emojiItems, emojiQuery, searchEmoji } from "./emoji.ts";
+import { EMOJI_LIMIT, emojiItems, emojiLoaded, emojiQuery, loadEmoji, searchEmoji } from "./emoji.ts";
 import { tIn } from "../i18n.ts";
-import "../i18n/en-quick.ts";
+
+// líná tabulka: před načtením prázdno, pak plná (statický import tabulky výš ji nenačte do `emoji.ts`)
+assert.equal(emojiLoaded(), false);
+assert.deepEqual(searchEmoji("srdce", "cs"), []);
+const p = loadEmoji();
+assert.equal(loadEmoji(), p, "jeden slib, jedno načtení");
+await p;
+assert.equal(emojiLoaded(), true);
 
 const first = (text, lang = "cs") => searchEmoji(text, lang)[0]?.item.emoji;
 
@@ -22,7 +29,7 @@ test("tabulka: rozumná velikost, jedinečné emoji i klíče, tvar, en jméno, 
     assert.match(x.key, /^palette\.emoji\.[a-z][A-Za-z0-9]*$/);
     assert.ok(x.e.trim() && !/[a-z0-9]/i.test(x.e.replace(/\uFE0F|\u200D|\u20E3/g, "")), `${x.key}: není emoji`);
     assert.ok(x.cs.trim(), x.key);
-    assert.ok(tIn("en", x.key, "\u0000") !== "\u0000", `${x.key}: chybí anglické jméno v en-quick.ts`);
+    assert.ok(tIn("en", x.key, "\u0000") !== "\u0000", `${x.key}: chybí anglické jméno v en-emoji.ts`);
     assert.match(x.kw, /^[a-z0-9 ]*$/, `${x.key}: kw jen malá písmena bez diakritiky`);
   }
 });

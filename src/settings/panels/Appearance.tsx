@@ -1,13 +1,14 @@
 // Panel Nastavení „Vzhled a animace“: motiv (galerie s náhledy), akcent, hustota, písmo, rohy, krytí
 // a rozmazání pozadí, šířka šuplíku, styl a rychlost animací, proužek (styl, velikost, pozice, linka,
 // krytí), pořadí karet. Každá změna se hned náhledově aplikuje na celý šuplík (`applyAppearance`);
-// odchod bez uložení vrátí uložený vzhled. Uloží shell (`p.save`) → Rust pošle `appearance` a překreslí
+// odchod bez uložení vrátí uložený vzhled. Ukládá JEN společná lišta Nastavení (Uložit / Zahodit, jako
+// všechny panely — vlastní tlačítko tu není) → Rust pošle `appearance` a překreslí
 // proužek. Logika (normalizace, pořadí, proměnné) je v `theme/appearance.ts`. Pozadí (`drawer.glass`),
 // šířka (`drawer.width`) a animace (`appearance.motion`, řídí i vysunutí okna v Rustu) se nastavují JEN
 // tady — panel Šuplík a proužek má jen chování. Kotvy hledání `f-<id>` = klíče z `labels.ts`.
 // Jazyk rozhraní (`ui.lang`) je tu taky: patří k tomu, jak UI vypadá (jako motiv a písmo), samostatný
 // panel „Obecné“ pro jednu volbu nemáme. Přepne se po Uložit (`ctx.loadBase` → `setLang`).
-import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { For, Show, createEffect, onCleanup } from "solid-js";
 import type { PanelProps } from "../types";
 import type { Appearance, MotionStyle } from "../../types";
 import { lang, t, type Lang } from "../../i18n";
@@ -88,21 +89,12 @@ export default function AppearancePanel(p: PanelProps) {
   const blur = () => p.cfg.drawer?.glass === "acrylic";
   const width = () => p.cfg.drawer?.width ?? DRAWER_WIDTH;
   const stripOpacity = () => p.cfg.strip?.opacity ?? STRIP_OPACITY;
-  const [saving, setSaving] = createSignal(false);
 
   function reset() {
     p.setCfg("appearance", structuredClone(DEFAULT_APPEARANCE));
     p.setCfg("drawer", "width", DRAWER_WIDTH);
     p.setCfg("drawer", "glass", "solid");
     p.setCfg("strip", "opacity", STRIP_OPACITY);
-  }
-  async function save() {
-    setSaving(true);
-    try {
-      await p.save();
-    } finally {
-      setSaving(false);
-    }
   }
   function move(order: CardId[], i: number, d: -1 | 1) {
     const next = [...order];
@@ -119,10 +111,9 @@ export default function AppearancePanel(p: PanelProps) {
         <AppearancePreview a={a()} stripOpacity={stripOpacity()} blur={blur()} />
         <div class="ap-bar">
           <Show when={dirty()} fallback={<span class="ap-state">{t("appearance.state.saved", "Odpovídá uloženému vzhledu.")}</span>}>
-            <span class="ap-state warn">{t("appearance.state.dirty", "Náhled — změny ještě nejsou uložené.")}</span>
+            <span class="ap-state warn">{t("appearance.state.dirty", "Náhled — ulož nebo zahoď dole v liště.")}</span>
           </Show>
           <button class="mini" onClick={reset}>{t("appearance.reset", "Obnovit vzhled")}</button>
-          <button class="btn pri" disabled={saving()} onClick={save}>{saving() ? t("appearance.saving", "Ukládám…") : t("appearance.save", "Uložit vzhled")}</button>
         </div>
       </div>
 

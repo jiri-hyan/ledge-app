@@ -3,7 +3,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { quick } from "./quick.ts";
+import { loadEmoji } from "./emoji.ts";
 import "../i18n/en-quick.ts";
+
+test("emoji před načtením tabulky (líný chunk): režim emoji, prázdné řádky, loading", async () => {
+  assert.deepEqual(quick(":srdce", "cs"), { kind: "emoji", rows: [], loading: true });
+  assert.equal(quick("12*2", "cs").kind, "calc", "výpočet na tabulce emoji nezávisí");
+  await loadEmoji();
+  assert.equal(quick(":srdce", "cs").loading, false);
+  assert.equal(quick(":srdce", "cs").rows[0].item.emoji, "❤️");
+});
 
 test("směrování dotazu (tabulka)", () => {
   const cases = [

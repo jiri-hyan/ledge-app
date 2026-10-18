@@ -9,7 +9,7 @@ import { t } from "./i18n";
 import { say, sayError } from "./ui/toast";
 import { PANELS, panelLabel, searchItems } from "./settings/catalog";
 import {
-  SettingsCtx, active, base, dirty, discard, fieldError, isLoaded, loadBase, makeCtx, rev, runUndo,
+  SettingsCtx, active, base, dirty, discard, fieldError, isLoaded, loadBase, makeCtx, rev, runAfterSave, runUndo,
   setActive, setCfg, setDirty, setFieldError, setHit, snapshotDraft, undoMsg,
 } from "./settings/ctx";
 import { IconSearch, PanelIcon } from "./settings/icons";
@@ -114,6 +114,8 @@ export default function Settings(p: { update: UpdateView; s: Snapshot }) {
         return;
       }
       await api.saveConfig(out);
+      // co panely odložily na „až bude uloženo“ (souhlas s příkazem akce)
+      for (const e of await runAfterSave()) sayError(e);
       const fresh = await api.getConfig();
       if (fresh) loadBase(fresh);
       setConflict(false);
@@ -258,7 +260,7 @@ export default function Settings(p: { update: UpdateView; s: Snapshot }) {
             <For each={[panel()]}>
               {(x) => (
                 <div class="st-panel" data-panel={x.id}>
-                  <Dynamic component={x.component} cfg={ctx.cfg} setCfg={setCfg} save={() => save()} s={p.s} />
+                  <Dynamic component={x.component} cfg={ctx.cfg} setCfg={setCfg} s={p.s} />
                 </div>
               )}
             </For>

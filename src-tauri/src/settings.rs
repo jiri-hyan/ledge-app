@@ -46,6 +46,7 @@ pub(crate) fn apply_config(new: Config) {
     if old.personal.weather.coords() != new.personal.weather.coords() || old.modes != new.modes || old.drawer.sections.weather != new.drawer.sections.weather {
         maybe_refresh_weather(false);
     }
+    crate::calendar::live::on_config(&old, &new);
     if old.personal.links != new.personal.links {
         reclassify_links();
     }
@@ -64,6 +65,10 @@ pub(crate) fn apply_config(new: Config) {
     if crate::media::strip_wants(&old) != crate::media::strip_wants(&new) {
         // položka `media` v proužku drží odběry GSMTC i bez záložky Osobní
         crate::media::sync(&new);
+    }
+    if old.clipboard != new.clipboard {
+        // historie schránky: zapnutí = listener, vypnutí = listener pryč + historie z paměti (`cliphist/`)
+        crate::cliphist::sync(&new.clipboard);
     }
     if old.update != new.update {
         c.updater.set_config(new.update.clone());

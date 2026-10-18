@@ -42,10 +42,11 @@ registerDict("en", {
   "palette.keys": "↑↓ select · Enter run · Esc close",
   "palette.keysBare": "Type to search · ↓ browse · Esc close",
   "palette.keysCopy": "↑↓ select · Enter copy · Esc close",
-  "palette.tips": "Also math (2^10), units (10 km to mi) and emoji (:heart)",
+  "palette.tips": "Also math (2^10), units (10 km to mi), emoji (:heart) and clipboard history (v:)",
   "palette.quick.sub": "Enter copies the result ({value})",
   "palette.emoji.open": "Emoji…",
   "palette.emoji.openSub": "Or type : and a word, e.g. :heart",
+  "palette.emoji.loading": "Loading emoji…",
   "palette.copied": "Copied: {value}",
   "palette.copyFail": "Can't write to the clipboard.",
 });

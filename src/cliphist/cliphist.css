@@ -1,0 +1,14 @@
+/* Historie schránky v Nastavení (`ClipSettings.tsx`, prefix `ch-`): vyloučené aplikace a výběr
+   běžícího programu. Tokeny jen ze styles.css. */
+.ch-apps { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.ch-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-app { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-pill); font-size: var(--fs-sm); }
+.ch-app small { color: var(--t3); font: var(--fs-xs) var(--mono); }
+.ch-app button { width: 18px; height: 18px; border-radius: 50%; color: var(--t3); line-height: 1; }
+.ch-app button:hover { color: var(--t1); background: var(--card-3); }
+.ch-none { color: var(--t3); font-size: var(--fs-sm); }
+.ch-bar { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-pick { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); }
+.ch-pick button { padding: 3px 10px; border-radius: var(--r-pill); background: var(--card-2); border: 1px solid var(--line); font-size: var(--fs-sm); }
+.ch-pick button:hover { background: var(--card-3); }
+.ch-pick button.ch-known { border-color: var(--accent); }

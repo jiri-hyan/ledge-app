@@ -1,19 +1,22 @@
 // Panel Nastavení „Rychlé akce“: seznam akcí z `cfg.actions` (přidat, upravit, řadit přetažením,
 // spustit, smazat s Vrátit), převod odkazů z Osobní (nic nemaže) a editor (`actions/ActionEditor`).
-// Ukládá přes `save()` skořápky; souhlas s příkazem až po uložení (`action_consent`).
-import { createSignal, For, onCleanup, Show } from "solid-js";
+// Jako všechny panely mění jen draft — zapíše společná lišta (Uložit / Zahodit); smazání nabídne Vrátit
+// v liště (`offerUndo`). Souhlas s příkazem přijme jádro až pro uloženou akci → `afterSave`. Spustit jde
+// jen akce, která je uložená v tomhle tvaru (jinak by běžela stará verze).
+import { createMemo, createSignal, For, Show } from "solid-js";
 import type { PanelProps } from "../types";
 import type { ActionCfg, ActionView } from "../../types";
 import ActionEditor, { kindLabel } from "../../actions/ActionEditor";
 import { actionsApi, runAction } from "../../actions/api";
-import { linksToActions, moveItem, slugId } from "../../actions/model";
+import { cleanAction, linksToActions, moveItem, slugId } from "../../actions/model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../../actions/ui";
 import ScriptsSettings from "../../actions/ScriptsSettings";
-import { say, sayError } from "../../ui/toast";
+import { say } from "../../ui/toast";
 import { t, tp } from "../../i18n";
+import { afterSave, base, offerUndo } from "../ctx";
 
 const NEW: ActionCfg = { id: "", label: "", kind: "url", target: "", showOn: "both" };
-const UNDO_MS = 8000;
+const shape = (a: ActionCfg) => JSON.stringify(cleanAction(structuredClone(a)));
 
 export default function ActionsPanel(p: PanelProps) {
   const list = (): ActionCfg[] => p.cfg.actions ?? [];
@@ -21,16 +24,21 @@ export default function ActionsPanel(p: PanelProps) {
   const groups = () => [...new Set(list().map((a) => a.group?.trim()).filter((g): g is string => !!g))];
   /** rozpracovaná akce: index v seznamu, `null` = nová */
   const [editing, setEditing] = createSignal<{ index: number | null; draft: ActionCfg } | null>(null);
-  const [undo, setUndo] = createSignal<{ a: ActionCfg; index: number } | null>(null);
   const [drag, setDrag] = createSignal<number | null>(null);
   const [over, setOver] = createSignal<number | null>(null);
-  let undoTimer: number | undefined;
-  onCleanup(() => clearTimeout(undoTimer));
+  /** uložené akce (id → tvar) — „Spustit“ jen pro akci, která je uložená přesně takhle */
+  const savedShapes = createMemo(() => {
+    const m = new Map<string, string>();
+    try {
+      for (const a of (JSON.parse(base() || "{}").actions ?? []) as ActionCfg[]) m.set(a.id, shape(a));
+    } catch {
+      // bez uložené verze nic nespouštět
+    }
+    return m;
+  });
+  const isSaved = (a: ActionCfg) => savedShapes().get(a.id) === shape(a);
 
-  async function commit(next: ActionCfg[]) {
-    p.setCfg("actions", next);
-    await p.save();
-  }
+  const commit = (next: ActionCfg[]) => p.setCfg("actions", next);
 
   async function onSave(a: ActionCfg, consent: boolean) {
     const e = editing();
@@ -40,46 +48,39 @@ export default function ActionsPanel(p: PanelProps) {
     const next = list().slice();
     if (e.index === null) next.push(saved);
     else next[e.index] = saved;
-    await commit(next);
-    if (consent) await actionsApi.consent(saved);
-    setEditing(null);
-    say(e.index === null ? t("actions.panel.added", "Akce „{label}“ přidána.", { label: saved.label }) : t("actions.panel.saved", "Uloženo."));
-  }
-
-  async function remove(index: number) {
-    const a = list()[index];
-    try {
-      await commit(list().filter((_, i) => i !== index));
-      setUndo({ a, index });
-      clearTimeout(undoTimer);
-      undoTimer = window.setTimeout(() => setUndo(null), UNDO_MS);
-    } catch (e) {
-      sayError(e);
+    commit(next);
+    // souhlas jádro přijme jen pro uloženou akci — po Uložit, a jen když se mezitím nezměnila
+    if (consent) {
+      const want = shape(saved);
+      afterSave(() => (list().some((x) => x.id === saved.id && shape(x) === want) ? actionsApi.consent(saved) : undefined));
     }
+    setEditing(null);
+    say(e.index === null ? t("actions.panel.added", "Akce „{label}“ přidána — ulož ji dole v liště.", { label: saved.label }) : t("actions.panel.saved", "Změněno — ulož dole v liště."));
   }
 
-  async function restore() {
-    const u = undo();
-    if (!u) return;
-    setUndo(null);
-    const next = list().slice();
-    next.splice(Math.min(u.index, next.length), 0, u.a);
-    await commit(next).catch(sayError);
+  function remove(index: number) {
+    const a = structuredClone(list()[index]);
+    commit(list().filter((_, i) => i !== index));
+    offerUndo(t("actions.panel.deleted", "Akce „{label}“ smazána.", { label: a.label }), () => {
+      const next = list().slice();
+      next.splice(Math.min(index, next.length), 0, a);
+      commit(next);
+    });
   }
 
-  async function drop(to: number) {
+  function drop(to: number) {
     const from = drag();
     setDrag(null);
     setOver(null);
     if (from === null || from === to) return;
-    await commit(moveItem(list(), from, to)).catch(sayError);
+    commit(moveItem(list(), from, to));
   }
 
   const links = () => p.cfg.personal?.links ?? [];
   const convertible = () => linksToActions(links(), list());
-  async function convert() {
+  function convert() {
     const add = convertible();
-    await commit([...list(), ...add]).catch(sayError);
+    commit([...list(), ...add]);
     say(t("actions.panel.converted", "Převedeno {n} odkazů. V kartě Odkazy zůstaly — smazat je můžeš tam.", { n: add.length }));
   }
 
@@ -102,14 +103,6 @@ export default function ActionsPanel(p: PanelProps) {
           <span class="grow">{tp("actions.panel.links", convertible().length, ["Na záložce Osobní máš {n} odkaz, který tu ještě není.", "Na záložce Osobní máš {n} odkazy, které tu ještě nejsou.", "Na záložce Osobní máš {n} odkazů, které tu ještě nejsou."])}</span>
           <button class="mini" onClick={convert}>{t("actions.panel.convert", "Převést na akce")}</button>
         </div>
-      </Show>
-      <Show when={undo()}>
-        {(u) => (
-          <div class="act-note">
-            <span class="grow">{t("actions.panel.deleted", "Akce „{label}“ smazána.", { label: u().a.label })}</span>
-            <button class="mini ok" onClick={restore}>{t("actions.panel.undo", "Vrátit")}</button>
-          </div>
-        )}
       </Show>
       <Show when={editing()} fallback={
         <div class="act-list">
@@ -147,7 +140,13 @@ export default function ActionsPanel(p: PanelProps) {
                   <span class="pill n">{kindLabel(a.kind)}</span>
                   <Show when={a.group}><span class="pill v">{a.group}</span></Show>
                   <div class="r">
-                    <Show when={v()}>{(vv) => <button class="mini" onClick={() => runAction(vv(), askConfirm("panel"))}>{t("actions.panel.run", "Spustit")}</button>}</Show>
+                    <Show when={v()}>
+                      {(vv) => (
+                        <button class="mini" disabled={!isSaved(a)} title={isSaved(a) ? undefined : t("actions.panel.unsaved", "Nejdřív ulož (lišta dole) — pak poběží v tomhle tvaru")} onClick={() => runAction(vv(), askConfirm("panel"))}>
+                          {t("actions.panel.run", "Spustit")}
+                        </button>
+                      )}
+                    </Show>
                     <button class="mini" onClick={() => setEditing({ index: i(), draft: structuredClone(a) })}>{t("actions.panel.edit", "Upravit")}</button>
                     <button class="mini" onClick={() => remove(i())}>{t("actions.panel.delete", "Smazat")}</button>
                   </div>
@@ -165,6 +164,7 @@ export default function ActionsPanel(p: PanelProps) {
             isNew={e().index === null}
             groups={groups()}
             saved={e().index === null ? undefined : views().get(e().draft.id)}
+            runnable={isSaved(e().draft)}
             onSave={onSave}
             onCancel={() => setEditing(null)}
           />

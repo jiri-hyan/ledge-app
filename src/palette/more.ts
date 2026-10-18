@@ -7,6 +7,7 @@ import type { PItem } from "./items";
 import type { Ranked } from "./search";
 import { quick } from "./quick";
 import { EMOJI_PREFIX } from "./emoji";
+import { CLIP_PREFIX, type ClipRow } from "../cliphist/model";
 import { t, type Lang } from "../i18n";
 import { runAny, scriptsApi } from "../actions/scripts";
 import { askConfirm } from "../actions/ui";
@@ -43,6 +44,8 @@ export function quickRows(query: string, lang: Lang): { only: boolean; rows: Ran
   if (!r) return { only: false, rows: [] };
   const noop = () => undefined;
   if (r.kind === "emoji") {
+    // tabulka se načítá (jen poprvé, okamžik) → jeden řádek „Načítám…“, Enter nic nekopíruje
+    if (r.loading) return { only: true, rows: [{ item: { id: "emoji:loading", title: t("palette.emoji.loading", "Načítám emoji…"), section: "emoji", glyph: "…", stay: true, run: noop }, score: 0, ranges: [] }] };
     // bez podtitulu: řádky emoji jsou husté, co dělá Enter říká patička
     return {
       only: true,
@@ -58,5 +61,16 @@ export function emojiCommand(open: (query: string) => void): PItem {
   return { id: "app:emoji", section: "emoji", order: 6, glyph: "😀", stay: true, title: t("palette.emoji.open", "Emoji…"), sub: t("palette.emoji.openSub", "Nebo napiš : a slovo, třeba :srdce"), keywords: "emoji smajlik smajliky emotikon ikona symbol smiley", run: () => open(EMOJI_PREFIX) };
 }
 
+/** Příkaz „Historie schránky…“: přepne dotaz na `v:` (paleta zůstane otevřená). */
+export function clipCommand(open: (query: string) => void): PItem {
+  return { id: "app:clip", section: "clip", order: 6, glyph: "📋", stay: true, title: t("palette.clip.open", "Historie schránky…"), sub: t("palette.clip.openSub", "Nebo napiš v: a slovo, třeba v:adresa"), keywords: "schranka clipboard historie vlozit paste kopirovat zkopirovane win+v", run: () => open(CLIP_PREFIX) };
+}
+
+/** Řádky historie schránky pro paletu (`v:…`); Enter / Ctrl+P / Ctrl+Del obsluhuje `Palette.tsx`. */
+export function clipItems(rows: Ranked<ClipRow>[]): Ranked<PItem>[] {
+  const glyph = (r: ClipRow) => (r.kind === "entry" ? (r.entry?.pinned ? "📌" : "📋") : r.kind === "off" ? "⏻" : r.kind === "clear" ? "🗑" : r.kind === "settings" ? "⚙" : "💡");
+  return rows.map((r) => ({ ...r, item: { id: r.item.id, title: r.item.title, sub: r.item.sub, section: "clip", glyph: glyph(r.item), clip: r.item, run: () => undefined } }));
+}
+
 /** Nápověda pod prázdnou paletou: co umí kromě hledání. */
-export const paletteTips = () => t("palette.tips", "Umím i počty (2^10), převody (10 km na mi) a emoji (:srdce)");
+export const paletteTips = () => t("palette.tips", "Umím i počty (2^10), převody (10 km na mi), emoji (:srdce) a historii schránky (v:)");

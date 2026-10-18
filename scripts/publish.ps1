@@ -92,7 +92,12 @@ try {
   $pubPaths = @('--', '.', ':(exclude)scripts/private', ':(exclude).github')
   # git píše UTF-8; bez tohohle ho PS 5.1 dekóduje jako OEM 852 a poznámky vydání mají rozbitou češtinu
   [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-  $log =if ($LASTEXITCODE -eq 0) { @(git log --no-decorate --format='- %s' "$prevTag..HEAD" @pubPaths) } else { @(git log --no-decorate -n 30 --format='- %s' @pubPaths) }
+  $log =if ($LASTEXITCODE -eq 0) { @(git log --no-decorate --format='%H - %s' "$prevTag..HEAD" @pubPaths) } else { @(git log --no-decorate -n 30 --format='%H - %s' @pubPaths) }
+  # commity vynechané z poznámek vydání (plný SHA na řádek, # = komentář) — pro zprávy, které by jinak
+  # zastavily denylist a pushnutou historii nepřepisujeme; snapshot stromu se kontroluje dál celý
+  $skipFile = Join-Path $root 'scripts\private\notes-skip.txt'
+  $skip = if (Test-Path $skipFile) { @(Get-Content $skipFile -Encoding UTF8 | ForEach-Object { ($_ -split '#')[0].Trim() } | Where-Object { $_ }) } else { @() }
+  $log = @($log | Where-Object { $skip -notcontains $_.Substring(0, 40) } | ForEach-Object { $_.Substring(41) })
   foreach ($line in $log) { foreach ($d in $deny) { if ($line -match "(?i)$d") { $hits += "seznam změn: $line ~ $d" } } }
   if ($hits.Count) { $hits | ForEach-Object { "  ZAKÁZÁNO: $_" }; Fail "snapshot obsahuje zakázaná slova ($($hits.Count)) — oprav na main a vydej znovu" }
   "snapshot:   $Clone čistý (denylist $($deny.Count) vzorů)"

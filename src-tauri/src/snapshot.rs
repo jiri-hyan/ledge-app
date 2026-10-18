@@ -99,6 +99,8 @@ pub(crate) struct PersonalView {
     volume: Option<crate::volume::VolumeView>,
     /// baterie (`battery::view`); `None` = stroj bez baterie / vypnuto
     battery: Option<crate::battery::BatteryView>,
+    /// karta Kalendář (`calendar::live::view`, jen paměť)
+    calendar: crate::calendar::live::CalendarView,
 }
 
 #[derive(Serialize, Clone)]
@@ -288,5 +290,6 @@ pub(crate) fn personal_view(cfg: &Config, (notes, notes_more): (Vec<notes::NoteV
         media: crate::media::view().filter(|_| sec.now_playing),
         volume: crate::volume::view().filter(|_| sec.sound),
         battery: crate::battery::view().filter(|_| sec.battery),
+        calendar: crate::calendar::live::view(cfg, now),
     }
 }

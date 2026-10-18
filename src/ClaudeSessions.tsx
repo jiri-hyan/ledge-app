@@ -15,7 +15,7 @@ import LimitsRow from "./limits/LimitsRow";
 import DiffPreview from "./sessions/DiffPreview";
 import PlanReview from "./sessions/PlanReview";
 import GitPanel from "./sessions/GitPanel";
-import { planTitle } from "./sessions/plan";
+import { addonsMissing, planTitle } from "./sessions/plan";
 import CostsSection from "./costs/CostsSection";
 import AgentActions, { BgPill } from "./sessions/AgentActions";
 import { statusPill } from "./sessions/agentview";
@@ -51,12 +51,13 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
   const asksFor = (sid: string) => p.s.questions.filter((x) => x.sessionId === sid);
   const orphanAsks = () => p.s.questions.filter((x) => !p.s.sessions.some((ss) => ss.id === x.sessionId));
   const needHooks = () => p.s.hooks.state === "none" || p.s.hooks.state === "partial";
-  /** hooky z dřívější verze bez otázek Clauda → doplnit jedním klikem (ostatní už šéf zapojil) */
-  const onlyQuestions = () => p.s.hooks.state === "partial" && p.s.hooks.missing.length === 1 && p.s.hooks.missing[0] === "PreToolUse";
+  /** hooky z dřívější verze bez otázek Clauda / review plánu → doplnit jedním klikem (ostatní už šéf zapojil) */
+  const onlyAddons = () => addonsMissing(p.s.hooks);
   async function addQuestions() {
+    const q = p.s.hooks.missing.includes("PreToolUse");
     try {
       await api.hooksInstall();
-      say(t("questions.hooksAdded", "Otázky Clauda zapojené — platí pro nově spuštěné session"));
+      say(q ? t("questions.hooksAdded", "Otázky Clauda zapojené — platí pro nově spuštěné session") : t("sessions.plan.hookAdded", "Review plánu zapojené — platí pro nově spuštěné session"));
     } catch (e) {
       say(String(e), true);
     }
@@ -80,10 +81,12 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
       </Show>
       <Show when={!p.s.claudeEnabled} fallback={
         <Show when={needHooks()}>
-          <Show when={onlyQuestions()} fallback={
+          <Show when={onlyAddons()} fallback={
             <button class="hint-link" onClick={p.onSettings} title={p.s.hooks.missing.length ? t("sessions.hooksMissing", "Chybí: {list}", { list: p.s.hooks.missing.join(", ") }) : undefined}>{t("sessions.connectHooks", "Zapojit hooky pro schvalování a subagenty")}</button>
           }>
-            <button class="hint-link" onClick={addQuestions} title={p.s.hooks.hint ?? undefined}>{t("questions.addHook", "Doplnit otázky Clauda (odpovídat na ně v Ledge)")}</button>
+            <button class="hint-link" onClick={addQuestions} title={p.s.hooks.hint ?? undefined}>
+              {p.s.hooks.missing.includes("PreToolUse") ? t("questions.addHook", "Doplnit otázky Clauda (odpovídat na ně v Ledge)") : t("sessions.plan.addHook", "Doplnit review plánu (schvalovat plány v Ledge)")}
+            </button>
           </Show>
         </Show>
       }>

@@ -2,6 +2,9 @@
 // rozdělaná práce se neztratí), uložená verze `base` (pro „Neuložené změny“ a Zahodit), poslední
 // chyba validace z Rustu, zvýrazněný řádek z hledání a lišta „Vrátit“. Pole čtou/mění config přes
 // `useSettings()` cestou (`"drawer.trigger"`, `"projects.2.run"`).
+// **Jedno chování ukládání ve všech panelech:** panel mění jen draft; zapíše ho JEN lišta skořápky
+// (Uložit / Ctrl+S, Zahodit vrátí uložené). Žádný panel nemá vlastní „Uložit“ ani neukládá sám. Co jádro
+// přijme až pro uloženou verzi (souhlas s příkazem akce), panel odloží přes `afterSave`.
 import { createContext, createSignal, useContext } from "solid-js";
 import { createStore, reconcile, unwrap } from "solid-js/store";
 import { setLang } from "../i18n";
@@ -34,6 +37,8 @@ export const setCfg: any = (...args: any[]) => {
 /** Načtená / právě uložená verze z jádra → draft i základ. Jazyk rozhraní jde podle ULOŽENÉ verze —
  *  přepínač v Nastavení (`ui.lang`) tak platí hned po Uložit, bez restartu. */
 export function loadBase(c: any) {
+  // jiná verze configu (Zahodit, Načíst nové, právě uloženo) = odložené úkoly k draftu propadají
+  pendingAfterSave = [];
   const l = c?.ui?.lang;
   if (l === "cs" || l === "en") setLang(l);
   setCfgRaw(reconcile(structuredClone(c)));
@@ -44,6 +49,29 @@ export function loadBase(c: any) {
 export const isLoaded = () => base() !== "";
 export const snapshotDraft = () => structuredClone(unwrap(cfg));
 export const discard = () => base() && loadBase(JSON.parse(base()));
+
+type AfterSave = () => Promise<unknown> | unknown;
+let pendingAfterSave: AfterSave[] = [];
+
+/** Úkol po příštím úspěšném Uložit (jádro ho přijme až pro uloženou verzi, např. souhlas s příkazem
+ *  akce). Zahodit / Načíst nové ho zruší (`loadBase`). */
+export function afterSave(fn: AfterSave) {
+  pendingAfterSave.push(fn);
+}
+/** Skořápka po zápisu configu: spustí odložené úkoly (každý zvlášť); vrátí chyby k ohlášení. */
+export async function runAfterSave(): Promise<unknown[]> {
+  const q = pendingAfterSave;
+  pendingAfterSave = [];
+  const errors: unknown[] = [];
+  for (const f of q) {
+    try {
+      await f();
+    } catch (e) {
+      errors.push(e);
+    }
+  }
+  return errors;
+}
 
 /** Lišta „Vrátit“ (smazání, obnova výchozích…) na 8 s. */
 export function offerUndo(text: string, restore: () => void) {

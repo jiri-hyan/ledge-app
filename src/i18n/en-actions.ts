@@ -59,7 +59,7 @@ registerDict("en", {
   "actions.edit.runNow": "Run now",
   "actions.edit.cancel": "Cancel",
   "actions.edit.add": "Add",
-  "actions.edit.save": "Save",
+  "actions.edit.apply": "Done",
   // spouštění a kontrola
   "actions.run.problem": "{label}: {problem}",
   "actions.run.already": "{label} is already running.",
