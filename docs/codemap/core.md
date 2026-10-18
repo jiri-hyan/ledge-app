@@ -7,7 +7,7 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `lib.rs` | `mod` seznam (první `#[macro_use] mod i18n`), `run()` (`i18n::set_lang` po `load_or_seed`), re-export `crate::log` a `crate::screen_glass_capable`; `RunEvent::ExitRequested` bez kódu (zavřené poslední okno) → `prevent_exit` | `run`, `generate_handler!` |
+| `lib.rs` | `mod` seznam (první `#[macro_use] mod i18n`), `mcp_main` (`ledge.exe --mcp`, [mcp.md](mcp.md)), `run()` (`i18n::set_lang` po `load_or_seed`), re-export `crate::log` a `crate::screen_glass_capable`; `RunEvent::ExitRequested` bez kódu (zavřené poslední okno) → `prevent_exit` | `run`, `generate_handler!` |
 | `i18n.rs` | jazyk textů jádra (hlášky, chyby, stavy ve snapshotu, proužek): globální atomic z `ui.lang` (`set_lang` při startu a v `apply_config`), výchozí čeština; text v obou jazycích na místě. Testy: jazyk per vlákno (`with_lang`) | `tr(cs, en)`, `trf!(cs, en, args)`, `lang`, `set_lang`, `with_lang` |
 | `state.rs` | sdílený stav a jeho přístup | `Core` (pole `pub(crate)`), `CORE`, `core()`, `mark_dirty`, `UiCmd`, `WeatherState`, `Core::{dead, monitor, monitor_fresh, project_dir, rebuild_index, send_ui, strip_logical}`, `MonitorCache`, `MONITOR_TTL`, `FLASH`, `now_ms`, `find_project`, `log` |
 | `snapshot.rs` | stav pro UI (`get_state`, událost `state`) — jen paměť, žádné I/O | `snapshot`, `Snapshot`, `ProjectView`, `PersonalView`, `WeatherView`, `LinkView`, `session_rows`, `personal_view`, `monogram`, `github_url` |

@@ -65,6 +65,10 @@ pub struct Config {
     /// Účty Microsoft a Google (OAuth, `accounts/`): vlastní registrace aplikace (Client ID), co Ledge
     /// z účtu čte. Přihlášení samo je ve Správci pověření Windows, nikdy tady. Výchozí = nic nepřihlášeno.
     pub accounts: crate::accounts::conf::AccountsConfig,
+    /// Lokální MCP server pro Clauda (`mcp/`): Claude smí číst a měnit nastavení Ledge (zástupci, akce,
+    /// rozložení, proužek, vzhled), nic nespouští, nic neposílá ven. Výchozí vypnuto; klíč je ve Správci
+    /// pověření Windows (`Ledge/mcp`), nikdy tady.
+    pub mcp: crate::mcp::McpConfig,
 }
 
 impl Default for Config {
@@ -97,6 +101,7 @@ impl Default for Config {
             system: Default::default(),
             layout: Default::default(),
             accounts: Default::default(),
+            mcp: Default::default(),
         }
     }
 }

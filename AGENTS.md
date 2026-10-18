@@ -13,7 +13,7 @@ bez UI. Architektura je v hlavičkách souborů `src-tauri/src/*.rs`.
 `src/settings/registry.ts`; staré id vedou dál): **Začínáme** (průvodce, tipy, novinky) · **Šuplík a karty**
 (záložky, karty, přihrádka) · **Vzhled** (4 kroky: Zavřený — vzhled zavřeného Ledge a celý proužek; Po najetí; Otevřený — styl, šířka a hustota na monitoru ve skutečném poměru, barvy; Pohyb — animace; jazyk) · **Projekty,
 akce a odkazy** (projekty se autodetekcí ze složky, jeden seznam akcí — odkaz je akce —, skripty) · **Claude**
-(schvalování, otázky, limity, útrata, hlídač, hooky) · **Osobní** (počasí, kalendář, přehrávač, časovač,
+(schvalování, otázky, Claude (MCP), limity, útrata, hlídač, hooky) · **Osobní** (počasí, kalendář, přehrávač, časovač,
 historie schránky, GitHub, Systém) · **Poznámky** (i sync) · **Chování** (otevírání, zkratky, paleta, herní režim, šuplík nad
 prohlížečem, spouštění po startu, šetřit paměť) · **Záloha a aplikace** (export / import s výběrem částí /
 obnova výchozích, verze, aktualizace). Hledání (Ctrl+F) najde i staré názvy voleb. Ruční
@@ -352,6 +352,9 @@ Typické úpravy:
   `enabled` (výchozí `true`, ale nic neběží, dokud widget nepřidáš na záložku / do proužku a nepovolíš ho),
   `dir` (chybí = `%USERPROFILE%\Ledge\widgets`, `%PROMĚNNÉ%` se rozbalí, jinak absolutní cesta). Starý
   config bez `widgets` = výchozí. Formát viz „Widgety ze skriptů“ níže a `docs/widgets.md`.
+- **Claude (MCP)** — sekce `mcp` (Nastavení → Claude → Claude (MCP), přepínač platí hned): `enabled` (výchozí
+  **`false`** → `/mcp` vrací 404). Zapnutí vytvoří klíč (32 B) ve Správci pověření Windows `Ledge/mcp` — klíč
+  nikdy není v configu ani v logu. Starý config bez `mcp` = vypnuto. Co MCP umí: „MCP server (`/mcp`)“ níže.
 
 ## Právě hraje, hlasitost, baterie (záložka Osobní)
 
@@ -657,8 +660,41 @@ ručně „Synchronizovat teď“ v Nastavení. Cyklus: `add -A` → commit `led
 | `POST /question` | **jen pro hook `PreToolUse` s matcherem `AskUserQuestion`** (otázky Clauda) |
 | `POST /plan` | **jen pro hook `PreToolUse` s matcherem `ExitPlanMode`** (review plánu) |
 | `POST /event` | hooky SessionStart/UserPromptSubmit/PostToolUse/Stop/SessionEnd/Notification/SubagentStart/SubagentStop |
+| `POST /mcp` | MCP server pro Clauda (JSON-RPC, `Authorization: Bearer <klíč>`; vypnuto = 404) — viz níže |
 
 Požadavky s hlavičkou `Origin` (prohlížeč) se odmítají.
+
+### MCP server (`/mcp`)
+
+Claude Code / Claude Desktop nastaví Ledge podle toho, co uživatel používá. Zapíná se v Nastavení → Claude →
+Claude (MCP) (výchozí vypnuto). Mapa: `docs/codemap/mcp.md`.
+
+- **Připojení (doporučené, stdio):** `claude mcp add --scope user ledge -- "<cesta k ledge.exe>" --mcp`
+  (přesný příkaz zkopíruje Nastavení). `ledge.exe --mcp` je tenký proxy stdin/stdout ↔ `POST /mcp`, klíč si
+  čte sám ze Správce pověření; neotevírá okno a nestartuje druhý Ledge. Ledge neběží → chyba JSON-RPC „Ledge
+  neběží“, MCP vypnuté → „Zapni v Ledge Nastavení → Claude (MCP)“. Claude Desktop: `mcpServers.ledge =
+  { "command": "<ledge.exe>", "args": ["--mcp"] }`.
+- **Záloha (http):** `claude mcp add --transport http --scope user ledge http://127.0.0.1:47800/mcp --header
+  "Authorization: Bearer <klíč>"` — klíč jen na „Zobrazit klíč“. Streamable HTTP bez SSE a bez session: `POST`
+  = jedna zpráva (nebo dávka), odpověď `application/json`; notifikace → 202; `GET`/`DELETE` → 405; bez klíče /
+  špatný klíč → 401 (bez detailu); tělo > 256 KB → 413. Protokol 2025-06-18, 2025-03-26, 2024-11-05.
+- **Nástroje:** `ledge_status`, `apps_discover` (Start menu uživatele i ProgramData, repa na disku; nic z
+  prohlížeče), `tiles_list` / `tiles_add` / `tiles_update` / `tiles_remove` (zástupci = `projects`),
+  `actions_list` / `actions_add` / `actions_update` / `actions_remove`, `layout_get` / `layout_preview` /
+  `layout_apply`, `strip_get` / `strip_set`, `appearance_get` / `appearance_set` (styl jen z katalogu stylů,
+  hodnoty jen z výčtů schématu), `undo_last`, `open_drawer`. Každý má JSON Schema vstupu a popis pro model.
+- **Zápis = stejná cesta jako Uložit v Nastavení:** načíst config → změna → `config::validate_field` (stejná
+  validace, i editoru rozložení) → snímek dotčených částí do Vrátit (posledních 20, jen v paměti) →
+  `save_config` → událost `config-changed`. Neplatný vstup = výsledek s `isError: true` a větou, co je špatně a
+  co jde (config beze změny); chyba protokolu (neznámý nástroj, špatná zpráva) = JSON-RPC error. `undo_last`
+  vrátí jen části, které ten zápis změnil, a odmítne, když je mezitím někdo změnil jinde.
+- **Neuložené úpravy v Nastavení:** zápis přes MCP projde vždy. Otevřené Nastavení dostane událost: bez
+  rozpracovaných změn se přenačte; rozpracované v jiné sekci zůstanou a změna zvenku se do nich sloučí; tatáž
+  sekce = lišta konfliktu „Načíst nové / Přesto uložit“ (nic se nepřepíše potichu, `src/mcp/merge.ts`).
+- **MCP nic nespouští** (žádné launch/run nástroje). Akce `command` / `app` s argumenty přidaná přes MCP souhlas
+  nedostane — Ledge se zeptá při prvním spuštění jako u ruční. Zástupce (karta Projekty) se spouští bez
+  potvrzení, proto mu MCP smí dát jen skript balíčkovače (`npm run dev`, `pnpm dev`…) nebo příkaz, který Ledge
+  sám najde ve složce projektu; jiný příkaz → rychlá akce `command`.
 
 **Schválení přes API záměrně NEJDE.** Povolit akci Clauda smí jen člověk — klikem v šuplíku (nebo
 zkratkou, je-li zapnutá). Nepřidávej `/ctl/decide` ani nic podobného: z mostu by se stal způsob, jak si agent
@@ -882,8 +918,10 @@ snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
   i seznam změn se před commitem prověří proti `scripts/private/denylist.txt` (jména klientů, strojů,
   osobní údaje — soubor je jen ve vývojovém repu); jediný nález = konec bez vydání. Pak lokální build
   (verze = nejvyšší `v0.2.x` v obou repech + 1, zapíše se jen dočasně přes `scripts/ci-version.ps1`)
-  a `gh release create` ve veřejném repu: instalátor + poznámky, první řádek `SHA256 (<setup>) = <hex>`
-  (tvar čte `update.rs`, neměnit). Tag se vytvoří i ve vývojovém repu. `-DryRun` = jen snapshot
+  a `gh release create` ve veřejném repu: instalátor + přílohy `SHA256SUMS.txt` (`<hex>  <soubor>`) a
+  `pro-claude.md` (kopie `docs/pro-claude.md`, návod pro Clauda — „Nastav s Claudem“) + poznámky, první řádek
+  `SHA256 (<setup>) = <hex>` (tvar čte `update.rs`, neměnit; řádky začínající `SHA256` se v UI z poznámek
+  vypouštějí) a na konci sekce „Nastav s Claudem“ s promptem. Tag se vytvoří i ve vývojovém repu. `-DryRun` = jen snapshot
   a kontrola, `-AlsoPrivate` = stejný instalátor i do vývojového repa (přechod pro Ledge ≤ 0.2.8, které
   hledaly aktualizace tam). CI (`.github/workflows/release.yml`) je jen ruční a do veřejného repa se
   nekopíruje.

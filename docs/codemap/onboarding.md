@@ -19,7 +19,9 @@ Autorův existující config se chová beze změny. Cituj symbolem, ne číslem 
 | `src/onboarding/state.ts` | kdy se průvodce ukáže, jazyk z configu | `checkFirstRun`, `startWizard`, `closeWizard`, `wizardOpen` |
 | `src/onboarding/store.ts` | stav průvodce, načítání, ukládání po krocích | `wiz`, `prefetch`, `loadRepos`, `addFolder`, `loadIcons`, `applyStep`, `pending`, `finish` |
 | `src/onboarding/logic.ts` · `api.ts` · `en.ts` | čisté pomůcky (kroky, výběr, URL) · IPC · anglický slovník | `STEPS`, `defaultRepoSelection`, `appProject`, `normalizeUrl`, `LINK_SUGGESTIONS` · `ob` |
-| `src/onboarding/Wizard.tsx` + `steps/*` | stránka `welcome`: hlavička s postupem, kroky, patička | `Wizard`, `WelcomeStep`, `ProjectsStep`, `AppsStep`, `ClaudeStep`, `LinksStep`, `LookStep`, `DoneStep`, `parts` (`Logo`, `CheckRow`, `Skeleton`, `Preview`) |
+| `src/onboarding/claudeSetup.ts` (+ `.test.mjs`) | krok „S Claudem“: čistá logika bez i18n/DOM — zadání pro Clauda a volba zobrazení | `PRO_CLAUDE_URL`, `buildSetupPrompt(t)`, `setupView` (`manualOnly`/`loading`/`choose`/`connect`), `hasConnectionKit` |
+| `src/onboarding/assist.ts` · `steps/Assist.tsx` · `src/mcp/api.ts` | stav kroku (`mcp_state` → `mcp_set_enabled`, kopírování přes `focusDrawer` + schránka) · vykreslení · IPC kontraktu MCP (vlastní ho worker MCP) | `assist`, `loadMcp`, `chooseClaude`, `disableMcp`, `copy`, `promptText` · `AssistStep` |
+| `src/onboarding/Wizard.tsx` + `steps/*` | stránka `welcome`: hlavička s postupem, kroky, patička | `Wizard`, `WelcomeStep`, `AssistStep`, `ProjectsStep`, `AppsStep`, `ClaudeStep`, `LinksStep`, `LookStep`, `DoneStep`, `parts` (`Logo`, `CheckRow`, `Skeleton`, `Preview`) |
 | `src/settings/panels/Start.tsx` | panel Nastavení → Začínáme (ruční spuštění průvodce, tipy, novinky) | `StartPanel` |
 
 Lepidlo: `settings::load_or_seed` (soubor chybí → `fresh_config`), `config::load` (→ `upgrade_loaded`),
@@ -34,6 +36,12 @@ se na ní neukazuje), `nav.ts` (`Page` + `typing` obsahují `welcome`).
    repa → Claude → aplikace na pozadí. Ikony jen pro viditelné položky (`onboarding_icons`, ≤ 48).
 3. „Uložit a pokračovat“ = `applyStep` → `onboarding_apply` → `apply::apply` → `config::save` +
    `apply_config`. Konec / Přeskočit průvodce = `{ done: true }`.
+4. Krok `assist` („S Claudem“, hned za Vítej): při mountu `loadMcp` → `mcp_state`. Selže-li (starší jádro,
+   mimo Tauri) → `setupView` = `manualOnly`, jen věta a Další, žádný pád. „Nastavit s Claudem“ = jeden klik
+   → `mcp_set_enabled(true)` → `connect`: `cliCommand` (Claude Code), `desktopConfig` (Claude Desktop),
+   „Zkopírovat zadání pro Clauda“ (`buildSetupPrompt`, odkaz na `pro-claude.md` ze vydání). Krok nic
+   neukládá do configu (`pending` = false); MCP stav drží jádro. Návod pro Clauda `docs/pro-claude.md`
+   jde jako příloha vydání (`scripts/publish.ps1`: `pro-claude.md`, `SHA256SUMS.txt`).
 
 ## Invarianty a pasti
 
@@ -50,6 +58,8 @@ se na ní neukazuje), `nav.ts` (`Page` + `typing` obsahují `welcome`).
 - `onboarding_icons` čte disk jen pro klíče, které vrátil sken (`KNOWN`) — UI nemůže podstrčit cestu.
 - Fokus: šuplík otevřený najetím nemá klávesnici — vstupy volají `api.focusDrawer()` na `pointerdown`
   (výslovný klik); „Přidat složku…“ taky, aby dialog (vlastník = šuplík) šuplík nezavřel.
+- Krok „S Claudem“ nikdy nespouští Clauda ani nic jiného; zapnutí MCP je výslovný klik na volbu a jde vypnout
+  tamtéž i v Nastavení → Claude (MCP). `claudeSetup.ts` bez importu `i18n` (testovatelné); `buildSetupPrompt(t)` dostává překladač.
 - `claude --version` jen v appce (bez okna, 8 s), nikdy v testech. Aplikace ze Storu (bez `.lnk`) chybí.
 
 ## Testy
@@ -59,7 +69,8 @@ se na ní neukazuje), `nav.ts` (`Page` + `typing` obsahují `welcome`).
 bez zápisu), `onboarding::repos::tests` (hloubka, přeskakování,
 worktree, `suggest` tabulka, Rust/.NET, `facts` z disku, slug, reflog), `onboarding::apps::tests` (skutečný
 `.lnk` vyrobený přes `IShellLinkW` v tempu, `keep`, `split_args`, `dedupe`), `onboarding::claude::tests`,
-`onboarding::themes::tests`, `onboarding::apply::tests`, `uiconf::tests`.
+`onboarding::themes::tests`, `onboarding::apply::tests`, `uiconf::tests`; UI: `src/onboarding/claudeSetup.test.mjs`
+(zadání, volba zobrazení vč. selhání `mcp_state`).
 
 ## Co nečíst
 

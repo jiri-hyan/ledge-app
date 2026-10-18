@@ -33,7 +33,7 @@ pub mod rules;
 #[cfg(test)]
 mod testkit;
 
-pub use bridge::{Ctl, serve};
+pub use bridge::{Ctl, Mcp, serve};
 pub use questions::{Ask, Reply};
 
 use crate::config::EnforceCommit;

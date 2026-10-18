@@ -11,7 +11,7 @@
 //! - `rawpush` — raw myš (tlak na horní hranu), zaregistrovaná jen u hrany nad prohlížečem
 //! - `shelf-drop` — cíl přetažení přihrádky (OLE); vznikne až při prvním tahu souborů na proužek
 //! - `cliphist` — historie schránky: jen se zapnutým `clipboard.enabled`, spí do `WM_CLIPBOARDUPDATE`
-//! - `claude-bridge` — HTTP pro hooky
+//! - `claude-bridge` — HTTP pro hooky a `/mcp` (MCP server pro Clauda, `mcp/`; každý požadavek vlastní krátké vlákno)
 //! - `notes-watch` — sleduje složku poznámek (události, žádný poll) a přepočítá připomínky
 //! - `pins-save` — zpožděný zápis stavu lístků na plochu (`pins/`); vznikne s prvním lístkem, spí na kanálu
 //! - `media` / `volume` (záložka Osobní) — vzniknou až při prvním zobrazení záložky (`personal_live`),
@@ -60,6 +60,7 @@ mod limits;
 mod layout;
 mod limitslive;
 mod looks;
+mod mcp;
 mod linkmigrate;
 mod media;
 mod mediaconf;
@@ -116,6 +117,11 @@ pub(crate) use state::{log, screen_glass_capable};
 /// `ledge.exe --statusline` (wrapper stavového řádku Claude Code) — volá `main.rs` místo `run()`.
 pub fn statusline_main() -> i32 {
     statusline::main()
+}
+
+/// `ledge.exe --mcp` (stdio proxy MCP pro Claude Code / Desktop, `mcp/proxy.rs`) — volá `main.rs` místo `run()`.
+pub fn mcp_main() -> i32 {
+    mcp::proxy::main()
 }
 
 use claude::Claude;
@@ -243,7 +249,7 @@ pub fn run() {
 
             sync_hotkeys();
             if cfg.claude.enabled
-                && let Err(e) = claude::serve(cfg.claude.port, claude, ctl::status_extra(), ctl::ctl_handler())
+                && let Err(e) = claude::serve(cfg.claude.port, claude, ctl::status_extra(), ctl::ctl_handler(), mcp::host::endpoint())
             {
                 *core_arc.cfg_error.lock() = Some(trf!("Most pro Claude neběží: {e}", "The Claude bridge isn't running: {e}"));
             }
@@ -436,7 +442,11 @@ pub fn run() {
             commands::onboarding::onboarding_claude,
             commands::onboarding::onboarding_pick_folder,
             commands::onboarding::onboarding_themes,
-            commands::onboarding::onboarding_apply
+            commands::onboarding::onboarding_apply,
+            commands::mcp::mcp_state,
+            commands::mcp::mcp_set_enabled,
+            commands::mcp::mcp_rotate_key,
+            commands::mcp::mcp_reveal_key
         ])
         .build(tauri::generate_context!())
         .expect("ledge: start selhal")

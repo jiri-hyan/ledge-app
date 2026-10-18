@@ -46,6 +46,17 @@ export function loadBase(c: any) {
   touch();
 }
 
+/** Změna zvenku sloučená s rozpracovaným draftem (`mcp/merge.ts`, Claude přes MCP): nový základ a draft
+ *  s převzatými sekcemi. Odložené úkoly zůstanou — patří k sekcím, které uživatel rozpracoval a zvenku
+ *  se neměnily. Jazyk jako `loadBase`. */
+export function adoptBase(c: any, draft: any) {
+  const l = c?.ui?.lang;
+  if (l === "cs" || l === "en") setLang(l);
+  setCfgRaw(reconcile(structuredClone(draft)));
+  setBaseSig(JSON.stringify(c));
+  touch();
+}
+
 export const isLoaded = () => base() !== "";
 export const snapshotDraft = () => structuredClone(unwrap(cfg));
 export const discard = () => base() && loadBase(JSON.parse(base()));

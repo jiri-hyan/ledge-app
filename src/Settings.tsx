@@ -4,12 +4,12 @@
 // Ukládá se ručně (Ctrl+S): config sdílí Claude i druhé PC a projekty bývají chvíli napůl vyplněné.
 import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { api, type FieldError, type Snapshot, type UpdateView } from "./api";
+import { api, on as onEvent, type FieldError, type Snapshot, type UpdateView } from "./api";
 import { t } from "./i18n";
 import { say, sayError } from "./ui/toast";
 import { PANELS, panelLabel, searchItems } from "./settings/catalog";
 import {
-  SettingsCtx, active, base, dirty, discard, fieldError, isLoaded, loadBase, makeCtx, rev, runAfterSave, runUndo,
+  SettingsCtx, active, adoptBase, base, dirty, discard, fieldError, isLoaded, loadBase, makeCtx, rev, runAfterSave, runUndo,
   setActive, setCfg, setDirty, setFieldError, setHit, snapshotDraft, undoMsg,
 } from "./settings/ctx";
 import { IconSearch, PanelIcon } from "./settings/icons";
@@ -18,6 +18,7 @@ import { PANEL_ALIASES } from "./settings/registry";
 import { narrowOut, widenIn } from "./settings/widen";
 import { FIELDS } from "./settings/labels";
 import { setSettingsTarget, settingsTarget } from "./palette/goto";
+import { external } from "./mcp/merge";
 import "./settings.css";
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -67,8 +68,26 @@ export default function Settings(p: { update: UpdateView; s: Snapshot }) {
     window.addEventListener("keydown", keys);
     onCleanup(() => window.removeEventListener("keydown", keys));
     // rozpracované změny z minula zůstanou; bez nich vzít čerstvý stav (mohl ho změnit Claude)
-    api.getConfig().then((c) => c && (!isLoaded() || !dirty()) && loadBase(c), sayError);
+    // (rozpracované + mezitím změna zvenku → stejná politika jako za běhu, `adoptExternal`)
+    api.getConfig().then((c) => {
+      if (!c) return;
+      if (!isLoaded() || !dirty()) loadBase(c);
+      else void adoptExternal();
+    }, sayError);
+    // config změněný mimo Nastavení (Claude přes MCP, přepínač MCP): načíst / sloučit / ukázat konflikt
+    const off = onEvent("config-changed", () => void adoptExternal());
+    onCleanup(() => void off.then((f) => f()));
   });
+
+  async function adoptExternal() {
+    if (!isLoaded() || saving()) return;
+    const fresh = await api.getConfig().catch(() => null);
+    if (!fresh) return;
+    const r = external(JSON.parse(base()), snapshotDraft(), fresh, canon);
+    if (r.action === "load") loadBase(fresh);
+    else if (r.action === "merge") adoptBase(fresh, r.draft);
+    else if (r.action === "conflict") setConflict(true);
+  }
   onCleanup(() => narrowOut());
 
   // ověření v Rustu + „neuloženo“ 250 ms po poslední změně

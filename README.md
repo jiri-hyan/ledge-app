@@ -57,6 +57,13 @@ Windows 11). Claude Code is optional — without it Ledge is a project launcher,
 never installs on its own: you click, it downloads the installer from GitHub over HTTPS, verifies the
 SHA256 and only then runs it.
 
+**Set up with Claude.** Send Claude the link
+`https://github.com/jiri-hyan/ledge-app/releases/latest/download/pro-claude.md` ("Install and set up Ledge for me
+using this guide"). Claude installs Ledge, connects to it over MCP, asks what you use and sets up shortcuts,
+links and layout for the way you work — after you approve. The connection is off until you turn it on in the
+setup guide or in Settings → Claude (MCP), and you can turn it off any time. The guide is
+[`docs/pro-claude.md`](docs/pro-claude.md).
+
 **Uninstall.** Windows Settings → Apps → Ledge. Your config (`%APPDATA%\Ledge`) and notes stay.
 
 ## Settings

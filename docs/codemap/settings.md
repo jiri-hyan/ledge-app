@@ -11,7 +11,7 @@ otázky Clauda, rozložení, schránka, přehrávač, kalendář) jen skládají
 | `suplik` | Šuplík a karty | `panels/Drawer.tsx` → `layout/LayoutEditor.tsx` (záložky, karty, části karet, „Upravit přímo v šuplíku“), přihrádka |
 | `vzhled` | Vzhled | `panels/Appearance.tsx` (4 kroky) → `AppearanceClosed.tsx` (+ `StripSettings.tsx` v Pokročilé: celý proužek), `AppearanceHover.tsx`, `AppearanceOpen.tsx` (+ `AppearanceStyles`, `AppearanceLayout`), `AppearanceMotion.tsx`; náhledy `settings/previews/*` — mapa [appearance.md](appearance.md) |
 | `akce` | Projekty, akce a odkazy | `panels/ProjectsActions.tsx` → `Projects.tsx` (+`ProjectEditor`), `Actions.tsx` (jeden seznam; odkaz = akce, `SortList`), `actions/ScriptsSettings.tsx`, `LegacyLinks.tsx` (jen nepřevedené `personal.links`) |
-| `claude` | Claude | `panels/Claude.tsx` (`HooksSetup`) + `panels/Questions.tsx` (otázky Clauda, `claude.questionHoldS`) |
+| `claude` | Claude | `panels/Claude.tsx` (`HooksSetup`) + `../mcp/McpSettings.tsx` (Claude (MCP), přepínač hned — [mcp.md](mcp.md)) + `panels/Questions.tsx` (otázky Clauda, `claude.questionHoldS`) |
 | `osobni` | Osobní | `panels/Personal.tsx` + `calendar/CalendarSettings`, `media/MediaSettings`, časovač, `cliphist/ClipSettings`, `integrations/IntegrationsSettings` (GitHub, Systém — [integrations.md](integrations.md)) |
 | `ucty` | Účty | `panels/Accounts.tsx` → `accounts/AccountsSettings.tsx` (přihlášení Microsoft / Google, průvodce Client ID) — mapa [accounts.md](accounts.md) |
 | `poznamky` | Poznámky | `panels/Notes.tsx` (kategorie a sync jsou rozsáhlé → vlastní panel) |
@@ -27,7 +27,7 @@ staré názvy jsou v `kw` (hledání je najde).
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
 | `src/Settings.tsx` | skořápka: navigace, hledání, panel, lišta Uložit/Zahodit, konflikt, ověření | `Settings` `save` `check` `jump` `reveal` `go` `navKey` |
-| `src/settings/ctx.ts` | rozpracovaný config (store na úrovni modulu), `base`, chyba, hit, Vrátit, úkoly po uložení, kontext pro pole | `cfg` `loadBase` `discard` `setCfg` `makeCtx` `useSettings` `offerUndo` `afterSave` `runAfterSave` `dirty` `active` |
+| `src/settings/ctx.ts` | rozpracovaný config (store na úrovni modulu), `base`, chyba, hit, Vrátit, úkoly po uložení, kontext pro pole | `cfg` `loadBase` `adoptBase` (změna zvenku sloučená s draftem, `mcp/merge.ts`) `discard` `setCfg` `makeCtx` `useSettings` `offerUndo` `afterSave` `runAfterSave` `dirty` `active` |
 | `src/settings/registry.ts` · `catalog.ts` · `labels.ts` | panely bez komponent (pořadí, názvy, kw — čte i paleta) a staré id · panely s komponentami + hledání · popisky voleb (JEDINÝ zdroj pro `Row` i hledání; i volby panelu Vzhled) | `PANEL_META` `PANEL_ALIASES` · `PANELS` `searchItems` · `FIELDS` `fieldLabel` `fieldHint` `fieldKw` `fieldCs` `fieldAnchor` |
 | `src/settings/en.ts` · `panels/en.ts` | angličtina (`registerDict`, načítá `src/i18n/load.ts`): skořápka, nav, volby `settings.f.<id>`/`.hint`/`.kw`, sekce configu · texty panelů (vč. `appearance.*`, `actions.panel.*`, `questions.panel.*`); Průvodce má `settings.welcome.*` v `onboarding/en.ts` | |
 | `src/settings/model.ts` | čistá logika: hledání bez diakritiky, cesty, chyba→panel (nejdelší prefix: `drawer` → chování, `drawer.glass`/`drawer.width`/`strip` → vzhled, `personal.links` → akce), skok odjinud (`resolveTarget`: id panelu / staré id / kotva `f-<pole>`), přesuny, zkratky, porovnání | `search` `highlight` `panelForField` `resolveTarget` `moveItem` `dropIndex` `normalizeHotkey` `hotkeyFromEvent` `hotkeyCollisions` `canon` `cleanDraft` `inRoots` `relativeTo` |
@@ -46,6 +46,8 @@ staré názvy jsou v `kw` (hledání je najde).
 
 - **Úprava**: pole → `ctx.set(path)` → `touch` → `check` (250 ms): `canon(draft) != canon(base)` = neuloženo,
   `check_config` → `FieldError` → `Row`/`FieldErr` u pole, tečka u panelu v navigaci.
+- **Změna zvenku** (Claude přes MCP, přepínač MCP): jádro pošle `config-changed` → `Settings` `adoptExternal` →
+  `mcp/merge.ts` `external`: bez úprav `loadBase`, úpravy v jiné sekci `adoptBase` (sloučení), stejná sekce = konflikt.
 - **Uložení** (`save`): `get_config` ≠ `base` → konflikt (Načíst nové / Přesto uložit) → `check_config` →
   `save_config` (String chyba, zpětně kompatibilní) → `runAfterSave` (odložené úkoly panelů) → `loadBase(get_config)`.
 - **Jedno chování ukládání ve všech panelech:** panel mění jen draft, zapisuje JEN lišta shellu (Uložit / Ctrl+S,

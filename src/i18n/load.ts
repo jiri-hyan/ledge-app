@@ -33,3 +33,4 @@ import "../settings/panels/en";
 import "../settings/panels/en-look";
 import "../settings/previews/en";
 import "../onboarding/en";
+import "../mcp/en";

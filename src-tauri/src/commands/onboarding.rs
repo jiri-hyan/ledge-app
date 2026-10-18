@@ -35,7 +35,7 @@ pub(crate) async fn onboarding_repos(extra: Vec<String>) -> Vec<repos::FoundRepo
     blocking(move || scan_repos(&extra)).await
 }
 
-fn scan_repos(extra: &[String]) -> Vec<repos::FoundRepo> {
+pub(crate) fn scan_repos(extra: &[String]) -> Vec<repos::FoundRepo> {
     let c = core();
     let cfg: Config = c.cfg.read().clone();
     let roots = repos::dedupe_dirs(repos::default_roots(env).into_iter().chain(cfg.roots.iter().map(PathBuf::from)).chain(extra.iter().map(PathBuf::from)));
@@ -51,7 +51,7 @@ pub(crate) async fn onboarding_apps() -> Vec<apps::FoundApp> {
     blocking(scan_apps).await
 }
 
-fn scan_apps() -> Vec<apps::FoundApp> {
+pub(crate) fn scan_apps() -> Vec<apps::FoundApp> {
     let cfg = core().cfg.read().clone();
     let exes: Vec<String> = cfg.projects.iter().filter_map(|p| p.exe.as_deref()).map(str::to_lowercase).collect();
     let names: Vec<String> = cfg.projects.iter().filter_map(|p| p.app_name.as_deref()).map(str::to_lowercase).collect();

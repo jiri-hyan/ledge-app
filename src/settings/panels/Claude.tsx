@@ -1,6 +1,6 @@
 // Panel „Claude“: most pro schvalování (zapnutí, port, jak dlouho čekat), otázky Clauda (`Questions.tsx`,
 // dřív samostatný panel), limity, útrata, hlídač nedokončených session a zapojení hooků Ledge do
-// `~/.claude/settings.json` (`HooksSetup` → Rust `hooksetup.rs`).
+// `~/.claude/settings.json` (`HooksSetup` → Rust `hooksetup.rs`), MCP server pro Clauda (`mcp/McpSettings.tsx`).
 import { createSignal, onMount, Show } from "solid-js";
 import { api, type HooksStatus } from "../../api";
 import { t } from "../../i18n";
@@ -13,6 +13,7 @@ import type { PanelProps } from "../types";
 import StatusLineSetup from "../../limits/StatusLineSetup";
 import { fieldLabel } from "../labels";
 import QuestionsSection from "./Questions";
+import { McpSettings } from "../../mcp/McpSettings";
 
 const HOOKS_TEXT: Record<HooksStatus["state"], [string, string]> = {
   full: ["settings.hooks.full", "Zapojené"],
@@ -97,6 +98,7 @@ export default function ClaudePanel(p: PanelProps) {
         </Row>
         <HooksSetup />
       </Section>
+      <McpSettings />
       <QuestionsSection s={p.s} />
       <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
         <Row id="claude.statusLine" stack>

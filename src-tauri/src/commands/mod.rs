@@ -11,6 +11,7 @@ pub(crate) mod integrations;
 pub(crate) mod costs;
 pub(crate) mod drawer;
 pub(crate) mod limits;
+pub(crate) mod mcp;
 pub(crate) mod media;
 pub(crate) mod notes;
 pub(crate) mod onboarding;

@@ -7,6 +7,7 @@ import { STEPS, reducedMotion, type StepId } from "./logic";
 import { closeWizard } from "./state";
 import { applyStep, finish, pending, prefetch, setWiz, wiz } from "./store";
 import ProjectsStep from "./steps/Projects";
+import { AssistStep } from "./steps/Assist";
 import AppsStep from "./steps/Apps";
 import { ClaudeStep, LinksStep } from "./steps/Extras";
 import { DoneStep, LookStep, WelcomeStep } from "./steps/Basics";
@@ -86,6 +87,7 @@ export default function Wizard(p: { onExit: () => void }) {
       <div class="ob-body" ref={body}>
         <Switch>
           <Match when={cur() === "welcome"}><WelcomeStep /></Match>
+          <Match when={cur() === "assist"}><AssistStep /></Match>
           <Match when={cur() === "projects"}><ProjectsStep /></Match>
           <Match when={cur() === "apps"}><AppsStep /></Match>
           <Match when={cur() === "claude"}><ClaudeStep /></Match>

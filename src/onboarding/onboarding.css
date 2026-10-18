@@ -94,6 +94,14 @@
 .ob-lang b, .ob-theme b { display: block; font-size: var(--fs-body); }
 .ob-lang small, .ob-theme small { color: var(--t3); font-size: var(--fs-sm); }
 
+/* volba způsobu nastavení a připojení Clauda */
+.ob-ways { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); }
+.ob-ways .ob-lang:disabled { opacity: 0.6; }
+.ob-conn { display: flex; flex-direction: column; gap: var(--s2); }
+.ob-conn + .ob-conn { border-top: 1px solid var(--line); padding-top: var(--s3); }
+.ob-conn h5 { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; }
+.ob-code { font: var(--fs-xs) var(--mono); color: var(--t1); background: var(--well-2); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 10px 12px; white-space: pre-wrap; word-break: break-all; user-select: text; max-height: 120px; overflow: auto; }
+
 /* karty a souhrny */
 .ob-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 16px 18px; display: flex; flex-direction: column; gap: var(--s3); }
 .ob-quiet { color: var(--t2); font-size: var(--fs-ui); line-height: 1.55; }

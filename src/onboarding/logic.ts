@@ -2,9 +2,10 @@
 import { t } from "../i18n";
 import type { FoundApp, FoundRepo } from "../types";
 
-export type StepId = "welcome" | "projects" | "apps" | "claude" | "links" | "look" | "done";
+export type StepId = "welcome" | "assist" | "projects" | "apps" | "claude" | "links" | "look" | "done";
 export const STEPS: { id: StepId; key: string; cs: string }[] = [
   { id: "welcome", key: "onboarding.step.welcome", cs: "Vítej" },
+  { id: "assist", key: "onboarding.step.assist", cs: "S Claudem" },
   { id: "projects", key: "onboarding.step.projects", cs: "Projekty" },
   { id: "apps", key: "onboarding.step.apps", cs: "Aplikace" },
   { id: "claude", key: "onboarding.step.claude", cs: "Claude Code" },

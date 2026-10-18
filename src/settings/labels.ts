@@ -61,6 +61,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "claude.statusLine": { panel: "claude", label: "Číst limity 5h / týden", hint: "Ledge obalí stavový řádek Claude Code a čte z něj limity 5h / týden; tvůj původní poběží dál", kw: "stavový řádek limit kvóta 5h týden statusline" },
   "claude.limitsReminder": { panel: "claude", label: "Připomenout reset limitu", hint: "Když limit 5h nebo týden dosáhne 100 %, v čase resetu krátce vyjede šuplík (ve hře nic)", kw: "limit kvóta reset připomínka" },
   "claude.costs": { panel: "claude", label: "Útrata Claude (odhad)", hint: "Sekce v kartě Claude: tokeny a odhad ceny v cenách API (ne účet) podle projektu a dne z lokálních transcriptů; počítá se jen po rozbalení", kw: "útrata cena tokeny dolary náklady odhad" },
+  "mcp.enabled": { panel: "claude", label: "Nastavovat Ledge přes Clauda (MCP)", hint: "Claude smí číst a měnit nastavení Ledge; nic nespouští a nic neposílá ven. Výchozí vypnuto.", kw: "mcp claude server nastavit klíč nástroje" },
   "claude.enforceCommit": { panel: "claude", label: "Hlídat nedokončenou práci", hint: "Soubory, které session upravila a nezacommitovala, a její nepushnuté commity", kw: "nedokončené session commit push hlídač" },
   // Osobní
   "personal.weather": { panel: "osobni", label: "Místo pro počasí", hint: "Open-Meteo, bez klíče. Prázdné = nic se nestahuje (polohu podle IP Ledge nezjišťuje).", kw: "počasí souřadnice šířka délka město" },

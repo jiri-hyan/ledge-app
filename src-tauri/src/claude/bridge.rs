@@ -1,6 +1,7 @@
 //! HTTP most na 127.0.0.1 (`tiny_http`): `POST /permission`, `POST /question`, `POST /plan`, `POST /event`, `GET /status`,
-//! `POST /ctl/<příkaz>`. Odmítá prohlížeč (`Origin`) a cizí `Host`. Každý požadavek ve vlastním
-//! vlákně; logiku dělá `Claude` (`mod.rs`), tady je jen směrování a odpovědi.
+//! `POST /ctl/<příkaz>`, `/mcp` (MCP server, `crate::mcp`). Odmítá prohlížeč (`Origin`) a cizí `Host`. Každý
+//! požadavek ve vlastním vlákně; logiku dělá `Claude` (`mod.rs`) a `mcp::handle_http`, tady je jen
+//! směrování a odpovědi.
 
 use super::{Claude, rules};
 use serde_json::{Value, json};
@@ -15,11 +16,25 @@ fn respond(req: tiny_http::Request, code: u16, body: String) {
     let _ = req.respond(tiny_http::Response::from_string(body).with_status_code(code).with_header(ct));
 }
 
+fn respond_mcp(req: tiny_http::Request, r: crate::mcp::HttpResp) {
+    let mut resp = tiny_http::Response::from_string(r.body.clone()).with_status_code(r.code);
+    if !r.body.is_empty() {
+        resp = resp.with_header(tiny_http::Header::from_bytes("Content-Type", "application/json").unwrap());
+    }
+    if let Some((k, v)) = r.header {
+        resp = resp.with_header(tiny_http::Header::from_bytes(k, v).unwrap());
+    }
+    let _ = req.respond(resp);
+}
+
 /// Obsluha `POST /ctl/<příkaz>` (otevřít/zavřít šuplík, reload…) — ovládání pro Clauda a skripty.
 pub type Ctl = Arc<dyn Fn(&str, &Value) -> Result<Value, String> + Send + Sync>;
 
-/// Spustí server. `extra` obslouží /status rozšířený o stav Ledge, `ctl` příkazy `/ctl/…`.
-pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sync>, ctl: Ctl) -> Result<(), String> {
+/// Obsluha `/mcp` (`mcp::host::endpoint`; vypnuté MCP = 404 uvnitř).
+pub type Mcp = Arc<dyn Fn(&crate::mcp::HttpReq) -> crate::mcp::HttpResp + Send + Sync>;
+
+/// Spustí server. `extra` obslouží /status rozšířený o stav Ledge, `ctl` příkazy `/ctl/…`, `mcp` cestu `/mcp`.
+pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sync>, ctl: Ctl, mcp: Mcp) -> Result<(), String> {
     let server = tiny_http::Server::http(("127.0.0.1", port)).map_err(|e| format!("Port {port}: {e}"))?;
     std::thread::Builder::new()
         .name("claude-bridge".into())
@@ -39,6 +54,27 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
                 }
                 let url = req.url().to_string();
                 let method = req.method().as_str().to_string();
+                if url == crate::mcp::PATH {
+                    // MCP: tělo jako bajty s vlastním stropem (přes strop = 413), klíč a verze z hlaviček
+                    let auth = header(&req, "Authorization").map(str::to_string);
+                    let proto = header(&req, "MCP-Protocol-Version").map(str::to_string);
+                    let mut raw = Vec::new();
+                    if method == "POST" {
+                        use std::io::Read;
+                        let _ = req.as_reader().take(crate::mcp::MAX_BODY as u64 + 1).read_to_end(&mut raw);
+                    }
+                    let mcp = mcp.clone();
+                    std::thread::spawn(move || {
+                        let r = mcp(&crate::mcp::HttpReq {
+                            method: &method,
+                            authorization: auth.as_deref(),
+                            protocol: proto.as_deref(),
+                            body: (raw.len() <= crate::mcp::MAX_BODY).then_some(raw.as_slice()),
+                        });
+                        respond_mcp(req, r);
+                    });
+                    continue;
+                }
                 let mut body = String::new();
                 if method == "POST" {
                     use std::io::Read;
@@ -95,7 +131,7 @@ mod tests {
         // inline: baseline z prvního eventu musí být hotová dřív, než přijde Stop
         let c = Claude::new(Arc::new(|| {}), Duration::from_millis(timeout_ms)).inline().patient();
         let port = crate::ports::ephemeral().unwrap();
-        serve(port, c.clone(), Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({})))).unwrap();
+        serve(port, c.clone(), Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(|_: &crate::mcp::HttpReq| crate::mcp::HttpResp { code: 404, body: String::new(), header: None })).unwrap();
         (c, port)
     }
 

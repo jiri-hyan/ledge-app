@@ -4,11 +4,11 @@
 # (`git archive HEAD` — vynechá cesty s `export-ignore` v .gitattributes: interní poznámky, CI, tenhle
 # seznam zakázaných slov), autor jiri-hyan s GitHub noreply e-mailem. Před commitem se strom i seznam
 # změn prověří proti `scripts/private/denylist.txt` (jména klientů, strojů…) — jediný nález = konec.
-# Pak lokální build (stejný tvar jako dřív) a GitHub Release v0.2.<N+1> ve veřejném repu s řádkem
+# Pak lokální build (stejný tvar jako dřív) a GitHub Release vX.Y.<Z+1> (nebo -Version) ve veřejném repu s řádkem
 # `SHA256 (<instalátor>) = <hex>`, který čte Ledge (update.rs `sha_for`).
 #
 # Použití: powershell -NoProfile -File scripts/publish.ps1 [-Public jiri-hyan/ledge-app]
-#          [-Private jiri-hyan/ledge] [-AlsoPrivate] [-Clone <složka klonu veřejného repa>] [-DryRun]
+#          [-Private jiri-hyan/ledge] [-AlsoPrivate] [-Clone <složka klonu veřejného repa>] [-DryRun] [-Version x.y.z]
 #   -AlsoPrivate  stejný instalátor vydá i v soukromém repu (přechod: Ledge ≤ 0.2.8 hledá aktualizace tam)
 #   -DryRun       jen snapshot do klonu + kontrola denylistu, nic necommituje, nebuilduje ani nevydá
 # Podmínky: větev main, čistý strom, HEAD pushnutý do soukromého repa.
@@ -17,7 +17,8 @@ param(
   [string]$Private = 'jiri-hyan/ledge',
   [switch]$AlsoPrivate,
   [string]$Clone = (Join-Path $env:LOCALAPPDATA 'ledge-public'),
-  [switch]$DryRun
+  [switch]$DryRun,
+  [string]$Version
 )
 # 'Continue': git/gh píšou průběh na stderr, PowerShell 5.1 by to pod 'Stop' bral jako chybu —
 # návratové kódy se kontrolují výslovně ($LASTEXITCODE) a chyby končí `exit 1`
@@ -58,14 +59,19 @@ try {
   if ($head -ne (git rev-parse origin/main)) { Fail 'HEAD není shodný s origin/main — nejdřív push/pull' }
   $deny = Get-Denylist
 
-  # další verze = nejvyšší vydaná 0.2.x v OBOU repech + 1 (jedna řada verzí; Ledge porovnává čísla)
-  $max = 0
+  # další verze = nejvyšší vydaná vX.Y.Z v OBOU repech, patch + 1 (jedna řada verzí; Ledge porovnává čísla);
+  # -Version x.y.z vydá zadanou verzi (musí být vyšší než poslední vydaná) — např. skok na 0.3.0
+  $last = [version]'0.0.0'
   foreach ($r in @($Public, $Private)) {
     $tags = @(gh release list --repo $r --limit 200 --json tagName --jq '.[].tagName' 2>$null)
-    foreach ($tg in $tags) { if ($tg -match '^v0\.2\.(\d+)$' -and [int]$Matches[1] -gt $max) { $max = [int]$Matches[1] } }
+    foreach ($tg in $tags) { if ($tg -match '^v(\d+\.\d+\.\d+)$' -and [version]$Matches[1] -gt $last) { $last = [version]$Matches[1] } }
   }
-  $v = "0.2.$($max + 1)"
-  "verze:      $v (poslední vydaná: 0.2.$max)"
+  if ($Version) {
+    if ($Version -notmatch '^\d+\.\d+\.\d+$') { Fail "-Version '$Version' není x.y.z" }
+    if ([version]$Version -le $last) { Fail "-Version $Version není vyšší než poslední vydaná $last" }
+    $v = $Version
+  } else { $v = "$($last.Major).$($last.Minor).$($last.Build + 1)" }
+  "verze:      $v (poslední vydaná: $last)"
 
   # ---- snapshot do klonu veřejného repa ----
   if (-not (Test-Path (Join-Path $Clone '.git'))) {
@@ -86,7 +92,7 @@ try {
   Remove-Item $tar
 
   $hits = @(Find-Denied $Clone $deny)
-  $prevTag = "v0.2.$max"
+  $prevTag = "v$last"
   git rev-parse -q --verify "refs/tags/$prevTag" *> $null
   # seznam změn jen z commitů, které mění něco, co jde ven (ne čistě interní export-ignore cesty)
   $pubPaths = @('--', '.', ':(exclude)scripts/private', ':(exclude).github')
@@ -133,16 +139,36 @@ try {
 
   # řádek SHA256 čte Ledge (update.rs `sha_for`) — tvar neměnit
   if ($log.Count -eq 0) { $log = @('- (žádné nové změny)') }
-  $notes = @("SHA256 ($($setup.Name)) = $sha", '', 'Změny:', '') + $log
+  # sekce „Nastav s Claudem“ (kolo 9): odkaz na návod pro Clauda + zadání, které stačí vložit do Clauda.
+  # Řádky nesmí začínat „SHA256“ (update::notes_of takové řádky z poznámek v UI vypouští)
+  $guideUrl = "https://github.com/$Public/releases/latest/download/pro-claude.md"
+  $claudeSection = @(
+    '', '## Nastav s Claudem / Set up with Claude', '',
+    'Pošli Claudovi odkaz na návod a on Ledge nainstaluje a přes MCP nastaví podle toho, co používáš. Připojení smí zapnout jen člověk (první průchod nebo Nastavení → Claude (MCP)) a jde kdykoli vypnout.',
+    'Send Claude the link to the guide: it installs Ledge and sets it up over MCP for the way you work. Only you can turn the connection on (setup guide or Settings → Claude (MCP)), and you can turn it off any time.',
+    '', '```', "Nainstaluj a nastav mi Ledge podle $guideUrl", '```',
+    '', "Návod pro Clauda / Guide for Claude: [pro-claude.md]($guideUrl). Kontrolní součty instalátoru jsou v souboru ``SHA256SUMS.txt`` (checksums in ``SHA256SUMS.txt``)."
+  )
+  $notes = @("SHA256 ($($setup.Name)) = $sha", '', 'Změny:', '') + $log + $claudeSection
   $notesFile = Join-Path $env:TEMP "ledge-release-notes-$v.md"
   [IO.File]::WriteAllLines($notesFile, [string[]]$notes, (New-Object System.Text.UTF8Encoding($false)))
+  # přílohy vedle instalátoru: SHA256SUMS.txt (formát `sha256sum`: <hex>  <soubor>) a návod pro Clauda z docs/
+  $assetDir = Join-Path $env:TEMP "ledge-release-assets-$v"
+  New-Item -ItemType Directory -Force $assetDir | Out-Null
+  $sumsFile = Join-Path $assetDir 'SHA256SUMS.txt'
+  [IO.File]::WriteAllText($sumsFile, "$sha  $($setup.Name)`n", (New-Object System.Text.UTF8Encoding($false)))
+  $guideSrc = Join-Path $root 'docs\pro-claude.md'
+  if (-not (Test-Path $guideSrc)) { Fail 'chybí docs/pro-claude.md — návod pro Clauda patří ke každému vydání' }
+  $guideFile = Join-Path $assetDir 'pro-claude.md'
+  Copy-Item $guideSrc $guideFile -Force
+  $assets = @($setup.FullName, $sumsFile, $guideFile)
 
   git -C $Clone push -q origin main
   if ($LASTEXITCODE -ne 0) { Fail 'push snapshotu do veřejného repa selhal' }
-  gh release create "v$v" $setup.FullName --repo $Public --title "Ledge $v" --notes-file $notesFile --target $pubHead
+  gh release create "v$v" @assets --repo $Public --title "Ledge $v" --notes-file $notesFile --target $pubHead
   if ($LASTEXITCODE -ne 0) { Fail "gh release create ($Public) selhal" }
   if ($AlsoPrivate) {
-    gh release create "v$v" $setup.FullName --repo $Private --title "Ledge $v" --notes-file $notesFile --target $head
+    gh release create "v$v" @assets --repo $Private --title "Ledge $v" --notes-file $notesFile --target $head
     if ($LASTEXITCODE -ne 0) { Fail "gh release create ($Private) selhal" }
   }
   if (-not $AlsoPrivate) {

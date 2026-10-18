@@ -56,6 +56,12 @@ Claude Code je volitelný — bez něj je Ledge spouštěč projektů, poznámky
 **Aktualizace.** Ledge kontroluje veřejná vydání tohoto repa a ukáže čip „Nová verze“. Nikdy se
 neinstaluje sám: klikneš, stáhne instalátor z GitHubu přes HTTPS, ověří SHA256 a teprve pak ho spustí.
 
+**Nastavení s Claudem.** Pošli Claudovi odkaz
+`https://github.com/jiri-hyan/ledge-app/releases/latest/download/pro-claude.md` („Nainstaluj a nastav mi Ledge
+podle tohoto návodu“). Claude Ledge nainstaluje, připojí se k němu přes MCP, zeptá se, co používáš, a po tvém
+schválení nastaví zástupce, odkazy a rozložení na míru. Připojení je vypnuté, dokud ho nezapneš v průvodci nebo
+v Nastavení → Claude (MCP), a jde kdykoli vypnout. Návod je v [`docs/pro-claude.md`](docs/pro-claude.md).
+
 **Odinstalace.** Nastavení Windows → Aplikace → Ledge. Config (`%APPDATA%\Ledge`) i poznámky zůstanou.
 
 ## Nastavení
