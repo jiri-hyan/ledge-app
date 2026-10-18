@@ -3,7 +3,7 @@
 // obsah pak scrolluje uvnitř karty). Rozpětí počítá `size.ts` `packSpans` (řada bez prázdného místa —
 // volné sloupce dostanou karty té řady), sloupce se čtou z `--deck-cols` při změně vzhledu (MutationObserver
 // na `<html>`, žádné časovače).
-// Režim úprav: karty se jemně rozvlní, úchyt ⠿ (pointer tažení — HTML5 drag&drop v okně Tauri nefunguje;
+// Režim úprav: karty dostanou klidný přerušovaný obrys (bez pohybu), úchyt ⠿ (pointer tažení — HTML5 drag&drop v okně Tauri nefunguje;
 // i na záložku v hlavičce = přesun tam), **tah za pravý okraj = šířka, za spodní = výška, za roh = obojí**
 // (živý obrys cíle s popiskem „2 × 3“, dvojklik na spodní okraj = výška podle obsahu), ⇔ / ↕ = totéž
 // klikem a z klávesnice, × do katalogu (s Vrátit), Alt+šipky na úchytu = přesun; karta bez dat je vidět

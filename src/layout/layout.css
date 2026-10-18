@@ -16,11 +16,9 @@
 
 /* ---------- režim úprav ---------- */
 .deck.editing .deck-item > :not(.lay-tools, .lay-rs) { pointer-events: none; user-select: none; }
-/* jemné rozvlnění (vypne systémové „omezit pohyb“ i styl pohybu „bez animací“ — pravidla ve styles.css) */
-.deck.editing .deck-item { animation: lay-wiggle var(--dur-5) var(--ease) infinite alternate; transform-origin: 50% 50%; }
-.deck.editing .deck-item:nth-child(2n) { animation-direction: alternate-reverse; }
-.deck.dragging .deck-item, .deck.resizing .deck-item { animation: none; }
-@keyframes lay-wiggle { from { transform: rotate(-0.3deg); } to { transform: rotate(0.3deg); } }
+/* klidné zvýraznění bez pohybu (dřív rozvlnění — šéfovi se karty „kynklaly“, 18. 10.) */
+.deck.editing .deck-item { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line-2)); outline-offset: 2px; border-radius: var(--r-xl); }
+.deck.editing .deck-item:hover { outline-style: solid; outline-color: var(--accent); }
 .deck-item.lifted { opacity: 0.4; }
 .deck-item.drop-at { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: var(--r-xl); }
 .lay-tools { position: absolute; top: var(--s1); right: var(--s1); z-index: 5; display: flex; gap: var(--s1); }
