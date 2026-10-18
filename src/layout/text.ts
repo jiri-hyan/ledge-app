@@ -1,9 +1,10 @@
 // Lidské názvy z modelu rozložení (páry klíč + čeština v `model.ts`) — překlad až při vykreslení.
 // Dynamická karta (widget ze skriptu) má název z hlavičky skriptu (`widgets/registry.ts`), jinak soubor.
-import { t } from "../i18n";
+import { t, tp } from "../i18n";
 import { widgetInfo } from "../widgets/registry";
 import { widgetFile } from "../widgets/model";
-import { builtinName, CARD_INFO, isBuiltin, PART_INFO, type CardId, type LayoutPage, type PartKey, type Text } from "./model";
+import { builtinName, CARD_INFO, isBuiltin, PART_INFO, type CardId, type CardSize, type LayoutPage, type PartKey, type Text } from "./model";
+import type { SizeOutcome } from "./size";
 
 export const tx = (x: Text): string => t(x[0], x[1]);
 export const cardName = (id: CardId): string => {
@@ -21,3 +22,26 @@ export const pageName = (p: LayoutPage): string => {
   const b = builtinName(p);
   return b ? tx(b) : p.name.trim() || p.id;
 };
+
+/** Lidský název velikosti (Malá / Střední / Velká / Přes celou šířku). */
+const SIZE_NAMES: Record<CardSize, Text> = {
+  s: ["cards.layout.size.s", "Malá"],
+  m: ["cards.layout.size.m", "Střední"],
+  l: ["cards.layout.size.l", "Velká"],
+  xl: ["cards.layout.size.xl", "Přes celou šířku"],
+};
+export const sizeName = (s: CardSize): string => (SIZE_NAMES[s] ? tx(SIZE_NAMES[s]) : s);
+
+/** Nápověda, když volba velikosti nemá viditelný efekt (`size.ts` `sizeOutcome`) — nikdy tiché nic. */
+export function sizeNoteText(o: SizeOutcome, want: CardSize, cols: number): string {
+  switch (o.note) {
+    case "cols":
+      return tp("cards.layout.note.cols", cols, ["Vzhled má jen {n} sloupec, „{want}“ se sem nevejde — vybráno „{size}“.", "Vzhled má jen {n} sloupce, „{want}“ se sem nevejde — vybráno „{size}“.", "Vzhled má jen {n} sloupců, „{want}“ se sem nevejde — vybráno „{size}“."], { want: sizeName(want), size: sizeName(o.size) });
+    case "alone":
+      return t("cards.layout.note.alone", "Karta je v řadě sama, proto vyplní celou šířku (aby nezůstala díra). Užší bude, až vedle ní dáš jinou kartu.");
+    case "fill":
+      return t("cards.layout.note.fill", "Karta teď vyplňuje volné místo v řadě, takže vypadá stejně. Rozdíl uvidíš, až se řada změní.");
+    default:
+      return "";
+  }
+}

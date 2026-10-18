@@ -1,0 +1,570 @@
+[
+ {
+  "name": "platné minimum",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m"
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "bez záložek",
+  "layout": {
+   "pages": []
+  },
+  "field": "layout.pages"
+ },
+ {
+  "name": "deset záložek",
+  "layout": {
+   "pages": [
+    {
+     "id": "x0",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x1",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x2",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x3",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x4",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x5",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x6",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x7",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x8",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x9",
+     "name": "X",
+     "cards": []
+    }
+   ]
+  },
+  "field": "layout.pages"
+ },
+ {
+  "name": "devět záložek",
+  "layout": {
+   "pages": [
+    {
+     "id": "x0",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x1",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x2",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x3",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x4",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x5",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x6",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x7",
+     "name": "X",
+     "cards": []
+    },
+    {
+     "id": "x8",
+     "name": "X",
+     "cards": []
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "špatné id",
+  "layout": {
+   "pages": [
+    {
+     "id": "Hry!",
+     "name": "Hry",
+     "cards": []
+    }
+   ]
+  },
+  "field": "layout.pages.0.id"
+ },
+ {
+  "name": "id přes 24 znaků",
+  "layout": {
+   "pages": [
+    {
+     "id": "aaaaaaaaaaaaaaaaaaaaaaaaa",
+     "name": "Hry",
+     "cards": []
+    }
+   ]
+  },
+  "field": "layout.pages.0.id"
+ },
+ {
+  "name": "id dvakrát",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": []
+    },
+    {
+     "id": "prace",
+     "name": "Práce 2",
+     "cards": []
+    }
+   ]
+  },
+  "field": "layout.pages.1.id"
+ },
+ {
+  "name": "vlastní bez názvu",
+  "layout": {
+   "pages": [
+    {
+     "id": "hry",
+     "name": "  ",
+     "cards": []
+    }
+   ]
+  },
+  "field": "layout.pages.0.name"
+ },
+ {
+  "name": "vestavěná bez názvu",
+  "layout": {
+   "pages": [
+    {
+     "id": "osobni",
+     "name": "",
+     "cards": []
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "dlouhý název",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+     "cards": []
+    }
+   ]
+  },
+  "field": "layout.pages.0.name"
+ },
+ {
+  "name": "název 32 znaků s diakritikou",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "žžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžž",
+     "cards": []
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "emoji ikona",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [],
+     "icon": "🎮"
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "ikona text",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [],
+     "icon": "hry hry"
+    }
+   ]
+  },
+  "field": "layout.pages.0.icon"
+ },
+ {
+  "name": "neznámá karta",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m"
+      },
+      {
+       "id": "pocasi",
+       "size": "m"
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.1.id"
+ },
+ {
+  "name": "widget ze skriptu",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "widget:kurz.ps1",
+       "size": "m"
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "widget s cestou",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "widget:..\\x.ps1",
+       "size": "m"
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.id"
+ },
+ {
+  "name": "widget bez souboru",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "widget:",
+       "size": "m"
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.id"
+ },
+ {
+  "name": "widget skrytý soubor",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "widget:.x.ps1",
+       "size": "m"
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.id"
+ },
+ {
+  "name": "karta dvakrát",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m"
+      },
+      {
+       "id": "claude",
+       "size": "s"
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.1.id"
+ },
+ {
+  "name": "stejná karta na dvou záložkách",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m"
+      }
+     ]
+    },
+    {
+     "id": "osobni",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "l"
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "výška 4",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "h": 4
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "výška 0",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "h": 0
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.h"
+ },
+ {
+  "name": "výška 5",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "h": 5
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.h"
+ },
+ {
+  "name": "strop 0 = bez stropu",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "limit": 0
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "strop 50",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "repos",
+       "size": "m",
+       "limit": 50
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "strop 51",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "limit": 51
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.limit"
+ },
+ {
+  "name": "neznámá část",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": []
+    }
+   ],
+   "hiddenParts": [
+    "git"
+   ]
+  },
+  "field": "layout.hiddenParts.0"
+ },
+ {
+  "name": "známá část",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": []
+    }
+   ],
+   "hiddenParts": [
+    "claudeCosts"
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "chyba záložky před chybou karty",
+  "layout": {
+   "pages": [
+    {
+     "id": "Hry!",
+     "name": "Hry",
+     "cards": [
+      {
+       "id": "pocasi",
+       "size": "m"
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.id"
+ }
+]

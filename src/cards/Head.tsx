@@ -1,4 +1,5 @@
 // Hlavička šuplíku: hodiny (nebo Zpět + název stránky), stavové chipy, nová verze, záložky (`layout/Tabs.tsx`),
+// pilulka „N běží“ (klik = seznam serverů se Stop / Restart / Otevřít / Log — `projects/RunningPill.tsx`),
 // ✎ režim úprav šuplíku (`layout/edit.ts`) a nástroje (paleta 🔍, poznámka, nastavení, zavřít). Čte jen snapshot; navigaci dělá skořápka (App) přes callbacky.
 import { Show } from "solid-js";
 import { api, type Snapshot } from "../api";
@@ -13,13 +14,13 @@ import { bubble } from "../pkgctx/BubbleNotice";
 import { gotoSettingsPanel } from "../palette/goto";
 import Tabs from "../layout/Tabs";
 import { beginEdit, editing, finishEdit } from "../layout/edit";
+import RunningPill from "../projects/RunningPill";
 import "./head.css";
 
 export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: () => void; onSettings: () => void; onBack: () => void; onUpdate: () => void; onPalette?: () => void }) {
   const d = () => new Date(p.now);
   const hhmm = () => fmtTime(d());
   const date = () => fmtDate(d());
-  const live = () => p.s.procs.filter((x) => ["ready", "running", "starting", "preparing"].includes(x.phase));
   const failed = () => p.s.procs.filter((x) => x.phase === "failed").length;
   const working = () => p.s.sessions.filter((x) => x.state === "working").length;
   const dirty = () => p.s.projects.filter((x) => (x.git?.dirty ?? 0) > 0).length;
@@ -44,7 +45,7 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
             <span class="chip amber"><span class="d" /><b>{t("cards.head.claudeWaiting", "Claude čeká")}</b>{p.s.pending.length + p.s.questions.length > 1 ? ` (${p.s.pending.length + p.s.questions.length})` : ""}</span>
           </Show>
           <Show when={failed() > 0}><span class="chip red"><span class="d" /><b>{tp("cards.head.crashes", failed(), "{n}× pád")}</b></span></Show>
-          <span class={`chip ${live().length ? "green" : "dim"}`}><span class="d" />{rich(t("cards.head.live", "<b>{n}</b> běží", { n: live().length }))}</span>
+          <RunningPill s={p.s} now={p.now} />
           <Show when={working() > 0}><span class="chip violet"><span class="d" />{rich(t("cards.head.working", "Claude <b>{n}×</b> pracuje", { n: working() }))}</span></Show>
           <Show when={unfinished().length > 0}>
             <span class="chip amber" title={unfinished().map((x) => x.title ?? x.project ?? x.cwd).join("\n")}><span class="d" />{rich(tp("cards.head.unfinished", unfinished().length, "<b>{n}</b> session nedokončily"))}</span>

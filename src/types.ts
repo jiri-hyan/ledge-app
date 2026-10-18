@@ -40,9 +40,24 @@ export interface ProjectView {
   links: Link[];
   git: GitInfo | null;
   run: string | null;
+  /** port z configu (co a odkud — tooltip a „Upravit…“ na dlaždici) */
+  port?: number | null;
+  remote?: string | null;
+  /** aplikace: exe nebo appName */
+  app?: string | null;
+  /** odkud poběží (`resolve::Place`); chybí (starší jádro) = podle `pathOk` */
+  place?: Place;
   /** vlastní vzhled dlaždice (`tilelook.rs`); chybí = automaticky */
   look?: TileLook;
 }
+
+/** Odkud projekt poběží: jasné · `path` neexistuje · víc složek s repem (vybrat) · nic na disku. */
+export type Place = { kind: "ok" } | { kind: "missing"; path: string } | { kind: "choose"; count: number } | { kind: "none" };
+/** Složka s repem projektu pro výběr (`project_folders`, nejčerstvější commit první). */
+export interface FolderCandidate { path: string; lastCommit: number | null; worktree: boolean }
+export interface FolderCandidates { current: string | null; items: FolderCandidate[] }
+/** Port projektu drží proces, který nespustil Ledge (`port_holders`). */
+export interface PortHolder { id: string; port: number; pid: number; process: string }
 
 // --- vzhled zástupců (zrcadlo `src-tauri/src/tilelook.rs`, logika `src/tilelook/model.ts`) ---
 /** Ikona místo automatické: emoji, systémová ikona (kód Segoe Fluent Icons) nebo vlastní obrázek (klíč v cache). */
@@ -70,6 +85,11 @@ export interface ProcView {
   message: string | null;
   lastLine: string | null;
   errors: number;
+  /** odkud a co běží (složka, příkaz s portem / exe) */
+  cwd?: string | null;
+  cmd?: string | null;
+  /** poslední řádky výstupu při selhání */
+  tail?: string[];
 }
 
 export interface Pending {

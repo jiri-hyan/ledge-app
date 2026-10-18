@@ -24,6 +24,11 @@
 .hov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--t3); }
 .hov-dot-run { background: var(--violet); }
 .hov-dot-wait { background: var(--amber); }
+.hov-dot-ok { background: var(--green); }
+.hov-dot-bad { background: var(--red); }
+/* servery z Ledge: ■ Stop (proužek je průchozí, zastavuje se tady) */
+.hov-stop { flex-shrink: 0; width: 24px; height: 22px; border-radius: var(--r-xs); color: var(--red); background: var(--card); border: 1px solid var(--line); font-size: var(--fs-xs); }
+.hov-stop:hover { background: var(--card-2); }
 .hov-pulse { animation: hov-pulse 1.6s ease-in-out infinite; }
 @keyframes hov-pulse { 50% { opacity: 0.4; } }
 

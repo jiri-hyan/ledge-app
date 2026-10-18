@@ -2,7 +2,13 @@
    z App), prstenec běhu kolem loga, akce UVNITŘ dlaždice dole (při najetí / fokusu). Velikost dlaždic
    `data-tiles` = small | tile | large (volba karty). Tokeny ze styles.css. */
 .proj-card { display: flex; flex-direction: column; }
-.projects { --tile-min: 118px; --logo: 56px; --logo-img: 36px; display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr)); gap: var(--s2); }
+.projects { --tile-min: 118px; --logo: 56px; --logo-img: 36px; display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--tile-min), 1fr)); gap: var(--s2); }
+/* vlna 9 Z: sloupce spočítané z šířky a počtu dlaždic (Projects.tsx `fitColumns`) — řada vždy přes celou šířku
+   karty, mezery rovnoměrně, přebytek na další řádek; bez JS platí auto-fit výš (taky bez prázdných stop) */
+.projects.proj-fit { grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); }
+/* malé dlaždice a jen ikony: v akcích při najetí jen ▶ / ■ a ⋯ (vše ostatní je v menu dlaždice) */
+.proj-xa { display: contents; }
+.projects[data-tiles="small"] .proj-xa, .projects[data-view="compact"] .proj-xa { display: none; }
 .projects[data-tiles="small"] { --tile-min: 76px; --logo: 40px; --logo-img: 26px; }
 .projects[data-tiles="large"] { --tile-min: 156px; --logo: 72px; --logo-img: 46px; }
 .proj-empty { grid-column: 1 / -1; }
@@ -14,6 +20,11 @@
 .proj:active { transform: perspective(520px) rotateX(var(--rx)) rotateY(var(--ry)) scale(0.96); transition-duration: calc(0.08s / var(--speed)); }
 .proj.missing .proj-hit { opacity: 0.4; filter: grayscale(0.6); }
 .proj.live { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+/* start selhal (vlna 9 Z): červený okraj + „nenaběhl“; víc složek s repem: „vyber složku“; ■ Stop v akcích */
+.proj.failed { border-color: color-mix(in srgb, var(--red) 55%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--red) 12%, transparent), color-mix(in srgb, var(--red) 3%, transparent)); }
+.proj-bad { color: var(--red); font-weight: 600; }
+.proj-ask { color: var(--amber); font-weight: 600; }
+.acts .proj-stop { color: var(--red); }
 .proj::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity var(--dur-3);
   background: radial-gradient(180px circle at var(--mx, 50%) var(--my, 50%), var(--spot), transparent 65%); }
 .proj:hover::before { opacity: 1; }

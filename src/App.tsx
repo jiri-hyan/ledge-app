@@ -31,7 +31,7 @@ import Palette from "./palette/Palette";
 import { gotoSettingsPanel } from "./palette/goto";
 import Wizard from "./onboarding/Wizard";
 import { checkFirstRun, wizardOpen } from "./onboarding/state";
-import { beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, setCatalogOpen, setEditPage } from "./layout/edit";
+import { beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, escEdit, resumeEdit, setCatalogOpen, setEditPage } from "./layout/edit";
 import { normalizeLayout } from "./layout/model";
 
 export default function App() {
@@ -196,7 +196,7 @@ export default function App() {
       }
       if (e.key === "Escape" && palette()) return closePalette();
       // režim úprav šuplíku: Esc = zavřít katalog, jinak Zrušit (pole přejmenování záložky si Esc obslouží samo)
-      if (e.key === "Escape" && editing() && page() === "main") return void (catalogOpen() ? setCatalogOpen(false) : cancelEdit());
+      if (e.key === "Escape" && editing() && page() === "main") return void (catalogOpen() ? setCatalogOpen(false) : escEdit());
       if (e.key === "Escape") {
         if (page() === "settings" || page() === "notes") setPage("main");
         else api.close();
@@ -240,8 +240,14 @@ export default function App() {
   }
   createEffect(onChange([view, page, holdWide], () => queueMicrotask(report)));
   createEffect(onChange(view, (v) => v === "hidden" && setPalette(null), { defer: true }));
-  // zavřený šuplík = rozpracované úpravy rozložení pryč (fokus vrací Rust sám); jiná stránka taky
-  createEffect(onChange([view, page], ([v, pg]) => (v === "hidden" || pg !== "main") && cancelEdit(false), { defer: true }));
+  // zavřený šuplík rozpracované úpravy rozložení NEzahodí (draft i Zpět žijí v `edit.ts`); po znovuotevření
+  // fokus zpět + připomínka. Výslovný odchod na jinou stránku je zahodí.
+  createEffect(onChange(page, (pg) => pg !== "main" && cancelEdit(false), { defer: true }));
+  let hiddenEditing = false;
+  createEffect(onChange(view, (v) => {
+    if (v === "hidden") hiddenEditing = editing();
+    else if (v === "full" && hiddenEditing) { hiddenEditing = false; if (page() === "main") resumeEdit(); }
+  }, { defer: true }));
   // „Upravit přímo v šuplíku“ z Nastavení
   createEffect(onChange(editAsk, () => {
     setPage("main");

@@ -1,11 +1,14 @@
-//! Velikost šuplíku vůči monitoru (čisté funkce): výška nikdy nepřeteče pracovní plochu (bez hlavního
-//! panelu, s rezervou dole), Nastavení si může říct o širší šuplík (min(žádost, 90 % monitoru)).
+//! Velikost šuplíku vůči monitoru (čisté funkce): výška nejvýš 80 % pracovní plochy (bez hlavního panelu;
+//! vlna 9 — dřív celá výška monitoru, šuplík s mnoha session zabral obrazovku), Nastavení si může říct
+//! o širší šuplík (min(žádost, 90 % monitoru)).
 //! Používá `drawer.rs` (`Drawer::logical_size`, `ViewMsg::max_h`); obsah nad limit posouvá frontend.
 
 use windows::Win32::Foundation::RECT;
 
 /// Rezerva nad spodkem pracovní plochy (logické px).
 pub const BOTTOM_GAP: f64 = 20.0;
+/// Nejvyšší podíl výšky pracovní plochy pro šuplík (obsah nad limit se posouvá uvnitř).
+pub const HEIGHT_FRACTION: f64 = 0.8;
 /// Nejvyšší podíl šířky monitoru pro širší šuplík (Nastavení).
 pub const WIDE_FRACTION: f64 = 0.9;
 /// Nikdy menší než tohle (rozbitý monitor / RDP bez displeje).
@@ -13,8 +16,9 @@ const MIN_H: f64 = 240.0;
 /// Výchozí šířka, když config žádnou nedá.
 const DEFAULT_W: f64 = 1080.0;
 
-/// Limity v logických px: `max_w` = šířka monitoru, `max_h` = od horní hrany monitoru po spodek
-/// pracovní plochy minus `BOTTOM_GAP` (šuplík visí z horní hrany i přes případný panel nahoře).
+/// Limity v logických px: `max_w` = šířka monitoru, `max_h` = `HEIGHT_FRACTION` výšky od horní hrany
+/// monitoru po spodek pracovní plochy (šuplík visí z horní hrany i přes případný panel nahoře), nikdy
+/// blíž spodku než `BOTTOM_GAP`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Limits {
     pub max_w: f64,
@@ -26,7 +30,8 @@ pub fn limits(mon: RECT, work: RECT, dpi: u32) -> Limits {
     let max_w = ((mon.right - mon.left).max(0) as f64 / scale).max(320.0);
     // prázdná pracovní plocha (výčet selhal) = celý monitor
     let bottom = if work.bottom > work.top { work.bottom.min(mon.bottom) } else { mon.bottom };
-    let max_h = ((bottom - mon.top) as f64 / scale - BOTTOM_GAP).max(MIN_H);
+    let avail = (bottom - mon.top) as f64 / scale;
+    let max_h = (avail * HEIGHT_FRACTION).min(avail - BOTTOM_GAP).max(MIN_H);
     Limits { max_w, max_h }
 }
 
@@ -51,19 +56,19 @@ mod tests {
         // (monitor, pracovní plocha, dpi, max_w, max_h)
         let cases = [
             // 1080p, 100 %, panel dole 48 px
-            (r(0, 0, 1920, 1080), r(0, 0, 1920, 1032), 96, 1920.0, 1012.0),
+            (r(0, 0, 1920, 1080), r(0, 0, 1920, 1032), 96, 1920.0, 1032.0 * 0.8),
             // 1080p, 125 %: 1536×864 logicky, panel 48 px fyzicky
-            (r(0, 0, 1920, 1080), r(0, 0, 1920, 1032), 120, 1536.0, 1032.0 / 1.25 - 20.0),
+            (r(0, 0, 1920, 1080), r(0, 0, 1920, 1032), 120, 1536.0, 1032.0 / 1.25 * 0.8),
             // 1080p, 150 %
-            (r(0, 0, 1920, 1080), r(0, 0, 1920, 1032), 144, 1280.0, 1032.0 / 1.5 - 20.0),
+            (r(0, 0, 1920, 1080), r(0, 0, 1920, 1032), 144, 1280.0, 1032.0 / 1.5 * 0.8),
             // panel nahoře: šuplík visí z horní hrany monitoru → výška po spodek monitoru
-            (r(0, 0, 1920, 1080), r(0, 48, 1920, 1080), 96, 1920.0, 1060.0),
+            (r(0, 0, 1920, 1080), r(0, 48, 1920, 1080), 96, 1920.0, 1080.0 * 0.8),
             // druhý monitor vpravo, 1440p, 150 %, panel dole
-            (r(1920, 0, 4480, 1440), r(1920, 0, 4480, 1392), 144, 1706.666, 1392.0 / 1.5 - 20.0),
+            (r(1920, 0, 4480, 1440), r(1920, 0, 4480, 1392), 144, 1706.666, 1392.0 / 1.5 * 0.8),
             // monitor nad hlavním (záporné souřadnice)
-            (r(0, -1080, 1920, 0), r(0, -1080, 1920, -40), 96, 1920.0, 1020.0),
+            (r(0, -1080, 1920, 0), r(0, -1080, 1920, -40), 96, 1920.0, 1040.0 * 0.8),
             // prázdná pracovní plocha = celý monitor
-            (r(0, 0, 1920, 1080), r(0, 0, 0, 0), 96, 1920.0, 1060.0),
+            (r(0, 0, 1920, 1080), r(0, 0, 0, 0), 96, 1920.0, 1080.0 * 0.8),
             // nesmyslně malý monitor → minimum
             (r(0, 0, 200, 100), r(0, 0, 200, 100), 96, 320.0, 240.0),
         ];

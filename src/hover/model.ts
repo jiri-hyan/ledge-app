@@ -1,7 +1,7 @@
 // Náhled po najetí (`drawer.hover`: kompaktní náhled / ostrůvek) — čistá logika bez DOM a bez `t()`:
 // co ukázat (jen z dat, která snapshot už má — nic se kvůli náhledu nestahuje ani nepočítá), priorita
 // dění pro ostrůvek a kdy se náhled sám rozbalí do celého šuplíku. Test `model.test.mjs`.
-import type { MediaView, SessionView, Snapshot, View } from "../types";
+import type { MediaView, ProcView, SessionView, Snapshot, View } from "../types";
 import type { TimerView } from "../timer/model";
 
 /** Šířky náhledů (logické px) — hlásí je skořápka (`App.tsx` `report`), Rust je ořízne na monitor. */
@@ -19,6 +19,8 @@ export const isHoverView = (v: View): v is "compact" | "island" => v === "compac
 
 /** Data náhledu — podmnožina snapshotu (testy staví jen tohle). */
 export type HoverData = Pick<Snapshot, "pending" | "questions" | "sessions"> & {
+  /** servery z Ledge (kompaktní náhled: řádek se ■ Stop) — starší volající bez nich = žádné */
+  procs?: ProcView[];
   personal: { media: MediaView | null; weather?: Snapshot["personal"]["weather"] };
   timer?: TimerView;
   limits?: Snapshot["limits"];
@@ -85,7 +87,12 @@ export interface CompactPlan {
   media: MediaView | null;
   /** limit 5h — jen když je vzorek (procenta z reálného zdroje) */
   limit: boolean;
+  /** servery, které spustil Ledge: běží / startují / selhaly (nejvýš `SERVER_ROWS`) — po najetí na proužek jde Stop */
+  servers: ProcView[];
 }
+
+export const SERVER_ROWS = 3;
+const SERVER_SHOWN = ["ready", "running", "starting", "preparing", "failed"];
 
 export function compactPlan(d: HoverData): CompactPlan {
   return {
@@ -93,6 +100,7 @@ export function compactPlan(d: HoverData): CompactPlan {
     sessions: compactSessions(d.sessions),
     media: d.personal.media && d.personal.media.status !== "stopped" ? d.personal.media : null,
     limit: !!(d.limits?.at != null && d.limits.fiveHour),
+    servers: (d.procs ?? []).filter((x) => SERVER_SHOWN.includes(x.phase)).slice(0, SERVER_ROWS),
   };
 }
 

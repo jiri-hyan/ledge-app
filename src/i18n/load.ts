@@ -24,6 +24,7 @@ import "./en-agentview";
 import "./en-pkgctx";
 import "./en-layout";
 import "../tilelook/en";
+import "../projects/en";
 import "../strip/en";
 import "./en-hover";
 import "./en-widgets";

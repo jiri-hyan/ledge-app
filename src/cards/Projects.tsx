@@ -5,7 +5,10 @@
 // Vlna 8 P: vlastní vzhled každé dlaždice (pravý klik / ⋯ v akcích / v režimu úprav klik → panel
 // `tilelook/LookEditor.tsx` pod dlaždicemi) a složky jako na telefonu — v režimu úprav tah dlaždice na
 // jinou = složka, na složku = do ní, ze složky ven = vyjmout (pointer události; HTML5 DnD v Tauri nejde).
-import { createSignal, For, Show, type JSX } from "solid-js";
+// Vlna 9 Z: co a odkud se spouští — ⋯ / pravý klik = Upravit…, Změnit složku…, Změnit příkaz, Stop / Restart;
+// panel `projects/ProjectPanel.tsx` pod dlaždicemi (i výběr z víc složek s jedním repem) a selhání startu
+// (`FailBox`: krátká chyba, poslední řádky logu, Zobrazit log, Změnit složku…).
+import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import type { ProjectView, Snapshot } from "../api";
 import type { NotePreset } from "../notes/store";
 import { t } from "../i18n";
@@ -14,16 +17,46 @@ import { DEFAULT_TILES, pageOf, setTiles, tilesOf, visibleProjects, type Layout,
 import { addToFolder, arrange, dropOnTile, folderOf, removeFolder, renameFolder, takeOut, MAX_FOLDER_NAME, type TileFolder } from "../layout/folders";
 import type { CardView } from "../layout/look";
 import { change, draft, editing, offerUndo, saveLayout } from "../layout/edit";
-import ProjectTile, { projectAuto } from "./ProjectTile";
+import ProjectTile, { cloneProject, projectAuto } from "./ProjectTile";
 import LookEditor from "../tilelook/LookEditor";
 import TileIcon from "../tilelook/TileIcon";
 import { lookOf, lookTarget, openLook, saveTileLook, wantKeys } from "../tilelook/state";
 import { openTileMenu, type MenuItem } from "../tilelook/TileMenu";
 import { isPlain } from "../tilelook/model";
 import { logoSrc } from "../logos";
+import ProjectPanel, { FailBox } from "../projects/ProjectPanel";
+import { failInfo, isLive, placeOf } from "../projects/model";
+import { changeFolder, closeProjectPanel, openProjectPanel, projectPanel, restartProject, startProject, stopProject, tip, tipLeave } from "../projects/state";
+import TileTip from "../projects/TileTip";
+import Popover, { boxOf } from "../ui/Popover";
+import { tileColumns } from "../ui/place";
+import { api } from "../api";
+import { hideWithUndo } from "./CardMenu";
 import "./projects.css";
 
 type Drag = { id: string; x: number; y: number; over: string | null; moved: boolean };
+
+/** Kotva popoveru = dlaždice projektu v téhle kartě (může být i ve složce). */
+const tileBox = (id: string) => boxOf(document.querySelector(`[data-tl-tile="p:${CSS.escape(id)}"]`));
+
+/** Mřížka vyplní celou šířku karty: počet sloupců z šířky (ResizeObserver — jen při změně velikosti) a počtu
+ *  dlaždic (`ui/place.ts` `tileColumns`); `key` = velikost / varianta (mění `--tile-min`). */
+function fitColumns(el: HTMLElement, key: () => string) {
+  const [w, setW] = createSignal(0);
+  const [n, setN] = createSignal(el.childElementCount);
+  const ro = new ResizeObserver((es) => setW(es[0]?.contentRect.width ?? 0));
+  const mo = new MutationObserver(() => setN(el.childElementCount));
+  ro.observe(el);
+  mo.observe(el, { childList: true });
+  onCleanup(() => (ro.disconnect(), mo.disconnect()));
+  createEffect(() => {
+    void key();
+    const cs = getComputedStyle(el);
+    const min = parseFloat(cs.getPropertyValue("--tile-min")) || 118;
+    const gap = parseFloat(cs.columnGap) || 0;
+    el.style.setProperty("--cols", String(tileColumns(w(), min, gap, n())));
+  });
+}
 
 export default function Projects(p: {
   s: Snapshot;
@@ -63,12 +96,42 @@ export default function Projects(p: {
     } else void saveLayout(upd, p.s.cfgError);
   }
 
-  const look = (pr: ProjectView) => openLook({ kind: "project", id: pr.id, name: pr.name, initial: pr.look }, p.s.cfgError);
+  const look = (pr: ProjectView) => (closeProjectPanel(), openLook({ kind: "project", id: pr.id, name: pr.name, initial: pr.look }, p.s.cfgError));
   function menuFor(e: MouseEvent, pr: ProjectView) {
-    const items: MenuItem[] = [{ text: t("cards.tile.edit", "Upravit vzhled…"), run: () => look(pr) }];
+    const proc = p.s.procs.find((x) => x.id === pr.id);
+    const items: MenuItem[] = [];
+    tipLeave();
+    // JEDNO menu dlaždice (pravý klik, ⋯, Shift+F10) — stejné v každé velikosti a variantě karty
+    if (isLive(proc?.phase)) {
+      items.push({ text: "■ " + t("cards.proj.menu.stop", "Zastavit server"), run: () => void stopProject(pr.id, pr.name) });
+      items.push({ text: t("cards.proj.menu.restart", "Restartovat"), run: () => void restartProject(pr.id, pr.name) });
+    } else if (placeOf(pr).kind === "choose") items.push({ text: "▶ " + t("cards.proj.menu.choose", "Vybrat složku…"), run: () => openProjectPanel(pr.id, "choose") });
+    else items.push({ text: "▶ " + t("cards.proj.run", "Spustit"), run: () => startProject(pr, proc) });
+    if (proc?.url) items.push({ text: t("cards.proj.menu.browser", "Otevřít v prohlížeči"), run: () => void api.openUrl(proc.url!) });
+    if (pr.pathOk) items.push({ text: t("cards.proj.menu.folder", "Otevřít složku"), run: () => void api.openIn(pr.id, "folder") });
+    if (proc) items.push({ text: t("cards.proj.menu.log", "Zobrazit log"), run: () => openProjectPanel(pr.id, "edit", "log") });
+    if (pr.clonable && !pr.cloning) items.push({ text: t("cards.projects.clone", "Naklonovat"), run: () => void cloneProject(pr) });
+    items.push({ text: t("cards.proj.folder.change", "Změnit složku…"), run: () => void changeFolder(pr) });
+    if (pr.kind === "dev") items.push({ text: t("cards.proj.menu.run", "Změnit příkaz…"), run: () => openProjectPanel(pr.id, "edit", "run") });
+    items.push({ text: t("cards.proj.menu.look", "Vzhled…"), run: () => look(pr) });
     if (!isPlain(pr.look)) items.push({ text: t("cards.tile.resetLook", "Obnovit vzhled"), run: () => void saveTileLook("project", pr.id, undefined) });
+    items.push({ text: t("cards.proj.edit.open", "Upravit…"), run: () => openProjectPanel(pr.id, "edit") });
     if (folderOf(tiles(), pr.id)) items.push({ text: t("cards.folder.takeOut", "Vyjmout ze složky"), run: () => applyTiles((x) => takeOut(x, pr.id)) });
+    items.push({ text: t("cards.proj.menu.remove", "Odebrat z téhle záložky"), danger: true, run: () => removeHere(pr) });
     openTileMenu(e, items);
+  }
+  /** „Odebrat“ = skrýt dlaždici na téhle záložce (`tiles.hidden`), s Vrátit; projekt v configu zůstává. */
+  function removeHere(pr: ProjectView) {
+    const pageId = p.page;
+    const hide = (l: Layout, on: boolean) => {
+      const cur = tilesOf(pageOf(l, pageId).cards.find((c) => c.id === "projects")).hidden;
+      return setTiles(l, pageId, { hidden: on ? [...new Set([...cur, pr.id])] : cur.filter((x) => x !== pr.id) });
+    };
+    const text = t("cards.proj.removed", "„{name}“ odebrán z téhle záložky (projekt zůstává v Nastavení)", { name: pr.name });
+    if (editing()) {
+      change((l) => hide(l, true));
+      offerUndo(text, () => change((l) => hide(l, false)));
+    } else void hideWithUndo(text, (l) => ({ layout: hide(l, true), undo: (x) => hide(x, false) }), p.s.cfgError);
   }
   function folderMenu(e: MouseEvent, f: TileFolder) {
     openTileMenu(e, [
@@ -162,7 +225,7 @@ export default function Projects(p: {
         <span class="n">{list().length || ""}</span>
         {p.menu}
       </h4>
-      <div class="projects" data-tiles={tiles().size} data-view={p.view ?? "tiles"} data-edit={editing() ? "" : undefined}>
+      <div class="projects proj-fit" ref={(el) => fitColumns(el, () => `${tiles().size}|${p.view ?? "tiles"}`)} data-tiles={tiles().size} data-view={p.view ?? "tiles"} data-edit={editing() ? "" : undefined}>
         <For each={entries()} fallback={
           <Show when={p.s.projects.length} fallback={
             <div class="empty proj-empty" data-anim>
@@ -227,14 +290,37 @@ export default function Projects(p: {
               <button class="mini" onClick={() => removeOne(f())}>{t("cards.folder.removeShort", "Zrušit složku")}</button>
               <button class="mini" aria-label={t("cards.folder.close", "Zavřít složku")} title={t("cards.folder.close", "Zavřít složku")} onClick={() => setOpen(null)}>×</button>
             </div>
-            <div class="projects" data-tiles={tiles().size} data-view={p.view ?? "tiles"} data-edit={editing() ? "" : undefined}>
+            <div class="projects proj-fit" ref={(el) => fitColumns(el, () => `${tiles().size}|${p.view ?? "tiles"}`)} data-tiles={tiles().size} data-view={p.view ?? "tiles"} data-edit={editing() ? "" : undefined}>
               <For each={f().items}>{(pr) => tile(pr)}</For>
             </div>
           </div>
         )}
       </Show>
+      <For each={p.s.procs.filter((x) => failInfo(x) && projectPanel()?.id !== x.id && list().some((pr) => pr.id === x.id))}>
+        {(pc) => <FailBox s={p.s} pr={byId(pc.id)!} proc={pc} />}
+      </For>
+      {/* Upravit… / výběr složky / Vzhled… = popover nad šuplíkem u dlaždice (ne v toku stránky, karta ho neořízne) */}
+      <Show when={projectPanel() && byId(projectPanel()!.id) && list().some((x) => x.id === projectPanel()!.id) ? projectPanel()!.id : null} keyed>
+        {(id) => (
+          <Popover anchor={() => tileBox(id)} label={byId(id)?.name ?? id}>
+            <ProjectPanel s={p.s} pr={byId(id)!} onSettings={p.onSettings} />
+          </Popover>
+        )}
+      </Show>
       <Show when={lookTarget()?.kind === "project" && byId(lookTarget()!.id) ? lookTarget() : null} keyed>
-        {(tg) => <LookEditor auto={projectAuto(byId(tg.id)!)} editing={editing()} />}
+        {(tg) => (
+          <Popover anchor={() => tileBox(tg.id)} label={tg.name}>
+            <LookEditor auto={projectAuto(byId(tg.id)!)} editing={editing()} />
+          </Popover>
+        )}
+      </Show>
+      {/* náhled po najetí: jméno, stav, čím a odkud (jen informace — akce jsou v menu) */}
+      <Show when={tip() && byId(tip()!.id) && !projectPanel() && !lookTarget() ? tip() : null} keyed>
+        {(tp) => (
+          <Popover anchor={() => tileBox(tp.id) ?? boxOf(tp.el)} label={byId(tp.id)!.name} passive>
+            <TileTip pr={byId(tp.id)!} proc={p.s.procs.find((x) => x.id === tp.id)} />
+          </Popover>
+        )}
       </Show>
       <Show when={drag()?.moved ? drag() : null}>
         {(d) => (

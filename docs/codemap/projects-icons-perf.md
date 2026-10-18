@@ -9,8 +9,10 @@
 | `src-tauri/src/icons.rs` | výběr loga projektu, cache výsledků | `resolve`, `Source`, `exe_policy`/`ExeIcon`, `candidates`, `load`, `raster_size`, `icon_links`, `manifest_icons`, `resolve_href`, `PATTERNS`, `Store` (`begin`/`finish`/`key`/`url`), `LIMIT`, `STALE` |
 | `src-tauri/src/iconimg.rs` | rastry přes WIC: dekódování, největší snímek ICO, zmenšení ≤ 128 px, PNG; ikona z exe; ikona souboru/složky ze shellu (rychlé akce, [actions.md](actions.md)) | `to_png`, `exe_png`, `shell_png`, `fit`, `MAX_PX`, `encode` |
 | `src-tauri/src/cloning.rs` | „Naklonovat“: kdy, kam, čím, spuštění | `clonable`, `target_in`, `folder_name`, `command`, `run`, `Busy`, `is_busy`, `TIMEOUT` |
-| `src-tauri/src/resolve.rs` | repo index podle remote, appka podle jména | `RepoIndex::build`/`resolve`/`clones`, `parse_remote`, `owner_repo_raw`, `installed_app_exe` |
-| `src-tauri/src/state.rs`, `refresh.rs`, `snapshot.rs`, `commands/projects.rs` | lepidlo | `Core.logos`, `Core::rebuild_index`, `refresh_logos`, `snapshot` (blok `projects`), `ProjectView`, `github_url`, příkazy `project_logo`, `clone_project`, `launch`, `open_in` → `open_dir` (sdílí panel Git session) |
+| `src-tauri/src/resolve.rs` | repo index podle remote (i linked worktree), odkud projekt poběží, kandidáti složek s datem commitu, appka podle jména | `RepoIndex::build`/`candidates`/`clones`, `origin_any`, `Place`, `place_of`, `Candidate`, `sort_candidates`, `candidates_dated`, `last_commit`, `parse_remote`, `owner_repo_raw`, `installed_app_exe` |
+| `src/ui/place.ts` · `src/ui/Popover.tsx` | umístění plovoucích prvků (`placePopup`: pod kotvu / otočit nahoru / posunout do okna, `maxH`) a počet sloupců mřížky (`tileColumns`; test `place.test.mjs`); popover přes Portal do `.shell` (Vzhled…, Upravit…, náhled dlaždice); `tilelook/TileMenu.tsx` se umisťuje stejně | `placePopup` `tileColumns` `Popover` `boxOf` |
+| `src/projects/*` | co a odkud se spouští (vlna 9 Z; `TileTip.tsx` = náhled po najetí, `tipState`, `tipEnter`/`tipLeave`): `model.ts` (čisté: `placeOf`, `clickOf`, `tileTip`, `whereOf`, `preselect`/`freshest`, `withProjectFields`, `failInfo`; test `model.test.mjs`), `state.ts` (panel, `startProject`, `changeFolder`, Stop/Restart/`stopAll`), `ProjectPanel.tsx` (Upravit… / výběr složky / `FailBox`), `RunningPill.tsx` (pilulka „N běží“ + cizí procesy na portech), `projpanel.css` (`pz-`), `en.ts` | `startProject` `openProjectPanel` `FailBox` `RunningPill` |
+| `src-tauri/src/state.rs`, `refresh.rs`, `snapshot.rs`, `commands/projects.rs` | lepidlo | `Core.logos`, `Core::rebuild_index`, `Core::project_place`/`project_dir`, `refresh_logos`, `on_proc_event` (toast selhání), `snapshot` (blok `projects`: `place`, `port`, `remote`, `app`), `ProjectView`, `github_url`, příkazy `project_logo`, `clone_project`, `launch` (`place_error`), `restart`, `stop_all_servers`, `project_folders`, `port_holders`, `kill_port_holder`, `open_in` → `open_dir` (sdílí panel Git session) |
 | `src-tauri/src/onboarding/repos.rs` | návrh projektů z rep na disku (průvodce) — viz [onboarding.md](onboarding.md) | `discover`, `suggest` |
 | `src/cards/Projects.tsx` · `ProjectTile.tsx` · `src/logos.ts` | karta (složky, tah v úpravách, menu pravého kliku, panel vzhledu) · jedna dlaždice (logo nebo `TileIcon`, akce uvnitř, ⋯ = Upravit vzhled) · cache log | `Projects` `startDrag` `applyTiles` · `ProjectTile` `launch` `tilt` `projectAuto` · `logoSrc`, `logoUrls` |
 | `src/tilelook/*` | vzhled jednotlivého zástupce (vlna 8 P): čistá logika `model.ts` (normalizace, předvolby, `inkDark` kontrast, `withTileLook`, přehled; test `model.test.mjs`), `glyphs.ts` (77 ikon Segoe Fluent Icons ověřených v `SegoeIcons.ttf` i `segmdl2.ttf`, hledání), `state.ts` (který zástupce se upravuje, živý náhled `lookOf`, uložení jen `look`, obrázky z cache), `TileIcon.tsx` (kresba), `LookEditor.tsx` (panel pod dlaždicemi), `TileMenu.tsx` (pravý klik), `tilelook.css` (`tl-`), `en.ts` | `normalizeTileLook` `inkDark` `TILE_COLORS` `GLYPHS` `searchGlyphs` `lookOf` `openLook` `closeLook` `saveTileLook` `pickLookImage` `TileIcon` `LookEditor` `openTileMenu` |
@@ -32,6 +34,19 @@ seřazeno SVG > větší rastr do 128 px > deklarované; protáhlé obrázky = n
 `ExeIcon::Fallback` (vlastní exe, ne `electron.exe`).
 
 ## Invarianty a pasti
+
+- **Jedno menu dlaždice** (`Projects.tsx` `menuFor`) pro pravý klik, ⋯ i Shift+F10 — nové akce přidávej TAM, ne do
+  `.acts` (ty jsou u malých dlaždic a „jen ikony“ schované kromě ▶/■ a ⋯, `.proj-xa`). Mřížka: `fitColumns`
+  (ResizeObserver + `tileColumns`) nastaví `--cols`; dlaždice se při každém snapshotu překreslují, proto kotvy
+  popoverů hledají dlaždici podle `data-tl-tile`, ne podle uloženého prvku.
+
+- **Odkud projekt poběží** (`resolve::place_of`, jediné místo): `path` vyhrává, i neexistující (= `Place::Missing`,
+  chyba na dlaždici — dřív se potichu hledalo podle remote). Bez `path` jediný kandidát podle `remote`; víc kandidátů
+  = `Place::Choose`, nikdy náhodný výběr. Datum commitu (`git log -1`) se zjišťuje JEN na otevření výběru
+  (`project_folders`), nikdy ve snapshotu. Linked worktree je kandidát (`origin_any`) — třeba `app-v2` vedle staré `app` je worktree.
+- Selhání startu: `procman` drží `cwd`, `cmd`, `tail` (`fail_tail`); `ProcEvent::Failed { id, message }` → toast
+  jen přes `attention::signal` (šuplík neotevřený, Ledge není „mrtvý“). Cizí proces na portu se zabíjí jen po
+  potvrzení a jen když port drží TEĎ (`kill_port_holder`), nikdy proces z vlastního jobu.
 
 - **Vzhled zástupce** (`look`): chybí = dlaždice jde PŮVODNÍ cestou (`.logo` s přechodem barvy projektu) —
   `TileIcon` se kreslí jen pro neprázdný vzhled. Kresba na barevném podkladu je černá / bílá (`inkDark`,
@@ -57,7 +72,10 @@ seřazeno SVG > větší rastr do 128 px > deklarované; protáhlé obrázky = n
   `measure_real_logos` (`#[ignore]`, `LEDGE_BENCH_ROOT`) měří nad skutečnými repy.
 - `iconimg::tests` — `fit`, zmenšení PNG, největší snímek ICO, exe ikona.
 - `cloning::tests` — `clonable`, cíle a kolize, jména složek, volba `gh`/`git`, `Busy`. Nic se neklonuje.
-- `resolve::tests` — `clones`, `owner_repo_raw`; `bench_remote_regex` (`#[ignore]`).
+- `resolve::tests` — `clones`, `owner_repo_raw`, worktree jako druhý klon, řazení kandidátů (deterministicky), `place_of`,
+  `last_commit` nad dočasným repem; `bench_remote_regex` (`#[ignore]`).
+- `procman::tests` — `fail_tail`, `tail`/`cwd`/`cmd` u pádu, událost `Failed` s id a zprávou.
+- `src/projects/model.test.mjs` — klik podle místa, tooltip, předvolba výběru, zápis `path`/`run`, `failInfo`.
 
 ## Výkon — co zbývá (neopraveno, s odhadem)
 

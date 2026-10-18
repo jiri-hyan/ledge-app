@@ -69,6 +69,13 @@ test("kompaktní náhled: co ukáže", () => {
   }
 });
 
+test("kompaktní náhled: servery z Ledge se ■ Stop (běží, startují, selhaly; skončené ne)", () => {
+  const pc = (id, phase) => ({ id, phase, pid: 1, port: 5210, url: null, startedAt: NOW, readyAt: null, exitCode: null, message: null, lastLine: null, errors: 0 });
+  assert.deepEqual(compactPlan(data()).servers, [], "bez procs (starší volající) = nic");
+  const procs = [pc("a", "ready"), pc("b", "exited"), pc("c", "failed"), pc("d", "starting"), pc("e", "running")];
+  assert.deepEqual(compactPlan(data({ procs })).servers.map((x) => x.id), ["a", "c", "d"], "skončený vynechán, strop 3");
+});
+
 test("samo-rozbalení: kdy odpočítávat", () => {
   // (ms, čeká schválení, myš nad tlačítkem) → ms | null
   const cases = [

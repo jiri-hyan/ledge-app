@@ -1,0 +1,4 @@
+/* Plovoucí panel nad šuplíkem (Popover.tsx): pevná pozice z `placePopup`, obsah se posouvá uvnitř, když je
+   vyšší než okno. Vzhled dodá obsah (panel Vzhled…, Upravit…, náhled dlaždice). */
+.ui-pop { position: fixed; z-index: 58; width: min(440px, calc(100vw - 16px)); overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
+.ui-pop-passive { z-index: 59; width: max-content; max-width: min(340px, calc(100vw - 16px)); pointer-events: none; }

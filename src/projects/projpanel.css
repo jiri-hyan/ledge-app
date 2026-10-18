@@ -1,0 +1,58 @@
+/* Zástupci projektů (vlna 9 Z): panel Upravit… / výběr složky pod dlaždicemi (ProjectPanel.tsx), selhání startu
+   v kartě (FailBox) a rozbalovací seznam pilulky „N běží“ (RunningPill.tsx). Prefix `pz-`, tokeny ze styles.css. */
+.pz-panel { padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow-toast); animation: drop var(--dur-2) var(--ease); text-align: left; }
+.pz-head { display: flex; align-items: baseline; gap: var(--s2); }
+.pz-head b { font-size: var(--fs-ui); color: var(--t1); }
+.pz-head small { font-size: var(--fs-sm); color: var(--t3); }
+.pz-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); min-width: 0; }
+.pz-cap { min-width: 72px; font-size: var(--fs-xs); font-weight: 600; color: var(--t3); }
+.pz-val { flex: 1; min-width: 0; font: var(--fs-sm) var(--mono); color: var(--t1); overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.pz-input { flex: 1; min-width: 160px; font: var(--fs-sm) var(--mono); color: var(--t1); background: var(--well); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 5px 8px; }
+.pz-input:focus { border-color: var(--accent); outline: none; }
+.pz-note { font-size: var(--fs-sm); color: var(--t3); overflow-wrap: anywhere; }
+.pz-bad { color: var(--red); }
+.pz-err { font-size: var(--fs-sm); color: var(--red); background: color-mix(in srgb, var(--red) 8%, transparent); border: 1px solid color-mix(in srgb, var(--red) 25%, transparent); border-radius: var(--r-sm); padding: 6px 10px; }
+.pz-btns { gap: var(--s1); }
+.pz-foot { margin-top: var(--s1); }
+.pz-lead { margin: 0; font-size: var(--fs-sm); color: var(--t2); }
+.pz-list { display: flex; flex-direction: column; gap: 4px; }
+.pz-opt { display: flex; align-items: center; gap: var(--s2); padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--card); cursor: pointer; }
+.pz-opt:hover { background: var(--card-2); }
+.pz-opt.pz-on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pz-opt code { display: block; font: var(--fs-sm) var(--mono); color: var(--t1); overflow-wrap: anywhere; }
+.pz-opt small { display: block; font-size: var(--fs-xs); color: var(--t3); margin-top: 2px; }
+.pz-opt input { accent-color: var(--accent); }
+
+/* log v panelu přes celou šířku řádku */
+.pz-log { flex-basis: 100%; }
+
+/* selhání startu: v panelu i samostatně v kartě (pod dlaždicemi) */
+.pz-fail { display: flex; flex-direction: column; gap: 4px; padding: var(--s2) var(--s3); border-radius: var(--r-md, var(--r-sm)); background: color-mix(in srgb, var(--red) 7%, transparent); border: 1px solid color-mix(in srgb, var(--red) 28%, transparent); text-align: left; }
+.pz-fail-card { grid-column: 1 / -1; margin-top: var(--s2); }
+.pz-fail-msg { font-size: var(--fs-sm); color: var(--red-ink); overflow-wrap: anywhere; }
+.pz-fail-msg b { color: var(--t1); }
+
+/* pilulka „N běží“ a její seznam */
+.pz-pill { cursor: pointer; }
+.pz-caret { font-size: var(--fs-2xs); color: var(--t3); }
+.pz-drop { position: fixed; z-index: 60; width: min(430px, calc(100vw - 16px)); max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; padding: var(--s2); display: flex; flex-direction: column; gap: 4px; background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow-toast); animation: drop var(--dur-2) var(--ease); }
+.pz-srv { display: flex; align-items: center; gap: var(--s1); padding: 5px 4px; border-radius: var(--r-sm); }
+.pz-srv:hover { background: var(--card); }
+.pz-srv b { display: block; font-size: var(--fs-ui); color: var(--t1); }
+.pz-srv small { display: block; font-size: var(--fs-xs); color: var(--t3); overflow-wrap: anywhere; }
+.pz-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--t3); margin: 0 4px; }
+.pz-dot-ok { background: var(--green); }
+.pz-dot-wait { background: var(--amber); }
+.pz-dot-bad { background: var(--red); }
+.pz-sep { margin-top: var(--s1); padding-top: var(--s2); border-top: 1px solid var(--line); font-size: var(--fs-xs); font-weight: 600; color: var(--t3); }
+.pz-ask { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); padding: 6px 8px; font-size: var(--fs-sm); color: var(--t2); background: color-mix(in srgb, var(--amber) 9%, transparent); border-radius: var(--r-sm); }
+
+/* náhled po najetí na dlaždici (TileTip.tsx) — neklikatelný, v popoveru */
+.pz-tip { display: flex; flex-direction: column; gap: 4px; padding: var(--s2) var(--s3); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md, var(--r-sm)); box-shadow: var(--shadow-toast); animation: drop var(--dur-2) var(--ease); font-size: var(--fs-sm); color: var(--t2); }
+.pz-tip-head { display: flex; align-items: center; gap: var(--s2); }
+.pz-tip-head b { color: var(--t1); font-size: var(--fs-ui); }
+.pz-tip-row { display: flex; gap: var(--s2); min-width: 0; }
+.pz-tip-row span { flex-shrink: 0; min-width: 64px; color: var(--t3); font-size: var(--fs-xs); }
+.pz-tip-row code { font: var(--fs-xs) var(--mono); color: var(--t1); overflow-wrap: anywhere; }
+.pz-tip-err { color: var(--red); overflow-wrap: anywhere; }
+.pz-tip-hint { color: var(--t3); font-size: var(--fs-2xs); }

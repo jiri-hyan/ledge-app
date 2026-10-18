@@ -9,6 +9,7 @@ import type { CalendarTest, OutlookProbe } from "./types";
 import type { MediaAction } from "./types";
 import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
 import type { PinInit, PinPrefs } from "./types";
+import type { FolderCandidates, PortHolder } from "./types";
 
 export type * from "./types";
 
@@ -24,6 +25,15 @@ export const api = {
   getState: () => call<Snapshot>("get_state"),
   launch: (id: string) => call<{ outcome: string; url?: string }>("launch", { id }),
   stop: (id: string) => call("stop", { id }),
+  /** Stop → počkat na port → spustit znovu (`commands/projects.rs` `restart`). */
+  restart: (id: string) => call<{ outcome: string; url?: string }>("restart", { id }),
+  /** Zastaví všechno, co spustil Ledge; vrací kolik. */
+  stopAllServers: () => call<number>("stop_all_servers"),
+  /** Složky s repem projektu k výběru (git se ptá jen tady). */
+  projectFolders: (id: string) => call<FolderCandidates>("project_folders", { id }),
+  /** Cizí procesy na portech projektů (jen ukázat; ukončit po potvrzení). */
+  portHolders: () => call<PortHolder[]>("port_holders"),
+  killPortHolder: (port: number, pid: number) => call("kill_port_holder", { port, pid }),
   dismiss: (id: string) => call("dismiss", { id }),
   logs: (id: string) => call<string[]>("logs", { id }),
   decide: (id: number | null, allow: boolean, extra?: DecideExtra) => call<boolean>("decide", { id, allow, extra: extra ?? null }),

@@ -55,6 +55,8 @@ const MAX_NAME: usize = 32;
 const MAX_ICON: usize = 4;
 /// Nejvyšší výška karty v řádcích (`h`).
 pub const MAX_H: u8 = 4;
+/// Nejvyšší strop řádků karty (`limit`; 0 = bez stropu).
+pub const MAX_LIMIT: u8 = 50;
 /// Jednorázová úprava: karta Projekty (zástupci) i na záložku Osobní (vlna 7).
 pub const UP_PERSONAL_PROJECTS: &str = "personalProjects";
 
@@ -119,6 +121,10 @@ pub struct LayoutCard {
     /// Vzhled karty (akcent, pozadí, hlavička, hustota, varianta — `tilelook.rs`). Chybí = podle stylu.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub look: Option<crate::tilelook::CardLook>,
+    /// Kolik řádků karta ukáže, než nabídne „Zobrazit další“ (karty Claude, Repa, Běží): 1–50, 0 = bez
+    /// stropu. Chybí = výchozí (4). Session, které čekají na tebe, se nikdy neschovají.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u8>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -349,6 +355,11 @@ pub fn validate(l: &LayoutConfig) -> Result<(), FieldError> {
                 && !(1..=MAX_H).contains(&h)
             {
                 return Err(fe(format!("layout.pages.{i}.cards.{j}.h"), trf!("Výška karty je 1–{} řádky (nebo chybí = podle obsahu).", "A card height is 1–{} rows (or absent = fit the content).", MAX_H)));
+            }
+            if let Some(n) = c.limit
+                && n > MAX_LIMIT
+            {
+                return Err(fe(format!("layout.pages.{i}.cards.{j}.limit"), trf!("Strop řádků karty je 0–{} (0 = bez stropu).", "A card row limit is 0–{} (0 = no limit).", MAX_LIMIT)));
             }
         }
     }
@@ -674,6 +685,29 @@ mod tests {
         }
     }
 
+
+    /// Zrcadlo validace s `src/layout/validate.ts` (test `validate.test.mjs` čte stejnou tabulku):
+    /// co Rust odmítne, odmítne i šuplík dřív, než se pokusí uložit — a naopak.
+    #[test]
+    fn validation_mirror_with_ts() {
+        let cases: Vec<Value> = serde_json::from_str(include_str!("fixtures/layout-validate.json")).unwrap();
+        assert!(cases.len() >= 10);
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let l: LayoutConfig = serde_json::from_value(c["layout"].clone()).unwrap_or_else(|e| panic!("{name}: {e}"));
+            assert_eq!(validate(&l).err().and_then(|e| e.field).as_deref(), c["field"].as_str(), "{name}");
+        }
+    }
+
+    #[test]
+    fn limit_shape() {
+        let c: LayoutCard = serde_json::from_value(json!({"id":"claude","size":"m"})).unwrap();
+        assert_eq!(c.limit, None);
+        assert_eq!(serde_json::to_value(&c).unwrap(), json!({"id":"claude","size":"m"}), "bez stropu se nic nového nepíše");
+        let c: LayoutCard = serde_json::from_value(json!({"id":"claude","size":"m","limit":0})).unwrap();
+        assert_eq!(c.limit, Some(0));
+        assert!(crate::config::schema_json().contains("\"limit\""));
+    }
 
     #[test]
     fn page_lookup_falls_back_to_first() {

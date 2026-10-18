@@ -44,7 +44,9 @@ import Deck from "./layout/Deck";
 import Catalog from "./layout/Catalog";
 import EditBar from "./layout/EditBar";
 import { beginEdit, catalogOpen, draft, editing, editPage, saveLayout, setCatalogOpen } from "./layout/edit";
-import { normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type PartKey } from "./layout/model";
+import { LIMIT_CARDS, limitOf, normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type CardSize, type PartKey } from "./layout/model";
+import { sizeOutcome } from "./layout/size";
+import { colsNow } from "./layout/cols";
 import { t } from "./i18n";
 import WidgetCard from "./widgets/WidgetCard";
 import { rememberWidgets } from "./widgets/registry";
@@ -69,6 +71,11 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const shows = (id: CardId) => shown().includes(id);
   const edit = (catalog = false) => beginEdit(p.s, catalog);
   const cardOf = (id: CardId) => page().cards.find((c) => c.id === id);
+  /** co udělá volba velikosti v ⋯ (karty v pořadí, jak je mřížka ukazuje; `size.ts` `sizeOutcome`) */
+  const outcome = (id: CardId) => (want: CardSize) => {
+    const cards = editing() ? page().cards : page().cards.filter((c) => shows(c.id));
+    return sizeOutcome(cards.map((c) => c.size), cards.findIndex((c) => c.id === id), want, colsNow());
+  };
   const tiles = () => tilesOf(cardOf("projects"));
   /** varianta zobrazení karty (vzhled karty; i rozpracovaný v panelu) */
   const view = (id: CardId) => viewOf(id, lookFor(page().id, id, cardOf(id)?.look));
@@ -78,7 +85,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     void closeCardLook(true);
   }, { defer: true }));
   const menu = (card: CardId, parts: PartKey[] = []) => (
-    <CardMenu card={card} page={page().id} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} look={cardOf(card)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={card === "notes" ? pinMenuItems(p.s) : undefined}>
+    <CardMenu card={card} page={page().id} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} outcome={outcome(card)} limit={LIMIT_CARDS.includes(card) ? limitOf(cardOf(card)) : undefined} look={cardOf(card)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={card === "notes" ? pinMenuItems(p.s) : undefined}>
       <Show when={card === "projects"}>
         <TileOptions page={page().id} tiles={tiles()} projects={p.s.projects} cfgError={p.s.cfgError} />
       </Show>
@@ -96,11 +103,11 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       case "projects":
         return <Projects s={p.s} page={page().id} view={view("projects")} onNote={p.onNote} onSettings={p.onSettings} tiles={tiles()} menu={menu("projects")} onShowAll={() => void saveLayout((l) => setTiles(l, page().id, { hidden: [] }), p.s.cfgError)} />;
       case "running":
-        return <Running s={p.s} now={p.now} menu={menu("running")} />;
+        return <Running s={p.s} now={p.now} menu={menu("running")} page={page().id} limit={limitOf(cardOf("running"))} />;
       case "claude":
-        return <ClaudeSessions s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("claude", CLAUDE_PARTS.filter(on))} />;
+        return <ClaudeSessions s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("claude", CLAUDE_PARTS.filter(on))} page={page().id} limit={limitOf(cardOf("claude"))} />;
       case "repos":
-        return <Repos s={p.s} view={view("repos")} menu={menu("repos")} onSettings={p.onSettings} />;
+        return <Repos s={p.s} view={view("repos")} menu={menu("repos")} onSettings={p.onSettings} page={page().id} limit={limitOf(cardOf("repos"))} />;
       case "notes":
         // Osobní = obecné poznámky; Práce a vlastní záložky = po projektech (reaktivně — karta zůstává při přepnutí záložky)
         return <Show when={kind() === "personal"} fallback={<NotesCard s={p.s} now={p.now} view={view("notes")} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} />}><NotesCard s={p.s} now={p.now} view={view("notes")} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>;
@@ -128,7 +135,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         return <SystemCard menu={menu("system")} />;
       default:
         // widget ze skriptu (`widget:<soubor>`)
-        return <WidgetCard s={p.s} id={id} now={p.now} menu={(extra) => <CardMenu card={id} page={page().id} size={cardOf(id)?.size} h={cardOf(id)?.h} look={cardOf(id)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={extra} />} />;
+        return <WidgetCard s={p.s} id={id} now={p.now} menu={(extra) => <CardMenu card={id} page={page().id} size={cardOf(id)?.size} h={cardOf(id)?.h} outcome={outcome(id)} look={cardOf(id)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={extra} />} />;
     }
   };
 

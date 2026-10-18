@@ -29,6 +29,12 @@ pub(crate) struct ProjectView {
     links: Vec<config::Link>,
     git: Option<GitInfo>,
     run: Option<String>,
+    /// co a odkud (tooltip a „Upravit…“ na dlaždici): port z configu, `remote`, u aplikace exe / appName
+    port: Option<u16>,
+    remote: Option<String>,
+    app: Option<String>,
+    /// odkud poběží (`resolve::Place`): jasné / `path` neexistuje / víc klonů k výběru / nic
+    place: resolve::Place,
     /// vzhled dlaždice (`tilelook::TileLook`); chybí = automaticky
     #[serde(skip_serializing_if = "Option::is_none")]
     look: Option<crate::tilelook::TileLook>,
@@ -159,6 +165,7 @@ pub(crate) fn snapshot() -> Snapshot {
     let git = c.git.lock().clone();
     let mut projects = Vec::new();
     for p in cfg.projects.iter().filter(|p| p.enabled) {
+        let (place, _) = c.project_place(p);
         let dir = c.project_dir(p);
         let path_ok = dir.as_ref().is_some_and(|d| d.is_dir());
         let clonable = !path_ok && cloning::clonable(p, path_ok, p.remote.as_deref().map_or(0, |r| c.index.lock().clones(r)));
@@ -178,6 +185,10 @@ pub(crate) fn snapshot() -> Snapshot {
             links: p.links.clone(),
             git: git.get(&p.id).and_then(|(_, g)| g.clone()),
             run: p.run.clone(),
+            port: p.port,
+            remote: p.remote.clone(),
+            app: p.exe.clone().or_else(|| p.app_name.clone()),
+            place,
             look: p.look.clone(),
         });
     }

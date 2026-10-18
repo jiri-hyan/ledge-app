@@ -63,6 +63,26 @@ Typické úpravy:
   `shape` `rounded` (výchozí) | `circle` | `square` | `glass`, `label` ≤ 40 znaků. Mění se v šuplíku: pravý
   klik na dlaždici / ⋯ v akcích dlaždice → „Upravit vzhled…“ (v režimu úprav stačí klik); přehled a
   „Obnovit vše“ v Nastavení → Šuplík a karty → Upravené karty a zástupci.
+- **Co a odkud se spouští** (`src/projects/`, `resolve::place_of`): tooltip dlaždice = příkaz, složka, port;
+  ⋯ / pravý klik → **Upravit…** (příkaz jde přepsat přímo, Enter uloží `run`), **Změnit složku…** (dialog
+  Windows → `path`), Stop / Restart. `path` v configu vyhrává — **neexistující `path` = chyba na dlaždici**,
+  žádné tiché hledání jinde. Bez `path` se hledá podle `remote` v `roots`; počítá se i linked worktree
+  (`Desktop\app-v2` vedle `Desktop\app`). **Víc složek s jedním repem = Ledge nehádá**: dlaždice ukáže
+  „vyber složku“ a klik otevře výběr (cesta + datum posledního commitu, nejčerstvější předvybraná), volba
+  se uloží do `path`. Chceš zpět dohledávání podle repa → „Hledat podle repa“ (smaže `path`).
+- **Menu dlaždice je jedno pro všechny velikosti** (S/M/L/XL, seznam i jen ikony): pravý klik, ⋯ (po najetí
+  / fokusu) nebo Shift+F10 / klávesa menu → Spustit / Stop / Restart, Otevřít v prohlížeči, Otevřít složku,
+  Zobrazit log, Změnit složku…, Změnit příkaz…, Vzhled…, Upravit…, Odebrat (skryje dlaždici na záložce, s
+  Vrátit). Menu, Vzhled… i Upravit… se kreslí nad celým šuplíkem a u okraje se otočí / posunou (`src/ui/place.ts`).
+  Najetí myší = jen náhled (jméno, stav, čím a odkud). Řada dlaždic vždy vyplní šířku karty (`tileColumns`).
+- **Selhání startu nikdy potichu**: skončí-li server před naběhnutím, nenaběhne-li port do 90 s, nebo chybí
+  složka / příkaz → dlaždice zčervená, pod ní krátká chyba + poslední řádky logu, Zobrazit log, Změnit
+  složku…, Zkusit znovu. Windows oznámení jen když šuplík není otevřený (a ne ve fullscreen hře).
+- **Zastavit server** jde: ■ v akcích dlaždice, pilulka „N běží“ v hlavičce (klik = seznam se Stop / Restart /
+  Otevřít / Log, „Zastavit všechny“), kompaktní náhled po najetí (`drawer.hover: "compact"`; proužek sám je
+  průchozí pro myš), paleta Ctrl+K („Zastavit …“, „Restartovat …“, „Zastavit všechny servery“), karta Běží,
+  `POST /ctl/stop`. Stop = celý strom (Job Object). Port projektu, který drží proces, jenž Ledge
+  nespustil, pilulka jen ukáže — ukončí ho až po potvrzení (jen ten jeden PID, ověřený těsně před tím).
 - **Projekt, který na tomhle PC není** (dlaždice „nenalezeno“), má v rychlých akcích **Naklonovat**:
   `gh repo clone <owner/repo>` (jiný hostitel než GitHub: `git clone <url>`) do první složky z `roots`
   (kolize jména → `<repo>-<owner>`, `<repo>-2`…), bez okna, termín 15 min, pak se projekt dohledá sám.
@@ -91,7 +111,9 @@ Typické úpravy:
   skriptů“); stejná karta smí být na víc záložkách, na jedné
   jen jednou. `size`: `s` (1 sloupec), `m` (2), `l` (3), `xl` (celá řada) z `--deck-cols` (výchozí 4 — počet
   sloupců určuje styl rozložení ve Vzhledu). **Řada nikdy nekončí prázdným místem:** karty jdou v pořadí
-  záložky a volné sloupce řady, do které se další karta nevejde, dostanou karty té řady (pořadí se nemění).
+  záložky a volné sloupce řady, do které se další karta nevejde, dostane největší karta té řady (pořadí se
+  nemění; menší zůstane menší). Když volba velikosti nemá viditelný efekt (karta sama v řadě, málo sloupců),
+  šuplík to řekne a vybere nejbližší možnou. Šuplík je vysoký nejvýš 80 % pracovní plochy, dál scrolluje.
   `h` (volitelné) = výška karty v řádcích 1–4 (řádek ≈ 104 px × hustota); chybí = podle obsahu. S pevnou
   výškou obsah scrolluje uvnitř karty, ne celý šuplík. `tiles` (jen karta `projects` = zástupci, volby
   pro tu záložku): `size` `small` (malé ikony) | `tile` (výchozí) | `large`, `label` (název pod ikonou,
@@ -104,6 +126,9 @@ Typické úpravy:
   `hideHead` (bez hlavičky, ⋯ zůstane při najetí), `density` (`compact` | `airy`), `view` jen u karet
   `projects` (výchozí `tiles`), `repos` a `notes` (výchozí `list`), `actions` (výchozí `tiles`): `list` |
   `tiles` | `compact`. V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu).
+  `limit` (volitelné, jen karty `claude`, `repos`, `running`; 0–50, `0` = bez stropu, chybí = 4) = kolik řádků
+  karta ukáže, zbytek pod „Zobrazit další (k)“ ↔ „Méně“; session, které čekají na tebe, se nikdy neschovají
+  (⋯ karty → Řádků 3/4/6/Vše, nebo Nastavení → Šuplík a karty).
   `upgrades` = jednorázové úpravy rozložení po aktualizaci,
   které už proběhly — neměň ručně: `personalProjects` dá kartu Projekty nahoru na Osobní, když
   tam nikdy nebyla (jen když ji uživatel používá na jiné záložce a Osobní existuje); odebereš-li ji
@@ -114,8 +139,9 @@ Typické úpravy:
   nevolá `gh` ani nevzorkuje. `hiddenParts` = skryté části
   karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude), `nowPlaying`, `sound`
   (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (přetáhnout, **tah za pravý okraj karty
-  = šířka, za spodní = výška, za roh = obojí** s obrysem „2 × 3“, ⇔ / ↕ klikem, × do katalogu, „+ Přidat
-  kartu“, vlastní záložky; Hotovo uloží jen `layout`), ⋯ na kartě (Velikost S/M/L/XL, Výška Auto/Nízká/
+  = šířka, za spodní = výška, za roh = obojí** — karta se mění živě s „2 × 3“, ⇔ / ↕ klikem, × do katalogu,
+  „+ Přidat kartu“, vlastní záložky, Zpět / Ctrl+Z po každé změně, Obnovit výchozí s potvrzením, klávesy na ⠿:
+  šipky přesun, + / − šířka, PageUp / PageDown výška; Hotovo uloží jen `layout`), ⋯ na kartě (Velikost S/M/L/XL, Výška Auto/Nízká/
   Vysoká, u Projektů dlaždice / název / git / které projekty, skrýt kartu / sekci — ukládá hned), nebo
   Nastavení → Šuplík a karty → Záložky a karty (i výška a volby Projektů). **`drawer.sections` a `modes.personalEnabled` jsou od
   vlny 6 odvozené** z `layout` (při načtení, uložení i aplikaci; ruční změna se přepíše) — čtou je moduly

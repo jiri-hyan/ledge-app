@@ -1,9 +1,11 @@
 // Karta Běží: procesy spuštěné Ledge (`Snapshot.procs`) — fáze, uptime, log (posledních 60 řádků
-// přes `api.logs`, jen u rozbaleného), Otevřít / Stop / Zavřít.
+// přes `api.logs`, jen u rozbaleného), Otevřít / Stop / Zavřít. Strop řádků (vlna 9, `layout/ShowMore.tsx`):
+// nejvýš `limit` procesů — spadlé a startující první, ať chyba nikdy nezůstane pod „Zobrazit další“.
 import { createEffect, createSignal, For, Show, type JSX } from "solid-js";
 import { api, type ProcView, type Snapshot } from "../api";
 import { uptime } from "../format";
 import { t, tp } from "../i18n";
+import ShowMore, { useCap } from "../layout/ShowMore";
 
 /** fáze → barva pilulky a popisek (funkce, ať se popisek přeloží až při vykreslení) */
 const PHASE: Record<string, [string, () => string]> = {
@@ -15,7 +17,11 @@ const PHASE: Record<string, [string, () => string]> = {
   failed: ["r", () => t("cards.running.failed", "pád")],
 };
 
-export default function Running(p: { s: Snapshot; now: number; menu?: JSX.Element }) {
+/** Proces, který chce pozornost (pád, startuje) — strop ho neschová. */
+const urgent = (pc: ProcView) => pc.phase === "failed" || pc.phase === "starting" || pc.phase === "preparing";
+
+export default function Running(p: { s: Snapshot; now: number; menu?: JSX.Element; page?: string; limit?: number }) {
+  const cap = useCap(() => ({ page: p.page, card: "running", limit: p.limit }), () => p.s.procs, urgent);
   const [open, setOpen] = createSignal<string | null>(null);
   const [lines, setLines] = createSignal<string[]>([]);
   const name = (id: string) => p.s.projects.find((x) => x.id === id)?.name ?? id;
@@ -28,7 +34,7 @@ export default function Running(p: { s: Snapshot; now: number; menu?: JSX.Elemen
   return (
     <div class="card" data-anim>
       <h4><span class="ic" style="background:var(--green)" />{t("cards.running.title", "Běží")} <span class="n">{p.s.procs.filter((x) => x.phase !== "exited" && x.phase !== "failed").length}</span>{p.menu}</h4>
-      <For each={p.s.procs} fallback={<div class="empty">{t("cards.running.empty", "Nic neběží. Klikni na projekt nahoře.")}</div>}>
+      <For each={cap.shown()} fallback={<div class="empty">{t("cards.running.empty", "Nic neběží. Klikni na projekt nahoře.")}</div>}>
         {(pc: ProcView) => {
           const ph = (): [string, () => string] => PHASE[pc.phase] ?? ["n", () => pc.phase];
           return (
@@ -58,6 +64,7 @@ export default function Running(p: { s: Snapshot; now: number; menu?: JSX.Elemen
           );
         }}
       </For>
+      <Show when={cap.toggles()}><ShowMore open={cap.open()} hidden={cap.hidden().length} onToggle={cap.toggle} /></Show>
     </div>
   );
 }

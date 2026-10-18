@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   CARD_IDS, CARD_INFO, DEFAULT_TILES, MAX_PAGES, PARTS, PART_INFO, QUICK_HEIGHTS, UP_PERSONAL_PROJECTS, addCard, addPage, catalog, clone, defaultLayout,
-  gridDropIndex, keyMove, moveCard, movePage, moveToPage, nextHeight, nextSize, normalizeLayout, normalizeTiles, pageIdFor, pageKind, pageNameError, pageOf,
+  gridDropIndex, keyMove, pageMoveBlock, moveCard, movePage, moveToPage, nextHeight, nextSize, normalizeLayout, normalizeTiles, pageIdFor, pageKind, pageNameError, pageOf,
   removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, shownCards, tilesOf,
   visibleProjects, withLayout,
 } from "./model.ts";
@@ -71,8 +71,13 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
   const m = moveToPage(d, "prace", "repos", "osobni");
   assert.ok(!ids(m, "prace").includes("repos") && ids(m, "osobni").at(-1) === "repos");
   assert.equal(pageOf(m, "osobni").cards.at(-1).size, "m", "velikost jde s kartou");
+  // případ 7 (vlna 9): karta, která už na cílové záložce je, dřív ze zdrojové jen zmizela
   const dup = moveToPage(d, "prace", "notes", "osobni");
-  assert.equal(ids(dup, "osobni").filter((x) => x === "notes").length, 1, "už tam je → jen zmizí ze zdroje");
+  assert.equal(dup, d, "už tam je → nic se nezmění, karta nezmizí");
+  assert.equal(pageMoveBlock(d, "prace", "notes", "osobni"), "there");
+  assert.equal(pageMoveBlock(d, "prace", "repos", "osobni"), null);
+  assert.equal(pageMoveBlock(d, "prace", "repos", "prace"), "same");
+  assert.equal(pageMoveBlock(d, "prace", "repos", "nikde"), "missing");
   assert.equal(moveToPage(d, "prace", "notes", "nikde"), d);
   assert.equal(JSON.stringify(d), before, "vstup se nemění");
 });
@@ -158,7 +163,10 @@ test("tažení v mřížce: nejbližší střed; Alt+šipky", () => {
     [0, 160, 40, 1],
     [0, 60, 170, 2],
     [1, 280, 150, 3],
-    [2, -500, -500, 0],
+    // případ 4 (vlna 9): pustit daleko mimo karty = zůstane, kde byla (dřív nejbližší karta = přesun)
+    [2, -500, -500, 2],
+    [2, 150, 260, 2],
+    [0, 150, 230, 2],
   ];
   for (const [from, x, y, want] of cases) assert.equal(gridDropIndex(r, from, x, y), want, `${x},${y}`);
   assert.equal(gridDropIndex([], 3, 0, 0), 3);

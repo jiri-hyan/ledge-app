@@ -181,6 +181,12 @@ pub struct ProcView {
     pub last_line: Option<String>,
     /// počet řádků, které vypadají jako chyba
     pub errors: u32,
+    /// odkud to běží (složka) a co (příkaz po doplnění portu / exe) — dlaždice, pilulka, Běží
+    pub cwd: Option<String>,
+    pub cmd: Option<String>,
+    /// poslední řádky výstupu při selhání (`fail_tail`), jinak prázdné — snapshot zůstává malý
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tail: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -188,8 +194,18 @@ pub enum ProcEvent {
     Changed,
     /// dev server naběhl (konzument potřebuje jen URL; kdo naběhl, ukáže snapshot)
     Ready { url: String, open_browser: bool },
-    /// spadl / nenaběhl
-    Failed,
+    /// spadl / nenaběhl — `message` = lidská zpráva (toast, když šuplík není otevřený)
+    Failed { id: String, message: String },
+}
+
+/// Kolik posledních řádků logu ukáže selhání na dlaždici.
+pub const TAIL_LINES: usize = 4;
+
+/// Poslední `n` řádků výstupu bez řádků Ledge (`› příkaz`) — co ukázat u selhání.
+pub fn fail_tail<'a>(log: impl DoubleEndedIterator<Item = &'a String>, n: usize) -> Vec<String> {
+    let mut v: Vec<String> = log.rev().filter(|l| !l.starts_with('›') && !l.trim().is_empty()).take(n).cloned().collect();
+    v.reverse();
+    v
 }
 
 pub type Notify = Arc<dyn Fn(ProcEvent) + Send + Sync>;
@@ -343,6 +359,9 @@ impl ProcMan {
                     message: None,
                     last_line: None,
                     errors: 0,
+                    cwd: None,
+                    cmd: None,
+                    tail: Vec::new(),
                 },
                 log: VecDeque::new(),
                 job: None,
@@ -364,13 +383,14 @@ impl ProcMan {
     fn fail(&self, id: &str, generation: u64, msg: String) {
         let hit = self.update(id, generation, |e| {
             e.view.phase = Phase::Failed;
-            e.view.message = Some(msg);
+            e.view.message = Some(msg.clone());
+            e.view.tail = fail_tail(e.log.iter(), TAIL_LINES);
             if let Some(j) = e.job.take() {
                 j.kill();
             }
         });
         if hit.is_some() {
-            (self.notify)(ProcEvent::Failed);
+            (self.notify)(ProcEvent::Failed { id: id.to_string(), message: msg });
             (self.notify)(ProcEvent::Changed);
         }
     }
@@ -483,6 +503,8 @@ impl ProcMan {
         };
         let cmdline = with_port(&spec.run, port, spec.pass_port);
         self.update(&spec.id, generation, |e| {
+            e.view.cwd = Some(spec.cwd.to_string_lossy().into_owned());
+            e.view.cmd = Some(cmdline.clone());
             e.view.port = Some(port);
             e.view.message = note.clone();
             if let Some(n) = &note {
@@ -541,15 +563,17 @@ impl ProcMan {
                 }
                 // 2) běží — blokující čekání na konec, nula CPU
                 let code = child.wait().ok().and_then(|s| s.code());
+                let msg = trf!("Server skončil (kód {}).", "The server exited (code {}).", code.unwrap_or(-1));
                 let hit = me.update(&id, generation, |e| {
                     e.view.phase = Phase::Exited;
                     e.view.exit_code = code;
-                    e.view.message = Some(trf!("Server skončil (kód {}).", "The server exited (code {}).", code.unwrap_or(-1)));
+                    e.view.message = Some(msg.clone());
+                    e.view.tail = fail_tail(e.log.iter(), TAIL_LINES);
                     e.job = None;
                 });
                 if hit.is_some() {
                     if code != Some(0) {
-                        (me.notify)(ProcEvent::Failed);
+                        (me.notify)(ProcEvent::Failed { id: id.clone(), message: msg });
                     }
                     (me.notify)(ProcEvent::Changed);
                 }
@@ -568,6 +592,13 @@ impl ProcMan {
             Ok(None) => unreachable!(),
             Err(g) => g,
         };
+        self.update(&spec.id, generation, |e| {
+            e.view.cwd = spec.cwd.as_ref().map(|d| d.to_string_lossy().into_owned());
+            e.view.cmd = Some(match &spec.prepare {
+                Some(prep) => format!("{prep} → {}", spec.exe.display()),
+                None => spec.exe.to_string_lossy().into_owned(),
+            });
+        });
         (self.notify)(ProcEvent::Changed);
         let me = self.clone();
         let id = spec.id.clone();
@@ -753,6 +784,25 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
         assert_eq!(v.exit_code, Some(3));
         assert!(v.message.unwrap().contains("boom"));
         assert_eq!(v.errors, 1);
+        // stav selhání na dlaždici: poslední řádky výstupu bez řádku Ledge, odkud a co se spouštělo
+        assert_eq!(v.tail, ["Error: boom"]);
+        assert_eq!(v.cwd.as_deref(), Some(dir.path().to_string_lossy().as_ref()));
+        assert!(v.cmd.unwrap().starts_with("node -e"));
+    }
+
+    #[test]
+    fn fail_tail_table() {
+        let log = |xs: &[&str]| xs.iter().map(|s| s.to_string()).collect::<VecDeque<String>>();
+        let cases: [(&[&str], usize, &[&str]); 5] = [
+            (&[], 4, &[]),
+            (&["› npm run dev"], 4, &[]),
+            (&["› npm run dev", "a", "b"], 4, &["a", "b"]),
+            (&["a", "b", "c", "d", "e", "f"], 4, &["c", "d", "e", "f"]),
+            (&["a", "  ", "› x", "b"], 2, &["a", "b"]),
+        ];
+        for (input, n, want) in cases {
+            assert_eq!(fail_tail(log(input).iter(), n), want, "{input:?}");
+        }
     }
 
     #[test]
@@ -807,7 +857,7 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
     #[test]
     fn timeout_kills_and_reports() {
         let dir = tempfile::tempdir().unwrap();
-        let (pm, _) = quiet();
+        let (pm, events) = quiet();
         pm.launch_dev(DevSpec {
             id: "s".into(),
             cwd: dir.path().into(),
@@ -820,5 +870,11 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
         .unwrap();
         let v = wait_for(&pm, "s", Phase::Failed, 10);
         assert!(v.message.unwrap().contains("nenaběhl"));
+        // událost nese id a zprávu (toast), ne jen „něco selhalo“
+        let t0 = Instant::now();
+        while !events.lock().iter().any(|e| matches!(e, ProcEvent::Failed { id, message } if id == "s" && message.contains("nenaběhl"))) {
+            assert!(t0.elapsed() < Duration::from_secs(5), "událost Failed nepřišla");
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 }

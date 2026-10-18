@@ -1,4 +1,4 @@
-// Položky palety příkazů ze snapshotu: rychlé akce, projekty (spustit/zastavit/složka/terminál/
+// Položky palety příkazů ze snapshotu: rychlé akce, projekty (spustit/zastavit/restartovat/vybrat složku/složka/terminál/
 // GitHub/poznámka), poznámky (nová + seznam z `note_list`), Claude session, panely Nastavení
 // (`settings/registry.ts`) a příkazy appky. Jen sestavení — hledání je v `search.ts`.
 import { api, type NoteView, type Snapshot } from "../api";
@@ -15,6 +15,8 @@ import { canBgLaunch, openBgLaunch } from "../sessions/BgLaunch";
 import { timerItems } from "./timer";
 import { normalizeLayout, pageOf } from "../layout/model";
 import { pageName } from "../layout/text";
+import { placeOf } from "../projects/model";
+import { restartProject, startProject, stopAll } from "../projects/state";
 import { styleItems } from "./styles";
 import { isPinned, newPin, throughAll, throughLabel, togglePin } from "../notes/pins";
 
@@ -76,7 +78,10 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
   for (const pr of s.projects) {
     const live = s.procs.some((x) => x.id === pr.id && LIVE.includes(x.phase));
     const kw = `projekt ${pr.id}`;
-    if (live) add({ id: `stop:${pr.id}`, section: "project", order: 2, title: t("palette.project.stop", "Zastavit {name}", { name: pr.name }), keywords: kw, run: () => report(api.stop(pr.id) as Promise<unknown>) });
+    if (live) {
+      add({ id: `stop:${pr.id}`, section: "project", order: 2, title: t("palette.project.stop", "Zastavit {name}", { name: pr.name }), keywords: `${kw} stop vypnout server localhost`, run: () => report(api.stop(pr.id) as Promise<unknown>) });
+      add({ id: `restart:${pr.id}`, section: "project", order: 2, title: t("palette.project.restart", "Restartovat {name}", { name: pr.name }), keywords: `${kw} restart znovu server`, run: () => restartProject(pr.id, pr.name) });
+    } else if (placeOf(pr).kind === "choose") add({ id: `choose:${pr.id}`, section: "project", order: 2, title: t("palette.project.choose", "Vybrat složku pro {name}…", { name: pr.name }), keywords: `${kw} spustit slozka`, run: () => startProject(pr) });
     else if (pr.pathOk && (pr.run || pr.kind === "app")) add({ id: `launch:${pr.id}`, section: "project", order: 2, title: t("palette.project.launch", "Spustit {name}", { name: pr.name }), keywords: kw, run: () => report(api.launch(pr.id) as Promise<unknown>) });
     if (pr.pathOk) {
       add({ id: `folder:${pr.id}`, section: "project", order: 3, title: t("palette.project.folder", "Otevřít složku {name}", { name: pr.name }), sub: pr.path ?? "", keywords: kw, run: () => report(api.openIn(pr.id, "folder") as Promise<unknown>) });
@@ -88,6 +93,10 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
     }
     if (canBgLaunch(s, pr) && s.mode === "prace") add({ id: `bgclaude:${pr.id}`, section: "claude", order: 3, title: t("palette.project.bgClaude", "Claude na pozadí v {name}…", { name: pr.name }), keywords: `${kw} claude bg background agent pozadi`, run: () => openBgLaunch(pr.id) });
     if (s.notesEnabled) add({ id: `pnote:${pr.id}`, section: "note", order: 4, title: t("palette.project.note", "Poznámka k {name}", { name: pr.name }), keywords: kw, run: () => nav.onNote({ project: pr.id }) });
+  }
+
+  if (s.procs.some((x) => LIVE.includes(x.phase))) {
+    add({ id: "stop:all", section: "project", order: 2, title: t("palette.project.stopAll", "Zastavit všechny servery"), keywords: "stop vypnout servery localhost vse", run: () => stopAll() });
   }
 
   if (s.notesEnabled) {

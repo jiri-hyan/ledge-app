@@ -134,7 +134,17 @@ pub(crate) fn on_proc_event(e: ProcEvent) {
             }
             mark_dirty();
         }
-        ProcEvent::Failed => mark_dirty(),
+        ProcEvent::Failed { id, message } => {
+            // selhání nikdy potichu: červený stav na dlaždici vždy (snapshot), toast jen když šuplík
+            // není otevřený naplno a Ledge není „mrtvý“ (fullscreen hra) — `attention::signal`
+            if attention::signal(Rgba::RED, true) {
+                let c = core();
+                let name = c.cfg.read().projects.iter().find(|p| p.id == id).map_or(id.clone(), |p| p.name.clone());
+                // zpráva sama říká co (nenaběhl / skončil s kódem / nenaběhl do N s)
+                crate::toast::show(&c.app.config().identifier, name, message);
+            }
+            mark_dirty();
+        }
     }
 }
 
@@ -180,13 +190,7 @@ pub(crate) fn refresh_git_async() {
             if fresh {
                 continue;
             }
-            let base = p
-                .path
-                .as_ref()
-                .map(PathBuf::from)
-                .filter(|d| d.is_dir())
-                .or_else(|| p.remote.as_deref().and_then(|r| c.index.lock().resolve(r)));
-            let info = base.and_then(|d| gitinfo::status(&d));
+            let info = c.project_place(p).1.and_then(|d| gitinfo::status(&d));
             c.git.lock().insert(p.id.clone(), (Instant::now(), info));
             changed = true;
         }

@@ -1,20 +1,23 @@
 // Karta Repa: projekty s neuloženou / nepushnutou prací nebo pozadu za remote (z `ProjectView.git`);
 // Pull jen u čistého repa, které je pozadu. Varianta zobrazení (vzhled karty): seznam / dlaždice / kompaktní.
+// Strop řádků (vlna 9, `layout/ShowMore.tsx`): nejvýš `limit` rep, zbytek pod „Zobrazit další“.
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { api, type ProjectView, type Snapshot } from "../api";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
 import type { CardView } from "../layout/look";
+import ShowMore, { useCap } from "../layout/ShowMore";
 import "./repos.css";
 
 /** Repa s neuloženou / nepushnutou prací a ta, co zaostávají za remote. */
-export default function Repos(p: { s: Snapshot; view?: CardView; menu?: JSX.Element; onSettings?: () => void }) {
+export default function Repos(p: { s: Snapshot; view?: CardView; menu?: JSX.Element; onSettings?: () => void; page?: string; limit?: number }) {
   const [busy, setBusy] = createSignal<string | null>(null);
   const list = () =>
     p.s.projects
       .filter((x) => x.git && (x.git.dirty > 0 || x.git.ahead > 0 || x.git.behind > 0))
       .sort((a, b) => b.git!.dirty + b.git!.ahead * 2 - (a.git!.dirty + a.git!.ahead * 2));
+  const cap = useCap(() => ({ page: p.page, card: "repos", limit: p.limit }), list);
   async function pull(pr: ProjectView) {
     setBusy(pr.id);
     try {
@@ -38,7 +41,7 @@ export default function Repos(p: { s: Snapshot; view?: CardView; menu?: JSX.Elem
         </div>
       </Show>
       <div class="repo-list" data-view={p.view ?? "list"}>
-      <For each={list()}>
+      <For each={cap.shown()}>
         {(pr) => (
           <div class="row">
             <div class="grow">
@@ -60,6 +63,7 @@ export default function Repos(p: { s: Snapshot; view?: CardView; menu?: JSX.Elem
         )}
       </For>
       </div>
+      <Show when={cap.toggles()}><ShowMore open={cap.open()} hidden={cap.hidden().length} onToggle={cap.toggle} /></Show>
     </div>
   );
 }

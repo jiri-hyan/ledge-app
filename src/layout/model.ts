@@ -31,11 +31,18 @@ export type TileSize = (typeof TILE_SIZES)[number];
 /** Volby karty Projekty na jedné záložce: velikost dlaždic, popisek, git, skryté projekty (prázdné = všechny),
  *  složky zástupců (chybí = žádné). */
 export type TileOpts = { size: TileSize; label: boolean; git: boolean; hidden: string[]; folders?: TileFolder[] };
-export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts; look?: CardLook };
+/** `limit` = kolik řádků karta ukáže, než nabídne „Zobrazit další“ (0 = bez stropu, chybí = `DEFAULT_LIMIT`). */
+export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts; look?: CardLook; limit?: number };
 export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[] };
 /** `upgrades` = jednorázové úpravy, které už proběhly (Rust `apply_upgrades`) — musí přežít každé uložení. */
 export type Layout = { pages: LayoutPage[]; hiddenParts: string[]; upgrades?: string[] };
 export const UP_PERSONAL_PROJECTS = "personalProjects";
+/** Strop řádků karty (`limit`): nejvýš (zrcadlo `layout::MAX_LIMIT`), výchozí, karty, které ho mají. */
+export const MAX_LIMIT = 50;
+export const DEFAULT_LIMIT = 4;
+export const LIMIT_CARDS: readonly CardId[] = ["claude", "repos", "running"];
+/** Rychlé volby stropu v ⋯ (0 = Vše). */
+export const QUICK_LIMITS: readonly number[] = [3, 4, 6, 0];
 export const DEFAULT_TILES: Readonly<TileOpts> = { size: "tile", label: true, git: true, hidden: [] };
 
 export const WORK = "prace";
@@ -94,6 +101,7 @@ export const PAGE_ICONS = ["", "💼", "🏠", "🎮", "🎵", "📚", "🛠️"
 const isCard = (x: unknown): x is CardId => isBuiltin(x) || isDynamic(x);
 const isSize = (x: unknown): x is CardSize => typeof x === "string" && (SIZES as readonly string[]).includes(x);
 const isHeight = (x: unknown): x is CardHeight => (HEIGHTS as readonly unknown[]).includes(x);
+const isLimit = (x: unknown): x is number => Number.isInteger(x) && (x as number) >= 0 && (x as number) <= MAX_LIMIT;
 const isTileSize = (x: unknown): x is TileSize => typeof x === "string" && (TILE_SIZES as readonly string[]).includes(x);
 /** Výchozí velikost karty (dynamická = střední). */
 export const defaultSize = (id: CardId): CardSize => (isBuiltin(id) ? CARD_INFO[id].size : "m");
@@ -146,6 +154,7 @@ export function normalizeLayout(raw: unknown): Layout {
       if (!isCard(id) || cards.some((k) => k.id === id)) continue;
       const out: LayoutCard = { id, size: isSize((c as any).size) ? (c as any).size : defaultSize(id) };
       if (isHeight((c as any).h)) out.h = (c as any).h;
+      if (isLimit((c as any).limit)) out.limit = (c as any).limit;
       if ((c as any).tiles && typeof (c as any).tiles === "object") out.tiles = normalizeTiles((c as any).tiles);
       const look = normalizeCardLook((c as any).look, id);
       if (look) out.look = look;
@@ -220,6 +229,20 @@ export const setHeight = (l: Layout, pageId: string, id: CardId, h: CardHeight |
   }));
 /** Další výška v kruhu podle obsahu → 1 → 2 → 3 → 4 → podle obsahu (tlačítko ↕ v úpravách). */
 export const nextHeight = (h: CardHeight | undefined): CardHeight | undefined => (h === undefined ? 1 : h >= 4 ? undefined : ((h + 1) as CardHeight));
+/** Strop řádků karty (chybí = výchozí 4; 0 = bez stropu). */
+export const limitOf = (c: LayoutCard | undefined): number => (c?.limit ?? DEFAULT_LIMIT);
+/** Nastavit strop řádků (`undefined` nebo výchozí = pole pryč). */
+export const setLimit = (l: Layout, pageId: string, id: CardId, n: number | undefined): Layout =>
+  mapPage(l, pageId, (p) => ({
+    ...p,
+    cards: p.cards.map((c) => {
+      if (c.id !== id) return c;
+      const out = { ...c };
+      if (n === undefined || n === DEFAULT_LIMIT || !isLimit(n)) delete out.limit;
+      else out.limit = n;
+      return out;
+    }),
+  }));
 /** Rychlé volby výšky v ⋯ menu: Auto / Nízká / Vysoká. */
 export const QUICK_HEIGHTS: readonly { h: CardHeight | undefined; name: Text }[] = [
   { h: undefined, name: ["cards.layout.height.auto", "Auto"] },
@@ -279,13 +302,22 @@ export function addCard(l: Layout, pageId: string, id: CardId, size?: CardSize):
   return { ...mapPage(l, pageId, (p) => ({ ...p, cards: [...p.cards, card(id, size)] })), hiddenParts };
 }
 
+/** Proč kartu nejde přetáhnout na záložku `toPage`: `same` = je to tatáž, `missing` = záložka není,
+ *  `there` = karta už tam je (na jedné záložce smí být jen jednou); null = jde. */
+export function pageMoveBlock(l: Layout, fromPage: string, id: CardId, toPage: string): "same" | "missing" | "there" | null {
+  if (fromPage === toPage) return "same";
+  const to = l.pages.find((p) => p.id === toPage);
+  if (!to) return "missing";
+  return pageHas(to, id) ? "there" : null;
+}
+
 /** Přesun karty na jinou záložku (tažením na záložku): pryč ze zdrojové, na konec cílové se stejnou
- *  velikostí. Když už tam je, jen zmizí ze zdrojové. */
+ *  velikostí. Když už tam je, NIC se nezmění (vlna 9: dřív jen zmizela ze zdrojové — „karta zmizela“). */
 export function moveToPage(l: Layout, fromPage: string, id: CardId, toPage: string): Layout {
-  if (fromPage === toPage || !l.pages.some((p) => p.id === toPage)) return l;
+  if (pageMoveBlock(l, fromPage, id, toPage)) return l;
   const { layout, undo } = removeCard(l, fromPage, id);
   if (!undo) return l;
-  return mapPage(layout, toPage, (p) => (pageHas(p, id) ? p : { ...p, cards: [...p.cards, undo.card] }));
+  return mapPage(layout, toPage, (p) => ({ ...p, cards: [...p.cards, undo.card] }));
 }
 
 /** Skrýt / ukázat část karty (`layout.hiddenParts`). */
@@ -399,9 +431,18 @@ export const withLayout = <T extends Record<string, any>>(cfg: T, l: Layout): T 
 // ---------- tažení v mřížce ----------
 
 export type Rect = { x: number; y: number; w: number; h: number };
+/** Jak daleko za kartami ještě platí cíl tažení (px); dál = karta zůstane, kde byla. */
+export const DROP_MARGIN = 48;
 /** Cílový index při tažení karty `from` na bod (px, py): karta, jejíž střed je nejblíž (mřížka se
- *  zalamuje, takže rozhoduje vzdálenost, ne jen osa). Bez karet = `from`. */
+ *  zalamuje, takže rozhoduje vzdálenost, ne jen osa). Bez karet nebo daleko mimo karty
+ *  (víc než `DROP_MARGIN` za jejich obrysem) = `from` (vlna 9: dřív i tah mimo šuplík kartu přesunul). */
 export function gridDropIndex(rects: readonly Rect[], from: number, px: number, py: number): number {
+  if (!rects.length) return from;
+  const left = Math.min(...rects.map((r) => r.x)) - DROP_MARGIN;
+  const top = Math.min(...rects.map((r) => r.y)) - DROP_MARGIN;
+  const right = Math.max(...rects.map((r) => r.x + r.w)) + DROP_MARGIN;
+  const bottom = Math.max(...rects.map((r) => r.y + r.h)) + DROP_MARGIN;
+  if (px < left || px > right || py < top || py > bottom) return from;
   let best = from;
   let bestD = Infinity;
   rects.forEach((r, i) => {

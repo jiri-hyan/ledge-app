@@ -34,7 +34,6 @@ registerDict("en", {
   "cards.projects.opening": "Opening {name}…",
   "cards.projects.cloningToast": "Cloning {name}… (a big repo can take a few minutes)",
   "cards.projects.done": "Done",
-  "cards.projects.folderMissing": "Folder not found",
   "cards.projects.launch": "Launch {name}",
   "cards.projects.cloning": "cloning…",
   "cards.projects.notFound": "not found",

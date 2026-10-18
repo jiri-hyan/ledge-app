@@ -1,6 +1,7 @@
 // Kompaktní náhled po najetí (`drawer.hover: "compact"`, Rust `View::Compact`): nahoře čekající schválení
 // nebo otázka (stejné UI jako peek — `cards/Peek.tsx` `Approval`), session Clauda (nejvýš 3: název, stav, čas),
-// Právě hraje (obal, název, ⏮⏯⏭ z `media/Player.tsx`), dole čas, limit 5h a „▾ celý šuplík“. Jen data ze
+// Právě hraje (obal, název, ⏮⏯⏭ z `media/Player.tsx`), servery z Ledge se ■ Stop (proužek sám kliknout
+// nejde — je průchozí; po najetí na něj se zastaví tady), dole čas, limit 5h a „▾ celý šuplík“. Jen data ze
 // snapshotu (nic se nestahuje). Klik mimo tlačítka nebo setrvání (`useExpand`) = celý šuplík.
 import { For, Show } from "solid-js";
 import { api, type SessionView, type Snapshot } from "../api";
@@ -11,6 +12,8 @@ import { pctText, level, winState } from "../limits/model";
 import { t } from "../i18n";
 import { compactPlan } from "./model";
 import { useExpand } from "./expand";
+import { isLive } from "../projects/model";
+import { stopProject } from "../projects/state";
 import "../media/media.css";
 import "./hover.css";
 
@@ -82,7 +85,24 @@ export default function Compact(p: { s: Snapshot; now: number; expandMs: number 
           </div>
         )}
       </Show>
-      <Show when={!plan().approval && !plan().sessions.length && !plan().media}>
+      <For each={plan().servers}>
+        {(pc) => {
+          const name = () => p.s.projects.find((x) => x.id === pc.id)?.name ?? pc.id;
+          return (
+            <div class="hov-row" data-anim>
+              <span class="hov-dot" classList={{ "hov-dot-ok": pc.phase === "ready" || pc.phase === "running", "hov-dot-wait": pc.phase === "starting" || pc.phase === "preparing", "hov-dot-bad": pc.phase === "failed" }} />
+              <span class="grow">{name()}</span>
+              <Show when={pc.phase === "failed"} fallback={<span class="meta">{pc.port ? `:${pc.port}` : uptime(pc.readyAt ?? pc.startedAt, p.now)}</span>}>
+                <span class="pill r">{t("cards.running.failed", "pád")}</span>
+              </Show>
+              <Show when={isLive(pc.phase)}>
+                <button class="hov-stop" title={t("cards.proj.stopOf", "Zastavit {name}", { name: name() })} aria-label={t("cards.proj.stopOf", "Zastavit {name}", { name: name() })} onClick={() => void stopProject(pc.id, name())}>■</button>
+              </Show>
+            </div>
+          );
+        }}
+      </For>
+      <Show when={!plan().approval && !plan().sessions.length && !plan().media && !plan().servers.length}>
         <div class="hov-empty" data-anim>{t("cards.hover.calm", "Nic se neděje.")}</div>
       </Show>
       <div class="hov-foot" data-anim>

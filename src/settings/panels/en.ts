@@ -434,4 +434,9 @@ registerDict("en", {
   "settings.looks.allHint": "Cards follow the design style again, tiles get the automatic icon. Folders stay.",
   "settings.looks.resetAll": "Reset all",
   "settings.looks.resetDone": "Look of cards and tiles reset",
+  "settings.layout.limit": "How many rows to show",
+  "settings.layout.limitTitle": "Extra rows go under “Show more”. Sessions waiting for you are never hidden.",
+  "settings.layout.limitN.one": "At most {n} row",
+  "settings.layout.limitN.other": "At most {n} rows",
+  "settings.layout.limitAll": "All rows",
 });

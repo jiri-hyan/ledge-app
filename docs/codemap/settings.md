@@ -40,7 +40,7 @@ staré názvy jsou v `kw` (hledání je najde).
 | `src-tauri/src/configerr.rs` | chyba s cestou k poli | `FieldError` `fe` `field_from_message` |
 | `src-tauri/src/configio.rs` | export, náhled importu po sekcích (rizikové), nic nezapisuje; pojistka zápisu | `section_diff` `preview` `read_import` `export` `RISKY` `keep_unreadable` |
 | `src-tauri/src/projectdetect.rs` | návrh projektu ze složky, naklonovaná repa v roots | `detect` `guess_port` `make_id` `candidates` |
-| `src-tauri/src/drawerfit.rs` | strop výšky (pracovní plocha − 20 px) a šířka Full | `limits` `fit_full` `BOTTOM_GAP` `WIDE_FRACTION` |
+| `src-tauri/src/drawerfit.rs` | strop výšky (80 % pracovní plochy, nejvýš do − 20 px; vlna 9) a šířka Full | `limits` `fit_full` `HEIGHT_FRACTION` `BOTTOM_GAP` `WIDE_FRACTION` |
 
 ## Toky
 

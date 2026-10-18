@@ -41,8 +41,9 @@
 /* klidné zvýraznění bez pohybu (dřív rozvlnění — šéfovi se karty „kynklaly“, 18. 10.) */
 .deck.editing .deck-item { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line-2)); outline-offset: 2px; border-radius: var(--r-xl); }
 .deck.editing .deck-item:hover { outline-style: solid; outline-color: var(--accent); }
-.deck-item.lifted { opacity: 0.4; }
-.deck-item.drop-at { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: var(--r-xl); }
+/* tažená karta = zástupce na místě dopadu (živý náhled pořadí, CSS `order`) */
+.deck.editing .deck-item.lifted { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.deck-item.lifted > :not(.lay-tools, .lay-rs, .lay-target) { opacity: 0.35; }
 .lay-tools { position: absolute; top: var(--s1); right: var(--s1); z-index: 5; display: flex; gap: var(--s1); }
 .lay-tools button { font-size: var(--fs-sm); font-weight: 600; color: var(--t1); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 2px 7px; box-shadow: var(--shadow-toast); transition: background var(--fast), color var(--fast); }
 .lay-tools button:hover { background: var(--card-2); }
@@ -61,14 +62,17 @@
 .lay-rs-s::after { left: 30%; right: 30%; top: 3px; height: 4px; }
 .lay-rs-e:hover::after, .lay-rs-s:hover::after, .deck.resizing .lay-rs::after { background: var(--accent); }
 .lay-rs-se { right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; display: grid; place-items: center; font-size: var(--fs-xs); line-height: 1; color: var(--accent); }
-.lay-target { position: absolute; left: 0; top: 0; z-index: 6; pointer-events: none; border: 2px dashed var(--accent); border-radius: var(--r-xl); background: color-mix(in srgb, var(--accent) 10%, transparent); display: grid; place-items: center; }
+.lay-target { position: absolute; inset: 0; z-index: 6; pointer-events: none; border: 2px dashed var(--accent); border-radius: var(--r-xl); background: color-mix(in srgb, var(--accent) 10%, transparent); display: grid; place-items: center; }
 .lay-dim { font: 700 var(--fs-md) var(--mono); color: var(--t0); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 2px 8px; box-shadow: var(--shadow-toast); }
 .lay-add { grid-column: span 1; min-height: calc(var(--s5) * 3); font-size: var(--fs-ui); font-weight: 600; color: var(--t2); background: transparent; border: 1px dashed var(--line-2); border-radius: var(--r-xl); transition: background var(--fast), color var(--fast); }
 .lay-add:hover { color: var(--t1); background: var(--card); }
+.lay-float.blocked { color: var(--t2); border-style: dashed; }
 .lay-float { position: fixed; z-index: 60; pointer-events: none; transform: translate(14px, 14px); font-size: var(--fs-sm); font-weight: 600; color: var(--t1); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 4px 10px; box-shadow: var(--shadow-toast); white-space: nowrap; }
 .lay-bar { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); padding: var(--s2) var(--s3); background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-lg); }
 .lay-bar-text { flex: 1; min-width: 0; font-size: var(--fs-ui); color: var(--t2); }
 .lay-bar-text b { color: var(--accent); font-weight: 700; }
+/* Obnovit výchozí: potvrzení v liště (dva kroky, žádný modal) */
+.lay-ask { display: inline-flex; align-items: center; gap: var(--s2); font-size: var(--fs-ui); color: var(--t1); }
 .lay-catalog { margin-top: var(--s3); }
 .lay-cat-row { width: 100%; text-align: left; border-radius: var(--r-sm); }
 .lay-cat-row:hover { background: var(--card-2); }
@@ -114,3 +118,13 @@ input.lay-st-name { width: 180px; }
   text-transform: uppercase;
   color: var(--t2);
 }
+
+/* ---------- strop řádků karty (ShowMore.tsx) ---------- */
+.cap-more { display: block; width: 100%; margin-top: var(--s1); padding: 6px var(--s2); text-align: left; font-size: var(--fs-sm); font-weight: 600; color: var(--t2); background: none; border: 0; border-top: 1px solid var(--line); cursor: pointer; transition: color var(--fast); }
+.cap-more:hover { color: var(--t0); }
+.cap-sum { font-weight: 400; color: var(--t3); }
+
+/* jedna karta bez pevné výšky nikdy nezabere celý šuplík (vlna 9): nejvýš 70 % stropu šuplíku
+   (`--drawer-max-h`, fit.ts), obsah pak scrolluje uvnitř karty */
+.deck-item:not([data-h]) { max-height: calc(var(--drawer-max-h, 100vh) * 0.7); }
+.deck-item:not([data-h]) > :not(.lay-tools, .lay-rs, .lay-target) { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

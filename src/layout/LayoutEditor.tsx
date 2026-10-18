@@ -4,14 +4,16 @@
 // název, git, které projekty na téhle záložce) a skryté části karet. Mění jen draft Nastavení (`c.set("layout")`),
 // zapíše společná lišta Uložit. Velké tlačítko „Upravit přímo v šuplíku“ = režim úprav (`askEdit`).
 // Pod tím přehled „Upravené karty a zástupci“ (vzhled karet a dlaždic, vlna 8 P — `LooksOverview.tsx`).
+// Vlna 9: u karet Claude, Repa a Běží strop řádků („Nejvýš 4 řádky“ / „Všechny řádky“, `limit`); přesun
+// nabízí jen záložky, kde karta ještě není.
 import { createMemo, For, onMount, Show } from "solid-js";
-import { t } from "../i18n";
+import { t, tp } from "../i18n";
 import { base, offerUndo, useSettings } from "../settings/ctx";
 import { Section } from "../settings/fields/Row";
 import { SortList } from "../settings/fields/SortList";
 import { askEdit } from "./edit";
 import {
-  addCard, addPage, catalog, CARD_INFO, HEIGHTS, isDynamic, MAX_PAGES, moveCard, movePage, moveToPage, normalizeLayout, PAGE_ICONS, PART_KEYS, PARTS, partHidden,
+  addCard, addPage, catalog, CARD_INFO, HEIGHTS, LIMIT_CARDS, limitOf, pageHas, setLimit, isDynamic, MAX_PAGES, moveCard, movePage, moveToPage, normalizeLayout, PAGE_ICONS, PART_KEYS, PARTS, partHidden,
   removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, SIZES, tilesOf, TILE_SIZES,
   type CardHeight, type CardId, type CardSize, type Layout, type LayoutCard, type PartKey, type TileSize,
 } from "./model";
@@ -19,12 +21,11 @@ import { heightLabel } from "./Deck";
 import { tileSizeName } from "../cards/TileOptions";
 import { catalogWidgets } from "../widgets/model";
 import { loadWidgets, widgetsListing } from "../widgets/registry";
-import { cardDesc, cardName, pageName, partName } from "./text";
+import { cardDesc, cardName, pageName, partName, sizeName } from "./text";
 import LooksOverview from "./LooksOverview";
 import "./layout.css";
 
-const sizeName = (s: CardSize) =>
-  ({ s: t("cards.layout.size.s", "Malá"), m: t("cards.layout.size.m", "Střední"), l: t("cards.layout.size.l", "Velká"), xl: t("cards.layout.size.xl", "Přes celou šířku") })[s];
+const LIMIT_OPTS = [2, 3, 4, 5, 6, 8, 10, 15, 20, 0];
 
 export default function LayoutEditor() {
   const c = useSettings();
@@ -142,6 +143,18 @@ export default function LayoutEditor() {
                       <option value="">{t("cards.layout.heightAutoOpt", "Výška podle obsahu")}</option>
                       <For each={HEIGHTS}>{(n) => <option value={String(n)}>{heightLabel(n)}</option>}</For>
                     </select>
+                    <Show when={LIMIT_CARDS.includes(cd.id)}>
+                      <select
+                        aria-label={t("settings.layout.limit", "Kolik řádků ukázat")}
+                        title={t("settings.layout.limitTitle", "Víc řádků schová karta pod „Zobrazit další“. Session, které čekají na tebe, se neschovají nikdy.")}
+                        value={String(limitOf(cd))}
+                        onChange={(e) => put(setLimit(L(), pg.id, cd.id, Number(e.currentTarget.value)))}
+                      >
+                        <For each={LIMIT_OPTS}>
+                          {(n) => <option value={String(n)}>{n ? tp("settings.layout.limitN", n, ["Nejvýš {n} řádek", "Nejvýš {n} řádky", "Nejvýš {n} řádků"]) : t("settings.layout.limitAll", "Všechny řádky")}</option>}
+                        </For>
+                      </select>
+                    </Show>
                     <Show when={L().pages.length > 1}>
                       <select
                         aria-label={t("settings.layout.moveTo", "Přesunout na záložku")}
@@ -153,7 +166,7 @@ export default function LayoutEditor() {
                         }}
                       >
                         <option value="">{t("settings.layout.moveTo", "Přesunout na záložku")}</option>
-                        <For each={L().pages.filter((x) => x.id !== pg.id)}>{(x) => <option value={x.id}>{pageName(x)}</option>}</For>
+                        <For each={L().pages.filter((x) => x.id !== pg.id && !pageHas(x, cd.id))}>{(x) => <option value={x.id}>{pageName(x)}</option>}</For>
                       </select>
                     </Show>
                     <button class="mini" onClick={() => removeOne(pg.id, cd.id)}>{t("settings.layout.removeCard", "Odebrat")}</button>

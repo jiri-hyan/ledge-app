@@ -15,7 +15,7 @@ use crate::threads::notes_watch::{NotesMsg, NotesState};
 use crate::{icons, notesync, personal, screen, update, weather};
 use parking_lot::{Condvar, Mutex, RwLock};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, OnceLock};
@@ -180,13 +180,20 @@ impl Core {
         let _ = self.ui.lock().send(cmd);
     }
 
+    /// Odkud projekt poběží (`resolve::place_of`): `path` vyhrává i neexistující (chyba, ne tichý pád jinam),
+    /// bez `path` jediný klon podle `remote`, víc klonů = výběr člověkem. Bez `subdir`.
+    pub(crate) fn project_place(&self, p: &config::Project) -> (crate::resolve::Place, Option<PathBuf>) {
+        let is_dir = p.path.as_deref().is_some_and(|d| Path::new(d).is_dir());
+        let idx = self.index.lock();
+        let cands = match (&p.path, p.remote.as_deref()) {
+            (None, Some(r)) => idx.candidates(r),
+            _ => &[],
+        };
+        crate::resolve::place_of(p.path.as_deref(), is_dir, cands)
+    }
+
     pub(crate) fn project_dir(&self, p: &config::Project) -> Option<PathBuf> {
-        let base = p
-            .path
-            .as_ref()
-            .map(PathBuf::from)
-            .filter(|d| d.is_dir())
-            .or_else(|| p.remote.as_deref().and_then(|r| self.index.lock().resolve(r)))?;
+        let base = self.project_place(p).1?;
         Some(match &p.subdir {
             Some(s) => base.join(s),
             None => base,

@@ -1,7 +1,9 @@
 //! Dohledání složky projektu podle git remote a nainstalované aplikace podle jména.
 //!
 //! Port dřívějšího resolveru repozitářů (`repoResolver.ts`) vč. jeho okrajových případů (fetch řádek nesmí
-//! prosáknout do URL, worktree s `.git` souborem se přeskočí, dva klony = nejednoznačné → None).
+//! prosáknout do URL, dva klony = nejednoznačné → None). Linked worktree (`.git` soubor) se počítá jako
+//! další klon téhož repa (`origin_any`) — dřív se přeskočil a projekt potichu běžel ze staré složky.
+//! Víc klonů = výběr člověkem (`Place::Choose`, `candidates_dated` + `sort_candidates`), volba do `path`.
 
 use regex::Regex;
 use std::collections::HashMap;
@@ -39,6 +41,18 @@ pub fn owner_repo_raw(remote: &str) -> Option<(String, String)> {
     let s = s.strip_suffix(".git").or_else(|| s.strip_suffix(".GIT")).unwrap_or(s);
     let c = OWNER_REPO_RE.captures(s)?;
     Some((c[1].to_string(), c[2].to_string()))
+}
+
+/// `origin` hlavního checkoutu i linked worktree (`.git` je soubor → config hlavního repa). Index rep
+/// (`RepoIndex::build`) bere obojí: aktivní složka bývá právě worktree (`app-v2` vedle staré
+/// `app`) a tichý výběr jen hlavních checkoutů pustil server ze staré složky. Submodul ne.
+pub fn origin_any(dir: &Path) -> Option<String> {
+    let g = dir.join(".git");
+    if g.is_dir() {
+        return read_origin(dir);
+    }
+    let main = main_from_gitfile(&std::fs::read_to_string(&g).ok()?)?;
+    read_origin(&main)
 }
 
 pub fn read_origin(repo_dir: &Path) -> Option<String> {
@@ -95,7 +109,7 @@ impl RepoIndex {
                 if !p.is_dir() || !seen.insert(p.to_string_lossy().to_lowercase()) {
                     continue;
                 }
-                let Some(remote) = read_origin(&p) else { continue };
+                let Some(remote) = origin_any(&p) else { continue };
                 let Some(or) = parse_remote(&remote) else { continue };
                 idx.by_repo.entry(or.repo.clone()).or_default().push(p.clone());
                 idx.by_full.entry(or).or_default().push(p);
@@ -110,19 +124,86 @@ impl RepoIndex {
         self.by_full.get(&or).or_else(|| self.by_repo.get(&or.repo)).map_or(0, Vec::len)
     }
 
+    /// Jediná složka repa, nebo nic (testy; jádro jde přes `place_of`, které rozliší i „víc klonů“).
+    #[cfg(test)]
     pub fn resolve(&self, remote: &str) -> Option<PathBuf> {
-        let or = parse_remote(remote)?;
-        if let Some(v) = self.by_full.get(&or) {
-            if v.len() == 1 {
-                return Some(v[0].clone());
-            }
-            return None; // dva klony téhož repa → nehádat
-        }
-        match self.by_repo.get(&or.repo) {
-            Some(v) if v.len() == 1 => Some(v[0].clone()),
-            _ => None,
+        match self.candidates(remote) {
+            [one] => Some(one.clone()),
+            _ => None, // žádný, nebo dva klony téhož repa → nehádat (vybere člověk, `sort_candidates`)
         }
     }
+
+    /// Všechny složky s tímhle repem (přesná shoda vlastník/repo, jinak podle jména repa) v pořadí
+    /// objevení; pro výběr je seřadí `sort_candidates` podle data posledního commitu.
+    pub fn candidates(&self, remote: &str) -> &[PathBuf] {
+        let Some(or) = parse_remote(remote) else { return &[] };
+        self.by_full.get(&or).or_else(|| self.by_repo.get(&or.repo)).map_or(&[], Vec::as_slice)
+    }
+}
+
+/// Složka, kterou by projekt mohl použít (výběr „Našel jsem 2 složky s tímto repem…“).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Candidate {
+    pub path: String,
+    /// unix s posledního commitu na HEAD (`git log -1 --format=%ct`); `None` = nejde zjistit
+    pub last_commit: Option<i64>,
+    /// linked worktree (`.git` je soubor)
+    pub worktree: bool,
+}
+
+/// Pořadí výběru: nejčerstvější commit první, bez data na konec, shoda → cesta (bez ohledu na velikost
+/// písmen). Vždy stejné pro stejný vstup — nic náhodného ani podle pořadí `read_dir`.
+pub fn sort_candidates(v: &mut [Candidate]) {
+    v.sort_by(|a, b| {
+        b.last_commit.is_some().cmp(&a.last_commit.is_some())
+            .then(b.last_commit.cmp(&a.last_commit))
+            .then_with(|| a.path.to_lowercase().cmp(&b.path.to_lowercase()))
+            .then_with(|| a.path.cmp(&b.path))
+    });
+}
+
+/// Datum posledního commitu (unix s) — git bez okna s termínem; jen na výslovné otevření výběru.
+pub fn last_commit(dir: &Path) -> Option<i64> {
+    let out = crate::gitinfo::run(dir, &["log", "-1", "--format=%ct"], std::time::Instant::now() + std::time::Duration::from_secs(4))?;
+    out.trim().parse().ok()
+}
+
+/// Odkud projekt poběží — stav pro dlaždici (`ProjectView.place`) i start (`launch`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum Place {
+    /// složka je jasná (`path`, nebo jediný klon podle `remote`)
+    Ok,
+    /// `path` je v configu, ale složka neexistuje — chyba hned, žádné tiché hledání jinde
+    Missing { path: String },
+    /// bez `path` a podle `remote` je klonů víc — vybere člověk, volba se uloží do `path`
+    Choose { count: usize },
+    /// nic: bez `path` a klon na disku není
+    None,
+}
+
+/// Čistá volba místa: `path` z configu vyhrává (i neexistující = `Missing`), jinak jediný kandidát.
+pub fn place_of(path: Option<&str>, path_is_dir: bool, cands: &[PathBuf]) -> (Place, Option<PathBuf>) {
+    match path.map(str::trim).filter(|p| !p.is_empty()) {
+        Some(p) if path_is_dir => (Place::Ok, Some(PathBuf::from(p))),
+        Some(p) => (Place::Missing { path: p.to_string() }, None),
+        None => match cands {
+            [] => (Place::None, None),
+            [one] => (Place::Ok, Some(one.clone())),
+            many => (Place::Choose { count: many.len() }, None),
+        },
+    }
+}
+
+/// Kandidáti s daty, seřazení (`sort_candidates`).
+pub fn candidates_dated(paths: &[PathBuf]) -> Vec<Candidate> {
+    let mut v: Vec<Candidate> = paths
+        .iter()
+        .map(|p| Candidate { path: p.to_string_lossy().into_owned(), last_commit: last_commit(p), worktree: p.join(".git").is_file() })
+        .collect();
+    sort_candidates(&mut v);
+    v
 }
 
 /// Najde .exe nainstalované aplikace podle jména v registru odinstalace (HKCU i HKLM).
@@ -258,6 +339,83 @@ mod tests {
         assert!(idx.resolve("x/dup").is_none());
         assert!(idx.resolve("nobody/nothing").is_none());
         assert_eq!((idx.clones("x/dup"), idx.clones("nobody/nothing"), idx.clones("acme/app")), (2, 0, 1));
+    }
+
+    #[test]
+    fn worktree_counts_as_second_clone() {
+        // stará složka (hlavní checkout) + aktivní worktree vedle — dřív se worktree přeskočil a
+        // `resolve` potichu vrátil starou složku
+        let t = tempfile::tempdir().unwrap();
+        fake_repo(t.path(), "orbit", "https://github.com/acme/orbit.git");
+        let wt = t.path().join("orbit-v2");
+        std::fs::create_dir_all(t.path().join("orbit/.git/worktrees/orbit-v2")).unwrap();
+        std::fs::create_dir_all(&wt).unwrap();
+        std::fs::write(wt.join(".git"), format!("gitdir: {}\n", t.path().join("orbit/.git/worktrees/orbit-v2").display())).unwrap();
+        assert_eq!(origin_any(&wt).as_deref(), Some("https://github.com/acme/orbit.git"));
+        let idx = RepoIndex::build(&[t.path().to_string_lossy().into_owned()]);
+        let mut names: Vec<_> = idx.candidates("acme/orbit").iter().map(|p| p.file_name().unwrap().to_string_lossy().into_owned()).collect();
+        names.sort();
+        assert_eq!(names, ["orbit", "orbit-v2"]);
+        assert!(idx.resolve("acme/orbit").is_none(), "dvě složky = nehádat");
+        assert!(idx.candidates("nobody/x").is_empty());
+    }
+
+    #[test]
+    fn candidates_sorted_freshest_first_and_deterministic() {
+        let c = |path: &str, last: Option<i64>| Candidate { path: path.into(), last_commit: last, worktree: false };
+        type Case = (&'static str, Vec<Candidate>, Vec<&'static str>);
+        let cases: Vec<Case> = vec![
+            ("čerstvější první", vec![c("C:/d/old", Some(100)), c("C:/d/new", Some(900))], vec!["C:/d/new", "C:/d/old"]),
+            ("bez data na konec", vec![c("C:/d/a", None), c("C:/d/b", Some(1))], vec!["C:/d/b", "C:/d/a"]),
+            ("shoda → cesta", vec![c("C:/d/Zeta", Some(5)), c("C:/d/alfa", Some(5))], vec!["C:/d/alfa", "C:/d/Zeta"]),
+            ("vše bez data → cesta", vec![c("C:/d/b", None), c("C:/d/a", None)], vec!["C:/d/a", "C:/d/b"]),
+            ("tři", vec![c("C:/d/m", Some(2)), c("C:/d/x", None), c("C:/d/n", Some(3))], vec!["C:/d/n", "C:/d/m", "C:/d/x"]),
+        ];
+        for (name, input, want) in cases {
+            let mut a = input.clone();
+            sort_candidates(&mut a);
+            assert_eq!(a.iter().map(|x| x.path.as_str()).collect::<Vec<_>>(), want, "{name}");
+            // obrácený vstup = stejný výsledek (nezávisle na pořadí read_dir)
+            let mut b: Vec<Candidate> = input.into_iter().rev().collect();
+            sort_candidates(&mut b);
+            assert_eq!(a, b, "{name}: pořadí nesmí záviset na vstupu");
+        }
+    }
+
+    #[test]
+    fn place_never_guesses() {
+        let one = [PathBuf::from("C:/d/a")];
+        let two = [PathBuf::from("C:/d/a"), PathBuf::from("C:/d/b")];
+        assert_eq!(place_of(Some("C:/d/x"), true, &two), (Place::Ok, Some(PathBuf::from("C:/d/x"))));
+        // neexistující path = chyba, ne tichý pád na klon podle remote
+        assert_eq!(place_of(Some("C:/d/x"), false, &one), (Place::Missing { path: "C:/d/x".into() }, None));
+        assert_eq!(place_of(Some("  "), false, &one), (Place::Ok, Some(PathBuf::from("C:/d/a"))));
+        assert_eq!(place_of(None, false, &one), (Place::Ok, Some(PathBuf::from("C:/d/a"))));
+        assert_eq!(place_of(None, false, &two), (Place::Choose { count: 2 }, None));
+        assert_eq!(place_of(None, false, &[]), (Place::None, None));
+    }
+
+    #[test]
+    fn last_commit_of_real_repo_and_non_repo() {
+        let t = tempfile::tempdir().unwrap();
+        assert_eq!(last_commit(t.path()), None);
+        let dir = t.path().join("r");
+        std::fs::create_dir_all(&dir).unwrap();
+        let git = |args: &[&str]| crate::gitinfo::run(&dir, args, std::time::Instant::now() + std::time::Duration::from_secs(20));
+        if git(&["init", "-q"]).is_none() {
+            return; // git na stroji není — zbytek nejde ověřit
+        }
+        std::fs::write(dir.join("a.txt"), "x").unwrap();
+        git(&["add", "a.txt"]).unwrap();
+        if git(&["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "x"]).is_none() {
+            return; // globální nastavení gitu commit nepustí (podpis, hooky) — datum nejde ověřit
+        }
+        // committer date = teď, stačí, že je to rozumné číslo
+        let ts = last_commit(&dir).expect("datum commitu");
+        assert!(ts > 1_600_000_000, "{ts}");
+        let v = candidates_dated(&[t.path().to_path_buf(), dir.clone()]);
+        assert_eq!(v[0].path, dir.to_string_lossy());
+        assert_eq!(v[1].last_commit, None);
     }
 
     #[test]

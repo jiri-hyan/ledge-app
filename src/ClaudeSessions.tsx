@@ -2,7 +2,11 @@
 // seřazené čeká > pracuje > nečinná > skončila s prací), schvalování (`PendingRow` + „Vždy povolit“ /
 // „Zamítnout s důvodem…“ v `sessions/PermExtra.tsx`, náhled diffu `sessions/DiffPreview.tsx`, review plánu
 // `sessions/PlanReview.tsx`), otázky Clauda
-// (`QuestionCard` pod řádkem session), subagenti, panel Git session (`sessions/GitPanel.tsx`) a klik = otevřít session (`api.sessionOpen`, Win32 v `winfocus.rs`). Nečinné nad 3 se sbalí do „+N nečinných“.
+// (`QuestionCard` pod řádkem session), subagenti, panel Git session (`sessions/GitPanel.tsx`) a klik = otevřít session (`api.sessionOpen`, Win32 v `winfocus.rs`).
+// Strop řádků (vlna 9, `layout/cap.ts`): nejvýš `limit` session (výchozí 4, ⋯ karty / Nastavení), pod nimi
+// „Zobrazit další (k) · +3 nečinné“ ↔ „Méně“ (rozbalení zvlášť pro každou záložku). Kdo čeká na tebe
+// (schválení, otázka), je vždy nahoře a nikdy se neschová; pak pracující, nečinné podle poslední aktivity
+// a skončené (`sessions/order.ts`).
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { api, type Snapshot, type SessionView, type Pending, type SubagentDone, type Ask } from "./api";
 import { ago, uptime } from "./format";
@@ -22,6 +26,8 @@ import { statusPill } from "./sessions/agentview";
 import { sectionOn } from "./cards/sections";
 import "./sessions.css";
 import { gotoSettingsPanel } from "./palette/goto";
+import ShowMore, { useCap } from "./layout/ShowMore";
+import { hiddenSummary, needsYou, orderSessions } from "./sessions/order";
 
 /** stav → barva pilulky a popisek (funkce, ať se popisek přeloží až při vykreslení) */
 const STATUS: Record<SessionView["status"], [string, () => string]> = {
@@ -30,7 +36,6 @@ const STATUS: Record<SessionView["status"], [string, () => string]> = {
   idle: ["n", () => t("sessions.status.idle", "nečinná")],
   ended: ["r", () => t("sessions.status.ended", "skončila")],
 };
-const IDLE_SHOWN = 3;
 
 const lastSeg = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 /** Délka běhu subagenta; neznámá (start přišel před zapojením hooků) = nic, ne „?“. */
@@ -40,13 +45,18 @@ const dur = (ms: number | null) => {
   return ms < 60_000 ? `${Math.max(1, Math.round(ms / 1000))} s` : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 };
 
-export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings: () => void; menu?: JSX.Element }) {
-  const [allIdle, setAllIdle] = createSignal(false);
-  const by = (st: SessionView["status"]) => p.s.sessions.filter((x) => x.status === st);
-  const active = () => p.s.sessions.filter((x) => x.status === "waiting" || x.status === "working");
-  const idle = () => (allIdle() ? by("idle") : by("idle").slice(0, IDLE_SHOWN));
-  const hiddenIdle = () => by("idle").length - idle().length;
+export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings: () => void; menu?: JSX.Element; page?: string; limit?: number }) {
   const live = () => p.s.sessions.filter((x) => x.status !== "ended").length;
+  const asked = (sid: string) => p.s.pending.some((x) => x.sessionId === sid) || p.s.questions.some((x) => x.sessionId === sid);
+  const cap = useCap(() => ({ page: p.page, card: "claude", limit: p.limit }), () => orderSessions(p.s.sessions, asked), (x) => needsYou(x, asked));
+  const summary = () => {
+    const h = hiddenSummary(cap.hidden());
+    return [
+      h.working ? tp("sessions.cap.working", h.working, ["+{n} pracující", "+{n} pracující", "+{n} pracujících"]) : "",
+      h.idle ? tp("sessions.cap.idle", h.idle, ["+{n} nečinná", "+{n} nečinné", "+{n} nečinných"]) : "",
+      h.ended ? tp("sessions.cap.ended", h.ended, ["+{n} skončená", "+{n} skončené", "+{n} skončených"]) : "",
+    ].filter(Boolean).join(", ");
+  };
   const pendingFor = (sid: string) => p.s.pending.filter((x) => x.sessionId === sid);
   const orphans = () => p.s.pending.filter((x) => !p.s.sessions.some((ss) => ss.id === x.sessionId));
   const asksFor = (sid: string) => p.s.questions.filter((x) => x.sessionId === sid);
@@ -71,12 +81,10 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
       <Show when={sectionOn(p.s.sections, "claudeLimits")}><LimitsRow s={p.s} now={p.now} onSettings={p.onSettings} /></Show>
       <For each={orphans()}>{(pd) => <PendingRow pd={pd} />}</For>
       <For each={orphanAsks()}>{(a) => <QuestionCard ask={a} s={p.s} />}</For>
-      <For each={active()}>{row}</For>
-      <For each={idle()}>{row}</For>
-      <Show when={hiddenIdle() > 0 || (allIdle() && by("idle").length > IDLE_SHOWN)}>
-        <button class="more-idle" onClick={() => setAllIdle(!allIdle())}>{allIdle() ? t("sessions.collapseIdle", "Sbalit nečinné") : tp("sessions.moreIdle", hiddenIdle(), "+{n} nečinných")}</button>
+      <For each={cap.shown()}>{row}</For>
+      <Show when={cap.toggles()}>
+        <ShowMore open={cap.open()} hidden={cap.hidden().length} summary={summary()} onToggle={cap.toggle} />
       </Show>
-      <For each={by("ended")}>{row}</For>
       <Show when={p.s.sessions.length === 0 && p.s.pending.length === 0 && p.s.questions.length === 0}>
         <div class="empty">{t("sessions.empty", "Žádná běžící session Claude Code.")}</div>
       </Show>

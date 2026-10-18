@@ -19,15 +19,19 @@ export function deckCols(raw: string | null | undefined): number {
   return Number.isFinite(n) && n >= 1 ? Math.min(n, 12) : 4;
 }
 
-/** Rozpětí karet tak, aby žádná řada nekončila prázdným místem. */
+/** Rozpětí karet tak, aby žádná řada nekončila prázdným místem. Volné sloupce řady dostanou karty
+ *  s NEJVĚTŠÍ zvolenou velikostí v té řadě (při shodě po jednom od poslední) — menší karta tak zůstane
+ *  menší a volba S je vidět (vlna 9: dřív volno dostala poslední karta a [M, S] vypadalo jako [M, M]). */
 export function packSpans(sizes: readonly CardSize[], cols: number): number[] {
   const out = sizes.map((s) => Math.max(1, Math.min(cols, spanOf(s, cols))));
   let row: number[] = [];
   let used = 0;
   const flush = () => {
     let free = cols - used;
-    for (let k = row.length - 1; free > 0 && row.length; k = (k - 1 + row.length) % row.length) {
-      out[row[k]]++;
+    const top = Math.max(...row.map((k) => out[k]));
+    const grow = row.filter((k) => out[k] === top);
+    for (let k = grow.length - 1; free > 0 && grow.length; k = (k - 1 + grow.length) % grow.length) {
+      out[grow[k]]++;
       free--;
     }
     row = [];
@@ -40,6 +44,64 @@ export function packSpans(sizes: readonly CardSize[], cols: number): number[] {
   });
   if (row.length) flush();
   return out;
+}
+
+/** Velikosti, které při `cols` sloupcích vypadají každá jinak (S a XL vždy; M / L jen když jsou užší než řada). */
+export const usableSizes = (cols: number): CardSize[] => ORDER.filter((s) => s === "s" || s === "xl" || spanOf(s, cols) < cols);
+
+/** Nejbližší možná velikost: ta z `usableSizes`, která vypadá stejně jako `want` (L ve 3 sloupcích = XL). */
+export function fitSize(want: CardSize, cols: number): CardSize {
+  const usable = usableSizes(cols);
+  if (usable.includes(want)) return want;
+  const span = spanOf(want, cols);
+  return usable.find((s) => s !== "s" && spanOf(s, cols) === span) ?? "xl";
+}
+
+/** Další velikost v kruhu přes velikosti, které vypadají jinak (⇔ v úpravách). */
+export function nextSizeFor(s: CardSize, cols: number): CardSize {
+  const usable = usableSizes(cols);
+  const i = usable.indexOf(fitSize(s, cols));
+  return usable[(i + 1) % usable.length];
+}
+
+/** O krok větší / menší (klávesy + / −) bez kruhu. */
+export function stepSize(s: CardSize, dir: 1 | -1, cols: number): CardSize {
+  const usable = usableSizes(cols);
+  const i = usable.indexOf(fitSize(s, cols));
+  return usable[Math.max(0, Math.min(usable.length - 1, i + dir))];
+}
+
+/** Proč volba nemá viditelný efekt: `cols` = styl má málo sloupců (vybrána nejbližší možná), `alone` =
+ *  karta je v řadě sama (vyplní šířku, aby nezůstala díra), `fill` = karta už volné místo řady vyplňuje. */
+export type SizeNote = "cols" | "alone" | "fill" | null;
+export type SizeOutcome = { size: CardSize; span: number; note: SizeNote };
+
+/** Co udělá volba velikosti `want` u karty `i` záložky (velikosti v pořadí, jak je ukáže mřížka). */
+export function sizeOutcome(sizes: readonly CardSize[], i: number, want: CardSize, cols: number): SizeOutcome {
+  const size = fitSize(want, cols);
+  const before = packSpans(sizes, cols);
+  const next = sizes.map((s, k) => (k === i ? size : s));
+  const after = packSpans(next, cols);
+  const span = after[i] ?? 1;
+  if (size !== want) return { size, span, note: "cols" };
+  if (size === sizes[i] || before[i] !== span) return { size, span, note: null };
+  return { size, span, note: rowCount(after, cols, i) === 1 ? "alone" : "fill" };
+}
+
+/** Kolik karet je v řadě karty `i` (po zabalení rozpětí `spans`). */
+function rowCount(spans: readonly number[], cols: number, i: number): number {
+  const rows: number[] = [];
+  let r = 0;
+  let used = 0;
+  for (const s of spans) {
+    if (used + s > cols) {
+      r++;
+      used = 0;
+    }
+    rows.push(r);
+    used += s;
+  }
+  return rows.filter((x) => x === rows[i]).length;
 }
 
 /** Velikost pro rozpětí `span` (nejbližší dostupná; celá řada = xl, při shodě menší). */
@@ -78,3 +140,10 @@ export function resizeTo(m: DeckMetrics, edge: Edge, start: Dim, px: number, py:
 
 /** Šířka obrysu cíle v px (`span` sloupců). */
 export const spanPx = (span: number, colW: number, gap: number): number => span * colW + (span - 1) * gap;
+
+/** Výška o krok (PageUp = −1 nižší, PageDown = +1 vyšší): 1 → 2 → 3 → 4 → podle obsahu, bez kruhu. */
+export function stepHeight(h: CardHeight | undefined, dir: 1 | -1): CardHeight | undefined {
+  const order: (CardHeight | undefined)[] = [1, 2, 3, 4, undefined];
+  const i = order.indexOf(h);
+  return order[Math.max(0, Math.min(order.length - 1, i + dir))];
+}
