@@ -50,7 +50,7 @@ export function LookStep() {
     <div class="ob-center">
       <div class="ob-lead">
         <h3>{t("onboarding.look.title", "Vzhled")}</h3>
-        <p>{t("onboarding.look.lead", "Vyber si motiv. Styl, barvy, animace a další drobnosti doladíš v Nastavení → Vzhled.")}</p>
+        <p>{t("onboarding.look.lead", "Vyber si motiv. Jak vypadá zavřený Ledge, co se stane po najetí myší, šířku a animace vybereš z obrázků v Nastavení → Vzhled (nebo Začínáme → Vyber si vzhled).")}</p>
       </div>
       <div class="ob-themes">
         <For each={wiz.themes}>

@@ -108,8 +108,9 @@ export default function ActionEditor(p: {
       <div class="act-field">
         <label>{t("actions.edit.kind", "Typ")}</label>
         <div class="ctl">
-          <div class="seg" role="group">
-            <For each={KINDS}>{(k) => <button classList={{ on: d.kind === k.kind }} aria-pressed={d.kind === k.kind} onClick={() => setD("kind", k.kind)}>{t(k.key, k.cs)}</button>}</For>
+          {/* 6 typů = galerie dlaždic, ne přepínač (víc než 4 volby přetékají) */}
+          <div class="act-kinds" role="radiogroup" aria-label={t("actions.edit.kind", "Typ")}>
+            <For each={KINDS}>{(k) => <button class="act-kind" classList={{ on: d.kind === k.kind }} role="radio" aria-checked={d.kind === k.kind} onClick={() => setD("kind", k.kind)}>{t(k.key, k.cs)}</button>}</For>
           </div>
         </div>
       </div>

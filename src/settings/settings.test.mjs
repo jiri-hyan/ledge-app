@@ -18,7 +18,7 @@ const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 const PANEL_FILES = {
   zaciname: ["panels/Start.tsx"],
   suplik: ["panels/Drawer.tsx", "../layout/LayoutEditor.tsx"],
-  vzhled: ["panels/Appearance.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
+  vzhled: ["panels/Appearance.tsx", "panels/AppearanceClosed.tsx", "panels/AppearanceHover.tsx", "panels/AppearanceOpen.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
   akce: ["panels/ProjectsActions.tsx", "panels/Projects.tsx", "panels/ProjectEditor.tsx", "panels/Actions.tsx", "../actions/ScriptsSettings.tsx", "panels/LegacyLinks.tsx"],
   claude: ["panels/Claude.tsx", "panels/Questions.tsx"],
   osobni: ["panels/Personal.tsx", "../media/MediaSettings.tsx", "../cliphist/ClipSettings.tsx", "../calendar/CalendarSettings.tsx"],
@@ -66,7 +66,7 @@ test("katalog: každá volba má kotvu ve svém panelu a v žádném jiném", ()
 
 test("sjednocené volby: vzhled i celý proužek jen ve Vzhledu, chování jen v Chování", () => {
   const f = fields();
-  for (const id of ["drawer.glass", "drawer.width", "appearance.motion", "appearance.strip", "strip.enabled", "strip.items", "strip.custom", "strip.monitor", "timer.strip"]) assert.equal(f[id].panel, "vzhled", id);
+  for (const id of ["drawer.glass", "drawer.width", "drawer.hover", "strip.look", "appearance.motion", "appearance.strip", "strip.enabled", "strip.items", "strip.custom", "strip.monitor", "timer.strip"]) assert.equal(f[id].panel, "vzhled", id);
   for (const id of ["drawer.trigger", "drawer.keepWarmS", "drawer.barWindows", "autostart", "hotkeys.enabled", "palette.compact", "gameMode"]) assert.equal(f[id].panel, "chovani", id);
   for (const id of ["clipboard.enabled", "timer.presets", "media.variant", "personal.weather"]) assert.equal(f[id].panel, "osobni", id);
   assert.equal(f["claude.questionHoldS"].panel, "claude");
@@ -138,7 +138,7 @@ test("skoky odjinud: každý cíl vede na existující panel a jeho řádek je v
   const f = fields();
   const targets = gotoTargets();
   // karty, paleta, hlavička, Začínáme — ať test nezačne potichu procházet naprázdno
-  for (const want of ["f-actions.add", "akce", "f-personal.calendars", "f-personal.weather", "f-autostart", "f-clipboard.enabled", "f-claude.hooks", "f-claude.statusLine", "f-appearance.style"]) {
+  for (const want of ["f-actions.add", "akce", "f-personal.calendars", "f-personal.weather", "f-autostart", "f-clipboard.enabled", "f-claude.hooks", "f-claude.statusLine", "f-appearance.style", "f-strip.look"]) {
     assert.ok(targets.some((x) => x.id === want), `cíl ${want} se v kódu najde`);
   }
   const bad = [];
@@ -224,6 +224,8 @@ test("chyba pole → panel (nejdelší prefix vyhrává)", () => {
     ["drawer.keepWarmS", "chovani"],
     ["drawer.glass", "vzhled"],
     ["drawer.width", "vzhled"],
+    ["drawer.hover", "vzhled"],
+    ["strip.look", "vzhled"],
     ["drawer.widthX", "chovani"],
     ["strip.items", "vzhled"],
     ["strip.opacity", "vzhled"],

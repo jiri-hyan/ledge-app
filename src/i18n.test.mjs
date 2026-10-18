@@ -15,7 +15,11 @@ import { ago, fmtDate, num } from "./format.ts";
 
 // Soubory (nebo složky `x/`), kde natvrdo česky psané texty ještě zůstaly — kontrola d je přeskočí,
 // a–c platí i tady. Teď prázdné: celé UI jde přes t(); nový nepřeložený modul sem jen dočasně.
-const PENDING = [];
+const PENDING = [
+  // w7: dočasné kontrakty s workery I/J (`{ id, cs, en }` — přeložené daty, ne t()); lead při merge vezme jejich verzi
+  "strip/looks.ts",
+  "hover/modes.ts",
+];
 
 // Záměrně česky i v angličtině (kontrola d): soubor, přesný text, proč.
 const ALLOW_CZECH = [
@@ -52,10 +56,10 @@ const DYNAMIC = [
   { file: "settings/labels.ts", key: "`settings.f.${id}`", why: TABLE },
   { file: "settings/labels.ts", key: "`settings.f.${id}.hint`", why: TABLE },
   { file: "settings/labels.ts", key: "`settings.f.${id}.kw`", why: TABLE },
-  { file: "settings/panels/Appearance.tsx", key: "THEMES[id].key", why: "motivy v theme/themes.ts — " + PAIRS },
+  { file: "settings/panels/AppearanceOpen.tsx", key: "THEMES[id].key", why: "motivy v theme/themes.ts — " + PAIRS },
   { file: "theme/label.ts", key: "p[0]", why: "styly, písma, materiály, rozložení, šířky (theme/looks.ts) a animace (AppearanceMotion.tsx) — " + PAIRS },
   { file: "onboarding/steps/Basics.tsx", key: "THEMES[id()].key", why: "motivy v theme/themes.ts — " + PAIRS },
-  { file: "settings/panels/Appearance.tsx", key: "key", why: "akcenty ACCENTS [hex, key, cs] — " + PAIRS },
+  { file: "settings/panels/AppearanceOpen.tsx", key: "key", why: "akcenty ACCENTS [hex, key, cs] — " + PAIRS },
   { file: "layout/text.ts", key: "x[0]", why: "názvy karet, částí a záložek z layout/model.ts (CARD_INFO, PART_INFO, builtinName) — " + PAIRS },
   { file: "settings/panels/Backup.tsx", key: "n[0]", why: "názvy sekcí SECTION_NAMES — " + PAIRS },
   { file: "settings/panels/Claude.tsx", key: "...HOOKS_TEXT[h().state]", why: PAIRS },

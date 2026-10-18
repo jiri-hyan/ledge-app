@@ -63,19 +63,27 @@
 /* podnadpis skupiny řádků v sekci (Karty na hlavní stránce: Práce / Osobní / V kartě Claude) */
 .st-group-h { margin-top: var(--s3); color: var(--t2); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 
-.st-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px var(--s4); padding: 12px 0; scroll-margin: 48px; border-radius: var(--r-md); transition: background calc(0.4s / var(--speed)), box-shadow calc(0.4s / var(--speed)); }
+/* Řádek volby: popisek vlevo, ovládání vpravo — a když se vedle sebe nevejdou (dlouhý přepínač, úzké okno),
+   ovládání se zalomí POD popisek (flex-wrap), nikdy nezmáčkne popisek do úzkého sloupce ani nepřeteče kartu.
+   Popisek si drží aspoň ~16 em. V úzké sekci (container query) jde zalomené ovládání vlevo pod popisek. */
+.st-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px var(--s4); padding: 12px 0; scroll-margin: 48px; border-radius: var(--r-md); transition: background calc(0.4s / var(--speed)), box-shadow calc(0.4s / var(--speed)); }
 .st-row + .st-row { border-top: 1px solid var(--line-soft); }
-.st-row.stack { grid-template-columns: minmax(0, 1fr); }
-.st-lbl { min-width: 0; }
+.st-lbl { flex: 1 1 16em; min-width: 0; }
+.st-row.stack > .st-lbl, .st-row.stack > .st-ctl { flex-basis: 100%; }
 .st-name { color: var(--t1); font-size: var(--fs-body); font-weight: 500; }
 .st-lbl small { display: block; margin-top: 2px; color: var(--t3); font-size: var(--fs-sm); line-height: 1.4; }
-.st-ctl { display: flex; align-items: center; gap: var(--s2); justify-self: end; min-width: 0; }
-.st-row.stack .st-ctl { flex-direction: column; align-items: stretch; justify-self: stretch; }
+.st-ctl { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s2); margin-left: auto; min-width: 0; max-width: 100%; }
+.st-row.stack .st-ctl { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin-left: 0; }
+.st-sec { container-type: inline-size; }
+@container (max-width: 520px) {
+  .st-ctl { margin-left: 0; justify-content: flex-start; }
+  .opt > :last-child:not(:first-child) { margin-left: 0; }
+}
 .st-row.stack .st-seg { align-self: flex-start; }
 .st-row.dim .st-lbl, .st-row.dim .st-ctl { opacity: 0.55; }
 .st-row.hit, .st-sec.hit, .st-phead.hit, .act-add.hit { background: color-mix(in srgb, var(--violet) 14%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--violet) 14%, transparent); }
 .st-row.bad .st-name { color: var(--red); }
-.st-err { grid-column: 1 / -1; display: flex; gap: 6px; align-items: baseline; color: var(--red); font-size: var(--fs-sm); }
+.st-err { flex-basis: 100%; display: flex; gap: 6px; align-items: baseline; color: var(--red); font-size: var(--fs-sm); }
 .st-err::before { content: "!"; display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--red); color: var(--on-light); font-weight: 700; font-size: var(--fs-2xs); flex-shrink: 0; }
 .st-empty { padding: var(--s3) 0; color: var(--t3); font-size: var(--fs-ui); }
 .st-note { color: var(--t3); font-size: var(--fs-sm); }
@@ -91,7 +99,7 @@
 .st-num { display: inline-flex; align-items: center; gap: 6px; }
 .st-num .unit { color: var(--t3); font-size: var(--fs-sm); }
 
-.st-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-md); }
+.st-seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; gap: 2px; padding: 3px; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-md); }
 .st-seg button { padding: 5px 12px; border-radius: calc(var(--r-md) - 3px); color: var(--t3); font-weight: 600; font-size: var(--fs-ui); transition: background var(--fast), color var(--fast); }
 .st-seg button:hover { color: var(--t2); }
 .st-seg button.on { background: var(--card-3); color: var(--t1); box-shadow: inset 0 0 0 1px var(--line-2); }
@@ -226,7 +234,10 @@
 .st-bar.warn .txt { color: var(--t1); }
 .st-bar.bad .txt { color: var(--red); }
 /* řádek volby v kartách panelů (Vzhled, Otázky, Průvodce): popisek s nápovědou vlevo, ovládání vpravo */
-.opt { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: 7px 0; font-size: var(--fs-body); }
+/* řádek volby v kartách (panel Vzhled): stejné pravidlo jako `.st-row` — nevejde se → ovládání pod popisek */
+.opt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px var(--s3); padding: 7px 0; font-size: var(--fs-body); }
+.opt > :first-child { flex: 1 1 14em; min-width: 0; }
+.opt > :last-child:not(:first-child) { margin-left: auto; max-width: 100%; }
 .opt + .opt { border-top: 1px solid var(--line-soft); }
 .opt small { display: block; color: var(--t3); font-size: var(--fs-sm); }
 .opt small.warn { color: var(--amber); }

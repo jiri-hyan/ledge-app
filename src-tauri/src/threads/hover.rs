@@ -68,12 +68,9 @@ pub(crate) fn spawn_hover_thread() {
                 // osa Ledge (střed / vlevo / vpravo podle `appearance.strip.position`) — zóna bez proužku
                 let cx = geom::axis2_for(&c.cfg.read(), mon.rect.left, mon.rect.right, mon.dpi).div_euclid(2);
                 let scale = mon.dpi as i32;
-                // zóna = proužek (nebo střed hrany, když je proužek skrytý) + kousek do stran
-                let (zl, zr, zb) = if srect.right > srect.left {
-                    (srect.left - 24 * scale / 96, srect.right + 24 * scale / 96, srect.bottom)
-                } else {
-                    (cx - 160 * scale / 96, cx + 160 * scale / 96, mon.rect.top + 4 * scale / 96)
-                };
+                // zóna = proužek v jakémkoli stylu (linka a lišta přes celou šířku, roh, …) + kousek do
+                // stran, nebo střed hrany, když je proužek skrytý (neviditelný styl v klidu)
+                let (zl, zr, zb) = crate::looks::frame::zone(srect, cx, mon.rect, mon.dpi);
                 // lištové okno (prohlížeč) v popředí? Exe je v cache podle HWND, jinak pár levných volání.
                 // Monitor nad proužkem (kurzor hranou projde) = tlačit nejde → bar režim ne.
                 if last_fg_check.elapsed() > Duration::from_millis(100) {
@@ -99,10 +96,10 @@ pub(crate) fn spawn_hover_thread() {
                         refresh_strip();
                     }
                 }
-                let (trigger, edge_ms, dwell_ms, close_ms, keep_warm, hover_ms, push_ms, push_distance) = {
+                let (trigger, edge_ms, dwell_ms, close_ms, keep_warm, hover_ms, push_ms, push_distance, hover_mode) = {
                     let d = &c.cfg.read().drawer;
                     let b = &d.bar_windows;
-                    (d.trigger, d.edge_delay_ms, d.dwell_delay_ms, d.close_delay_ms, d.keep_warm_s, d.hover_delay_ms, b.push_ms, b.push_distance)
+                    (d.trigger, d.edge_delay_ms, d.dwell_delay_ms, d.close_delay_ms, d.keep_warm_s, d.hover_delay_ms, b.push_ms, b.push_distance, d.hover)
                 };
                 c.drawer.destroy_if_idle(Duration::from_secs(keep_warm));
                 let Some(p) = screen::cursor() else {
@@ -121,7 +118,7 @@ pub(crate) fn spawn_hover_thread() {
                 let on_strip = in_x && p.y >= mon.rect.top && p.y < zb;
                 // přihrádka: tah souborů na proužek (šuplík zavřený / peek) → neviditelný cíl přetažení
                 // nad zónou (`shelf::drop`); tlačítko a kurzor se čtou jen s kurzorem v zóně
-                let shelf_zone = (view != View::Full && c.cfg.read().shelf.enabled).then(|| crate::shelf::zone(zl, zr, zb, mon.rect.top, scale));
+                let shelf_zone = (!view.covers_strip() && c.cfg.read().shelf.enabled).then(|| crate::shelf::zone(zl, zr, zb, mon.rect.top, scale));
                 let dropping = shelf_arm.step(shelf_zone, p.x, p.y, || screen::primary_button_down() && crate::shelf::drop::ole_drag_likely());
                 crate::shelf::drop::set_armed(dropping);
                 let dropping = dropping.is_some();
@@ -129,7 +126,7 @@ pub(crate) fn spawn_hover_thread() {
                 let bar_push = c.bar_window.load(Ordering::Relaxed);
                 let want_raw = bar_push
                     && trigger != Trigger::Off
-                    && view != View::Full
+                    && !view.covers_strip()
                     && in_x
                     && p.y >= mon.rect.top
                     && p.y <= mon.rect.top + 3 * scale / 96;
@@ -186,13 +183,15 @@ pub(crate) fn spawn_hover_thread() {
                                 if t.elapsed() >= Duration::from_millis(ms) {
                                     zone_since = None;
                                     push.fire();
-                                    c.send_ui(UiCmd::Show(if full { View::Full } else { View::Peek }, Opener::Hover));
+                                    // KTERÝ pohled: peek (Claude čeká), celý, nebo náhled podle `drawer.hover`
+                                    c.send_ui(UiCmd::Show(crate::hovermode::hover_target(hover_mode, full, peek_hover), Opener::Hover));
                                 }
                             }
                             None => zone_since = None,
                         }
                     }
-                    View::Full => {
+                    // celý šuplík i náhled po najetí: odjetí myši zavírá stejně
+                    View::Full | View::Compact | View::Island => {
                         zone_since = None;
                         c.strip.set(|m| m.hot = false);
                         if c.drawer.opener() == Opener::Hover {

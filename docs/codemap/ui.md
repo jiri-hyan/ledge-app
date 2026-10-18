@@ -13,12 +13,13 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 | `snapshot.ts` | prázdný snapshot do startu | `EMPTY_SNAPSHOT` |
 | `MainPage.tsx` | hlavní stránka: karty záložky `Snapshot.mode` z `layout` → `layout/Deck.tsx` (→ [layout.md](layout.md)); každé kartě předá `menu` (⋯), lišta úprav, katalog, prázdná záložka = „Přidej první kartu“ | `MainPage` `card` |
 | `cards/sections.ts` | `drawer.sections` ze snapshotu — ODVOZENÉ z `layout` (zrcadlo `config::Sections`): klíče, čtení části karty; test `sections.test.mjs` (shoda s config.rs a s modelem rozložení) | `SECTION_KEYS` `sectionOn` `allSectionsOn` `CLAUDE_PARTS` |
-| `cards/CardMenu.tsx` | ⋯ v hlavičce karty (vidět při najetí) → „Skrýt kartu“ (z této záložky do katalogu) / „Skrýt sekci: …“ (`layout.hiddenParts`) / „Upravit šuplík…“; ukládá jen `layout` (`layout/edit.ts` `saveLayout`, při `cfgError` ne); lišta „… skryta · Vrátit“ 6 s | `CardMenu` `HiddenNotice` |
-| `cards/Head.tsx` | hlavička: hodiny / Zpět + název, chipy (vč. tlumeného „V bublině Claude“ z `pkgctx/BubbleNotice.tsx` `bubble` → klik = Nastavení u autostartu), nová verze, záložky `layout/Tabs.tsx`, ✎ režim úprav, nástroje | `Head` |
+| `cards/CardMenu.tsx` · `TileOptions.tsx` | ⋯ v hlavičce karty (vidět při najetí; seznam přes `Portal` s pevnou pozicí) → Velikost S/M/L/XL, Výška Auto/Nízká/Vysoká, u Projektů volby dlaždic (`TileOptions`), „Skrýt kartu“ (z této záložky do katalogu) / „Skrýt sekci: …“ (`layout.hiddenParts`) / „Upravit šuplík…“; ukládá jen `layout` (`layout/edit.ts` `saveLayout`, při `cfgError` ne); lišta „… skryta · Vrátit“ 6 s | `CardMenu` `MenuChoice` `HiddenNotice` `TileOptions` |
+| `cards/Head.tsx` | hlavička (✎ a 🔍 mají `data-tip` = cíle prohlídky `layout/Tour.tsx`): hodiny / Zpět + název, chipy (vč. tlumeného „V bublině Claude“ z `pkgctx/BubbleNotice.tsx` `bubble` → klik = Nastavení u autostartu), nová verze, záložky `layout/Tabs.tsx`, ✎ režim úprav, nástroje | `Head` |
 | `cards/UpdatePanel.tsx` | poznámky k vydání → Instalovat (druhé potvrzení při běžících serverech; v bublině MSIX řádek, že instalátor poběží mimo ni) | `UpdatePanel` `install` |
-| `cards/Projects.tsx` | dlaždice, spuštění, náklon, klon, akce pod dlaždicí | `Projects` `launch` `tilt` `cloneProject` |
+| `cards/Projects.tsx` | karta Projekty (zástupci; jde na každou záložku, výchozí i na Osobní): hlavička s ⋯, dlaždice `data-tiles` small/tile/large, název a git podle `tiles`, skryté projekty záložky, spuštění, náklon, klon, akce UVNITŘ dlaždice dole (nikdy přes kartu pod ní); prázdné stavy „Přidat projekt“ / „Ukázat všechny“ | `Projects` `launch` `tilt` `cloneProject` |
 | `cards/Running.tsx` · `Repos.tsx` | karta Běží (log jen rozbalený) · karta Repa (Pull jen čisté a pozadu) | `Running` `PHASE` · `Repos` `pull` |
-| `cards/Peek.tsx` | malý šuplík: první schválení Clauda, jinak `ReminderPeek` | `Peek` |
+| `cards/Peek.tsx` | malý šuplík: první schválení Clauda (nebo otázka), jinak limity / `ReminderPeek`; `Approval` (schválení / otázka, `stack` = tlačítka pod textem) a `DecideButtons` sdílí náhled po najetí | `Peek` `Approval` `DecideButtons` `hasApproval` `pendingWhere` |
+| `hover/*` | náhled po najetí (`drawer.hover`, Rust `View::Compact` / `View::Island`, [core.md](core.md)): `SmallView.tsx` (peek / kompaktní / ostrůvek ve skořápce), `Compact.tsx` (schválení přes `Approval`, max 3 session, Právě hraje z `media/Player.tsx`, čas, limit 5h, „▾ celý šuplík“), `Island.tsx` (černá kapsle s jedním děním a tlačítky), `expand.ts` (klik mimo tlačítka / setrvání → `api.expandDrawer`), čistá logika `model.ts` (+ `model.test.mjs`: priorita dění, co compact ukáže, kdy se rozbalit, šířky), `modes.ts` = `HOVER_MODES` pro výběr v Nastavení (id `full|compact|island` = kontrakt), styly `hover.css` (`hov-*`, `isl-*`) | `SmallView` `Compact` `Island` `useExpand` `islandEvent` `compactPlan` `expandAfter` `smallWidth` `freshWeather` `HOVER_MODES` `hoverModeOf` |
 | `cards/ActionsCard.tsx` · `palette/*` | karta Rychlé akce · paleta příkazů (Ctrl+K, 🔍) → [actions.md](actions.md) | `ActionsCard` · `Palette` `buildItems` `rank` |
 | `cards/ClockCard.tsx` · `WeatherCard.tsx` · `LinksCard.tsx` | záložka Osobní (Čas ukazuje i baterii `media/Battery.tsx`; Odkazy = akce typu web/složka/soubor → [actions.md](actions.md)) | `observedLabel` `WX_MAX_AGE_MS` `LINK_ICON` `linkActions` `openLink` |
 | `timer/*` | Osobní: karta Časovač (odpočet + stopky; stav drží Rust `timer.rs`, sekundy z tiku `now`), čistá logika `model.ts` (+ `model.test.mjs`), akce `timerDo` (karta i paleta) | `TimerCard` `timerDo` `leftMs` `elapsedMs` `fmtDuration` `parseMinutes` `parsePresets` |
@@ -46,7 +47,13 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 - **Morf** (jen `App.tsx` + `motion.ts`): `view` → `prepare` (složí clip-path na proužek, `preHide`, `animAck("prepared")`)
   → Rust ukáže okno → `play` (clip-path na `FULL_CLIP`, „nádech“, `revealContent`, `measure("open")`);
   `closing` → `concealContent` + zúžení → `animAck("closed")`. Statistika jde do `/status` → `drawer.anim`.
-- **Výška okna**: `ResizeObserver(content)` + změna `view`/`page` → `report` → `api.reportSize(view, w, h − OVERLAP)`.
+- **Výška okna**: `ResizeObserver(content)` + změna `view`/`page` → `report` → `api.reportSize(view, w, h − OVERLAP)`;
+  šířka malých pohledů `hover/model.ts` `smallWidth` (peek 680, kompaktní 420, ostrůvek 480), jinak podle stránky.
+- **Náhled po najetí** (`view` = `compact` / `island`, `hover/*`): kreslí se jen ze snapshotu (žádný fetch; média /
+  počasí / limity jen když už jsou), stejný morf jako peek (z proužku, do celého šuplíku z tvaru náhledu).
+  Celý šuplík: klik na prázdné místo nebo „▾ celý šuplík“ hned, setrvání po `ViewMsg.expandMs`
+  (`drawer.hoverExpandMs`) — odpočet stojí nad tlačítky, mimo okno a s čekajícím schválením (`expandAfter`).
+  `api.expandDrawer()` fokus nebere; odjetí myši zavře náhled jako šuplík (Rust `threads/hover.rs`).
 - **Fokus**: šuplík je okno BEZ fokusu. Jen výslovný klik do poznámky (`startNote`/`editNote`/`allNotes`) volá
   `api.focusDrawer()`; odchod ze stránky, která chce klávesnici (`typing`), volá `api.releaseFocus()`.
   `api.close()` (Esc, ✕, uložení nové poznámky, paleta „Zavřít šuplík“) = `UiCmd::Close` → Rust vrátí fokus
@@ -89,7 +96,7 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
   (0.15–0.35 s ÷ `--speed`), pružný průběh `var(--spring)` / `var(--ease)`.
 - **CSS je globální** (žádné moduly): třídu, kterou soubor vlastní (stojí na začátku selektoru sama, `.proj { … }`),
   nesmí zmínit jiný soubor — ani jako modifikátor (`.st-item.proj` dostal `flex-direction` dlaždice). Nové třídy
-  s prefixem oblasti: `st-` Nastavení, `ap-` Vzhled, `ob-` průvodce, `act-` akce, `pal-` paleta, `q-` otázky,
+  s prefixem oblasti: `st-` Nastavení, `ap-` Vzhled, `apv-` HTML náhledy Vzhledu (`settings/previews`), `ob-` průvodce, `act-` akce, `pal-` paleta, `q-` otázky,
   `sess-` Claude, `proj-` dlaždice, `note-`/`pick-`/`pp-`/`rp-` poznámky. Neprefixované smějí být jen modifikátory
   (`.on`, `.bad`, `.dim`, `.unset`…) se jménem, které nikdo nevlastní, a základ ze `styles.css` (`.card`, `.row`,
   `.btn`, `.mini`…). Hlídá `src/cssClasses.test.mjs` (`test:ui`); záměrné sdílení = `SHARED` s důvodem.
@@ -107,7 +114,8 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
   samy — Běží, akce na Práci, Přihrádka, Právě hraje — jsou tam jako „fakta“). Sekce karty Claude
   (`claudeLimits/Costs/Git/Subagents`) hlídá `ClaudeSessions` (`sectionOn` nad odvozeným `drawer.sections`);
   skrytá útrata se nevykreslí → žádné `costs_refresh`. Nová karta / část → [layout.md](layout.md) (Invarianty).
-- Chyby jádra jsou string v jazyce UI (`i18n::tr`/`trf!` v Rustu) → `sayError(e)`; prázdné stavy karet říkají, co udělat (žádná vymyšlená čísla).
+- Chyby jádra jsou string v jazyce UI (`i18n::tr`/`trf!` v Rustu) → `sayError(e)`; prázdné stavy karet říkají, co udělat (žádná vymyšlená čísla), a kde to jde, mají JEDNU akci (`button.mini`: Přidat projekt, Přidat poznámku, Přidat akci, Přidat kalendář, Nastavit místo…).
+- První spuštění: krátká prohlídka 3 bublin (`layout/Tour.tsx`, `ui.tips`) — nikdy modal přes šuplík, nikdy `focus()`.
 
 ## Ověření
 

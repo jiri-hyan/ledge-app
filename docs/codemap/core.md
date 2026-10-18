@@ -11,8 +11,10 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 | `i18n.rs` | jazyk textů jádra (hlášky, chyby, stavy ve snapshotu, proužek): globální atomic z `ui.lang` (`set_lang` při startu a v `apply_config`), výchozí čeština; text v obou jazycích na místě. Testy: jazyk per vlákno (`with_lang`) | `tr(cs, en)`, `trf!(cs, en, args)`, `lang`, `set_lang`, `with_lang` |
 | `state.rs` | sdílený stav a jeho přístup | `Core` (pole `pub(crate)`), `CORE`, `core()`, `mark_dirty`, `UiCmd`, `WeatherState`, `Core::{dead, monitor, monitor_fresh, project_dir, rebuild_index, send_ui, strip_logical}`, `MonitorCache`, `MONITOR_TTL`, `FLASH`, `now_ms`, `find_project`, `log` |
 | `snapshot.rs` | stav pro UI (`get_state`, událost `state`) — jen paměť, žádné I/O | `snapshot`, `Snapshot`, `ProjectView`, `PersonalView`, `WeatherView`, `LinkView`, `session_rows`, `personal_view`, `monogram`, `github_url` |
-| `stripview.rs` | obsah proužku podle `strip.items` (vč. `waiting`, `custom`, `timer`, `media` = `media::strip_now`; časovač i automaticky), segmenty po položkách → `stripconf::compose` (klid, barvy), ambient, puls, viditelnost (`Core::dead`) | `refresh_strip`, `seg`, `project_for_cwd`, `local_clock` |
-| `stripconf.rs` | config proužku (`StripConfig`, `StripItem`, `StripColor`; re-export z `config.rs`), validace `strip.custom`, čisté skládání: vlastní text, „v klidu skryté“ (`is_event`), barva na položku, automatická položka časovače | `StripConfig`, `StripItem`, `StripColor::base`, `compose`, `is_event`, `custom_segment`, `effective_items`, `validate`, `CUSTOM_MAX` |
+| `stripview.rs` | obsah proužku podle `strip.items` (vč. `waiting`, `custom`, `timer`, `media` = `media::strip_now`; časovač i automaticky), segmenty po položkách → `stripconf::compose` (klid, barvy), ambient, puls, viditelnost (`Core::dead`); u stylů zavřeného Ledge (`strip.look` ≠ `classic`) sbírá `looks::Facts` z paměti (`look_facts`) → `looks::show` do `StripModel.show` | `refresh_strip`, `look_facts`, `seg`, `project_for_cwd`, `local_clock` |
+| `looks/*` | styly zavřeného Ledge (`strip.look`, `strip.lookHide`): čisté „stav → co styl ukáže“ (`show`, priorita `events`), převody faktů (`facts`), tvar, místo a hover zóna (`frame`) → [appearance.md](appearance.md) | `Look`, `Facts`, `Show`, `Part`, `Glyph`, `show`, `events`, `without`, `frame::{spec, place, zone, WidthAnim}` |
+| `stripdraw.rs` | kreslení stylů zavřeného Ledge (D2D, písmo ikon zjištěné jednou při startu vlákna `strip`) | `draw`, `pick_fonts`, `Fonts` |
+| `stripconf.rs` | config proužku (`StripConfig` vč. `look`/`lookHide`, `StripItem`, `StripColor`; re-export z `config.rs`), validace `strip.custom`, čisté skládání: vlastní text, „v klidu skryté“ (`is_event`), barva na položku, automatická položka časovače | `StripConfig`, `StripItem`, `StripColor::base`, `compose`, `is_event`, `custom_segment`, `effective_items`, `validate`, `CUSTOM_MAX` |
 | `timer.rs` | časovač: odpočet + stopky jako časy (žádný tik), akce `Op` → `apply`, `tick` (doběhnutí → `attention::signal` + toast `timer.toast`), `next_deadline` (konec, změny minuty v proužku), segment proužku, stav v `timer.json` (zápis jen při akci), config `TimerConfig` | `TimerState`, `Countdown`, `Stopwatch`, `Op`, `apply`, `tick`, `next_deadline`, `strip_segments`, `minutes_text`, `clock_text`, `act`, `tick_live`, `next_deadline_live`, `init`, `view`, `TimerView` |
 | `attention.rs` | pozornost Clauda: počet čekajících session (segment `waiting`, `upgrade_items` pro starý config), přechody „čeká na tebe“ / „hotovo“ ze snímků mostu, dedup 30 s, rozhodnutí bliknutí / puls / toast, tvar pulsu; `on_change` volá `refresh::on_claude_change`; `signal` = bliknutí + puls podle `react` i pro jiné zdroje (konec časovače) | `waiting_count`, `waiting_text`, `upgrade_items`, `ITEMS_REV`, `Seen`, `transitions`, `Dedup`, `Gate`, `react`, `signal`, `pulse_level`, `PULSE_MS`, `pulse`, `on_change` |
 | `toast.rs` | oznámení Windows přes WinRT (`windows` crate, `UI_Notifications`), krátké vlákno; QUNS „přijímá oznámení?“ | `show`, `toast_xml`, `xml_escape`, `accepts_notifications` |
@@ -23,12 +25,13 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 | `ctl.rs` | most `/status` doplněk a `/ctl/*` (open, close, settings, launch, stop, reload) | `status_extra`, `ctl_handler` |
 | `threads/ui.rs` | vlákno `ui`: sériově `UiCmd` → `Drawer` | `spawn_ui_thread` |
 | `threads/emit.rs` | vlákno `emit`: stav do šuplíku, proužek, připomínky, git | `spawn_emit_thread`, `next_wake`, `GIT_EVERY` |
-| `threads/hover.rs` | vlákno `hover`: myš, fullscreen, lištové okno, tlak → otevřít/zavřít; tah souborů na proužek → `shelf::Arm` / `shelf::drop::set_armed` ([shelf.md](shelf.md)) | `spawn_hover_thread` |
+| `threads/hover.rs` | vlákno `hover`: myš, fullscreen, lištové okno, tlak → otevřít/zavřít; zóna u hrany = `looks::frame::zone` (tvar proužku, ořez na monitor, skrytý proužek = pruh na ose); tah souborů na proužek → `shelf::Arm` / `shelf::drop::set_armed` ([shelf.md](shelf.md)) | `spawn_hover_thread` |
 | `threads/notes_watch.rs`, `notes_sync.rs` | vlákna poznámek (watcher, git sync) — viz [notes.md](notes.md) | `NotesState`, `reload_notes`, `check_reminders`, `SyncMsg`, `spawn_notes_sync` |
-| `commands/*.rs` | Tauri příkazy po oblastech: `drawer` (stav, režim, fokus, odkazy), `projects` (launch, open_in, `git_pull`, klon), `notes`, `sessions` (decide, hooky), `config`, `update`, `pkgctx` (`pkg_context`, `relaunch_outside`) | `git_pull` + `pull_message`, `focus_in_own_popup`, `open_link`, `update_install` |
+| `commands/*.rs` | Tauri příkazy po oblastech: `drawer` (stav, režim, fokus, odkazy, `expand_drawer` z náhledu po najetí), `projects` (launch, open_in, `git_pull`, klon), `notes`, `sessions` (decide, hooky), `config`, `update`, `pkgctx` (`pkg_context`, `relaunch_outside`) | `git_pull` + `pull_message`, `focus_in_own_popup`, `open_link`, `update_install` |
 | `focusreturn.rs` | návrat fokusu do předchozí aplikace: `remember` v `Drawer::focus` (těsně před převzetím), `give_back` v `Drawer::hide` / po Full → peek; jen po `UiCmd::Close`, jinak `on_close(false)` zapomene. Čisté `decide`/`keep_or_take` (tabulky) | `remember`, `on_close`, `give_back`, `decide`, `keep_or_take`, `Remembered`, `Probe` |
-| `drawer.rs` | okno šuplíku (WebView2), argumenty Chromia, handshake morfu, suspend, sklo, pozice u hrany (`appearance`) | `Drawer::{show, hide, warm, ack, set_dormant, take_focus, release_focus, destroy_if_idle, set_anchor}`, `BROWSER_ARGS`, `View`, `Opener`, `LABEL` |
-| `strip.rs` | nativní proužek: vrstvené okno, D2D, click-through, vlákno `strip`; vzhled z `appearance::geom` ([appearance.md](appearance.md)); puls (`StripModel.pulse`) animuje `WM_TIMER` jen po dobu pulsu; překryv přihrádky `StripModel.shelf` → `shelf::overlay` ([shelf.md](shelf.md)) | `Strip::{start, set}`, `StripModel`, `Segment`, `Rgba`, `pulse_now`, `PULSE_TIMER` |
+| `drawer.rs` | okno šuplíku (WebView2), argumenty Chromia, handshake morfu, suspend, sklo, pozice u hrany (`appearance`); pohledy `View` = Hidden / Peek / Full / Compact / Island (náhledy po najetí), `View::covers_strip` = panel, který zavírá odjetí myši; velikosti malých pohledů `hovermode::SmallSizes`, `ViewMsg.expand_ms` | `Drawer::{show, hide, warm, ack, set_dormant, take_focus, release_focus, destroy_if_idle, set_anchor, set_expand_ms}`, `BROWSER_ARGS`, `View`, `Opener`, `LABEL` |
+| `hovermode.rs` | co se stane po najetí (`drawer.hover`: `full` výchozí / `compact` / `island`, `drawer.hoverExpandMs`), čisté funkce + tabulky: cíl najetí (`hover_target`: Claude čeká → peek ve všech režimech, podržení nad připomínkou → Full, jinak pohled režimu), zavření (`after_close`: s čekajícím Claudem Full/Compact/Island → peek), ořez prodlevy a velikostí, pohled podle jména pro `/ctl/open` | `HoverMode`, `hover_target`, `after_close`, `expand_ms`, `EXPAND_MS`, `SmallSizes`, `fit_small`, `view_by_name` |
+| `strip.rs` | nativní proužek: vrstvené okno, D2D, click-through, vlákno `strip`; vzhled z `appearance::geom` ([appearance.md](appearance.md)); puls (`StripModel.pulse`) animuje `WM_TIMER` jen po dobu pulsu (týž časovač ~240 ms při změně šířky ostrůvku, `ROTATE_TIMER` 5 s jen u `ticker` s víc událostmi); `StripModel.show` → `stripdraw::draw`, jinak klasický `draw`; překryv přihrádky `StripModel.shelf` → `shelf::overlay` ([shelf.md](shelf.md)) | `Strip::{start, set}`, `StripModel`, `Segment`, `Rgba`, `pulse_now`, `PULSE_TIMER`, `ROTATE_TIMER` |
 | `edge.rs` | čistá logika „otevřít myší?“ (tabulkové testy) | `armed`, `PushTracker`, `BarLatch`, `is_bar_window`, `edge_passes_through`, `Delays` |
 | `rawpush.rs` | raw myš (tlak na hranu), vlákno `rawpush`, aktivní jen u hrany | `RawPush::{start, arm, take}` |
 | `screen.rs` | monitory, DPI, kurzor, fullscreen (QUNS + okno v popředí) | `monitors`, `pick`, `fullscreen_on`, `ForegroundProbe` |
@@ -54,7 +57,7 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
   `hover` ho budí i po změně fullscreenu (peek připomínky).
 - `hover`: 16 ms u hrany / 100 ms daleko / 500 ms ve fullscreenu; co 3 s `monitor_fresh` + výčet monitorů.
 - `ui`, `notes-watch`, `notes-sync`, `config-watch`, `strip`, `rawpush`, `update`, `media` a `volume` (vzniknou až při prvním zobrazení záložky Osobní; `media` i dřív, je-li v proužku položka `media`, [media.md](media.md)), `shelf-drop` (vznikne až
-  při prvním tahu souborů na proužek, [shelf.md](shelf.md)), `cliphist` (jen se zapnutou historií schránky, [clipboard.md](clipboard.md)): blokují na kanálu / událostech. `strip` má časovač (~30 fps) jen během pulsu `attention::PULSE_MS` (1,2 s), v klidu žádný;
+  při prvním tahu souborů na proužek, [shelf.md](shelf.md)), `cliphist` (jen se zapnutou historií schránky, [clipboard.md](clipboard.md)): blokují na kanálu / událostech. `strip` má časovač (~30 fps) jen během pulsu `attention::PULSE_MS` (1,2 s) a ~240 ms po změně šířky ostrůvku, střídání `ticker` po 5 s jen při víc událostech; v klidu žádný;
   `toast` je jednorázové vlákno na jedno oznámení. `logos`, `links`, git (`refresh_git_async`) jsou krátká jednorázová vlákna.
 
 ## Invarianty a pasti
@@ -64,7 +67,12 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
   nechá být; ven jen přes Plánovač úloh (`outside`), ne přes `Command::spawn` (dítě zdědí kontejner).
   `relaunch_outside` i aktualizace končí `app.exit(0)` (s kódem → `ExitRequested` neblokuje).
 
-- **Fokus:** jen `UiCmd::Focus` z výslovného kliku (`focus_drawer`); hover/peek/připomínka nikdy.
+- **Fokus:** jen `UiCmd::Focus` z výslovného kliku (`focus_drawer`); hover/peek/připomínka/náhled po najetí nikdy.
+- **Náhled po najetí** (`hovermode`): vlákno `hover` rozhodne pohled (`hover_target`, jediné místo v
+  `threads/hover.rs`), Compact/Island zavírá odjetí myši stejně jako Full otevřený najetím; do celého šuplíku
+  `expand_drawer` (klik / setrvání z frontendu) se stejným openerem → bez fokusu. Show Compact/Island nic
+  drahého nespouští (git, logy, sessionlive, poznámky, počasí a kalendář jen pro Full). `/ctl/open` bere
+  `view: "compact" | "island"` (živé ověření bez myši).
 - **Návrat fokusu** (`focusreturn`): `UiCmd::Close` = výslovné zavření (`close_drawer`: Esc, ✕, uložení
   poznámky, paleta „Zavřít“; zkratka `toggle` znovu) → `SetForegroundWindow` zpět, jen když je Ledge
   pořád v popředí a zapamatované okno žije, je vidět, není minimalizované a patří stejnému pid.
@@ -94,12 +102,12 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 
 ## Testy
 
-`attention` (počet a text čekajících, `upgrade_items` i přes `config::load`, přechody, dedup, `react`,
+`hovermode` (cíl najetí, zavření do peeku, `covers_strip`, prodleva, velikosti, starý i nový config přes `config::load`), `attention` (počet a text čekajících, `upgrade_items` i přes `config::load`, přechody, dedup, `react`,
 tvar pulsu), `stripconf` (serde starých/nových configů, migrace přes `config::load`, vlastní text, `is_event`,
 `compose` klid/barvy, automatický časovač, čitelnost předvoleb ve všech motivech), `timer` (akce odpočtu a
 stopek, `tick`, termíny, texty, segmenty, tvar `Op`, config, soubor v tempdiru), `gamemode` (`is_dead`, `decide`, stav v tempdiru), `toast` (XML), `threads::emit` (`next_wake`, hodina klidu), `state` (`MonitorCache`; `monitor_cache_bench` je
 `#[ignore]`), `commands::projects` (`pull_message`), `threads::notes_watch` (filtr událostí),
-`edge`, `config`, `procman`, `autostart`, `migrate`, `personal`, `weather`, `update`, `focusreturn`
+`looks` (tabulka 11 stylů × 6 stavů, priorita, Pokročilé, geometrie a hover zóny, config, zrcadlo TS), `edge`, `config`, `procman`, `autostart`, `migrate`, `personal`, `weather`, `update`, `focusreturn`
 (`decide`, `keep_or_take`), `paletteconf`.
 
 Nečti: `claude/` (most, viz [sessions.md](sessions.md)), `notes*` ([notes.md](notes.md)),

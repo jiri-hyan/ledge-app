@@ -33,6 +33,8 @@ export const api = {
   close: () => call("close_drawer"),
   /** Jen na výslovný klik do poznámky: okno otevřené najetím aktivuje (jinak by nešlo psát). */
   focusDrawer: () => call("focus_drawer"),
+  /** Náhled po najetí (Compact / Island) → celý šuplík: klik do náhledu nebo jeho setrvání. Fokus nebere. */
+  expandDrawer: () => call("expand_drawer"),
   /** Odchod ze stránky poznámky: šuplík otevřený najetím zase zavře odjetí myší. */
   releaseFocus: () => call("release_focus"),
   uiReady: () => call("ui_ready"),

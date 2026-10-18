@@ -49,11 +49,13 @@ mod gamemode;
 mod gitinfo;
 mod hooksetup;
 mod hotkeys;
+mod hovermode;
 mod iconimg;
 mod icons;
 mod limits;
 mod layout;
 mod limitslive;
+mod looks;
 mod linkmigrate;
 mod media;
 mod mediaconf;
@@ -85,6 +87,7 @@ mod statusline;
 mod statuslinesetup;
 mod strip;
 mod stripconf;
+mod stripdraw;
 mod stripview;
 mod subagents;
 mod threads;
@@ -225,7 +228,7 @@ pub fn run() {
             core_arc.drawer.set_on_blur(Arc::new(|| {
                 let c = core();
                 c.drawer.note_blur();
-                if c.drawer.view() == View::Full && c.drawer.opener() == Opener::Hotkey && !focus_in_own_popup() {
+                if c.drawer.view().covers_strip() && c.drawer.opener() == Opener::Hotkey && !focus_in_own_popup() {
                     c.send_ui(UiCmd::Hide);
                 }
             }));
@@ -277,6 +280,7 @@ pub fn run() {
             commands::drawer::anim_stats,
             commands::drawer::close_drawer,
             commands::drawer::focus_drawer,
+            commands::drawer::expand_drawer,
             commands::drawer::release_focus,
             commands::drawer::open_url,
             commands::projects::open_in,

@@ -108,7 +108,12 @@ export function NotesCard(p: {
       <Show when={tabs().length > 2}>
         <Tabs tabs={tabs()} value={cur()} onChange={setTab} />
       </Show>
-      <For each={items()} fallback={<div class="empty">{t("notes.card.empty", "Zatím žádné poznámky. „+ Nová“ zapíše novou (i s obrázkem ze schránky).")}</div>}>
+      <For each={items()} fallback={
+        <div class="empty">
+          {t("notes.card.emptyShort", "Zatím žádné poznámky — i s obrázkem ze schránky.")}
+          <button class="mini ok" onClick={() => p.onNew(newKind())}>{t("notes.card.add", "Přidat poznámku")}</button>
+        </div>
+      }>
         {(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}
       </For>
       <Show when={moreCount() > 0 || (!p.personal && items().length > 0)}>

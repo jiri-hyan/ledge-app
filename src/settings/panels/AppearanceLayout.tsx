@@ -1,10 +1,11 @@
-// Panel Vzhled, část „Šířka a rozložení“ (předvolby šířky + vlastní px, rozložení hlavní stránky jako
-// malé schéma sloupců) a rozbalovací „Upravit detaily“ (písmo, materiál, hustota, velikost písma, rohy,
-// krytí a rozmazání pozadí) — jednotlivé složky stylu, které jde přebít. Hodnoty stylů: `theme/looks.ts`.
-import { For, Show } from "solid-js";
+// Panel Vzhled, krok Otevřený → „Pokročilé“: rozložení karet (malé schéma sloupců), vlastní šířka v px
+// a jednotlivé složky stylu, které jde přebít (písmo, materiál, velikost písma, rohy, krytí a rozmazání
+// pozadí). Šířka předvolbou a hustota jsou hlavní volby kroku (`AppearanceOpen.tsx`). Hodnoty stylů:
+// `theme/looks.ts`.
+import { For } from "solid-js";
 import { t } from "../../i18n";
-import type { FontLook, LayoutId, Material, WidthPreset } from "../../types";
-import { FONTS, LAYOUTS, MATERIALS, WIDTHS } from "../../theme/looks";
+import type { FontLook, LayoutId, Material } from "../../types";
+import { FONTS, LAYOUTS, MATERIALS } from "../../theme/looks";
 import { lbl } from "../../theme/label";
 import { Seg, Slider, lit, pct, type Ap } from "./apUi";
 
@@ -12,21 +13,12 @@ import { Seg, Slider, lit, pct, type Ap } from "./apUi";
 export const DRAWER_WIDTH = 1080;
 const keys = <T extends string>(o: Record<T, unknown>) => Object.keys(o) as T[];
 
-export function LayoutCard(q: { ap: Ap }) {
+/** Rozložení hlavní stránky jako galerie schémat (sloupce = `--deck-cols` stylu). */
+export function LayoutPicker(q: { ap: Ap }) {
   const a = () => q.ap.a();
-  const width = () => q.ap.p.cfg.drawer?.width ?? DRAWER_WIDTH;
   return (
-    <div class="card" id="f-appearance.layout" classList={{ hit: lit("appearance.layout") }}>
-      <h4>{t("appearance.layout.title", "Šířka a rozložení")}</h4>
-      <div class="opt" id="f-drawer.width" classList={{ hit: lit("drawer.width") }}>
-        <span>{t("appearance.width", "Šířka šuplíku")}<small>{a().width === "full" ? t("appearance.width.fullHint", "Přes celou šířku monitoru.") : t("appearance.width.hint", "Na menším monitoru se ořízne na 95 % šířky.")}</small></span>
-        <Seg<WidthPreset> label={t("appearance.width", "Šířka šuplíku")} value={a().width} set={(v) => q.ap.set("width", v)}
-          options={keys(WIDTHS).map((w) => [w, lbl(WIDTHS[w].name)])} />
-      </div>
-      <Show when={a().width === "custom"}>
-        <Slider label={t("appearance.width.custom", "Vlastní šířka")} min={720} max={2400} step={20} value={width()} fmt={(v) => `${v} px`}
-          set={(v) => q.ap.p.setCfg("drawer", "width", v)} />
-      </Show>
+    <div class="ap-col">
+      <span>{t("appearance.layout.pick", "Rozložení karet")}<small>{t("appearance.layout.pickHint", "Kolik sloupců má mřížka karet — náhled monitoru nahoře se změní hned.")}</small></span>
       <div class="ap-layouts" role="radiogroup" aria-label={t("appearance.layout.pick", "Rozložení karet")}>
         <For each={keys(LAYOUTS)}>
           {(id: LayoutId) => (
@@ -43,11 +35,29 @@ export function LayoutCard(q: { ap: Ap }) {
   );
 }
 
-export function DetailsCard(q: { ap: Ap }) {
+/** Vlastní šířka v px (`appearance.width: custom` + `drawer.width`). */
+export function CustomWidth(q: { ap: Ap }) {
+  const width = () => q.ap.p.cfg.drawer?.width ?? DRAWER_WIDTH;
+  const on = () => q.ap.a().width === "custom";
+  return (
+    <div class="opt" id="f-drawer.width" classList={{ hit: lit("drawer.width") }}>
+      <span>{t("appearance.width.custom", "Vlastní šířka")}<small>{on() ? t("appearance.width.hint", "Na menším monitoru se ořízne na 95 % šířky.") : t("appearance.width.customOff", "Teď platí předvolba z kroku nahoře — zapni, když chceš přesné px.")}</small></span>
+      <span class="ap-range">
+        <button class="st-switch" classList={{ on: on() }} role="switch" aria-checked={on()} aria-label={t("appearance.width.custom", "Vlastní šířka")}
+          onClick={() => q.ap.set("width", on() ? "medium" : "custom")} />
+        <input type="range" min={720} max={2400} step={20} value={width()} disabled={!on()} aria-label={t("appearance.width.custom", "Vlastní šířka")}
+          onInput={(e) => q.ap.p.setCfg("drawer", "width", +e.currentTarget.value)} />
+        <output>{width()} px</output>
+      </span>
+    </div>
+  );
+}
+
+/** Složky stylu, které jde přebít: písmo, materiál, velikost písma, rohy, pozadí. */
+export function DetailsRows(q: { ap: Ap }) {
   const a = () => q.ap.a();
   return (
-    <details class="card ap-details" id="f-appearance.details" classList={{ hit: lit("appearance.details") || lit("drawer.glass") }} open={lit("appearance.details") || lit("drawer.glass")}>
-      <summary><h4>{t("appearance.details.title", "Upravit detaily")}</h4><small>{t("appearance.details.hint", "Písmo, materiál, hustota, rohy a pozadí — přebijí hodnoty stylu.")}</small></summary>
+    <div id="f-appearance.details" classList={{ hit: lit("appearance.details") }}>
       <div class="opt">
         <span>{t("appearance.font.title", "Písmo")}<small>{t("appearance.font.hint", "Jen písma, která má Windows.")}</small></span>
         <Seg<FontLook> label={t("appearance.font.title", "Písmo")} value={a().font} set={(v) => q.ap.set("font", v)} options={keys(FONTS).map((f) => [f, lbl(FONTS[f].name)])} />
@@ -62,18 +72,13 @@ export function DetailsCard(q: { ap: Ap }) {
           </For>
         </span>
       </div>
-      <div class="opt">
-        <span>{t("appearance.density", "Hustota")}</span>
-        <Seg label={t("appearance.density", "Hustota")} value={a().density} set={(v) => q.ap.set("density", v)}
-          options={[["compact", t("appearance.density.compact", "Úsporná")], ["normal", t("appearance.density.normal", "Běžná")], ["comfy", t("appearance.density.comfy", "Vzdušná")]]} />
-      </div>
       <Slider label={t("appearance.font", "Velikost písma")} min={0.85} max={1.25} step={0.05} value={a().fontScale} fmt={pct} set={(v) => q.ap.set("fontScale", +v.toFixed(2))} />
       <div class="opt">
         <span>{t("appearance.radius", "Rohy")}</span>
         <Seg label={t("appearance.radius", "Rohy")} value={a().radius} set={(v) => q.ap.set("radius", v)}
           options={[["sharp", t("appearance.radius.sharp", "Ostré")], ["normal", t("appearance.radius.normal", "Běžné")], ["round", t("appearance.radius.round", "Kulaté")]]} />
       </div>
-      <div id="f-drawer.glass">
+      <div id="f-drawer.glass" classList={{ hit: lit("drawer.glass") }}>
         <Slider label={t("appearance.glass.opacity", "Krytí pozadí")} hint={t("appearance.glass.opacityHint", "Méně = víc prosvítá plocha za šuplíkem.")}
           min={0.25} max={1} step={0.05} value={a().glass.opacity} fmt={pct} set={(v) => q.ap.set("glass", { opacity: +v.toFixed(2) })} />
         <div class="opt">
@@ -82,6 +87,6 @@ export function DetailsCard(q: { ap: Ap }) {
             onClick={() => q.ap.setBlur(!q.ap.blur())} />
         </div>
       </div>
-    </details>
+    </div>
   );
 }

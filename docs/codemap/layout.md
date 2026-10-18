@@ -5,8 +5,20 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 
 ## Rozhodnutí: jeden model
 
-- `layout` (`pages[] { id, name, icon?, cards[] { id, size } }`, `hiddenParts[]`) je JEDINÝ zdroj pravdy.
-  Karta, která není na žádné záložce, je skrytá (katalog ji nabídne).
+- `layout` (`pages[] { id, name, icon?, cards[] { id, size, h?, tiles? } }`, `hiddenParts[]`, `upgrades[]`) je
+  JEDINÝ zdroj pravdy. Karta, která není na žádné záložce, je skrytá (katalog ji nabídne). `h` = výška
+  1–4 řádky (`--deck-row`), chybí = podle obsahu; `tiles` = volby karty Projekty (zástupci) na té záložce.
+- **Jednorázové úpravy po aktualizaci** (`layout::apply_upgrades` v `upgrade_loaded`, značka v `upgrades`):
+  `personalProjects` = karta Projekty nahoru na Osobní, když tam nebyla (jen když je na jiné záložce a Osobní
+  existuje). Značka se zapíše prvním uložením; co uživatel pak odebere, se nevrací. **Frontend musí
+  `upgrades` přenést** (`normalizeLayout`, `clone`) — jinak by se odebrané Projekty vracely (test).
+  Výchozí rozložení (`LayoutConfig::default`, `defaultLayout`) už úpravy má. Pozor: `upgrades` má
+  field-level `#[serde(default)]` — struct-level default by ho vzal z výchozího rozložení (= „hotovo“).
+- **Mřížka bez děr** (rozhodnutí): `.deck` zůstává CSS grid se sloupci `--deck-cols` (styl), rozpětí karet
+  počítá `size.ts` `packSpans` — karty v pořadí záložky, řada, do které se další nevejde, se uzavře a její
+  volné sloupce dostanou karty té řady (po jednom od poslední). Bez `grid-auto-flow: dense`: přeskládání by
+  v úpravách posouvalo karty jinam, než je uživatel položil. Zvolená velikost (S/M/L/XL) je tedy minimum.
+  Sloupce čte `Deck` z `--deck-cols` při startu a při změně vzhledu (MutationObserver na `<html>`).
 - `drawer.sections` a `modes.personalEnabled` zůstaly, ale jsou **odvozené** (`layout::derive` v
   `config::load`, `config::save`, `apply_config`): karta = je na nějaké záložce, část = karta je a část
   není v `hiddenParts`; `personalEnabled` = vždy `true`. Proč: moduly, které podle karty zapínají stahování
@@ -20,13 +32,16 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `src-tauri/src/layout.rs` | struktura, výchozí rozložení, převod starého configu, odvozená pole, validace, záložka pro režim, název pro proužek; testy (tabulka starých configů, `load`/`save`) | `LayoutConfig` `LayoutPage` `LayoutCard` `CardSize` `CARDS` `PARTS` `from_legacy` `upgrade_loaded` `derive` `validate` `page` `page_id` `page_has` `title` `row_sizes` |
-| `src/layout/model.ts` | zrcadlo modelu + čistá logika: normalizace, úpravy karet a záložek (s Vrátit), katalog, co záložka ukáže, cíl tažení, `withLayout` (jedno pole configu); test `model.test.mjs` (i shoda `CARDS`/`PARTS` s Rustem) | `CARD_IDS` `CARD_INFO` `PARTS` `PART_INFO` `defaultLayout` `normalizeLayout` `moveCard` `setSize` `nextSize` `removeCard` `restoreCard` `addCard` `moveToPage` `setPartHidden` `catalog` `addPage` `renamePage` `removePage` `restorePage` `movePage` `pageKind` `shownCards` `gridDropIndex` `keyMove` |
+| `src-tauri/src/layout.rs` | struktura, výchozí rozložení, převod starého configu, jednorázové úpravy, odvozená pole, validace (i `h` 1–4), záložka pro režim, název pro proužek; testy (tabulka starých configů, migrace Projekty → Osobní, tvar `h`/`tiles`, `load`/`save`) | `LayoutConfig` `LayoutPage` `LayoutCard` `CardSize` `TileOpts` `TileSize` `MAX_H` `UP_PERSONAL_PROJECTS` `CARDS` `PARTS` `from_legacy` `apply_upgrades` `upgrade_loaded` `derive` `validate` `page` `page_id` `page_has` `title` `row_sizes` |
+| `src/layout/model.ts` | zrcadlo modelu + čistá logika: normalizace, úpravy karet a záložek (s Vrátit), výška, volby dlaždic, katalog, co záložka ukáže, cíl tažení, `withLayout` (jedno pole configu); test `model.test.mjs` (i shoda `CARDS`/`PARTS`/`UP_PERSONAL_PROJECTS`/`MAX_H` s Rustem) | `CARD_IDS` `CARD_INFO` `PARTS` `PART_INFO` `HEIGHTS` `TILE_SIZES` `DEFAULT_TILES` `QUICK_HEIGHTS` `defaultLayout` `normalizeLayout` `normalizeTiles` `tilesOf` `moveCard` `setSize` `nextSize` `setHeight` `nextHeight` `setTiles` `showProject` `visibleProjects` `removeCard` `restoreCard` `addCard` `moveToPage` `setPartHidden` `catalog` `addPage` `renamePage` `removePage` `restorePage` `movePage` `pageKind` `shownCards` `gridDropIndex` `keyMove` |
 | `src/layout/edit.ts` | stav režimu úprav: draft, záložka v úpravách, katalog, lišta Vrátit, cíl tažení; Hotovo / Zrušit; jedna změna mimo úpravy (⋯) | `beginEdit` `change` `finishEdit` `cancelEdit` `offerUndo` `saveLayout` `askEdit` `editAsk` |
-| `src/layout/Deck.tsx` · `layout.css` | mřížka záložky `.deck` > `.deck-item[data-size][data-card]` (rozhraní pro styly: `--deck-cols`, výchozí 4), v úpravách úchyt ⠿ (pointer, i na záložku), ⇔, ×, zástupce karty bez dat, „+ Přidat kartu“, rozvlnění | `Deck` |
+| `src/layout/Deck.tsx` · `layout.css` | mřížka záložky `.deck` > `.deck-item[data-size][data-card][data-h]` (rozhraní pro styly: `--deck-cols`, výchozí 4; rozpětí `--span` z `packSpans`, výška `--h` × `--deck-row`, obsah s výškou scrolluje uvnitř), v úpravách úchyt ⠿ (pointer, i na záložku), **úchyty okrajů `.lay-rs-e/-s/-se`** (tah = šířka / výška / obojí, obrys `.lay-target` s „2 × 3“, Esc zruší, dvojklik spodní = auto), ⇔, ↕, ×, zástupce karty bez dat, „+ Přidat kartu“, rozvlnění | `Deck` `sizeLabel` `heightLabel` |
+| `src/layout/size.ts` | čistá mechanika mřížky: rozpětí velikosti, řada bez děr, cíl tahu za okraj, px ↔ řádky; test `size.test.mjs` | `spanOf` `packSpans` `sizeForSpan` `resizeTo` `rowsForPx` `heightPx` `deckCols` |
+| `src/layout/Tour.tsx` · `tips.ts` · `tour.css` | prohlídka 3 bublin (✎ `data-tip="edit"`, ⋯ první karty, 🔍 `data-tip="palette"`) při prvním otevření; viditelnost z událostí `view`/`closing`, stav `ui.tips` (`tour1`); čistá logika + test `tips.test.mjs` | `Tour` `TOUR_ID` `STEPS` `shouldShow` `withTip` `bubblePos` |
 | `src/layout/Tabs.tsx` | záložky v hlavičce (N), v úpravách přejmenovat dvojklikem, smazat, pořadí tažením, nová záložka s ikonou; cíl tažení karty (`data-tab`) | `Tabs` |
-| `src/layout/Catalog.tsx` · `EditBar.tsx` | katalog karet (název, popis, kde je) · lišta úprav (Zrušit / Hotovo) + Vrátit | |
-| `src/layout/LayoutEditor.tsx` | editor stejného modelu v Nastavení (panel Šuplík a karty, `SortList`), části karet, „Upravit přímo v šuplíku“ | |
+| `src/layout/Catalog.tsx` · `EditBar.tsx` | katalog karet (název, popis, kde je) · lišta úprav (výrazně „Táhni za okraj karty = velikost“, Zrušit / Hotovo) + Vrátit | |
+| `src/layout/LayoutEditor.tsx` | editor stejného modelu v Nastavení (panel Šuplík a karty, `SortList`): velikost, výška, u Projektů volby dlaždic a které projekty, části karet, „Upravit přímo v šuplíku“ | |
+| `src/cards/CardMenu.tsx` · `TileOptions.tsx` · `cardmenu.css` | ⋯ karty (Portal, pevná pozice — neořízne ho karta s výškou, u spodu nahoru): Velikost S/M/L/XL, Výška Auto/Nízká/Vysoká, u Projektů Dlaždice (Malé ikony/Dlaždice/Velké), název, git, které projekty; ukládá hned (`saveLayout`) | `CardMenu` `MenuChoice` `TileOptions` `tileSizeName` |
 | `src/layout/text.ts` | lidské názvy z párů v modelu (překlad až při vykreslení) | `tx` `cardName` `partName` `pageName` |
 
 ## Toky
@@ -38,7 +53,12 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 - **Úpravy**: ✎ v hlavičce / paleta „Upravit šuplík“ / ⋯ „Upravit šuplík…“ / prázdná záložka → `beginEdit`
   (`focusDrawer`; šuplík nezavře odjetí myši) → změny jen v draftu → Hotovo: `get_config` → `withLayout` →
   `save_config` → `set_mode(záložka)`; Zrušit / Esc / zavření šuplíku / jiná stránka = zahodit.
-- **Klávesy**: 1–9 = záložka (App), v úpravách Esc = Zrušit, Alt+šipky na úchytu = přesun karty.
+- **Velikost karty**: v úpravách tah za okraj (`Deck` `resize` → `size.ts` `resizeTo`; změří mřížku jednou při
+  chycení, sonda `.lay-probe` pro `--deck-row`) → obrys → pustit = `setSize` / `setHeight` v draftu; mimo
+  úpravy ⋯ → `saveLayout`. Projekty: `MainPage` předá kartě `tilesOf(karta)`, dlaždice filtruje `visibleProjects`.
+- **Prohlídka**: `MainPage` → `Tour` (mimo úpravy) → jednou `get_config` → `shouldShow` → po otevření šuplíku
+  (`view` = full) a 700 ms bubliny; Hotovo / Přeskočit → `withTip` → `save_config`.
+- **Klávesy**: 1–9 = záložka (App), v úpravách Esc = Zrušit (během tahu za okraj jen zruší tah), Alt+šipky na úchytu = přesun karty.
 - **Nastavení**: panel Šuplík a karty → `LayoutEditor` mění draft Nastavení (`c.set("layout")`), uloží
   společná lišta. Pořadí karet ve Vzhledu už není.
 
@@ -48,10 +68,16 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 - Nová karta = id do `layout::CARDS` + `model.ts` `CARD_IDS`/`CARD_INFO` + případně pole `sections!`
   v `config.rs` (+ `SECTION_KEYS`) + větev v `MainPage` `card`. Nová část = `PARTS` v obou + pole `sections!`.
 - Vzhled karet (barvy, rohy, šířky podle stylu) patří stylům; `layout.css` drží jen mechaniku mřížky a ovládání úprav.
+- Akce dlaždice projektu jsou UVNITŘ dlaždice (`.acts` absolutně dole přes název a větev) — nikdy přes kartu
+  pod ní; nová akce = ikona s `title`/`aria-label`, ne text (dlaždice je úzká).
+- Menu a bubliny nad kartami kresli přes `Portal` do `.shell` s `position: fixed` (karta s výškou má
+  `overflow: auto` a okno šuplíku je jen tak vysoké jako obsah).
 - `src/theme/appearance.ts` `cardOrder` / `CARD_IDS` / `cards` jsou po vlně 6 mrtvé (Rust pole `appearance.cards` už nemá).
 
 ## Testy
 
 `cargo test layout` (výchozí = dnešní šuplík, převod starých configů — tabulka se skutečnými tvary, velikosti
-řady, odvozená pole, validace, `load` → `save` → `load`). `corepack pnpm test:ui` → `src/layout/model.test.mjs`,
+řady, migrace Projekty → Osobní včetně „odebrané se nevrací“ přes `load` → `save` → `load`, tvar `h`/`tiles`,
+odvozená pole, validace), `cargo test uiconf` (`ui.tips`). `corepack pnpm test:ui` → `src/layout/model.test.mjs`,
+`size.test.mjs` (řada bez děr, tah za okraj), `tips.test.mjs` (prohlídka),
 `src/cards/sections.test.mjs` (shoda polí `drawer.sections` s modelem), hlídače CSS tříd a překladů.

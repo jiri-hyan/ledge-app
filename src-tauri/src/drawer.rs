@@ -8,9 +8,14 @@
 //! - **slide** (pozadí „acrylic“): DWM akryl kryje celé okno, tvar animovat nejde → okno vyjíždí.
 //!
 //! Horní rohy jsou vždy schované nad okrajem obrazovky → panel vypadá přilepený k hraně.
+//!
+//! Pohledy (`View`): Hidden, Peek (schválení / připomínka), Full (celý šuplík) a náhledy po najetí
+//! Compact / Island (`drawer.hover`, čisté rozhodování v `hovermode.rs`). Přechody mezi nimi jdou stejným
+//! morfem (výchozí tvar = předchozí pohled). Fokus bere jen Full otevřený zkratkou / výslovný klik.
 
 use crate::appearance::{StripPosition, geom};
 use crate::drawerfit;
+use crate::hovermode::{self, SmallSizes};
 use crate::screen::Monitor;
 use parking_lot::{Condvar, Mutex};
 use serde::{Deserialize, Serialize};
@@ -44,6 +49,18 @@ pub enum View {
     /// malý pruh se schválením pro Claude
     Peek,
     Full,
+    /// po najetí (`drawer.hover: "compact"`): malý panel s tím nejdůležitějším (`src/hover/Compact.tsx`)
+    Compact,
+    /// po najetí (`drawer.hover: "island"`): kapsle s jedním děním (`src/hover/Island.tsx`)
+    Island,
+}
+
+impl View {
+    /// Otevřený panel u horní hrany (celý šuplík nebo náhled po najetí): kryje proužek, zavírá ho
+    /// odjetí myši (otevřený najetím) a s čekajícím Claudem se stáhne do peeku (`hovermode::after_close`).
+    pub fn covers_strip(self) -> bool {
+        matches!(self, View::Full | View::Compact | View::Island)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +85,8 @@ pub struct ViewMsg {
     pub to_h: f64,
     /// strop výšky obsahu na tomhle monitoru (logické px, bez přesahu) — nad ním posouvá frontend
     pub max_h: f64,
+    /// náhled po najetí (Compact / Island): po kolika ms setrvání se rozbalí celý šuplík, 0 = jen klikem
+    pub expand_ms: u64,
 }
 
 /// Měření plynulosti animace z frontendu (requestAnimationFrame).
@@ -90,8 +109,10 @@ struct St {
     full_h: f64,
     /// žádost frontendu o širší Full (Nastavení), 0 = šířka z configu (`drawerfit::fit_full`)
     full_w: f64,
-    peek_h: f64,
-    peek_w: f64,
+    /// peek, kompaktní náhled, ostrůvek (`hovermode::SmallSizes`)
+    small: SmallSizes,
+    /// `drawer.hoverExpandMs` (oříznuté) — jde frontendu ve `ViewMsg`
+    expand_ms: u64,
     rect: RECT,
     last_blur: Option<Instant>,
     /// frontend má posluchače a stav
@@ -135,8 +156,8 @@ impl Drawer {
                 focus_restore: None,
                 full_h: 420.0,
                 full_w: 0.0,
-                peek_h: 72.0,
-                peek_w: 680.0,
+                small: SmallSizes::default(),
+                expand_ms: hovermode::EXPAND_MS,
                 rect: RECT::default(),
                 last_blur: None,
                 ready: false,
@@ -351,6 +372,11 @@ impl Drawer {
         self.st.lock().anchor = pos;
     }
 
+    /// Prodleva rozbalení náhledu po najetí (`drawer.hoverExpandMs`, vlákno `ui` z configu).
+    pub fn set_expand_ms(&self, ms: u64) {
+        self.st.lock().expand_ms = hovermode::expand_ms(ms);
+    }
+
     pub fn view(&self) -> View {
         self.st.lock().view
     }
@@ -363,13 +389,14 @@ impl Drawer {
         self.st.lock().rect
     }
 
-    /// Velikost pohledu v logických px, Full oříznutý na monitor (`drawerfit`).
+    /// Velikost pohledu v logických px, Full i náhledy po najetí oříznuté na monitor (`drawerfit`, `hovermode`).
     fn logical_size(&self, view: View, width: f64, mon: &Monitor) -> (f64, f64) {
         let s = self.st.lock();
+        let lim = drawerfit::limits(mon.rect, mon.work, mon.dpi);
         match view {
-            View::Full => drawerfit::fit_full(s.full_w, width, s.full_h, drawerfit::limits(mon.rect, mon.work, mon.dpi)),
-            View::Peek => (s.peek_w, s.peek_h),
+            View::Full => drawerfit::fit_full(s.full_w, width, s.full_h, lim),
             View::Hidden => (0.0, 0.0),
+            small => s.small.get(small).map_or((0.0, 0.0), |sz| hovermode::fit_small(small, sz, width, lim.max_h)),
         }
     }
 
@@ -381,21 +408,14 @@ impl Drawer {
                 self.cv.notify_all();
             }
             let changed = match view {
-                View::Full => (s.full_h - h).abs() > 0.5 || (s.full_w - w).abs() > 0.5,
-                View::Peek => (s.peek_h - h).abs() > 0.5 || (s.peek_w - w).abs() > 0.5,
-                View::Hidden => false,
-            };
-            match view {
                 View::Full => {
+                    let changed = (s.full_h - h).abs() > 0.5 || (s.full_w - w).abs() > 0.5;
                     s.full_h = h;
                     s.full_w = w.max(0.0);
+                    changed
                 }
-                View::Peek => {
-                    s.peek_h = h;
-                    s.peek_w = w;
-                }
-                View::Hidden => {}
-            }
+                small => s.small.set(small, w, h),
+            };
             changed && s.view == view
         };
         if changed {
@@ -432,8 +452,12 @@ impl Drawer {
         let morph = self.morph() && animate_ms > 0;
         let (to_w, to_h) = self.logical_size(view, width, mon);
         let max_h = drawerfit::limits(mon.rect, mon.work, mon.dpi).max_h;
-        self.st.lock().prepared = false;
-        let _ = self.app.emit_to(LABEL, "view", ViewMsg { view, morph, from_w, from_h, to_w, to_h, max_h });
+        let expand_ms = {
+            let mut s = self.st.lock();
+            s.prepared = false;
+            s.expand_ms
+        };
+        let _ = self.app.emit_to(LABEL, "view", ViewMsg { view, morph, from_w, from_h, to_w, to_h, max_h, expand_ms });
         if morph {
             // frontend se složí do tvaru proužku dřív, než okno uvidíš → žádné probliknutí
             self.wait_flag(|s| s.prepared, Duration::from_millis(250));
@@ -559,7 +583,7 @@ impl Drawer {
             let _ = self.app.emit_to(
                 LABEL,
                 "closing",
-                ViewMsg { view: View::Hidden, morph: true, from_w: 0.0, from_h: 0.0, to_w: strip.0, to_h: strip.1, max_h: 0.0 },
+                ViewMsg { view: View::Hidden, morph: true, from_w: 0.0, from_h: 0.0, to_w: strip.0, to_h: strip.1, max_h: 0.0, expand_ms: 0 },
             );
             // stažení do proužku; pojistka, kdyby frontend neodpověděl
             self.wait_flag(|s| s.closed, Duration::from_millis(600));
@@ -567,7 +591,7 @@ impl Drawer {
                 let _ = ShowWindow(h, SW_HIDE);
             }
         } else {
-            let _ = self.app.emit_to(LABEL, "view", ViewMsg { view: View::Hidden, morph: false, from_w: 0.0, from_h: 0.0, to_w: 0.0, to_h: 0.0, max_h: 0.0 });
+            let _ = self.app.emit_to(LABEL, "view", ViewMsg { view: View::Hidden, morph: false, from_w: 0.0, from_h: 0.0, to_w: 0.0, to_h: 0.0, max_h: 0.0, expand_ms: 0 });
             unsafe {
                 let mut r = RECT::default();
                 let _ = GetWindowRect(h, &mut r);

@@ -1,0 +1,48 @@
+/* Náhled po najetí (`src/hover/*`): kompaktní panel v barvách motivu a černý ostrůvek. Pohyb (pulz tečky)
+   vypíná globální „omezit pohyb“ / appearance.motion.style = none ze styles.css. */
+.hov { padding: var(--s2) var(--s4) var(--s3); cursor: default; }
+.hov-approval { margin: 0 calc(-1 * var(--s4)) var(--s1); border-bottom: 1px solid var(--line); }
+/* schválení v úzkém panelu: text přes celou šířku, tlačítka pod ním (`Approval stack`) */
+.hov-stack { flex-wrap: wrap; justify-content: flex-end; row-gap: var(--s2); }
+.hov-stack > :nth-child(2) { flex: 1 1 calc(100% - 56px); }
+.hov-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line-soft, var(--line)); font-size: var(--fs-sm); min-width: 0; }
+.hov-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t1); }
+.hov-row .meta { color: var(--t3); white-space: nowrap; font-size: var(--fs-xs); }
+.hov-media .grow { display: flex; flex-direction: column; line-height: 1.25; }
+.hov-title { overflow: hidden; text-overflow: ellipsis; }
+.hov-sub { color: var(--t3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; }
+.hov-empty { color: var(--t3); font-size: var(--fs-sm); padding: 8px 0; }
+.hov-foot { display: flex; align-items: center; gap: 10px; padding-top: 8px; font-size: var(--fs-xs); color: var(--t3); }
+.hov-clock { font: 600 var(--fs-sm) var(--mono); color: var(--t2); }
+.hov-more { margin-left: auto; color: var(--t3); font-size: var(--fs-xs); padding: 2px 6px; border-radius: var(--r-sm); }
+.hov-more:hover { color: var(--t1); background: var(--card-2); }
+.hov-lim { font: 600 var(--fs-xs) var(--mono); color: var(--t2); white-space: nowrap; }
+.hov-lim-warn { color: var(--amber); }
+.hov-lim-bad { color: var(--red); }
+.hov-lim-old { opacity: 0.6; }
+
+.hov-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--t3); }
+.hov-dot-run { background: var(--violet); }
+.hov-dot-wait { background: var(--amber); }
+.hov-pulse { animation: hov-pulse 1.6s ease-in-out infinite; }
+@keyframes hov-pulse { 50% { opacity: 0.4; } }
+
+/* Ostrůvek: černá kapsle (jako výřez monitoru) v každém motivu — barvy textu a tlačítek lokálně */
+.isl {
+  --t1: #f4f5f8; --t2: #c9ccd4; --t3: #8d929e; --card: #1b1c22; --card-2: #26282f; --line: #2a2c33; --line-2: #33363e;
+  --on-light: #0b0b0e; --pri-hover: #d9dbe0;
+  background: #000; color: var(--t1);
+  min-height: 56px; padding: 10px 18px 12px; display: flex; align-items: center; gap: 14px;
+  border-radius: 0 0 var(--r-shell) var(--r-shell); font-size: var(--fs-sm); cursor: default;
+}
+.isl-ico { width: 30px; height: 30px; border-radius: var(--r-md); display: grid; place-items: center; flex-shrink: 0; font-weight: 700; }
+.isl-ico svg { width: 16px; height: 16px; }
+.isl-ico.wait { background: color-mix(in srgb, var(--amber) 20%, transparent); color: var(--amber); }
+.isl-ico.ok { background: color-mix(in srgb, var(--green) 20%, transparent); color: var(--green); }
+.isl-ico.tm { background: color-mix(in srgb, var(--violet) 22%, transparent); color: var(--violet); }
+.isl-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.isl-tx b, .isl-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isl-tx b { font-weight: 650; }
+.isl-sub { color: var(--t3); font-size: var(--fs-xs); }
+.isl-act { display: flex; align-items: center; gap: var(--s2); flex-shrink: 0; }
+.isl-time { font: 600 calc(26px * var(--fz, 1)) var(--display, var(--sans)); letter-spacing: -0.02em; }

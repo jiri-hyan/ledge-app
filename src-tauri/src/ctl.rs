@@ -27,7 +27,8 @@ pub(crate) fn ctl_handler() -> claude::Ctl {
         let c = core();
         match cmd {
             "open" => {
-                let view = if body.get("view").and_then(Value::as_str) == Some("peek") { View::Peek } else { View::Full };
+                // "peek" / "compact" / "island" (náhledy po najetí — i k živému ověření bez myši), jinak celý
+                let view = crate::hovermode::view_by_name(body.get("view").and_then(Value::as_str));
                 c.send_ui(UiCmd::Show(view, Opener::Remote));
                 Ok(json!({ "ok": true }))
             }

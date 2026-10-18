@@ -100,7 +100,10 @@ pub(crate) fn allowed(cfg: &Config) -> bool {
 /// Chce data proužek? (zapnutý proužek s položkou `media` nebo vzhled „Jen v proužku“; nezávisle na
 /// záložce Osobní)
 pub(crate) fn strip_wants(cfg: &Config) -> bool {
-    cfg.strip.enabled && crate::mediaconf::strip_has_item(&cfg.strip.items, &cfg.media)
+    let look = cfg.strip.look;
+    // styl zavřeného Ledge, který hudbu ukazuje (a nemá ji v Pokročilých vypnutou), ji chce taky
+    let by_look = look.shows_music() && !cfg.strip.look_hide.contains(&crate::config::StripItem::Media);
+    cfg.strip.enabled && (by_look || crate::mediaconf::strip_has_item(&cfg.strip.items, &cfg.media))
 }
 
 /// Má vlákno běžet? Karta (UI už Osobní ukázalo = `wanted`, karta smí běžet) NEBO položka proužku.

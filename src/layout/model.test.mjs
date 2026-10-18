@@ -5,9 +5,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  CARD_IDS, CARD_INFO, MAX_PAGES, PARTS, PART_INFO, addCard, addPage, catalog, defaultLayout, gridDropIndex, keyMove, moveCard, movePage, moveToPage,
-  nextSize, normalizeLayout, pageIdFor, pageKind, pageNameError, pageOf, removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout,
-  setPartHidden, setSize, shownCards, withLayout,
+  CARD_IDS, CARD_INFO, DEFAULT_TILES, MAX_PAGES, PARTS, PART_INFO, QUICK_HEIGHTS, UP_PERSONAL_PROJECTS, addCard, addPage, catalog, clone, defaultLayout,
+  gridDropIndex, keyMove, moveCard, movePage, moveToPage, nextHeight, nextSize, normalizeLayout, normalizeTiles, pageIdFor, pageKind, pageNameError, pageOf,
+  removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, shownCards, tilesOf,
+  visibleProjects, withLayout,
 } from "./model.ts";
 
 const ids = (l, page) => pageOf(l, page).cards.map((c) => c.id);
@@ -22,7 +23,12 @@ test("zrcadlo Rustu: karty a části jako v layout.rs", () => {
   // výchozí velikosti = výchozí rozložení v Rustu (Práce: Běží xl, Claude a Repa m)
   const d = defaultLayout();
   assert.deepEqual(d.pages[0].cards.map((c) => `${c.id}:${c.size}`), ["projects:xl", "actions:xl", "shelf:xl", "running:xl", "claude:m", "repos:m", "notes:xl"]);
-  assert.deepEqual(d.pages[1].cards.map((c) => `${c.id}:${c.size}`), ["clock:s", "timer:s", "weather:s", "calendar:s", "media:m", "links:m", "actions:xl", "shelf:xl", "notes:xl"]);
+  assert.deepEqual(d.pages[1].cards.map((c) => `${c.id}:${c.size}`), ["projects:xl", "clock:s", "timer:s", "weather:s", "calendar:s", "media:m", "links:m", "actions:xl", "shelf:xl", "notes:xl"]);
+  assert.deepEqual(d.upgrades, [UP_PERSONAL_PROJECTS], "výchozí = jednorázové úpravy už hotové");
+  const up = src.match(/pub const UP_PERSONAL_PROJECTS: &str = "([A-Za-z]+)"/)[1];
+  assert.equal(up, UP_PERSONAL_PROJECTS);
+  const maxH = Number(src.match(/pub const MAX_H: u8 = (\d+);/)[1]);
+  assert.equal(maxH, 4);
   for (const id of CARD_IDS) assert.ok(CARD_INFO[id].name[0].startsWith("cards.layout.card.") && CARD_INFO[id].desc[1], id);
   for (const k of Object.keys(PARTS)) assert.ok(PART_INFO[k], k);
 });
@@ -46,7 +52,7 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
   const before = JSON.stringify(d);
   assert.deepEqual(ids(moveCard(d, "prace", 4, 0), "prace").slice(0, 2), ["claude", "projects"]);
   assert.deepEqual(ids(moveCard(d, "prace", 0, 99), "prace"), ids(d, "prace"), "mimo rozsah = beze změny");
-  assert.equal(pageOf(setSize(d, "osobni", "clock", "l"), "osobni").cards[0].size, "l");
+  assert.equal(pageOf(setSize(d, "osobni", "clock", "l"), "osobni").cards.find((c) => c.id === "clock").size, "l");
   assert.deepEqual(["s", "m", "l", "xl"].map(nextSize), ["m", "l", "xl", "s"]);
 
   const r = removeCard(d, "prace", "claude");
@@ -121,8 +127,8 @@ test("co stránka ukáže: karty bez dat se schovají samy", () => {
     [pageOf(d, "prace"), f(), ["projects", "claude", "repos", "notes"]],
     [pageOf(d, "prace"), f({ procs: 1, actions: 2, shelf: true }), ["projects", "actions", "shelf", "running", "claude", "repos", "notes"]],
     [pageOf(d, "prace"), f({ scriptOut: true, notesEnabled: false }), ["projects", "actions", "claude", "repos"]],
-    [pageOf(d, "osobni"), f(), ["clock", "timer", "weather", "calendar", "links", "actions", "notes"]],
-    [pageOf(d, "osobni"), f({ media: true }), ["clock", "timer", "weather", "calendar", "media", "links", "actions", "notes"]],
+    [pageOf(d, "osobni"), f(), ["projects", "clock", "timer", "weather", "calendar", "links", "actions", "notes"]],
+    [pageOf(d, "osobni"), f({ media: true }), ["projects", "clock", "timer", "weather", "calendar", "media", "links", "actions", "notes"]],
     [custom, f(), ["actions"]],
   ];
   for (const [p, facts, want] of cases) assert.deepEqual(shownCards(p, facts).map((c) => c.id), want, `${p.id} ${JSON.stringify(facts)}`);
@@ -161,4 +167,59 @@ test("tažení v mřížce: nejbližší střed; Alt+šipky", () => {
     ["Enter", 1, 3, null],
   ];
   for (const [k, i, n, want] of keys) assert.equal(keyMove(k, i, n), want, `${k} ${i}`);
+});
+
+test("výška karty: normalizace, nastavení, kruh ↕, rychlé volby", () => {
+  const raw = { pages: [{ id: "a", name: "A", cards: [{ id: "claude", size: "m", h: 3 }, { id: "repos", size: "m", h: 9 }, { id: "notes", size: "xl", h: "2" }] }] };
+  const l = normalizeLayout(raw);
+  assert.deepEqual(l.pages[0].cards, [{ id: "claude", size: "m", h: 3 }, { id: "repos", size: "m" }, { id: "notes", size: "xl" }], "jen 1–4, číslo");
+  const d = defaultLayout();
+  const before = JSON.stringify(d);
+  const set = setHeight(d, "prace", "claude", 2);
+  assert.equal(pageOf(set, "prace").cards.find((c) => c.id === "claude").h, 2);
+  assert.ok(!("h" in pageOf(setHeight(set, "prace", "claude", undefined), "prace").cards.find((c) => c.id === "claude")), "auto = pole pryč");
+  assert.equal(JSON.stringify(d), before, "vstup se nemění");
+  assert.deepEqual([undefined, 1, 2, 3, 4].map(nextHeight), [1, 2, 3, 4, undefined]);
+  assert.deepEqual(QUICK_HEIGHTS.map((q) => q.h), [undefined, 2, 4]);
+  // výška jde s kartou na jinou záložku i přes Vrátit
+  const m = moveToPage(set, "prace", "claude", "osobni");
+  assert.equal(pageOf(m, "osobni").cards.at(-1).h, 2);
+  const r = removeCard(set, "prace", "claude");
+  assert.equal(pageOf(restoreCard(r.layout, r.undo), "prace").cards.find((c) => c.id === "claude").h, 2);
+});
+
+test("zástupci (karta Projekty): volby dlaždic, skryté projekty, výchozí = bez pole", () => {
+  const cases = [
+    ["nic", undefined, DEFAULT_TILES],
+    ["část", { size: "small", git: false }, { size: "small", label: true, git: false, hidden: [] }],
+    ["nesmysl", { size: "huge", label: "ano", hidden: ["a", 3, "a", ""] }, { size: "tile", label: true, git: true, hidden: ["a"] }],
+  ];
+  for (const [name, raw, want] of cases) assert.deepEqual(normalizeTiles(raw), want, name);
+  const d = defaultLayout();
+  const s = setTiles(d, "osobni", { size: "large" });
+  assert.deepEqual(tilesOf(pageOf(s, "osobni").cards[0]), { ...DEFAULT_TILES, size: "large" });
+  assert.equal(pageOf(s, "prace").cards[0].tiles, undefined, "jiná záložka beze změny");
+  assert.equal(pageOf(setTiles(s, "osobni", { size: "tile" }), "osobni").cards[0].tiles, undefined, "zpět na výchozí = pole pryč");
+  const h = showProject(showProject(d, "osobni", "harbor", false), "osobni", "kino", false);
+  assert.deepEqual(tilesOf(pageOf(h, "osobni").cards[0]).hidden, ["harbor", "kino"]);
+  assert.deepEqual(tilesOf(pageOf(showProject(h, "osobni", "harbor", true), "osobni").cards[0]).hidden, ["kino"]);
+  const projects = [{ id: "harbor" }, { id: "kino" }, { id: "ledge" }];
+  assert.deepEqual(visibleProjects(projects, tilesOf(pageOf(h, "osobni").cards[0])).map((p) => p.id), ["ledge"]);
+  assert.deepEqual(visibleProjects(projects, DEFAULT_TILES).length, 3, "výchozí = všechny (i nový projekt)");
+  // volby přežijí normalizaci, klon a přesun na jinou záložku
+  const n = normalizeLayout(JSON.parse(JSON.stringify(h)));
+  assert.deepEqual(tilesOf(pageOf(n, "osobni").cards[0]).hidden, ["harbor", "kino"]);
+  const c = clone(h);
+  c.pages[1].cards[0].tiles.hidden.push("x");
+  assert.deepEqual(tilesOf(pageOf(h, "osobni").cards[0]).hidden, ["harbor", "kino"], "klon je hluboký");
+});
+
+test("značka jednorázových úprav přežije normalizaci i uložení (jinak by se odebrané Projekty vracely)", () => {
+  const raw = { pages: [{ id: "osobni", name: "", cards: [{ id: "clock", size: "s" }] }], hiddenParts: [], upgrades: ["personalProjects", 7, "personalProjects"] };
+  const l = normalizeLayout(raw);
+  assert.deepEqual(l.upgrades, ["personalProjects"]);
+  assert.deepEqual(withLayout({ ui: {} }, l).layout.upgrades, ["personalProjects"]);
+  assert.deepEqual(clone(l).upgrades, ["personalProjects"]);
+  assert.ok(!("upgrades" in normalizeLayout({ pages: [{ id: "a", name: "A", cards: [] }] })), "chybí = nepsat");
+  assert.ok(!sameLayout(l, { ...l, upgrades: [] }), "značka je součást rozložení");
 });

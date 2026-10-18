@@ -1,6 +1,11 @@
-/* Dlaždice projektů (Projects.tsx): náklon za kurzorem (--rx/--ry z `tilt`), reflektor (--mx/--my
-   z App), prstenec běhu kolem loga a akce pod dlaždicí. Tokeny ze styles.css. */
-.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: var(--s2); margin-bottom: var(--gap-section); }
+/* Karta Projekty (Projects.tsx): dlaždice s náklonem za kurzorem (--rx/--ry z `tilt`), reflektor (--mx/--my
+   z App), prstenec běhu kolem loga, akce UVNITŘ dlaždice dole (při najetí / fokusu). Velikost dlaždic
+   `data-tiles` = small | tile | large (volba karty). Tokeny ze styles.css. */
+.proj-card { display: flex; flex-direction: column; }
+.projects { --tile-min: 118px; --logo: 56px; --logo-img: 36px; display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr)); gap: var(--s2); }
+.projects[data-tiles="small"] { --tile-min: 76px; --logo: 40px; --logo-img: 26px; }
+.projects[data-tiles="large"] { --tile-min: 156px; --logo: 72px; --logo-img: 46px; }
+.proj-empty { grid-column: 1 / -1; }
 .proj { --a: #64748b; --rx: 0deg; --ry: 0deg; position: relative; transform-style: preserve-3d; border-radius: var(--r-xl); padding: 14px 6px 11px; display: flex; flex-direction: column; align-items: center; gap: 7px; text-align: center;
   background: linear-gradient(180deg, color-mix(in srgb, var(--a) 13%, transparent), color-mix(in srgb, var(--a) 4%, transparent));
   border: 1px solid color-mix(in srgb, var(--a) 22%, transparent);
@@ -15,8 +20,11 @@
 .proj-hit { display: flex; flex-direction: column; align-items: center; gap: 7px; width: 100%; border-radius: var(--r-lg); }
 .live-port { color: var(--green); font-weight: 600; }
 
-.logo { width: 56px; height: 56px; border-radius: var(--r-xl); display: grid; place-items: center; font: 650 calc(18px * var(--fz)) var(--display); color: var(--white); position: relative; box-shadow: var(--ring-logo), 0 6px 18px -6px var(--logo-shadow); transition: transform var(--dur-5) var(--spring); }
-.logo img { width: 36px; height: 36px; object-fit: contain; }
+.logo { width: var(--logo); height: var(--logo); border-radius: var(--r-xl); display: grid; place-items: center; font: 650 calc(18px * var(--fz)) var(--display); color: var(--white); position: relative; box-shadow: var(--ring-logo), 0 6px 18px -6px var(--logo-shadow); transition: transform var(--dur-5) var(--spring); }
+.logo img { width: var(--logo-img); height: var(--logo-img); object-fit: contain; }
+.projects[data-tiles="small"] .proj { padding: 9px 4px 8px; gap: 4px; }
+.projects[data-tiles="small"] .logo { font-size: calc(14px * var(--fz)); }
+.projects[data-tiles="large"] .logo { font-size: calc(24px * var(--fz)); }
 .logo.has-img { background: var(--logo-plate) !important; }
 .proj:hover .logo { transform: translateZ(18px) scale(1.06); }
 /* běžící projekt: rotující prstenec kolem loga */
@@ -34,13 +42,15 @@
 .br .dirty { color: var(--amber); }
 .br .ahead { color: var(--blue); }
 
-/* akce pod dlaždicí: na hover i na fokus z klávesnice (focus-within) */
-.acts { position: absolute; left: 50%; top: calc(100% - 6px); transform: translate(-50%, -4px); display: flex; gap: 2px; background: var(--pop); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s1); opacity: 0; pointer-events: none; transition: opacity var(--dur-1), transform var(--dur-2) var(--ease); z-index: 10; box-shadow: var(--shadow-pop); }
-.proj:hover .acts, .proj:focus-within .acts { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
-.acts button { height: 28px; min-width: 30px; padding: 0 var(--s2); display: inline-flex; gap: 5px; align-items: center; justify-content: center; border-radius: var(--r-xs); color: var(--t2); font-size: var(--fs-sm); white-space: nowrap; }
+/* akce při najetí / fokusu z klávesnice: UVNITŘ dlaždice, přilepené dole přes její název a větev —
+   nikdy přes kartu pod ní, rozložení se neposune; víc akcí se zalomí nahoru (wrap-reverse) */
+.acts { position: absolute; left: 1px; right: 1px; bottom: 1px; z-index: 2; display: flex; flex-wrap: wrap-reverse; justify-content: center; gap: 1px; padding: 3px; background: var(--pop); border-top: 1px solid color-mix(in srgb, var(--a) 40%, var(--line-2)); border-radius: 0 0 calc(var(--r-xl) - 1px) calc(var(--r-xl) - 1px); opacity: 0; pointer-events: none; transform: translateY(3px); transition: opacity var(--dur-1), transform var(--dur-2) var(--ease); }
+.proj:hover .acts, .proj:focus-within .acts { opacity: 1; pointer-events: auto; transform: none; }
+.acts:empty { display: none; }
+.acts button { height: 24px; min-width: 24px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-xs); color: var(--t2); }
 .acts button:hover { background: var(--card-2); color: var(--t1); }
 .acts button:disabled { opacity: 0.55; cursor: progress; }
-.acts svg { width: 15px; height: 15px; }
+.acts svg { width: 14px; height: 14px; }
 
 /* bez náklonu a „vyskočení“ loga, když systém chce méně pohybu */
 @media (prefers-reduced-motion: reduce) {

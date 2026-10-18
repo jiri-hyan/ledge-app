@@ -112,6 +112,13 @@ pub struct DrawerConfig {
     pub dwell_delay_ms: u64,
     /// Za jak dlouho (ms) se šuplík zavře, když z něj myš odjede.
     pub close_delay_ms: u64,
+    /// Co se stane po najetí myší: "full" = rovnou celý šuplík (výchozí), "compact" = kompaktní náhled
+    /// (schválení, session Clauda, právě hraje, čas a limit 5h), "island" = roztažený ostrůvek (jedno
+    /// nejdůležitější dění s tlačítky). Z náhledu otevře celý šuplík klik nebo setrvání myši.
+    pub hover: crate::hovermode::HoverMode,
+    /// Náhled po najetí ("compact" / "island"): po kolika ms setrvání myši se rozbalí celý šuplík.
+    /// 0 = jen klikem; jinak 400–10000 (oříznuto). Nad tlačítky a s čekajícím schválením se neodpočítává.
+    pub hover_expand_ms: u64,
     /// Šířka šuplíku v logických px.
     pub width: u32,
     /// "acrylic" = rozmazaná plocha za šuplíkem (Win11), "solid" = tmavé matné pozadí.
@@ -178,6 +185,8 @@ impl Default for DrawerConfig {
             edge_delay_ms: 120,
             dwell_delay_ms: 450,
             close_delay_ms: 350,
+            hover: crate::hovermode::HoverMode::Full,
+            hover_expand_ms: crate::hovermode::EXPAND_MS,
             width: 1080,
             glass: Glass::Solid,
             sections: Sections::default(),

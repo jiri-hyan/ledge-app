@@ -9,7 +9,7 @@ otázky Clauda, rozložení, schránka, přehrávač, kalendář) jen skládají
 |---|---|---|
 | `zaciname` | Začínáme | `panels/Start.tsx` — průvodce (`onboarding.wizard`), „Upravit šuplík“, tipy, co je nového (odkazy `gotoSettingsPanel`) |
 | `suplik` | Šuplík a karty | `panels/Drawer.tsx` → `layout/LayoutEditor.tsx` (záložky, karty, části karet, „Upravit přímo v šuplíku“), přihrádka |
-| `vzhled` | Vzhled | `panels/Appearance*.tsx` + `panels/StripSettings.tsx` (celý proužek: co ukazuje, barvy, klid, vlastní text, časovač, monitor) |
+| `vzhled` | Vzhled | `panels/Appearance.tsx` (4 kroky) → `AppearanceClosed.tsx` (+ `StripSettings.tsx` v Pokročilé: celý proužek), `AppearanceHover.tsx`, `AppearanceOpen.tsx` (+ `AppearanceStyles`, `AppearanceLayout`), `AppearanceMotion.tsx`; náhledy `settings/previews/*` — mapa [appearance.md](appearance.md) |
 | `akce` | Projekty, akce a odkazy | `panels/ProjectsActions.tsx` → `Projects.tsx` (+`ProjectEditor`), `Actions.tsx` (jeden seznam; odkaz = akce, `SortList`), `actions/ScriptsSettings.tsx`, `LegacyLinks.tsx` (jen nepřevedené `personal.links`) |
 | `claude` | Claude | `panels/Claude.tsx` (`HooksSetup`) + `panels/Questions.tsx` (otázky Clauda, `claude.questionHoldS`) |
 | `osobni` | Osobní | `panels/Personal.tsx` + `calendar/CalendarSettings`, `media/MediaSettings`, časovač, `cliphist/ClipSettings` |
@@ -30,7 +30,8 @@ staré názvy jsou v `kw` (hledání je najde).
 | `src/settings/registry.ts` · `catalog.ts` · `labels.ts` | panely bez komponent (pořadí, názvy, kw — čte i paleta) a staré id · panely s komponentami + hledání · popisky voleb (JEDINÝ zdroj pro `Row` i hledání; i volby panelu Vzhled) | `PANEL_META` `PANEL_ALIASES` · `PANELS` `searchItems` · `FIELDS` `fieldLabel` `fieldHint` `fieldKw` `fieldCs` `fieldAnchor` |
 | `src/settings/en.ts` · `panels/en.ts` | angličtina (`registerDict`, načítá `src/i18n/load.ts`): skořápka, nav, volby `settings.f.<id>`/`.hint`/`.kw`, sekce configu · texty panelů (vč. `appearance.*`, `actions.panel.*`, `questions.panel.*`); Průvodce má `settings.welcome.*` v `onboarding/en.ts` | |
 | `src/settings/model.ts` | čistá logika: hledání bez diakritiky, cesty, chyba→panel (nejdelší prefix: `drawer` → chování, `drawer.glass`/`drawer.width`/`strip` → vzhled, `personal.links` → akce), skok odjinud (`resolveTarget`: id panelu / staré id / kotva `f-<pole>`), přesuny, zkratky, porovnání | `search` `highlight` `panelForField` `resolveTarget` `moveItem` `dropIndex` `normalizeHotkey` `hotkeyFromEvent` `hotkeyCollisions` `canon` `cleanDraft` `inRoots` `relativeTo` |
-| `src/settings/fields/*` | `Row`/`Section`/`PanelHead`/`FieldErr` (`id` = kotva `f-<id>` i u sekce a hlavičky), ovládání (`controls.tsx`), `SortList` (pointer drag + Alt+šipky), `HotkeyInput`, `Confirm` | |
+| `src/settings/fields/*` | `Row`/`Section`/`PanelHead`/`FieldErr` (`id` = kotva `f-<id>` i u sekce a hlavičky), ovládání (`controls.tsx`; `Seg` = 2–4 volby), `SortList` (pointer drag + Alt+šipky), `HotkeyInput`, `Confirm` | |
+| `src/settings/appearanceModel.ts` | panel Vzhled jako čistá data: kroky a kde leží která kotva (i „Pokročilé“), volby přepínačů (≤ 4), monitor ve skutečném poměru (šířka = zrcadlo Rust `preset_width`, pozice = `anchor_c2`, sloupce rozložení) | `STEPS` `ANCHOR_STEP` `ADVANCED` `stepOf` `isAdvanced` `WIDTH_STEPS` `DENSITY_STEPS` `PREVIEW_STATES` `drawerWidth` `drawerLeft` `monitorModel` `sampleSpans` |
 | `src/settings/panels/*` | panely a jejich sekce — tabulka **Panely** výš; každý panel jen mění draft (`PanelProps` bez `save`); proužek čistou logikou `settings/strip.ts` (+ `strip.test.mjs`); bublina MSIX `pkgctx/model.ts` (+ `model.test.mjs`); Osobní záložku nevypíná (řídí `layout`) | |
 | `src/settings/widen.ts` | širší šuplík pro Nastavení a přechod podle stylu pohybu (`theme/appearance.ts` `widenMotion`; none / omezit pohyb = okamžitě) | `SETTINGS_WIDE` `wantWidth` `holdWide` `widenIn` `narrowOut` |
 | `src/fit.ts` · `fit.css` | `ViewMsg.maxH` → `--drawer-max-h`; tělo stránky se posouvá uvnitř (všechny stránky) | |
@@ -77,6 +78,12 @@ staré názvy jsou v `kw` (hledání je najde).
   `dialog:*` oprávnění a `@tauri-apps/plugin-dialog` se nepoužívá (node_modules sdílené s hlavním repem).
 - Draft přežije zavření stránky (modul); zničení WebView v úsporném režimu ho zahodí.
 - Nastavení bere fokus (`focus_drawer`) — otevírá se jen klikem; `nav.typing` obsahuje `settings`.
+- **Ovládání se vždy vejde:** segmentový přepínač má nejvýš 4 volby (víc = galerie dlaždic nebo rozbalovací;
+  hlídá `segments.test.mjs` nad celým `src`, výjimky s důvodem v `EXEMPT`). Řádek `.st-row` / `.opt` je flex
+  se zalomením: nevejde-li se ovládání vedle popisku, spadne pod něj (popisek drží ~16 em, nikdy se nezmáčkne);
+  v úzké sekci (`@container`) jde zalomené ovládání vlevo.
+- **Skok na kotvu v panelu s kroky** (Vzhled): `reveal` nastaví `hit` HNED, panel podle něj přepne krok a
+  rozbalí Pokročilé (`appearanceModel.stepOf`/`isAdvanced`), řádek se hledá až po dvou snímcích.
 - HTML5 drag&drop v okně Tauri nefunguje (chytá ho přetahování souborů) → `SortList` přes pointer.
 - **Každá volba na jednom místě.** Vzhled šuplíku (pozadí/akryl `drawer.glass`, šířka `drawer.width`,
   animace `appearance.motion`) a CELÝ proužek (styl, pozice, krytí, položky, barvy, vlastní text, monitor)
@@ -92,7 +99,8 @@ staré názvy jsou v `kw` (hledání je najde).
 `configerr::tests` (cesty všech chyb validace — tabulka), `configio::tests` (diff, import ověří před
 čímkoli, export, záloha nečitelného configu, soubor jen pro čtení, souběžné zápisy), `projectdetect::tests` (port, id, web/podsložka/exe, kandidáti), `drawerfit::tests`
 (monitory, DPI 100/125/150 %, panel dole/nahoře). Frontend: `npx tsc --noEmit`; `corepack pnpm test:ui` →
-`src/settings/settings.test.mjs` (každá volba z `labels.ts` má kotvu `f-<id>` ve svém panelu a v žádném
+`src/settings/appearanceModel.test.mjs` (každá volba Vzhledu má krok, šířka = tabulka Rust `preset_width_table`, pozice, sloupce),
+`src/settings/segments.test.mjs` (žádný přepínač > 4 volby; mutace ověřená), `src/settings/settings.test.mjs` (každá volba z `labels.ts` má kotvu `f-<id>` ve svém panelu a v žádném
 jiném; soubory panelu z importů jeho komponenty a žádného jiného; všechny `gotoSettingsPanel`/`onSettings`/
 `go:` cíle v `src` vedou na existující panel a kotvu v něm; staré id; hledání starých názvů bez diakritiky;
 chyba pole → panel); Rust `linkmigrate::tests` (skutečný tvar starého configu přes `config::load`,

@@ -12,21 +12,25 @@ export const FIELDS: Record<string, FieldDef> = {
   // Šuplík a karty
   "layout": { panel: "suplik", label: "Záložky a karty", hint: "Co šuplík ukazuje, na které záložce a jak velké", kw: "karty záložky rozložení pořadí velikost skrýt zobrazit přidat katalog běží claude poznámky projekty repa akce přihrádka hodiny počasí odkazy limity útrata git subagenti osobní práce" },
   "shelf.enabled": { panel: "suplik", label: "Přihrádka na soubory", hint: "Přetáhni soubory z Průzkumníka na proužek nahoře — uloží se jen odkazy (cesty) do karty Přihrádka. Kopírování cesty pro Claude Code, otevření, tah ven.", kw: "shelf přihrádka soubory přetáhnout drag drop cesta schránka claude" },
-  // Vzhled (panel `Appearance.tsx`; kotvy `f-…` jsou na jeho kartách a řádcích) — i celý proužek (`StripSettings.tsx`)
-  "appearance.style": { panel: "vzhled", label: "Design styl", hint: "Hotový balíček vzhledu: barvy, tvar, písmo, materiál, rozložení a šířka", kw: "styl design sklo terminál papír neon brutal pastel klasický vzhled" },
+  // Vzhled (panel `Appearance.tsx` ve 4 krocích: Zavřený · Po najetí · Otevřený · Pohyb; krok každé kotvy
+  // a co je v „Pokročilé“ je v `appearanceModel.ts` `ANCHOR_STEP`) — i celý proužek (`StripSettings.tsx`)
+  "strip.look": { panel: "vzhled", label: "Vzhled zavřeného Ledge", hint: "Co je vidět u horní hrany, když je šuplík zavřený — vyber obrázek", kw: "zavřený proužek styl vzhled ostrůvek tečky linka ikony hodiny roh neviditelný lišta výřez průběh notch island" },
+  "appearance.strip": { panel: "vzhled", label: "Pozice a velikost proužku", hint: "Vlevo, uprostřed nebo vpravo u horní hrany; malý, střední, velký. Tvar, linka a krytí jsou v Pokročilé", kw: "proužek pozice vlevo vpravo uprostřed velikost tvar pilulka linka krytí" },
+  "drawer.hover": { panel: "vzhled", label: "Po najetí myší", hint: "Celý šuplík, kompaktní náhled, nebo roztažený ostrůvek", kw: "najetí myš hover kompaktní náhled ostrůvek peek otevření" },
+  "appearance.style": { panel: "vzhled", label: "Design styl", hint: "Hotový balíček vzhledu: barvy, tvar, písmo, materiál, rozložení a šířka", kw: "styl design sklo terminál papír neon brutal pastel klasický vzhled otevřený" },
+  "appearance.layout": { panel: "vzhled", label: "Šířka šuplíku", hint: "Úzký, střední, široký nebo přes celou obrazovku — náhled ukáže skutečný poměr k monitoru", kw: "šířka rozložení sloupce úzký široký celá šířka monitor panel list panoráma mozaika dlaždice" },
+  "appearance.density": { panel: "vzhled", label: "Hustota", hint: "Víc karet na obrazovce, nebo víc vzduchu", kw: "hustota vzdušná běžná hustá úsporná mezery" },
   "appearance.theme": { panel: "vzhled", label: "Barvy", hint: "Barevný motiv", kw: "motiv barvy tmavý světlý kontrast nord téma" },
   "appearance.accent": { panel: "vzhled", label: "Akcent", hint: "Linka, záře a fokus", kw: "barva akcentu" },
-  "appearance.layout": { panel: "vzhled", label: "Šířka a rozložení", hint: "Úzký, střední, široký nebo přes celou obrazovku; sloupce karet", kw: "šířka rozložení sloupce úzký široký celá šířka panel list panoráma mozaika dlaždice" },
-  "appearance.details": { panel: "vzhled", label: "Upravit detaily", hint: "Písmo, materiál, hustota, velikost písma, rohy", kw: "písmo font materiál hustota úsporná vzdušná rohy zaoblení stín záře" },
-  "drawer.width": { panel: "vzhled", label: "Šířka šuplíku", kw: "šířka px velikost" },
+  "appearance.details": { panel: "vzhled", label: "Písmo, rohy a materiál", hint: "Písmo, materiál, velikost písma, rohy — přebijí hodnoty stylu", kw: "písmo font materiál rohy zaoblení stín záře rozložení sloupce detaily pokročilé" },
+  "drawer.width": { panel: "vzhled", label: "Vlastní šířka šuplíku", hint: "Přesně v px, když ti předvolby nesedí", kw: "šířka px velikost vlastní" },
   "drawer.glass": { panel: "vzhled", label: "Pozadí šuplíku", hint: "Krytí a rozmazání plochy za šuplíkem (akryl)", kw: "sklo akryl průhlednost rozmazání krytí glass" },
   "appearance.motion": { panel: "vzhled", label: "Animace", hint: "Jak se šuplík otevírá; „Žádná“ = ukáže se hned", kw: "animace pohyb vysunutí pružina plynulá svižná odskok rozplynutí výřez žádná rychlost" },
-  "appearance.strip": { panel: "vzhled", label: "Vzhled proužku", hint: "Styl, velikost, pozice u hrany, linka a krytí", kw: "proužek pilulka tečky linka pozice vlevo vpravo uprostřed krytí" },
   "strip.enabled": { panel: "vzhled", label: "Proužek nahoře", hint: "Vypnuto = zůstane jen svítící linka při událostech", kw: "lišta strip" },
   "strip.items": { panel: "vzhled", label: "Co proužek ukazuje", hint: "Zapni, co chceš vidět; pořadí změníš přetažením (nebo Alt+šipkou). U položky barva a „Jen při dění“ = v klidu skrytá.", kw: "položky hodiny režim běží claude repa barva klid událost notch vlastní text časovač" },
   "strip.custom": { panel: "vzhled", label: "Vlastní text v proužku", hint: "Krátký text nebo emoji, nejvýš 24 znaků — položka „Vlastní text“", kw: "notch text emoji popisek motto" },
   "timer.strip": { panel: "vzhled", label: "Časovač v proužku, když běží", hint: "Běžící odpočet nebo stopky se ukážou na začátku proužku i bez položky „Časovač“", kw: "časovač odpočet stopky timer proužek" },
-  "strip.monitor": { panel: "vzhled", label: "Na kterém monitoru", hint: "Proužek i šuplík budou na tomhle monitoru. Místo u hrany (vlevo, uprostřed, vpravo) je v kartě Vzhled proužku.", kw: "monitor obrazovka displej" },
+  "strip.monitor": { panel: "vzhled", label: "Na kterém monitoru", hint: "Proužek i šuplík budou na tomhle monitoru. Místo u hrany (vlevo, uprostřed, vpravo) je hned pod galerií kroku Zavřený.", kw: "monitor obrazovka displej" },
   "ui.lang": { panel: "vzhled", label: "Jazyk", hint: "Jazyk rozhraní Ledge — přepne se hned po uložení", kw: "jazyk language čeština angličtina english czech překlad" },
   // Projekty, akce a odkazy (odkaz = akce typu web / složka / soubor)
   projects: { panel: "akce", label: "Projekty v šuplíku", hint: "Dlaždice na hlavní stránce. Pořadí změníš přetažením za úchyt.", kw: "dlaždice pořadí smazat vypnout" },

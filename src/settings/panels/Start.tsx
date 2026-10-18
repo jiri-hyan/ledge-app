@@ -21,6 +21,7 @@ const TIPS: Item[] = [
 ];
 
 const NEWS: Item[] = [
+  { k: "▭", title: () => t("settings.start.new.closed", "Vzhled po krocích"), text: () => t("settings.start.new.closed.text", "Zavřený Ledge ve 12 podobách, co se stane po najetí myší a monitor, na kterém je vidět skutečná šířka a hustota."), go: "f-strip.look" },
   { k: "◐", title: () => t("settings.start.new.styles", "Design styly"), text: () => t("settings.start.new.styles.text", "Hotové balíčky vzhledu jedním klikem, s náhledem na celém šuplíku."), go: "f-appearance.style" },
   { k: "↧", title: () => t("settings.start.new.motion", "Nové animace otevírání"), text: () => t("settings.start.new.motion.text", "Vyber, jak šuplík vyjede — nebo žádnou animaci."), go: "f-appearance.motion" },
   { k: "▦", title: () => t("settings.start.new.layout", "Karty podle sebe"), text: () => t("settings.start.new.layout.text", "Vlastní záložky, velikost karet a přetahování přímo v šuplíku."), go: "f-layout" },
@@ -61,6 +62,9 @@ export default function StartPanel(p: PanelProps) {
         </Row>
         <Row id="layout.editNow" label={t("settings.start.editNow", "Upravit šuplík")} hint={dirty() ? t("settings.start.editNow.dirty", "Nejdřív ulož nebo zahoď rozpracované změny (lišta dole).") : t("settings.start.editNow.hint", "Přepne na šuplík v režimu úprav — co uděláš tam, uložíš tlačítkem Hotovo.")}>
           <button class="mini" disabled={dirty()} onClick={askEdit}>✎ {t("settings.start.editNow.btn", "Upravit")}</button>
+        </Row>
+        <Row id="appearance.pick" label={t("settings.start.look", "Vyber si vzhled")} hint={t("settings.start.look.hint", "Jak Ledge vypadá zavřený u horní hrany, po najetí myší a otevřený — galerie s náhledy.")}>
+          <button class="mini" onClick={() => gotoSettingsPanel("f-strip.look")}>◐ {t("settings.start.look.btn", "Vybrat")}</button>
         </Row>
       </Section>
       <Section title={t("settings.start.tips", "Tipy")}>

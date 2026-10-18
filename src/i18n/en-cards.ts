@@ -34,7 +34,6 @@ registerDict("en", {
   "cards.projects.opening": "Opening {name}…",
   "cards.projects.cloningToast": "Cloning {name}… (a big repo can take a few minutes)",
   "cards.projects.done": "Done",
-  "cards.projects.empty": "No projects yet. Add them in Settings → Projects, actions and links.",
   "cards.projects.folderMissing": "Folder not found",
   "cards.projects.launch": "Launch {name}",
   "cards.projects.cloning": "cloning…",
@@ -126,4 +125,10 @@ registerDict("en", {
   "cards.hide.doneSection": "Section “{name}” hidden",
   "cards.hide.undo": "Undo",
   "cards.hide.cfgError": "The config has an error — for now you can hide cards only in Settings.",
+  "cards.projects.title": "Projects",
+  "cards.projects.emptyShort": "No projects yet — a tile starts a server, opens a folder or an app.",
+  "cards.projects.add": "Add project",
+  "cards.projects.allHidden": "All projects are hidden on this tab.",
+  "cards.projects.showAll": "Show all",
+  "cards.projects.actions": "Actions for {name}",
 });

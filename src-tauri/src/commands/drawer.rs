@@ -68,6 +68,17 @@ pub(crate) fn focus_drawer() {
     core().send_ui(UiCmd::Focus);
 }
 
+/// Klik do náhledu po najetí (Compact / Island: prázdné místo, „▾ celý šuplík“) nebo jeho setrvání
+/// (`drawer.hoverExpandMs`, odpočítává frontend) → celý šuplík stejným openerem. Fokus nebere (otevřený
+/// najetím zůstane NOACTIVATE, zavře ho odjetí myši); z jiných pohledů nic.
+#[tauri::command]
+pub(crate) fn expand_drawer() {
+    let c = core();
+    if matches!(c.drawer.view(), View::Compact | View::Island) {
+        c.send_ui(UiCmd::Show(View::Full, c.drawer.opener()));
+    }
+}
+
 /// Odchod ze stránky poznámky zpět do šuplíku: opener na hodnotu před `focus_drawer`.
 #[tauri::command]
 pub(crate) fn release_focus() {

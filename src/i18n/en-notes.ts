@@ -26,7 +26,6 @@ registerDict("en", {
   "notes.card.newKind": "New: {kind}",
   "notes.card.newNote": "New note",
   "notes.card.new": "+ New",
-  "notes.card.empty": "No notes yet. “+ New” writes one (even with an image from the clipboard).",
   "notes.card.more.one": "+{n} more",
   "notes.card.more.other": "+{n} more",
   "notes.card.all": "All notes",
@@ -108,4 +107,6 @@ registerDict("en", {
   "notes.remind.month.oct": "October",
   "notes.remind.month.nov": "November",
   "notes.remind.month.dec": "December",
+  "notes.card.emptyShort": "No notes yet — images from the clipboard work too.",
+  "notes.card.add": "Add note",
 });

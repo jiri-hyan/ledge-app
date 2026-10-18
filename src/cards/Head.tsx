@@ -67,13 +67,13 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
         </Show>
         <Show when={p.page === "main"}>
           <Tabs s={p.s} />
-          <button class="icon-btn" classList={{ on: editing() }} aria-pressed={editing()} onClick={() => (editing() ? void finishEdit() : beginEdit(p.s))} title={editing() ? t("cards.layout.doneTitle", "Hotovo — uložit rozložení") : t("cards.layout.editTitle", "Upravit šuplík: přesunout, zvětšit, přidat karty a záložky")} aria-label={t("cards.layout.editDrawer", "Upravit šuplík")}>✎</button>
+          <button class="icon-btn" data-tip="edit" classList={{ on: editing() }} aria-pressed={editing()} onClick={() => (editing() ? void finishEdit() : beginEdit(p.s))} title={editing() ? t("cards.layout.doneTitle", "Hotovo — uložit rozložení") : t("cards.layout.editTitle", "Upravit šuplík: přesunout, zvětšit, přidat karty a záložky")} aria-label={t("cards.layout.editDrawer", "Upravit šuplík")}>✎</button>
         </Show>
         <Show when={p.s.notesEnabled && p.page === "main"}>
           <button class="icon-btn wide" onClick={p.onNote} title={t("cards.head.newNote", "Nová poznámka")}><IconNote />{t("cards.head.note", "Poznámka")}</button>
         </Show>
         <Show when={p.onPalette && p.page !== "note"}>
-          <button class="icon-btn" onClick={() => p.onPalette?.()} title={t("cards.head.paletteTitle", "Hledat a spouštět (Ctrl+K)")} aria-label={t("cards.head.palette", "Paleta příkazů")}><IconSearch /></button>
+          <button class="icon-btn" data-tip="palette" onClick={() => p.onPalette?.()} title={t("cards.head.paletteTitle", "Hledat a spouštět (Ctrl+K)")} aria-label={t("cards.head.palette", "Paleta příkazů")}><IconSearch /></button>
         </Show>
         <button class="icon-btn" onClick={p.onSettings} title={t("cards.head.settings", "Nastavení")} aria-label={t("cards.head.settings", "Nastavení")} aria-pressed={p.page === "settings"}><IconSettings /></button>
         <button class="icon-btn" onClick={() => api.close()} title={t("cards.head.closeTitle", "Zavřít (Esc)")} aria-label={t("cards.head.close", "Zavřít šuplík")}><IconX /></button>

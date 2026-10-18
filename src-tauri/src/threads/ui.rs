@@ -5,6 +5,7 @@ use super::notes_watch::request_notes_reload;
 use crate::appearance::{geom, motion};
 use crate::drawer::{self, Opener, View};
 use crate::focusreturn;
+use crate::hovermode;
 use crate::refresh::{maybe_refresh_weather, refresh_git_async, refresh_logos};
 use crate::sessionlive;
 use crate::snapshot::snapshot;
@@ -25,6 +26,7 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                 let (anim, width) = {
                     let cfg = c.cfg.read();
                     c.drawer.set_anchor(cfg.appearance.strip.position);
+                    c.drawer.set_expand_ms(cfg.drawer.hover_expand_ms);
                     // pohyb jen z `appearance.motion` (styl none i systémové „omezit pohyb“ = okamžitě);
                     // šířka z předvolby stylu nebo `drawer.width`, oříznutá na monitor
                     (motion::anim_ms_now(&cfg.appearance.motion), geom::drawer_width_for(&cfg, mon.rect.right - mon.rect.left, mon.dpi))
@@ -64,7 +66,8 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                         *c.pending_page.lock() = None;
                         // jen výslovné zavření vrací fokus; spuštění (okno má dostat fokus), blur, myš ne
                         focusreturn::on_close(give_back && c.drawer.view() != View::Hidden);
-                        if c.claude.attention() && c.drawer.view() == View::Full && !c.dead() {
+                        // s čekajícím Claudem se šuplík i náhled po najetí stáhnou do peeku (`hovermode::after_close`)
+                        if hovermode::after_close(c.drawer.view(), c.claude.attention(), c.dead()) == View::Peek {
                             c.drawer.show(View::Peek, Opener::Hover, &mon, width, anim, c.strip_logical(&mon));
                             focusreturn::give_back();
                         } else {

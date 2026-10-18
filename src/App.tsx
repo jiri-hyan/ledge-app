@@ -1,6 +1,7 @@
 // Skořápka šuplíku: drží snapshot (`api.on("state")` → store → stránky), stránky a navigaci, morf
 // proužek ⇄ šuplík (`prepare` / `play` / `closing` + `motion.ts`, měřeno v `drawer.anim`), hlášení
-// výšky obsahu (`report`) a fokus (jen výslovný klik → `focusDrawer`, odchod → `releaseFocus`).
+// výšky obsahu (`report`) a fokus (jen výslovný klik → `focusDrawer`, odchod → `releaseFocus`). Malé
+// pohledy (peek, náhled po najetí `compact` / `island`) kreslí `hover/SmallView.tsx` stejným morfem.
 // Vzhled (motiv, animace) aplikuje `theme/apply.ts` (`initAppearance` v onMount).
 // Karty jsou v `cards/`, hlavní stránka v `MainPage.tsx`, poznámky v `notes/`.
 // anglické slovníky (registerDict) dřív než cokoli, co volá t()
@@ -21,7 +22,8 @@ import { holdWide, wantWidth } from "./settings/widen";
 import MainPage from "./MainPage";
 import Head from "./cards/Head";
 import UpdatePanel from "./cards/UpdatePanel";
-import Peek from "./cards/Peek";
+import SmallView from "./hover/SmallView";
+import { isHoverView, smallWidth } from "./hover/model";
 import { asPage, typing, type Page } from "./nav";
 import { EMPTY_SNAPSHOT } from "./snapshot";
 import { Toast } from "./ui/toast";
@@ -35,6 +37,8 @@ import { normalizeLayout } from "./layout/model";
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
   const [view, setView] = createSignal<View>("hidden");
+  /** náhled po najetí (compact / island): za kolik ms se sám rozbalí — z `view` (`drawer.hoverExpandMs`) */
+  const [expandMs, setExpandMs] = createSignal(0);
   const [page, setPage] = createSignal<Page>("main");
   const [now, setNow] = createSignal(Date.now());
   /** panel „Nová verze“ (poznámky k vydání + Instalovat) — otevírá chip v hlavičce */
@@ -104,6 +108,7 @@ export default function App() {
 
   function prepare(msg: ViewMsg) {
     const fromVisible = view() !== "hidden";
+    setExpandMs(msg.expandMs ?? 0);
     setView(msg.view);
     if (msg.view === "hidden") {
       // skrytí bez morfu (bez `closing`) — příště začít na hlavní stránce
@@ -231,7 +236,7 @@ export default function App() {
   function report() {
     if (!content || view() === "hidden") return;
     const v = view();
-    api.reportSize(v, v === "peek" ? 680 : wantWidth(page()), Math.ceil(content.getBoundingClientRect().height) - OVERLAP);
+    api.reportSize(v, smallWidth(v) ?? wantWidth(page()), Math.ceil(content.getBoundingClientRect().height) - OVERLAP);
   }
   createEffect(onChange([view, page, holdWide], () => queueMicrotask(report)));
   createEffect(onChange(view, (v) => v === "hidden" && setPalette(null), { defer: true }));
@@ -251,7 +256,7 @@ export default function App() {
   return (
     <div class="shell" ref={panel}>
       <div ref={content} style={{ "padding-top": `${OVERLAP}px` }}>
-        <Show when={view() === "peek"} fallback={
+        <Show when={view() === "peek" || isHoverView(view())} fallback={
           <div class="content">
             <Show when={page() !== "welcome"}>
               <Head s={s} now={now()} page={page()} onNote={() => startNote()} onSettings={() => setPage(page() === "settings" ? "main" : "settings")} onBack={() => setPage(page() === "note" ? returnTo() : "main")} onUpdate={() => setUpdOpen(!updOpen())} onPalette={() => (palette() ? closePalette() : openPalette(true))} />
@@ -270,7 +275,7 @@ export default function App() {
             <Show when={page() === "notes"}><NotesPage s={s} now={now()} onOpen={editNote} onNew={notesNav.onNew} /></Show>
           </div>
         }>
-          <Peek s={s} />
+          <SmallView view={view()} s={s} now={now()} expandMs={expandMs()} />
         </Show>
       </div>
       <Toast />

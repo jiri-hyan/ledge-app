@@ -14,10 +14,14 @@ Konfigurace). Výchozí = vzhled před zavedením sekce (styl `classic`). Pořad
 | `src-tauri/src/appearance/motion.rs` | pohyb okna šuplíku z `motion` (none nebo systémové „omezit pohyb“ = 0 ms, jinak 170 / rychlost); převod starého `drawer.animationMs` při `config::load` | `drawer_anim_ms` `anim_ms_now` `legacy_animation_ms` `upgrade_loaded` `BASE_SLIDE_MS` |
 | `src-tauri/src/appearance/geom.rs` | čistá geometrie a barvy pro Rust: osa Ledge u hrany, šířka (předvolba stylu / `drawer.width`, ořez), tvar a paleta proužku (11 motivů), linka, kontrast a čitelná barva položky (`strip.colors`) | `anchor_c2` `span_x` `axis2_for` `drawer_width_for` `preset_width` `drawer_width` `strip_metrics` `palette` `ink` `readable` `contrast` `line_stops` `accent_pair` |
 | `strip.rs` (`draw`) | kreslí podle `StripModel.{style, metrics, palette, line, axis2, pulse}` + `stripdeco` (styl `dot` = jen tečky; stíny/záře v přesahu okna kolem těla, `last` = tělo; puls = linka v rytmu `attention::pulse_level` roztažená k plné šířce) | `StripModel` `pulse_now` |
-| `stripview.rs` (`refresh_strip`) | naplní vzhled modelu z configu | |
+| `stripview.rs` (`refresh_strip`) | naplní vzhled modelu z configu; u `strip.look` ≠ `classic` i `StripModel.{look, show, animate, position}` (`look_facts` → `looks::show`) | `look_facts` |
+| `src-tauri/src/looks/mod.rs` | **styly zavřeného Ledge** (`strip.look`): `Look` (id = kontrakt s `src/strip/looks.ts`), stav (`events`, priorita čeká > hotovo > časovač > pracuje > hudba > klid), „stav → co styl ukáže“ (`show` → `Show { parts, right, progress, line, rotate, hidden, idle }`), Pokročilé `without` (`strip.lookHide`), ikony `Glyph` (kódy Segoe Fluent Icons / MDL2 + náhrady) | `Look` `Facts` `Show` `Part` `Glyph` `show` `events` `state_of` `without` `DONE_MS` `ROTATE_MS` |
+| `src-tauri/src/looks/facts.rs` · `frame.rs` | převody stavu jádra (časovač, právě hraje, limit 5h — jen čerstvá data) · rozměry stylu (`spec`), šířka těla, okno a tělo v něm (`place`: celá šířka, roh podle pozice, výřez s oušky, jinak na ose), hover zóna (`zone`), tvar morfu (`morph_body`), šířka ostrůvku (`WidthAnim`, 240 ms jen při změně obsahu) | `timer_fact` `music_fact` `limit_fact` · `Spec` `spec` `body_width` `place` `Placed` `zone` `morph_body` `WidthAnim` |
+| `stripdraw.rs` | kreslí `Show` stylu (tělo, oušky výřezu přes path geometrii, tečky, ikony s odznaky, lišta průběhu, úseky linky, puls = obrys v barvě události, nažhavení = linka akcentu); písmo ikon / mono / display zjistí jednou `pick_fonts` | `draw` `pick_fonts` `Fonts` |
+| `src/strip/looks.ts` · `strip/en.ts` | jediný seznam stylů pro Nastavení (`STRIP_LOOKS` = `{ id, key, cs, en, desc }`, `lookOf`), Pokročilé `LOOK_HIDEABLE` + `withLookShown`; angličtina `appearance.look.*` | `STRIP_LOOKS` `STRIP_LOOK_IDS` `StripLookId` `lookOf` `LOOK_HIDEABLE` `withLookShown` |
 | `drawer.rs` | `set_anchor` + `place` (x z `anchor_c2`/`span_x`); šířku dostává oříznutou | `Drawer::set_anchor` |
 | `threads/ui.rs` | před každým `UiCmd`: `set_anchor`, šířka = `geom::drawer_width_for` (předvolba stylu; jinak ≤ 95 % monitoru), délka animace = `motion::anim_ms_now` | |
-| `threads/hover.rs` | zóna bez proužku leží na ose (`axis2_for`), jinak podle skutečného obdélníku proužku | |
+| `threads/hover.rs` | zóna = `looks::frame::zone`: podle skutečného obdélníku proužku (linka / lišta celá šířka, roh, …), oříznutá na monitor, aspoň 4 px; bez proužku (neviditelný styl v klidu) pruh na ose (`axis2_for`) | |
 | `settings.rs` (`apply_config`) | změna `appearance` → událost `appearance` do šuplíku; proužek přes `mark_dirty` | |
 | `src/theme/looks.ts` | **tabulka stylů** a jejich složek jako čistá data: co styl nastaví (`StyleParts`), písma (jen systémová), materiály, rozložení (sloupce), šířky; `lookVars` = CSS proměnné `--m-*` `--h-*` `--deck-*` `--span-*` `--l-pad` `--sans` `--display` (vždy úplná sada) | `STYLES` `STYLE_IDS` `styleOf` `FONTS` `MATERIALS` `LAYOUTS` `WIDTHS` `spans` `lookVars` `CLASSIC` |
 | `src/theme/styles.ts` | výběr stylu: hodnoty stylu do vzhledu / celého configu, které složky se od stylu liší | `withStyle` `configWithStyle` `styleChanges` `PARTS` |
@@ -27,7 +31,12 @@ Konfigurace). Výchozí = vzhled před zavedením sekce (styl `classic`). Pořad
 | `src/theme/apply.ts` · `label.ts` | DOM: proměnné na `<html>` (staré smaže), `data-theme`/`data-motion`/`data-scheme`/`data-style`/`data-layout`/`data-material`/`data-font`, motion.ts; událost + `get_config` · překlad páru `[klíč, cs]` z tabulek | `applyAppearance` `initAppearance` `savedAppearance` `scopeStyle` · `lbl` |
 | `src/motion.ts` | styl/rychlost mění jen parametry pružin a délky; `FULL_CLIP` a rádius proužku sledují vzhled; `bandClip` = mezikrok „z výřezu“ | `setMotion` `motionNow` `dur` `bandClip` `setShellRadius` `shellRadius` `setStripRadius` |
 | `src/App.tsx` (`prepare`/`play`/`closing`) | přehraje `openPlan`/`closePlan` na `.shell`; handshake `prepared`/`closed` beze změny; přechod z peek = vždy morf tvaru | `geo` `settle` |
-| `src/settings/panels/Appearance.tsx` · `StripSettings.tsx` · `AppearanceStyles.tsx` · `AppearanceLayout.tsx` · `AppearanceMotion.tsx` · `AppearancePreview.tsx` · `apUi.tsx` · `appearance.css` · `en-look.ts` | panel: galerie stylů (živé miniatury `.theme-scope`, „Upraveno: …“, Obnovit styl) → náhled → barvy → šířka a rozložení → animace (7 ukázek, hraje jen po kliku) → proužek: vzhled + hned pod ním „Co proužek ukazuje“ (`StripSettings.tsx`: zapnutí, položky s náhledem, barvy, klid, vlastní text, časovač, monitor) → Upravit detaily (`<details>`) → jazyk; vše živě na celý šuplík, ukládá společná lišta; JEDINÉ místo pro pozadí/akryl, šířku, animace a celý proužek; kotvy hledání `f-<klíč z labels.ts>` | `AppearancePanel` `AppearanceStyles` `LayoutCard` `DetailsCard` `AppearanceMotion` `Ap` `Seg` `Slider` `lit` |
+| `src/settings/panels/Appearance.tsx` | panel ve 4 krocích (záložky `.ap-step`): **Zavřený · Po najetí · Otevřený · Pohyb** + jazyk pod nimi; krok a rozbalené Pokročilé drží modul (přežijí přepnutí panelu), skok z hledání (`hit`) přepne krok a rozbalí Pokročilé (`settings/appearanceModel.ts`); živý náhled `applyAppearance(draft)` na celý šuplík | `AppearancePanel` `lastStep` `advOpen` |
+| `panels/AppearanceClosed.tsx` · `StripSettings.tsx` | krok Zavřený: galerie 12 vzhledů `strip.look` (data `src/strip/looks.ts` od I) s HTML náhledy a přepínačem „Co se děje“, pod ní pozice a velikost proužku; Pokročilé = tvar klasického proužku (galerie 8 tvarů), linka, krytí a „Co proužek ukazuje“ (`StripSettings.tsx`). Klik = draft + „Vrátit“ (`offerUndo`); proužek se překreslí po Uložit | `AppearanceClosed` `normLook` `LOOK_DESC` |
+| `panels/AppearanceHover.tsx` | krok Po najetí: 3 dlaždice `drawer.hover` (data `src/hover/modes.ts` od J) s náhledem | `AppearanceHover` `normHover` |
+| `panels/AppearanceOpen.tsx` · `AppearanceStyles.tsx` · `AppearanceLayout.tsx` | krok Otevřený: galerie stylů (živé miniatury, „Upraveno: …“, Obnovit styl) → monitor ve skutečném poměru + Šířka (4 předvolby) + Hustota; Pokročilé = barvy a akcent, rozložení karet, vlastní šířka px, písmo, materiál, velikost písma, rohy, krytí a rozmazání | `AppearanceOpen` `AppearanceStyles` `LayoutPicker` `CustomWidth` `DetailsRows` |
+| `panels/AppearanceMotion.tsx` · `apUi.tsx` · `appearance.css` · `en-look.ts` | krok Pohyb (7 ukázek, hraje jen po kliku, rychlost) · společné prvky (`Seg` ≤ 4 volby, `Slider`, `Advanced`, `StateSwitch`, `lit`) | `AppearanceMotion` `Ap` `Seg` `Slider` `Advanced` `StateSwitch` `previewState` |
+| `src/settings/previews/*` (`StripLookPreview`, `HoverPreview`, `MonitorPreview`, `previews.css`, `en.ts`) | HTML náhledy (prefix `apv-`): zavřený Ledge na „horní hraně monitoru“ a po najetí (ukázková data podle stavu, `.theme-scope` rozpracovaného vzhledu, žádná nekonečná animace); monitor v poměru `window.screen` (jinak 16 : 9 bez čísel) se šuplíkem ve skutečných px, na své pozici, se skutečnými sloupci a hustotou — kreslí se v plné velikosti a zmenší `transform: scale` (ResizeObserver) | `StripLookPreview` `HoverPreview` `MonitorPreview` |
 | `src/palette/styles.ts` | paleta Ctrl+K: „Styl: …“ → `configWithStyle` → `save_config` | `styleItems` |
 
 ## Nový design styl (jeden záznam + volitelný CSS blok)
@@ -46,12 +55,27 @@ styl dává `--deck-cols` (Klasický ho nevydá = 4), `--deck-gap` a `--deck-pad
 čte je `html[data-layout] .deck` ve `styles.css`, `deck` je v SHARED hlídače); `--span-*` jsou k dispozici,
 `.deck` si rozpětí ořízne sama přes `min(n, var(--deck-cols))`.
 
+## Styly zavřeného Ledge (`strip.look`, vlna 7)
+
+- `classic` = dnešní proužek (`strip.items`, `appearance.strip.style`), kreslí `strip::draw`. Ostatní styly obsah
+  skládají samy z `Facts` (`looks::show`), `items`/`quiet`/`colors`/`custom`/`opacity` nepoužijí; doladění =
+  `strip.lookHide` (co neukazovat). `appearance.strip.size` styly zvětší (`metrics.k`), `position` = osa (roh u `corner`).
+- Nový styl: varianta `Look` + `ALL`/`id`/`name` + větev v `show` a `frame::spec` (případně `place`), řádek
+  v tabulce `looks::tests::table_11_looks_x_6_states`, záznam v `src/strip/looks.ts` + `strip/en.ts` (zrcadla to hlídají).
+- Výkon: kreslí se jen při změně modelu; jediné časovače = puls, ~240 ms změny šířky ostrůvku, 5 s střídání
+  `ticker` s víc událostmi. „Hotovo“ vyprší s minutovým budíkem `emit` (`DONE_MS`), průběh skladby / časovače
+  se přepočítá po minutách — po sekundách nic.
+- Okno zůstává click-through a bez fokusu (stejné okno jako klasický proužek); `ghost` v klidu = `visible: false`,
+  hover zóna pak leží na ose. Tah souborů (přihrádka) se kreslí ve tvaru stylu (`shelf_show`).
+
 ## Toky
 
 - **Start**: `App` → `initAppearance()` → `api.getConfig()` → `applyAppearance` (CSS proměnné inline na
   `<html>`). Do té doby platí `:root` ze `styles.css` (= motiv dark).
 - **Náhled**: panel `createEffect(() => applyAppearance(rozpracovaný))`, `onCleanup` → `savedAppearance()`.
-  Klik na styl = `withStyle` do rozpracovaného configu (+ `drawer.glass` jen při změně rozmazání).
+  Klik na styl = `withStyle` do rozpracovaného configu (+ `drawer.glass` jen při změně rozmazání). Šířku okna
+  a nativní proužek (`strip.look`) náhled v šuplíku nezmění — šířku ukáže monitor v kroku Otevřený, vzhled
+  proužku galerie; skutečné okno / proužek se změní po Uložit.
 - **Otevření**: `prepare` vezme `openPlan(styl, rychlost, geo)` → nastaví `plan.start` na `.shell`, `prepared`;
   `play` přehraje snímky; `closing` přehraje `closePlan` a pošle `closed`. Šířka okna: Rust
   `drawer_width_for` (předvolba stylu) — panel ji v náhledu nemění (projeví se po uložení).
@@ -88,7 +112,10 @@ styl dává `--deck-cols` (Klasický ho nevydá = 4), `--deck-gap` a `--deck-pad
 
 ## Testy
 
-`cargo test appearance` (validace, starý config z vlny 5, osa na DPI a záporných monitorech, ořez a předvolby
+`cargo test looks` (11 stylů × 6 stavů, priorita a střídání, připomínka, jen reálná data, Pokročilé, angličtina,
+převody faktů, config starý/nový, zrcadlo `looks.ts`, vlákno `media` pro styly s hudbou, umístění každého stylu na
+monitoru vč. záporných a DPI, hover zóny, šířka ostrůvku); `node --test src/strip/looks.test.mjs` (id = Rust,
+slovník, Pokročilé). `cargo test appearance` (validace, starý config z vlny 5, osa na DPI a záporných monitorech, ořez a předvolby
 šířky, kontrast textu proužku ve všech 11 motivech, linka, ozdoby proužku, zrcadla TS, `motion::tests` — délka
 animace i se systémovým „omezit pohyb“ a převod `drawer.animationMs`, tabulka). `npm run test:ui` =
 `node --test src/theme/theme.test.mjs` (kontrast textů ≥ 4.5:1 ve všech motivech, dark = CSS, výchozí hodnoty

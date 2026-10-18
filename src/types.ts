@@ -3,7 +3,8 @@
 import type { SectionKey } from "./cards/sections";
 import type { Layout } from "./layout/model";
 
-export type View = "hidden" | "peek" | "full";
+/** `compact` / `island` = náhled po najetí (`drawer.hover`, `src/hover/*`, Rust `hovermode.rs`) */
+export type View = "hidden" | "peek" | "full" | "compact" | "island";
 
 export interface ViewMsg {
   view: View;
@@ -14,6 +15,8 @@ export interface ViewMsg {
   toH: number;
   /** strop výšky obsahu na monitoru (logické px); nad ním se posouvá uvnitř stránky */
   maxH: number;
+  /** náhled po najetí: po kolika ms setrvání rozbalit celý šuplík (`drawer.hoverExpandMs`), 0 = jen klikem; chybí = staré jádro */
+  expandMs?: number;
 }
 export type Phase = "preparing" | "starting" | "ready" | "running" | "exited" | "failed";
 
@@ -583,6 +586,8 @@ export type ThemeId = "dark" | "midnight" | "graphite" | "nord" | "light" | "con
 export type MotionStyle = "spring" | "smooth" | "snappy" | "bounce" | "fade" | "notch" | "none";
 export type StripPosition = "center" | "left" | "right";
 export type StripStyle = "pill" | "line" | "dot" | "term" | "tag" | "glow" | "block" | "drop";
+/** styl zavřeného Ledge (`strip.look`); seznam s názvy je `strip/looks.ts` */
+export type { StripLookId } from "./strip/looks";
 /** složky design stylu (vlna 6, `appearance/look.rs`); tabulka stylů je `theme/styles.ts` */
 export type FontLook = "system" | "mono" | "serif" | "grotesk";
 export type Material = "solid" | "glass" | "paper" | "glow" | "hard" | "soft" | "frame";
@@ -610,6 +615,10 @@ export interface Appearance {
   /** předvolba šířky; `custom` = `drawer.width` v px */
   width: WidthPreset;
 }
+
+// Co se stane po najetí myší (`drawer.hover`, data `src/hover/modes.ts`); chybí v configu = `full`.
+// `StripLookId` (vzhled zavřeného Ledge) je re-export z `src/strip/looks.ts` výše.
+export type { HoverModeId } from "./hover/modes";
 
 // --- onboarding ---
 /** Repo z průvodce (Rust `onboarding::repos::FoundRepo`); `project` = hotový návrh pro config. */

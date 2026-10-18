@@ -1,8 +1,8 @@
 // Sekce „Co proužek ukazuje“ v panelu Vzhled (dřív v panelu Šuplík a proužek): proužek zapnout,
 // položky s náhledem (V klidu / Když se něco děje), pořadí přetažením, barva a „Jen při dění“ u položky
 // (čistá logika `settings/strip.ts` + `strip.test.mjs`), vlastní text, časovač v proužku a monitor.
-// Tvar, velikost, pozice u hrany, linka a krytí proužku jsou v kartě „Vzhled proužku“ hned nad tím
-// (`Appearance.tsx`) — celý proužek je tak na jednom místě.
+// Leží v kroku Zavřený → Pokročilé (`AppearanceClosed.tsx`) spolu s tvarem, linkou a krytím; pozice
+// a velikost jsou hned pod galerií vzhledů — celý proužek je tak na jednom místě.
 import { createSignal, For, Show } from "solid-js";
 import { t } from "../../i18n";
 import { useSettings } from "../ctx";

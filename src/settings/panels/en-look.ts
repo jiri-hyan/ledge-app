@@ -50,11 +50,8 @@ registerDict("en", {
   "appearance.material.hard": "Hard shadow",
   "appearance.material.soft": "Soft raised",
   "appearance.material.frame": "Frames",
-  "appearance.details.title": "Fine-tune",
-  "appearance.details.hint": "Font, material, density, corners and background — they override the style.",
   "appearance.glass.blurHint2": "Windows 11 acrylic — costs more performance; the drawer then just slides down instead of morphing from the strip, and the floating panel loses its gap.",
   // šířka a rozložení
-  "appearance.width.fullHint": "Across the whole monitor width.",
   "appearance.width.custom": "Custom width",
   "appearance.widthPreset.custom": "Custom",
   "appearance.widthPreset.narrow": "Narrow",

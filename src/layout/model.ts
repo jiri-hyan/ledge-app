@@ -1,5 +1,5 @@
 // Rozložení šuplíku (`config.layout`, zrcadlo `src-tauri/src/layout.rs`): záložky, karty na nich (pořadí,
-// velikost s|m|l|xl) a skryté části karet. JEDINÝ model pro to, co šuplík ukazuje — `drawer.sections` je
+// šířka s|m|l|xl, výška `h` 1–4 řádky / podle obsahu, u Projektů volby dlaždic `tiles`) a skryté části karet. JEDINÝ model pro to, co šuplík ukazuje — `drawer.sections` je
 // odvozené v Rustu (karta = na nějaké záložce). Čistá logika bez importů za běhu (test `model.test.mjs`):
 // normalizace, úpravy (přesun, velikost, odebrat/přidat, záložky), katalog, co stránka ukáže, cíl tažení.
 // Texty jako páry klíč + čeština, přeloží se až při vykreslení.
@@ -8,9 +8,20 @@ export const CARD_IDS = ["projects", "running", "claude", "repos", "notes", "act
 export type CardId = (typeof CARD_IDS)[number];
 export const SIZES = ["s", "m", "l", "xl"] as const;
 export type CardSize = (typeof SIZES)[number];
-export type LayoutCard = { id: CardId; size: CardSize };
+/** Výška karty v řádcích mřížky (`--deck-row`); chybí = podle obsahu. */
+export const HEIGHTS = [1, 2, 3, 4] as const;
+export type CardHeight = (typeof HEIGHTS)[number];
+/** Velikost dlaždic v kartě Projekty (zástupci). */
+export const TILE_SIZES = ["small", "tile", "large"] as const;
+export type TileSize = (typeof TILE_SIZES)[number];
+/** Volby karty Projekty na jedné záložce: velikost dlaždic, popisek, git, skryté projekty (prázdné = všechny). */
+export type TileOpts = { size: TileSize; label: boolean; git: boolean; hidden: string[] };
+export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts };
 export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[] };
-export type Layout = { pages: LayoutPage[]; hiddenParts: string[] };
+/** `upgrades` = jednorázové úpravy, které už proběhly (Rust `apply_upgrades`) — musí přežít každé uložení. */
+export type Layout = { pages: LayoutPage[]; hiddenParts: string[]; upgrades?: string[] };
+export const UP_PERSONAL_PROJECTS = "personalProjects";
+export const DEFAULT_TILES: Readonly<TileOpts> = { size: "tile", label: true, git: true, hidden: [] };
 
 export const WORK = "prace";
 export const PERSONAL = "osobni";
@@ -63,6 +74,8 @@ export const PAGE_ICONS = ["", "💼", "🏠", "🎮", "🎵", "📚", "🛠️"
 
 const isCard = (x: unknown): x is CardId => typeof x === "string" && (CARD_IDS as readonly string[]).includes(x);
 const isSize = (x: unknown): x is CardSize => typeof x === "string" && (SIZES as readonly string[]).includes(x);
+const isHeight = (x: unknown): x is CardHeight => (HEIGHTS as readonly unknown[]).includes(x);
+const isTileSize = (x: unknown): x is TileSize => typeof x === "string" && (TILE_SIZES as readonly string[]).includes(x);
 const card = (id: CardId, size: CardSize = CARD_INFO[id].size): LayoutCard => ({ id, size });
 
 /** Výchozí rozložení = dnešní Práce + Osobní (zrcadlo `layout::from_legacy(Null)`; test hlídá tvar). */
@@ -73,12 +86,27 @@ export function defaultLayout(): Layout {
       {
         id: PERSONAL,
         name: "",
-        cards: [card("clock"), card("timer"), card("weather"), card("calendar"), card("media"), card("links"), card("actions"), card("shelf"), card("notes")],
+        cards: [card("projects"), card("clock"), card("timer"), card("weather"), card("calendar"), card("media"), card("links"), card("actions"), card("shelf"), card("notes")],
       },
     ],
     hiddenParts: [],
+    upgrades: [UP_PERSONAL_PROJECTS],
   };
 }
+
+/** Obranné čtení voleb dlaždic (chybějící pole = výchozí). */
+export function normalizeTiles(raw: unknown): TileOpts {
+  const r = (raw ?? {}) as Partial<Record<string, unknown>>;
+  const hidden = (Array.isArray(r.hidden) ? r.hidden : []).filter((h): h is string => typeof h === "string" && !!h);
+  return {
+    size: isTileSize(r.size) ? r.size : DEFAULT_TILES.size,
+    label: typeof r.label === "boolean" ? r.label : DEFAULT_TILES.label,
+    git: typeof r.git === "boolean" ? r.git : DEFAULT_TILES.git,
+    hidden: [...new Set(hidden)],
+  };
+}
+/** Volby dlaždic karty (bez `tiles` = výchozí). */
+export const tilesOf = (c: LayoutCard | undefined): TileOpts => normalizeTiles(c?.tiles);
 
 /** Obranné čtení (snapshot, config): neznámé karty a velikosti pryč, bez záložek = výchozí. */
 export function normalizeLayout(raw: unknown): Layout {
@@ -91,7 +119,11 @@ export function normalizeLayout(raw: unknown): Layout {
     const cards: LayoutCard[] = [];
     for (const c of Array.isArray(x.cards) ? x.cards : []) {
       const id = (c as any)?.id;
-      if (isCard(id) && !cards.some((k) => k.id === id)) cards.push({ id, size: isSize((c as any).size) ? (c as any).size : CARD_INFO[id].size });
+      if (!isCard(id) || cards.some((k) => k.id === id)) continue;
+      const out: LayoutCard = { id, size: isSize((c as any).size) ? (c as any).size : CARD_INFO[id].size };
+      if (isHeight((c as any).h)) out.h = (c as any).h;
+      if ((c as any).tiles && typeof (c as any).tiles === "object") out.tiles = normalizeTiles((c as any).tiles);
+      cards.push(out);
     }
     const page: LayoutPage = { id: x.id as string, name: typeof x.name === "string" ? x.name : "", cards };
     if (typeof x.icon === "string" && x.icon) page.icon = x.icon;
@@ -99,10 +131,18 @@ export function normalizeLayout(raw: unknown): Layout {
   }
   if (!pages.length) return defaultLayout();
   const hiddenParts = (Array.isArray(r.hiddenParts) ? r.hiddenParts : []).filter((h): h is string => typeof h === "string" && h in PARTS);
-  return { pages, hiddenParts: [...new Set(hiddenParts)] };
+  const out: Layout = { pages, hiddenParts: [...new Set(hiddenParts)] };
+  const upgrades = (Array.isArray(r.upgrades) ? r.upgrades : []).filter((u): u is string => typeof u === "string" && !!u);
+  if (upgrades.length) out.upgrades = [...new Set(upgrades)];
+  return out;
 }
 
-export const clone = (l: Layout): Layout => ({ pages: l.pages.map((p) => ({ ...p, cards: p.cards.map((c) => ({ ...c })) })), hiddenParts: [...l.hiddenParts] });
+const cloneCard = (c: LayoutCard): LayoutCard => (c.tiles ? { ...c, tiles: { ...c.tiles, hidden: [...c.tiles.hidden] } } : { ...c });
+export const clone = (l: Layout): Layout => {
+  const out: Layout = { pages: l.pages.map((p) => ({ ...p, cards: p.cards.map(cloneCard) })), hiddenParts: [...l.hiddenParts] };
+  if (l.upgrades) out.upgrades = [...l.upgrades];
+  return out;
+};
 export const sameLayout = (a: Layout, b: Layout): boolean => JSON.stringify(normalizeLayout(a)) === JSON.stringify(normalizeLayout(b));
 
 /** Záložka podle id; neznámé (smazaná) = první (jako `layout::page` v Rustu). */
@@ -134,6 +174,49 @@ export const moveCard = (l: Layout, pageId: string, from: number, to: number): L
 export const nextSize = (s: CardSize): CardSize => SIZES[(SIZES.indexOf(s) + 1) % SIZES.length];
 export const setSize = (l: Layout, pageId: string, id: CardId, size: CardSize): Layout =>
   mapPage(l, pageId, (p) => ({ ...p, cards: p.cards.map((c) => (c.id === id ? { ...c, size } : c)) }));
+
+/** Výška karty (`undefined` = podle obsahu). */
+export const setHeight = (l: Layout, pageId: string, id: CardId, h: CardHeight | undefined): Layout =>
+  mapPage(l, pageId, (p) => ({
+    ...p,
+    cards: p.cards.map((c) => {
+      if (c.id !== id) return c;
+      const out = { ...c };
+      if (h === undefined) delete out.h;
+      else out.h = h;
+      return out;
+    }),
+  }));
+/** Další výška v kruhu podle obsahu → 1 → 2 → 3 → 4 → podle obsahu (tlačítko ↕ v úpravách). */
+export const nextHeight = (h: CardHeight | undefined): CardHeight | undefined => (h === undefined ? 1 : h >= 4 ? undefined : ((h + 1) as CardHeight));
+/** Rychlé volby výšky v ⋯ menu: Auto / Nízká / Vysoká. */
+export const QUICK_HEIGHTS: readonly { h: CardHeight | undefined; name: Text }[] = [
+  { h: undefined, name: ["cards.layout.height.auto", "Auto"] },
+  { h: 2, name: ["cards.layout.height.low", "Nízká"] },
+  { h: 4, name: ["cards.layout.height.high", "Vysoká"] },
+];
+
+/** Změna voleb dlaždic karty Projekty na záložce (výchozí volby = pole `tiles` pryč). */
+export function setTiles(l: Layout, pageId: string, patch: Partial<TileOpts>): Layout {
+  return mapPage(l, pageId, (p) => ({
+    ...p,
+    cards: p.cards.map((c) => {
+      if (c.id !== "projects") return c;
+      const next = normalizeTiles({ ...tilesOf(c), ...patch });
+      const out: LayoutCard = { ...c, tiles: next };
+      if (JSON.stringify(next) === JSON.stringify(normalizeTiles(DEFAULT_TILES))) delete out.tiles;
+      return out;
+    }),
+  }));
+}
+/** Ukázat / skrýt jeden projekt na záložce. */
+export function showProject(l: Layout, pageId: string, projectId: string, shown: boolean): Layout {
+  const t = tilesOf(pageOf(l, pageId).cards.find((c) => c.id === "projects"));
+  const rest = t.hidden.filter((h) => h !== projectId);
+  return setTiles(l, pageId, { hidden: shown ? rest : [...rest, projectId] });
+}
+/** Projekty, které dlaždice na téhle záložce ukáže (v pořadí configu). */
+export const visibleProjects = <T extends { id: string }>(projects: readonly T[], t: TileOpts): T[] => projects.filter((p) => !t.hidden.includes(p.id));
 
 export type CardUndo = { pageId: string; index: number; card: LayoutCard };
 /** Odebere kartu ze záložky (do katalogu); `undo` ji vrátí na totéž místo. */

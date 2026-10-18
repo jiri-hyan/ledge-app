@@ -1,7 +1,9 @@
-/* Panel Vzhled (Appearance.tsx) a jeho živý náhled (AppearancePreview.tsx). Jen tokeny ze styles.css;
-   náhledy jsou `.theme-scope` s proměnnými rozpracovaného vzhledu inline. */
-.ap { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
-.ap .card { display: flex; flex-direction: column; gap: 2px; }
+/* Panel Vzhled (Appearance*.tsx): 4 kroky, galerie, Pokročilé. Jen tokeny ze styles.css; náhledy jsou
+   `.theme-scope` s proměnnými rozpracovaného vzhledu inline (HTML náhledy: settings/previews/previews.css). */
+.ap { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+.ap .card { display: flex; flex-direction: column; gap: 2px; container-type: inline-size; }
+/* přepínač v kartě se smí zalomit (nikdy nepřeteče kartu); víc než 4 volby = galerie, ne přepínač */
+.ap .seg { flex-wrap: wrap; max-width: 100%; }
 .ap .ap-top { grid-column: 1 / -1; gap: var(--s3); }
 .ap .ap-lang, .ap .ap-wide { grid-column: 1 / -1; }
 .ap-bar { display: flex; gap: var(--s2); align-items: center; justify-content: flex-end; }
@@ -39,59 +41,7 @@
 .ap-acc.own:has(:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ap-move { display: inline-flex; gap: var(--s1); }
 
-/* ---------- živý náhled ---------- */
-.ap-preview { position: relative; display: flex; flex-direction: column; gap: var(--s2); color: var(--t1); font-size: var(--fs-body); }
-.ap-screen { position: relative; display: flex; justify-content: center; padding-bottom: var(--s3); border-radius: var(--r-lg); overflow: hidden;
-  /* ilustrační tapeta „plochy“ (stejná ve všech motivech, aby šlo porovnat krytí) */
-  background: linear-gradient(135deg, #3b4a6b, #6b4a7a 45%, #2f6f73); box-shadow: inset 0 0 0 1px var(--line); }
-.ap-screen[data-pos="left"] { justify-content: flex-start; padding-left: 3%; }
-.ap-screen[data-pos="right"] { justify-content: flex-end; padding-right: 3%; }
-.ap-axis { width: 64%; display: flex; flex-direction: column; align-items: center; }
-
-.ap-strip { --k: 1; --so: 0.82; position: relative; display: inline-flex; align-items: center; gap: calc(10px * var(--k));
-  height: calc(32px * var(--k)); padding: 0 calc(14px * var(--k)); font-size: calc(12px * var(--k)); white-space: nowrap;
-  background: rgb(var(--bg) / var(--so)); border: 1px solid var(--line-2); border-top: 0; border-radius: 0 0 calc(14px * var(--k)) calc(14px * var(--k));
-}
-.ap-strip.line { height: calc(26px * var(--k)); border-radius: 0 0 calc(3px * var(--k)) calc(3px * var(--k)); }
-.ap-strip.dot { height: calc(22px * var(--k)); gap: calc(4px * var(--k)); padding: 0 calc(9px * var(--k)); border-radius: 0 0 calc(11px * var(--k)) calc(11px * var(--k)); }
-.ap-strip b { font-weight: 600; }
-.ap-dim { color: var(--t2); }
-.ap-sep { width: 1px; height: 12px; background: var(--line-2); }
-.ap-pillseg { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--green) 16%, transparent); }
-.ap-dot { width: calc(7px * var(--k, 1)); height: calc(7px * var(--k, 1)); border-radius: 50%; display: inline-block; }
-.ap-sig { position: absolute; left: 29%; right: 29%; bottom: 0; height: 2px; border-radius: 1px; opacity: 0.8; }
-.ap-strip.line .ap-sig { left: 3%; right: 3%; }
-/* tvary proužku stylů (zrcadlo `stripShape` a `appearance::stripdeco`) */
-.ap-strip.ap-s-term { height: calc(24px * var(--k)); border-radius: 0; font-family: var(--mono); }
-.ap-strip.ap-s-term .ap-sig { left: 0; right: 0; height: 1px; }
-.ap-strip.ap-s-tag { height: calc(30px * var(--k)); border-radius: 0 0 calc(6px * var(--k)) calc(6px * var(--k)); font-family: Georgia, serif; box-shadow: 0 3px 6px color-mix(in srgb, var(--logo-shadow) 50%, transparent); }
-.ap-strip.ap-s-tag .ap-sig { left: 41%; right: 41%; }
-.ap-strip.ap-s-glow { height: calc(28px * var(--k)); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
-.ap-strip.ap-s-glow .ap-sig { left: 15%; right: 15%; box-shadow: 0 0 8px 1px color-mix(in srgb, var(--accent) 70%, transparent); }
-.ap-strip.ap-s-block { height: calc(30px * var(--k)); border-radius: 0; border: 2px solid var(--t1); border-top: 0; box-shadow: 3px 3px 0 var(--t1); font-family: Bahnschrift, var(--sans); }
-.ap-strip.ap-s-block .ap-sig { left: 0; right: 0; height: 3px; }
-.ap-strip.ap-s-drop { height: calc(34px * var(--k)); border: 0; border-radius: 0 0 calc(17px * var(--k)) calc(17px * var(--k)); box-shadow: 0 5px 12px color-mix(in srgb, var(--logo-shadow) 60%, transparent); }
-.ap-strip.ap-s-drop .ap-sig { left: 35%; right: 35%; }
-
-.ap-drawer { position: relative; width: 100%; margin-top: var(--s3); border-radius: 0 0 var(--r-shell) var(--r-shell); overflow: hidden;
-  background:
-    radial-gradient(220px 100px at 8% 0%, color-mix(in srgb, var(--accent) calc(var(--glow-1) * var(--m-glow, 1)), transparent), transparent 70%),
-    radial-gradient(220px 110px at 96% 4%, color-mix(in srgb, var(--accent-2) calc(var(--glow-2) * var(--m-glow, 1)), transparent), transparent 70%),
-    var(--tint-solid);
-  box-shadow: var(--m-shell-ring, 0 0 0 0 transparent), inset 0 -1px 0 var(--shell-edge), inset 1px 0 0 var(--shell-side), inset -1px 0 0 var(--shell-side); }
-.ap-drawer.ap-float { width: 94%; margin-top: calc(var(--s3) + 6px); border-radius: var(--r-shell); }
-.ap-drawer.blur { backdrop-filter: blur(10px); }
-.ap-drawer::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 0; height: 2px; border-radius: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 70%, transparent), color-mix(in srgb, var(--accent-2) 70%, transparent), transparent); }
-.ap-body { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3) var(--s4) var(--s4); }
-.ap-head { display: flex; align-items: center; justify-content: space-between; font: 600 calc(15px * var(--fz)) var(--display); }
-.ap-head .seg button { padding: 3px 10px; }
-.ap-body .card { gap: 0; }
-.ap-actions { display: flex; gap: var(--s2); justify-content: flex-end; align-items: center; }
-.ap-replay { align-self: flex-start; }
-
 @media (max-width: 760px) {
-  .ap { grid-template-columns: 1fr; }
   .ap-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 /* zvýraznění volby z hledání (stejné jako `.st-row.hit` v settings.css) */
@@ -156,7 +106,7 @@
 .ap-lschema[data-layout="tiles"] { gap: 5px; }
 .ap-lschema[data-layout="tiles"] i { border-radius: 6px; }
 
-/* ---------- Upravit detaily (rozbalovací) ---------- */
+/* ---------- Pokročilé (rozbalovací, `apUi.Advanced`) ---------- */
 .ap-details > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: var(--s2); }
 .ap-details > summary::-webkit-details-marker { display: none; }
 .ap-details > summary::before { content: "▸"; color: var(--t3); }
@@ -166,3 +116,30 @@
 .ap-details[open] > summary { margin-bottom: var(--s2); }
 .ap-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 60%; }
 .ap-chips .ap-chip-on { color: var(--t1); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+/* ---------- kroky (Appearance.tsx): Zavřený · Po najetí · Otevřený · Pohyb ---------- */
+.ap-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 4px; padding: 4px; border-radius: var(--r-lg); background: var(--well); border: 1px solid var(--line); }
+.ap-step { display: flex; flex-direction: column; gap: 1px; padding: 7px 12px; border-radius: calc(var(--r-lg) - 4px); text-align: left; color: var(--t3); transition: background var(--dur-1), color var(--dur-1); }
+.ap-step b { font-size: var(--fs-body); font-weight: 600; }
+.ap-step small { font-size: var(--fs-xs); }
+.ap-step:hover { color: var(--t2); }
+.ap-step.on { background: var(--card-3); color: var(--t1); box-shadow: inset 0 0 0 1px var(--line-2); }
+.ap-step:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* galerie vzhledů zavřeného Ledge a chování po najetí (dlaždice = `.ap-style`) */
+.ap-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s2); }
+.ap-hovers { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s2); }
+.ap-states { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: var(--s2); }
+.ap-states-l { margin-right: 4px; font-size: var(--fs-sm); color: var(--t3); }
+.ap-states .ap-chip-on { color: var(--t1); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+/* řádek, kde galerie leží POD popiskem (rozložení, tvar proužku) */
+.ap-col { display: flex; flex-direction: column; gap: 6px; padding: 7px 0; font-size: var(--fs-body); }
+.ap-col small { display: block; color: var(--t3); font-size: var(--fs-sm); }
+.ap-shapes { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: var(--s2); }
+.ap-shape { display: flex; justify-content: center; height: 30px; padding: 0 10px; border-radius: var(--r-sm); background: var(--well-2); }
+.ap-shape i { display: block; width: 70%; background: var(--t2); opacity: 0.75; }
+.ap-shape[data-shape="line"] i { width: 100%; }
+.ap-shape[data-shape="dot"] i { width: 34%; }
+.ap-shape[data-shape="block"] i { box-shadow: 2px 2px 0 var(--t1); }
+.ap-shape[data-shape="glow"] i { box-shadow: 0 0 6px var(--accent); }

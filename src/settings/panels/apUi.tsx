@@ -1,7 +1,10 @@
-// Společné ovládací prvky panelu Vzhled (Appearance*.tsx): přepínač `Seg`, posuvník s hodnotou
-// `Slider`, zvýraznění kotvy hledání `lit` a formáty hodnot. Jen vzhled — stav drží panel.
-import { For, Show } from "solid-js";
-import { lang } from "../../i18n";
+// Společné ovládací prvky panelu Vzhled (Appearance*.tsx): přepínač `Seg` (nejvýš 4 volby — víc = galerie,
+// hlídá `settings/segments.test.mjs`), posuvník s hodnotou `Slider`, rozbalovací „Pokročilé“ `Advanced`,
+// přepínač ukázkového dění `StateSwitch` (náhledy kroků Zavřený a Po najetí), zvýraznění kotvy hledání `lit`
+// a formáty hodnot. Jen vzhled — stav drží panel.
+import { For, Show, createSignal, type JSX } from "solid-js";
+import { lang, t } from "../../i18n";
+import { PREVIEW_STATES, type PreviewState } from "../appearanceModel";
 import type { Appearance } from "../../types";
 import type { PanelProps } from "../types";
 import { hit } from "../ctx";
@@ -40,6 +43,46 @@ export function Slider(q: { label: string; hint?: string; anchor?: string; min: 
         <input type="range" min={q.min} max={q.max} step={q.step} value={q.value} aria-label={q.label} onInput={(e) => q.set(+e.currentTarget.value)} />
         <output>{q.fmt(q.value)}</output>
       </span>
+    </div>
+  );
+}
+
+/** Rozbalovací „Pokročilé“ kroku: otevřené drží panel (skok z hledání na volbu uvnitř ho rozbalí). */
+export function Advanced(q: { id?: string; open: boolean; onToggle: (open: boolean) => void; hint: string; children: JSX.Element }) {
+  return (
+    <details class="card ap-details ap-top" id={q.id ? `f-${q.id}` : undefined} classList={{ hit: !!q.id && lit(q.id) }} open={q.open}
+      onToggle={(e) => e.currentTarget.open !== q.open && q.onToggle(e.currentTarget.open)}>
+      <summary><h4>{t("appearance.adv.title", "Pokročilé")}</h4><small>{q.hint}</small></summary>
+      {q.children}
+    </details>
+  );
+}
+
+/** Co se v náhledech zrovna „děje“ — sdílí kroky Zavřený a Po najetí (přepnutí kroku ho nezahodí). */
+const [previewState, setPreviewState] = createSignal<PreviewState>("work");
+export { previewState };
+
+const STATE_LABEL: Record<PreviewState, () => string> = {
+  idle: () => t("appearance.state.idle", "Klid"),
+  work: () => t("appearance.state.work", "Claude pracuje"),
+  wait: () => t("appearance.state.wait", "Čeká na tebe"),
+  music: () => t("appearance.state.music", "Hraje hudba"),
+  timer: () => t("appearance.state.timer", "Časovač"),
+  done: () => t("appearance.state.done", "Hotovo"),
+};
+
+/** Čipy „Co se děje“ nad náhledy (ukázková data, nic skutečného). */
+export function StateSwitch() {
+  return (
+    <div class="ap-states" role="radiogroup" aria-label={t("appearance.state.title", "Co se zrovna děje (ukázka)")}>
+      <span class="ap-states-l">{t("appearance.state.title", "Co se zrovna děje (ukázka)")}</span>
+      <For each={PREVIEW_STATES}>
+        {(s) => (
+          <button class="mini" classList={{ "ap-chip-on": previewState() === s }} role="radio" aria-checked={previewState() === s} onClick={() => setPreviewState(s)}>
+            {STATE_LABEL[s]()}
+          </button>
+        )}
+      </For>
     </div>
   );
 }

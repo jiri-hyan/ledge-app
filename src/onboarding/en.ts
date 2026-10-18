@@ -93,7 +93,7 @@ registerDict("en", {
   "onboarding.links.previewEmpty": "No link yet.",
   "onboarding.links.toActions": "Saved as links — in the Links card and in Settings → Projects, actions and links.",
   "onboarding.look.title": "Look",
-  "onboarding.look.lead": "Pick a theme. Fine-tune the style, colours, animations and more in Settings → Look.",
+  "onboarding.look.lead": "Pick a theme. How the closed Ledge looks, what happens on hover, the width and animations are picked from pictures in Settings → Look (or Getting started → Pick a look).",
   "onboarding.saved.projects": "Added to Ledge: {n}",
   "onboarding.saved.links": "Links saved: {n}",
   "onboarding.done.title": "Done — Ledge is yours",

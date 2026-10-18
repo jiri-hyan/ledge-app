@@ -156,7 +156,7 @@ pub(crate) fn refresh_strip() {
     let palette = geom::palette(look.theme);
     let accent = geom::parse_hex(&look.accent).unwrap_or(palette.accent[0]);
     let mut segs = stripconf::compose(parts, &cfg.strip, ambient.is_some() || due_count > 0, |c| geom::readable(c.base(accent), &palette));
-    if let Some(first) = due_first {
+    if let Some(first) = &due_first {
         let mut text: String = if first.is_empty() { tr("Připomínka", "Reminder").into() } else { first.chars().take(28).collect() };
         if first.chars().count() > 28 {
             text.push('…');
@@ -169,8 +169,22 @@ pub(crate) fn refresh_strip() {
     let drawer_open = c.drawer.view() != View::Hidden;
     // nad taby prohlížeče proužek ustoupí na tenkou linku, dokud nepřijde událost
     let retreat = c.bar_window.load(Ordering::Relaxed) && ambient.is_none();
-    let line_only = !cfg.strip.enabled || retreat;
-    let visible = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some());
+    // styl zavřeného Ledge (`strip.look`): obsah podle stavu (`looks::show`); vypnutý proužek a ústup
+    // nad taby (u stylů, které taby překrývají) = klasická linka
+    let closed = cfg.strip.look;
+    let looked = closed != crate::looks::Look::Classic && cfg.strip.enabled && !(retreat && closed.retreats());
+    let show = looked.then(|| {
+        let f = look_facts(&cfg, &pending, &asks, &procs, due_first.as_deref(), due_count, &mode_title, accent);
+        crate::looks::show(closed, &crate::looks::without(f, &cfg.strip.look_hide))
+    });
+    let hidden = show.as_ref().is_some_and(|s| s.hidden);
+    let line_only = !cfg.strip.enabled || (retreat && !looked);
+    let visible = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some()) && !hidden;
+    let position = cfg.appearance.strip.position;
+    // plynulá šířka ostrůvku jen se zapnutými animacemi (Ledge i Windows „omezit pohyb“)
+    let animate = closed == crate::looks::Look::Island
+        && cfg.appearance.motion.style != crate::appearance::MotionStyle::None
+        && !attention::os_animations_off();
     let opacity = cfg.strip.opacity;
     let (style, metrics, line) = (look.strip.style, geom::strip_metrics(look.strip.style, look.strip.size), geom::line_stops(look, &palette));
     let axis2 = geom::axis2_for(&cfg, mon.rect.left, mon.rect.right, mon.dpi);
@@ -191,7 +205,83 @@ pub(crate) fn refresh_strip() {
         m.line = line;
         m.axis2 = Some(axis2);
         m.pulse = pulse;
+        m.look = closed;
+        m.show = show;
+        m.animate = animate;
+        m.position = position;
     });
+}
+
+/// Co se děje — pro styly zavřeného Ledge (`looks::Facts`). Jen paměť jádra, jako zbytek `refresh_strip`.
+#[allow(clippy::too_many_arguments)]
+fn look_facts(
+    cfg: &Config,
+    pending: &[claude::Pending],
+    asks: &[claude::Ask],
+    procs: &[procman::ProcView],
+    due_first: Option<&str>,
+    due_count: usize,
+    mode_title: &str,
+    accent: Rgba,
+) -> crate::looks::Facts {
+    use crate::looks::{DONE_MS, Facts, facts};
+    let c = core();
+    let now_ms = crate::state::now_ms();
+    let where_of = |cwd: &str| project_for_cwd(cfg, cwd).unwrap_or_else(|| cwd.rsplit(['/', '\\']).find(|s| !s.is_empty()).unwrap_or("").to_string());
+    // čekající: jako položka `waiting` (schválení, otázky, Agent View)
+    let live: Vec<String> = crate::sessionlive::with_cache(|c| {
+        let live = crate::sessions::Live { agents: c.agents.as_deref(), fetched_at: c.fetched_at, registry: &c.registry };
+        crate::sessions::waiting_ids(&live).into_iter().map(str::to_string).collect()
+    });
+    let live: Vec<&str> = live.iter().map(String::as_str).collect();
+    let waiting = attention::waiting_count_all(pending, asks, &live);
+    let waiting_where = pending.first().map(|p| p.cwd.as_str()).or_else(|| asks.first().map(|a| a.cwd.as_str())).map(where_of).unwrap_or_default();
+    let sessions = c.claude.sessions();
+    let now = now_ms.max(0) as u64;
+    let working: Vec<_> = sessions.iter().filter(|s| s.state == claude::SessionState::Working).collect();
+    let mut done: Vec<_> = sessions
+        .iter()
+        .filter(|s| s.state == claude::SessionState::Idle && !s.ended && !s.unfinished() && now.saturating_sub(s.updated_at) < DONE_MS)
+        .collect();
+    done.sort_by_key(|s| std::cmp::Reverse(s.updated_at));
+    let (mut repos, git) = (0, c.git.lock());
+    for p in cfg.projects.iter().filter(|p| p.enabled) {
+        if let Some((_, Some(g))) = git.get(&p.id)
+            && (g.dirty > 0 || g.ahead > 0)
+        {
+            repos += 1;
+        }
+    }
+    drop(git);
+    let reminder = due_first.map(|t| {
+        let mut s: String = if t.is_empty() { tr("Připomínka", "Reminder").into() } else { t.chars().take(28).collect() };
+        if t.chars().count() > 28 {
+            s.push('…');
+        }
+        (s, due_count)
+    });
+    use windows::Win32::System::SystemInformation::GetLocalTime;
+    let lt = unsafe { GetLocalTime() };
+    Facts {
+        waiting,
+        waiting_where,
+        reminder,
+        working: working.len(),
+        working_where: working.first().map(|s| where_of(&s.cwd)).unwrap_or_default(),
+        done: done.len(),
+        done_where: done.first().map(|s| where_of(&s.cwd)).unwrap_or_default(),
+        timer: facts::timer_fact(&crate::timer::state(), now_ms),
+        music: facts::music_fact(crate::media::view().as_ref(), now_ms),
+        servers: procs.iter().filter(|p| p.phase != procman::Phase::Exited).count(),
+        server_failed: procs.iter().any(|p| p.phase == procman::Phase::Failed),
+        repos,
+        limit5h: facts::limit_fact(&crate::limitslive::view(), now_ms),
+        clock: crate::looks::hm(lt.wHour, lt.wMinute),
+        date: clock_text(lt.wHour, lt.wMinute, lt.wDayOfWeek, lt.wDay, lt.wMonth),
+        mode: mode_title.to_string(),
+        // akcent čitelný na tmavém těle stylů
+        accent: geom::readable(accent, &geom::palette(crate::appearance::Theme::Dark)),
+    }
 }
 
 /// Název projektu, ve kterém leží cwd (nejdelší shoda cesty).

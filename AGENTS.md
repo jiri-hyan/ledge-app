@@ -11,7 +11,7 @@ bez UI. Architektura je v hlavičkách souborů `src-tauri/src/*.rs`.
 
 **Všechno jde nastavit klikem v Nastavení** (ozubené kolo v šuplíku). Panely (od vlny 6, id v
 `src/settings/registry.ts`; staré id vedou dál): **Začínáme** (průvodce, tipy, novinky) · **Šuplík a karty**
-(záložky, karty, přihrádka) · **Vzhled** (styl, barvy, šířka, animace, celý proužek, jazyk) · **Projekty,
+(záložky, karty, přihrádka) · **Vzhled** (4 kroky: Zavřený — vzhled zavřeného Ledge a celý proužek; Po najetí; Otevřený — styl, šířka a hustota na monitoru ve skutečném poměru, barvy; Pohyb — animace; jazyk) · **Projekty,
 akce a odkazy** (projekty se autodetekcí ze složky, jeden seznam akcí — odkaz je akce —, skripty) · **Claude**
 (schvalování, otázky, limity, útrata, hlídač, hooky) · **Osobní** (počasí, kalendář, přehrávač, časovač,
 historie schránky) · **Poznámky** (i sync) · **Chování** (otevírání, zkratky, paleta, herní režim, šuplík nad
@@ -29,7 +29,10 @@ vedle jako `config.json.broken-<unix s>` — rozbitý config se tak nikdy potich
 čistý config (`onboarding::fresh_config`): **žádné projekty**, `roots` = Plocha, sync poznámek vypnutý
 s prázdným `remote`, `update.repo` = `jiri-hyan/ledge-app` (veřejné repo), `onboarding.done: false`. Šuplík
 pak při prvním otevření ukáže **průvodce** (jazyk `ui.lang`, repa na disku, aplikace ze Start menu,
-hooky Claude Code, odkazy, motiv) — každý krok se hned ukládá, nic nemaže, duplicity přeskočí.
+hooky Claude Code, odkazy, motiv) — každý krok se hned ukládá, nic nemaže, duplicity přeskočí. Po průvodci
+(a u stávajícího uživatele jednou po aktualizaci) krátká **prohlídka** 3 bublin (✎ úpravy, ⋯ menu karty,
+Ctrl+K) — přeskočitelná, bez modalu a bez braní fokusu; dokončení i přeskočení zapíše `"ui": { "tips":
+["tour1"] }` a už se neukáže (smazáním `tour1` z `ui.tips` se ukáže znovu).
 Ručně: Nastavení → Začínáme → Spustit průvodce. **Existující config se nemění:** chybějící `onboarding` = `done: true`
 (průvodce se neukáže); chybějící `notes.sync.remote` se při načtení vezme z `origin` pracovní kopie
 poznámek (kde sync běžel, běží dál), jinak zůstane sync vypnutý; `update.repo` = dřívější
@@ -59,29 +62,54 @@ Typické úpravy:
   ```json
   "layout": {
     "pages": [
-      { "id": "prace", "name": "", "cards": [{ "id": "projects", "size": "xl" }, { "id": "claude", "size": "m" }] },
+      { "id": "prace", "name": "", "cards": [{ "id": "projects", "size": "xl" }, { "id": "claude", "size": "m", "h": 3 }] },
+      { "id": "osobni", "name": "", "cards": [{ "id": "projects", "size": "xl",
+          "tiles": { "size": "small", "label": true, "git": false, "hidden": ["harbor"] } }] },
       { "id": "hry", "name": "Hry", "icon": "🎮", "cards": [{ "id": "media", "size": "m" }] }
     ],
-    "hiddenParts": ["claudeCosts"]
+    "hiddenParts": ["claudeCosts"],
+    "upgrades": ["personalProjects"]
   }
   ```
   Záložky v pořadí (1–9, klávesy 1–9 / paleta „Přejít na záložku“); `prace` a `osobni` jsou vestavěné
   (prázdný `name` = „Práce“ / „Osobní“ podle jazyka), vlastní záložka potřebuje `name`, `id` = `a-z0-9-`.
   Karty: `projects`, `running`, `claude`, `repos`, `notes`, `actions`, `shelf`, `clock`, `timer`, `weather`,
   `calendar`, `links`, `media` (Právě hraje + hlasitost); stejná karta smí být na víc záložkách, na jedné
-  jen jednou. `size`: `s` (1 sloupec), `m` (2), `l` (3), `xl` (celá řada) z `--deck-cols` (výchozí 4).
+  jen jednou. `size`: `s` (1 sloupec), `m` (2), `l` (3), `xl` (celá řada) z `--deck-cols` (výchozí 4 — počet
+  sloupců určuje styl rozložení ve Vzhledu). **Řada nikdy nekončí prázdným místem:** karty jdou v pořadí
+  záložky a volné sloupce řady, do které se další karta nevejde, dostanou karty té řady (pořadí se nemění).
+  `h` (volitelné) = výška karty v řádcích 1–4 (řádek ≈ 104 px × hustota); chybí = podle obsahu. S pevnou
+  výškou obsah scrolluje uvnitř karty, ne celý šuplík. `tiles` (jen karta `projects` = zástupci, volby
+  pro tu záložku): `size` `small` (malé ikony) | `tile` (výchozí) | `large`, `label` (název pod ikonou,
+  výchozí `true`), `git` (větev a stav gitu, výchozí `true`), `hidden` = id projektů, které tu nejsou
+  (prázdné = všechny, nový projekt se ukáže sám). `upgrades` = jednorázové úpravy rozložení po aktualizaci,
+  které už proběhly — neměň ručně: `personalProjects` dá kartu Projekty nahoru na Osobní, když
+  tam nikdy nebyla (jen když ji uživatel používá na jiné záložce a Osobní existuje); odebereš-li ji
+  potom, už se nevrátí.
   Karta, která není na žádné záložce, je skrytá a nic nepočítá: skryté počasí ani kalendář se nestahují
   (stahují se, jen když je karta na otevřené záložce), skrytá útrata / karta Claude neindexuje transcripty,
   skryté Právě hraje / hlasitost / Čas (baterie) zruší odběry událostí Windows. `hiddenParts` = skryté části
   karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude), `nowPlaying`, `sound`
-  (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (přetáhnout, ⇔ velikost, × do katalogu,
-  „+ Přidat kartu“, vlastní záložky; Hotovo uloží jen `layout`), ⋯ na kartě (skrýt kartu / sekci), nebo
-  Nastavení → Šuplík a karty → Záložky a karty. **`drawer.sections` a `modes.personalEnabled` jsou od
+  (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (přetáhnout, **tah za pravý okraj karty
+  = šířka, za spodní = výška, za roh = obojí** s obrysem „2 × 3“, ⇔ / ↕ klikem, × do katalogu, „+ Přidat
+  kartu“, vlastní záložky; Hotovo uloží jen `layout`), ⋯ na kartě (Velikost S/M/L/XL, Výška Auto/Nízká/
+  Vysoká, u Projektů dlaždice / název / git / které projekty, skrýt kartu / sekci — ukládá hned), nebo
+  Nastavení → Šuplík a karty → Záložky a karty (i výška a volby Projektů). **`drawer.sections` a `modes.personalEnabled` jsou od
   vlny 6 odvozené** z `layout` (při načtení, uložení i aplikaci; ruční změna se přepíše) — čtou je moduly
   podle karty a starší Ledge. Starý config bez `layout` se při načtení převede beze ztráty: viditelnost
   z `drawer.sections`, pořadí karet Práce z dřívějšího `appearance.cards`, záložka Osobní jen při
   `modes.personalEnabled != false`, dnešní pořadí Osobní. Celé funkce dál vypínají `strip.enabled`,
   `notes.enabled`, `shelf.enabled`, `claude.costs`.
+- **Po najetí myší** — `drawer.hover` (Nastavení → Vzhled → Po najetí): `"full"` = rovnou celý šuplík
+  (výchozí; starý config beze změny), `"compact"` = kompaktní náhled (malý panel pod proužkem: čekající
+  schválení / otázka s Povolit / Zamítnout, nejvýš 3 session Clauda, Právě hraje s ⏮⏯⏭, čas a limit 5h,
+  „▾ celý šuplík“), `"island"` = roztažený ostrůvek (černá kapsle s jedním nejdůležitějším děním: čeká na tebe →
+  hotovo → časovač → hudba → Claude pracuje → klid s časem, datem a počasím). Z náhledu otevře celý šuplík klik
+  mimo tlačítka nebo setrvání myši `drawer.hoverExpandMs` (výchozí `1200`, `0` = jen klikem, jinak 400–10000;
+  nad tlačítky a s čekajícím schválením se neodpočítává). Odjetí myši zavře jako šuplík; s čekajícím Claudem
+  zůstane peek se schválením (ve všech režimech — najetí při čekání otevře peek). Náhled bere jen data, která
+  Ledge už má (nic nestahuje, fokus nebere); ve hře / herním režimu se neukáže. Bez myši:
+  `POST /ctl/open {"view":"compact"}` / `{"view":"island"}`.
 - **Proužek** — `strip.items` (pořadí): `mode`, `clock`, `running`, `claude`, `waiting`, `repos`, volitelně
   `limits` (limity Claude 5h / týden), `custom` (vlastní text), `timer` (časovač) a `media` (právě hraje:
   „♪ Název · Interpret“ jen při přehrávání, pauza / nic = žádný segment) — ve výchozím stavu vypnuté. Config proužku žije v `src-tauri/src/stripconf.rs` (re-export z `config.rs`). Další pole:
@@ -95,8 +123,24 @@ Typické úpravy:
     pracuje / čeká / je hotový, běží časovač, hraje hudba (`media`), limity ≥ 70 %, připomínka po termínu nebo barevná linka
     (neuložená repa se jako událost nepočítají — je to trvalý stav). Smysl má u `mode`, `clock`, `custom`,
     `limits`; `running`, `claude`, `waiting`, `repos`, `timer`, `media` se v klidu neukazují samy. Výchozí `[]`.
-  - Nastavení → Vzhled → Co proužek ukazuje (celý proužek je v panelu Vzhled): řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
+  - Nastavení → Vzhled → Zavřený → Pokročilé → Co proužek ukazuje (celý proužek je v panelu Vzhled): řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
     náhled s ukázkovými texty (přepínač „V klidu / Když se něco děje“).
+  - `strip.look` — **styl zavřeného Ledge** (vlna 7, `src-tauri/src/looks/*`, kreslí `stripdraw.rs`): jedna volba
+    určí tvar, místo, velikost i obsah. `classic` (výchozí; starý config = beze změny) = proužek podle `strip.items`
+    a `appearance.strip.style`. Ostatní: `island` (černá kapsle, v klidu malá, při dění se plynule roztáhne —
+    bez animace při „omezit pohyb“ / `motion.style: none`), `dots` (4 tečky: Claude, servery, repa, ty), `line`
+    (3 px přes celou šířku, barevné úseky), `icons` (ikony Segoe Fluent Icons / MDL2 Assets s odznaky čísel),
+    `clock` (velké hodiny + stavová tečka), `corner` (odznak v rohu; roh = `appearance.strip.position`, střed =
+    pravý), `ghost` (v klidu nic, jen „čeká na tebe“ / „hotovo“; najetí k hraně šuplík otevře dál), `bar` (lišta
+    přes celou šířku, monospace, vpravo limit 5h a čas), `notch` (černý výřez s oušky), `progress` (text + lišta
+    průběhu: limit 5h / časovač / skladba, jen z reálných dat), `ticker` (jeden řádek; víc událostí se střídá po
+    5 s, jinak žádný časovač). Priorita: čeká na tebe (i připomínka) > hotovo (session doběhlá za 5 min) >
+    časovač > Claude pracuje > hudba > klid. U stylů mimo `classic` se `items`, `quiet`, `colors`, `custom`,
+    `opacity` a `appearance.strip.style`/`color` nepoužijí; `appearance.strip.size` styl zvětší / zmenší.
+    `strip.enabled: false` = jako dřív jen linka při událostech; nad taby prohlížeče ustoupí na linku všechny
+    styly kromě `line`, `dots`, `corner`, `ghost`. Seznam s názvy pro Nastavení: `src/strip/looks.ts` (`STRIP_LOOKS`).
+  - `strip.lookHide` — Pokročilé u stylů mimo `classic`: co styl nemá ukazovat (`waiting`, `claude` = pracuje /
+    hotovo, `running`, `repos`, `timer`, `media`, `limits`, `clock`). Výchozí `[]` = všechno.
 - **Časovač** — sekce `timer` (Nastavení → Osobní → Časovač, `src-tauri/src/timer.rs`): `presets`
   (minuty, 1–600, nejvýš 6; výchozí `[5, 15, 25, 50]`), `toast` (výchozí `true`: oznámení Windows po
   doběhnutí odpočtu — bez fokusu, ne ve hře / herním režimu / při „nerušit“ / s otevřeným šuplíkem), `strip`
@@ -139,7 +183,7 @@ Typické úpravy:
   (za běhu nejvýš 95 % monitoru), krytí proužku `strip.opacity`. Změna se projeví bez restartu.
   **Design styly (vlna 6):** `style` (`classic` výchozí = vzhled před vlnou 6, `glass`, `terminal`, `paper`,
   `neon`, `brutal`, `pastel`) je jen jméno — výběr stylu v Nastavení / paletě (`Styl: Neon`) zapíše jeho
-  hodnoty do polí výš a níž, ta jdou dál přebít („Upravit detaily“, „Obnovit styl“ je vrátí). Nová pole:
+  hodnoty do polí výš a níž, ta jdou dál přebít (krok Otevřený → „Pokročilé“, „Obnovit styl“ je vrátí). Nová pole:
   `font` (`system|mono|serif|grotesk`, jen systémová písma Windows), `material`
   (`solid|glass|paper|glow|hard|soft|frame`), `layout` (`classic|float|band|sheet|panorama|mosaic|tiles` —
   sloupce a mezery karet), `width` (`custom` = `drawer.width` | `narrow` 820 | `medium` 1080 | `wide` 1440 |
@@ -410,7 +454,7 @@ ručně „Synchronizovat teď“ v Nastavení. Cyklus: `add -A` → commit `led
 | volání | co dělá |
 |---|---|
 | `GET /status` | čekající schválení, sessions, běžící procesy, cesta ke configu |
-| `POST /ctl/open` `{"view":"full"\|"peek"}` | otevře šuplík (bez fokusu, nezavírá se sám) |
+| `POST /ctl/open` `{"view":"full"\|"peek"\|"compact"\|"island"}` | otevře šuplík / peek / náhled po najetí (bez fokusu, nezavírá se sám) |
 | `POST /ctl/close` | zavře šuplík |
 | `POST /ctl/settings` | otevře Nastavení |
 | `POST /ctl/launch` `{"id":"atlas"}` | spustí projekt jako klik na logo |

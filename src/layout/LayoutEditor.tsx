@@ -1,6 +1,7 @@
 // Editor rozložení v Nastavení (panel Šuplík a karty): stejný model jako režim úprav v šuplíku —
 // záložky (pořadí tažením, název, ikona, smazat), karty na nich (pořadí, velikost, přesun na jinou
-// záložku, odebrat, přidat z katalogu) a skryté části karet. Mění jen draft Nastavení (`c.set("layout")`),
+// záložku, odebrat, přidat z katalogu), výška karty, volby karty Projekty (zástupci: velikost dlaždic,
+// název, git, které projekty na téhle záložce) a skryté části karet. Mění jen draft Nastavení (`c.set("layout")`),
 // zapíše společná lišta Uložit. Velké tlačítko „Upravit přímo v šuplíku“ = režim úprav (`askEdit`).
 import { createMemo, For, Show } from "solid-js";
 import { t } from "../i18n";
@@ -9,9 +10,12 @@ import { Section } from "../settings/fields/Row";
 import { SortList } from "../settings/fields/SortList";
 import { askEdit } from "./edit";
 import {
-  addCard, addPage, catalog, CARD_INFO, MAX_PAGES, moveCard, movePage, moveToPage, normalizeLayout, PAGE_ICONS, PART_KEYS, PARTS, partHidden,
-  removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setPartHidden, setSize, SIZES, type CardId, type CardSize, type Layout, type PartKey,
+  addCard, addPage, catalog, CARD_INFO, HEIGHTS, MAX_PAGES, moveCard, movePage, moveToPage, normalizeLayout, PAGE_ICONS, PART_KEYS, PARTS, partHidden,
+  removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, SIZES, tilesOf, TILE_SIZES,
+  type CardHeight, type CardId, type CardSize, type Layout, type LayoutCard, type PartKey, type TileSize,
 } from "./model";
+import { heightLabel } from "./Deck";
+import { tileSizeName } from "../cards/TileOptions";
 import { cardDesc, cardName, pageName, partName } from "./text";
 import "./layout.css";
 
@@ -42,6 +46,35 @@ export default function LayoutEditor() {
     put(r.layout);
     offerUndo(t("cards.layout.removed", "Karta „{name}“ odebrána do katalogu", { name: cardName(id) }), () => put(restoreCard(L(), u)));
   }
+  const projects = (): { id: string; name: string }[] =>
+    (Array.isArray(c.cfg.projects) ? c.cfg.projects : []).filter((x: any) => x && typeof x.id === "string").map((x: any) => ({ id: x.id, name: typeof x.name === "string" && x.name ? x.name : x.id }));
+  /** volby karty Projekty na záložce `pageId` (zástupci) */
+  const Tiles = (q: { pageId: string; card: LayoutCard }) => {
+    const o = () => tilesOf(q.card);
+    return (
+      <div class="lay-st-tiles">
+        <label>
+          {t("cards.tiles.size", "Dlaždice")}{" "}
+          <select value={o().size} onChange={(e) => put(setTiles(L(), q.pageId, { size: e.currentTarget.value as TileSize }))}>
+            <For each={TILE_SIZES}>{(s) => <option value={s}>{tileSizeName(s)}</option>}</For>
+          </select>
+        </label>
+        <label><input type="checkbox" checked={o().label} onChange={(e) => put(setTiles(L(), q.pageId, { label: e.currentTarget.checked }))} /> {t("cards.tiles.label", "Název pod ikonou")}</label>
+        <label><input type="checkbox" checked={o().git} onChange={(e) => put(setTiles(L(), q.pageId, { git: e.currentTarget.checked }))} /> {t("cards.tiles.git", "Větev a stav gitu")}</label>
+        <Show when={projects().length > 1}>
+          <div class="lay-st-which" role="group" aria-label={t("cards.tiles.which", "Projekty na téhle záložce")}>
+            <small>{t("cards.tiles.which", "Projekty na téhle záložce")}</small>
+            <For each={projects()}>
+              {(pr) => (
+                <label><input type="checkbox" checked={!o().hidden.includes(pr.id)} onChange={(e) => put(showProject(L(), q.pageId, pr.id, e.currentTarget.checked))} /> {pr.name}</label>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+    );
+  };
+
   function newTab() {
     const r = addPage(L(), t("cards.layout.tab.newName", "Nová záložka"));
     if (r) put(r.layout);
@@ -85,11 +118,19 @@ export default function LayoutEditor() {
               </div>
               <SortList items={pg.cards} onMove={(f, to) => put(moveCard(L(), pg.id, f, to))} label={t("settings.layout.cardsOrder", "Pořadí karet na záložce {name}", { name: pageName(pg) })} class="lay-st-cards">
                 {(cd, _j, h) => (
-                  <div class="st-item">
+                  <div class="st-item lay-st-card">
                     {h()}
                     <span class="grow">{cardName(cd.id)}<small>{cardDesc(cd.id)}</small></span>
                     <select aria-label={t("settings.layout.size", "Velikost")} value={cd.size} onChange={(e) => put(setSize(L(), pg.id, cd.id, e.currentTarget.value as CardSize))}>
                       <For each={SIZES}>{(s) => <option value={s}>{sizeName(s)}</option>}</For>
+                    </select>
+                    <select
+                      aria-label={t("cards.layout.heightLabel", "Výška")}
+                      value={cd.h === undefined ? "" : String(cd.h)}
+                      onChange={(e) => put(setHeight(L(), pg.id, cd.id, e.currentTarget.value ? (Number(e.currentTarget.value) as CardHeight) : undefined))}
+                    >
+                      <option value="">{t("cards.layout.heightAutoOpt", "Výška podle obsahu")}</option>
+                      <For each={HEIGHTS}>{(n) => <option value={String(n)}>{heightLabel(n)}</option>}</For>
                     </select>
                     <Show when={L().pages.length > 1}>
                       <select
@@ -106,6 +147,7 @@ export default function LayoutEditor() {
                       </select>
                     </Show>
                     <button class="mini" onClick={() => removeOne(pg.id, cd.id)}>{t("settings.layout.removeCard", "Odebrat")}</button>
+                    <Show when={cd.id === "projects"}><Tiles pageId={pg.id} card={cd} /></Show>
                   </div>
                 )}
               </SortList>

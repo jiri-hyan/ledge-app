@@ -6,8 +6,11 @@
 //! Vzhled (styl `pill`/`line`/`dot` a tvary stylů vlny 6 `term`/`tag`/`glow`/`block`/`drop`, velikost,
 //! paleta motivu, barva linky, osa u hrany) přichází v `StripModel` spočítaný čistými funkcemi
 //! `appearance::geom`; ozdoby stylu (okraj, stíny, záře, písmo) dává `appearance::stripdeco`.
-//! Puls „Claude čeká / hotovo“ (`StripModel.pulse`, `attention::pulse_level`) je jediná animace:
-//! časovač `WM_TIMER` běží jen po dobu pulsu (`attention::PULSE_MS`), v klidu žádný.
+//! Puls „Claude čeká / hotovo“ (`StripModel.pulse`, `attention::pulse_level`): časovač `WM_TIMER` běží
+//! jen po dobu pulsu (`attention::PULSE_MS`), v klidu žádný.
+//! Styly zavřeného Ledge (`strip.look` ≠ `classic`, `StripModel.show`) kreslí `stripdraw`; navíc jen
+//! plynulá změna šířky ostrůvku (stejný snímkový časovač, ~240 ms po změně obsahu) a střídání řádků
+//! `ticker` po 5 s (`ROTATE_TIMER`, jen když je víc než jedna událost).
 
 use crate::appearance::StripStyle;
 use crate::appearance::geom::{self, Palette, StripMetrics, ink};
@@ -45,6 +48,8 @@ pub const WM_STRIP_VISIBLE: u32 = WM_APP + 2;
 const PULSE_TIMER: usize = 1;
 /// snímek pulsu (~30 fps; software D2D, 24px proužek)
 const PULSE_FRAME_MS: u32 = 33;
+/// id časovače střídání řádků stylu `ticker` (jen při víc než jedné události, `looks::ROTATE_MS`)
+const ROTATE_TIMER: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rgba(pub f32, pub f32, pub f32, pub f32);
@@ -95,10 +100,18 @@ pub struct StripModel {
     pub pulse: Option<(Rgba, Instant)>,
     /// přihrádka: tah souborů nad proužkem / právě puštěno (`shelf::overlay`)
     pub shelf: crate::shelf::Hint,
+    /// styl zavřeného Ledge (`strip.look`)
+    pub look: crate::looks::Look,
+    /// co styl ukáže (`looks::show`); `None` = klasický proužek ze `segments` (`draw`)
+    pub show: Option<crate::looks::Show>,
+    /// smí se šířka ostrůvku měnit plynule (animace zapnuté v Ledge i ve Windows)
+    pub animate: bool,
+    /// místo u hrany (roh u stylu `corner`)
+    pub position: crate::appearance::StripPosition,
 }
 
 /// Jas běžícího pulsu (barva, 0–1); `None` = puls není / skončil.
-fn pulse_now(m: &StripModel) -> Option<(Rgba, f32)> {
+pub(crate) fn pulse_now(m: &StripModel) -> Option<(Rgba, f32)> {
     m.pulse.and_then(|(c, t)| crate::attention::pulse_level(t.elapsed().as_millis() as u64).map(|l| (c, l)))
 }
 
@@ -120,6 +133,10 @@ impl Default for StripModel {
             axis2: None,
             pulse: None,
             shelf: crate::shelf::Hint::None,
+            look: crate::looks::Look::Classic,
+            show: None,
+            animate: false,
+            position: crate::appearance::StripPosition::Center,
         }
     }
 }
@@ -173,10 +190,11 @@ impl Strip {
     }
 }
 
-struct Renderer {
-    d2d: ID2D1Factory,
-    dw: IDWriteFactory,
-    target: ID2D1DCRenderTarget,
+pub(crate) struct Renderer {
+    pub(crate) d2d: ID2D1Factory,
+    pub(crate) dw: IDWriteFactory,
+    pub(crate) target: ID2D1DCRenderTarget,
+    pub(crate) fonts: crate::stripdraw::Fonts,
 }
 
 static mut STRIP: Option<Arc<Strip>> = None;
@@ -227,23 +245,58 @@ unsafe fn run(strip: Arc<Strip>) {
             };
             let target = d2d.CreateDCRenderTarget(&props)?;
             target.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-            Ok(Renderer { d2d, dw, target })
+            let fonts = crate::stripdraw::pick_fonts(&dw);
+            Ok(Renderer { d2d, dw, target, fonts })
         })();
         let Ok(renderer) = renderer else { return };
 
         let mut shown = false;
         let mut pulsing = false;
+        // styly zavřeného Ledge: střídání řádků (`ticker`, jen při víc událostech) a šířka ostrůvku
+        let mut rotating = false;
+        let mut rot: usize = 0;
+        let mut anim = crate::looks::frame::WidthAnim::default();
+        let t0 = Instant::now();
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             let frame = msg.message == WM_TIMER && msg.wParam.0 == PULSE_TIMER;
-            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE || frame {
+            let turn = msg.message == WM_TIMER && msg.wParam.0 == ROTATE_TIMER;
+            if turn {
+                rot = rot.wrapping_add(1);
+            }
+            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE || frame || turn {
                 // sloučit nahromaděné požadavky na překreslení
                 let mut peek = MSG::default();
                 while PeekMessageW(&mut peek, Some(hwnd), WM_STRIP_REDRAW, WM_STRIP_VISIBLE, PM_REMOVE).as_bool() {}
                 let mut model = strip.model.lock().clone();
                 crate::shelf::overlay(&mut model, crate::state::CORE.get().is_none_or(|c| c.dead()));
-                // časovač jen během pulsu na viditelném proužku
-                let active = model.visible && pulse_now(&model).is_some();
+                let looked = model.show.is_some() && !model.line_only;
+                if !model.visible {
+                    // skrytý proužek: žádný časovač, příště rovnou v cílové šířce
+                    if pulsing {
+                        let _ = KillTimer(Some(hwnd), PULSE_TIMER);
+                        pulsing = false;
+                    }
+                    if rotating {
+                        let _ = KillTimer(Some(hwnd), ROTATE_TIMER);
+                        rotating = false;
+                    }
+                    anim.reset();
+                    if shown {
+                        let _ = ShowWindow(hwnd, SW_HIDE);
+                        shown = false;
+                    }
+                    *strip.rect.lock() = RECT::default();
+                    continue;
+                }
+                let drawn = if looked {
+                    crate::stripdraw::draw(&renderer, hwnd, &model, rot, &mut anim, t0.elapsed().as_millis() as u64)
+                } else {
+                    anim.reset();
+                    draw(&renderer, hwnd, &model)
+                };
+                // snímkový časovač jen během pulsu nebo změny šířky ostrůvku; střídání jen u víc událostí
+                let active = pulse_now(&model).is_some() || anim.running();
                 if active != pulsing {
                     if active {
                         SetTimer(Some(hwnd), PULSE_TIMER, PULSE_FRAME_MS, None);
@@ -252,15 +305,16 @@ unsafe fn run(strip: Arc<Strip>) {
                     }
                     pulsing = active;
                 }
-                if !model.visible {
-                    if shown {
-                        let _ = ShowWindow(hwnd, SW_HIDE);
-                        shown = false;
+                let turns = looked && model.shelf == crate::shelf::Hint::None && model.show.as_ref().is_some_and(|s| s.rotate.len() > 1);
+                if turns != rotating {
+                    if turns {
+                        SetTimer(Some(hwnd), ROTATE_TIMER, crate::looks::ROTATE_MS, None);
+                    } else {
+                        let _ = KillTimer(Some(hwnd), ROTATE_TIMER);
                     }
-                    *strip.rect.lock() = RECT::default();
-                    continue;
+                    rotating = turns;
                 }
-                if let Some((r, body)) = draw(&renderer, hwnd, &model) {
+                if let Some((r, body)) = drawn {
                     *strip.rect.lock() = r;
                     // výchozí tvar morfu = tělo proužku (bez stínů a záře kolem)
                     *strip.last.lock() = body;
@@ -269,7 +323,7 @@ unsafe fn run(strip: Arc<Strip>) {
                     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                     shown = true;
                 }
-                if !frame {
+                if !frame && !turn {
                     let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
                 }
                 continue;
@@ -280,15 +334,15 @@ unsafe fn run(strip: Arc<Strip>) {
     }
 }
 
-fn color(c: Rgba, alpha_mul: f32) -> D2D1_COLOR_F {
+pub(crate) fn color(c: Rgba, alpha_mul: f32) -> D2D1_COLOR_F {
     D2D1_COLOR_F { r: c.0, g: c.1, b: c.2, a: c.3 * alpha_mul }
 }
 
-fn wide(s: &str) -> Vec<u16> {
+pub(crate) fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().collect()
 }
 
-unsafe fn text_format(dw: &IDWriteFactory, size: f32, strong: bool, family: &str) -> windows::core::Result<IDWriteTextFormat> {
+pub(crate) unsafe fn text_format(dw: &IDWriteFactory, size: f32, strong: bool, family: &str) -> windows::core::Result<IDWriteTextFormat> {
     unsafe {
         let family: Vec<u16> = family.encode_utf16().chain(std::iter::once(0)).collect();
         dw.CreateTextFormat(
@@ -303,7 +357,7 @@ unsafe fn text_format(dw: &IDWriteFactory, size: f32, strong: bool, family: &str
     }
 }
 
-unsafe fn measure(dw: &IDWriteFactory, fmt: &IDWriteTextFormat, s: &str) -> f32 {
+pub(crate) unsafe fn measure(dw: &IDWriteFactory, fmt: &IDWriteTextFormat, s: &str) -> f32 {
     unsafe {
         let t = wide(s);
         match dw.CreateTextLayout(&t, fmt, 4000.0, 100.0) {

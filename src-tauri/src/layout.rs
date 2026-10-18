@@ -10,6 +10,11 @@
 //! Starý config bez `layout` se převede beze ztráty ([`from_legacy`]): viditelnost z `drawer.sections`,
 //! pořadí karet Práce z `appearance.cards`, záložka Osobní jen při `modes.personalEnabled != false`,
 //! dnešní pevné pořadí Osobní. Velikosti dřív nebyly — řada se rozdělí jako dnešní mřížka ([`row_sizes`]).
+//!
+//! Karta má šířku `size` a volitelně výšku `h` (1–4 řádky, chybí = podle obsahu; obsah pak scrolluje
+//! uvnitř karty). Karta Projekty (zástupci) má navíc volby dlaždic `tiles` (velikost, popisek, git,
+//! skryté projekty na téhle záložce). Jednorázové úpravy rozložení po aktualizaci ([`apply_upgrades`])
+//! se značí v `upgrades` — co uživatel potom odebere, už se nevrací.
 
 use crate::config::Config;
 use crate::configerr::{FieldError, fe};
@@ -37,6 +42,10 @@ pub const PARTS: [(&str, &str); 7] = [
 pub const MAX_PAGES: usize = 9;
 const MAX_NAME: usize = 32;
 const MAX_ICON: usize = 4;
+/// Nejvyšší výška karty v řádcích (`h`).
+pub const MAX_H: u8 = 4;
+/// Jednorázová úprava: karta Projekty (zástupci) i na záložku Osobní (vlna 7).
+pub const UP_PERSONAL_PROJECTS: &str = "personalProjects";
 
 /// Šířka karty v mřížce `.deck` (`--deck-cols`, výchozí 4): `s` = 1 sloupec, `m` = 2, `l` = 3, `xl` = celá řada.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -49,6 +58,36 @@ pub enum CardSize {
     Xl,
 }
 
+/// Velikost dlaždic v kartě Projekty: malé ikony, dlaždice (výchozí), velké.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TileSize {
+    Small,
+    #[default]
+    Tile,
+    Large,
+}
+
+/// Volby karty Projekty (zástupci) na jedné záložce.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct TileOpts {
+    /// `small` (malé ikony) / `tile` (dlaždice) / `large` (velké).
+    pub size: TileSize,
+    /// Název projektu pod ikonou.
+    pub label: bool,
+    /// Větev a stav gitu (neuloženo ●, nepushnuto ↑, pozadu ↓) pod názvem.
+    pub git: bool,
+    /// Id projektů, které na téhle záložce nejsou (prázdné = všechny; nový projekt se ukáže sám).
+    pub hidden: Vec<String>,
+}
+
+impl Default for TileOpts {
+    fn default() -> Self {
+        Self { size: TileSize::Tile, label: true, git: true, hidden: Vec::new() }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct LayoutCard {
@@ -57,6 +96,12 @@ pub struct LayoutCard {
     pub id: String,
     /// `s` / `m` / `l` / `xl` (celá řada).
     pub size: CardSize,
+    /// Výška v řádcích mřížky 1–4 (obsah scrolluje uvnitř karty); chybí = podle obsahu.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub h: Option<u8>,
+    /// Jen karta `projects`: velikost dlaždic, popisek, git, skryté projekty. Chybí = výchozí.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tiles: Option<TileOpts>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -81,16 +126,22 @@ pub struct LayoutConfig {
     /// Skryté části karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude),
     /// `nowPlaying`, `sound` (karta Právě hraje), `battery` (karta Čas).
     pub hidden_parts: Vec<String>,
+    /// Jednorázové úpravy rozložení, které už proběhly (`personalProjects`). Neměň ručně.
+    /// Chybí = žádná (ne výchozí rozložení — to je má všechny).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgrades: Vec<String>,
 }
 
 impl Default for LayoutConfig {
     fn default() -> Self {
-        from_legacy(&Value::Null)
+        let mut l = from_legacy(&Value::Null);
+        apply_upgrades(&mut l);
+        l
     }
 }
 
 fn card(id: &str, size: CardSize) -> LayoutCard {
-    LayoutCard { id: id.into(), size }
+    LayoutCard { id: id.into(), size, ..Default::default() }
 }
 
 /// Velikosti karet jedné řady tak, aby ji vyplnily jako dřívější mřížka (4 sloupce): 1 karta = celá
@@ -153,15 +204,32 @@ pub fn from_legacy(raw: &Value) -> LayoutConfig {
         pages.push(LayoutPage { id: PERSONAL.into(), cards, ..Default::default() });
     }
     let hidden_parts = PARTS.iter().filter(|(p, _)| !on(p)).map(|(p, _)| p.to_string()).collect();
-    LayoutConfig { pages, hidden_parts }
+    LayoutConfig { pages, hidden_parts, upgrades: Vec::new() }
 }
 
-/// Po `config::load`: soubor bez `layout` → převod ze starého tvaru (nic se nezapisuje, nový klíč
-/// přibude až s prvním uložením).
+/// Jednorázové úpravy rozložení po aktualizaci (každá jen jednou — značka v `upgrades`; co uživatel
+/// potom odebere, se nevrací). `personalProjects`: karta Projekty nahoru na Osobní, když tam nikdy
+/// nebyla — jen když ji uživatel vůbec používá (je na nějaké záložce) a Osobní existuje. Čistá funkce.
+pub fn apply_upgrades(l: &mut LayoutConfig) {
+    if !l.upgrades.iter().any(|u| u == UP_PERSONAL_PROJECTS) {
+        l.upgrades.push(UP_PERSONAL_PROJECTS.into());
+        let used = placed(l, "projects");
+        if let Some(p) = l.pages.iter_mut().find(|p| p.id == PERSONAL)
+            && used
+            && !p.cards.iter().any(|c| c.id == "projects")
+        {
+            p.cards.insert(0, card("projects", CardSize::Xl));
+        }
+    }
+}
+
+/// Po `config::load`: soubor bez `layout` → převod ze starého tvaru; pak jednorázové úpravy
+/// ([`apply_upgrades`]). Nic se nezapisuje — změna přibude do souboru až s prvním uložením.
 pub fn upgrade_loaded(raw: &Value, cfg: &mut Config) {
     if raw.get("layout").is_none() {
         cfg.layout = from_legacy(raw);
     }
+    apply_upgrades(&mut cfg.layout);
 }
 
 /// Je karta na nějaké záložce?
@@ -260,6 +328,11 @@ pub fn validate(l: &LayoutConfig) -> Result<(), FieldError> {
             if !seen.insert(c.id.as_str()) {
                 return Err(fe(format!("layout.pages.{i}.cards.{j}.id"), trf!("Karta „{}“ je na záložce dvakrát.", "Card “{}” is on the tab twice.", c.id)));
             }
+            if let Some(h) = c.h
+                && !(1..=MAX_H).contains(&h)
+            {
+                return Err(fe(format!("layout.pages.{i}.cards.{j}.h"), trf!("Výška karty je 1–{} řádky (nebo chybí = podle obsahu).", "A card height is 1–{} rows (or absent = fit the content).", MAX_H)));
+            }
         }
     }
     for (i, h) in l.hidden_parts.iter().enumerate() {
@@ -288,14 +361,18 @@ mod tests {
     #[test]
     fn default_is_todays_drawer() {
         let d = LayoutConfig::default();
-        assert_eq!(d, from_legacy(&json!({})));
+        let mut legacy = from_legacy(&json!({}));
+        apply_upgrades(&mut legacy);
+        assert_eq!(d, legacy);
+        assert_eq!(d.upgrades, [UP_PERSONAL_PROJECTS]);
         assert_eq!(d.pages.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), [WORK, PERSONAL]);
         let s = |v: &[(&str, CardSize)]| v.iter().map(|(a, b)| (a.to_string(), *b)).collect::<Vec<_>>();
         assert_eq!(shape(&d, WORK), s(&[("projects", Xl), ("actions", Xl), ("shelf", Xl), ("running", Xl), ("claude", M), ("repos", M), ("notes", Xl)]));
         assert_eq!(
             shape(&d, PERSONAL),
-            s(&[("clock", S), ("timer", S), ("weather", S), ("calendar", S), ("media", M), ("links", M), ("actions", Xl), ("shelf", Xl), ("notes", Xl)])
+            s(&[("projects", Xl), ("clock", S), ("timer", S), ("weather", S), ("calendar", S), ("media", M), ("links", M), ("actions", Xl), ("shelf", Xl), ("notes", Xl)])
         );
+        assert!(d.pages.iter().flat_map(|p| &p.cards).all(|c| c.h.is_none() && c.tiles.is_none()), "výška podle obsahu, výchozí dlaždice");
         assert!(d.hidden_parts.is_empty());
         assert!(validate(&d).is_ok());
         // každá karta je ve výchozím rozložení (katalog je na začátku prázdný)
@@ -455,6 +532,9 @@ mod tests {
             ("karta dvakrát", Box::new(|l| l.pages[0].cards.push(card("claude", S))), Some("layout.pages.0.cards.7.id")),
             ("stejná karta na dvou záložkách", Box::new(|l| l.pages[1].cards.push(card("claude", L))), None),
             ("neznámá část", Box::new(|l| l.hidden_parts = vec!["git".into()]), Some("layout.hiddenParts.0")),
+            ("výška 4", Box::new(|l| l.pages[0].cards[1].h = Some(4)), None),
+            ("výška 0", Box::new(|l| l.pages[0].cards[1].h = Some(0)), Some("layout.pages.0.cards.1.h")),
+            ("výška 5", Box::new(|l| l.pages[1].cards[0].h = Some(5)), Some("layout.pages.1.cards.0.h")),
         ];
         for (name, f, want) in cases {
             let mut l = LayoutConfig::default();
@@ -462,6 +542,110 @@ mod tests {
             assert_eq!(validate(&l).err().and_then(|e| e.field).as_deref(), want, "{name}");
         }
     }
+
+    #[test]
+    fn upgrade_personal_projects_table() {
+        // (popis, rozložení z configu 0.2.16 (už s `layout`, bez `upgrades`), Osobní po načtení)
+        type Case = (&'static str, Value, Option<Vec<&'static str>>);
+        let cases: Vec<Case> = vec![
+            (
+                "skutečný tvar 0.2.16",
+                json!({"pages":[{"id":"prace","name":"","cards":[{"id":"projects","size":"xl"},{"id":"claude","size":"m"},{"id":"repos","size":"m"},{"id":"notes","size":"xl"}]},{"id":"osobni","name":"","cards":[{"id":"clock","size":"s"},{"id":"weather","size":"s"}]}],"hiddenParts":["claudeCosts"]}),
+                Some(vec!["projects", "clock", "weather"]),
+            ),
+            (
+                "Projekty už na Osobní jsou (jinde v pořadí)",
+                json!({"pages":[{"id":"osobni","name":"","cards":[{"id":"clock","size":"s"},{"id":"projects","size":"m"}]}]}),
+                Some(vec!["clock", "projects"]),
+            ),
+            (
+                "Projekty uživatel nikde nemá",
+                json!({"pages":[{"id":"prace","name":"","cards":[{"id":"claude","size":"m"}]},{"id":"osobni","name":"","cards":[{"id":"clock","size":"s"}]}]}),
+                Some(vec!["clock"]),
+            ),
+            ("bez záložky Osobní", json!({"pages":[{"id":"prace","name":"","cards":[{"id":"projects","size":"xl"}]}]}), None),
+            (
+                "už proběhlo a uživatel je z Osobní odebral",
+                json!({"pages":[{"id":"prace","name":"","cards":[{"id":"projects","size":"xl"}]},{"id":"osobni","name":"","cards":[{"id":"clock","size":"s"}]}],"upgrades":["personalProjects"]}),
+                Some(vec!["clock"]),
+            ),
+        ];
+        for (name, layout, personal) in cases {
+            let raw = json!({ "layout": layout });
+            let mut cfg = Config::deserialize(&raw).unwrap();
+            upgrade_loaded(&raw, &mut cfg);
+            match personal {
+                Some(p) => assert_eq!(ids(&cfg.layout, PERSONAL), p, "{name}"),
+                None => assert!(cfg.layout.pages.iter().all(|p| p.id != PERSONAL), "{name}"),
+            }
+            assert_eq!(cfg.layout.upgrades, [UP_PERSONAL_PROJECTS], "{name}: značka");
+            let again = cfg.layout.clone();
+            apply_upgrades(&mut cfg.layout);
+            assert_eq!(cfg.layout, again, "{name}: jen jednou");
+        }
+        // starý config bez `layout` (před vlnou 6) dostane Projekty na Osobní taky; skryté projekty ne
+        let old = json!({"drawer":{"sections":{"weather":false}}});
+        let mut cfg = Config::deserialize(&old).unwrap();
+        upgrade_loaded(&old, &mut cfg);
+        assert_eq!(ids(&cfg.layout, PERSONAL)[..2], ["projects", "clock"]);
+        let off = json!({"drawer":{"sections":{"projects":false}}});
+        let mut cfg = Config::deserialize(&off).unwrap();
+        upgrade_loaded(&off, &mut cfg);
+        assert!(!placed(&cfg.layout, "projects"));
+    }
+
+    #[test]
+    fn removed_from_personal_stays_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let old = r#"{"layout":{"pages":[{"id":"prace","name":"","cards":[{"id":"projects","size":"xl"}]},{"id":"osobni","name":"","cards":[{"id":"clock","size":"s"}]}],"hiddenParts":[]}}"#;
+        std::fs::write(&path, old).unwrap();
+        let mut cfg = crate::config::load(&path).unwrap().unwrap();
+        assert_eq!(ids(&cfg.layout, PERSONAL), ["projects", "clock"], "migrace");
+        // uživatel kartu z Osobní odebere a uloží
+        cfg.layout.pages[1].cards.retain(|c| c.id != "projects");
+        crate::config::save(&path, &cfg).unwrap();
+        let saved: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(saved["layout"]["upgrades"], json!(["personalProjects"]));
+        let again = crate::config::load(&path).unwrap().unwrap();
+        assert_eq!(ids(&again.layout, PERSONAL), ["clock"], "odebranou už nevracet");
+    }
+
+    #[test]
+    fn height_and_tiles_shape() {
+        // (popis, karta v JSON, výška, volby dlaždic)
+        let cases: Vec<(&str, Value, Option<u8>, Option<TileOpts>)> = vec![
+            ("starý tvar", json!({"id":"claude","size":"m"}), None, None),
+            ("výška", json!({"id":"claude","size":"m","h":3}), Some(3), None),
+            (
+                "dlaždice jen část",
+                json!({"id":"projects","size":"xl","tiles":{"size":"small","git":false}}),
+                None,
+                Some(TileOpts { size: TileSize::Small, label: true, git: false, hidden: vec![] }),
+            ),
+            (
+                "dlaždice celé",
+                json!({"id":"projects","size":"xl","h":2,"tiles":{"size":"large","label":false,"git":true,"hidden":["harbor"]}}),
+                Some(2),
+                Some(TileOpts { size: TileSize::Large, label: false, git: true, hidden: vec!["harbor".into()] }),
+            ),
+        ];
+        for (name, v, h, tiles) in cases {
+            let c: LayoutCard = serde_json::from_value(v.clone()).unwrap();
+            assert_eq!((c.h, c.tiles.clone()), (h, tiles), "{name}");
+            let back = serde_json::to_value(&c).unwrap();
+            assert_eq!(serde_json::from_value::<LayoutCard>(back.clone()).unwrap(), c, "{name}: tam a zpět");
+            if name == "starý tvar" {
+                assert_eq!(back, v, "bez výšky a voleb se nic nového nepíše");
+            }
+        }
+        assert!(serde_json::from_value::<LayoutCard>(json!({"id":"projects","tiles":{"size":"huge"}})).is_err());
+        let schema = crate::config::schema_json();
+        for needle in ["\"tiles\"", "\"upgrades\"", "\"small\""] {
+            assert!(schema.contains(needle), "{needle} ve schématu");
+        }
+    }
+
 
     #[test]
     fn page_lookup_falls_back_to_first() {

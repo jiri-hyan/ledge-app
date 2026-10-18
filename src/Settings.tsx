@@ -22,17 +22,19 @@ import "./settings.css";
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Skok na řádek: panel, posun do středu, krátké zvýraznění. */
+/** Skok na řádek: panel, posun do středu, krátké zvýraznění. Zvýraznění (`hit`) jde HNED — panel s kroky
+ *  (Vzhled) podle něj přepne krok a rozbalí „Pokročilé“; řádek se hledá až po dvou snímcích, kdy už existuje. */
 function reveal(anchor: string | null, main: HTMLElement) {
-  requestAnimationFrame(() => {
-    const el = (anchor && document.getElementById(`f-${anchor}`)) || main.querySelector<HTMLElement>(".st-err");
-    if (!el) return;
-    el.scrollIntoView({ block: "center", behavior: reduced() ? "auto" : "smooth" });
-    if (anchor) {
-      setHit(anchor);
-      window.setTimeout(() => setHit(null), 1800);
-    }
-  });
+  if (anchor) {
+    setHit(anchor);
+    window.setTimeout(() => setHit((h) => (h === anchor ? null : h)), 1800);
+  }
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const el = (anchor && document.getElementById(`f-${anchor}`)) || main.querySelector<HTMLElement>(".st-err");
+      el?.scrollIntoView({ block: "center", behavior: reduced() ? "auto" : "smooth" });
+    }),
+  );
 }
 
 export default function Settings(p: { update: UpdateView; s: Snapshot }) {

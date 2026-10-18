@@ -40,6 +40,14 @@ pub struct StripConfig {
     /// (ne výchozí hodnota struktury — ta má aktuální revizi pro nový config).
     #[serde(default)]
     pub items_rev: u32,
+    /// Styl zavřeného Ledge: `classic` (výchozí = proužek podle `items`, tvar `appearance.strip.style`),
+    /// `island`, `dots`, `line`, `icons`, `clock`, `corner`, `ghost`, `bar`, `notch`, `progress`, `ticker`.
+    /// Ostatní styly než `classic` samy určí tvar, místo i obsah podle toho, co se děje (`looks.rs`);
+    /// `items`, `quiet`, `colors`, `custom` a `opacity` platí jen pro `classic`.
+    pub look: crate::looks::Look,
+    /// Pokročilé u stylů mimo `classic`: co styl nemá ukazovat (`claude` = pracuje / hotovo, `waiting`,
+    /// `running`, `repos`, `timer`, `media`, `limits`, `clock`). Výchozí prázdné = všechno.
+    pub look_hide: Vec<StripItem>,
 }
 
 impl Default for StripConfig {
@@ -53,6 +61,8 @@ impl Default for StripConfig {
             colors: BTreeMap::new(),
             quiet: Vec::new(),
             items_rev: crate::attention::ITEMS_REV,
+            look: crate::looks::Look::Classic,
+            look_hide: Vec::new(),
         }
     }
 }

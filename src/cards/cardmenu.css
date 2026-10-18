@@ -1,0 +1,14 @@
+/* ⋯ menu karty (CardMenu.tsx, TileOptions.tsx): rychlé volby velikosti / výšky / dlaždic jako malé
+   segmenty (nejvýš 4 volby), zaškrtávací položky a seznam projektů. Základ seznamu (`.card-menu-list`)
+   je ve styles.css; tady jen nové části. Tokeny ze styles.css. */
+.card-menu-choice { display: flex; flex-direction: column; gap: 3px; padding: 4px 6px 6px; }
+.card-menu-cap { font-size: var(--fs-xs); font-weight: 600; color: var(--t3); padding: 4px 6px 0; }
+.card-menu-choice > .card-menu-cap { padding: 0; }
+.card-menu-seg { display: flex; gap: 2px; padding: 2px; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.card-menu-seg button { flex: 1; text-align: center; padding: 3px 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--t2); border-radius: calc(var(--r-sm) - 2px); white-space: nowrap; }
+.card-menu-seg button.on { background: var(--card-3); color: var(--t1); box-shadow: inset 0 0 0 1px var(--line-2); }
+.card-menu-sep { height: 1px; margin: 4px 2px; background: var(--line); }
+button.card-menu-check { position: relative; padding-left: 26px; }
+.card-menu-check::before { content: ""; position: absolute; left: 9px; top: 50%; width: 10px; height: 10px; margin-top: -6px; border: 1px solid var(--line-2); border-radius: 3px; }
+.card-menu-check.on::before { content: "✓"; display: grid; place-items: center; font-size: var(--fs-2xs); line-height: 1; font-weight: 700; color: var(--accent); border-color: var(--accent); }
+.card-menu-scroll { display: flex; flex-direction: column; max-height: 168px; overflow-y: auto; overscroll-behavior: contain; }

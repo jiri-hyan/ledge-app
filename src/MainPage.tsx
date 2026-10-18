@@ -2,8 +2,9 @@
 // Co je na které záložce, v jakém pořadí a jak velké, řídí JEN `layout` (`layout/model.ts`); vykreslí
 // to `layout/Deck.tsx` (`.deck` > `.deck-item[data-size][data-card]`). Karty bez dat se schovají samy
 // (`shownCards`), v režimu úprav (`layout/edit.ts`, ✎ v hlavičce) jsou vidět jako zástupce. Každá karta
-// má v hlavičce ⋯ (`cards/CardMenu.tsx`: skrýt kartu / sekci, upravit šuplík); prázdná záložka = výzva
-// „Přidej první kartu“ (katalog).
+// má v hlavičce ⋯ (`cards/CardMenu.tsx`: velikost, výška, skrýt kartu / sekci, upravit šuplík; u Projektů
+// i volby dlaždic `cards/TileOptions.tsx`); prázdná záložka = výzva „Přidej první kartu“ (katalog).
+// Při prvním otevření (i po aktualizaci) jednou krátká prohlídka 3 bublin (`layout/Tour.tsx`, `ui.tips`).
 import { createMemo, Show, type JSX } from "solid-js";
 import type { Snapshot } from "./api";
 import type { NotesNav } from "./nav";
@@ -23,14 +24,16 @@ import ActionsCard from "./cards/ActionsCard";
 import ShelfCard, { shelfShown } from "./shelf/ShelfCard";
 import BgLaunch from "./sessions/BgLaunch";
 import CardMenu, { HiddenNotice } from "./cards/CardMenu";
+import TileOptions from "./cards/TileOptions";
+import Tour from "./layout/Tour";
 import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
 import { isLink, visibleGroups } from "./actions/model";
 import { lastResult } from "./actions/api";
 import Deck from "./layout/Deck";
 import Catalog from "./layout/Catalog";
 import EditBar from "./layout/EditBar";
-import { beginEdit, catalogOpen, draft, editing, editPage, setCatalogOpen } from "./layout/edit";
-import { normalizeLayout, pageHas, sameLayout, pageKind, pageOf, shownCards, type CardId, type PartKey } from "./layout/model";
+import { beginEdit, catalogOpen, draft, editing, editPage, saveLayout, setCatalogOpen } from "./layout/edit";
+import { normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type PartKey } from "./layout/model";
 import { t } from "./i18n";
 
 export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
@@ -52,7 +55,15 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const shown = () => shownCards(page(), facts()).map((c) => c.id);
   const shows = (id: CardId) => shown().includes(id);
   const edit = (catalog = false) => beginEdit(p.s, catalog);
-  const menu = (card: CardId, parts: PartKey[] = []) => <CardMenu card={card} page={page().id} parts={parts} cfgError={p.s.cfgError} onEdit={() => edit()} />;
+  const cardOf = (id: CardId) => page().cards.find((c) => c.id === id);
+  const tiles = () => tilesOf(cardOf("projects"));
+  const menu = (card: CardId, parts: PartKey[] = []) => (
+    <CardMenu card={card} page={page().id} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} cfgError={p.s.cfgError} onEdit={() => edit()}>
+      <Show when={card === "projects"}>
+        <TileOptions page={page().id} tiles={tiles()} projects={p.s.projects} cfgError={p.s.cfgError} />
+      </Show>
+    </CardMenu>
+  );
   /** baterie v kartě Čas: jen stroj s baterií a zapnutá část */
   const battery = () => (on("battery") ? p.s.personal.battery : null);
   const inbox = () => p.s.pending.length + p.s.questions.length > 0;
@@ -61,13 +72,13 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const card = (id: CardId): JSX.Element => {
     switch (id) {
       case "projects":
-        return <Projects s={p.s} onNote={p.onNote} />;
+        return <Projects s={p.s} onNote={p.onNote} onSettings={p.onSettings} tiles={tiles()} menu={menu("projects")} onShowAll={() => void saveLayout((l) => setTiles(l, page().id, { hidden: [] }), p.s.cfgError)} />;
       case "running":
         return <Running s={p.s} now={p.now} menu={menu("running")} />;
       case "claude":
         return <ClaudeSessions s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("claude", CLAUDE_PARTS.filter(on))} />;
       case "repos":
-        return <Repos s={p.s} menu={menu("repos")} />;
+        return <Repos s={p.s} menu={menu("repos")} onSettings={p.onSettings} />;
       case "notes":
         // Osobní = obecné poznámky; Práce a vlastní záložky = po projektech (reaktivně — karta zůstává při přepnutí záložky)
         return <Show when={kind() === "personal"} fallback={<NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} />}><NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>;
@@ -118,6 +129,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         </div>
       </Show>
       <HiddenNotice cfgError={p.s.cfgError} />
+      <Show when={!editing()}><Tour cfgError={p.s.cfgError} /></Show>
     </>
   );
 }

@@ -1,20 +1,25 @@
 /* Rozložení karet a režim úprav (layout/*). Jen mechanika mřížky a ovládání úprav — vzhled karet
    (barvy, rohy, stíny, šířky podle stylu šuplíku) patří stylům; tady jen tokeny ze styles.css.
    Rozhraní: `.deck` > `.deck-item[data-size][data-card]`, počet sloupců `--deck-cols` (výchozí 4). */
-.deck { display: grid; grid-template-columns: repeat(var(--deck-cols, 4), minmax(0, 1fr)); gap: var(--s3); position: relative; }
-.deck-item { grid-column: span min(2, var(--deck-cols, 4)); min-width: 0; position: relative; display: flex; flex-direction: column; }
-.deck-item[data-size="s"] { grid-column: span 1; }
-.deck-item[data-size="l"] { grid-column: span min(3, var(--deck-cols, 4)); }
-.deck-item[data-size="xl"] { grid-column: 1 / -1; }
+.deck { --dg: var(--deck-gap, var(--s3)); --deck-row: calc(104px * var(--dens, 1)); display: grid; grid-template-columns: repeat(var(--deck-cols, 4), minmax(0, 1fr)); grid-auto-flow: row; gap: var(--s3); position: relative; }
+/* rozpětí `--span` počítá Deck (`size.ts` `packSpans`): řada bez prázdného místa — volné sloupce dostanou
+   karty té řady, pořadí se nemění; `data-size` zůstává pro styly */
+.deck-item { grid-column: span var(--span, 2); min-width: 0; position: relative; display: flex; flex-direction: column; }
 /* karta vyplní buňku; vlastní odsazení dolů (dřív nad mřížkou) tu nahrazuje mezera mřížky */
 .deck > .deck-item > * { flex: 1; margin-bottom: 0; }
+/* pevná výška (`h` řádků `--deck-row`): obsah scrolluje uvnitř karty, ne celý šuplík */
+.deck-item[data-h] { height: calc(var(--h, 2) * var(--deck-row) + (var(--h, 2) - 1) * var(--dg)); }
+.deck-item[data-h] > :not(.lay-tools, .lay-rs, .lay-target) { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.deck-item[data-h] > ::-webkit-scrollbar { width: 6px; }
+.deck-item[data-h] > ::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 3px; }
+.lay-probe { position: absolute; visibility: hidden; height: var(--deck-row); width: 1px; }
 
 /* ---------- režim úprav ---------- */
-.deck.editing .deck-item > :not(.lay-tools) { pointer-events: none; user-select: none; }
+.deck.editing .deck-item > :not(.lay-tools, .lay-rs) { pointer-events: none; user-select: none; }
 /* jemné rozvlnění (vypne systémové „omezit pohyb“ i styl pohybu „bez animací“ — pravidla ve styles.css) */
 .deck.editing .deck-item { animation: lay-wiggle var(--dur-5) var(--ease) infinite alternate; transform-origin: 50% 50%; }
 .deck.editing .deck-item:nth-child(2n) { animation-direction: alternate-reverse; }
-.deck.dragging .deck-item { animation: none; }
+.deck.dragging .deck-item, .deck.resizing .deck-item { animation: none; }
 @keyframes lay-wiggle { from { transform: rotate(-0.3deg); } to { transform: rotate(0.3deg); } }
 .deck-item.lifted { opacity: 0.4; }
 .deck-item.drop-at { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: var(--r-xl); }
@@ -26,11 +31,24 @@
 .deck.dragging .lay-grip { cursor: grabbing; }
 .lay-remove:hover { color: var(--red); }
 .lay-ghost { opacity: 0.7; border-style: dashed; }
+/* úchyty okrajů v úpravách: pravý = šířka, spodní = výška, roh = obojí — vidět vždy (linka akcentu);
+   uvnitř karty, aby nepřetekly mřížku (posuvník) */
+.lay-rs { position: absolute; z-index: 4; touch-action: none; }
+.lay-rs-e { top: var(--s4); bottom: var(--s4); right: 0; width: 10px; cursor: ew-resize; }
+.lay-rs-s { left: var(--s4); right: var(--s4); bottom: 0; height: 10px; cursor: ns-resize; }
+.lay-rs-e::after, .lay-rs-s::after { content: ""; position: absolute; border-radius: 2px; background: color-mix(in srgb, var(--accent) 45%, transparent); transition: background var(--fast); }
+.lay-rs-e::after { top: 30%; bottom: 30%; left: 3px; width: 4px; }
+.lay-rs-s::after { left: 30%; right: 30%; top: 3px; height: 4px; }
+.lay-rs-e:hover::after, .lay-rs-s:hover::after, .deck.resizing .lay-rs::after { background: var(--accent); }
+.lay-rs-se { right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; display: grid; place-items: center; font-size: var(--fs-xs); line-height: 1; color: var(--accent); }
+.lay-target { position: absolute; left: 0; top: 0; z-index: 6; pointer-events: none; border: 2px dashed var(--accent); border-radius: var(--r-xl); background: color-mix(in srgb, var(--accent) 10%, transparent); display: grid; place-items: center; }
+.lay-dim { font: 700 var(--fs-md) var(--mono); color: var(--t0); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 2px 8px; box-shadow: var(--shadow-toast); }
 .lay-add { grid-column: span 1; min-height: calc(var(--s5) * 3); font-size: var(--fs-ui); font-weight: 600; color: var(--t2); background: transparent; border: 1px dashed var(--line-2); border-radius: var(--r-xl); transition: background var(--fast), color var(--fast); }
 .lay-add:hover { color: var(--t1); background: var(--card); }
 .lay-float { position: fixed; z-index: 60; pointer-events: none; transform: translate(14px, 14px); font-size: var(--fs-sm); font-weight: 600; color: var(--t1); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 4px 10px; box-shadow: var(--shadow-toast); white-space: nowrap; }
 .lay-bar { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); padding: var(--s2) var(--s3); background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-lg); }
 .lay-bar-text { flex: 1; min-width: 0; font-size: var(--fs-ui); color: var(--t2); }
+.lay-bar-text b { color: var(--accent); font-weight: 700; }
 .lay-catalog { margin-top: var(--s3); }
 .lay-cat-row { width: 100%; text-align: left; border-radius: var(--r-sm); }
 .lay-cat-row:hover { background: var(--card-2); }
@@ -60,3 +78,9 @@ input.lay-tab-input { width: 130px; padding: 3px 7px; }
 input.lay-st-name { width: 180px; }
 .lay-st-cards { margin-left: var(--s4); }
 .lay-st-add { align-self: flex-start; margin-left: var(--s4); }
+.lay-st-card { flex-wrap: wrap; }
+/* volby karty Projekty (zástupci) pod jejím řádkem */
+.lay-st-tiles { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); padding: var(--s2) 0 var(--s1) var(--s5); font-size: var(--fs-sm); color: var(--t2); }
+.lay-st-tiles label { display: inline-flex; align-items: center; gap: var(--s1); }
+.lay-st-which { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); }
+.lay-st-which small { flex-basis: 100%; color: var(--t3); }

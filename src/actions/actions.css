@@ -50,7 +50,18 @@
 .act-field { display: grid; grid-template-columns: 130px 1fr; gap: var(--s3); align-items: start; font-size: var(--fs-ui); }
 .act-field > label { color: var(--t2); padding-top: 7px; }
 .act-field .ctl { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.act-field .line { display: flex; gap: var(--s2); align-items: center; min-width: 0; }
+.act-field .line { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; min-width: 0; }
+/* typ akce: 6 dlaždic v mřížce (zalomí se, nikdy nepřeteče) */
+.act-kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 4px; }
+.act-kind { padding: 6px 8px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--well); color: var(--t2); font-weight: 600; font-size: var(--fs-ui); text-align: center; transition: border-color var(--fast), color var(--fast); }
+.act-kind:hover { border-color: var(--line-2); color: var(--t1); }
+.act-kind.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--t1); }
+/* úzký editor: popisek nad polem */
+.act-edit { container-type: inline-size; }
+@container (max-width: 460px) {
+  .act-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .act-field > label { padding-top: 0; }
+}
 .act-field .line > input { flex: 1; min-width: 0; }
 .act-field small { color: var(--t3); font-size: var(--fs-sm); }
 .act-field small.err { color: var(--red); }

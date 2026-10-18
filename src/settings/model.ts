@@ -64,6 +64,7 @@ const FIELD_PANELS: [string, string][] = [
   ["drawer", "chovani"],
   ["drawer.glass", "vzhled"],
   ["drawer.width", "vzhled"],
+  ["drawer.hover", "vzhled"],
   ["drawer.sections", "suplik"],
   ["layout", "suplik"],
   ["shelf", "suplik"],

@@ -1,0 +1,15 @@
+/* Prohlídka při prvním otevření (layout/Tour.tsx): bublina u cíle, žádné ztmavení šuplíku, nic modálního.
+   Tokeny ze styles.css. */
+.tour-bubble { position: fixed; z-index: 70; width: 268px; max-width: calc(100vw - 16px); display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3); background: var(--raised); color: var(--t1); border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line-2)); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); animation: drop var(--dur-2) var(--ease); }
+.tour-bubble p { font-size: var(--fs-sm); color: var(--t2); line-height: 1.45; }
+/* šipka k cíli (vodorovně na středu cíle, `--arrow` z `bubblePos`) */
+.tour-bubble::before { content: ""; position: absolute; left: calc(var(--arrow, 24px) - 6px); width: 10px; height: 10px; background: var(--raised); border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line-2)); transform: rotate(45deg); }
+.tour-bubble.below::before { top: -6px; border-right: 0; border-bottom: 0; }
+.tour-bubble.above::before { bottom: -6px; border-left: 0; border-top: 0; }
+.tour-head { display: flex; align-items: baseline; gap: var(--s2); font-size: var(--fs-ui); }
+.tour-head b { flex: 1; color: var(--t0); }
+.tour-n { font: 600 var(--fs-xs) var(--mono); color: var(--t3); }
+.tour-btns { display: flex; justify-content: flex-end; gap: var(--s2); }
+/* zvýrazněný cíl (i ⋯, které je jinak vidět jen při najetí) */
+.tour-target { opacity: 1; outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); animation: tour-pulse var(--dur-5) var(--ease) infinite alternate; }
+@keyframes tour-pulse { from { outline-color: var(--accent); } to { outline-color: color-mix(in srgb, var(--accent) 35%, transparent); } }
