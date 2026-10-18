@@ -167,7 +167,7 @@ export default function ProjectsPanel(p: PanelProps) {
     offerUndo(t("settings.proj.removed", "Projekt „{n}“ odebrán", { n: before[i].name }), () => c.set("projects", before));
   }
   const summary = (x: any) => {
-    const what = x.kind === "app" ? (x.exe || x.appName || "—") : (x.run || "—");
+    const what = x.kind === "app" ? (x.exe || x.appName || x.aumid || "—") : (x.run || "—");
     const where = x.path ? x.path : x.remote ? t("settings.proj.byRemote", "podle {r}", { r: x.remote }) : t("settings.proj.noDir", "bez složky");
     return `${what} · ${x.port ? `:${x.port} · ` : ""}${where}`;
   };

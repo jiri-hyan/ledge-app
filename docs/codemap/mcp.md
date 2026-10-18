@@ -10,9 +10,10 @@ jméno, změň kontrakt i docs. Formát pro agenty: `AGENTS.md` → „MCP serve
 |---|---|---|
 | `src-tauri/src/mcp/mod.rs` | config `mcp`, `Host` (co MCP potřebuje od Ledge), `Server` (klíč, Vrátit, zámek zápisů), HTTP brána v pořadí vypnuto 404 → klíč 401 → metoda 405 → velikost 413 → verze 400 → JSON-RPC | `McpConfig` `Host` `Server` `HttpReq` `HttpResp` `handle_http` `PATH` `MAX_BODY` |
 | `mcp/rpc.rs` | JSON-RPC 2.0 ručně: `initialize` (vyjednání verze), `ping`, `tools/list`, `tools/call`, notifikace → 202, dávky, kódy chyb | `handle` `Outcome` `Tools` `RpcErr` `VERSIONS` `negotiate` `INSTRUCTIONS` |
-| `mcp/tools.rs` | katalog nástrojů (jméno, popis pro model, schéma vstupu ze schemars, anotace) a volání; společný zápis `write` (validace → snímek → `Host::save` → Vrátit) a `undo` | `TOOLS` `Tool` `Handler` `embed` |
-| `mcp/edit.rs` | zástupci (`projects`) a akce: přidat (návrh ze složky přes `Host::detect`), upravit (sloučení), odebrat; pravidlo příkazu zástupce | `tile_add` `tile_update` `tile_remove` `action_add` `action_update` `action_remove` `check_cmd` `detected_runs` `PM_SCRIPT` `unique_id` |
-| `mcp/look.rs` | rozložení (celé, `upgrades` se převezmou), proužek (sloučení), vzhled (styl + pole navrch, `blur` = `drawer.glass`); zrcadlo tabulky stylů | `layout_get` `layout_parse` `layout_summary` `strip_get` `strip_set` `appearance_get` `appearance_set` `STYLES` `Style` |
+| `mcp/tools.rs` | katalog nástrojů (jméno, popis pro model, schéma vstupu ze schemars, anotace) a volání; společný zápis `write` (validace → snímek → `Host::save` → Vrátit) a `undo`; `slim` zbavuje vložená schémata popisů, `default`, mezí a null variant (`tools/list` < 20 kB) | `TOOLS` `Tool` `Handler` `embed` `slim` `id_and_fields` |
+| `mcp/round.rs` · `discover.rs` | čísla ve výstupu na 2 místa (f32 šum) · výstup `apps_discover` (Start menu + Store `source: "store"`/`aumid` + repa; `alreadyInLedge` jen `true`) | `clean` `two` · `output` |
+| `mcp/edit.rs` | zástupci (`projects`) a akce: přidat (návrh ze složky přes `Host::detect`), upravit (sloučení), odebrat; pravidlo příkazu zástupce; `kind: app` má `passPort`/`openBrowser` vždy `false` | `tile_add` `tile_update` `tile_remove` `action_add` `action_update` `action_remove` `check_cmd` `detected_runs` `PM_SCRIPT` `unique_id` |
+| `mcp/look.rs` | rozložení (celé, `upgrades` se převezmou), proužek (sloučení), vzhled (styl + pole navrch, `blur` = `drawer.glass`); zrcadlo tabulky stylů | `layout_get` `layout_parse` `unknown_cards` `layout_summary` `strip_get` `strip_set` `appearance_get` `appearance_set` `STYLES` `Style` |
 | `mcp/schema.rs` | nad JSON Schema configu: neznámá pole (překlep = chyba), RFC 7396 sloučení, katalog výčtů, čitelné chyby serde | `patch` `parse` `merge` `unknown_key` `catalog` `enum_values` `serde_msg` |
 | `mcp/undo.rs` | zásobník 20 zápisů; záznam = jen dotčené části (pointer, před, po); vrácení odmítne, když část změnil někdo jiný | `Undo` `Entry` `pick` `revert` `MAX` |
 | `mcp/auth.rs` | klíč 32 B (base64url) ve Správci pověření `Ledge/mcp` přes `accounts::vault::Vault`, cache, Bearer, konstantní čas (`pkce::same`) | `Keys` (`get` `ensure` `rotate` `check`) `TARGET` `bearer` `read` `fresh` |
@@ -55,13 +56,20 @@ Lepidlo: `claude/bridge.rs` (`/mcp` před ostatními cestami, vlastní strop tě
   pravidlo příkazu zástupce, `itemsRev` nejde měnit.
 - Tabulka stylů žije ve frontendu (`src/theme/looks.ts` `STYLES`); `look::STYLES` je zrcadlo — test
   `styles_mirror_frontend_table` čte TS. Nový styl = řádek v obou.
+- **Velikost a výstup:** `tools/list` < 20 kB (test `tools_list_stays_small` vypíše velikost po nástrojích);
+  nové pole configu nepřidává velikost (popisy se z vložených schémat stripují), nový nástroj ano. Výstupy
+  nástrojů = `tools::pretty` (jméno historické: kompaktní JSON + `round::clean`).
+- **`layout_*` chyby:** `layout_parse` sbírá VŠECHNA neznámá id karet (`unknown_cards`) a přidá je k první
+  chybě serde („Neznámé karty: foo, bar. Povolené: …“).
+- **Store aplikace:** `tiles_add {"kind":"app","aumid":…}`; spuštění `commands::projects::launch` →
+  `onboarding::store::launch` (bez ProcMan, bez sledování procesu).
 - Odpověď je vždy jeden řádek JSON (proxy ji posílá jako řádek); `INSTRUCTIONS` bez zalomení.
 - GUI subsystém (release) dostane stdio roury od klienta stejně jako `--statusline`; ověřeno testem se
   skutečnými rourami nad testovacím binárem (konzolový), živě zbývá ověřit release exe.
 
 ## Testy
 
-`cargo test mcp` — `rpc::tests` (vyjednání verze, tabulka protokolu, dávky), `auth::tests` (Bearer, klíč,
+`cargo test mcp` — `round::tests`, `discover::tests`, `rpc::tests` (vyjednání verze, tabulka protokolu, dávky), `auth::tests` (Bearer, klíč,
 výměna), `schema::tests` (sloučení, katalog, neznámá pole, hlášky), `undo::tests`, `look::tests` (zrcadlo
 stylů), `edit::tests` (`PM_SCRIPT`, id), `mcp::tests` (brána, skutečný most: 401/403/404/413, katalog =
 kontrakt, každý zápis platný + Vrátit / neplatný beze změny, fixture `layout-validate.json`, Vrátit po cizí

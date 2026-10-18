@@ -11,7 +11,7 @@
 use super::{Host, schema};
 use crate::i18n::tr;
 use crate::actions::Action;
-use crate::config::{Config, Project};
+use crate::config::{Config, Project, ProjectKind};
 use regex::Regex;
 use serde_json::{Map, Value, json};
 use std::path::Path;
@@ -141,6 +141,11 @@ pub fn tile_add(cfg: &Config, args: &Value, host: &dyn Host) -> Result<(Config, 
         }
     }
     schema::merge(&mut v, &without_id(args));
+    // `passPort` / `openBrowser` patří dev serveru; aplikace je nemá (výchozí v configu je `true`)
+    if v["kind"] == "app" {
+        v["passPort"] = Value::Bool(false);
+        v["openBrowser"] = Value::Bool(false);
+    }
     let p: Project = serde_json::from_value(v).map_err(|e| schema::serde_msg(&e))?;
     check_cmd(None, &p, host)?;
     let summary = describe(&p);
@@ -152,7 +157,7 @@ pub fn tile_add(cfg: &Config, args: &Value, host: &dyn Host) -> Result<(Config, 
 }
 
 fn describe(p: &Project) -> String {
-    let what = match (p.run.as_deref(), p.exe.as_deref().or(p.app_name.as_deref())) {
+    let what = match (p.run.as_deref(), p.exe.as_deref().or(p.app_name.as_deref()).or(p.aumid.as_deref())) {
         (Some(r), _) => format!("„{r}“"),
         (None, Some(e)) => format!("„{e}“"),
         _ => String::new(),
@@ -165,7 +170,10 @@ pub fn tile_update(cfg: &Config, args: &Value, host: &dyn Host) -> Result<(Confi
     let id = str_arg(args, "id").ok_or_else(|| tr("Chybí id zástupce (tiles_list).", "The shortcut id is missing (tiles_list)."))?;
     let i = cfg.projects.iter().position(|p| p.id == id).ok_or_else(|| trf!("Zástupce „{id}“ není (jsou: {}).", "There's no shortcut “{id}” (there are: {}).", ids_of(cfg.projects.iter().map(|p| p.id.as_str()))))?;
     let old = &cfg.projects[i];
-    let new: Project = schema::patch(old, &without_id(args), "tiles")?;
+    let mut new: Project = schema::patch(old, &without_id(args), "tiles")?;
+    if new.kind == ProjectKind::App {
+        (new.pass_port, new.open_browser) = (false, false);
+    }
     check_cmd(Some(old), &new, host)?;
     let mut next = cfg.clone();
     next.projects[i] = new;

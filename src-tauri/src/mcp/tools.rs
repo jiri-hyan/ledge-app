@@ -27,6 +27,78 @@ fn no_args() -> Value {
     json!({ "type": "object", "properties": {}, "additionalProperties": false })
 }
 
+/// Zbaví schéma všeho, bez čeho se model obejde — `tools/list` jde do jeho kontextu při každém připojení
+/// a schémata configu by ho natáhla na desítky kB: popisy polí (doc komentáře ze schemars), `default`
+/// (včetně celého výchozího rozložení), `format` a meze čísel (config je stejně znovu zvaliduje).
+/// Zůstanou typy, výčty (`oneOf` samých `const` se sloučí do jednoho `enum`) a `$ref`. Pozor:
+/// `description` / `default` jako *jméno pole* (pod `properties`) se nemaže.
+fn slim(v: &mut Value) {
+    match v {
+        Value::Object(o) => {
+            for k in ["description", "title", "default", "format", "minimum", "maximum"] {
+                o.remove(k);
+            }
+            for (k, x) in o.iter_mut() {
+                if k == "properties" || k == "$defs" || k == "patternProperties" {
+                    if let Value::Object(m) = x {
+                        m.values_mut().for_each(slim);
+                    }
+                } else {
+                    slim(x);
+                }
+            }
+            // `Option<T>`: model nulu nepotřebuje (null maže pole, říká popis nástroje) — `T` stačí
+            if let Some(Value::Object(inner)) = nullable_inner(o) {
+                o.remove("anyOf");
+                o.extend(inner);
+            }
+            if let Some(Value::Array(t)) = o.get("type").cloned()
+                && let [Value::String(one), Value::String(null)] = t.as_slice()
+                && null == "null"
+            {
+                o.insert("type".into(), Value::String(one.clone()));
+            }
+            // až po zbavení potomků popisů (u každé hodnoty výčtu je doc komentář)
+            if let Some(e) = enum_of_consts(o) {
+                o.remove("oneOf");
+                o.insert("enum".into(), e);
+                o.insert("type".into(), "string".into());
+            }
+        }
+        Value::Array(a) => a.iter_mut().for_each(slim),
+        _ => {}
+    }
+}
+
+/// `anyOf: [X, {type: null}]` → `X`.
+fn nullable_inner(o: &serde_json::Map<String, Value>) -> Option<Value> {
+    let any = o.get("anyOf")?.as_array()?;
+    let is_null = |v: &Value| v.get("type").and_then(Value::as_str) == Some("null");
+    match any.as_slice() {
+        [a, b] if is_null(b) && !is_null(a) => Some(a.clone()),
+        [a, b] if is_null(a) && !is_null(b) => Some(b.clone()),
+        _ => None,
+    }
+}
+
+/// `oneOf: [{const, type:string} | {enum, type:string}, …]` → seznam všech hodnot (jinak `None`).
+fn enum_of_consts(o: &serde_json::Map<String, Value>) -> Option<Value> {
+    let items = o.get("oneOf")?.as_array()?;
+    let mut out = Vec::new();
+    for i in items {
+        let m = i.as_object()?;
+        if m.keys().any(|k| k != "const" && k != "enum" && k != "type") || m.get("type").and_then(Value::as_str) != Some("string") {
+            return None;
+        }
+        match (m.get("const"), m.get("enum").and_then(Value::as_array)) {
+            (Some(c), None) if c.is_string() => out.push(c.clone()),
+            (None, Some(e)) => out.extend(e.iter().cloned()),
+            _ => return None,
+        }
+    }
+    (!out.is_empty()).then_some(Value::Array(out))
+}
+
 /// Schéma typu configu vložené jako vstup nástroje (`$defs` nahoru, ať sedí `$ref`).
 fn embed(root: Value, wrap: Option<&str>, required: &[&str], drop: &[&str]) -> Value {
     let mut s = root;
@@ -53,12 +125,21 @@ fn embed(root: Value, wrap: Option<&str>, required: &[&str], drop: &[&str]) -> V
     if let Some(d) = defs {
         out["$defs"] = d;
     }
+    slim(&mut out);
     out
 }
 
 fn with_id(mut s: Value, what: &str) -> Value {
     s["properties"]["id"] = json!({ "type": "string", "description": format!("Id of the {what} to change (from the list tool).") });
     s["required"] = json!(["id"]);
+    s
+}
+
+/// Změna po polích: schéma polí už model zná z `*_add` (a z `*_list`), tady jen `id` + libovolná pole —
+/// druhá kopie schématu by přidala ~2 kB do `tools/list` (neznámá pole ověří server).
+fn id_and_fields(what: &str) -> Value {
+    let mut s = json!({ "type": "object", "properties": {}, "additionalProperties": true });
+    s = with_id(s, what);
     s
 }
 
@@ -71,15 +152,15 @@ pub const TOOLS: &[Tool] = &[
         desc: "Read Ledge's current state: version, whether MCP is on, how many shortcuts (tiles), quick actions and tabs there are, the active design style and theme, the strip style, the UI language, whether the drawer is open and how many changes undo_last can revert. Call this first." },
     Tool { name: "apps_discover", title: "Discover apps and projects", write: false,
         input: || json!({ "type": "object", "properties": { "repos": { "type": "boolean", "description": "Also scan the user's folders for git repositories and suggest project shortcuts (default true)." } }, "additionalProperties": false }),
-        desc: "List what the user actually has on this PC, read-only: apps from the Start menu (shortcut name and target .exe, user and all-users Start menu) and git repositories in the usual folders with a ready project suggestion (kind dev/app, run command, port). Nothing comes from the browser. alreadyInLedge marks things Ledge already shows. Use the results for tiles_add (projects, apps) and actions_add (apps with arguments, websites). Can take a few seconds." },
+        desc: "List what the user actually has on this PC, read-only: apps from the Start menu (shortcut name and target .exe, user and all-users Start menu), Microsoft Store apps such as Notepad or Calculator (source \"store\", with aumid instead of exe) and git repositories in the usual folders with a ready project suggestion (kind dev/app, run command, port). Nothing comes from the browser. alreadyInLedge (only present when true) marks things Ledge already shows. Use the results for tiles_add (projects, apps; a Store app: kind app + aumid) and actions_add (apps with arguments, websites). Can take a few seconds." },
     Tool { name: "tiles_list", title: "List shortcuts", write: false, input: no_args,
         desc: "List the shortcuts (tiles) on the Projects card: each with id, name, kind (dev = local dev server with run command and port, app = desktop program with exe or appName), folder, look. Also says on which tabs the Projects card is." },
     Tool { name: "tiles_add", title: "Add a shortcut", write: true,
         input: || embed(schema::of::<Project>(), None, &["name"], &["links", "args"]),
-        desc: "Add a shortcut (tile) to the Projects card. Give name plus either path (an absolute project folder — Ledge then detects kind, run command, port and remote itself, like Settings → Projects → Add) or kind app with exe (absolute path to an .exe, e.g. from apps_discover) or appName. For safety a shortcut's run command can only be a package-manager script (\"npm run dev\", \"pnpm dev\") or a command Ledge itself finds in the folder; anything else belongs to actions_add (kind command), which asks the user before its first run. Example: {\"name\":\"Web shop\",\"path\":\"C:\\\\Users\\\\me\\\\code\\\\shop\"} or {\"name\":\"Notepad\",\"kind\":\"app\",\"exe\":\"C:\\\\Windows\\\\notepad.exe\"}. id is generated from the name when missing." },
+        desc: "Add a shortcut (tile) to the Projects card. Give name plus either path (an absolute project folder — Ledge then detects kind, run command, port and remote itself, like Settings → Projects → Add) or kind app with exe (absolute path to an .exe, e.g. from apps_discover), appName, or aumid (a Microsoft Store app from apps_discover). Apps never use openBrowser or passPort (Ledge keeps them off). For safety a shortcut's run command can only be a package-manager script (\"npm run dev\", \"pnpm dev\") or a command Ledge itself finds in the folder; anything else belongs to actions_add (kind command), which asks the user before its first run. Example: {\"name\":\"Web shop\",\"path\":\"C:\\\\Users\\\\me\\\\code\\\\shop\"} or {\"name\":\"Notepad\",\"kind\":\"app\",\"exe\":\"C:\\\\Windows\\\\notepad.exe\"}. id is generated from the name when missing." },
     Tool { name: "tiles_update", title: "Change a shortcut", write: true,
-        input: || with_id(embed(schema::of::<Project>(), None, &[], &["links"]), "shortcut"),
-        desc: "Change fields of one shortcut by id (only the fields you send; null clears an optional field). Example: {\"id\":\"web-shop\",\"port\":5180,\"look\":{\"icon\":{\"kind\":\"emoji\",\"value\":\"🛒\"},\"color\":\"#2563eb\"}}. Same command rules as tiles_add." },
+        input: || id_and_fields("shortcut"),
+        desc: "Change fields of one shortcut by id (the same fields as tiles_add; only the fields you send; null clears an optional field). Example: {\"id\":\"web-shop\",\"port\":5180,\"look\":{\"icon\":{\"kind\":\"emoji\",\"value\":\"🛒\"},\"color\":\"#2563eb\"}}. Same command rules as tiles_add." },
     Tool { name: "tiles_remove", title: "Remove a shortcut", write: true, input: id_only,
         desc: "Remove one shortcut (tile) from the Projects card by id (see tiles_list). The project folder on disk is not touched. Reversible with undo_last." },
     Tool { name: "actions_list", title: "List quick actions", write: false, input: no_args,
@@ -88,15 +169,15 @@ pub const TOOLS: &[Tool] = &[
         input: || embed(schema::of::<Action>(), None, &["label", "kind", "target"], &[]),
         desc: "Add a quick action or link. kind: url (website in the browser, https://…), web (website in a small Ledge window), file / folder (absolute path), app (.exe, optional args), command (cmd or PowerShell line). Websites the user uses belong here as kind url. A command or an app with args is never pre-approved: Ledge asks the user before its first run. Examples: {\"label\":\"Mail\",\"kind\":\"url\",\"target\":\"https://mail.example.com\"}, {\"label\":\"Build\",\"kind\":\"command\",\"target\":\"npm run build\",\"cwd\":\"C:\\\\code\\\\app\"}. id is generated from the label when missing." },
     Tool { name: "actions_update", title: "Change a quick action", write: true,
-        input: || with_id(embed(schema::of::<Action>(), None, &[], &[]), "action"),
-        desc: "Change fields of one quick action by id (only the fields you send; null clears an optional field). Changing what a command runs drops any earlier consent, so Ledge asks again." },
+        input: || id_and_fields("action"),
+        desc: "Change fields of one quick action by id (the same fields as actions_add; only the fields you send; null clears an optional field). Changing what a command runs drops any earlier consent, so Ledge asks again." },
     Tool { name: "actions_remove", title: "Remove a quick action", write: true, input: id_only,
         desc: "Remove one quick action or link by id (see actions_list). Any consent the user gave for it stays only for that exact command. Reversible with undo_last." },
     Tool { name: "layout_get", title: "Get the drawer layout", write: false, input: no_args,
         desc: "Read the drawer layout: tabs (pages, max 9; built-in prace = Work and osobni = Personal) with their cards in order, each card's width (s = 1 column, m = 2, l = 3, xl = whole row), optional height h (1–4 rows), Projects card tile options, card look; hidden card parts. The catalog lists every card id and allowed value. Edit this JSON and pass it whole to layout_preview, then layout_apply." },
     Tool { name: "layout_preview", title: "Check a layout", write: false,
-        input: || embed(schema::of::<LayoutConfig>(), Some("layout"), &[], &[]),
-        desc: "Validate a whole layout (same rules as Ledge's layout editor) without saving. Returns what each tab would show and which cards become visible or hidden, or a sentence saying what is wrong. Always preview before layout_apply." },
+        input: || json!({ "type": "object", "properties": { "layout": { "type": "object" } }, "required": ["layout"], "additionalProperties": false }),
+        desc: "Validate a whole layout, passed as {\"layout\":…} exactly like layout_apply (same rules as Ledge's layout editor) without saving. Returns what each tab would show and which cards become visible or hidden, or a sentence saying what is wrong. Always preview before layout_apply." },
     Tool { name: "layout_apply", title: "Apply a layout", write: true,
         input: || embed(schema::of::<LayoutConfig>(), Some("layout"), &[], &[]),
         desc: "Save a whole layout (tabs, cards, sizes) — same validation as layout_preview. A card on no tab is hidden and fetches nothing. Example: {\"layout\":{\"pages\":[{\"id\":\"prace\",\"name\":\"\",\"cards\":[{\"id\":\"projects\",\"size\":\"xl\"},{\"id\":\"claude\",\"size\":\"m\"},{\"id\":\"repos\",\"size\":\"m\"}]}],\"hiddenParts\":[]}}." },
@@ -132,8 +213,10 @@ fn result(text: String, is_error: bool) -> Value {
     json!({ "content": [{ "type": "text", "text": text }], "isError": is_error })
 }
 
+/// Výstup nástroje: kompaktní JSON na jeden řádek (model počítá tokeny, odsazení jsou jen mezery navíc)
+/// a čísla bez šumu `f32` (`1.0499999523` → `1.05`).
 fn pretty(v: &Value) -> String {
-    serde_json::to_string_pretty(v).unwrap_or_default()
+    serde_json::to_string(&super::round::clean(v.clone())).unwrap_or_default()
 }
 
 impl rpc::Tools for Handler<'_> {
@@ -144,7 +227,7 @@ impl rpc::Tools for Handler<'_> {
                 .map(|t| {
                     json!({
                         "name": t.name, "title": t.title, "description": t.desc, "inputSchema": (t.input)(),
-                        "annotations": { "title": t.title, "readOnlyHint": !t.write, "destructiveHint": t.name.ends_with("_remove"), "idempotentHint": !t.write, "openWorldHint": false },
+                        "annotations": { "readOnlyHint": !t.write, "destructiveHint": t.name.ends_with("_remove"), "openWorldHint": false },
                     })
                 })
                 .collect(),

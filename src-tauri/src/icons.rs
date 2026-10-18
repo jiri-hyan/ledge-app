@@ -470,6 +470,7 @@ mod tests {
             open_browser: false,
             exe: None,
             app_name: Some("Acme Studio".into()),
+            aumid: None,
             args: vec![],
             accent: None,
             monogram: None,

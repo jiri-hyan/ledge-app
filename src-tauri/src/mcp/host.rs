@@ -74,19 +74,9 @@ impl Host for LiveHost {
 
     fn discover(&self, repos: bool) -> Value {
         let apps = crate::commands::onboarding::scan_apps();
+        let taken: Vec<String> = apps.iter().map(|a| a.name.to_lowercase()).collect();
+        let store = crate::commands::onboarding::scan_store_apps(&taken);
         let found = if repos { crate::commands::onboarding::scan_repos(&[]) } else { Vec::new() };
-        json!({
-            "apps": apps.iter().take(300).map(|a| {
-                let mut v = json!({ "name": a.name, "exe": a.exe, "alreadyInLedge": a.already });
-                if !a.args.is_empty() {
-                    v["args"] = json!(a.args);
-                }
-                v
-            }).collect::<Vec<_>>(),
-            "repos": found.iter().take(200).map(|r| json!({
-                "name": r.name, "path": r.path, "remote": r.remote, "kind": r.kind, "hint": r.hint,
-                "lastActiveMs": r.last_ms, "alreadyInLedge": r.already, "suggestion": r.project,
-            })).collect::<Vec<_>>(),
-        })
+        super::discover::output(&apps, &store, &found)
     }
 }

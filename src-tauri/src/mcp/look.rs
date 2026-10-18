@@ -35,13 +35,42 @@ pub fn layout_get(cfg: &Config) -> Value {
 /// jednorázové úpravy pustily znovu a vrátily, co uživatel odebral).
 pub fn layout_parse(cfg: &Config, args: &Value) -> Result<Config, String> {
     let input = args.get("layout").ok_or_else(|| tr("Chybí layout (celé rozložení jako z layout_get).", "layout is missing (the whole layout as from layout_get)."))?;
-    let mut l: LayoutConfig = schema::parse(input, "layout")?;
+    let unknown = unknown_cards(input);
+    let mut l: LayoutConfig = match schema::parse(input, "layout") {
+        Ok(l) if unknown.is_empty() => l,
+        Ok(_) => return Err(unknown_cards_msg(&unknown)),
+        // serde se zastaví u první chyby; neznámé karty z celého vstupu přidáme, ať model opraví vše najednou
+        Err(e) if !unknown.is_empty() => return Err(format!("{e} {}", unknown_cards_msg(&unknown))),
+        Err(e) => return Err(e),
+    };
     if input.get("upgrades").is_none() {
         l.upgrades = cfg.layout.upgrades.clone();
     }
     let mut next = cfg.clone();
     next.layout = l;
     Ok(next)
+}
+
+/// Id karet ve vstupu `{pages:[{cards:[{id}]}]}`, které nejsou v katalogu (`layout::CARDS`) ani dynamické
+/// (`widget:<soubor>`) — všechny, bez duplicit, v pořadí ve vstupu.
+pub fn unknown_cards(layout: &Value) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for id in layout.get("pages").and_then(Value::as_array).into_iter().flatten().flat_map(|p| p.get("cards").and_then(Value::as_array).into_iter().flatten()).filter_map(|c| c.get("id").and_then(Value::as_str)) {
+        if !layout::CARDS.contains(&id) && !layout::is_dynamic(id) && !out.iter().any(|x| x == id) {
+            out.push(id.to_string());
+        }
+    }
+    out
+}
+
+fn unknown_cards_msg(unknown: &[String]) -> String {
+    let list = unknown.join(", ");
+    let allowed = format!("{}, widget:<{}>", layout::CARDS.join(", "), tr("soubor", "file"));
+    if unknown.len() == 1 {
+        trf!("Neznámá karta: {list}. Povolené: {allowed}.", "Unknown card: {list}. Allowed: {allowed}.")
+    } else {
+        trf!("Neznámé karty: {list}. Povolené: {allowed}.", "Unknown cards: {list}. Allowed: {allowed}.")
+    }
 }
 
 /// Lidsky: co bude na záložkách a co se proti dnešku změní.
@@ -176,11 +205,33 @@ pub fn appearance_set(cfg: &Config, args: &Value) -> Result<Config, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::collections::BTreeMap;
 
     /// `parts: { theme: "dark", fontScale: 1, … }` → mapa klíč → hodnota (bez uvozovek).
     fn parts(text: &str) -> BTreeMap<String, String> {
         text.split(',').filter_map(|kv| kv.split_once(':')).map(|(k, v)| (k.trim().to_string(), v.trim().trim_matches('"').to_string())).collect()
+    }
+
+    #[test]
+    fn unknown_cards_are_all_listed() {
+        let cfg = Config::default();
+        let msg = |v: Value| layout_parse(&cfg, &json!({ "layout": v })).err().unwrap_or_default();
+        let two = json!({ "pages": [{ "id": "prace", "cards": [{ "id": "foo" }, { "id": "projects" }, { "id": "bar" }, { "id": "foo" }] }] });
+        let m = msg(two);
+        assert!(m.starts_with("Neznámé karty: foo, bar. Povolené: projects, running,"), "{m}");
+        assert!(m.contains("widget:<soubor>"), "{m}");
+        // jedna neznámá karta + chyba serde jinde: obojí v jedné větě
+        let both = json!({ "pages": [{ "id": "prace", "cards": [{ "id": "foo", "size": "gigantic" }, { "id": "baz" }] }] });
+        let m = msg(both);
+        assert!(m.contains("size") || m.contains("gigantic") || m.contains("variant"), "serde chyba chybí: {m}");
+        assert!(m.contains("Neznámé karty: foo, baz."), "{m}");
+        // dynamická a známé karty projdou; bez neznámých se chyby serde nemění
+        let ok = json!({ "pages": [{ "id": "prace", "cards": [{ "id": "projects" }, { "id": "widget:cpu.ps1" }] }] });
+        assert!(layout_parse(&cfg, &json!({ "layout": ok })).is_ok());
+        assert!(msg(json!({ "pages": [{ "id": "prace", "cards": [{ "id": "clock", "size": "gigantic" }] }] })).starts_with("layout: "));
+        assert_eq!(unknown_cards(&json!({ "pages": [{ "cards": [{ "id": "a" }, { "nic": 1 }] }, { "cards": [{ "id": "a" }, { "id": "notes" }] }] })), ["a"]);
+        assert!(unknown_cards(&json!({})).is_empty());
     }
 
     #[test]

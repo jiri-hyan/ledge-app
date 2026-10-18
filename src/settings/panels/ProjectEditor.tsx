@@ -14,7 +14,7 @@ import { useTone } from "../../ui/iconTone";
 export function ProjectLogo(p: { project: any; savedLogo?: string; size?: number }) {
   const key = () => {
     const x = p.project;
-    return JSON.stringify([x.id, x.kind, x.path, x.remote, x.subdir, x.logo, x.exe, x.appName]);
+    return JSON.stringify([x.id, x.kind, x.path, x.remote, x.subdir, x.logo, x.exe, x.appName, x.aumid]);
   };
   // náhled se ptá s malým zpožděním (psaní cesty), a jen když dlaždice logo nemá
   const [debounced, setDebounced] = createSignal(key());
@@ -93,6 +93,7 @@ export function ProjectEditor(p: { i: number; notes?: string[] }) {
             <FieldErr path={at("exe")} />
           </label>
           <label class="st-sub">{L(t("settings.proj.appName", "Nainstalovaná aplikace"), t("settings.proj.appName.hint", "Jméno z Přidat/odebrat programy, když exe nevyplníš"))}<Text path={at("appName")} nullable label={t("settings.proj.appName", "Nainstalovaná aplikace")} placeholder="—" /></label>
+          <label class="st-sub">{L(t("settings.proj.aumid", "Aplikace ze Storu (AUMID)"), t("settings.proj.aumid.hint", "Např. Microsoft.WindowsCalculator_8wekyb3d8bbwe!App, když není exe; Ledge ji pak spustí jako ze Start menu"))}<Text path={at("aumid")} nullable mono label={t("settings.proj.aumid", "Aplikace ze Storu (AUMID)")} placeholder="—" /><FieldErr path={at("aumid")} /></label>
           <label class="st-sub">{L(t("settings.proj.prepare", "Příprava před spuštěním"), t("settings.proj.prepare.hint", "Volitelné, např. npm run build"))}<Text path={at("run")} nullable mono label={t("settings.proj.prepare", "Příprava před spuštěním")} placeholder="—" /></label>
           <div class="st-sub wide">{L(t("settings.proj.args", "Argumenty programu"), t("settings.proj.args.hint", "Každý argument zvlášť, Enter přidá"))}<Chips path={at("args")} label={t("settings.proj.args", "Argumenty programu")} placeholder="--flag" /></div>
         </Show>

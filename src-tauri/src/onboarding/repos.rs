@@ -283,6 +283,7 @@ fn base_project(name: &str, path: &str, remote: Option<&str>, kind: ProjectKind)
         open_browser: kind == ProjectKind::Dev,
         exe: None,
         app_name: None,
+        aumid: None,
         args: vec![],
         accent: None,
         monogram: None,

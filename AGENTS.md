@@ -47,8 +47,11 @@ Typické úpravy:
     "run": "npm run dev", "port": 5180, "accent": "#2563eb", "logo": "public/favicon.svg" }
   ```
   `path` neuváděj, pokud nemusíš — složka se dohledá podle `remote` v `roots` (funguje na obou
-  strojích). `kind: "app"` = `.exe` (`exe` relativně k projektu, nebo `appName` nainstalované appky),
-  volitelně s přípravným `run` (build).
+  strojích). `kind: "app"` = `.exe` (`exe` relativně k projektu, nebo `appName` nainstalované appky,
+  nebo `aumid` aplikace z Microsoft Store — např. `Microsoft.WindowsCalculator_8wekyb3d8bbwe!App`, jen
+  `A-Za-z0-9._!-`; spouští se jako `shell:AppsFolder\<aumid>` bez sledování procesu, `exe`/`appName` mají
+  přednost), volitelně s přípravným `run` (build). Aplikace nemá `openBrowser` ani `passPort` (patří dev
+  serveru; MCP je pro `app` vždy vypne).
 - **Logo je volitelné.** Bez `logo` (nebo když soubor neexistuje — jiná větev) ho Ledge najde sám:
   u `appName` ikona nainstalovaného exe, jinak ikona z `<link rel="icon">` v `index.html` / web
   manifestu a obvyklé soubory (`public/favicon.*`, `build/icon.*`, `src-tauri/icons/…`), SVG a větší
@@ -678,11 +681,15 @@ Claude (MCP) (výchozí vypnuto). Mapa: `docs/codemap/mcp.md`.
   "Authorization: Bearer <klíč>"` — klíč jen na „Zobrazit klíč“. Streamable HTTP bez SSE a bez session: `POST`
   = jedna zpráva (nebo dávka), odpověď `application/json`; notifikace → 202; `GET`/`DELETE` → 405; bez klíče /
   špatný klíč → 401 (bez detailu); tělo > 256 KB → 413. Protokol 2025-06-18, 2025-03-26, 2024-11-05.
-- **Nástroje:** `ledge_status`, `apps_discover` (Start menu uživatele i ProgramData, repa na disku; nic z
-  prohlížeče), `tiles_list` / `tiles_add` / `tiles_update` / `tiles_remove` (zástupci = `projects`),
+- **Nástroje:** `ledge_status`, `apps_discover` (Start menu uživatele i ProgramData, aplikace z Microsoft
+  Store ze `shell:AppsFolder` — položky `source: "store"` s `aumid` místo `exe`, repa na disku; nic z
+  prohlížeče; `alreadyInLedge` jen když je `true`), `tiles_list` / `tiles_add` / `tiles_update` / `tiles_remove` (zástupci = `projects`),
   `actions_list` / `actions_add` / `actions_update` / `actions_remove`, `layout_get` / `layout_preview` /
   `layout_apply`, `strip_get` / `strip_set`, `appearance_get` / `appearance_set` (styl jen z katalogu stylů,
   hodnoty jen z výčtů schématu), `undo_last`, `open_drawer`. Každý má JSON Schema vstupu a popis pro model.
+  **Velikost:** `tools/list` < 20 kB (test `tools_list_stays_small`; schémata configu bez popisů polí, `default`
+  a mezí, `*_update` a `layout_preview` bez druhé kopie schématu), výstupy nástrojů jsou jednořádkový JSON a
+  neceločíselná čísla mají 2 desetinná místa (`mcp/round.rs`; config na disku se nemění).
 - **Zápis = stejná cesta jako Uložit v Nastavení:** načíst config → změna → `config::validate_field` (stejná
   validace, i editoru rozložení) → snímek dotčených částí do Vrátit (posledních 20, jen v paměti) →
   `save_config` → událost `config-changed`. Neplatný vstup = výsledek s `isError: true` a větou, co je špatně a

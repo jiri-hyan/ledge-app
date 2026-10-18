@@ -155,6 +155,36 @@ fn tools_list_matches_contract() {
     assert!(!names.iter().any(|n| n.contains("launch") || n.contains("run")), "MCP nic nespouští");
 }
 
+/// `tools/list` se posílá do kontextu modelu při každém připojení: strop 20 kB (před úpravou ~55 kB).
+#[test]
+fn tools_list_stays_small() {
+    let srv = server();
+    let host = MemHost::new(true);
+    let list = <tools::Handler as rpc::Tools>::list(&tools::Handler { srv: &srv, host: &host });
+    let size = serde_json::to_string(&list).unwrap().len();
+    let per: Vec<String> = list.as_array().unwrap().iter().map(|t| format!("{} {}", t["name"].as_str().unwrap(), t.to_string().len())).collect();
+    eprintln!("tools/list: {size} B ({})", per.join(", "));
+    assert!(size < 20_000, "tools/list má {size} B (strop 20000) — zkrať popisy nebo schémata; po nástrojích: {}", per.join(", "));
+}
+
+/// Výstupy jsou kompaktní JSON na jednom řádku a čísla `f32` bez šumu (`1.05`, ne `1.0499999523162842`).
+#[test]
+fn outputs_are_compact_and_rounded() {
+    let srv = server();
+    let host = MemHost::new(true);
+    host.cfg.lock().appearance.glass.opacity = 1.05_f32;
+    host.cfg.lock().appearance.motion.speed = 0.7_f32;
+    for t in ["ledge_status", "tiles_list", "actions_list", "layout_get", "strip_get", "appearance_get", "apps_discover"] {
+        let (err, text) = call(&srv, &host, t, json!({}));
+        assert!(!err && !text.contains('\n') &&!text.contains(": "), "{t}: ne kompaktní: {}", &text[..text.len().min(120)]);
+    }
+    let (_, a) = call(&srv, &host, "appearance_get", json!({}));
+    let v: Value = serde_json::from_str(&a).unwrap();
+    assert!(a.contains("\"opacity\":1.05") && a.contains("\"speed\":0.7"), "{a}");
+    assert!(!a.contains("999") && !a.contains("000000"), "šum f32: {a}");
+    assert!(v.is_object());
+}
+
 #[test]
 fn read_tools() {
     let srv = server();
@@ -193,6 +223,41 @@ fn roundtrip(name: &str, good: Value, bad: Value, changed: impl Fn(&Config) -> b
     crate::layout::derive(&mut want);
     assert_eq!(host.config(), want, "{name}: undo vrátil původní stav");
     assert!(call(&srv, &host, "undo_last", json!({})).0, "prázdný zásobník = chyba");
+}
+
+/// Zástupce `kind: app` nemá `openBrowser` ani `passPort` (patří dev serveru); aplikace ze Storu jde přes `aumid`.
+#[test]
+fn app_tiles_have_no_dev_flags() {
+    let srv = server();
+    let host = MemHost::new(true);
+    let flags = |id: &str| host.cfg.lock().projects.iter().find(|p| p.id == id).map(|p| (p.kind, p.pass_port, p.open_browser, p.aumid.clone()));
+    // výchozí hodnoty configu jsou true — MCP je pro app vypne, i když je model výslovně zapne
+    for args in [
+        json!({ "name": "Notepad", "kind": "app", "exe": r"C:\Windows\notepad.exe" }),
+        json!({ "name": "Notepad2", "kind": "app", "exe": r"C:\Windows\notepad.exe", "openBrowser": true, "passPort": true }),
+    ] {
+        let (err, text) = call(&srv, &host, "tiles_add", args);
+        assert!(!err, "{text}");
+    }
+    assert_eq!(flags("notepad"), Some((crate::config::ProjectKind::App, false, false, None)));
+    assert_eq!(flags("notepad2"), Some((crate::config::ProjectKind::App, false, false, None)));
+    // Store: jen aumid, bez exe
+    let aumid = "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
+    let (err, text) = call(&srv, &host, "tiles_add", json!({ "name": "Kalkulačka", "kind": "app", "aumid": aumid }));
+    assert!(!err, "{text}");
+    assert_eq!(flags("kalkulacka"), Some((crate::config::ProjectKind::App, false, false, Some(aumid.to_string()))));
+    // špatné aumid (cesta, příkaz) se nepřijme; app bez exe / appName / aumid také ne
+    for bad in [json!({ "name": "x", "kind": "app", "aumid": r"..\..\calc.exe" }), json!({ "name": "x", "kind": "app", "aumid": "Pkg_abc!App && calc" }), json!({ "name": "x", "kind": "app" })] {
+        let (err, text) = call(&srv, &host, "tiles_add", bad.clone());
+        assert!(err, "{bad}: {text}");
+    }
+    // dev zástupce zůstává s výchozími true a po přepnutí na app je vypnutý
+    let (err, text) = call(&srv, &host, "tiles_add", json!({ "name": "Web", "kind": "dev", "run": "npm run dev" }));
+    assert!(!err, "{text}");
+    assert_eq!(flags("web").map(|f| (f.1, f.2)), Some((true, true)));
+    let (err, text) = call(&srv, &host, "tiles_update", json!({ "id": "web", "kind": "app", "exe": r"C:\Windows\notepad.exe", "run": null }));
+    assert!(!err, "{text}");
+    assert_eq!(flags("web").map(|f| (f.0, f.1, f.2)), Some((crate::config::ProjectKind::App, false, false)));
 }
 
 #[test]

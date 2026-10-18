@@ -55,6 +55,11 @@ pub(crate) fn launch(id: String) -> Result<LaunchOutcome, String> {
             })
         }
         ProjectKind::App => {
+            // aplikace ze Storu: bez exe, spustí ji shell; proces se nesleduje (okno si otevře sama)
+            if p.exe.is_none() && p.app_name.is_none() && let Some(aumid) = p.aumid.as_deref() {
+                crate::onboarding::store::launch(aumid)?;
+                return Ok(LaunchOutcome::Started);
+            }
             let dir = c.project_dir(&p);
             let exe = match (&p.exe, &p.app_name) {
                 (Some(e), _) => {

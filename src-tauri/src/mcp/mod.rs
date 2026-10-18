@@ -10,10 +10,12 @@
 //!   (`ledge.exe --mcp`). Skutečný `Host` je `host.rs`, testy jedou nad `tests::MemHost`.
 
 pub mod auth;
+pub mod discover;
 pub mod edit;
 pub mod host;
 pub mod look;
 pub mod proxy;
+pub mod round;
 pub mod rpc;
 pub mod schema;
 pub mod tools;

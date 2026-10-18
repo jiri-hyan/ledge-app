@@ -43,7 +43,7 @@ export interface ProjectView {
   /** port z configu (co a odkud — tooltip a „Upravit…“ na dlaždici) */
   port?: number | null;
   remote?: string | null;
-  /** aplikace: exe nebo appName */
+  /** aplikace: exe, appName nebo aumid (Microsoft Store) */
   app?: string | null;
   /** odkud poběží (`resolve::Place`); chybí (starší jádro) = podle `pathOk` */
   place?: Place;

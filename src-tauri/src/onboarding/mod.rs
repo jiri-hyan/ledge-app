@@ -13,6 +13,7 @@ pub mod apps;
 pub mod claude;
 pub mod dialog;
 pub mod repos;
+pub mod store;
 pub mod themes;
 
 use crate::config::{Config, NotesSyncConfig, UpdateConfig, valid_notes_remote};

@@ -644,6 +644,11 @@ pub struct Project {
     /// kind=app: jméno nainstalované aplikace (dohledá se v registru odinstalace), když `exe` chybí.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub app_name: Option<String>,
+    /// kind=app: aplikace z Microsoft Store (bez `.exe` a `.lnk`) podle AppUserModelID, např.
+    /// `Microsoft.WindowsCalculator_8wekyb3d8bbwe!App`. Spouští se jako `shell:AppsFolder\<aumid>`
+    /// (bez sledování procesu); jen znaky `A-Za-z0-9._!-`. `exe` a `appName` mají přednost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aumid: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
     /// Barva identity projektu (#rrggbb).
@@ -666,6 +671,12 @@ pub struct Project {
 
 fn yes() -> bool {
     true
+}
+
+/// AppUserModelID aplikace ze Storu (`Balicek_hash!App`): jen bezpečné znaky, žádná lomítka — ať z něj
+/// `shell:AppsFolder\<aumid>` nemůže ukázat na jinou položku shellu.
+pub fn valid_aumid(a: &str) -> bool {
+    (3..=256).contains(&a.len()) && a.contains('!') && a.chars().all(|c| c.is_ascii_alphanumeric() || "._!-".contains(c))
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -759,8 +770,13 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
         if p.kind == ProjectKind::Dev && p.run.as_deref().unwrap_or("").trim().is_empty() {
             return Err(fe(at("run"), trf!("Projekt „{}“ (dev) nemá příkaz `run`.", "Project “{}” (dev) has no `run` command.", p.id)));
         }
-        if p.kind == ProjectKind::App && p.exe.is_none() && p.app_name.is_none() {
-            return Err(fe(at("exe"), trf!("Projekt „{}“ (app) potřebuje `exe` nebo `appName`.", "Project “{}” (app) needs `exe` or `appName`.", p.id)));
+        if p.kind == ProjectKind::App && p.exe.is_none() && p.app_name.is_none() && p.aumid.is_none() {
+            return Err(fe(at("exe"), trf!("Projekt „{}“ (app) potřebuje `exe`, `appName` nebo `aumid`.", "Project “{}” (app) needs `exe`, `appName` or `aumid`.", p.id)));
+        }
+        if let Some(a) = p.aumid.as_deref()
+            && !valid_aumid(a)
+        {
+            return Err(fe(at("aumid"), trf!("Projekt „{}“: aumid „{a}“ nesedí (čekám tvar Jmeno_hash!App, jen A–Z a–z 0–9 . _ ! -).", "Project “{}”: aumid “{a}” doesn't fit (expected the form Name_hash!App, only A–Z a–z 0–9 . _ ! -).", p.id)));
         }
         if let Some(a) = &p.accent {
             let ok = a.len() == 7 && a.starts_with('#') && a[1..].chars().all(|c| c.is_ascii_hexdigit());
@@ -1027,6 +1043,7 @@ mod tests {
             open_browser: true,
             exe: None,
             app_name: None,
+            aumid: None,
             args: vec![],
             accent: Some("#e0a13a".into()),
             monogram: None,
@@ -1058,6 +1075,7 @@ mod tests {
             open_browser: true,
             exe: Some("a.exe".into()),
             app_name: None,
+            aumid: None,
             args: vec![],
             accent: None,
             monogram: None,

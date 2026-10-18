@@ -4,7 +4,7 @@
 //! nevolá bez otevřeného průvodce.
 
 use crate::config::{self, Config};
-use crate::onboarding::{apply, apps, claude, dialog, repos, themes};
+use crate::onboarding::{apply, apps, claude, dialog, repos, store, themes};
 use crate::settings::apply_config;
 use crate::state::core;
 use parking_lot::Mutex;
@@ -58,6 +58,15 @@ pub(crate) fn scan_apps() -> Vec<apps::FoundApp> {
     let found = apps::discover(&apps::start_menu_dirs(env), Instant::now() + SCAN_TIMEOUT, &exes, &names);
     remember(found.iter().map(|a| format!("app:{}", a.exe)));
     found
+}
+
+/// Aplikace ze Storu (bez `.lnk`) — jen pro MCP `apps_discover`, průvodce je nenabízí. `taken` = jména
+/// z Start menu (stejná aplikace se nenabídne dvakrát).
+pub(crate) fn scan_store_apps(taken: &[String]) -> Vec<store::StoreApp> {
+    let cfg = core().cfg.read().clone();
+    let aumids: Vec<String> = cfg.projects.iter().filter_map(|p| p.aumid.clone()).collect();
+    let names: Vec<String> = cfg.projects.iter().map(|p| p.name.to_lowercase()).collect();
+    store::pick(store::list_raw(), taken, &aumids, &names)
 }
 
 /// Ikony nalezených rep / aplikací jako data URL (PNG ≤ 128 px, SVG). Neznámý klíč = `None`.

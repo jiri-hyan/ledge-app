@@ -10,7 +10,8 @@ Autorův existující config se chová beze změny. Cituj symbolem, ne číslem 
 | `src-tauri/src/onboarding/mod.rs` | sekce `onboarding`, čistý config, dorovnání starého configu při `config::load` | `OnboardingConfig` (výchozí `done: true`), `fresh_config`, `upgrade_loaded`, `legacy_notes_sync`, `legacy_update_repo` (`jiri-hyan/ledge` → `jiri-hyan/ledge-app`) |
 | `src-tauri/src/uiconf.rs` | sekce `ui` (jazyk) | `UiConfig`, `Lang` (`cs`/`en`) |
 | `onboarding/repos.rs` | mělký sken rep (hloubka ≤ 2) + návrh projektu | `default_roots`, `scan`, `facts`/`Facts`, `suggest`, `dev_port`, `cargo_name`, `slug`, `reflog_last_ms`, `discover`, `FoundRepo` |
-| `onboarding/apps.rs` | Start menu `.lnk` → exe přes `IShellLinkW` | `start_menu_dirs`, `read_lnk`, `keep`, `dedupe`, `split_args`, `discover`, `FoundApp` |
+| `onboarding/apps.rs` | Start menu `.lnk` → exe přes `IShellLinkW`; argumenty jako `CommandLineToArgvW` (uvozovky, `\"`), cesta s mezerou bez uvozovek se slepí zpět, když existuje | `start_menu_dirs`, `read_lnk`, `keep`, `dedupe`, `dedupe_key`, `split_args`, `split_args_fs`, `discover`, `FoundApp` |
+| `onboarding/store.rs` | aplikace z Microsoft Store (`shell:AppsFolder`, COM STA, termín 6 s, jen na vyžádání z MCP `apps_discover`; průvodce je nenabízí) + spuštění `shell:AppsFolder\<aumid>`; `pick` a `shell_target` čisté | `list_raw`, `pick`, `shell_target`, `launch`, `StoreApp` |
 | `onboarding/claude.rs` | `claude` na PATH / `~\.local\bin`, `~\.claude`, verze | `find_exe`, `parse_version`, `detect`, `ClaudeInfo` |
 | `onboarding/dialog.rs` | výběr složky (`IFileOpenDialog`, STA vlákno, vlastník = šuplík) | `pick_folder` |
 | `onboarding/themes.rs` | motivy `appearance.theme` ze schématu configu | `theme_options`, `ThemeOption` |

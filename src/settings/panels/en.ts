@@ -55,6 +55,8 @@ registerDict("en", {
   "settings.proj.exe.hint": "Path to the .exe (saved relative when inside the project), or fill in the name of an installed app",
   "settings.proj.appName": "Installed app",
   "settings.proj.appName.hint": "Name from Add or remove programs, if you leave the exe empty",
+  "settings.proj.aumid": "Microsoft Store app (AUMID)",
+  "settings.proj.aumid.hint": "E.g. Microsoft.WindowsCalculator_8wekyb3d8bbwe!App when there is no exe; Ledge then starts it as from the Start menu",
   "settings.proj.prepare": "Prepare before start",
   "settings.proj.prepare.hint": "Optional, e.g. npm run build",
   "settings.proj.args": "Program arguments",

@@ -41,7 +41,7 @@ pub fn is_busy(id: &str) -> bool {
 /// Ukázat „Naklonovat“? Složka chybí, remote je, index o žádném klonu neví (dva klony = nejednoznačné,
 /// třetí nepomůže) a nejde o nainstalovanou appku (`appName` bez `exe` repo ke spuštění nepotřebuje).
 pub fn clonable(p: &Project, path_ok: bool, known_clones: usize) -> bool {
-    let installed_only = p.kind == ProjectKind::App && p.exe.is_none() && p.app_name.is_some();
+    let installed_only = p.kind == ProjectKind::App && p.exe.is_none() && (p.app_name.is_some() || p.aumid.is_some());
     !path_ok && !installed_only && known_clones == 0 && p.remote.as_deref().and_then(owner_repo_raw).is_some()
 }
 
@@ -126,6 +126,7 @@ mod tests {
             open_browser: true,
             exe: exe.map(Into::into),
             app_name: app.map(Into::into),
+            aumid: None,
             args: vec![],
             accent: None,
             monogram: None,
