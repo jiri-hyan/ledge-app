@@ -63,6 +63,4 @@ registerDict("en", {
   "settings.f.personal.calendars": "Calendars",
   "settings.f.personal.calendars.hint": "Google or Outlook from a secret ICS link — read-only, no sign-in. Paste the link and click Add.",
   "settings.f.personal.calendars.kw": "calendar google outlook ics ical webcal events meetings",
-  "settings.drawer.sec.calendar": "Calendar",
-  "settings.drawer.sec.calendar.hint": "Today and tomorrow from an ICS link (Google, Outlook); hidden isn't downloaded",
 });

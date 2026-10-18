@@ -39,6 +39,8 @@ pub(crate) struct Snapshot {
     view: View,
     cfg_error: Option<String>,
     sections: config::Sections,
+    /// záložky a karty na nich (`layout.rs`); `mode` = id záložky, která je vidět
+    layout: crate::layout::LayoutConfig,
     claude_enabled: bool,
     projects: Vec<ProjectView>,
     procs: Vec<procman::ProcView>,
@@ -95,6 +97,8 @@ pub(crate) struct PersonalView {
     notes_more: usize,
     /// právě hraje (`media::view`, jen paměť); `None` = nic nehraje / karta vypnutá / ještě nespuštěno
     media: Option<crate::media::MediaView>,
+    /// vzhled karty Právě hraje (`media` v configu, `mediaconf.rs`) — i bez skladby (karta Zvuk, přepínač)
+    media_look: crate::mediaconf::MediaConfig,
     /// hlasitost výchozího výstupu (`volume::view`); `None` = bez zařízení / vypnuto
     volume: Option<crate::volume::VolumeView>,
     /// baterie (`battery::view`); `None` = stroj bez baterie / vypnuto
@@ -180,7 +184,7 @@ pub(crate) fn snapshot() -> Snapshot {
         let st = c.notes.lock();
         let eod = notes::end_of_day_ms(&notes::now_local());
         let general: Vec<notes::NoteView> =
-            if cfg.modes.personal_enabled { st.all.iter().filter(|n| n.project.is_none()).cloned().collect() } else { Vec::new() };
+            st.all.iter().filter(|n| n.project.is_none()).cloned().collect();
         (
             notes::card(&st.all, eod, notes::CARD_ROWS),
             st.due.iter().take(3).cloned().collect(),
@@ -192,11 +196,12 @@ pub(crate) fn snapshot() -> Snapshot {
     };
     let personal = personal_view(&cfg, personal_notes);
     Snapshot {
-        mode: if cfg.modes.personal_enabled { mode } else { "prace".into() },
+        mode: crate::layout::page_id(&cfg.layout, &mode),
         personal_enabled: cfg.modes.personal_enabled,
         view: c.drawer.view(),
         cfg_error: c.cfg_error.lock().clone(),
         sections: cfg.drawer.sections.clone(),
+        layout: cfg.layout.clone(),
         claude_enabled: cfg.claude.enabled,
         projects,
         procs: c.procs.snapshot(),
@@ -288,6 +293,7 @@ pub(crate) fn personal_view(cfg: &Config, (notes, notes_more): (Vec<notes::NoteV
         notes,
         notes_more,
         media: crate::media::view().filter(|_| sec.now_playing),
+        media_look: cfg.media.clone(),
         volume: crate::volume::view().filter(|_| sec.sound),
         battery: crate::battery::view().filter(|_| sec.battery),
         calendar: crate::calendar::live::view(cfg, now),

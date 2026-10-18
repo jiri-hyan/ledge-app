@@ -1,6 +1,7 @@
-// Skok na panel Nastavení podle id z `settings/registry.ts` (paleta, karta Rychlé akce). Skořápka
-// Nastavení může číst `settingsTarget` (a po použití ho vynulovat); bez ní aspoň posune stránku na
-// prvek s tím id a pošle událost `ledge:settings-panel` (detail = id).
+// Skok do Nastavení odjinud (paleta, karty, hlavička): id panelu z `settings/catalog.ts` (`osobni`, `akce`…)
+// nebo kotva pole `f-<pole>` (`f-personal.links`, `f-autostart`). Skořápka `Settings.tsx` čte
+// `settingsTarget`: přepne panel (u kotvy panel toho pole), posune na řádek, zvýrazní ho a cíl vynuluje.
+// Ostatní id (prvek mimo Nastavení) jen posune do pohledu; vždy jde i událost `ledge:settings-panel`.
 import { createSignal } from "solid-js";
 
 const [settingsTarget, setSettingsTarget] = createSignal<string | null>(null);
@@ -10,6 +11,7 @@ export { settingsTarget, setSettingsTarget };
 export function gotoSettingsPanel(id: string) {
   setSettingsTarget(id);
   window.dispatchEvent(new CustomEvent("ledge:settings-panel", { detail: id }));
+  if (id.startsWith("f-")) return;
   // dva snímky: stránka se nejdřív vykreslí
   requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start", behavior: "smooth" })));
 }

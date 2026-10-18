@@ -1,6 +1,7 @@
 // Typy snapshotu a IPC (zrcadlo serde struktur v `src-tauri/src`) — jen tvary dat, žádná logika.
 // Volání jádra jsou v `api.ts`, který tyto typy zároveň re-exportuje (`import type { … } from "./api"`).
 import type { SectionKey } from "./cards/sections";
+import type { Layout } from "./layout/model";
 
 export type View = "hidden" | "peek" | "full";
 
@@ -176,7 +177,7 @@ export interface HooksStatus {
   hint: string | null;
 }
 
-/** `drawer.sections` — přepínače viditelnosti karet a sekcí (seznam v `cards/sections.ts`). */
+/** `drawer.sections` — viditelnost karet a jejich částí, ODVOZENÁ v Rustu z `layout` (seznam v `cards/sections.ts`). */
 export type Sections = Record<SectionKey, boolean>;
 
 /** Poznámka z `%USERPROFILE%\Ledge\notes` (jeden `.md` s frontmatter). */
@@ -419,11 +420,15 @@ export type UpdateView = UpdateStatus & {
 export type InstallOutcome = { outcome: "confirm"; running: string[] } | { outcome: "started" };
 
 export interface Snapshot {
-  mode: "prace" | "osobni";
+  /** id záložky, která je vidět (`layout.pages[].id`; vestavěné `prace` / `osobni`) */
+  mode: string;
+  /** zastaralé — vždy true, záložky řídí `layout` */
   personalEnabled: boolean;
   view: View;
   cfgError: string | null;
   sections: Sections;
+  /** záložky a karty na nich (`config.layout`, `layout/model.ts`) */
+  layout: Layout;
   claudeEnabled: boolean;
   projects: ProjectView[];
   procs: ProcView[];
@@ -574,10 +579,18 @@ export interface Snapshot {
 
 // --- appearance ---
 // Zrcadlo `AppearanceConfig` (src-tauri/src/appearance.rs) — `config.appearance`, událost `appearance`.
-export type ThemeId = "dark" | "midnight" | "graphite" | "nord" | "light" | "contrast";
-export type MotionStyle = "spring" | "smooth" | "snappy" | "none";
+export type ThemeId = "dark" | "midnight" | "graphite" | "nord" | "light" | "contrast" | "terminal" | "paper" | "neon" | "brutal" | "pastel";
+export type MotionStyle = "spring" | "smooth" | "snappy" | "bounce" | "fade" | "notch" | "none";
 export type StripPosition = "center" | "left" | "right";
+export type StripStyle = "pill" | "line" | "dot" | "term" | "tag" | "glow" | "block" | "drop";
+/** složky design stylu (vlna 6, `appearance/look.rs`); tabulka stylů je `theme/styles.ts` */
+export type FontLook = "system" | "mono" | "serif" | "grotesk";
+export type Material = "solid" | "glass" | "paper" | "glow" | "hard" | "soft" | "frame";
+export type LayoutId = "classic" | "float" | "band" | "sheet" | "panorama" | "mosaic" | "tiles";
+export type WidthPreset = "custom" | "narrow" | "medium" | "wide" | "full";
 export interface Appearance {
+  /** design styl (`classic` = vzhled před vlnou 6); hodnoty stylu jsou v polích níž */
+  style: string;
   theme: ThemeId;
   /** `#rrggbb`, prázdné = výchozí akcent motivu */
   accent: string;
@@ -590,9 +603,12 @@ export interface Appearance {
   /** speed 0.5–2 (2 = dvakrát rychleji) */
   motion: { style: MotionStyle; speed: number };
   /** color: prázdné = výchozí přechod, `accent`, nebo `#rrggbb` */
-  strip: { style: "pill" | "line" | "dot"; size: "small" | "normal" | "large"; color: string; position: StripPosition };
-  /** pořadí karet záložky Práce (`running`, `claude`, `repos`, `notes`) */
-  cards: string[];
+  strip: { style: StripStyle; size: "small" | "normal" | "large"; color: string; position: StripPosition };
+  font: FontLook;
+  material: Material;
+  layout: LayoutId;
+  /** předvolba šířky; `custom` = `drawer.width` v px */
+  width: WidthPreset;
 }
 
 // --- onboarding ---
@@ -743,3 +759,21 @@ export interface Snapshot {
   /** časovač (chybí jen ve starém jádře) */
   timer?: import("./timer/model").TimerView;
 }
+
+// --- media: průběh skladby a vzhled karty Právě hraje ---
+// Zrcadlo Rust `mediatime::Timeline` / `mediaconf::MediaConfig` (typy a logika v `media/timeline.ts`).
+export type { MediaLook, MediaRepeat, MediaStripTime, MediaTimeline, MediaVariant } from "./media/timeline";
+export interface MediaView {
+  /** průběh; null = zdroj timeline nedává (lišta se neukáže); chybí jen ve starém jádře */
+  timeline?: import("./media/timeline").MediaTimeline | null;
+  /** náhodně; null = zdroj nepodporuje (tlačítko se neukáže) */
+  shuffle?: boolean | null;
+  /** opakovat; null = zdroj nepodporuje */
+  repeat?: import("./media/timeline").MediaRepeat | null;
+}
+export interface PersonalView {
+  /** sekce `media` v configu (vzhled karty); chybí jen ve starém jádře = výchozí */
+  mediaLook?: import("./media/timeline").MediaLook;
+}
+/** Akce `api.mediaControl` (Rust `media::Control`). */
+export type MediaAction = "toggle" | "next" | "prev" | { seek: number } | { shuffle: boolean } | { repeat: import("./media/timeline").MediaRepeat };

@@ -109,6 +109,8 @@ test("model: viditelné skupiny podle záložky", () => {
   const list = [v("a", "both"), v("b", "work", "Dev"), v("c", "personal"), v("d", "work"), v("e", "both", "Dev")];
   assert.deepEqual(visibleGroups(list, "prace").map((g) => [g.group, g.items.map((x) => x.id)]), [[null, ["a", "d"]], ["Dev", ["b", "e"]]]);
   assert.deepEqual(visibleGroups(list, "osobni").map((g) => [g.group, g.items.map((x) => x.id)]), [[null, ["a", "c"]], ["Dev", ["e"]]]);
+  // vlastní záložka (id z layout) = všechny akce
+  assert.deepEqual(visibleGroups(list, "hry").map((g) => [g.group, g.items.map((x) => x.id)]), [[null, ["a", "c", "d"]], ["Dev", ["b", "e"]]]);
 });
 
 test("model: cleanAction zahodí prázdná a nepatřičná pole", () => {

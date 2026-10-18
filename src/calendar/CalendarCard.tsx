@@ -14,8 +14,7 @@ import "./calendar.css";
 /** Nastavení → Osobní → Kalendáře (přidání, úpravy). */
 export function openCalendarSettings(onSettings: () => void) {
   onSettings();
-  gotoSettingsPanel("osobni");
-  requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById("f-personal.calendars")?.scrollIntoView({ block: "start" })));
+  gotoSettingsPanel("f-personal.calendars");
 }
 
 /** Zapne / vypne jeden kalendář (uloží jen to pole). S chybou configu neukládá — přepsal by se. */

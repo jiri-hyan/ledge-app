@@ -20,6 +20,7 @@ const SHARED = {
   // strop výšky (fit.ts) je průřezový: ořízne obsah šuplíku a nechá posouvat jen hlavní plochy stránek
   content: { files: ["styles.css", "fit.css"], why: "fit.css doplní obsahu šuplíku strop výšky" },
   grid: { files: ["styles.css", "fit.css"], why: "mřížka karet je posuvná plocha hlavní stránky" },
+  deck: { files: ["layout/layout.css", "fit.css", "styles.css"], why: "mřížka karet záložky (layout/Deck.tsx) je posuvná plocha hlavní stránky; mezery a okraj podle rozložení design stylu (`html[data-layout] .deck`)" },
   "notes-page": { files: ["notes/notes.css", "fit.css"], why: "posuvná plocha stránky poznámek" },
   "note-page": { files: ["notes/notes.css", "fit.css"], why: "posuvná plocha editoru poznámky" },
   st: { files: ["settings.css", "fit.css"], why: "Nastavení se vejde pod strop výšky" },

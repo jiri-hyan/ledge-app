@@ -1,23 +1,138 @@
-/* Záložka Osobní: právě hraje + hlasitost (MediaCard), baterie v kartě Čas (Battery). Prefix `med-`, tokeny ze styles.css. */
+/* Záložka Osobní: právě hraje + hlasitost (MediaCard, pět vzhledů `med-v-*`), baterie v kartě Čas (Battery),
+   výběr vzhledu (VariantPicker, Nastavení → Osobní). Prefix `med-`, jen tokeny ze styles.css (barvy, rohy,
+   stíny) — pevnou barvu nemá nic kromě obalu alba. Pohyb (deska, ekvalizér) jen s `med-disc-spin` /
+   `med-eq-live` (hraje + otevřený šuplík); omezení pohybu ho vypne globálně (styles.css). */
+
+/* ---------- karta s průběhem (výchozí) ---------- */
 .med-now { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 2px 0; }
 .med-cover { width: 44px; height: 44px; border-radius: var(--r-sm); flex-shrink: 0; overflow: hidden; display: grid; place-items: center; background: var(--card-2); color: var(--t3); }
 .med-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .med-cover svg { width: 20px; height: 20px; }
 .med-text { flex: 1; min-width: 0; }
 .med-title { font-weight: 600; font-size: var(--fs-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.med-by { color: var(--t2); font-weight: 400; }
+.med-grow { flex: 1; min-width: 0; }
 
-.med-ctl { display: flex; align-items: center; gap: var(--s1); margin-top: 10px; }
+.med-foot { display: flex; align-items: center; gap: var(--s1); margin-top: 8px; min-width: 0; }
+.med-ctl { display: flex; align-items: center; gap: var(--s1); }
+.med-ctl-tight { gap: 2px; flex-shrink: 0; }
+.med-ctl-tight .med-ico { padding: 4px 6px; }
 .med-state { margin-left: auto; }
-.med-ico { display: grid; place-items: center; padding: 5px 9px; color: var(--t1); }
+.med-ico { position: relative; display: grid; place-items: center; padding: 5px 9px; color: var(--t1); }
 .med-ico svg { width: 15px; height: 15px; }
 .med-ico.on { color: var(--red); }
 .med-play { color: var(--t0); }
+.med-mode { color: var(--t3); }
+.med-mode-on { color: var(--accent); }
+.med-badge { position: absolute; right: 3px; bottom: 1px; font: 700 9px/1 var(--sans); color: var(--accent); }
 
+/* lišta průběhu: průhledná plocha pro klik, uvnitř 4px dráha (::before) a výplň (scaleX, bez přechodu —
+   posouvá se po sekundách, žádné snímky navíc) */
+.med-prog { margin-top: 8px; min-width: 0; }
+.med-bar { position: relative; height: 12px; touch-action: none; border-radius: var(--r-sm); }
+.med-bar::before,
+.med-fill { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 4px; border-radius: var(--r-pill); }
+.med-bar::before { background: var(--card-3); }
+.med-fill { display: block; background: var(--t1); transform-origin: 0 50%; }
+.med-bar-seek { cursor: pointer; }
+.med-bar-seek:hover .med-fill,
+.med-bar-drag .med-fill { background: var(--accent); }
+.med-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.med-times { display: flex; justify-content: space-between; font: var(--fs-2xs) var(--mono); color: var(--t3); font-variant-numeric: tabular-nums; }
+.med-prog-thin { margin-top: 2px; }
+.med-prog-thin .med-bar { height: 8px; }
+.med-prog-thin .med-bar::before,
+.med-prog-thin .med-fill { top: 3px; height: 2px; }
+
+/* ---------- A · kompaktní řádek ---------- */
+.med-row { gap: 9px; }
+.med-cover-sm { width: 32px; height: 32px; }
+.med-cover-sm svg { width: 15px; height: 15px; }
+.med-v-compact h4 { margin-bottom: 6px; }
+
+/* ---------- C · velký obal: rozmazaný obal (statický obrázek, filtr se vykreslí jednou) pod obsahem ---------- */
+.med-v-cover { isolation: isolate; }
+.med-backdrop { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.med-backdrop img { width: 100%; height: 100%; object-fit: cover; display: block; filter: blur(22px) saturate(1.3); transform: scale(1.35); opacity: 0.6; }
+.med-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, color-mix(in srgb, var(--card) 40%, transparent), color-mix(in srgb, var(--card) 82%, transparent)); }
+.med-cover-lg { width: 72px; height: 72px; border-radius: var(--r-md); box-shadow: var(--shadow-pop); }
+.med-cover-lg svg { width: 28px; height: 28px; }
+.med-v-cover .med-title { font-size: var(--fs-md); }
+
+/* ---------- D · vinyl: drážky z tokenů, uprostřed obal jako štítek ---------- */
+.med-disc { width: 76px; height: 76px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: repeating-radial-gradient(circle, var(--card-3) 0 1.5px, var(--well) 1.5px 3px); box-shadow: var(--shadow-pop); animation: med-spin 5s linear infinite; animation-play-state: paused; }
+.med-disc-spin { animation-play-state: running; }
+.med-cover-label { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--line-2); }
+.med-cover-label svg { width: 14px; height: 14px; }
+@keyframes med-spin { to { transform: rotate(360deg); } }
+
+/* ---------- E · jen v proužku: v šuplíku tenký ovladač bez hlavičky ---------- */
+.med-v-slim { padding-block: 7px; }
+.med-slim { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.med-clock { font: var(--fs-xs) var(--mono); color: var(--t2); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.med-note { display: grid; color: var(--t3); flex-shrink: 0; }
+.med-note svg { width: 14px; height: 14px; }
+.med-v-slim .med-vol { margin-top: 6px; }
+/* ekvalizér = jen ozdoba (neukazuje skutečný zvuk); stojí, dokud nehraje s otevřeným šuplíkem */
+.med-eq { display: inline-flex; align-items: flex-end; gap: 2px; width: 14px; height: 13px; flex-shrink: 0; }
+.med-eq i { flex: 1; height: 100%; border-radius: 1px; background: var(--accent); transform-origin: 50% 100%; transform: scaleY(0.4); animation: med-eq 0.9s ease-in-out infinite alternate; animation-play-state: paused; }
+.med-eq i:nth-child(2) { animation-duration: 0.7s; animation-delay: -0.3s; }
+.med-eq i:nth-child(3) { animation-duration: 1.1s; animation-delay: -0.6s; }
+.med-eq-live i { animation-play-state: running; }
+@keyframes med-eq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+
+/* ---------- výběr vzhledu (roh karty) ---------- */
+.med-pick { position: relative; display: inline-flex; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.med-pick-push { margin-left: auto; }
+.med-pick-btn { width: 22px; height: 18px; border-radius: var(--r-sm); color: var(--t3); display: grid; place-items: center; opacity: 0; transition: opacity var(--fast), background var(--fast), color var(--fast); }
+.med-pick-btn svg { width: 13px; height: 13px; }
+.med-card:hover .med-pick-btn,
+.med-pick-open .med-pick-btn,
+.med-pick-btn:focus-visible { opacity: 1; }
+.med-pick-btn:hover { background: var(--card-2); color: var(--t1); }
+.med-pick-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 190px; background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: var(--shadow-toast); padding: var(--s1); animation: drop var(--dur-2) var(--ease); }
+.med-pick-list button { display: flex; align-items: center; gap: var(--s2); padding: 5px 8px; border-radius: var(--r-sm); font-size: var(--fs-sm); color: var(--t1); text-align: left; white-space: nowrap; }
+.med-pick-list button:hover { background: var(--card-2); }
+.med-pick-list .med-pick-on { background: var(--card-2); color: var(--t0); font-weight: 600; }
+.med-pick-list .med-pick-undo { margin-top: 2px; color: var(--accent); justify-content: center; }
+
+/* miniatury vzhledů (jen tvary; `lg` = náhled v Nastavení) */
+.med-thumb { position: relative; display: block; width: 44px; height: 30px; flex-shrink: 0; overflow: hidden; border-radius: var(--r-xs); background: var(--card-2); border: 1px solid var(--line); }
+.med-thumb-lg { width: 100%; height: 58px; }
+.med-th-art,
+.med-th-line,
+.med-th-bar { position: absolute; display: block; }
+.med-th-art { left: 8%; top: 18%; width: 22%; height: 34%; border-radius: 2px; background: var(--t3); }
+.med-th-line { left: 36%; top: 22%; width: 52%; height: 10%; border-radius: 2px; background: var(--t2); }
+.med-th-bar { left: 8%; right: 8%; bottom: 18%; height: 8%; border-radius: 2px; background: var(--accent); }
+.med-th-compact .med-th-art { top: 32%; width: 14%; height: 36%; border-radius: 50%; }
+.med-th-compact .med-th-line { left: 28%; top: 34%; width: 44%; }
+.med-th-compact .med-th-bar { left: 28%; right: 26%; bottom: auto; top: 54%; height: 5%; }
+.med-th-cover { background: linear-gradient(140deg, color-mix(in srgb, var(--accent) 45%, var(--card-2)), var(--card-2) 75%); }
+.med-th-cover .med-th-art { top: auto; bottom: 30%; width: 26%; height: 40%; }
+.med-th-cover .med-th-line { left: 40%; top: auto; bottom: 46%; width: 46%; }
+.med-th-vinyl .med-th-art { left: 7%; top: 15%; width: 30%; height: 70%; border-radius: 50%; background: repeating-radial-gradient(circle, var(--t3) 0 1px, var(--card-3) 1px 2px); }
+.med-th-vinyl .med-th-line { left: 44%; top: 30%; width: 44%; }
+.med-th-vinyl .med-th-bar { left: 44%; right: 8%; bottom: 30%; }
+.med-th-strip .med-th-art { left: 0; top: 0; width: 100%; height: 26%; border-radius: 0; background: var(--card-3); }
+.med-th-strip .med-th-line { left: 24%; top: 8%; width: 52%; height: 10%; background: var(--t1); }
+.med-th-strip .med-th-bar { display: none; }
+
+/* Nastavení → Osobní: výběr s náhledy */
+.med-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: var(--s2); width: 100%; }
+.med-look { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); color: var(--t1); text-align: left; transition: border-color var(--fast), background var(--fast); }
+.med-look:hover { background: var(--card-2); }
+.med-look-on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.med-look b { font-size: var(--fs-sm); font-weight: 600; }
+.med-look small { font-size: var(--fs-xs); color: var(--t3); line-height: 1.35; }
+
+/* ---------- hlasitost ---------- */
 .med-vol { display: flex; align-items: center; gap: var(--s2); margin-top: 10px; min-width: 0; }
 h4 + .med-vol { margin-top: 0; }
 .med-range { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
 .med-pct { font: var(--fs-xs) var(--mono); color: var(--t3); min-width: 4.2ch; text-align: right; font-variant-numeric: tabular-nums; }
 
+/* ---------- baterie (karta Čas) ---------- */
 .med-bat { display: flex; align-items: center; gap: 7px; margin-top: 8px; font: var(--fs-xs) var(--mono); color: var(--t2); }
 .med-bat-icon { width: 22px; height: 11px; border: 1.5px solid currentColor; border-radius: 3px; padding: 1px; position: relative; display: block; flex-shrink: 0; }
 .med-bat-icon::after { content: ""; position: absolute; right: -4px; top: 2.5px; width: 2px; height: 3px; border-radius: 0 1px 1px 0; background: currentColor; }

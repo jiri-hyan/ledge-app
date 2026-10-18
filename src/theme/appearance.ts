@@ -1,11 +1,13 @@
 // Čistá logika vzhledu (bez DOM, testuje `theme.test.mjs`): výchozí hodnoty a doplnění configu,
-// CSS proměnné pro motiv + akcent + škály (`appearanceVars`), odvozený akcent (`accentPair`), pořadí
-// karet (`cardOrder`), tvar proužku pro morf (`stripShape`, zrcadlo `appearance::geom::strip_metrics`)
-// a presety pružin (`springPreset`). DOM a události řeší `apply.ts`.
-import type { Appearance, MotionStyle } from "../types.ts";
+// CSS proměnné pro motiv + akcent + škály (`appearanceVars`), odvozený akcent (`accentPair`), tvar proužku pro morf (`stripShape`, zrcadlo `appearance::geom::strip_metrics`)
+// a presety pružin (`springPreset`). Design styly (tabulka, písmo, materiál, rozložení) jsou v
+// `looks.ts`, výběr stylu v `styles.ts`. DOM a události řeší `apply.ts`.
+import type { Appearance, MotionStyle, StripStyle } from "../types.ts";
 import { THEMES, THEME_IDS } from "./themes.ts";
+import { CLASSIC, FONTS, LAYOUTS, MATERIALS, STYLE_IDS, WIDTHS, lookVars } from "./looks.ts";
 
 export const DEFAULT_APPEARANCE: Appearance = {
+  style: CLASSIC,
   theme: "dark",
   accent: "",
   density: "normal",
@@ -14,17 +16,19 @@ export const DEFAULT_APPEARANCE: Appearance = {
   glass: { opacity: 1 },
   motion: { style: "spring", speed: 1 },
   strip: { style: "pill", size: "normal", color: "", position: "center" },
-  cards: [],
+  font: "system",
+  material: "solid",
+  layout: "classic",
+  width: "custom",
 };
-
-/** Id karet záložky Práce ve výchozím pořadí (zrcadlo `CARD_IDS` v appearance.rs). */
-export const CARD_IDS = ["running", "claude", "repos", "notes"] as const;
-export type CardId = (typeof CARD_IDS)[number];
 
 export const DENSITY = { compact: 0.78, normal: 1, comfy: 1.22 } as const;
 export const RADIUS = { sharp: 0.35, normal: 1, round: 1.4 } as const;
 export const STRIP_SIZE = { small: 0.85, normal: 1, large: 1.2 } as const;
-const MOTION_STYLES: MotionStyle[] = ["spring", "smooth", "snappy", "none"];
+/** Styly animací v pořadí panelu (zrcadlo `MotionStyle` v appearance.rs). */
+export const MOTION_STYLES: MotionStyle[] = ["spring", "smooth", "snappy", "bounce", "fade", "notch", "none"];
+export const STRIP_STYLES: StripStyle[] = ["pill", "line", "dot", "term", "tag", "glow", "block", "drop"];
+const keysOf = <T extends string>(o: Record<T, unknown>) => Object.keys(o) as T[];
 
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
 const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === "number" && v >= lo && v <= hi ? v : d);
@@ -35,6 +39,7 @@ export function normalizeAppearance(raw: any): Appearance {
   const d = DEFAULT_APPEARANCE;
   const r = raw ?? {};
   return {
+    style: pick(r.style, STYLE_IDS, CLASSIC),
     theme: pick(r.theme, THEME_IDS, d.theme),
     accent: isHex(r.accent) ? r.accent : "",
     density: pick(r.density, ["compact", "normal", "comfy"] as const, d.density),
@@ -43,20 +48,16 @@ export function normalizeAppearance(raw: any): Appearance {
     glass: { opacity: num(r.glass?.opacity, 0.25, 1, 1) },
     motion: { style: pick(r.motion?.style, MOTION_STYLES, "spring"), speed: num(r.motion?.speed, 0.5, 2, 1) },
     strip: {
-      style: pick(r.strip?.style, ["pill", "line", "dot"] as const, "pill"),
+      style: pick(r.strip?.style, STRIP_STYLES, "pill"),
       size: pick(r.strip?.size, ["small", "normal", "large"] as const, "normal"),
       color: r.strip?.color === "accent" || isHex(r.strip?.color) ? r.strip.color : "",
       position: pick(r.strip?.position, ["center", "left", "right"] as const, "center"),
     },
-    cards: Array.isArray(r.cards) ? r.cards.filter((c: unknown) => CARD_IDS.includes(c as CardId)) : [],
+    font: pick(r.font, keysOf(FONTS), d.font),
+    material: pick(r.material, keysOf(MATERIALS), d.material),
+    layout: pick(r.layout, keysOf(LAYOUTS), d.layout),
+    width: pick(r.width, keysOf(WIDTHS), d.width),
   };
-}
-
-/** Pořadí karet: nejdřív z configu (bez duplicit a neznámých), zbytek ve výchozím pořadí. */
-export function cardOrder(cards: readonly string[]): CardId[] {
-  const out: CardId[] = [];
-  for (const c of [...cards, ...CARD_IDS]) if (CARD_IDS.includes(c as CardId) && !out.includes(c as CardId)) out.push(c as CardId);
-  return out;
 }
 
 /** `#rrggbb` → [h 0–360, s 0–1, l 0–1]. */
@@ -94,6 +95,9 @@ const CSS_EASE: Record<Exclude<MotionStyle, "none">, { spring: string; ease: str
   spring: { spring: "cubic-bezier(0.34, 1.56, 0.64, 1)", ease: "cubic-bezier(0.2, 0.9, 0.25, 1.05)" },
   smooth: { spring: "cubic-bezier(0.25, 0.8, 0.3, 1)", ease: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
   snappy: { spring: "cubic-bezier(0.3, 1.3, 0.5, 1)", ease: "cubic-bezier(0.1, 0.95, 0.2, 1.02)" },
+  bounce: { spring: "cubic-bezier(0.34, 1.9, 0.6, 1)", ease: "cubic-bezier(0.25, 1.15, 0.4, 1.08)" },
+  fade: { spring: "cubic-bezier(0.25, 0.8, 0.3, 1)", ease: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
+  notch: { spring: "cubic-bezier(0.3, 1.35, 0.5, 1)", ease: "cubic-bezier(0.2, 0.9, 0.25, 1.05)" },
 };
 
 export type WidenMotion = { shrinkMs: number; fadeMs: number; restoreMs: number; easing: string };
@@ -128,13 +132,16 @@ export function appearanceVars(a: Appearance, reducedMotion = false): Record<str
   const ease = CSS_EASE[style === "none" ? "spring" : style];
   out.spring = ease.spring;
   out.ease = ease.ease;
-  return out;
+  return { ...out, ...lookVars(a) };
 }
 
 /** Výška a rádius proužku (logické px) — výchozí tvar morfu ve frontendu. */
-export function stripShape(style: Appearance["strip"]["style"], size: Appearance["strip"]["size"]): { h: number; r: number } {
+const STRIP_HR: Record<StripStyle, [number, number]> = {
+  pill: [32, 14], line: [26, 3], dot: [22, 11], term: [24, 0], tag: [30, 6], glow: [28, 14], block: [30, 0], drop: [34, 17],
+};
+export function stripShape(style: StripStyle, size: Appearance["strip"]["size"]): { h: number; r: number } {
   const k = STRIP_SIZE[size];
-  const [h, r] = style === "line" ? [26, 3] : style === "dot" ? [22, 11] : [32, 14];
+  const [h, r] = STRIP_HR[style] ?? STRIP_HR.pill;
   return { h: h * k, r: r * k };
 }
 
@@ -146,7 +153,10 @@ export function springPreset(style: MotionStyle, stiffness: number, damping: num
     case "none":
       return null;
     case "smooth":
+    case "fade":
       return { stiffness, damping: Math.max(damping, critical(stiffness)) };
+    case "bounce":
+      return { stiffness: stiffness * 1.15, damping: damping * 0.62 };
     case "snappy": {
       const k = stiffness * 1.7;
       return { stiffness: k, damping: Math.max(damping, 0.85 * critical(k)) };

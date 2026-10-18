@@ -305,10 +305,10 @@ pub async fn test(raw: &str) -> Result<TestResult, String> {
 
 // ---------- napojení na jádro ----------
 
-/// Karta je vidět (nebo se šuplík právě otevírá) na Osobní, záložka i karta zapnuté.
+/// Karta je na právě otevřené záložce a šuplík je vidět (nebo se právě otevírá).
 fn card_visible(cfg: &Config, opening: bool) -> bool {
     let c = core();
-    cfg.modes.personal_enabled && cfg.drawer.sections.calendar && *c.mode.lock() == "osobni" && (opening || c.drawer.view() == View::Full)
+    crate::layout::page_has(&cfg.layout, &c.mode.lock(), "calendar") && (opening || c.drawer.view() == View::Full)
 }
 
 /// (klíč, adresa) zapnutých kalendářů s platnou adresou.
@@ -385,7 +385,7 @@ pub(crate) fn maybe_refresh(opening: bool) {
 /// Změna configu: zahodit stav odebraných kalendářů (bez kalendářů smazat i cache) a případně stáhnout.
 pub(crate) fn on_config(old: &Config, new: &Config) {
     let (o, n) = (&old.personal.calendars, &new.personal.calendars);
-    if o == n && old.modes == new.modes && old.drawer.sections.calendar == new.drawer.sections.calendar {
+    if o == n && old.layout == new.layout && old.drawer.sections.calendar == new.drawer.sections.calendar {
         return;
     }
     let keep: Vec<String> = n.iter().filter_map(|f| conf::normalize_url(&f.url).ok()).map(|u| conf::key(&u)).collect();

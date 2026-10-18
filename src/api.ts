@@ -6,6 +6,7 @@ import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, 
 import type { StatusLineStatus, TimerOp, TimerState } from "./types";
 import type { EditPreview, GitView } from "./types";
 import type { CalendarTest } from "./types";
+import type { MediaAction } from "./types";
 import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
 
 export type * from "./types";
@@ -93,7 +94,7 @@ export const api = {
   // --- Osobní: právě hraje, hlasitost, baterie (Rust `media.rs`, `volume.rs`, `battery.rs`) ---
   /** Záložka Osobní je vidět: Rust spustí odběry událostí (líně, jen jednou). */
   personalLive: () => call("personal_live"),
-  mediaControl: (action: "toggle" | "next" | "prev") => call("media_control", { action }),
+  mediaControl: (action: MediaAction) => call("media_control", { action }),
   /** Obal skladby jako data URL (jednou na `coverKey`); null = není / skladba se změnila. */
   mediaCover: (key: string) => call<string | null>("media_cover", { key }),
   volumeSet: (level: number) => call("volume_set", { level }),

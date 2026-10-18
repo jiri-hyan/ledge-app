@@ -12,6 +12,7 @@ import { moveItem } from "../model";
 import type { PanelProps } from "../types";
 import { parsePresets } from "../../timer/model";
 import CalendarSettings from "../../calendar/CalendarSettings";
+import MediaSettings from "../../media/MediaSettings";
 
 const MAX_LINKS = 24;
 
@@ -82,10 +83,9 @@ export default function PersonalPanel(_p: PanelProps) {
   const w = () => c.cfg.personal.weather;
   return (
     <>
-      <PanelHead id="modes.personalEnabled" title={t("settings.nav.osobni", "Osobní")} desc={t("settings.personal.desc", "Záložka pro běžné věci mimo práci: čas, počasí, rychlé odkazy a obecné poznámky.")}>
-        <Toggle path="modes.personalEnabled" label={t("settings.f.modes.personalEnabled", "Záložka Osobní")} />
-      </PanelHead>
-      <Show when={c.cfg.modes.personalEnabled} fallback={<p class="st-empty">{t("settings.personal.off", "Záložka Osobní je vypnutá — šuplík ukazuje jen Práci.")}</p>}>
+      <PanelHead title={t("settings.nav.osobni", "Osobní")} desc={t("settings.personal.desc", "Záložka pro běžné věci mimo práci: čas, počasí, rychlé odkazy a obecné poznámky.")} />
+      <p class="st-note">{t("settings.personal.layoutNote", "Na které záložce která karta je (i jestli záložka Osobní vůbec je), upravíš v panelu Šuplík a proužek nebo přímo v šuplíku přes ✎.")}</p>
+      <>
         <Section title={t("settings.f.personal.weather", "Místo pro počasí")} desc={t("settings.f.personal.weather.hint", "Open-Meteo, bez klíče. Prázdné = nic se nestahuje (polohu podle IP Ledge nezjišťuje).")}>
           <Row id="personal.weather" label={t("settings.personal.place", "Místo")} hint={t("settings.personal.place.hint", "Název je jen popisek na kartě. Souřadnice najdeš třeba na mapy.cz (pravý klik na místo).")} stack nested>
             <div class="st-inline">
@@ -103,6 +103,9 @@ export default function PersonalPanel(_p: PanelProps) {
         </Section>
         <Section id="personal.calendars" title={t("settings.f.personal.calendars", "Kalendáře")} desc={t("settings.f.personal.calendars.hint", "Google nebo Outlook z tajného odkazu ICS — jen čtení, bez přihlášení. Vlož odkaz a klikni na Přidat.")}>
           <CalendarSettings />
+        </Section>
+        <Section title={t("settings.media.section", "Přehrávač")} desc={t("settings.media.desc", "Jak vypadá karta Právě hraje. Vzhled přepneš i přímo v kartě — ikonkou v jejím rohu.")}>
+          <MediaSettings />
         </Section>
         <Section title={t("settings.timer.section", "Časovač")} desc={t("settings.timer.desc", "Odpočet a stopky v kartě Časovač, v paletě (Ctrl+K) a v proužku. Běží i se zavřeným šuplíkem a přes restart Ledge.")}>
           <Row id="timer.presets">
@@ -125,7 +128,7 @@ export default function PersonalPanel(_p: PanelProps) {
         <Section title={t("settings.f.personal.links", "Rychlé odkazy")} desc={t("settings.f.personal.links.hint", "Web (jen http/https), složka, soubor nebo aplikace — vždy bez argumentů")}>
           <Links />
         </Section>
-      </Show>
+      </>
     </>
   );
 }

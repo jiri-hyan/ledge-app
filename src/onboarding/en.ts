@@ -110,6 +110,7 @@ registerDict("en", {
   "onboarding.done.tipDwell": "Open the drawer by resting the mouse on the strip at the top centre for a moment.",
   "onboarding.done.tipOff": "Opening with the mouse is off — use the shortcut (Settings → Shortcuts).",
   "onboarding.done.tipBrowser": "In a browser or a maximised window, push the mouse against the top edge — the drawer slides out over it.",
+  "onboarding.done.tipLayout": "Make the drawer yours — ✎ in the header: drag cards, change their size, add them from the catalogue or create your own tab.",
   "onboarding.done.tipAgain": "Run this setup again any time: Settings → Setup guide. Everything else is there too.",
   "settings.welcome.title": "First-run setup guide",
   "settings.welcome.done": "Completed or skipped",

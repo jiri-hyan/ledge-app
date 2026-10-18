@@ -3,8 +3,9 @@
 //! Žádný WebView: vrstvené okno (UpdateLayeredWindow s per-pixel alfou) kreslené Direct2D +
 //! DirectWrite. `WS_EX_TRANSPARENT` → myš jím propadá (záložky prohlížeče pod ním fungují),
 //! `WS_EX_NOACTIVATE` → nikdy nebere fokus. Překresluje se jen při změně obsahu.
-//! Vzhled (styl `pill`/`line`/`dot`, velikost, paleta motivu, barva linky, osa u hrany) přichází
-//! v `StripModel` spočítaný čistými funkcemi `appearance::geom`.
+//! Vzhled (styl `pill`/`line`/`dot` a tvary stylů vlny 6 `term`/`tag`/`glow`/`block`/`drop`, velikost,
+//! paleta motivu, barva linky, osa u hrany) přichází v `StripModel` spočítaný čistými funkcemi
+//! `appearance::geom`; ozdoby stylu (okraj, stíny, záře, písmo) dává `appearance::stripdeco`.
 //! Puls „Claude čeká / hotovo“ (`StripModel.pulse`, `attention::pulse_level`) je jediná animace:
 //! časovač `WM_TIMER` běží jen po dobu pulsu (`attention::PULSE_MS`), v klidu žádný.
 
@@ -259,9 +260,10 @@ unsafe fn run(strip: Arc<Strip>) {
                     *strip.rect.lock() = RECT::default();
                     continue;
                 }
-                if let Some(r) = draw(&renderer, hwnd, &model) {
+                if let Some((r, body)) = draw(&renderer, hwnd, &model) {
                     *strip.rect.lock() = r;
-                    *strip.last.lock() = (r.right - r.left, r.bottom - r.top);
+                    // výchozí tvar morfu = tělo proužku (bez stínů a záře kolem)
+                    *strip.last.lock() = body;
                 }
                 if !shown {
                     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
@@ -286,10 +288,11 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().collect()
 }
 
-unsafe fn text_format(dw: &IDWriteFactory, size: f32, strong: bool) -> windows::core::Result<IDWriteTextFormat> {
+unsafe fn text_format(dw: &IDWriteFactory, size: f32, strong: bool, family: &str) -> windows::core::Result<IDWriteTextFormat> {
     unsafe {
+        let family: Vec<u16> = family.encode_utf16().chain(std::iter::once(0)).collect();
         dw.CreateTextFormat(
-            w!("Segoe UI Variable Text"),
+            PCWSTR(family.as_ptr()),
             None,
             if strong { DWRITE_FONT_WEIGHT_SEMI_BOLD } else { DWRITE_FONT_WEIGHT_MEDIUM },
             DWRITE_FONT_STYLE_NORMAL,
@@ -333,10 +336,11 @@ fn grad(t: &ID2D1DCRenderTarget, stops: &[(f32, D2D1_COLOR_F)], from: (f32, f32)
     }
 }
 
-/// Vykreslí proužek a umístí ho. Vrací jeho obdélník na obrazovce.
-unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
+/// Vykreslí proužek a umístí ho. Vrací jeho obdélník na obrazovce (i se stíny) a velikost těla (px).
+unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<(RECT, (i32, i32))> {
     unsafe {
         let mt = m.metrics;
+        let deco = crate::appearance::stripdeco::strip_deco(m.style);
         let pal = m.palette;
         let pulse = pulse_now(m);
         let dots_only = m.style == StripStyle::Dot;
@@ -344,8 +348,8 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
         let h_logical = if m.line_only { 3.0 } else if m.hot { mt.height + mt.hot_extra } else { mt.height };
         let ks = scale * mt.k;
         let font = 12.5 * ks;
-        let fmt = text_format(&r.dw, font, false).ok()?;
-        let fmt_strong = text_format(&r.dw, font, true).ok()?;
+        let fmt = text_format(&r.dw, font, false, deco.font.family()).ok()?;
+        let fmt_strong = text_format(&r.dw, font, true, deco.font.family()).ok()?;
         for f in [&fmt, &fmt_strong] {
             let _ = f.SetParagraphAlignment(windows::Win32::Graphics::DirectWrite::DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
         }
@@ -395,10 +399,14 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
         let min_w = if dots_only { 44.0 * ks } else { 120.0 * ks };
         let width = if m.line_only { (180.0 * scale).round() } else { (content + pad * 2.0).ceil().max(min_w) };
         let height = (h_logical * scale).round();
-        let (w, h) = (width as i32, height as i32);
+        let (bw, bh) = (width as i32, height as i32);
+        // stíny a záře stylu leží kolem těla: okno je o ně větší, tělo zůstává na ose
+        let (ex_l, ex_r, ex_b) = if m.line_only { (0.0, 0.0, 0.0) } else { deco.extents() };
+        let (ex_l, ex_r, ex_b) = ((ex_l * scale).ceil(), (ex_r * scale).ceil(), (ex_b * scale).ceil());
+        let (w, h) = (bw + (ex_l + ex_r) as i32, bh + ex_b as i32);
         let mon = m.monitor;
         let axis2 = m.axis2.unwrap_or(2 * mon.left + (mon.right - mon.left));
-        let x = geom::span_x(axis2, w).clamp(mon.left, (mon.right - w).max(mon.left));
+        let x = (geom::span_x(axis2, bw) - ex_l as i32).clamp(mon.left, (mon.right - w).max(mon.left));
         let y = mon.top;
 
         // DIB pro vrstvené okno
@@ -425,6 +433,7 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
             let t = &r.target;
             t.BeginDraw();
             t.Clear(Some(&D2D1_COLOR_F { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }));
+            t.SetTransform(&windows_numerics::Matrix3x2::translation(ex_l, 0.0));
             let radius = if m.line_only { 2.0 * scale } else { mt.radius * scale };
             // horní rohy „za okrajem“: obdélník začíná nad obrazovkou
             let body = D2D1_ROUNDED_RECT {
@@ -446,19 +455,48 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
             } else {
                 // tělo: svislý přechod podle motivu, dole o chlup světlejší (světlý motiv: při
                 // nažhavení tmavší)
-                let o = if m.hot { 0.96 } else { m.opacity };
+                // tvrdý stín (blok) by průsvitným tělem prosvítal → tělo je u něj vždy plné
+                let o = if m.hot { 0.96 } else if deco.hard_shadow > 0.0 { 1.0 } else { m.opacity };
                 let lift = match (m.hot, pal.light) {
                     (false, _) => 0.0,
                     (true, false) => 0.035,
                     (true, true) => -0.03,
                 };
                 let tone = |c: Rgba| D2D1_COLOR_F { r: c.0 + lift, g: c.1 + lift, b: c.2 + lift, a: o };
+                // stíny stylu pod tělem: tvrdý posunutý (brutal) / měkký ve vrstvách (kapka, štítek)
+                if deco.hard_shadow > 0.0 {
+                    let d = deco.hard_shadow * scale;
+                    let sh = D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: body.rect.left + d, top: body.rect.top + d, right: body.rect.right + d, bottom: body.rect.bottom + d }, ..body };
+                    if let Ok(b) = t.CreateSolidColorBrush(&color(ink(Rgba::TEXT, pal.light), o), None) {
+                        t.FillRoundedRectangle(&sh, &b);
+                    }
+                }
+                if deco.soft_shadow > 0.0 {
+                    let s = deco.soft_shadow * scale;
+                    for i in 1..=3 {
+                        let e = s * i as f32 / 3.0;
+                        let sh = D2D1_ROUNDED_RECT {
+                            rect: D2D_RECT_F { left: body.rect.left - e * 0.6, top: body.rect.top, right: body.rect.right + e * 0.6, bottom: body.rect.bottom + e },
+                            radiusX: body.radiusX + e,
+                            radiusY: body.radiusY + e,
+                        };
+                        if let Ok(b) = t.CreateSolidColorBrush(&color(Rgba(0.1, 0.12, 0.2, 1.0), 0.06 * o), None) {
+                            t.FillRoundedRectangle(&sh, &b);
+                        }
+                    }
+                }
                 if let Some(b) = grad(t, &[(0.0, tone(pal.top)), (1.0, tone(pal.bottom))], (0.0, 0.0), (0.0, height)) {
                     t.FillRoundedRectangle(&body, &b);
                 }
-                let edge = if m.hot { pal.edge_hot } else { pal.edge };
-                if let Ok(b) = t.CreateSolidColorBrush(&color(edge, 1.0), None) {
-                    t.DrawRoundedRectangle(&body, &b, 1.0, None);
+                if deco.edge_w > 0.0 {
+                    let edge = match (deco.edge_accent, m.hot) {
+                        (true, hot) => Rgba(m.line[0].0, m.line[0].1, m.line[0].2, if hot { 1.0 } else { 0.7 }),
+                        (false, true) => pal.edge_hot,
+                        (false, false) => pal.edge,
+                    };
+                    if let Ok(b) = t.CreateSolidColorBrush(&color(edge, 1.0), None) {
+                        t.DrawRoundedRectangle(&body, &b, deco.edge_w * scale, None);
+                    }
                 }
                 // segmenty
                 let mut cx = pad;
@@ -536,10 +574,12 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
                 }
                 // podpisová linka dole: v klidu tlumený fialovo-modrý přechod (nebo barva z configu),
                 // při události plná barva; styl `line` = linka skoro přes celou šířku
-                let share = match (m.style, m.ambient.is_some() || m.hot) {
-                    (StripStyle::Line, _) => 0.94,
-                    (_, true) => 0.78,
-                    (_, false) => 0.42,
+                let share = match (deco.line_share, m.style, m.ambient.is_some() || m.hot) {
+                    (Some(s), _, true) => s.max(0.78),
+                    (Some(s), _, false) => s,
+                    (None, StripStyle::Line, _) => 0.94,
+                    (None, _, true) => 0.78,
+                    (None, _, false) => 0.42,
                 };
                 // puls: linka se v rytmu roztáhne k plné šířce
                 let share = match pulse {
@@ -548,10 +588,11 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
                 };
                 let lw = width * share;
                 let left = (width - lw) / 2.0;
+                let lh = deco.line_h * scale;
                 let line = D2D1_ROUNDED_RECT {
-                    rect: D2D_RECT_F { left, top: height - 2.0 * scale, right: left + lw, bottom: height },
-                    radiusX: scale,
-                    radiusY: scale,
+                    rect: D2D_RECT_F { left, top: height - lh, right: left + lw, bottom: height },
+                    radiusX: scale.min(lh / 2.0),
+                    radiusY: scale.min(lh / 2.0),
                 };
                 let a = if m.hot { 1.0 } else { 0.55 };
                 let stops: Vec<(f32, D2D1_COLOR_F)> = match pulse.map(|(c, l)| (c, 0.5 + 0.5 * l)).or(m.ambient.map(|c| (c, 1.0))) {
@@ -565,10 +606,25 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
                         vec![(0.0, color(l0, 0.0)), (0.35, color(l0, a)), (0.65, color(l1, a)), (1.0, color(l2, 0.0))]
                     }
                 };
+                // neonová záře: tatáž linka ve dvou širších průsvitných vrstvách (statická, kreslí se jen při změně)
+                if deco.glow > 0.0 {
+                    for (spread, k) in [(deco.glow * scale, 0.12), (deco.glow * scale * 0.5, 0.25)] {
+                        let faint: Vec<(f32, D2D1_COLOR_F)> = stops.iter().map(|(p, c)| (*p, D2D1_COLOR_F { a: c.a * k, ..*c })).collect();
+                        let halo = D2D1_ROUNDED_RECT {
+                            rect: D2D_RECT_F { left: left - spread, top: height - lh - spread, right: left + lw + spread, bottom: height + spread },
+                            radiusX: spread + lh,
+                            radiusY: spread + lh,
+                        };
+                        if let Some(b) = grad(t, &faint, (left - spread, 0.0), (left + lw + spread, 0.0)) {
+                            t.FillRoundedRectangle(&halo, &b);
+                        }
+                    }
+                }
                 if let Some(b) = grad(t, &stops, (left, 0.0), (left + lw, 0.0)) {
                     t.FillRoundedRectangle(&line, &b);
                 }
             }
+            t.SetTransform(&windows_numerics::Matrix3x2::identity());
             let _ = t.EndDraw(None, None);
         }
         let _ = &r.d2d;
@@ -589,6 +645,6 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<RECT> {
         let _ = DeleteDC(mem);
         ReleaseDC(None, screen);
         let _ = PCWSTR::null();
-        Some(RECT { left: x, top: y, right: x + w, bottom: y + h })
+        Some((RECT { left: x, top: y, right: x + w, bottom: y + h }, (bw, bh)))
     }
 }

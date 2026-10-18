@@ -13,6 +13,9 @@ import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { canBgLaunch, openBgLaunch } from "../sessions/BgLaunch";
 import { timerItems } from "./timer";
+import { normalizeLayout, pageOf } from "../layout/model";
+import { pageName } from "../layout/text";
+import { styleItems } from "./styles";
 
 export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows" | "calc" | "convert" | "emoji" | "clip";
 export interface PItem extends Item {
@@ -51,6 +54,8 @@ export type Nav = {
   onOpenNote: (n: NoteView) => void;
   onAllNotes: () => void;
   onSettings: (panelId?: string) => void;
+  /** režim úprav šuplíku (hlavní stránka + `layout/edit.ts` `beginEdit`) */
+  onEditDrawer: () => void;
 };
 
 const LIVE = ["ready", "running", "starting", "preparing"];
@@ -109,11 +114,15 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
   add({ id: "app:update", section: "app", order: 6, title: t("palette.app.update", "Zkontrolovat aktualizaci Ledge"), keywords: "verze update nova", run: () => report(api.updateCheckNow() as Promise<unknown>, () => t("palette.app.checking", "Kontroluji novou verzi…")) });
   if (s.claudeEnabled && s.hooks.state !== "full")
     add({ id: "app:hooks", section: "app", order: 6, title: t("palette.app.hooks", "Zapojit hooky Claude Code"), keywords: "claude hooky schvalovani", run: () => report(api.hooksInstall() as Promise<unknown>, () => t("palette.app.hooked", "Hooky zapojené.")) });
-  if (s.personalEnabled)
-    add(s.mode === "prace"
-      ? { id: "app:osobni", section: "app", order: 6, title: t("palette.app.personal", "Přepnout na Osobní"), run: () => api.setMode("osobni") }
-      : { id: "app:prace", section: "app", order: 6, title: t("palette.app.work", "Přepnout na Práce"), run: () => api.setMode("prace") });
+  // záložky z `layout`: přejít na jinou (klávesy 1–9 jsou v App) a režim úprav šuplíku
+  const lay = normalizeLayout(s.layout);
+  const cur = pageOf(lay, s.mode).id;
+  lay.pages.forEach((pg, i) => {
+    if (pg.id !== cur) add({ id: `tab:${pg.id}`, section: "app", order: 6, title: t("palette.app.tab", "Přejít na záložku {name}", { name: pageName(pg) }), keywords: `zalozka tab prepnout ${i + 1} ${pg.id}`, run: () => api.setMode(pg.id) });
+  });
+  add({ id: "app:editDrawer", section: "app", order: 6, title: t("palette.app.editDrawer", "Upravit šuplík (karty a záložky)"), keywords: "upravit rozlozeni karty zalozky presunout pridat odebrat velikost katalog edit layout", run: () => nav.onEditDrawer() });
   for (const x of timerItems(s)) add(x);
+  for (const x of styleItems(s)) add(x);
   add({ id: "app:gamemode", section: "app", order: 7, title: t("palette.app.gameMode", "Zapnout herní režim (Ledge zmizí)"), keywords: "hra game fullscreen schovat skryt nerusit herni rezim", run: () => api.setGameMode(true) });
   add({ id: "app:close", section: "app", order: 7, title: t("palette.app.close", "Zavřít šuplík"), run: () => api.close() });
   return out;

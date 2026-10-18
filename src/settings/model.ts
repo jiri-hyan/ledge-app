@@ -58,6 +58,7 @@ const FIELD_PANELS: [string, string][] = [
   ["projects", "projekty"],
   ["roots", "projekty"],
   ["drawer", "suplik"],
+  ["layout", "suplik"],
   ["drawer.glass", "vzhled"],
   ["drawer.width", "vzhled"],
   ["strip", "suplik"],

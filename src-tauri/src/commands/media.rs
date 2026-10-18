@@ -12,7 +12,8 @@ pub(crate) fn personal_live() {
     battery::ensure();
 }
 
-/// Přehrát/pauza, další, předchozí v aktuální mediální session.
+/// Přehrát/pauza, další, předchozí, přetočit (`{"seek": ms}`), náhodně (`{"shuffle": bool}`), opakovat
+/// (`{"repeat": "none"|"track"|"list"}`) v aktuální mediální session — jen co zdroj umí.
 #[tauri::command]
 pub(crate) fn media_control(action: media::Control) -> Result<(), String> {
     media::control(action)

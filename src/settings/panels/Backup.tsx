@@ -15,6 +15,7 @@ const SECTION_NAMES: Record<string, readonly [string, string]> = {
   projects: ["settings.section.projects", "Projekty"],
   roots: ["settings.section.roots", "Kde hledat repa"],
   drawer: ["settings.section.drawer", "Šuplík"],
+  layout: ["settings.section.layout", "Záložky a karty"],
   strip: ["settings.section.strip", "Proužek"],
   modes: ["settings.section.modes", "Záložky"],
   claude: ["settings.section.claude", "Claude Code"],

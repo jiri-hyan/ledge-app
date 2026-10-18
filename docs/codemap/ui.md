@@ -9,12 +9,12 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 |---|---|---|
 | `index.tsx` | vstup; `styles.css` načte PRVNÍ, pak `App` | |
 | `App.tsx` | skořápka: store snapshotu, stránky, morf, výška okna, fokus, klávesy, reflektor | `App` `apply` `prepare` `play` `closing` `report` `startNote` `editNote` `allNotes` `notesNav` |
-| `nav.ts` | stránky a navigace | `Page` `asPage` `typing` `NotesNav` |
+| `nav.ts` | stránky a navigace (záložky šuplíku jsou `layout`, ne stránky) | `Page` `asPage` `typing` `NotesNav` |
 | `snapshot.ts` | prázdný snapshot do startu | `EMPTY_SNAPSHOT` |
-| `MainPage.tsx` | hlavní stránka: Práce (dlaždice + mřížka karet) / Osobní; viditelnost z `cards/sections.ts`, každé kartě předá `menu` (⋯), vše skryté = nápověda `page-empty` | `MainPage` |
-| `cards/sections.ts` | `drawer.sections` (zrcadlo `config::Sections`): klíče, skupiny pro Nastavení, čistá logika — co stránka ukáže, třída mřížky (`one`/`two`), změna jednoho pole configu; test `sections.test.mjs` (i shoda klíčů s config.rs) | `SECTION_KEYS` `SECTION_GROUPS` `CLAUDE_PARTS` `PERSONAL_PARTS` `mediaCardKey` `sectionOn` `visibleCards` `gridClass` `withSection` `hiddenSections` |
-| `cards/CardMenu.tsx` | ⋯ v hlavičce karty (vidět při najetí) → „Skrýt kartu“ / „Skrýt sekci: …“ (karta Claude); ukládá `get_config` → `withSection` → `save_config` (při `cfgError` ne); lišta „… skryta · Vrátit“ 6 s | `CardMenu` `HiddenNotice` `setSection` |
-| `cards/Head.tsx` | hlavička: hodiny / Zpět + název, chipy (vč. tlumeného „V bublině Claude“ z `pkgctx/BubbleNotice.tsx` `bubble` → klik = Nastavení u autostartu), nová verze, Práce/Osobní, nástroje | `Head` |
+| `MainPage.tsx` | hlavní stránka: karty záložky `Snapshot.mode` z `layout` → `layout/Deck.tsx` (→ [layout.md](layout.md)); každé kartě předá `menu` (⋯), lišta úprav, katalog, prázdná záložka = „Přidej první kartu“ | `MainPage` `card` |
+| `cards/sections.ts` | `drawer.sections` ze snapshotu — ODVOZENÉ z `layout` (zrcadlo `config::Sections`): klíče, čtení části karty; test `sections.test.mjs` (shoda s config.rs a s modelem rozložení) | `SECTION_KEYS` `sectionOn` `allSectionsOn` `CLAUDE_PARTS` |
+| `cards/CardMenu.tsx` | ⋯ v hlavičce karty (vidět při najetí) → „Skrýt kartu“ (z této záložky do katalogu) / „Skrýt sekci: …“ (`layout.hiddenParts`) / „Upravit šuplík…“; ukládá jen `layout` (`layout/edit.ts` `saveLayout`, při `cfgError` ne); lišta „… skryta · Vrátit“ 6 s | `CardMenu` `HiddenNotice` |
+| `cards/Head.tsx` | hlavička: hodiny / Zpět + název, chipy (vč. tlumeného „V bublině Claude“ z `pkgctx/BubbleNotice.tsx` `bubble` → klik = Nastavení u autostartu), nová verze, záložky `layout/Tabs.tsx`, ✎ režim úprav, nástroje | `Head` |
 | `cards/UpdatePanel.tsx` | poznámky k vydání → Instalovat (druhé potvrzení při běžících serverech; v bublině MSIX řádek, že instalátor poběží mimo ni) | `UpdatePanel` `install` |
 | `cards/Projects.tsx` | dlaždice, spuštění, náklon, klon, akce pod dlaždicí | `Projects` `launch` `tilt` `cloneProject` |
 | `cards/Running.tsx` · `Repos.tsx` | karta Běží (log jen rozbalený) · karta Repa (Pull jen čisté a pozadu) | `Running` `PHASE` · `Repos` `pull` |
@@ -28,13 +28,13 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 | `notes/*` | poznámky → [notes.md](notes.md) | |
 | `api.ts` | most k Rustu: `api.*` = `invoke`, `on` = `listen`; mimo Tauri no-op | `api` `on` `inTauri` `call` |
 | `types.ts` | typy snapshotu a IPC (zrcadlo serde v Rustu); `api.ts` je re-exportuje | `Snapshot` `ProjectView` `ProcView` `SessionView` `NoteView` `UpdateView` `ViewMsg` |
-| `motion.ts` | pružiny → CSS `linear()`, clip-path morf, naskakování `[data-anim]`, měření; styl/rychlost z vzhledu | `spring` `collapsedClip` `FULL_CLIP` `OVERLAP` `measure` `preHide` `revealContent` `concealContent` `setMotion` `dur` |
+| `motion.ts` | pružiny → CSS `linear()` (simulace `theme/springs.ts`), clip-path morf, naskakování `[data-anim]`, měření; styl/rychlost z vzhledu; co se při otevření animuje, určuje `theme/openAnim.ts` | `spring` `collapsedClip` `bandClip` `FULL_CLIP` `OVERLAP` `measure` `preHide` `revealContent` `concealContent` `setMotion` `dur` |
 | `theme/*` | motivy a vzhled (→ [appearance.md](appearance.md)): `themes.ts` sady tokenů, `appearance.ts` čistá logika, `apply.ts` DOM | `THEMES` `appearanceVars` `applyAppearance` `initAppearance` `savedAppearance` |
 | `format.ts` | formátování času a čísel podle jazyka (`t`, `locale()`; čas 24h v obou) | `ago` `uptime` `fmtTime` `fmtDate` `dayNames` `isoWeek` `num` `pad2` |
 | `ui/toast.tsx` · `ui/rich.tsx` | hlášky dole; `<Toast />` ve skořápce · přeložený text s `<b>…</b>` → uzly (bez innerHTML) | `say` `sayError` `errorText` `Toast` · `rich` |
 | `i18n.ts` · `i18n/*` · `i18nScan.ts` | překlady (viz sekce i18n) · anglické slovníky + `load.ts` · statická kontrola pro hlídací test | `t` `tp` `plural` `pluralForm` `lang` `setLang` `locale` `registerDict` · `scanSource` |
 | `logos.ts` · `icons.tsx` | cache log podle `logoKey` (jednou na klíč) · inline SVG ikony | `logoSrc` · `Icon*` |
-| `styles.css` | tokeny `:root` (= motiv dark; škály `--fz --dens --rr --glass --speed`, barvy, `--accent*`, `--dur-*`), odvozené tokeny v `:root, .theme-scope` + základ (shell, karta, řádek, pill, `.btn`/`.mini`, pole, toast) | |
+| `styles.css` | tokeny `:root` (= motiv dark; škály `--fz --dens --rr --glass --speed`, barvy, `--accent*`, `--dur-*`), odvozené tokeny v `:root, .theme-scope` + základ (shell, karta, řádek, pill, `.btn`/`.mini`, pole, toast) čtoucí proměnné design stylu (`--m-*`, `--h-*`, `--deck-*`, `--l-pad`; výchozí = dnešní vzhled) + blok „Styly“ (plovoucí panel, ozdoby `html[data-style]`) → [appearance.md](appearance.md) | |
 | `cards/*.css` · `settings.css` · `sessions.css` · `notes/notes.css` | styly vedle komponent, jen tokeny ze `styles.css` | |
 | `cssClasses.ts` | čistá analýza globálních CSS tříd pro hlídací test: vlastník vs. zmínky (kolize) a třídy přidělené v TSX/TS vs. definované v CSS | `cssRules` `ownedClass` `classesIn` `collisions` · `usedClasses` `definedClasses` `missingClasses` |
 
@@ -52,7 +52,7 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
   `api.close()` (Esc, ✕, uložení nové poznámky, paleta „Zavřít šuplík“) = `UiCmd::Close` → Rust vrátí fokus
   aplikaci, odkud si ho vzal (`focusreturn`, [core.md](core.md)); spuštění akce/projektu zavírá bez návratu.
 - **Klávesy** (`App`): `Ctrl+K` = paleta (jen se šuplíkem s fokusem; 🔍 klikem fokus vezme; kompaktní režim
-  `palette.compact` = jen pole, seznam až při psaní / ↓ — `palette/compact.ts`), Esc = zavřít paletu / zpět na hlavní / zavřít; `1`/`2` = Práce/Osobní (ne v polích). Na stránce `note` je
+  `palette.compact` = jen pole, seznam až při psaní / ↓ — `palette/compact.ts`), Esc = zavřít paletu / zrušit úpravy šuplíku / zpět na hlavní / zavřít; `1`–`9` = záložka z `layout` (ne v polích). Na stránce `note` je
   obsluhuje `NoteEditor`.
 - **Reflektor**: `pointermove` v `App` nastaví `--mx/--my` na `.card`/`.proj` (jen CSS proměnné, žádný render);
   náklon dlaždice `--rx/--ry` v `tilt`.
@@ -103,10 +103,10 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 - `prefers-reduced-motion` i `appearance.motion.style = none` (`html[data-motion=none]`) vypínají CSS
   animace/přechody; WAAPI morf v `motion.ts` pak běží s délkou 0 (okamžitě, handshake stejný).
 - **Karta = `menu` slot**: karty hlavní stránky berou `menu?: JSX.Element` a vykreslí ho na konci `<h4>`; co je
-  vidět, rozhoduje jen `MainPage` přes `visibleCards` (karty, které se bez dat schovají samy — Běží, akce na
-  Práci, Přihrádka — jsou tam jako „fakta“). Sekce karty Claude (`claudeLimits/Costs/Git/Subagents`) hlídá
-  `ClaudeSessions` (`sectionOn`); skrytá útrata se nevykreslí → žádné `costs_refresh`. Nový přepínač = klíč
-  v `SECTION_KEYS` + řádek `sections!` v `config.rs` + položka `SECTION_GROUPS` (test hlídá shodu).
+  vidět, rozhoduje jen `layout` (`MainPage` → `layout/model.ts` `shownCards`; karty, které se bez dat schovají
+  samy — Běží, akce na Práci, Přihrádka, Právě hraje — jsou tam jako „fakta“). Sekce karty Claude
+  (`claudeLimits/Costs/Git/Subagents`) hlídá `ClaudeSessions` (`sectionOn` nad odvozeným `drawer.sections`);
+  skrytá útrata se nevykreslí → žádné `costs_refresh`. Nová karta / část → [layout.md](layout.md) (Invarianty).
 - Chyby jádra jsou string v jazyce UI (`i18n::tr`/`trf!` v Rustu) → `sayError(e)`; prázdné stavy karet říkají, co udělat (žádná vymyšlená čísla).
 
 ## Ověření

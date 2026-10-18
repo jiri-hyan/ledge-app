@@ -1,12 +1,13 @@
 // Živý náhled vzhledu pro panel Vzhled: mini „obrazovka“ s proužkem (pill/line/dot, pozice) a malým
 // šuplíkem s kartou, vykreslené v DOM pod `.theme-scope` s proměnnými rozpracovaného vzhledu
-// (`scopeStyle`). „Přehrát animaci“ zahraje morf proužek → šuplík pružinou z motion.ts (aktuální
-// styl a rychlost); po změně stylu/rychlosti se přehraje sám.
+// (`scopeStyle`). „Přehrát animaci“ zahraje otevření stejným plánem jako šuplík (`theme/openAnim.ts`,
+// styl a rychlost rozpracovaného vzhledu); po změně stylu/rychlosti se přehraje sám.
 import { For, Show, createEffect, on } from "solid-js";
 import type { Appearance } from "../../types";
 import { t } from "../../i18n";
 import { spring } from "../../motion";
-import { RADIUS, STRIP_SIZE, stripShape } from "../../theme/appearance";
+import { RADIUS, STRIP_SIZE, effectiveMotion, stripShape } from "../../theme/appearance";
+import { openPlan } from "../../theme/openAnim";
 import { scopeStyle } from "../../theme/apply";
 
 type Props = { a: Appearance; stripOpacity: number; blur: boolean };
@@ -27,15 +28,14 @@ export default function AppearancePreview(p: Props) {
     const shape = stripShape(p.a.strip.style, p.a.strip.size);
     const w = p.a.strip.style === "dot" ? 56 : 150;
     const r = 26 * RADIUS[p.a.radius];
-    const sp = spring(240, 25);
+    const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const plan = openPlan(effectiveMotion(p.a.motion.style, reduced), p.a.motion.speed, {
+      collapsed: `inset(0px calc(50% - ${w / 2}px) calc(100% - ${shape.h}px) calc(50% - ${w / 2}px) round 0px 0px ${shape.r}px ${shape.r}px)`,
+      band: `inset(0px 0px calc(100% - ${Math.round(shape.h * 1.6)}px) 0px round 0px 0px ${r}px ${r}px)`,
+      full: `inset(0px 0px 0px 0px round 0px 0px ${r}px ${r}px)`,
+    });
     drawer.getAnimations().forEach((x) => x.cancel());
-    drawer.animate(
-      [
-        { clipPath: `inset(0px calc(50% - ${w / 2}px) calc(100% - ${shape.h}px) calc(50% - ${w / 2}px) round 0px 0px ${shape.r}px ${shape.r}px)` },
-        { clipPath: `inset(0px 0px 0px 0px round 0px 0px ${r}px ${r}px)` },
-      ],
-      { duration: sp.duration, easing: sp.easing },
-    );
+    if (plan) drawer.animate(plan.frames, { duration: plan.duration, easing: plan.easing });
     const pop = spring(420, 22);
     body.animate([{ opacity: 0, transform: "translateY(-8px)" }, { opacity: 1, transform: "none" }], {
       duration: pop.duration,
@@ -54,7 +54,10 @@ export default function AppearancePreview(p: Props) {
         <div class="ap-axis">
           <div
             class="ap-strip"
-            classList={{ line: p.a.strip.style === "line", dot: p.a.strip.style === "dot" }}
+            classList={{
+              line: p.a.strip.style === "line", dot: p.a.strip.style === "dot", "ap-s-term": p.a.strip.style === "term", "ap-s-tag": p.a.strip.style === "tag",
+              "ap-s-glow": p.a.strip.style === "glow", "ap-s-block": p.a.strip.style === "block", "ap-s-drop": p.a.strip.style === "drop",
+            }}
             style={{ "--k": String(STRIP_SIZE[p.a.strip.size]), "--so": String(p.stripOpacity) }}
           >
             <Show
@@ -69,7 +72,7 @@ export default function AppearancePreview(p: Props) {
             </Show>
             <span class="ap-sig" style={{ background: lineBackground(p.a) }} />
           </div>
-          <div class="ap-drawer" classList={{ blur: p.blur }} ref={drawer}>
+          <div class="ap-drawer" classList={{ blur: p.blur, "ap-float": p.a.layout === "float" && !p.blur }} ref={drawer}>
             <div ref={body} class="ap-body">
               <div class="ap-head">
                 <b>{t("appearance.preview.work", "Práce")}</b>

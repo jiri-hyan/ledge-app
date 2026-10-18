@@ -1,11 +1,10 @@
-// Hlavní stránka šuplíku: záložka Práce (dlaždice projektů + mřížka karet) nebo Osobní (hodiny,
-// počasí, časovač (`timer/`), odkazy, právě hraje + hlasitost (`media/`), obecné poznámky) + Rychlé akce a Přihrádka na obou. Viditelnost karet řídí
-// `Snapshot.sections` (`drawer.sections`, logika `cards/sections.ts` `visibleCards`) / `notesEnabled`,
-// pořadí karet Práce `appearance.cards` (`cardOrder`, uložený vzhled z `theme/apply.ts`). Každá karta
-// má v hlavičce ⋯ „Skrýt kartu“ (`cards/CardMenu.tsx`); skryté všechno = nápověda, jak karty vrátit.
-import { For, Show, type JSX } from "solid-js";
-import { cardOrder, type CardId } from "./theme/appearance";
-import { savedAppearance } from "./theme/apply";
+// Hlavní stránka šuplíku: karty záložky, na které šuplík je (`Snapshot.mode` = id z `layout.pages`).
+// Co je na které záložce, v jakém pořadí a jak velké, řídí JEN `layout` (`layout/model.ts`); vykreslí
+// to `layout/Deck.tsx` (`.deck` > `.deck-item[data-size][data-card]`). Karty bez dat se schovají samy
+// (`shownCards`), v režimu úprav (`layout/edit.ts`, ✎ v hlavičce) jsou vidět jako zástupce. Každá karta
+// má v hlavičce ⋯ (`cards/CardMenu.tsx`: skrýt kartu / sekci, upravit šuplík); prázdná záložka = výzva
+// „Přidej první kartu“ (katalog).
+import { createMemo, Show, type JSX } from "solid-js";
 import type { Snapshot } from "./api";
 import type { NotesNav } from "./nav";
 import ClaudeSessions, { ClaudeInbox } from "./ClaudeSessions";
@@ -24,82 +23,97 @@ import ActionsCard from "./cards/ActionsCard";
 import ShelfCard, { shelfShown } from "./shelf/ShelfCard";
 import BgLaunch from "./sessions/BgLaunch";
 import CardMenu, { HiddenNotice } from "./cards/CardMenu";
-import { CLAUDE_PARTS, gridClass, mediaCardKey, sectionOn, visibleCards, type SectionKey } from "./cards/sections";
+import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
 import { visibleGroups } from "./actions/model";
-import { gotoSettingsPanel } from "./palette/goto";
+import { lastResult } from "./actions/api";
+import Deck from "./layout/Deck";
+import Catalog from "./layout/Catalog";
+import EditBar from "./layout/EditBar";
+import { beginEdit, catalogOpen, draft, editing, editPage, setCatalogOpen } from "./layout/edit";
+import { normalizeLayout, pageHas, sameLayout, pageKind, pageOf, shownCards, type CardId, type PartKey } from "./layout/model";
 import { t } from "./i18n";
 
 export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
-  const visible = () =>
-    visibleCards({
-      mode: p.s.mode === "osobni" ? "osobni" : "prace",
-      sec: p.s.sections,
-      procs: p.s.procs.length,
-      notesEnabled: p.s.notesEnabled,
-      actions: visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], p.s.mode).reduce((n, g) => n + g.items.length, 0),
-      shelf: shelfShown(),
-      media: !!((sectionOn(p.s.sections, "nowPlaying") && p.s.personal.media) || (sectionOn(p.s.sections, "sound") && p.s.personal.volume)),
-    });
-  const shows = (k: SectionKey) => visible().includes(k);
-  const on = (k: SectionKey) => sectionOn(p.s.sections, k);
-  const menu = (k: SectionKey) => <CardMenu k={k} cfgError={p.s.cfgError} />;
-  const claudeParts = () => CLAUDE_PARTS.filter(on);
-  /** baterie v kartě Čas: jen stroj s baterií a zapnutý přepínač */
+  // stejné rozložení = stejný objekt (nový snapshot karty nepřestaví)
+  const saved = createMemo(() => normalizeLayout(p.s.layout), undefined, { equals: sameLayout });
+  const layout = () => draft() ?? saved();
+  const page = () => pageOf(layout(), editing() ? editPage() : p.s.mode);
+  const kind = () => pageKind(page().id);
+  const on = (k: Parameters<typeof sectionOn>[1]) => sectionOn(p.s.sections, k);
+  const facts = () => ({
+    procs: p.s.procs.length,
+    notesEnabled: p.s.notesEnabled,
+    actions: visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], page().id).reduce((n, g) => n + g.items.length, 0),
+    scriptOut: !!lastResult()?.id.startsWith("script:"),
+    shelf: shelfShown(),
+    media: !!((on("nowPlaying") && p.s.personal.media) || (on("sound") && p.s.personal.volume)),
+  });
+  const shown = () => shownCards(page(), facts()).map((c) => c.id);
+  const shows = (id: CardId) => shown().includes(id);
+  const edit = (catalog = false) => beginEdit(p.s, catalog);
+  const menu = (card: CardId, parts: PartKey[] = []) => <CardMenu card={card} page={page().id} parts={parts} cfgError={p.s.cfgError} onEdit={() => edit()} />;
+  /** baterie v kartě Čas: jen stroj s baterií a zapnutá část */
   const battery = () => (on("battery") ? p.s.personal.battery : null);
   const inbox = () => p.s.pending.length + p.s.questions.length > 0;
-  /** nic na stránce (a nic nečeká) → nápověda místo prázdné plochy */
-  const empty = () => visible().length === 0 && !inbox();
-  const editCards = () => {
-    p.onSettings();
-    gotoSettingsPanel("suplik");
-    requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById("f-drawer.sections")?.scrollIntoView({ block: "start" })));
-  };
+  const has = (id: CardId) => pageHas(page(), id);
+
   const card = (id: CardId): JSX.Element => {
     switch (id) {
+      case "projects":
+        return <Projects s={p.s} onNote={p.onNote} />;
       case "running":
-        return <Show when={shows("running")}><Running s={p.s} now={p.now} menu={menu("running")} /></Show>;
+        return <Running s={p.s} now={p.now} menu={menu("running")} />;
       case "claude":
-        return <Show when={shows("claude")}><ClaudeSessions s={p.s} now={p.now} onSettings={p.onSettings} menu={<CardMenu k="claude" parts={claudeParts()} cfgError={p.s.cfgError} />} /></Show>;
+        return <ClaudeSessions s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("claude", CLAUDE_PARTS.filter(on))} />;
       case "repos":
-        return <Show when={shows("repos")}><Repos s={p.s} menu={menu("repos")} /></Show>;
+        return <Repos s={p.s} menu={menu("repos")} />;
       case "notes":
-        return <Show when={shows("notes")}><NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} /></Show>;
+        // Osobní = obecné poznámky; Práce a vlastní záložky = po projektech (reaktivně — karta zůstává při přepnutí záložky)
+        return <Show when={kind() === "personal"} fallback={<NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} />}><NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>;
+      case "actions":
+        return <ActionsCard s={p.s} onSettings={p.onSettings} wide menu={menu("actions")} />;
+      case "shelf":
+        return <ShelfCard wide menu={menu("shelf")} />;
+      case "clock":
+        return <ClockCard now={p.now} battery={battery()} menu={menu("clock", battery() ? ["battery"] : [])} />;
+      case "timer":
+        return <TimerCard s={p.s} now={p.now} menu={menu("timer")} />;
+      case "weather":
+        return <WeatherCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("weather")} />;
+      case "calendar":
+        return <CalendarCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("calendar")} />;
+      case "links":
+        return <LinksCard s={p.s} onSettings={p.onSettings} menu={menu("links")} />;
+      case "media":
+        return <MediaCard s={p.s} menu={menu("media", on("nowPlaying") && on("sound") && p.s.personal.volume ? ["sound"] : [])} />;
     }
   };
+
   return (
     <>
-      <Show when={p.s.mode === "prace"} fallback={<>
-        <ClaudeInbox s={p.s} />
-        <PersonalLive />
-        <div class="grid">
-          <Show when={shows("clock")}><ClockCard now={p.now} battery={battery()} menu={<CardMenu k="clock" parts={battery() ? ["battery"] : []} cfgError={p.s.cfgError} />} /></Show>
-          <Show when={shows("timer")}><TimerCard s={p.s} now={p.now} menu={menu("timer")} /></Show>
-          <Show when={shows("weather")}><WeatherCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("weather")} /></Show>
-          <Show when={shows("calendar")}><CalendarCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("calendar")} /></Show>
-          <Show when={shows(mediaCardKey(p.s.sections))}>
-            <MediaCard s={p.s} menu={<CardMenu k={mediaCardKey(p.s.sections)} parts={mediaCardKey(p.s.sections) === "nowPlaying" && on("sound") && p.s.personal.volume ? ["sound"] : []} cfgError={p.s.cfgError} />} />
-          </Show>
-          <Show when={shows("links")}><LinksCard s={p.s} onSettings={p.onSettings} menu={menu("links")} /></Show>
-          <Show when={on("actions")}><ActionsCard s={p.s} onSettings={p.onSettings} wide menu={menu("actions")} /></Show>
-          <Show when={on("shelf")}><ShelfCard wide menu={menu("shelf")} /></Show>
-          <Show when={shows("notes")}><NotesCard s={p.s} now={p.now} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>
-        </div>
-      </>}>
-        <Show when={!on("claude")}><ClaudeInbox s={p.s} /></Show>
-        <BgLaunch s={p.s} />
-        <Show when={on("projects")}>
-          <Projects s={p.s} onNote={p.onNote} />
-        </Show>
-        <Show when={on("actions")}><ActionsCard s={p.s} onSettings={p.onSettings} menu={menu("actions")} /></Show>
-        <Show when={on("shelf")}><ShelfCard menu={menu("shelf")} /></Show>
-        <div class="grid" classList={{ one: gridClass(visible()) === "one", two: gridClass(visible()) === "two" }}>
-          <For each={cardOrder(savedAppearance().cards)}>{card}</For>
+      <Show when={editing()}><EditBar /></Show>
+      <Show when={!has("claude")}><ClaudeInbox s={p.s} /></Show>
+      <BgLaunch s={p.s} />
+      {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
+      <Show when={has("media") || has("clock")}><PersonalLive /></Show>
+      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} />
+      <Show when={editing() && catalogOpen()}><Catalog layout={layout()} /></Show>
+      <Show when={!editing() && page().cards.length === 0}>
+        <div class="empty page-empty" data-anim>
+          {t("cards.layout.emptyTab", "Na téhle záložce zatím nic není.")}
+          <button class="mini" onClick={() => edit(true)}>{t("cards.layout.firstCard", "Přidej první kartu")}</button>
         </div>
       </Show>
-      <Show when={empty()}>
+      <Show when={!editing() && page().cards.length > 0 && shown().length === 0 && !inbox()}>
         <div class="empty page-empty" data-anim>
-          {t("cards.hide.allHidden", "Na téhle stránce jsou všechny karty skryté.")}
-          <button class="mini" onClick={editCards}>{t("cards.hide.restore", "Vrátit karty v Nastavení")}</button>
+          {t("cards.layout.nothingNow", "Karty na téhle záložce teď nemají co ukázat.")}
+          <button class="mini" onClick={() => edit(true)}>{t("cards.layout.editDrawer", "Upravit šuplík")}</button>
+        </div>
+      </Show>
+      <Show when={editing() && page().cards.length === 0 && !catalogOpen()}>
+        <div class="empty page-empty">
+          {t("cards.layout.emptyTabEdit", "Prázdná záložka — přidej kartu z katalogu.")}
+          <button class="mini" onClick={() => setCatalogOpen(true)}>{t("cards.layout.firstCard", "Přidej první kartu")}</button>
         </div>
       </Show>
       <HiddenNotice cfgError={p.s.cfgError} />

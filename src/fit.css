@@ -3,7 +3,7 @@
    (settings.css), proto jeho obal jen předá výšku dál. */
 .content { display: flex; flex-direction: column; max-height: var(--drawer-max-h, none); }
 .content > * { flex-shrink: 0; }
-.content > :is(.grid, .notes-page, .note-page) { flex-shrink: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.content > :is(.grid, .deck, .notes-page, .note-page) { flex-shrink: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .content > div:has(> .st) { flex-shrink: 1; min-height: 0; display: flex; flex-direction: column; }
-.content > :is(.grid, .notes-page, .note-page)::-webkit-scrollbar { width: 6px; }
-.content > :is(.grid, .notes-page, .note-page)::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 3px; }
+.content > :is(.grid, .deck, .notes-page, .note-page)::-webkit-scrollbar { width: 6px; }
+.content > :is(.grid, .deck, .notes-page, .note-page)::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 3px; }

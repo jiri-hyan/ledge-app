@@ -342,8 +342,7 @@ mod tests {
     #[test]
     fn every_preset_readable_in_every_theme() {
         // barva na položku nesmí rozbít kontrast textu proužku (≥ 4.5:1 na obou koncích přechodu)
-        let themes = [Theme::Dark, Theme::Midnight, Theme::Graphite, Theme::Nord, Theme::Light, Theme::Contrast];
-        for t in themes {
+        for t in Theme::ALL {
             let p = palette(t);
             for c in StripColor::ALL {
                 let x = crate::appearance::geom::readable(c.base(p.accent[0]), &p);

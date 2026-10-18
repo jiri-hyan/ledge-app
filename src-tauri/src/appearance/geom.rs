@@ -3,7 +3,7 @@
 //! (`strip_metrics`) a jeho paleta podle motivu (`palette`, `ink`). Bez WinAPI — tabulkové testy.
 //! Volá `stripview::refresh_strip` (model proužku), `strip::draw`, `drawer::place`, `threads::hover`.
 
-use super::{AppearanceConfig, StripPosition, StripSize, StripStyle, Theme};
+use super::{AppearanceConfig, StripPosition, StripSize, StripStyle, Theme, WidthPreset};
 use crate::strip::Rgba;
 
 /// Odstup šuplíku od boční hrany monitoru u pozice `left` / `right` (logické px).
@@ -34,7 +34,7 @@ pub fn span_x(c2: i32, w: i32) -> i32 {
 /// Osa Ledge u horní hrany podle configu (`anchor_c2` se šířkou šuplíku oříznutou na monitor) —
 /// jediný výpočet pro proužek (`stripview`) i hover zónu bez proužku (`threads::hover`).
 pub fn axis2_for(cfg: &crate::config::Config, left: i32, right: i32, dpi: u32) -> i32 {
-    let full = (drawer_width(cfg.drawer.width, right - left, dpi) * dpi as f64 / 96.0).round() as i32;
+    let full = (drawer_width_for(cfg, right - left, dpi) * dpi as f64 / 96.0).round() as i32;
     anchor_c2(left, right, full, cfg.appearance.strip.position, dpi)
 }
 
@@ -48,6 +48,22 @@ pub fn drawer_width(cfg_w: u32, mon_w: i32, dpi: u32) -> f64 {
     }
     let cap = (mon_w as f64 * MAX_SHARE / (dpi.max(1) as f64 / 96.0)).floor();
     w.min(cap)
+}
+
+/// Šířka velkého šuplíku podle configu (logické px): předvolba `appearance.width` (úzký / střední /
+/// široký = pevné px, celá šířka = monitor bez stropu 95 %), jinak `drawer.width` jako dřív.
+pub fn drawer_width_for(cfg: &crate::config::Config, mon_w: i32, dpi: u32) -> f64 {
+    preset_width(cfg.appearance.width, cfg.drawer.width, mon_w, dpi)
+}
+
+/// Čistá část `drawer_width_for` (tabulkový test).
+pub fn preset_width(preset: WidthPreset, custom: u32, mon_w: i32, dpi: u32) -> f64 {
+    match (preset, preset.px()) {
+        (WidthPreset::Full, _) if mon_w > 0 => (mon_w as f64 / (dpi.max(1) as f64 / 96.0)).floor(),
+        (WidthPreset::Full, _) => super::DRAWER_WIDTH.1 as f64,
+        (_, Some(px)) => drawer_width(px, mon_w, dpi),
+        (_, None) => drawer_width(custom, mon_w, dpi),
+    }
 }
 
 /// Tvar proužku v logických px (bez „nažhavení“, které přidá `hot_extra`).
@@ -75,6 +91,11 @@ pub fn strip_metrics(style: StripStyle, size: StripSize) -> StripMetrics {
         StripStyle::Pill => (32.0 * k, 14.0 * k),
         StripStyle::Line => (26.0 * k, 3.0 * k),
         StripStyle::Dot => (22.0 * k, 11.0 * k),
+        StripStyle::Term => (24.0 * k, 0.0),
+        StripStyle::Tag => (30.0 * k, 6.0 * k),
+        StripStyle::Glow => (28.0 * k, 14.0 * k),
+        StripStyle::Block => (30.0 * k, 0.0),
+        StripStyle::Drop => (34.0 * k, 17.0 * k),
     };
     StripMetrics { k, height, radius, hot_extra: 4.0 * k }
 }
@@ -102,6 +123,11 @@ pub fn palette(theme: Theme) -> Palette {
         Theme::Nord => (rgb(0.180, 0.204, 0.251), rgb(0.208, 0.235, 0.290), white(0.12), white(0.24), false),
         Theme::Light => (rgb(0.973, 0.976, 0.988), rgb(0.910, 0.918, 0.945), Rgba(0.0, 0.0, 0.0, 0.14), Rgba(0.0, 0.0, 0.0, 0.28), true),
         Theme::Contrast => (rgb(0.0, 0.0, 0.0), rgb(0.0, 0.0, 0.0), white(0.6), white(0.95), false),
+        Theme::Terminal => (rgb(0.0, 0.0, 0.0), rgb(0.012, 0.031, 0.016), Rgba(0.49, 1.0, 0.54, 0.35), Rgba(0.49, 1.0, 0.54, 0.7), false),
+        Theme::Paper => (rgb(0.984, 0.973, 0.949), rgb(0.937, 0.910, 0.863), Rgba(0.35, 0.24, 0.08, 0.18), Rgba(0.35, 0.24, 0.08, 0.34), true),
+        Theme::Neon => (rgb(0.043, 0.016, 0.094), rgb(0.090, 0.035, 0.170), Rgba(1.0, 0.25, 0.85, 0.45), Rgba(1.0, 0.35, 0.9, 0.85), false),
+        Theme::Brutal => (rgb(1.0, 1.0, 1.0), rgb(0.96, 0.96, 0.94), Rgba(0.0, 0.0, 0.0, 1.0), Rgba(0.0, 0.0, 0.0, 1.0), true),
+        Theme::Pastel => (rgb(0.914, 0.929, 0.961), rgb(0.875, 0.894, 0.937), Rgba(0.31, 0.37, 0.55, 0.16), Rgba(0.31, 0.37, 0.55, 0.3), true),
     };
     let hex = |s: &str| parse_hex(s).unwrap_or(Rgba::DIM);
     let accent = match theme {
@@ -112,6 +138,11 @@ pub fn palette(theme: Theme) -> Palette {
         Theme::Nord => [hex("#88c0d0"), hex("#81a1c1"), hex("#81a1c1")],
         Theme::Light => [hex("#7c3aed"), hex("#2563eb"), hex("#2563eb")],
         Theme::Contrast => [hex("#ffd400"), hex("#00e5ff"), hex("#00e5ff")],
+        Theme::Terminal => [hex("#7cff8a"), hex("#2dd4bf"), hex("#2dd4bf")],
+        Theme::Paper => [hex("#b5651d"), hex("#8c6d46"), hex("#8c6d46")],
+        Theme::Neon => [hex("#ff3fd8"), hex("#7a5cff"), hex("#7a5cff")],
+        Theme::Brutal => [hex("#ff3d7f"), hex("#ffe600"), hex("#ffe600")],
+        Theme::Pastel => [hex("#8b9cff"), hex("#f0a6ca"), hex("#f0a6ca")],
     };
     Palette { top, bottom, edge, edge_hot, light, accent }
 }
@@ -277,18 +308,45 @@ mod tests {
     }
 
     #[test]
+    fn preset_width_table() {
+        use WidthPreset::*;
+        // (předvolba, drawer.width, monitor px, dpi, očekávaná šířka)
+        let cases = [
+            (Custom, 1080, 1920, 96, 1080.0),
+            (Custom, 1300, 1920, 96, 1300.0), // starý config: vlastní px beze změny
+            (Narrow, 1300, 1920, 96, 820.0),
+            (Medium, 2000, 1920, 96, 1080.0),
+            (Wide, 1080, 1920, 96, 1440.0),
+            (Wide, 1080, 1366, 96, 1297.0), // 95 % menšího monitoru
+            (Full, 1080, 1920, 96, 1920.0), // celá šířka bez stropu 95 %
+            (Full, 1080, 3840, 192, 1920.0),
+            (Full, 1080, 0, 96, 2400.0), // neznámý monitor
+        ];
+        for (p, custom, mon, dpi, want) in cases {
+            assert_eq!(preset_width(p, custom, mon, dpi), want, "{p:?} {custom} na {mon} @ {dpi}");
+        }
+        // celá šířka leží na ose u levé hrany monitoru (bez přesahu)
+        let full = preset_width(Full, 1080, 1920, 96) as i32;
+        assert_eq!(span_x(anchor_c2(0, 1920, full, StripPosition::Right, 96), full), 0);
+    }
+
+    #[test]
     fn metrics_default_is_today() {
         let m = strip_metrics(StripStyle::Pill, StripSize::Normal);
         assert_eq!((m.height, m.radius, m.hot_extra, m.k), (crate::strip::HEIGHT, 14.0, 4.0, 1.0));
         assert!(strip_metrics(StripStyle::Dot, StripSize::Small).height < strip_metrics(StripStyle::Line, StripSize::Small).height);
         assert!(strip_metrics(StripStyle::Pill, StripSize::Large).height > m.height);
+        // rádius nikdy větší než polovina výšky (kapka = půlkruh dole)
+        for s in [StripStyle::Term, StripStyle::Tag, StripStyle::Glow, StripStyle::Block, StripStyle::Drop] {
+            let x = strip_metrics(s, StripSize::Large);
+            assert!(x.radius <= x.height / 2.0 + 0.01 && x.height >= 22.0, "{s:?}");
+        }
     }
 
     #[test]
     fn strip_text_contrast_in_every_theme() {
         // texty proužku (stripview) ≥ 4.5:1 na obou koncích přechodu těla
-        let themes = [Theme::Dark, Theme::Midnight, Theme::Graphite, Theme::Nord, Theme::Light, Theme::Contrast];
-        for t in themes {
+        for t in Theme::ALL {
             let p = palette(t);
             for c in [Rgba::TEXT, Rgba::DIM, Rgba::AMBER] {
                 for bg in [p.top, p.bottom] {
@@ -329,7 +387,7 @@ mod tests {
     fn theme_accents_mirror_frontend() {
         let ts = include_str!("../../../src/theme/themes.ts");
         let hex = |c: Rgba| format!("#{:02x}{:02x}{:02x}", (c.0 * 255.0).round() as u8, (c.1 * 255.0).round() as u8, (c.2 * 255.0).round() as u8);
-        for t in [Theme::Midnight, Theme::Graphite, Theme::Nord, Theme::Light, Theme::Contrast] {
+        for t in Theme::ALL.into_iter().filter(|t| *t != Theme::Dark) {
             let p = palette(t);
             let pair = format!("accent: \"{}\", \"accent-2\": \"{}\"", hex(p.accent[0]), hex(p.accent[1]));
             assert!(ts.contains(&pair), "{t:?}: {pair} chybí v themes.ts");

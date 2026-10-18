@@ -19,6 +19,8 @@ import "./en-media";
 import "./en-calendar";
 import "./en-agentview";
 import "./en-pkgctx";
+import "./en-layout";
 import "../settings/en";
 import "../settings/panels/en";
+import "../settings/panels/en-look";
 import "../onboarding/en";

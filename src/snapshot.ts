@@ -1,6 +1,7 @@
 // Prázdný snapshot do startu: tvar `Snapshot` z Rustu, dokud nepřijde `get_state` / událost `state`.
 import type { Snapshot } from "./types";
 import { allSectionsOn } from "./cards/sections";
+import { defaultLayout } from "./layout/model";
 
 export const EMPTY_SNAPSHOT: Snapshot = {
   mode: "prace",
@@ -8,6 +9,7 @@ export const EMPTY_SNAPSHOT: Snapshot = {
   view: "hidden",
   cfgError: null,
   sections: allSectionsOn(),
+  layout: defaultLayout(),
   claudeEnabled: true,
   projects: [],
   procs: [],

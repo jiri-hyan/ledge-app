@@ -42,17 +42,18 @@ pub(crate) fn refresh_strip() {
         flash
     };
     let name_of = |id: &str| cfg.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| id.to_string());
-    let mode = if cfg.modes.personal_enabled { c.mode.lock().clone() } else { "prace".into() };
+    let mode_title = crate::layout::page(&cfg.layout, &c.mode.lock()).map(crate::layout::title).unwrap_or_default();
     let timer = crate::timer::state();
     let now_ms = crate::state::now_ms();
-    let items = stripconf::effective_items(&cfg.strip.items, crate::timer::active(&timer), cfg.timer.strip);
+    // vzhled „Jen v proužku“ doplní položku `media` (`mediaconf::with_strip_item`)
+    let items = crate::mediaconf::with_strip_item(stripconf::effective_items(&cfg.strip.items, crate::timer::active(&timer), cfg.timer.strip), &cfg.media);
     // segmenty po položkách; „v klidu skryté“ a barvy řeší čisté `stripconf::compose`
     let mut parts: Vec<(config::StripItem, Vec<Segment>)> = Vec::with_capacity(items.len());
     for item in &items {
         let mut segs = Vec::new();
         match item {
             config::StripItem::Mode => {
-                segs.push(seg(if mode == "osobni" { tr("Osobní", "Personal") } else { tr("Práce", "Work") }, Rgba::TEXT, None, true, false));
+                segs.push(seg(mode_title.clone(), Rgba::TEXT, None, true, false));
             }
             config::StripItem::Clock => segs.push(seg(local_clock(), Rgba::DIM, None, false, false)),
             config::StripItem::Running => {
@@ -147,7 +148,7 @@ pub(crate) fn refresh_strip() {
             config::StripItem::Custom => segs.extend(stripconf::custom_segment(&cfg.strip.custom)),
             config::StripItem::Timer => segs.extend(crate::timer::strip_segments(&timer, now_ms)),
             // jen paměť (`media.rs` ji přepíše při události přehrávače → `mark_dirty`); nic nehraje = nic
-            config::StripItem::Media => segs.extend(crate::media::strip_now()),
+            config::StripItem::Media => segs.extend(crate::media::strip_now(&cfg, now_ms)),
         }
         parts.push((*item, segs));
     }

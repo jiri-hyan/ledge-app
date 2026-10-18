@@ -32,7 +32,7 @@ pub struct Config {
     pub autostart: bool,
     /// Upozornění na novou verzi Ledge (GitHub Releases přes veřejné API, záložně `gh`; instalace jen na klik).
     pub update: UpdateConfig,
-    /// Vzhled: motiv, akcent, hustota, písmo, animace, proužek, pořadí karet (`appearance.rs`).
+    /// Vzhled: motiv, akcent, hustota, písmo, animace, proužek (`appearance.rs`). Pořadí karet je v `layout`.
     pub appearance: crate::appearance::AppearanceConfig,
     pub projects: Vec<Project>,
     /// Rychlé akce (web, soubor, složka, aplikace, příkaz) — karta „Rychlé akce“ a paleta (`actions.rs`).
@@ -51,6 +51,11 @@ pub struct Config {
     pub timer: crate::timer::TimerConfig,
     /// Historie schránky v paletě (`cliphist/`): výchozí vypnuto, jen text, jen paměť.
     pub clipboard: crate::cliphist::ClipboardConfig,
+    /// Právě hraje: vzhled karty, čas a ozdoba v proužku (`mediaconf.rs`).
+    pub media: crate::mediaconf::MediaConfig,
+    /// Rozložení šuplíku: záložky, karty na nich (pořadí, velikost), skryté části karet (`layout.rs`).
+    /// Jediný zdroj pravdy pro to, co šuplík ukazuje — `drawer.sections` se z něj odvozuje.
+    pub layout: crate::layout::LayoutConfig,
 }
 
 impl Default for Config {
@@ -77,6 +82,8 @@ impl Default for Config {
             shelf: Default::default(),
             timer: Default::default(),
             clipboard: Default::default(),
+            media: Default::default(),
+            layout: Default::default(),
         }
     }
 }
@@ -197,9 +204,11 @@ pub enum Glass {
     Solid,
 }
 
-/// Plochý seznam přepínačů viditelnosti (`drawer.sections`): každé pole je `bool`, výchozí `true`,
-/// chybějící pole ve starém configu = zapnuto. Nový přepínač = jeden řádek v `sections!` níže
-/// (+ zrcadlo `SECTION_KEYS` v `src/cards/sections.ts`).
+/// Plochý seznam viditelnosti (`drawer.sections`): každé pole je `bool`. **Odvozené z `layout`**
+/// (`layout::derive` při načtení, uložení i aplikaci) — čtou ho moduly, které podle karty zapínají
+/// stahování/odběry, a starší Ledge; ruční změna se přepíše. Starý config bez `layout` se z něj převede.
+/// Nová karta / část = řádek v `sections!` níže + `layout::CARDS` / `PARTS` (+ zrcadla v `src/cards/sections.ts`
+/// `SECTION_KEYS` a `src/layout/model.ts`).
 macro_rules! sections {
     ($($(#[$doc:meta])* $field:ident,)*) => {
         #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -255,9 +264,9 @@ sections! {
     claude_git,
     /// Karta Claude: řádek subagentů u session.
     claude_subagents,
-    /// Osobní: karta „Právě hraje“ (média Windows — název, interpret, ovládání; `media.rs`).
+    /// Karta „Právě hraje“ (`layout` id `media`): skladba z médií Windows — název, interpret, ovládání (`media.rs`).
     now_playing,
-    /// Osobní: hlasitost výchozího výstupu (posuvník + ztlumit; `volume.rs`), v kartě Právě hraje.
+    /// Hlasitost výchozího výstupu (posuvník + ztlumit; `volume.rs`), část karty Právě hraje (`media`).
     sound,
     /// Osobní: stav baterie v kartě Čas — jen na stroji s baterií (`battery.rs`).
     battery,
@@ -266,8 +275,8 @@ sections! {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ModesConfig {
-    /// Záložka „Osobní“ (běžné věci mimo práci): čas, počasí, rychlé odkazy, obecné poznámky
-    /// a připomínky. Výchozí zapnutá; starý config s výslovným `false` zůstane vypnutý.
+    /// Zastaralé — záložky řídí `layout`. Starý config s výslovným `false` se převede na rozložení bez
+    /// záložky Osobní (`layout::from_legacy`); po načtení je pole odvozené (vždy `true`).
     pub personal_enabled: bool,
 }
 
@@ -677,6 +686,9 @@ pub fn load(path: &Path) -> Result<Option<Config>, String> {
     crate::appearance::motion::upgrade_loaded(&raw, &mut cfg);
     // nová položka proužku `waiting` i u stávajícího configu (jednou; odebraná zůstane odebraná)
     crate::attention::upgrade_items(&mut cfg.strip);
+    // bez `layout`: rozložení ze `drawer.sections` + `appearance.cards`; pak odvozená pole z rozložení
+    crate::layout::upgrade_loaded(&raw, &mut cfg);
+    crate::layout::derive(&mut cfg);
     validate(&cfg)?;
     Ok(Some(cfg))
 }
@@ -776,6 +788,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     crate::stripconf::validate(&cfg.strip)?;
     crate::timer::validate(&cfg.timer)?;
     crate::cliphist::validate(&cfg.clipboard)?;
+    crate::layout::validate(&cfg.layout)?;
     Ok(())
 }
 
@@ -866,7 +879,10 @@ pub fn save(path: &Path, cfg: &Config) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    let text = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
+    // odvozená pole (`drawer.sections`) v souboru vždy odpovídají `layout` (i pro starší Ledge)
+    let mut cfg = cfg.clone();
+    crate::layout::derive(&mut cfg);
+    let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     let mut n = SAVING.lock();
     *n += 1;
     crate::configio::keep_unreadable(path)?;

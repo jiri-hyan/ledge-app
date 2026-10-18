@@ -1,5 +1,6 @@
-// DOM strana vzhledu: `applyAppearance` zapíše CSS proměnné motivu a škál inline na <html>
-// (`data-theme`, `data-motion`, `color-scheme`) a předá styl/rychlost animací a tvary morfu do
+// DOM strana vzhledu: `applyAppearance` zapíše CSS proměnné motivu, škál a design stylu inline na <html>
+// (`data-theme`, `data-motion`, `data-style`, `data-layout`, `data-material`, `data-font`,
+// `color-scheme`) a předá styl/rychlost animací a tvary morfu do
 // motion.ts. `initAppearance` (App při startu) načte uložený vzhled z `get_config` a poslouchá
 // událost `appearance` (Rust po uložení configu) → změna bez restartu. Panel Vzhled náhledově
 // aplikuje rozpracovaný config a při odchodu vrátí `savedAppearance()`.
@@ -24,13 +25,24 @@ export function scopeStyle(a: Appearance): Record<string, string> {
   return out;
 }
 
+/** Proměnné zapsané minule — co nový vzhled nevydá (např. `--deck-cols` u Klasického), se smaže. */
+let written = new Set<string>();
+
 export function applyAppearance(raw: unknown) {
   const a = normalizeAppearance(raw);
   const root = document.documentElement;
-  for (const [k, v] of Object.entries(appearanceVars(a, reduced()))) root.style.setProperty(`--${k}`, v);
+  const vars = appearanceVars(a, reduced());
+  const now = new Set(Object.keys(vars));
+  for (const k of written) if (!now.has(k)) root.style.removeProperty(`--${k}`);
+  for (const [k, v] of Object.entries(vars)) root.style.setProperty(`--${k}`, v);
+  written = now;
   const motion = effectiveMotion(a.motion.style, reduced());
   root.dataset.theme = a.theme;
   root.dataset.motion = motion;
+  root.dataset.style = a.style;
+  root.dataset.layout = a.layout;
+  root.dataset.material = a.material;
+  root.dataset.font = a.font;
   root.style.colorScheme = THEMES[a.theme].light ? "light" : "dark";
   // pro CSS, které potřebuje tón motivu (podklad ikon opačného tónu, `ui/iconTone.ts`)
   root.dataset.scheme = THEMES[a.theme].light ? "light" : "dark";

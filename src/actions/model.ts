@@ -57,12 +57,13 @@ export function linksToActions(links: { name: string; target: string }[], existi
   return out;
 }
 
-/** Akce viditelné na záložce (`prace`/`osobni`) ve skupinách; bez skupiny první, jinak pořadí výskytu. */
+/** Akce viditelné na záložce `mode` (id z `layout`) ve skupinách; bez skupiny první, jinak pořadí výskytu.
+ *  Práce = akce pro práci, Osobní = pro osobní, vlastní záložka = všechny. */
 export function visibleGroups<T extends { showOn: ShowOn; group: string | null }>(list: readonly T[], mode: string): { group: string | null; items: T[] }[] {
-  const want: ShowOn = mode === "osobni" ? "personal" : "work";
+  const want: ShowOn | null = mode === "osobni" ? "personal" : mode === "prace" ? "work" : null;
   const groups = new Map<string | null, T[]>([[null, []]]);
   for (const a of list) {
-    if (a.showOn !== "both" && a.showOn !== want) continue;
+    if (want && a.showOn !== "both" && a.showOn !== want) continue;
     const g = a.group?.trim() || null;
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g)!.push(a);

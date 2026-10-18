@@ -19,7 +19,7 @@ export const FIELDS: Record<string, FieldDef> = {
   // Šuplík a proužek
   "drawer.trigger": { panel: "suplik", label: "Jak se šuplík otevírá", hint: "Myší u horního okraje obrazovky", kw: "trigger najetí hrana podržet myš" },
   "drawer.delays": { panel: "suplik", label: "Prodlevy", hint: "Jak rychle šuplík reaguje na myš a kdy se zavře", kw: "zpoždění ms rychlost zavření" },
-  "drawer.sections": { panel: "suplik", label: "Karty na hlavní stránce", hint: "Co šuplík ukazuje", kw: "sekce karty skrýt zobrazit běží claude poznámky projekty repa akce přihrádka hodiny počasí odkazy limity útrata git subagenti" },
+  "layout": { panel: "suplik", label: "Záložky a karty", hint: "Co šuplík ukazuje, na které záložce a jak velké", kw: "karty záložky rozložení pořadí velikost skrýt zobrazit přidat katalog běží claude poznámky projekty repa akce přihrádka hodiny počasí odkazy limity útrata git subagenti osobní práce" },
   "strip.enabled": { panel: "suplik", label: "Proužek nahoře", hint: "Vypnuto = zůstane jen svítící linka při událostech", kw: "lišta strip" },
   "strip.items": { panel: "suplik", label: "Co proužek ukazuje", hint: "Zapni, co chceš vidět; pořadí změníš přetažením (nebo Alt+šipkou). U položky barva a „jen při dění“ = v klidu skrytá.", kw: "položky hodiny režim běží claude repa barva klid událost notch vlastní text časovač" },
   "strip.custom": { panel: "suplik", label: "Vlastní text v proužku", hint: "Krátký text nebo emoji, nejvýš 24 znaků — položka „Vlastní text“", kw: "notch text emoji popisek motto" },
@@ -46,14 +46,15 @@ export const FIELDS: Record<string, FieldDef> = {
   fullscreen: { panel: "suplik", label: "Hry a video na celou obrazovku", hint: "Ledge je při nich vždy neaktivní: nic neukazuje a nebere myš ani fokus", kw: "fullscreen hra celá obrazovka" },
   gameMode: { panel: "suplik", label: "Herní režim", hint: "Ledge zmizí jako při hře na celou obrazovku, i po restartu, dokud ho nevypneš: znovu spusť Ledge (zástupce nebo Start), nebo stiskni zkratku šuplíku či herního režimu", kw: "hra game skrýt schovat nerušit mrtvý" },
   // Vzhled a animace (panel `Appearance.tsx`; kotvy `f-…` jsou na jeho kartách a řádcích)
-  "appearance.theme": { panel: "vzhled", label: "Motiv", kw: "barvy tmavý světlý kontrast nord téma" },
+  "appearance.style": { panel: "vzhled", label: "Design styl", hint: "Hotový balíček vzhledu: barvy, tvar, písmo, materiál, rozložení a šířka", kw: "styl design sklo terminál papír neon brutal pastel klasický vzhled" },
+  "appearance.theme": { panel: "vzhled", label: "Barvy", hint: "Barevný motiv", kw: "motiv barvy tmavý světlý kontrast nord téma" },
   "appearance.accent": { panel: "vzhled", label: "Akcent", hint: "Linka, záře a fokus", kw: "barva akcentu" },
-  "appearance.layout": { panel: "vzhled", label: "Písmo a rozložení", hint: "Hustota, velikost písma, rohy", kw: "hustota úsporná vzdušná písmo font rohy zaoblení" },
+  "appearance.layout": { panel: "vzhled", label: "Šířka a rozložení", hint: "Úzký, střední, široký nebo přes celou obrazovku; sloupce karet", kw: "šířka rozložení sloupce úzký široký celá šířka panel list panoráma mozaika dlaždice" },
+  "appearance.details": { panel: "vzhled", label: "Upravit detaily", hint: "Písmo, materiál, hustota, velikost písma, rohy", kw: "písmo font materiál hustota úsporná vzdušná rohy zaoblení stín záře" },
   "drawer.width": { panel: "vzhled", label: "Šířka šuplíku", kw: "šířka px velikost" },
   "drawer.glass": { panel: "vzhled", label: "Pozadí šuplíku", hint: "Krytí a rozmazání plochy za šuplíkem (akryl)", kw: "sklo akryl průhlednost rozmazání krytí glass" },
-  "appearance.motion": { panel: "vzhled", label: "Animace", hint: "Styl a rychlost pohybu; „Bez animací“ = šuplík se ukáže hned", kw: "animace pohyb vysunutí pružina plynulý svižný bez animací rychlost" },
+  "appearance.motion": { panel: "vzhled", label: "Animace", hint: "Jak se šuplík otevírá; „Žádná“ = ukáže se hned", kw: "animace pohyb vysunutí pružina plynulá svižná odskok rozplynutí výřez žádná rychlost" },
   "appearance.strip": { panel: "vzhled", label: "Vzhled proužku", hint: "Styl, velikost, pozice u hrany, linka a krytí", kw: "proužek pilulka tečky linka pozice vlevo vpravo uprostřed krytí" },
-  "appearance.cards": { panel: "vzhled", label: "Pořadí karet na hlavní stránce", kw: "karty pořadí práce" },
   "ui.lang": { panel: "vzhled", label: "Jazyk", hint: "Jazyk rozhraní Ledge — přepne se hned po uložení", kw: "jazyk language čeština angličtina english czech překlad" },
   // Claude Code
   "claude.enabled": { panel: "claude", label: "Schvalování z Ledge", hint: "Žádosti Clauda o povolení se objeví v šuplíku", kw: "povolit most" },
@@ -73,11 +74,14 @@ export const FIELDS: Record<string, FieldDef> = {
   "notes.sync.remote": { panel: "poznamky", label: "Repo pro poznámky", hint: "Soukromé repo: https://… nebo git@…. Přihlášení: gh auth setup-git", kw: "remote github" },
   "notes.sync.intervalMin": { panel: "poznamky", label: "Jak často synchronizovat", hint: "Navíc 10 s po změně a při otevření šuplíku", kw: "interval minuty" },
   // Osobní
-  "modes.personalEnabled": { panel: "osobni", label: "Záložka Osobní", hint: "Čas, počasí, rychlé odkazy a obecné poznámky", kw: "režim práce" },
   "personal.calendars": { panel: "osobni", label: "Kalendáře", hint: "Google nebo Outlook z tajného odkazu ICS — jen čtení, bez přihlášení. Vlož odkaz a klikni na Přidat.", kw: "kalendář google outlook ics ical webcal události schůzky" },
   "personal.weather": { panel: "osobni", label: "Místo pro počasí", hint: "Open-Meteo, bez klíče. Prázdné = nic se nestahuje (polohu podle IP Ledge nezjišťuje).", kw: "počasí souřadnice šířka délka město" },
   "timer.presets": { panel: "osobni", label: "Předvolby časovače", hint: "Minuty oddělené čárkou (1–600, nejvýš 6) — tlačítka v kartě Časovač a příkazy v paletě", kw: "časovač odpočet minuty pomodoro focus timer" },
   "timer.toast": { panel: "osobni", label: "Oznámení po doběhnutí", hint: "Oznámení Windows, když odpočet skončí. Nebere fokus; ve hře, při „nerušit“ a s otevřeným šuplíkem se neukáže. Proužek blikne vždy.", kw: "časovač toast oznámení notifikace konec" },
+  // Osobní → Přehrávač (media/MediaSettings.tsx)
+  "media.variant": { panel: "osobni", label: "Vzhled přehrávače", hint: "Karta Právě hraje: kompaktní řádek, karta s průběhem, velký obal, vinyl, nebo jen v proužku. Přepneš i ikonkou v rohu karty.", kw: "přehrávač hudba spotify youtube vinyl obal vzhled karta právě hraje" },
+  "media.stripTime": { panel: "osobni", label: "Čas skladby v proužku", hint: "Po minutách (třeba „1/4 min“) a jen když přehrávač čas hlásí. Sekundy proužek neukazuje, aby zbytečně nepracoval.", kw: "proužek čas skladby minuty průběh" },
+  "media.equalizer": { panel: "osobni", label: "Ozdoba ekvalizéru", hint: "Jen ozdoba — neukazuje skutečný zvuk. V proužku stojí, v šuplíku se hýbe jen při přehrávání.", kw: "ekvalizér animace ozdoba proužek" },
   "personal.links": { panel: "osobni", label: "Rychlé odkazy", hint: "Web (jen http/https), složka, soubor nebo aplikace — vždy bez argumentů", kw: "odkaz web aplikace složka" },
   // Zkratky
   "hotkeys.enabled": { panel: "zkratky", label: "Globální klávesové zkratky", hint: "Vypnuté = nic se neregistruje; šuplík se otevírá myší", kw: "klávesnice" },

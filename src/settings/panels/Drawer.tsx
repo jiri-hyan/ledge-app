@@ -1,4 +1,4 @@
-// Panel „Šuplík a proužek“: CHOVÁNÍ — jak se šuplík otevírá a zavírá, karty hlavní stránky, proužek (co
+// Panel „Šuplík a proužek“: CHOVÁNÍ — jak se šuplík otevírá a zavírá, záložky a karty (`layout/LayoutEditor.tsx`), proužek (co
 // ukazuje, monitor), paleta příkazů (kompaktní), okna s taby nahoře (tlak na hranu), uvolnění paměti, autostart. Vzhled (pozadí,
 // rozmazání, šířka, animace, styl a pozice proužku) je JEN v panelu „Vzhled a animace“ (`Appearance.tsx`).
 import { createSignal, For, Show } from "solid-js";
@@ -10,13 +10,13 @@ import { PanelHead, Row, Section } from "../fields/Row";
 import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 import type { PanelProps } from "../types";
-import { hiddenSections, SECTION_GROUPS, SECTION_KEYS, type SectionKey } from "../../cards/sections";
+import LayoutEditor from "../../layout/LayoutEditor";
 import { ClipSettings } from "../../cliphist/ClipSettings";
 import BubbleNotice, { bubble } from "../../pkgctx/BubbleNotice";
 import { clipCustom, COLOR_VAR, CUSTOM_MAX, customLen, previewSegments, QUIETABLE, STRIP_COLORS, withColor, withQuiet, type StripColorId } from "../strip";
 
 const STRIP_ITEMS: { id: string; key: string; cs: string }[] = [
-  { id: "mode", key: "settings.strip.item.mode", cs: "Režim (Práce / Osobní)" },
+  { id: "mode", key: "settings.strip.item.mode", cs: "Záložka (Práce, Osobní nebo vlastní)" },
   { id: "clock", key: "settings.strip.item.clock", cs: "Čas a datum" },
   { id: "running", key: "settings.strip.item.running", cs: "Běžící servery" },
   { id: "claude", key: "settings.strip.item.claude", cs: "Claude (čekající žádosti, session)" },
@@ -84,16 +84,6 @@ export default function DrawerPanel(_p: PanelProps) {
   const quiet = (id: string) => (c.cfg.strip.quiet ?? []).includes(id);
   const [pvMode, setPvMode] = createSignal<"calm" | "busy">("calm");
 
-  // karty: „Zobrazit vše“ zapne každý přepínač v draftu (uloží až Uložit); proč je karta i zapnutá neviditelná
-  const showAll = () => SECTION_KEYS.forEach((k) => d().sections?.[k] === false && c.set(`drawer.sections.${k}`, true));
-  const offWhy = (k: SectionKey): string => {
-    if (k === "notes" && c.cfg.notes?.enabled === false) return t("settings.drawer.sec.notes.off", "Poznámky jsou vypnuté celé (panel Poznámky) — karta se neukáže");
-    if (k === "shelf" && c.cfg.shelf?.enabled === false) return t("settings.drawer.sec.shelf.off", "Přihrádka je vypnutá celá (Proužek níže) — karta se neukáže");
-    if (k === "claudeCosts" && c.cfg.claude?.costs === false) return t("settings.drawer.sec.claudeCosts.off", "Útrata je vypnutá v panelu Claude — sekce se neukáže");
-    if (k.startsWith("claude") && k !== "claude" && d().sections?.claude === false) return t("settings.drawer.sec.claudeOff", "Karta Claude je skrytá — sekce se neukáže");
-    if (["clock", "weather", "links"].includes(k) && c.cfg.modes?.personalEnabled === false) return t("settings.drawer.sec.personalOff", "Záložka Osobní je vypnutá — karta se neukáže");
-    return "";
-  };
 
   return (
     <>
@@ -132,27 +122,7 @@ export default function DrawerPanel(_p: PanelProps) {
         </Row>
       </Section>
 
-      <Section
-        id="drawer.sections"
-        title={t("settings.f.drawer.sections", "Karty na hlavní stránce")}
-        desc={t("settings.drawer.sections.desc", "Skrytá karta zmizí ze šuplíku a její data se zbytečně nesbírají. Kartu skryješ i přímo v šuplíku: ⋯ v její hlavičce.")}
-        aside={<button class="mini" disabled={hiddenSections(d().sections).length === 0} onClick={showAll}>{t("settings.drawer.sections.showAll", "Zobrazit vše")}</button>}
-      >
-        <For each={SECTION_GROUPS}>
-          {(g) => (
-            <>
-              <div class="st-group-h">{t(g.key, g.cs)}</div>
-              <For each={g.items}>
-                {(it) => (
-                  <Row id={`drawer.sections.${it.k}`} label={t(it.key, it.cs)} dim={!!offWhy(it.k)} hint={offWhy(it.k) || t(it.hint[0], it.hint[1])}>
-                    <Toggle path={`drawer.sections.${it.k}`} label={t(it.key, it.cs)} />
-                  </Row>
-                )}
-              </For>
-            </>
-          )}
-        </For>
-      </Section>
+      <LayoutEditor />
 
       <Section title={t("settings.drawer.palette", "Paleta příkazů")}>
         <Row id="palette.compact"><Toggle path="palette.compact" label={t("settings.f.palette.compact", "Kompaktní paleta příkazů")} /></Row>

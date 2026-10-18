@@ -25,9 +25,9 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                 let (anim, width) = {
                     let cfg = c.cfg.read();
                     c.drawer.set_anchor(cfg.appearance.strip.position);
-                    // pohyb jen z `appearance.motion` (styl none = okamžitě); šířka z configu oříznutá na
-                    // monitor (nejvýš 95 % šířky)
-                    (motion::drawer_anim_ms(&cfg.appearance.motion), geom::drawer_width(cfg.drawer.width, mon.rect.right - mon.rect.left, mon.dpi))
+                    // pohyb jen z `appearance.motion` (styl none i systémové „omezit pohyb“ = okamžitě);
+                    // šířka z předvolby stylu nebo `drawer.width`, oříznutá na monitor
+                    (motion::anim_ms_now(&cfg.appearance.motion), geom::drawer_width_for(&cfg, mon.rect.right - mon.rect.left, mon.dpi))
                 };
                 let give_back = matches!(cmd, UiCmd::Close);
                 // herní režim: šuplík se neukazuje (vypnutí jde přes `gamemode::set(false)` dřív než Show)

@@ -50,17 +50,33 @@ Typické úpravy:
   `gh repo clone <owner/repo>` (jiný hostitel než GitHub: `git clone <url>`) do první složky z `roots`
   (kolize jména → `<repo>-<owner>`, `<repo>-2`…), bez okna, termín 15 min, pak se projekt dohledá sám.
   Nenabízí se u dvou klonů téhož repa (nejednoznačné) ani u `appName` bez `exe`.
-- **Skrýt karty a sekce šuplíku** — `drawer.sections` je plochý seznam přepínačů (všechny `bool`, výchozí
-  `true`; chybějící pole ve starém configu = zapnuto). Práce: `projects`, `running`, `claude`, `repos`;
-  Osobní: `clock`, `timer` (karta Časovač; skrytá karta časovač nevypne), `weather`, `calendar` (karta Kalendář), `links`, `nowPlaying`, `sound` (hlasitost v kartě Právě hraje), `battery`
-  (v kartě Čas); obě záložky: `notes`, `actions`, `shelf`; sekce v kartě Claude:
-  `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents`. Skrytá karta nic nepočítá, kde to jde:
-  skryté počasí ani kalendář se nestahují, skrytá útrata (nebo celá karta Claude) neindexuje transcripty, skrytý Git panel
-  ani subagenti se nenačítají, skryté Právě hraje / hlasitost / baterie zruší odběry událostí Windows
-  (viz „Právě hraje, hlasitost, baterie“). Kartu skryje i ⋯ v její hlavičce v šuplíku (uloží jen to jedno pole, pár sekund
-  jde „Vrátit“); vrátit vše: Nastavení → Šuplík a proužek → Karty na hlavní stránce → „Zobrazit vše“. Celé
-  funkce dál vypínají `modes.personalEnabled` (záložka Osobní), `strip.enabled`, `notes.enabled`,
-  `shelf.enabled`, `claude.costs`.
+- **Rozložení šuplíku — záložky a karty** (`layout`, `src-tauri/src/layout.rs`; jediný zdroj pravdy):
+  ```json
+  "layout": {
+    "pages": [
+      { "id": "prace", "name": "", "cards": [{ "id": "projects", "size": "xl" }, { "id": "claude", "size": "m" }] },
+      { "id": "hry", "name": "Hry", "icon": "🎮", "cards": [{ "id": "media", "size": "m" }] }
+    ],
+    "hiddenParts": ["claudeCosts"]
+  }
+  ```
+  Záložky v pořadí (1–9, klávesy 1–9 / paleta „Přejít na záložku“); `prace` a `osobni` jsou vestavěné
+  (prázdný `name` = „Práce“ / „Osobní“ podle jazyka), vlastní záložka potřebuje `name`, `id` = `a-z0-9-`.
+  Karty: `projects`, `running`, `claude`, `repos`, `notes`, `actions`, `shelf`, `clock`, `timer`, `weather`,
+  `calendar`, `links`, `media` (Právě hraje + hlasitost); stejná karta smí být na víc záložkách, na jedné
+  jen jednou. `size`: `s` (1 sloupec), `m` (2), `l` (3), `xl` (celá řada) z `--deck-cols` (výchozí 4).
+  Karta, která není na žádné záložce, je skrytá a nic nepočítá: skryté počasí ani kalendář se nestahují
+  (stahují se, jen když je karta na otevřené záložce), skrytá útrata / karta Claude neindexuje transcripty,
+  skryté Právě hraje / hlasitost / Čas (baterie) zruší odběry událostí Windows. `hiddenParts` = skryté části
+  karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude), `nowPlaying`, `sound`
+  (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (přetáhnout, ⇔ velikost, × do katalogu,
+  „+ Přidat kartu“, vlastní záložky; Hotovo uloží jen `layout`), ⋯ na kartě (skrýt kartu / sekci), nebo
+  Nastavení → Šuplík a proužek → Záložky a karty. **`drawer.sections` a `modes.personalEnabled` jsou od
+  vlny 6 odvozené** z `layout` (při načtení, uložení i aplikaci; ruční změna se přepíše) — čtou je moduly
+  podle karty a starší Ledge. Starý config bez `layout` se při načtení převede beze ztráty: viditelnost
+  z `drawer.sections`, pořadí karet Práce z dřívějšího `appearance.cards`, záložka Osobní jen při
+  `modes.personalEnabled != false`, dnešní pořadí Osobní. Celé funkce dál vypínají `strip.enabled`,
+  `notes.enabled`, `shelf.enabled`, `claude.costs`.
 - **Proužek** — `strip.items` (pořadí): `mode`, `clock`, `running`, `claude`, `waiting`, `repos`, volitelně
   `limits` (limity Claude 5h / týden), `custom` (vlastní text), `timer` (časovač) a `media` (právě hraje:
   „♪ Název · Interpret“ jen při přehrávání, pauza / nic = žádný segment) — ve výchozím stavu vypnuté. Config proužku žije v `src-tauri/src/stripconf.rs` (re-export z `config.rs`). Další pole:
@@ -107,15 +123,24 @@ Typické úpravy:
 - **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
   ceny v cenách API podle projektu a dne (viz „Útrata Claude (odhad)“); `false` = sekce zmizí, nic se nečte.
 - **Vzhled** — sekce `appearance` (Nastavení → Vzhled a animace; chybějící sekce = dnešní vzhled):
-  `theme` (`dark` výchozí, `midnight`, `graphite`, `nord`, `light`, `contrast`), `accent` (`#rrggbb`,
+  `theme` (`dark` výchozí, `midnight`, `graphite`, `nord`, `light`, `contrast`, `terminal`, `paper`, `neon`, `brutal`, `pastel`), `accent` (`#rrggbb`,
   prázdné = akcent motivu), `density` (`compact|normal|comfy`), `fontScale` 0.85–1.25, `radius`
   (`sharp|normal|round`), `glass.opacity` 0.25–1 (krytí pozadí; rozmazání je `drawer.glass: "acrylic"`),
-  `motion.style` (`spring|smooth|snappy|none`) + `motion.speed` 0.5–2 (řídí i vysunutí šuplíku; starý
-  `drawer.animationMs` se při načtení převede: `0` → `none`, jiná délka → rychlost), `strip.style` (`pill|line|dot`),
+  `motion.style` (`spring|smooth|snappy|bounce|fade|notch|none`) + `motion.speed` 0.5–2 (řídí i vysunutí šuplíku; starý
+  `drawer.animationMs` se při načtení převede: `0` → `none`, jiná délka → rychlost), `strip.style` (`pill|line|dot|term|tag|glow|block|drop`),
   `strip.size` (`small|normal|large`), `strip.color` (prázdné = přechod akcentu, `accent`, `#rrggbb`),
-  `strip.position` (`center|left|right` — proužek i šuplík u horní hrany, myš otevírá tam), `cards`
-  (pořadí karet Práce: `running`, `claude`, `repos`, `notes`). Šířka šuplíku zůstává `drawer.width`
+  `strip.position` (`center|left|right` — proužek i šuplík u horní hrany, myš otevírá tam). Pořadí a velikost karet je v `layout`
+  (dřívější `appearance.cards` se převede). Šířka šuplíku zůstává `drawer.width`
   (za běhu nejvýš 95 % monitoru), krytí proužku `strip.opacity`. Změna se projeví bez restartu.
+  **Design styly (vlna 6):** `style` (`classic` výchozí = vzhled před vlnou 6, `glass`, `terminal`, `paper`,
+  `neon`, `brutal`, `pastel`) je jen jméno — výběr stylu v Nastavení / paletě (`Styl: Neon`) zapíše jeho
+  hodnoty do polí výš a níž, ta jdou dál přebít („Upravit detaily“, „Obnovit styl“ je vrátí). Nová pole:
+  `font` (`system|mono|serif|grotesk`, jen systémová písma Windows), `material`
+  (`solid|glass|paper|glow|hard|soft|frame`), `layout` (`classic|float|band|sheet|panorama|mosaic|tiles` —
+  sloupce a mezery karet), `width` (`custom` = `drawer.width` | `narrow` 820 | `medium` 1080 | `wide` 1440 |
+  `full` = celá šířka monitoru). Další motivy: `terminal`, `paper`, `neon`, `brutal`, `pastel`; animace navíc
+  `bounce`, `fade`, `notch`; tvary proužku navíc `term`, `tag`, `glow`, `block`, `drop`. Systémové „omezit
+  pohyb“ (Windows → Efekty animace) vypíná animace i vysunutí okna. Tabulka stylů: `src/theme/looks.ts`.
 - **Zkratky** — globální zkratky jsou ve výchozím stavu **vypnuté** (nic se neregistruje, v UI se
   nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Zkratky, nebo v configu:
   `hotkeys.enabled: true` + `hotkeys.toggle|approve|deny|note` (formát `Ctrl+Alt+Space`). Config bez
@@ -170,6 +195,12 @@ Typické úpravy:
   / `CanUploadToCloudClipboard=0` (správci hesel, hesla z Chromu/Edge), prázdný, jen bílé znaky, delší než
   64 KB (neořezává se). Paleta: `v:` (+ hledání), Enter = zpět do schránky (nový záznam nevznikne),
   Ctrl+P připnout, Ctrl+Delete smazat, řádek „Vymazat historii“. Mapa `docs/codemap/clipboard.md`.
+- **Přehrávač (Právě hraje)** — sekce `media` (Nastavení → Osobní → Přehrávač, nebo ikonka v rohu karty):
+  `variant` = vzhled karty: `compact` (kompaktní řádek), `card` (výchozí, karta s průběhem), `cover` (velký
+  rozmazaný obal), `vinyl` (deska se točí jen při přehrávání), `strip` (jen v proužku — v šuplíku tenký ovladač,
+  proužek ukáže skladbu i bez položky `media` v `strip.items`); `stripTime` = čas skladby v proužku po minutách
+  („1/4 min“): `auto` (výchozí, jen u `strip`), `on`, `off`; `equalizer` (výchozí `true`, jen u `strip`) =
+  ozdoba ekvalizéru — jen dekorace, neukazuje skutečný zvuk. Starý config bez `media` = `card`, beze změny.
 - **Skripty** — sekce `scripts` (Nastavení → Rychlé akce → Skripty): `enabled` (výchozí `true`, ale nic
   se neukáže, dokud složka neexistuje), `dir` (chybí = `%USERPROFILE%\Ledge\scripts`, `%PROMĚNNÉ%` se
   rozbalí, jinak absolutní cesta), `inActions` (výchozí `false`; `true` = i dlaždice v kartě Rychlé
@@ -181,18 +212,24 @@ Typické úpravy:
   prohlížeč s YouTube, Media Player, VLC…): název, interpret, aplikace (z AUMID, `media::app_name`), hraje/pauza,
   tlačítka předchozí / přehrát-pauza / další (jen na klik), malý obal (WIC ≤ 128 px, načte se až s otevřeným
   šuplíkem, jednou na skladbu). Nic nehraje + hlasitost skrytá = karta zmizí; s hlasitostí řekne „Nic nehraje“.
+  **Průběh skladby** z timeline GSMTC (`mediatime.rs`): lišta s časem, přetáčení klikem / tahem / šipkami jen když
+  to přehrávač dovolí (`IsPlaybackPositionEnabled`), jinak lišta jen ukazuje; zdroj bez timeline (délka 0 —
+  některé prohlížeče) = lišta se neukáže. **Náhodně / Opakovat** jen u zdroje, který je podporuje. Pět vzhledů
+  karty — config `media` (viz Konfigurace).
 - **Hlasitost** (`drawer.sections.sound`) — výchozí výstup (Core Audio): posuvník 0–100 (při tahu nejvýš
   ~20 změn/s), ztlumit, název zařízení v tooltipu; změna klávesou / mixérem se ukáže hned (callback).
 - **Baterie** (`drawer.sections.battery`) — pod hodinami v kartě Čas: procenta, nabíjí se / v síti / na baterii,
   zbývající čas jen když ho Windows odhadne. Stroj bez baterie (desktop) neukazuje nic a nic neodebírá.
 - **Výkon:** nic nepolluje. Odběry vzniknou až při prvním zobrazení záložky Osobní (Tauri `personal_live`;
   GSMTC navíc hned při startu / uložení configu, když je v zapnutém proužku položka `media`):
-  vlákna `media` a `volume` pak jen čekají na události (pozice skladby se záměrně neodebírá), baterie je
+  vlákna `media` a `volume` pak jen čekají na události (timeline jen jako událost — hlášení, které jen potvrzuje
+  dopočítaný průběh, se zahodí; průběh dopočítává UI a tiká jen s otevřeným šuplíkem při přehrávání), baterie je
   callback `PowerSettingRegisterNotification` bez vlákna a okna. Skrytá karta / vypnutá záložka Osobní odběry
-  zruší (GSMTC jen tehdy, když `media` není ani v proužku). Tauri: `personal_live`, `media_control` (`toggle|next|prev`), `media_cover`, `volume_set`, `volume_mute`.
-- Proužek: položka `strip.items` `media` (výchozí vypnutá) — `media::strip_segment` nad `strip_text` (jen při
-  přehrávání, „♪ Název · Interpret“, text ≤ 36 znaků). Změna skladby / pauza → událost GSMTC → `mark_dirty` →
-  překreslení; nic netiká. Ve fullscreen hře / herním režimu je proužek pryč jako vždy.
+  zruší (GSMTC jen tehdy, když `media` není ani v proužku). Tauri: `personal_live`, `media_control` (`"toggle"|"next"|"prev"`, `{"seek": ms}`, `{"shuffle": bool}`, `{"repeat": "none"|"track"|"list"}`), `media_cover`, `volume_set`, `volume_mute`.
+- Proužek: položka `strip.items` `media` (výchozí vypnutá; vzhled `strip` ji doplní sám) — `mediaconf::strip_segment`
+  (jen při přehrávání, „♪ Název · Interpret“, text ≤ 36 znaků, s `media.stripTime` navíc „· 1/4 min“, u `strip`
+  s ozdobou ▂▅▃ místo ♪). Změna skladby / pauza → událost GSMTC → `mark_dirty` → překreslení; čas jen po minutách
+  (≤ 1 probuzení vlákna `emit` za minutu při přehrávání), sekundy proužek neukazuje. Ve fullscreen hře / herním režimu je proužek pryč jako vždy.
 
 ## Rychlé akce (`actions`)
 

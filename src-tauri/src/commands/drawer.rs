@@ -15,7 +15,9 @@ pub(crate) fn get_state() -> Snapshot {
 
 #[tauri::command]
 pub(crate) fn set_mode(mode: String) {
-    *core().mode.lock() = if mode == "osobni" { mode } else { "prace".into() };
+    // režim = id záložky z `layout`; neznámé (smazaná záložka) = první
+    let id = crate::layout::page_id(&core().cfg.read().layout, &mode);
+    *core().mode.lock() = id;
     maybe_refresh_weather(false);
     crate::calendar::live::maybe_refresh(false);
     mark_dirty();

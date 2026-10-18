@@ -127,6 +127,7 @@ export function DoneStep() {
       </div>
       <ul class="ob-bullets">
         <li>{t("onboarding.done.tipBrowser", "V prohlížeči nebo maximalizovaném okně přitlač myš k hornímu okraji — šuplík vyjede i přes ně.")}</li>
+        <li>{t("onboarding.done.tipLayout", "Uprav si šuplík — ✎ v hlavičce: přetáhni karty, změň jejich velikost, přidej je z katalogu nebo si založ vlastní záložku.")}</li>
         <li>{t("onboarding.done.tipAgain", "Průvodce kdykoli znovu: Nastavení → Průvodce. Všechno ostatní najdeš tamtéž.")}</li>
       </ul>
     </div>

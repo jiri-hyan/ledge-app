@@ -1,5 +1,5 @@
-// Hlavička šuplíku: hodiny (nebo Zpět + název stránky), stavové chipy, nová verze, Práce/Osobní a
-// nástroje (paleta 🔍, poznámka, nastavení, zavřít). Čte jen snapshot; navigaci dělá skořápka (App) přes callbacky.
+// Hlavička šuplíku: hodiny (nebo Zpět + název stránky), stavové chipy, nová verze, záložky (`layout/Tabs.tsx`),
+// ✎ režim úprav šuplíku (`layout/edit.ts`) a nástroje (paleta 🔍, poznámka, nastavení, zavřít). Čte jen snapshot; navigaci dělá skořápka (App) přes callbacky.
 import { Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { IconBack, IconNote, IconSettings, IconX } from "../icons";
@@ -12,6 +12,8 @@ import { rich } from "../ui/rich";
 import { bubble } from "../pkgctx/BubbleNotice";
 import { gotoSettingsPanel } from "../palette/goto";
 import { setActive } from "../settings/ctx";
+import Tabs from "../layout/Tabs";
+import { beginEdit, editing, finishEdit } from "../layout/edit";
 import "./head.css";
 
 export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: () => void; onSettings: () => void; onBack: () => void; onUpdate: () => void; onPalette?: () => void }) {
@@ -64,11 +66,9 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
         <Show when={avail()}>
           {(u) => <button class="chip green upd" onClick={p.onUpdate} title={t("cards.head.updateTitle", "Poznámky k vydání a instalace")}><span class="d" />{t("cards.head.newVersion", "Nová verze")} <b>{u().verze}</b></button>}
         </Show>
-        <Show when={p.s.personalEnabled && p.page === "main"}>
-          <div class="seg" role="group" aria-label={t("cards.head.tab", "Záložka")}>
-            <button classList={{ on: p.s.mode === "prace" }} aria-pressed={p.s.mode === "prace"} title={t("cards.head.workKey", "Práce (1)")} onClick={() => api.setMode("prace")}>{t("cards.head.work", "Práce")}</button>
-            <button classList={{ on: p.s.mode === "osobni" }} aria-pressed={p.s.mode === "osobni"} title={t("cards.head.personalKey", "Osobní (2)")} onClick={() => api.setMode("osobni")}>{t("cards.head.personal", "Osobní")}</button>
-          </div>
+        <Show when={p.page === "main"}>
+          <Tabs s={p.s} />
+          <button class="icon-btn" classList={{ on: editing() }} aria-pressed={editing()} onClick={() => (editing() ? void finishEdit() : beginEdit(p.s))} title={editing() ? t("cards.layout.doneTitle", "Hotovo — uložit rozložení") : t("cards.layout.editTitle", "Upravit šuplík: přesunout, zvětšit, přidat karty a záložky")} aria-label={t("cards.layout.editDrawer", "Upravit šuplík")}>✎</button>
         </Show>
         <Show when={p.s.notesEnabled && p.page === "main"}>
           <button class="icon-btn wide" onClick={p.onNote} title={t("cards.head.newNote", "Nová poznámka")}><IconNote />{t("cards.head.note", "Poznámka")}</button>

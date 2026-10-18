@@ -5,15 +5,12 @@
 
 import { api } from "./api";
 import type { MotionStyle } from "./types";
-import { springPreset } from "./theme/appearance";
+import { simulateSpring, type Spring } from "./theme/springs";
 
 /** Přesah okna nad horní hranu obrazovky (logické px) — musí sedět s drawer.rs a --overlap. */
 export const OVERLAP = 18;
 
-export interface Spring {
-  easing: string;
-  duration: number;
-}
+export type { Spring };
 
 const cache = new Map<string, Spring>();
 
@@ -35,38 +32,14 @@ export const motionNow = (): { style: MotionStyle; speed: number } => ({ style: 
 export const dur = (ms: number) => (motionStyle === "none" ? 0 : Math.round(ms / motionSpeed));
 
 /**
- * Tlumená pružina → CSS `linear()` easing. Simulace pohybové rovnice (m·x'' = −k(x−1) − c·x'),
- * vzorkovaná, dokud se neusadí. Overshoot vzniká přirozeně z fyziky, ne ručně laděnou bezierkou.
+ * Tlumená pružina → CSS `linear()` easing podle aktuálního stylu a rychlosti (simulace je čistá
+ * funkce `theme/springs.ts` `simulateSpring`; tady jen cache na klíč parametrů).
  */
 export function spring(stiffness = 300, damping = 24, mass = 1): Spring {
   const key = `${stiffness}/${damping}/${mass}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const p = springPreset(motionStyle, stiffness, damping, mass);
-  if (!p) {
-    const none: Spring = { easing: "linear", duration: 0 };
-    cache.set(key, none);
-    return none;
-  }
-  ({ stiffness, damping } = p);
-  const dt = 1 / 240;
-  let x = 0;
-  let v = 0;
-  let t = 0;
-  const pts: number[] = [0];
-  let still = 0;
-  while (t < 2) {
-    const a = (-stiffness * (x - 1) - damping * v) / mass;
-    v += a * dt;
-    x += v * dt;
-    t += dt;
-    if (Math.round(t * 240) % 4 === 0) pts.push(x);
-    if (Math.abs(x - 1) < 0.0015 && Math.abs(v) < 0.02) {
-      if (++still > 12) break;
-    } else still = 0;
-  }
-  pts.push(1);
-  const s: Spring = { easing: `linear(${pts.map((v) => +v.toFixed(4)).join(", ")})`, duration: Math.round((t * 1000) / motionSpeed) };
+  const s = simulateSpring(motionStyle, motionSpeed, stiffness, damping, mass);
   cache.set(key, s);
   return s;
 }
@@ -79,6 +52,11 @@ export const setStripRadius = (r: number) => (stripRadius = r);
 export function collapsedClip(w: number, h: number, r = stripRadius): string {
   const half = Math.max(0, w / 2);
   return `inset(0px calc(50% - ${half}px) calc(100% - ${OVERLAP + h}px) calc(50% - ${half}px) round 0px 0px ${r}px ${r}px)`;
+}
+
+/** Proužek roztažený do celé šířky (mezikrok animace „Z výřezu“): výška `h` + kousek, rohy jako šuplík. */
+export function bandClip(h: number, r = shellR): string {
+  return `inset(0px 0px calc(100% - ${OVERLAP + Math.round(h * 1.6)}px) 0px round 0px 0px ${r}px ${r}px)`;
 }
 
 const fullClip = (r: number) => `inset(0px 0px 0px 0px round 0px 0px ${r}px ${r}px)`;

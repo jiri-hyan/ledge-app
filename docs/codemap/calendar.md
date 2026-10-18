@@ -21,8 +21,8 @@ Napojení (jednořádkové): `threads/ui.rs` (otevření šuplíku), `threads/em
 `snapshot.rs` `PersonalView.calendar`, `config.rs` (`sections!` → `calendar`, `PersonalConfig.calendars`,
 `validate_field`), `commands/calendar.rs` `calendar_test`.
 
-**Výkon:** nic nepolluje. Stahuje se jen s viditelnou kartou (šuplík Full, mód `osobni`, zapnutá záložka
-i `drawer.sections.calendar`), data starší `MAX_AGE_MS` (15 min). Emit vlákno dostane termín jen
+**Výkon:** nic nepolluje. Stahuje se jen s viditelnou kartou (šuplík Full a karta Kalendář na otevřené
+záložce — `layout::page_has`), data starší `MAX_AGE_MS` (15 min). Emit vlákno dostane termín jen
 s viditelnou kartou (`view::pick` → `next_change`: začátek/konec dnešní události, místní půlnoc). V paměti
 jen výskyty v okně (nejvýš `MAX_OCCS` na feed); text odpovědi se po parsování zahodí.
 

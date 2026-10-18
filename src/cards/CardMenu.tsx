@@ -1,46 +1,33 @@
-// Skrytí karty / sekce jedním klikem: nenápadné ⋯ v hlavičce karty (vidět při najetí) → „Skrýt kartu“
-// (karta Claude navíc „Skrýt sekci: …“ pro limity, útratu, Git, subagenty). Uloží jen pole
-// `drawer.sections.<k>` existující cestou Nastavení (`get_config` → změna jednoho pole → `save_config`);
-// kartu pak schová nový snapshot. Po skrytí lišta
-// „… skryta · Vrátit“ na pár sekund (`HiddenNotice`, vykresluje `MainPage`) — žádný modal.
+// ⋯ v hlavičce karty (vidět při najetí): „Skrýt kartu“ (odebere ji z této záložky do katalogu),
+// „Skrýt sekci: …“ (části karty — limity, útrata, Git, subagenti v kartě Claude; hlasitost; baterie)
+// a „Upravit šuplík…“ (režim úprav). Ukládá jen pole `layout` (`layout/edit.ts` `saveLayout`:
+// `get_config` → změna → `save_config`); kartu schová nový snapshot. Po skrytí lišta „… skryta · Vrátit“
+// na pár sekund (`HiddenNotice`, vykresluje `MainPage`) — žádný modal.
 import { createSignal, For, onCleanup, Show } from "solid-js";
-import { api } from "../api";
 import { t } from "../i18n";
-import { say, sayError } from "../ui/toast";
-import { isPart, sectionItem, withSection, type SectionKey } from "./sections";
+import { saveLayout } from "../layout/edit";
+import { removeCard, restoreCard, setPartHidden, type CardId, type Layout, type PartKey } from "../layout/model";
+import { cardName, partName } from "../layout/text";
 
 const UNDO_MS = 6000;
-const [hidden, setHidden] = createSignal<SectionKey | null>(null);
+const [hidden, setHidden] = createSignal<{ text: string; undo: (l: Layout) => Layout } | null>(null);
 let undoTimer: number | undefined;
 
-/** Změní jedno pole `drawer.sections` a uloží config. Při chybě configu (rozbitý soubor = v paměti výchozí
- *  hodnoty) neukládá — uživatelův config by se přepsal; to patří do Nastavení. */
-export async function setSection(k: SectionKey, on: boolean, cfgError: string | null): Promise<boolean> {
-  if (cfgError) {
-    say(t("cards.hide.cfgError", "Config má chybu — karty teď skryješ jen v Nastavení."), true);
-    return false;
-  }
-  try {
-    const cfg = await api.getConfig();
-    if (!cfg) return false;
-    await api.saveConfig(withSection(cfg, k, on));
-    return true;
-  } catch (e) {
-    sayError(e);
-    return false;
-  }
-}
-
-async function hide(k: SectionKey, cfgError: string | null) {
-  if (!(await setSection(k, false, cfgError))) return;
+async function hide(text: string, f: (l: Layout) => { layout: Layout; undo: (l: Layout) => Layout }, cfgError: string | null) {
+  const got: { undo?: (l: Layout) => Layout } = {};
+  const ok = await saveLayout((l) => {
+    const r = f(l);
+    got.undo = r.undo;
+    return r.layout;
+  }, cfgError);
+  if (!ok || !got.undo) return;
   clearTimeout(undoTimer);
-  setHidden(k);
+  setHidden({ text, undo: got.undo });
   undoTimer = window.setTimeout(() => setHidden(null), UNDO_MS);
 }
 
-/** ⋯ v hlavičce karty. `k` = přepínač karty v `drawer.sections`; `parts` = zapnuté sekce uvnitř karty
- *  (karta Claude: limity, útrata, Git, subagenti) → položky „Skrýt sekci: …“. */
-export default function CardMenu(p: { k: SectionKey; parts?: SectionKey[]; cfgError: string | null }) {
+/** ⋯ v hlavičce karty `card` na záložce `page`; `parts` = viditelné části karty → „Skrýt sekci: …“. */
+export default function CardMenu(p: { card: CardId; page: string; parts?: PartKey[]; cfgError: string | null; onEdit?: () => void }) {
   const [open, setOpen] = createSignal(false);
   let root: HTMLSpanElement | undefined;
   const outside = (e: PointerEvent) => {
@@ -56,43 +43,49 @@ export default function CardMenu(p: { k: SectionKey; parts?: SectionKey[]; cfgEr
     document.addEventListener("pointerdown", outside, true);
   };
   onCleanup(() => document.removeEventListener("pointerdown", outside, true));
-  const pick = (k: SectionKey) => {
+  const hideCard = () => {
     close();
-    void hide(k, p.cfgError);
+    void hide(t("cards.hide.doneCard", "Karta „{name}“ skryta", { name: cardName(p.card) }), (l) => {
+      const r = removeCard(l, p.page, p.card);
+      return { layout: r.layout, undo: (x) => (r.undo ? restoreCard(x, r.undo) : x) };
+    }, p.cfgError);
+  };
+  const hidePart = (k: PartKey) => {
+    close();
+    void hide(t("cards.hide.doneSection", "Sekce „{name}“ skryta", { name: partName(k) }), (l) => ({ layout: setPartHidden(l, k, true), undo: (x) => setPartHidden(x, k, false) }), p.cfgError);
   };
   return (
     <span class="card-menu" classList={{ open: open() }} ref={root}>
       <button class="card-menu-btn" aria-haspopup="menu" aria-expanded={open()} title={t("cards.hide.more", "Další volby")} aria-label={t("cards.hide.more", "Další volby")} onClick={toggle}>⋯</button>
       <Show when={open()}>
         <span class="card-menu-list" role="menu">
-          <button role="menuitem" onClick={() => pick(p.k)}>{t("cards.hide.card", "Skrýt kartu")}</button>
+          <button role="menuitem" onClick={hideCard}>{t("cards.hide.card", "Skrýt kartu")}</button>
           <For each={p.parts ?? []}>
-            {(k) => <button role="menuitem" onClick={() => pick(k)}>{t("cards.hide.part", "Skrýt sekci: {name}", { name: sectionName(k) })}</button>}
+            {(k) => <button role="menuitem" onClick={() => hidePart(k)}>{t("cards.hide.part", "Skrýt sekci: {name}", { name: partName(k) })}</button>}
           </For>
+          <Show when={p.onEdit}>
+            <button role="menuitem" onClick={() => { close(); p.onEdit?.(); }}>{t("cards.layout.editMenu", "Upravit šuplík…")}</button>
+          </Show>
         </span>
       </Show>
     </span>
   );
 }
 
-const sectionName = (k: SectionKey) => {
-  const it = sectionItem(k);
-  return it ? t(it.key, it.cs) : k;
-};
-
-/** Lišta po skrytí: „Karta X skryta · Vrátit“. Vrátit = totéž pole zpět na `true`. */
+/** Lišta po skrytí: „Karta X skryta · Vrátit“. Vrátit = opačná změna rozložení. */
 export function HiddenNotice(p: { cfgError: string | null }) {
-  const undo = async (k: SectionKey) => {
+  const undo = async () => {
+    const h = hidden();
     clearTimeout(undoTimer);
     setHidden(null);
-    await setSection(k, true, p.cfgError);
+    if (h) await saveLayout(h.undo, p.cfgError);
   };
   return (
     <Show when={hidden()}>
-      {(k) => (
+      {(h) => (
         <div class="card-undo" role="status">
-          <span>{isPart(k()) ? t("cards.hide.doneSection", "Sekce „{name}“ skryta", { name: sectionName(k()) }) : t("cards.hide.doneCard", "Karta „{name}“ skryta", { name: sectionName(k()) })}</span>
-          <button class="mini" onClick={() => void undo(k())}>{t("cards.hide.undo", "Vrátit")}</button>
+          <span>{h().text}</span>
+          <button class="mini" onClick={() => void undo()}>{t("cards.hide.undo", "Vrátit")}</button>
         </div>
       )}
     </Show>

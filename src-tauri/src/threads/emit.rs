@@ -28,7 +28,7 @@ pub(crate) fn next_wake(now_ms: i64, deadlines: impl IntoIterator<Item = Option<
 }
 
 /// Termíny pro `next_wake` ze stavu jádra (jen čtení paměti).
-fn deadlines(last_git: Instant) -> [Option<i64>; 7] {
+fn deadlines(last_git: Instant) -> [Option<i64>; 8] {
     let c = core();
     let now = now_ms();
     let in_ms = |left: Duration| now + left.as_millis() as i64 + 1;
@@ -41,8 +41,9 @@ fn deadlines(last_git: Instant) -> [Option<i64>; 7] {
         w.attempt_ms.filter(|_| w.loading).map(|a| a + 2 * weather::TIMEOUT.as_millis() as i64 + 1)
     };
     // časovač: konec odpočtu a změny minuty v proužku jen, když běží (`timer::next_deadline`);
-    // kalendář jen s viditelnou kartou (`calendar::live::next_deadline`)
-    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline()]
+    // kalendář jen s viditelnou kartou (`calendar::live::next_deadline`); čas skladby v proužku po minutách
+    // jen když hraje a proužek ho ukazuje (`media::next_deadline_live`)
+    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline(), crate::media::next_deadline_live()]
 }
 
 pub(crate) fn spawn_emit_thread() {

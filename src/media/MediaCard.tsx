@@ -1,12 +1,18 @@
 // Osobní: karta „Právě hraje“ (média Windows přes Rust `media.rs`) + hlasitost výchozího výstupu
-// (`volume.rs`). Nic nehraje a hlasitost vypnutá / bez zařízení → karta zmizí; s hlasitostí zůstane
-// a řekne „Nic nehraje“ (posuvník je pořád k užitku). Ovládání jen klikem / tahem, nic nebere fokus.
-import { Show, createEffect, createSignal, onCleanup, onMount, type JSX } from "solid-js";
-import { api, type Snapshot } from "../api";
+// (`volume.rs`). Pět vzhledů (`media.variant`, přepínač v rohu karty — `VariantPicker.tsx`): kompaktní
+// řádek, karta s průběhem (výchozí), velký obal, vinyl, jen v proužku (v šuplíku tenký ovladač).
+// Nic nehraje a hlasitost vypnutá / bez zařízení → karta zmizí; s hlasitostí zůstane a řekne „Nic
+// nehraje“. Ovládání jen klikem / tahem, nic nebere fokus. Lišta průběhu jen se skutečnou timeline.
+import { Match, Show, Switch, createSignal, onMount, type JSX } from "solid-js";
+import { api, type MediaVariant, type MediaView, type Snapshot } from "../api";
 import { sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { sectionOn } from "../cards/sections";
 import { throttle, volumeLevel } from "./model";
+import { Controls, Cover, Equalizer, IcNote, Progress, TimeText, isPlaying, useCover } from "./Player";
+import { VariantPicker, shownVariant } from "./VariantPicker";
+import { drawerShown } from "./shown";
+import { live } from "./timeline";
 import "./media.css";
 
 /** Záložka Osobní je vidět → Rust spustí odběry událostí (líně, jen poprvé). Nic nevykresluje. */
@@ -15,12 +21,6 @@ export function PersonalLive() {
   return null;
 }
 
-const svg = { viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true } as const;
-const IcPrev = () => <svg {...svg}><path d="M6 5h2v14H6zM20 5v14L9.5 12z" /></svg>;
-const IcNext = () => <svg {...svg}><path d="M16 5h2v14h-2zM4 5v14l10.5-7z" /></svg>;
-const IcPlay = () => <svg {...svg}><path d="M7 4.5v15L19.5 12z" /></svg>;
-const IcPause = () => <svg {...svg}><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z" /></svg>;
-const IcNote = () => <svg {...svg}><path d="M10 4v10.6A3.5 3.5 0 1 0 12 18V8h6V4z" /></svg>;
 const stroke = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 1.8, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": true } as const;
 const SPEAKER = "M4 9.5h3.5L12 5.5v13l-4.5-4H4z";
 const VOL_ICON: Record<ReturnType<typeof volumeLevel>, () => JSX.Element> = {
@@ -29,23 +29,6 @@ const VOL_ICON: Record<ReturnType<typeof volumeLevel>, () => JSX.Element> = {
   mid: () => <svg {...stroke}><path d={SPEAKER} /><path d="M15.5 10a3 3 0 0 1 0 4M18 8a6 6 0 0 1 0 8" /></svg>,
   high: () => <svg {...stroke}><path d={SPEAKER} /><path d="M15.5 10a3 3 0 0 1 0 4M18 8a6 6 0 0 1 0 8M20.5 5.5a9.5 9.5 0 0 1 0 13" /></svg>,
 };
-
-function Cover(p: { coverKey: string | null }) {
-  const [url, setUrl] = createSignal<string | null>(null);
-  createEffect(() => {
-    const key = p.coverKey;
-    setUrl(null);
-    if (!key) return;
-    let live = true;
-    onCleanup(() => (live = false));
-    void api.mediaCover(key).then((u) => live && setUrl(u ?? null), () => {});
-  });
-  return (
-    <div class="med-cover">
-      <Show when={url()} fallback={<IcNote />}>{(u) => <img src={u()} alt="" />}</Show>
-    </div>
-  );
-}
 
 function Volume(p: { level: number; muted: boolean; device: string }) {
   // při tahu platí místní hodnota (Rust ji potvrdí událostí; mezitím by posuvník poskakoval)
@@ -92,54 +75,133 @@ function Volume(p: { level: number; muted: boolean; device: string }) {
   );
 }
 
+const titleOf = (m: MediaView) => m.title || t("cards.media.untitled", "Bez názvu");
+
+/** Název + interpret (dva řádky, nebo jeden „Název · Interpret“). */
+function Text(p: { m: MediaView; inline?: boolean }) {
+  return (
+    <div class="med-text">
+      <Show
+        when={!p.inline}
+        fallback={
+          <div class="med-title" title={[p.m.title, p.m.artist].filter(Boolean).join(" · ")}>
+            {titleOf(p.m)}
+            <Show when={p.m.artist}><span class="med-by"> · {p.m.artist}</span></Show>
+          </div>
+        }
+      >
+        <div class="med-title" title={p.m.title}>{titleOf(p.m)}</div>
+        <Show when={p.m.artist}><div class="sub" title={p.m.artist}>{p.m.artist}</div></Show>
+      </Show>
+    </div>
+  );
+}
+
+/** Pauza u vzhledů bez velkého tlačítka stavu. */
+const Paused = (p: { m: MediaView }) => (
+  <Show when={p.m.status === "paused"}><span class="pill n med-state">{t("cards.media.paused", "pauza")}</span></Show>
+);
+
+/** Obsah podle vzhledu (bez hlavičky a hlasitosti). */
+function Body(p: { m: MediaView; v: MediaVariant; cover: string | null; eq: boolean; menu?: JSX.Element; picker: JSX.Element }) {
+  const tl = () => p.m.timeline ?? null;
+  const spin = () => live(isPlaying(p.m), drawerShown());
+  const bar = (times: boolean) => <Show when={tl()}>{(x) => <Progress m={p.m} tl={x()} times={times} thin={!times} />}</Show>;
+  const foot = () => (
+    <div class="med-foot">
+      <Controls m={p.m} modes />
+      <Paused m={p.m} />
+    </div>
+  );
+  return (
+    <Switch>
+      <Match when={p.v === "compact"}>
+        <div class="med-now med-row">
+          <Cover url={p.cover} size="sm" />
+          <div class="med-grow">
+            <Text m={p.m} inline />
+            {bar(false)}
+          </div>
+          <Controls m={p.m} tight />
+        </div>
+      </Match>
+      <Match when={p.v === "cover"}>
+        <div class="med-now">
+          <Cover url={p.cover} size="lg" />
+          <Text m={p.m} />
+        </div>
+        {bar(true)}
+        {foot()}
+      </Match>
+      <Match when={p.v === "vinyl"}>
+        <div class="med-now">
+          <div class="med-disc" classList={{ "med-disc-spin": spin() }} aria-hidden="true">
+            <Cover url={p.cover} size="label" />
+          </div>
+          <div class="med-grow">
+            <Text m={p.m} />
+            {bar(true)}
+          </div>
+        </div>
+        {foot()}
+      </Match>
+      <Match when={p.v === "strip"}>
+        <div class="med-slim">
+          <Show when={p.eq} fallback={<span class="med-note"><IcNote /></span>}>
+            <Equalizer playing={isPlaying(p.m)} />
+          </Show>
+          <Text m={p.m} inline />
+          <Show when={tl()}>{(x) => <TimeText m={p.m} tl={x()} />}</Show>
+          <Controls m={p.m} tight />
+          {p.picker}
+          {p.menu}
+        </div>
+      </Match>
+      <Match when={p.v === "card"}>
+        <div class="med-now">
+          <Cover url={p.cover} />
+          <Text m={p.m} />
+        </div>
+        {bar(true)}
+        {foot()}
+      </Match>
+    </Switch>
+  );
+}
+
 export default function MediaCard(p: { s: Snapshot; menu?: JSX.Element }) {
   const playing = () => sectionOn(p.s.sections, "nowPlaying");
   const m = () => (playing() ? p.s.personal.media : null);
   const vol = () => (sectionOn(p.s.sections, "sound") ? p.s.personal.volume : null);
-  const control = (a: "toggle" | "next" | "prev") => void api.mediaControl(a).catch(sayError);
+  const v = () => shownVariant(p.s.personal.mediaLook);
+  const eq = () => p.s.personal.mediaLook?.equalizer !== false;
+  const cover = useCover(() => m()?.coverKey ?? null);
+  /** tenký ovladač (Jen v proužku) — jen se skladbou; bez ní zůstane obyčejná karta (Zvuk / Nic nehraje) */
+  const slim = () => v() === "strip" && !!m();
+  const picker = () => <VariantPicker current={v()} cfgError={p.s.cfgError} push={!slim() && !m()?.app} />;
   return (
     <Show when={m() || vol()}>
-      <div class="card" data-anim>
-        <h4>
-          <span class="ic" style="background:var(--violet)" />
-          {playing() ? t("cards.media.title", "Právě hraje") : t("cards.sound.title", "Zvuk")}
-          <Show when={m()?.app}>{(a) => <span class="n">{a()}</span>}</Show>
-          {p.menu}
-        </h4>
+      <div
+        class="card med-card"
+        classList={{ "med-v-compact": v() === "compact", "med-v-cover": v() === "cover" && !!m(), "med-v-slim": slim() }}
+        data-anim
+      >
+        <Show when={v() === "cover" && cover()}>{(u) => <span class="med-backdrop" aria-hidden="true"><img src={u()} alt="" draggable={false} /></span>}</Show>
+        <Show when={!slim()}>
+          <h4>
+            <span class="ic" style="background:var(--violet)" />
+            {playing() ? t("cards.media.title", "Právě hraje") : t("cards.sound.title", "Zvuk")}
+            <Show when={m()?.app}>{(a) => <span class="n">{a()}</span>}</Show>
+            <Show when={playing()}>{picker()}</Show>
+            {p.menu}
+          </h4>
+        </Show>
         <Show when={playing()}>
           <Show when={m()} fallback={<div class="empty">{t("cards.media.none", "Nic nehraje")}</div>}>
-            {(mm) => (
-              <>
-                <div class="med-now">
-                  <Cover coverKey={mm().coverKey} />
-                  <div class="med-text">
-                    <div class="med-title" title={mm().title}>{mm().title || t("cards.media.untitled", "Bez názvu")}</div>
-                    <Show when={mm().artist}><div class="sub" title={mm().artist}>{mm().artist}</div></Show>
-                  </div>
-                </div>
-                <div class="med-ctl">
-                  <button class="mini med-ico" disabled={!mm().canPrev} title={t("cards.media.prev", "Předchozí")} aria-label={t("cards.media.prev", "Předchozí")} onClick={() => control("prev")}>
-                    <IcPrev />
-                  </button>
-                  <button
-                    class="mini med-ico med-play"
-                    disabled={!mm().canToggle}
-                    title={mm().status === "playing" ? t("cards.media.pause", "Pozastavit") : t("cards.media.play", "Přehrát")}
-                    aria-label={mm().status === "playing" ? t("cards.media.pause", "Pozastavit") : t("cards.media.play", "Přehrát")}
-                    onClick={() => control("toggle")}
-                  >
-                    <Show when={mm().status === "playing"} fallback={<IcPlay />}><IcPause /></Show>
-                  </button>
-                  <button class="mini med-ico" disabled={!mm().canNext} title={t("cards.media.next", "Další")} aria-label={t("cards.media.next", "Další")} onClick={() => control("next")}>
-                    <IcNext />
-                  </button>
-                  <Show when={mm().status === "paused"}><span class="pill n med-state">{t("cards.media.paused", "pauza")}</span></Show>
-                </div>
-              </>
-            )}
+            {(mm) => <Body m={mm()} v={v()} cover={cover()} eq={eq()} menu={slim() ? p.menu : undefined} picker={picker()} />}
           </Show>
         </Show>
-        <Show when={vol()}>{(v) => <Volume level={v().level} muted={v().muted} device={v().device} />}</Show>
+        <Show when={vol()}>{(x) => <Volume level={x().level} muted={x().muted} device={x().device} />}</Show>
       </div>
     </Show>
   );

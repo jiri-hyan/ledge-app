@@ -13,7 +13,9 @@ use std::time::Duration;
 
 // ---------- config ----------
 
-pub(crate) fn apply_config(new: Config) {
+pub(crate) fn apply_config(mut new: Config) {
+    // `drawer.sections` a `modes` jsou odvozené z `layout` (karta = na nějaké záložce)
+    crate::layout::derive(&mut new);
     let c = core();
     let old = c.cfg.read().clone();
     crate::i18n::set_lang(new.ui.lang);
@@ -43,7 +45,7 @@ pub(crate) fn apply_config(new: Config) {
         let _ = c.notes_tx.lock().send(NotesMsg::Reroot);
         send_sync(SyncMsg::Config);
     }
-    if old.personal.weather.coords() != new.personal.weather.coords() || old.modes != new.modes || old.drawer.sections.weather != new.drawer.sections.weather {
+    if old.personal.weather.coords() != new.personal.weather.coords() || old.layout != new.layout || old.drawer.sections.weather != new.drawer.sections.weather {
         maybe_refresh_weather(false);
     }
     crate::calendar::live::on_config(&old, &new);

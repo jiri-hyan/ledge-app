@@ -1,0 +1,254 @@
+//! Config „Právě hraje“ (`media` v configu: vzhled karty, čas a ozdoba v proužku) a čistá logika
+//! segmentu proužku (`media.rs` → `strip_now`).
+//!
+//! Vzhled `strip` („Jen v proužku“) nemá v šuplíku kartu, jen tenký ovladač, a skladbu ukáže proužek
+//! i bez položky `media` v `strip.items` (`with_strip_item`) — jinak by nebyla vidět nikde. Čas v proužku
+//! je po minutách („1/4 min“): proužek se přepočítá jen při změně minuty (`mediatime::next_minute`),
+//! sekundy by ho budily každou sekundu i se zavřeným šuplíkem. Ozdoba ekvalizéru je jen statický znak
+//! (skutečný zvuk neznázorňuje); rozpohybovaná je jen v šuplíku (CSS, jen když hraje a je vidět).
+
+use crate::config::StripItem;
+use crate::media::MediaView;
+use crate::strip::{Rgba, Segment};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+/// Délka „Název · Interpret“ v proužku (znaky); čas se přidá za ni.
+pub const STRIP_CHARS: usize = 36;
+/// Ozdoba ekvalizéru místo „♪“ (jen vzhled `strip` se zapnutým `equalizer`).
+pub const EQ_GLYPH: &str = "▂▅▃";
+
+/// Vzhled karty Právě hraje (`media.variant`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Variant {
+    /// Kompaktní řádek: malý obal, název, tenký průběh, tlačítka v jednom řádku.
+    Compact,
+    /// Karta s průběhem (výchozí): obal, název, interpret, lišta s časem, ovládání.
+    #[default]
+    Card,
+    /// Velký obal: rozmazaný obal přes celou kartu.
+    Cover,
+    /// Vinyl: deska s obalem uprostřed, točí se jen při přehrávání.
+    Vinyl,
+    /// Jen v proužku: v šuplíku jen tenký ovladač, skladba v proužku (i bez položky `media`).
+    Strip,
+}
+
+/// Čas skladby v proužku (`media.stripTime`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum StripTime {
+    /// Jen u vzhledu „Jen v proužku“ (výchozí).
+    #[default]
+    Auto,
+    /// Vždy, když přehrávač hlásí průběh.
+    On,
+    /// Nikdy.
+    Off,
+}
+
+/// Sekce `media` v configu.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MediaConfig {
+    /// Vzhled karty: `compact` | `card` (výchozí) | `cover` | `vinyl` | `strip` (jen v proužku).
+    pub variant: Variant,
+    /// Čas skladby v proužku po minutách („1/4 min“): `auto` (výchozí, jen u `strip`) | `on` | `off`.
+    pub strip_time: StripTime,
+    /// Ozdoba ekvalizéru u vzhledu `strip` (znak v proužku, animace v šuplíku). Jen dekorace — neukazuje
+    /// skutečný zvuk. Výchozí true.
+    pub equalizer: bool,
+}
+
+impl Default for MediaConfig {
+    fn default() -> Self {
+        Self { variant: Variant::Card, strip_time: StripTime::Auto, equalizer: true }
+    }
+}
+
+/// Ukazuje proužek čas skladby?
+pub(crate) fn shows_time(m: &MediaConfig) -> bool {
+    match m.strip_time {
+        StripTime::Auto => m.variant == Variant::Strip,
+        StripTime::On => true,
+        StripTime::Off => false,
+    }
+}
+
+/// Ozdoba ekvalizéru (jen vzhled „Jen v proužku“).
+pub(crate) fn shows_eq(m: &MediaConfig) -> bool {
+    m.variant == Variant::Strip && m.equalizer
+}
+
+/// Položky proužku: vzhled `strip` doplní `media` na konec, když tam není.
+pub(crate) fn with_strip_item(mut items: Vec<StripItem>, m: &MediaConfig) -> Vec<StripItem> {
+    if m.variant == Variant::Strip && !items.contains(&StripItem::Media) {
+        items.push(StripItem::Media);
+    }
+    items
+}
+
+/// Chce položku `media` proužek? (výslovně v `strip.items`, nebo vzhled `strip`)
+pub(crate) fn strip_has_item(items: &[StripItem], m: &MediaConfig) -> bool {
+    items.contains(&StripItem::Media) || m.variant == Variant::Strip
+}
+
+/// Krátký text pro proužek: jen když hraje, „Název · Interpret“ zkrácené na `max` znaků s „…“.
+/// Pauza / nic = `None`.
+pub(crate) fn strip_text(v: Option<&MediaView>, max: usize) -> Option<String> {
+    let v = v.filter(|v| v.status == "playing")?;
+    let full = match (v.title.trim(), v.artist.trim()) {
+        ("", "") => return None,
+        (t, "") => t.to_string(),
+        ("", a) => a.to_string(),
+        (t, a) => format!("{t} · {a}"),
+    };
+    if full.chars().count() <= max {
+        return Some(full);
+    }
+    let cut: String = full.chars().take(max.saturating_sub(1)).collect();
+    Some(format!("{}…", cut.trim_end()))
+}
+
+/// Segment proužku „♪ Název · Interpret[ · 1/4 min]“; pauza / nic = žádný segment. Čas jen s timeline
+/// a `shows_time`, ozdoba `EQ_GLYPH` místo „♪“ podle `shows_eq`.
+pub(crate) fn strip_segment(v: Option<&MediaView>, m: &MediaConfig, now_ms: i64) -> Option<Segment> {
+    let text = strip_text(v, STRIP_CHARS)?;
+    let time = v.and_then(|v| v.timeline.as_ref()).filter(|_| shows_time(m)).and_then(|t| crate::mediatime::strip_time(t, now_ms, true));
+    let icon = if shows_eq(m) { EQ_GLYPH } else { "♪" };
+    let text = match time {
+        Some(t) => format!("{icon} {text} · {t}"),
+        None => format!("{icon} {text}"),
+    };
+    Some(Segment { text, color: Rgba::TEXT, dot: None, strong: false, pill: false })
+}
+
+/// Budík vlákna `emit` pro čas v proužku: další změna minuty, jen když proužek čas ukazuje a hraje.
+pub(crate) fn next_deadline(v: Option<&MediaView>, m: &MediaConfig, strip_on: bool, now_ms: i64) -> Option<i64> {
+    let v = v.filter(|_| strip_on && shows_time(m))?;
+    crate::mediatime::next_minute(v.timeline.as_ref()?, now_ms, v.status == "playing")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mediatime::Timeline;
+
+    const NOW: i64 = 1_760_000_000_000;
+
+    fn mv(title: &str, artist: &str, status: &'static str) -> MediaView {
+        MediaView { title: title.into(), artist: artist.into(), app: "Spotify".into(), status, can_toggle: true, can_prev: true, can_next: true, cover_key: None, timeline: None, shuffle: None, repeat: None }
+    }
+    fn with_tl(mut v: MediaView) -> MediaView {
+        v.timeline = Some(Timeline { position_ms: 102_000, duration_ms: 243_000, updated_ms: NOW, rate: 1.0, can_seek: true, start_ticks: 0 });
+        v
+    }
+    fn cfg(variant: Variant, strip_time: StripTime, equalizer: bool) -> MediaConfig {
+        MediaConfig { variant, strip_time, equalizer }
+    }
+
+    #[test]
+    fn serde_defaults_and_old_config() {
+        // starý config bez `media` = karta s průběhem, čas v proužku jen u „Jen v proužku“, ozdoba zapnutá
+        let c: crate::config::Config = serde_json::from_str("{}").unwrap();
+        assert_eq!(c.media, MediaConfig::default());
+        assert_eq!((c.media.variant, c.media.strip_time, c.media.equalizer), (Variant::Card, StripTime::Auto, true));
+        // skutečný tvar configu z vlny 5 (proužek s `media`, karta zapnutá): beze změny chování
+        let old: crate::config::Config = serde_json::from_str(
+            r#"{"strip":{"enabled":true,"items":["mode","clock","media"],"itemsRev":2},"drawer":{"sections":{"nowPlaying":true,"sound":true,"battery":true}},"modes":{"personalEnabled":true},"personal":{"links":[]}}"#,
+        )
+        .unwrap();
+        assert_eq!(old.media, MediaConfig::default());
+        assert_eq!(with_strip_item(old.strip.items.clone(), &old.media), old.strip.items);
+        assert!(!shows_time(&old.media) && !shows_eq(&old.media));
+        let m: MediaConfig = serde_json::from_str(r#"{"variant":"vinyl","stripTime":"on","equalizer":false}"#).unwrap();
+        assert_eq!(m, cfg(Variant::Vinyl, StripTime::On, false));
+        let v = serde_json::to_value(cfg(Variant::Strip, StripTime::Off, true)).unwrap();
+        assert_eq!(v, serde_json::json!({ "variant": "strip", "stripTime": "off", "equalizer": true }));
+        for s in ["compact", "card", "cover", "vinyl", "strip"] {
+            assert!(serde_json::from_str::<Variant>(&format!("\"{s}\"")).is_ok(), "{s}");
+        }
+        assert!(serde_json::from_str::<Variant>("\"big\"").is_err());
+        assert!(crate::config::schema_json().contains("\"stripTime\""));
+    }
+
+    #[test]
+    fn time_eq_and_strip_item_table() {
+        use StripItem::*;
+        // (název, config, čas v proužku, ozdoba, položky z [Clock] / [Clock, Media])
+        type Case<'a> = (&'a str, MediaConfig, bool, bool, [&'a [StripItem]; 2]);
+        let cases: [Case; 6] = [
+            ("výchozí karta", MediaConfig::default(), false, false, [&[Clock], &[Clock, Media]]),
+            ("karta, čas vždy", cfg(Variant::Card, StripTime::On, true), true, false, [&[Clock], &[Clock, Media]]),
+            ("jen v proužku", cfg(Variant::Strip, StripTime::Auto, true), true, true, [&[Clock, Media], &[Clock, Media]]),
+            ("jen v proužku bez času a ozdoby", cfg(Variant::Strip, StripTime::Off, false), false, false, [&[Clock, Media], &[Clock, Media]]),
+            ("vinyl auto = bez času", cfg(Variant::Vinyl, StripTime::Auto, true), false, false, [&[Clock], &[Clock, Media]]),
+            ("kompaktní, čas vždy", cfg(Variant::Compact, StripTime::On, false), true, false, [&[Clock], &[Clock, Media]]),
+        ];
+        for (name, m, time, eq, [a, b]) in cases {
+            assert_eq!((shows_time(&m), shows_eq(&m)), (time, eq), "{name}");
+            assert_eq!(with_strip_item(vec![Clock], &m), a, "{name}");
+            assert_eq!(with_strip_item(vec![Clock, Media], &m), b, "{name}");
+            assert_eq!(strip_has_item(&[Clock], &m), a.contains(&Media), "{name}");
+        }
+    }
+
+    #[test]
+    fn strip_text_only_while_playing() {
+        let long = "Velmi dlouhý název skladby, který se do proužku nevejde";
+        let cases: [(Option<MediaView>, Option<&str>); 7] = [
+            (None, None),
+            (Some(mv("Song", "Band", "paused")), None),
+            (Some(mv("Song", "Band", "playing")), Some("Song · Band")),
+            (Some(mv("Song", "", "playing")), Some("Song")),
+            (Some(mv("", "Band", "playing")), Some("Band")),
+            (Some(mv(" ", " ", "playing")), None),
+            (Some(mv(long, "X", "playing")), Some("Velmi dlouhý název skladby, který…")),
+        ];
+        for (v, want) in cases {
+            let got = strip_text(v.as_ref(), 34);
+            assert_eq!(got.as_deref(), want, "{v:?}");
+            assert!(got.is_none_or(|g| g.chars().count() <= 34));
+        }
+    }
+
+    #[test]
+    fn strip_segment_table() {
+        let card = MediaConfig::default();
+        let strip = cfg(Variant::Strip, StripTime::Auto, true);
+        let strip_plain = cfg(Variant::Strip, StripTime::Off, false);
+        // (název, view, config, očekávaný text segmentu)
+        let cases: [(&str, Option<MediaView>, &MediaConfig, Option<&str>); 9] = [
+            ("hraje", Some(mv("Song", "Band", "playing")), &card, Some("♪ Song · Band")),
+            ("pauza", Some(mv("Song", "Band", "paused")), &card, None),
+            ("zastaveno", Some(mv("Song", "Band", "stopped")), &card, None),
+            ("nic nehraje", None, &card, None),
+            ("hraje bez titulku i interpreta", Some(mv("", "", "playing")), &card, None),
+            ("karta: timeline bez času", Some(with_tl(mv("Song", "Band", "playing"))), &card, Some("♪ Song · Band")),
+            ("jen v proužku: ozdoba a čas", Some(with_tl(mv("Song", "Band", "playing"))), &strip, Some("▂▅▃ Song · Band · 1/4 min")),
+            ("jen v proužku bez timeline: bez času", Some(mv("Song", "Band", "playing")), &strip, Some("▂▅▃ Song · Band")),
+            ("jen v proužku, vypnuto", Some(with_tl(mv("Song", "Band", "playing"))), &strip_plain, Some("♪ Song · Band")),
+        ];
+        for (name, v, m, want) in cases {
+            let s = strip_segment(v.as_ref(), m, NOW);
+            assert_eq!(s.as_ref().map(|s| s.text.as_str()), want, "{name}");
+            if let Some(s) = s {
+                assert!(s.text.chars().count() <= STRIP_CHARS + 16, "{name}");
+                assert_eq!((s.dot, s.pill), (None, false), "{name}");
+            }
+        }
+    }
+
+    #[test]
+    fn next_deadline_only_when_time_shows_and_plays() {
+        let strip = cfg(Variant::Strip, StripTime::Auto, true);
+        let playing = with_tl(mv("Song", "Band", "playing"));
+        assert_eq!(next_deadline(Some(&playing), &strip, true, NOW), Some(NOW + 18_001));
+        assert_eq!(next_deadline(Some(&playing), &strip, false, NOW), None, "vypnutý proužek");
+        assert_eq!(next_deadline(Some(&playing), &MediaConfig::default(), true, NOW), None, "čas se neukazuje");
+        assert_eq!(next_deadline(Some(&with_tl(mv("Song", "Band", "paused"))), &strip, true, NOW), None, "pauza");
+        assert_eq!(next_deadline(Some(&mv("Song", "Band", "playing")), &strip, true, NOW), None, "bez timeline");
+        assert_eq!(next_deadline(None, &strip, true, NOW), None);
+    }
+}

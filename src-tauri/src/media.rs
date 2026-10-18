@@ -4,8 +4,9 @@
 //!
 //! Žádný polling: vlákno `media` vznikne až při prvním zobrazení záložky Osobní (`ensure`, příkaz
 //! `personal_live`) nebo hned, když je v proužku položka `media` (`sync` při startu a změně configu).
-//! Drží odběr `CurrentSessionChanged` a u aktuální session `MediaPropertiesChanged` a
-//! `PlaybackInfoChanged` (timeline záměrně NE — pozice se mění pořád = CPU) a jinak spí na kanálu.
+//! Drží odběr `CurrentSessionChanged` a u aktuální session `MediaPropertiesChanged`,
+//! `PlaybackInfoChanged` a `TimelinePropertiesChanged` (jen čtení timeline bez dotazu do přehrávače;
+//! hlášení, které jen potvrzuje průběh, se zahodí — `mediatime::merge`) a jinak spí na kanálu.
 //! Handler události jen pošle zprávu; vlastnosti čte vlákno (s termínem `WAIT`); změna → `mark_dirty`
 //! → vlákno `emit` překreslí šuplík i proužek. Když data nepotřebuje karta (`drawer.sections.nowPlaying`,
 //! záložka Osobní) ani proužek → `sync` vlákno ukončí a odběry zruší. `view` a `strip_now` čtou jen
@@ -15,7 +16,8 @@
 use crate::config::Config;
 use crate::i18n::tr;
 use crate::state::{core, log, mark_dirty};
-use crate::strip::{Rgba, Segment};
+use crate::mediatime::{self, Repeat, Timeline};
+use crate::strip::Segment;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -32,8 +34,6 @@ const DEBOUNCE: Duration = Duration::from_millis(150);
 const WAIT: Duration = Duration::from_secs(3);
 /// Větší obal se nečte (běžný je 300×300 JPEG, desítky kB).
 const MAX_COVER_BYTES: u64 = 4 << 20;
-/// Délka textu pro proužek (`strip_text`) ve znacích.
-pub const STRIP_CHARS: usize = 36;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +49,12 @@ pub struct MediaView {
     pub can_next: bool,
     /// klíč obalu pro `media_cover`; `None` = session obal nemá
     pub cover_key: Option<String>,
+    /// průběh skladby (`mediatime`); `None` = zdroj timeline nedává → lišta se neukáže
+    pub timeline: Option<Timeline>,
+    /// náhodně; `None` = zdroj nepodporuje (tlačítko se neukáže)
+    pub shuffle: Option<bool>,
+    /// opakovat; `None` = zdroj nepodporuje
+    pub repeat: Option<Repeat>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -57,11 +63,17 @@ pub enum Control {
     Toggle,
     Next,
     Prev,
+    /// přetočit na ms od začátku skladby
+    Seek(i64),
+    Shuffle(bool),
+    Repeat(Repeat),
 }
 
 enum Msg {
     Session,
     Changed,
+    /// `TimelinePropertiesChanged` — jen timeline, bez dotazu na vlastnosti skladby
+    Timeline,
     Control(Control),
     Cover(String, mpsc::SyncSender<Option<String>>),
     Stop,
@@ -85,9 +97,10 @@ pub(crate) fn allowed(cfg: &Config) -> bool {
     cfg.modes.personal_enabled && cfg.drawer.sections.now_playing
 }
 
-/// Chce data proužek? (zapnutý proužek s položkou `media`; nezávisle na záložce Osobní)
+/// Chce data proužek? (zapnutý proužek s položkou `media` nebo vzhled „Jen v proužku“; nezávisle na
+/// záložce Osobní)
 pub(crate) fn strip_wants(cfg: &Config) -> bool {
-    cfg.strip.enabled && cfg.strip.items.contains(&crate::config::StripItem::Media)
+    cfg.strip.enabled && crate::mediaconf::strip_has_item(&cfg.strip.items, &cfg.media)
 }
 
 /// Má vlákno běžet? Karta (UI už Osobní ukázalo = `wanted`, karta smí běžet) NEBO položka proužku.
@@ -164,28 +177,6 @@ pub(crate) fn cover_key(aumid: &str, title: &str, artist: &str, album: &str, has
     Some(format!("{:016x}", h.finish()))
 }
 
-/// Krátký text pro proužek (segment „právě hraje“ přidá `stripview`): jen když hraje,
-/// „Název · Interpret“ zkrácené na `max` znaků s „…“. Pauza / nic = `None`.
-pub(crate) fn strip_text(v: Option<&MediaView>, max: usize) -> Option<String> {
-    let v = v.filter(|v| v.status == "playing")?;
-    let full = match (v.title.trim(), v.artist.trim()) {
-        ("", "") => return None,
-        (t, "") => t.to_string(),
-        ("", a) => a.to_string(),
-        (t, a) => format!("{t} · {a}"),
-    };
-    if full.chars().count() <= max {
-        return Some(full);
-    }
-    let cut: String = full.chars().take(max.saturating_sub(1)).collect();
-    Some(format!("{}…", cut.trim_end()))
-}
-
-/// Segment proužku „♪ Název · Interpret“ (`strip_text`, `STRIP_CHARS`); pauza / nic = žádný segment.
-pub(crate) fn strip_segment(v: Option<&MediaView>) -> Option<Segment> {
-    strip_text(v, STRIP_CHARS).map(|t| Segment { text: format!("♪ {t}"), color: Rgba::TEXT, dot: None, strong: false, pill: false })
-}
-
 // ---------- za běhu ----------
 
 /// Pro snapshot — jen paměť.
@@ -193,9 +184,15 @@ pub(crate) fn view() -> Option<MediaView> {
     VIEW.lock().clone()
 }
 
-/// Segment proužku z paměti (viz `strip_segment`).
-pub(crate) fn strip_now() -> Option<Segment> {
-    strip_segment(VIEW.lock().as_ref())
+/// Segment proužku z paměti (`mediaconf::strip_segment`).
+pub(crate) fn strip_now(cfg: &Config, now_ms: i64) -> Option<Segment> {
+    crate::mediaconf::strip_segment(VIEW.lock().as_ref(), &cfg.media, now_ms)
+}
+
+/// Budík vlákna `emit`: změna minuty času v proužku (`mediaconf::next_deadline`), jen paměť.
+pub(crate) fn next_deadline_live() -> Option<i64> {
+    let cfg = core().cfg.read();
+    crate::mediaconf::next_deadline(VIEW.lock().as_ref(), &cfg.media, strip_wants(&cfg), crate::state::now_ms())
 }
 
 /// UI ukázalo záložku Osobní: spustit vlákno, pokud je potřeba a ještě neběží.
@@ -228,8 +225,20 @@ fn send(m: Msg) -> Result<(), String> {
     LIVE.lock().tx.as_ref().and_then(|tx| tx.send(m).ok()).ok_or_else(|| tr("Ovládání médií neběží.", "Media control isn't running.").to_string())
 }
 
-/// Tlačítko v kartě (jen výslovný klik).
+/// Tlačítko v kartě (jen výslovný klik). Přetáčení / náhodně / opakovat jen, když je zdroj umí.
 pub(crate) fn control(c: Control) -> Result<(), String> {
+    let ok = {
+        let v = VIEW.lock();
+        match c {
+            Control::Seek(_) => v.as_ref().and_then(|v| v.timeline).is_some_and(|t| t.can_seek),
+            Control::Shuffle(_) => v.as_ref().is_some_and(|v| v.shuffle.is_some()),
+            Control::Repeat(_) => v.as_ref().is_some_and(|v| v.repeat.is_some()),
+            Control::Toggle | Control::Next | Control::Prev => true,
+        }
+    };
+    if !ok {
+        return Err(tr("Tenhle přehrávač to neumí.", "This player can't do that.").to_string());
+    }
     send(Msg::Control(c))
 }
 
@@ -270,6 +279,7 @@ struct Sub {
     session: Session,
     props: Option<i64>,
     playback: Option<i64>,
+    timeline: Option<i64>,
 }
 
 fn unsubscribe(sub: Option<Sub>) {
@@ -280,12 +290,15 @@ fn unsubscribe(sub: Option<Sub>) {
         if let Some(t) = s.playback {
             let _ = s.session.RemovePlaybackInfoChanged(t);
         }
+        if let Some(t) = s.timeline {
+            let _ = s.session.RemoveTimelinePropertiesChanged(t);
+        }
     }
 }
 
 fn subscribe(mgr: &Manager, tx: &Sender<Msg>) -> Option<Sub> {
     let session = mgr.GetCurrentSession().ok()?;
-    let (a, b) = (tx.clone(), tx.clone());
+    let (a, b, c) = (tx.clone(), tx.clone(), tx.clone());
     let props = session
         .MediaPropertiesChanged(&TypedEventHandler::new(move |_, _| {
             let _ = a.send(Msg::Changed);
@@ -298,7 +311,13 @@ fn subscribe(mgr: &Manager, tx: &Sender<Msg>) -> Option<Sub> {
             Ok(())
         }))
         .ok();
-    Some(Sub { session, props, playback })
+    let timeline = session
+        .TimelinePropertiesChanged(&TypedEventHandler::new(move |_, _| {
+            let _ = c.send(Msg::Timeline);
+            Ok(())
+        }))
+        .ok();
+    Some(Sub { session, props, playback, timeline })
 }
 
 fn props(s: &Session) -> Option<Props> {
@@ -327,7 +346,11 @@ fn read(s: &Session) -> Option<MediaView> {
         ctl.as_ref().and_then(|c| f(c).ok()).unwrap_or(false)
     };
     let can_toggle = on(|c| c.IsPlayPauseToggleEnabled()) || on(|c| c.IsPlayEnabled()) || on(|c| c.IsPauseEnabled());
+    let modes = mediatime::modes(info.as_ref());
     Some(MediaView {
+        timeline: mediatime::read(s, info.as_ref(), crate::state::now_ms()),
+        shuffle: modes.shuffle,
+        repeat: modes.repeat,
         cover_key: cover_key(&aumid, &title, &artist, &album, has_thumb),
         app: app_name(&aumid),
         title,
@@ -339,8 +362,32 @@ fn read(s: &Session) -> Option<MediaView> {
     })
 }
 
+/// Timeline nového čtení sloučená s předchozím stavem téže skladby (`mediatime::merge`).
+fn merge_timeline(prev: Option<&MediaView>, v: &mut MediaView) {
+    let same = |p: &&MediaView| (&p.title, &p.artist, &p.app) == (&v.title, &v.artist, &v.app);
+    let prev = prev.filter(same).and_then(|p| p.timeline.as_ref().map(|t| (t, p.status == "playing")));
+    v.timeline = mediatime::merge(prev, v.timeline, v.status == "playing", crate::state::now_ms());
+}
+
 fn publish(sub: Option<&Sub>) {
-    let v = sub.and_then(|s| read(&s.session));
+    let mut v = sub.and_then(|s| read(&s.session));
+    if let Some(v) = v.as_mut() {
+        merge_timeline(VIEW.lock().as_ref(), v);
+    }
+    store(v);
+}
+
+/// Jen timeline (`TimelinePropertiesChanged`): bez dotazu na vlastnosti skladby (synchronní čtení);
+/// hlášení, které jen potvrzuje průběh, nic nezmění → žádné `mark_dirty`.
+fn publish_timeline(sub: Option<&Sub>) {
+    let (Some(s), Some(prev)) = (sub, VIEW.lock().clone()) else { return };
+    let info = s.session.GetPlaybackInfo().ok();
+    let mut v = MediaView { timeline: mediatime::read(&s.session, info.as_ref(), crate::state::now_ms()), ..prev.clone() };
+    merge_timeline(Some(&prev), &mut v);
+    store(Some(v));
+}
+
+fn store(v: Option<MediaView>) {
     let mut g = VIEW.lock();
     if *g != v {
         *g = v;
@@ -353,9 +400,15 @@ fn do_control(sub: Option<&Sub>, c: Control) {
     let Some(s) = sub else { return };
     // operace doběhne i po zahození; výsledek přijde událostí PlaybackInfoChanged
     let r = match c {
-        Control::Toggle => s.session.TryTogglePlayPauseAsync(),
-        Control::Next => s.session.TrySkipNextAsync(),
-        Control::Prev => s.session.TrySkipPreviousAsync(),
+        Control::Toggle => s.session.TryTogglePlayPauseAsync().map(|_| ()),
+        Control::Next => s.session.TrySkipNextAsync().map(|_| ()),
+        Control::Prev => s.session.TrySkipPreviousAsync().map(|_| ()),
+        Control::Seek(ms) => {
+            let t = VIEW.lock().as_ref().and_then(|v| v.timeline);
+            mediatime::seek(&s.session, t.as_ref(), ms)
+        }
+        Control::Shuffle(on) => mediatime::set_shuffle(&s.session, on),
+        Control::Repeat(r) => mediatime::set_repeat(&s.session, r),
     };
     if let Err(e) = r {
         log(&format!("media: ovládání {c:?} selhalo: {e}"));
@@ -403,7 +456,7 @@ fn run(rx: Receiver<Msg>, tx: Sender<Msg>) {
         }))
         .ok();
     let mut sub: Option<Sub> = None;
-    let (mut new_session, mut changed) = (true, false);
+    let (mut new_session, mut changed, mut timeline) = (true, false, false);
     loop {
         if new_session {
             unsubscribe(sub.take());
@@ -412,11 +465,13 @@ fn run(rx: Receiver<Msg>, tx: Sender<Msg>) {
         }
         if changed {
             publish(sub.as_ref());
+        } else if timeline {
+            publish_timeline(sub.as_ref());
         }
-        (new_session, changed) = (false, false);
+        (new_session, changed, timeline) = (false, false, false);
         let Ok(first) = rx.recv() else { break };
         let mut batch = vec![first];
-        if matches!(batch[0], Msg::Session | Msg::Changed) {
+        if matches!(batch[0], Msg::Session | Msg::Changed | Msg::Timeline) {
             let until = Instant::now() + DEBOUNCE;
             while let Some(left) = until.checked_duration_since(Instant::now()) {
                 match rx.recv_timeout(left) {
@@ -430,6 +485,7 @@ fn run(rx: Receiver<Msg>, tx: Sender<Msg>) {
             match m {
                 Msg::Session => new_session = true,
                 Msg::Changed => changed = true,
+                Msg::Timeline => timeline = true,
                 Msg::Control(c) => do_control(sub.as_ref(), c),
                 Msg::Cover(key, reply) => {
                     let _ = reply.send(load_cover(sub.as_ref(), &key));
@@ -481,49 +537,6 @@ mod tests {
         let cases = [(0, None), (1, Some("stopped")), (2, Some("changing")), (3, Some("stopped")), (4, Some("playing")), (5, Some("paused")), (9, Some("stopped"))];
         for (code, want) in cases {
             assert_eq!(status_of(code), want, "{code}");
-        }
-    }
-
-    fn mv(title: &str, artist: &str, status: &'static str) -> MediaView {
-        MediaView { title: title.into(), artist: artist.into(), app: "Spotify".into(), status, can_toggle: true, can_prev: true, can_next: true, cover_key: None }
-    }
-
-    #[test]
-    fn strip_text_only_while_playing() {
-        let long = "Velmi dlouhý název skladby, který se do proužku nevejde";
-        let cases: [(Option<MediaView>, Option<&str>); 7] = [
-            (None, None),
-            (Some(mv("Song", "Band", "paused")), None),
-            (Some(mv("Song", "Band", "playing")), Some("Song · Band")),
-            (Some(mv("Song", "", "playing")), Some("Song")),
-            (Some(mv("", "Band", "playing")), Some("Band")),
-            (Some(mv(" ", " ", "playing")), None),
-            (Some(mv(long, "X", "playing")), Some("Velmi dlouhý název skladby, který…")),
-        ];
-        for (v, want) in cases {
-            let got = strip_text(v.as_ref(), 34);
-            assert_eq!(got.as_deref(), want, "{v:?}");
-            assert!(got.is_none_or(|g| g.chars().count() <= 34));
-        }
-    }
-
-    #[test]
-    fn strip_segment_table() {
-        // (název, stav, očekávaný text segmentu)
-        let cases: [(&str, Option<MediaView>, Option<&str>); 5] = [
-            ("hraje", Some(mv("Song", "Band", "playing")), Some("♪ Song · Band")),
-            ("pauza", Some(mv("Song", "Band", "paused")), None),
-            ("zastaveno", Some(mv("Song", "Band", "stopped")), None),
-            ("nic nehraje", None, None),
-            ("hraje bez titulku i interpreta", Some(mv("", "", "playing")), None),
-        ];
-        for (name, v, want) in cases {
-            let s = strip_segment(v.as_ref());
-            assert_eq!(s.as_ref().map(|s| s.text.as_str()), want, "{name}");
-            if let Some(s) = s {
-                assert!(s.text.chars().count() <= STRIP_CHARS + 2, "{name}");
-                assert_eq!((s.dot, s.pill), (None, false), "{name}");
-            }
         }
     }
 

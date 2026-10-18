@@ -13,7 +13,8 @@ import NoteEditor from "./notes/NoteEditor";
 import NotesPage from "./notes/NotesPage";
 import { returnTo, setEditPath, setNotePreset, setPageProject, setReturnTo, type NotePreset } from "./notes/store";
 import "./notes/notes.css";
-import { OVERLAP, spring, collapsedClip, FULL_CLIP, dur, measure, preHide, revealContent, concealContent } from "./motion";
+import { OVERLAP, spring, collapsedClip, bandClip, FULL_CLIP, measure, motionNow, preHide, revealContent, concealContent } from "./motion";
+import { closePlan, openPlan, type Geo, type Plan } from "./theme/openAnim";
 import { initAppearance } from "./theme/apply";
 import Settings from "./Settings";
 import { holdWide, wantWidth } from "./settings/widen";
@@ -28,6 +29,8 @@ import Palette from "./palette/Palette";
 import { gotoSettingsPanel } from "./palette/goto";
 import Wizard from "./onboarding/Wizard";
 import { checkFirstRun, wizardOpen } from "./onboarding/state";
+import { beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, setCatalogOpen, setEditPage } from "./layout/edit";
+import { normalizeLayout } from "./layout/model";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
@@ -83,12 +86,24 @@ export default function App() {
       setPage("settings");
       if (id) gotoSettingsPanel(id);
     },
+    onEditDrawer: () => {
+      setPage("main");
+      beginEdit(s);
+    },
   };
 
-  // ---------- morf: proužek ⇄ šuplík ----------
-  let pendingFrom: ViewMsg | null = null;
+  // ---------- morf: proužek ⇄ šuplík (co se animuje, určuje styl pohybu — `theme/openAnim.ts`) ----------
+  let pending: Plan | null = null;
+  const geo = (w: number, h: number): Geo => ({ collapsed: collapsedClip(w, h), band: bandClip(h), full: FULL_CLIP });
+  /** po animaci zpět na „žádný inline styl“ (clip, posun i průhlednost řídí jen plán) */
+  const settle = () => {
+    panel.style.clipPath = "";
+    panel.style.transform = "";
+    panel.style.opacity = "";
+  };
 
   function prepare(msg: ViewMsg) {
+    const fromVisible = view() !== "hidden";
     setView(msg.view);
     if (msg.view === "hidden") {
       // skrytí bez morfu (bez `closing`) — příště začít na hlavní stránce
@@ -96,51 +111,51 @@ export default function App() {
       return;
     }
     panel.getAnimations().forEach((a) => a.cancel());
-    if (msg.morph) {
-      // složit do výchozího tvaru (proužek / předchozí pohled) — okno je zatím schované
-      panel.style.clipPath = collapsedClip(msg.fromW, msg.fromH);
+    settle();
+    const m = motionNow();
+    const plan = msg.morph ? openPlan(m.style, m.speed, geo(msg.fromW, msg.fromH), fromVisible) : null;
+    if (plan) {
+      // výchozí stav plánu (složený tvar / nad hranou / průhledný) — okno je zatím schované
+      Object.assign(panel.style, plan.start);
       preHide(content);
       void panel.offsetHeight; // vynutit styl dřív, než Rust okno ukáže
-      pendingFrom = msg;
+      pending = plan;
       api.animAck("prepared");
     } else {
-      panel.style.clipPath = "";
       revealContent(content, 40);
+      if (msg.morph) api.animAck("prepared");
     }
   }
 
   function play() {
-    const msg = pendingFrom;
-    pendingFrom = null;
-    if (!msg) return;
-    const sp = spring(240, 25);
-    panel
-      .animate([{ clipPath: collapsedClip(msg.fromW, msg.fromH) }, { clipPath: FULL_CLIP }], {
-        duration: sp.duration,
-        easing: sp.easing,
-      })
-      .finished.then(() => (panel.style.clipPath = ""), () => {});
-    // celá plocha se zároveň „nadechne“ z proužku
-    const breath = spring(300, 22);
-    content.animate([{ transform: "scale(0.97)", transformOrigin: "50% 0" }, { transform: "scale(1)", transformOrigin: "50% 0" }], {
-      duration: breath.duration,
-      easing: breath.easing,
-    });
+    const plan = pending;
+    pending = null;
+    if (!plan) return;
+    panel.animate(plan.frames, { duration: plan.duration, easing: plan.easing }).finished.then(settle, () => {});
+    // přehrávání začalo z prvního snímku — inline výchozí stav už nepotřebuje (po zrušení by zůstal)
+    settle();
+    if (plan.breath) {
+      // celá plocha se zároveň „nadechne“ z proužku
+      const breath = spring(300, 22);
+      content.animate([{ transform: "scale(0.97)", transformOrigin: "50% 0" }, { transform: "scale(1)", transformOrigin: "50% 0" }], {
+        duration: breath.duration,
+        easing: breath.easing,
+      });
+    }
     revealContent(content, 60);
-    measure("open", sp.duration + 120);
+    measure("open", plan.duration + 120);
   }
 
   async function closing(msg: ViewMsg) {
     panel.getAnimations().forEach((a) => a.cancel());
     measure("close", 250);
     const hide = concealContent(content, 110);
-    const shrink = panel.animate([{ clipPath: FULL_CLIP }, { clipPath: collapsedClip(msg.toW, msg.toH) }], {
-      duration: dur(240),
-      delay: dur(40),
-      easing: "cubic-bezier(.55,0,.75,.05)",
-      fill: "forwards",
-    });
-    await Promise.all([hide, shrink.finished.catch(() => {})]);
+    const m = motionNow();
+    const plan = closePlan(m.style, m.speed, geo(msg.toW, msg.toH));
+    const shrink = plan
+      ? panel.animate(plan.frames, { duration: plan.duration, delay: plan.delay, easing: plan.easing, fill: "forwards" }).finished.catch(() => {})
+      : Promise.resolve();
+    await Promise.all([hide, shrink]);
     api.animAck("closed");
     setView("hidden");
     setPage("main");
@@ -175,12 +190,19 @@ export default function App() {
         return;
       }
       if (e.key === "Escape" && palette()) return closePalette();
+      // režim úprav šuplíku: Esc = zavřít katalog, jinak Zrušit (pole přejmenování záložky si Esc obslouží samo)
+      if (e.key === "Escape" && editing() && page() === "main") return void (catalogOpen() ? setCatalogOpen(false) : cancelEdit());
       if (e.key === "Escape") {
         if (page() === "settings" || page() === "notes") setPage("main");
         else api.close();
       } else if (!e.ctrlKey && !e.altKey && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement).tagName)) {
-        if (e.key === "1" && s.personalEnabled) api.setMode("prace");
-        if (e.key === "2" && s.personalEnabled) api.setMode("osobni");
+        // 1–9 = záložka v pořadí z `layout` (v úpravách jen rozpracovaná)
+        const n = Number(e.key);
+        if (Number.isInteger(n) && n >= 1 && n <= 9) {
+          const pg = (draft() ?? normalizeLayout(s.layout)).pages[n - 1];
+          if (pg && editing()) setEditPage(pg.id);
+          else if (pg) void api.setMode(pg.id);
+        }
       }
     };
     window.addEventListener("keydown", key);
@@ -213,6 +235,13 @@ export default function App() {
   }
   createEffect(onChange([view, page, holdWide], () => queueMicrotask(report)));
   createEffect(onChange(view, (v) => v === "hidden" && setPalette(null), { defer: true }));
+  // zavřený šuplík = rozpracované úpravy rozložení pryč (fokus vrací Rust sám); jiná stránka taky
+  createEffect(onChange([view, page], ([v, pg]) => (v === "hidden" || pg !== "main") && cancelEdit(false), { defer: true }));
+  // „Upravit přímo v šuplíku“ z Nastavení
+  createEffect(onChange(editAsk, () => {
+    setPage("main");
+    queueMicrotask(() => beginEdit(s));
+  }, { defer: true }));
   // průvodce prvním spuštěním: config se čte při prvním otevření; dokud běží, šuplík otevírá na něm
   createEffect(() => view() === "full" && void checkFirstRun());
   createEffect(() => view() === "full" && wizardOpen() && setPage("welcome"));

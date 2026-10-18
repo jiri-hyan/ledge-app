@@ -1,6 +1,6 @@
-// Karta „Rychlé akce“ (Práce i Osobní podle `showOn`): mřížka dlaždic s ikonou, volitelně ve
+// Karta „Rychlé akce“ (na kterékoli záložce; Práce / Osobní filtruje `showOn`, vlastní záložka ukáže všechny): mřížka dlaždic s ikonou, volitelně ve
 // skupinách; klik = spustit (`runAction`: potvrzení, stav běží, výsledek do hlášky / výstupu).
-// Prázdná karta se ukáže jen na Osobní (pozvánka), na Práci by jen zabírala místo. Skripty ze složky
+// Prázdná karta se ukáže mimo Práci (pozvánka), na Práci by jen zabírala místo (`layout/model.ts` `shownCards`). Skripty ze složky
 // skriptů jsou tu jen se `scripts.inActions` (`s.scripts`); výstup skriptu spuštěného z palety se ale
 // ukáže vždy (karta se kvůli němu objeví i prázdná).
 import { For, Show, type JSX } from "solid-js";
@@ -22,7 +22,7 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
     gotoSettingsPanel("akce");
   };
   return (
-    <Show when={ids().length > 0 || p.s.mode === "osobni" || scriptOut()}>
+    <Show when={ids().length > 0 || p.s.mode !== "prace" || scriptOut()}>
       <div class="card act-card" classList={{ wide: !!p.wide }} data-anim>
         <h4>
           <span class="ic" style="background:var(--teal)" />

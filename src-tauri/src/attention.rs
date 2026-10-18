@@ -206,8 +206,9 @@ pub(crate) fn pulse() -> Option<(Rgba, Instant)> {
     WATCH.lock().as_ref().and_then(|w| w.pulse).filter(|(_, t)| (t.elapsed().as_millis() as u64) < PULSE_MS)
 }
 
-/// Systémové „Efekty animace“ vypnuté (Nastavení Windows → Usnadnění → Vizuální efekty).
-fn os_animations_off() -> bool {
+/// Systémové „Efekty animace“ vypnuté (Nastavení Windows → Usnadnění → Vizuální efekty). Bere i
+/// vysunutí šuplíku (`appearance::motion::anim_ms_now`).
+pub(crate) fn os_animations_off() -> bool {
     use windows::Win32::Foundation::TRUE;
     use windows::Win32::UI::WindowsAndMessaging::{SPI_GETCLIENTAREAANIMATION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW};
     let mut on = TRUE;

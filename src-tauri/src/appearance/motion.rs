@@ -10,14 +10,24 @@ use serde_json::Value;
 pub const BASE_SLIDE_MS: u64 = 170;
 
 /// Délka animace okna šuplíku (ms) pro Rust: `0` = bez morfu i bez vysunutí (okamžitě). Morf (pozadí
-/// „solid“) časuje frontend pružinami; tohle číslo rozhoduje, jestli morf vůbec běží, a je délkou
-/// vysunutí okna v akrylovém režimu. Čistá funkce.
-pub fn drawer_anim_ms(m: &MotionLook) -> u64 {
-    if m.style == MotionStyle::None {
+/// „solid“) časuje frontend (pružiny, odskok, rozplynutí…); tohle číslo rozhoduje, jestli morf vůbec
+/// běží, a je délkou vysunutí okna v akrylovém režimu. `os_reduced` = systémové „omezit pohyb“
+/// (Windows → Usnadnění → Efekty animace vypnuté) → vždy 0, jako styl `none`. Čistá funkce.
+pub fn drawer_anim_ms(m: &MotionLook, os_reduced: bool) -> u64 {
+    if m.style == MotionStyle::None || os_reduced {
         return 0;
     }
     let speed = if m.speed.is_finite() && m.speed > 0.0 { m.speed as f64 } else { 1.0 };
     (BASE_SLIDE_MS as f64 / speed).round() as u64
+}
+
+/// [`drawer_anim_ms`] se skutečným systémovým nastavením (jedno `SystemParametersInfoW`, levné) —
+/// volá vlákno `ui` před každým příkazem šuplíku, takže změna v nastavení Windows platí hned.
+pub fn anim_ms_now(m: &MotionLook) -> u64 {
+    if m.style == MotionStyle::None {
+        return 0;
+    }
+    drawer_anim_ms(m, crate::attention::os_animations_off())
 }
 
 /// Převod starého `drawer.animationMs` na `appearance.motion` (čistá funkce nad syrovým JSON configu):
@@ -56,17 +66,25 @@ mod tests {
 
     #[test]
     fn anim_ms_table() {
+        // (pohyb, systémové „omezit pohyb“, délka vysunutí)
         let cases = [
-            (look(MotionStyle::Spring, 1.0), 170),
-            (look(MotionStyle::Smooth, 1.0), 170),
-            (look(MotionStyle::Snappy, 2.0), 85),
-            (look(MotionStyle::Spring, 0.5), 340),
-            (look(MotionStyle::None, 1.0), 0),
-            (look(MotionStyle::None, 2.0), 0),
-            (look(MotionStyle::Spring, 0.0), 170), // nesmysl z ruky → jako rychlost 1, ne dělení nulou
+            (look(MotionStyle::Spring, 1.0), false, 170),
+            (look(MotionStyle::Smooth, 1.0), false, 170),
+            (look(MotionStyle::Snappy, 2.0), false, 85),
+            (look(MotionStyle::Spring, 0.5), false, 340),
+            (look(MotionStyle::Bounce, 1.0), false, 170),
+            (look(MotionStyle::Fade, 2.0), false, 85),
+            (look(MotionStyle::Notch, 1.0), false, 170),
+            (look(MotionStyle::None, 1.0), false, 0),
+            (look(MotionStyle::None, 2.0), false, 0),
+            (look(MotionStyle::Spring, 0.0), false, 170), // nesmysl z ruky → jako rychlost 1, ne dělení nulou
+            // systémové „omezit pohyb“ = bez morfu i bez vysunutí, ať je styl jakýkoli
+            (look(MotionStyle::Spring, 1.0), true, 0),
+            (look(MotionStyle::Bounce, 0.5), true, 0),
+            (look(MotionStyle::None, 1.0), true, 0),
         ];
-        for (m, want) in cases {
-            assert_eq!(drawer_anim_ms(&m), want, "{m:?}");
+        for (m, reduced, want) in cases {
+            assert_eq!(drawer_anim_ms(&m, reduced), want, "{m:?} reduced={reduced}");
         }
     }
 

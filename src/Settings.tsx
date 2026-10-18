@@ -15,6 +15,8 @@ import {
 import { IconSearch, PanelIcon } from "./settings/icons";
 import { canon, cleanDraft, highlight, panelForField, search, type SearchItem } from "./settings/model";
 import { narrowOut, widenIn } from "./settings/widen";
+import { FIELDS } from "./settings/labels";
+import { setSettingsTarget, settingsTarget } from "./palette/goto";
 import "./settings.css";
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -146,6 +148,19 @@ export default function Settings(p: { update: UpdateView; s: Snapshot }) {
     setQuery("");
     reveal(it.anchor || null, main);
   }
+  // skok odjinud (karta, paleta, hlavička — `palette/goto.ts` `gotoSettingsPanel`): id panelu, nebo kotva
+  // `f-<pole>` → panel toho pole (`labels.ts`, jinak podle cesty) + posun a zvýraznění
+  createEffect(() => {
+    const id = settingsTarget();
+    if (!id) return;
+    setSettingsTarget(null);
+    if (PANELS.some((x) => x.id === id)) return setActive(id);
+    if (!id.startsWith("f-")) return;
+    const field = id.slice(2);
+    const target = FIELDS[field]?.panel ?? panelForField(field);
+    if (target) setActive(target);
+    reveal(field, main);
+  });
   const searchKey = (e: KeyboardEvent) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();

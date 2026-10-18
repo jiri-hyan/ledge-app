@@ -13,15 +13,15 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 use tauri_plugin_opener::OpenerExt;
 
-/// Stáhne počasí, když je šuplík otevřený (`opening` = volající ho právě otevírá) na Osobní, karta
-/// Počasí není skrytá, místo je nastavené a data jsou stará (`weather::needs_fetch`). Výsledek přes `mark_dirty` → emit
+/// Stáhne počasí, když je šuplík otevřený (`opening` = volající ho právě otevírá) na záložce s kartou
+/// Počasí (`layout::page_has`), místo je nastavené a data jsou stará (`weather::needs_fetch`). Výsledek přes `mark_dirty` → emit
 /// vlákno. Jinak nic — žádný poll.
 pub(crate) fn maybe_refresh_weather(opening: bool) {
     let c = core();
     let place = {
         let cfg = c.cfg.read();
-        // skrytá karta Počasí (`drawer.sections.weather`) = nic se nestahuje
-        let on_personal = cfg.modes.personal_enabled && cfg.drawer.sections.weather && *c.mode.lock() == "osobni";
+        // jen když je karta Počasí na právě otevřené záložce (skrytá = nic se nestahuje)
+        let on_personal = crate::layout::page_has(&cfg.layout, &c.mode.lock(), "weather");
         let open = opening || c.drawer.view() == View::Full;
         match cfg.personal.weather.coords() {
             Some(p) if on_personal && open => p,
