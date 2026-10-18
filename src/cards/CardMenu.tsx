@@ -1,17 +1,21 @@
 // ⋯ v hlavičce karty (vidět při najetí): rychlé volby „Velikost: S/M/L/XL“ a „Výška: Auto/Nízká/Vysoká“,
 // volby navíc z `children` (karta Projekty: dlaždice, popisek, git, které projekty), „Skrýt kartu“
 // (odebere ji z této záložky do katalogu), „Skrýt sekci: …“ (části karty — limity, útrata, Git,
-// subagenti v kartě Claude; hlasitost; baterie) a „Upravit šuplík…“ (režim úprav). Ukládá jen pole
+// subagenti v kartě Claude; hlasitost; baterie), „Vzhled karty…“ (vlna 8 P: akcent, pozadí, hlavička,
+// hustota, varianta — panel `layout/CardLook.tsx` pod mřížkou) a „Upravit šuplík…“ (režim úprav). Ukládá jen pole
 // `layout` (`layout/edit.ts` `saveLayout`: `get_config` → změna → `save_config`); kartu překreslí nový
 // snapshot. Po skrytí lišta „… skryta · Vrátit“ na pár sekund (`HiddenNotice`, vykresluje `MainPage`) —
 // žádný modal. Seznam se kreslí přes `Portal` s pevnou pozicí u tlačítka: karta s omezenou výškou
-// (obsah scrolluje) ho neořízne a u spodního okraje šuplíku se otevře nahoru.
+// (obsah scrolluje) ho neořízne a u spodního okraje šuplíku se otevře nahoru. `extra` = vlastní volby
+// karty nahoře (widget: Obnovit teď, Upravit skript, Zobrazit výstup, V proužku).
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { t } from "../i18n";
 import { saveLayout } from "../layout/edit";
 import { QUICK_HEIGHTS, removeCard, restoreCard, setHeight, setPartHidden, setSize, SIZES, type CardHeight, type CardId, type CardSize, type Layout, type PartKey } from "../layout/model";
 import { cardName, partName, tx } from "../layout/text";
+import { openCardLook } from "../layout/CardLook";
+import type { CardLook } from "../layout/look";
 import "./cardmenu.css";
 
 const UNDO_MS = 6000;
@@ -32,6 +36,9 @@ async function hide(text: string, f: (l: Layout) => { layout: Layout; undo: (l: 
 }
 
 type Pos = { top?: number; bottom?: number; right: number };
+
+/** Vlastní volba karty v ⋯ (text už přeložený). */
+export type CardMenuItem = { label: string; run: () => void; disabled?: boolean };
 
 /** Řádek rychlé volby v menu: popisek + až 4 tlačítka (víc voleb = jinde, ne segment). */
 export function MenuChoice<T>(p: { label: string; items: readonly { v: T; text: string; title?: string }[]; value: T; onPick: (v: T) => void }) {
@@ -59,9 +66,12 @@ export default function CardMenu(p: {
   parts?: PartKey[];
   size?: CardSize;
   h?: CardHeight;
+  /** uložený vzhled karty (`layout…cards[].look`) — výchozí stav panelu Vzhled karty */
+  look?: CardLook;
   cfgError: string | null;
   onEdit?: () => void;
   children?: JSX.Element;
+  extra?: CardMenuItem[];
 }) {
   const [pos, setPos] = createSignal<Pos | null>(null);
   const open = () => pos() !== null;
@@ -106,18 +116,23 @@ export default function CardMenu(p: {
   // vlastní výška mimo rychlé volby (1 nebo 3 řádky z úprav) = žádné tlačítko není zvýrazněné
   const quickH = () => (QUICK_HEIGHTS.some((q) => q.h === p.h) ? p.h : null);
   return (
-    <span class="card-menu" classList={{ open: open() }} ref={root}>
+    <span class="card-menu" classList={{ open: open() }} ref={root} data-cmenu>
       <button class="card-menu-btn" aria-haspopup="menu" aria-expanded={open()} title={t("cards.hide.more", "Další volby")} aria-label={t("cards.hide.more", "Další volby")} onClick={toggle}>⋯</button>
       <Show when={pos()}>
         {(at) => (
           <Portal mount={root?.closest(".shell") ?? document.body}>
             <span class="card-menu-list" role="menu" ref={list} style={{ position: "fixed", top: at().top === undefined ? "auto" : `${at().top}px`, bottom: at().bottom === undefined ? "auto" : `${at().bottom}px`, right: `${at().right}px` }}>
+              <For each={p.extra ?? []}>
+                {(x) => <button role="menuitem" disabled={x.disabled} onClick={() => { close(); x.run(); }}>{x.label}</button>}
+              </For>
+              <Show when={(p.extra ?? []).length > 0}><span class="card-menu-sep" /></Show>
               <Show when={p.size}>
                 {(sz) => <MenuChoice label={t("cards.menu.size", "Velikost")} items={sizeItems()} value={sz()} onPick={(v) => { close(); void saveLayout((l) => setSize(l, p.page, p.card, v), p.cfgError); }} />}
               </Show>
               <MenuChoice label={t("cards.menu.height", "Výška")} items={heightItems()} value={quickH()} onPick={(v) => { close(); void saveLayout((l) => setHeight(l, p.page, p.card, v ?? undefined), p.cfgError); }} />
               {p.children}
               <span class="card-menu-sep" />
+              <button role="menuitem" onClick={() => { close(); openCardLook(p.page, p.card, p.look, p.cfgError); }}>{t("cards.cardlook.menu", "Vzhled karty…")}</button>
               <button role="menuitem" onClick={hideCard}>{t("cards.hide.card", "Skrýt kartu")}</button>
               <For each={p.parts ?? []}>
                 {(k) => <button role="menuitem" onClick={() => hidePart(k)}>{t("cards.hide.part", "Skrýt sekci: {name}", { name: partName(k) })}</button>}

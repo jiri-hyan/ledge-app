@@ -1,6 +1,7 @@
 // Karta Poznámky (záložky podle `kind`), řádek poznámky, záložky a peek připomínky.
 // „Vše“ bere řádky ze snapshotu (pořadí a strop dělá Rust `notes::card`); jiná záložka je dotaz
-// `note_query` obnovený při změně `notesRev`. Klik na řádek = úprava v Ledge (`onOpen`).
+// `note_query` obnovený při změně `notesRev`. Klik na řádek = úprava v Ledge (`onOpen`). Varianta zobrazení
+// karty (vzhled karty, vlna 8 P): seznam / dlaždice / kompaktní (`.note-list[data-view]`).
 
 import { createResource, For, Show, type JSX } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
@@ -9,6 +10,9 @@ import { IconBell } from "../icons";
 import { KindBadge, kindOf, kindColor, KindIcon } from "./kinds";
 import { doneBusy, openExternal, projName, remindLabel, setDone, setTab, tab } from "./store";
 import { t, tp } from "../i18n";
+import type { CardView } from "../layout/look";
+import { IconPin } from "../pin/icons";
+import { isPinned, newPin, togglePin } from "./pins";
 
 /** Kolik řádků má karta (stejně jako `notes::CARD_ROWS`). */
 const CARD_ROWS = 8;
@@ -27,6 +31,7 @@ export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: 
         <span class="pill" classList={{ g: n().tasksDone === n().tasksTotal, n: n().tasksDone < n().tasksTotal }} title={t("notes.row.tasks", "Splněné úkoly")}>{n().tasksDone}/{n().tasksTotal}</span>
       </Show>
       <Show when={remindLabel(n(), p.now)}>{(l) => <span class={`pill ${l()[0]}`}>{l()[1]}</span>}</Show>
+      <button class="note-pin" classList={{ on: isPinned(p.s.pins, n().path) }} aria-pressed={isPinned(p.s.pins, n().path)} title={isPinned(p.s.pins, n().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.rowPin", "Připnout na plochu — lístek přes ostatní okna")} onClick={() => togglePin(n().path)}><IconPin /></button>
     </div>
   );
 }
@@ -86,6 +91,7 @@ export function NotesCard(p: {
   personal?: boolean;
   /** ⋯ „Skrýt kartu“ z hlavní stránky (`cards/CardMenu.tsx`) */
   menu?: JSX.Element;
+  view?: CardView;
 }) {
   const tabs = () => (p.personal ? [] : tabsOf(p.s));
   // uložená záložka bez nehotových poznámek → Vše (volba zůstane zapamatovaná)
@@ -102,20 +108,22 @@ export function NotesCard(p: {
     <div class="card wide" data-anim>
       <h4>
         <span class="ic" style="background:var(--blue)" />{t("notes.card.title", "Poznámky")} <span class="n">{open() || ""}</span>
+        <button class="mini note-pin-new" onClick={() => newPin()} title={t("notes.pin.newTitle", "Nový lístek na plochu — poznámka přes ostatní okna (QA, checklist)")}><IconPin /></button>
         <button class="mini" onClick={() => p.onNew(newKind())} title={newKind() ? t("notes.card.newKind", "Nová: {kind}", { kind: kindOf(p.s.noteKinds, newKind()!).label }) : t("notes.card.newNote", "Nová poznámka")}>{t("notes.card.new", "+ Nová")}</button>
         {p.menu}
       </h4>
       <Show when={tabs().length > 2}>
         <Tabs tabs={tabs()} value={cur()} onChange={setTab} />
       </Show>
-      <For each={items()} fallback={
+      <Show when={!items().length}>
         <div class="empty">
           {t("notes.card.emptyShort", "Zatím žádné poznámky — i s obrázkem ze schránky.")}
           <button class="mini ok" onClick={() => p.onNew(newKind())}>{t("notes.card.add", "Přidat poznámku")}</button>
         </div>
-      }>
-        {(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}
-      </For>
+      </Show>
+      <div class="note-list" data-view={p.view ?? "list"}>
+        <For each={items()}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
+      </div>
       <Show when={moreCount() > 0 || (!p.personal && items().length > 0)}>
         <button class="mini note-more-btn" onClick={p.onAll}>{moreCount() > 0 ? tp("notes.card.more", moreCount(), "+{n} dalších") : t("notes.card.all", "Všechny poznámky")}</button>
       </Show>

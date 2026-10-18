@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "pins",
+  "description": "Lístky na plochu (okna note-*): jen poslech událostí (pin-note, pin-prefs); okno ovládají vlastní příkazy pin_*",
+  "windows": [
+    "note-*"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

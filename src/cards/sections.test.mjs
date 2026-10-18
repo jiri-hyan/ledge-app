@@ -30,7 +30,7 @@ test("výchozí: všechno zapnuté, chybějící pole = zapnuto", () => {
 test("klíče se shodují s Rustem (`config::Sections` v config.rs, camelCase)", () => {
   const src = readFileSync(new URL("../../src-tauri/src/config.rs", import.meta.url), "utf8");
   const body = src.slice(src.indexOf("sections! {"), src.indexOf("}", src.indexOf("sections! {")));
-  const rust = [...body.matchAll(/^\s*([a-z_]+),\s*$/gm)].map((m) => m[1].replace(/_([a-z])/g, (_, c) => c.toUpperCase()));
+  const rust = [...body.matchAll(/^\s*([a-z_]+)(?: = (?:true|false))?,\s*$/gm)].map((m) => m[1].replace(/_([a-z])/g, (_, c) => c.toUpperCase()));
   assert.deepEqual(rust, [...SECTION_KEYS]);
 });
 

@@ -1,20 +1,28 @@
 // Osobní: karta Kalendář — Dnes / Zítra (nebo nejbližší další den) z odkazů ICS. Data stahuje a vybírá
 // Rust (`calendar/live.rs`, `view.rs`); karta jen kreslí. Co Rust nemá, karta poctivě řekne (žádný
 // kalendář / načítám / nedostupné / stará data) — nic se nevymýšlí. Kalendář jde jedním klikem vypnout
-// (a zase zapnout) přímo v patičce karty; adresa se nikde neukazuje, jen název.
-import { For, Show, type JSX } from "solid-js";
+// (a zase zapnout) přímo v patičce karty; adresa se nikde neukazuje, jen název. U schůzky s odkazem
+// (Teams, Meet, Zoom, Webex, Jitsi — Rust `calendar/meeting.rs`) tlačítko Připojit; Outlook v tomto PC
+// se zavřeným Outlookem nabídne „Načíst z Outlooku“ (jen na klik — Ledge ho sám nespouští).
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { api, type CalendarDay, type CalendarItem, type Snapshot } from "../api";
 import { ago, fmtDate } from "../format";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
 import { say, sayError } from "../ui/toast";
-import { calColor, timeLabel, withCalendar } from "./model";
+import { calColor, joinable, placeLabel, providerName, startsIn, timeLabel, withCalendar } from "./model";
 import "./calendar.css";
 
 /** Nastavení → Osobní → Kalendáře (přidání, úpravy). */
 export function openCalendarSettings(onSettings: () => void) {
   onSettings();
   gotoSettingsPanel("f-personal.calendars");
+}
+
+/** w8: Q — zdroj z účtu (Microsoft / Google) se vypíná v Nastavení → Účty, ne v `personal.calendars`. */
+function openAccountSettings(onSettings: () => void, account: "microsoft" | "google") {
+  onSettings();
+  gotoSettingsPanel(account === "microsoft" ? "f-accounts.microsoft" : "f-accounts.google");
 }
 
 /** Zapne / vypne jeden kalendář (uloží jen to pole). S chybou configu neukládá — přepsal by se. */
@@ -40,8 +48,32 @@ function dayTitle(d: CalendarDay): string {
   return t("cards.calendar.later", "Příští · {date}", { date: fmtDate(new Date(y, m - 1, day)) });
 }
 
-function Row(p: { it: CalendarItem; day: string; color: string }) {
+/** Připojit: otevře ověřený odkaz na schůzku (Rust ho zkontroluje znovu). */
+async function join(url: string) {
+  try {
+    await api.calendarJoin(url);
+  } catch (e) {
+    sayError(e);
+  }
+}
+
+/** Načíst z Outlooku (výslovný klik — smí Outlook spustit na pozadí). */
+async function loadOutlook(setBusy: (b: boolean) => void) {
+  setBusy(true);
+  try {
+    const n = await api.calendarOutlookLoad();
+    say(t("cards.calendar.outlookLoaded", "Načteno z Outlooku — nadcházejících událostí: {n}.", { n: n ?? 0 }));
+  } catch (e) {
+    sayError(e);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function Row(p: { it: CalendarItem; day: string; color: string; now: number }) {
   const time = () => timeLabel(p.it, p.day);
+  const place = () => placeLabel(p.it);
+  const soon = () => startsIn(p.it, p.now);
   return (
     <div class="row cal-row">
       <span class="cal-dot" style={{ background: p.color }} aria-hidden="true" />
@@ -51,9 +83,17 @@ function Row(p: { it: CalendarItem; day: string; color: string }) {
       </span>
       <div class="grow">
         <div class="name" classList={{ "cal-now": p.it.ongoing }}>{p.it.title || t("cards.calendar.untitled", "(bez názvu)")}</div>
-        <Show when={p.it.location}><div class="sub" title={p.it.location}>{p.it.location}</div></Show>
+        <Show when={place()}><div class="sub" title={place()}>{place()}</div></Show>
       </div>
+      <Show when={soon()}>{(m) => <span class="pill b">{t("cards.calendar.soon", "za {n} min", { n: m() })}</span>}</Show>
       <Show when={p.it.ongoing}><span class="pill g">{t("cards.calendar.ongoing", "teď")}</span></Show>
+      <Show when={joinable(p.it, p.now) ? p.it.join : null}>
+        {(j) => (
+          <button class="mini ok cal-join" title={t("cards.calendar.joinTitle", "Připojit se přes {app}", { app: providerName(j().provider) })} onClick={() => join(j().url)}>
+            {t("cards.calendar.join", "Připojit")}
+          </button>
+        )}
+      </Show>
     </div>
   );
 }
@@ -67,6 +107,7 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
   const fetched = () => cals().some((c) => c.enabled && c.fetchedMs != null);
   const problems = () => cals().filter((c) => c.enabled && c.error);
   const add = () => openCalendarSettings(p.onSettings);
+  const [olBusy, setOlBusy] = createSignal(false);
   /** proč chybí dnešek: „Dnes už nic.“ / „Dnes ani zítra nic.“ */
   const lead = () => {
     const d = days();
@@ -94,23 +135,38 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
             {(d) => (
               <div class="cal-day">
                 <div class="cal-day-h">{dayTitle(d)}</div>
-                <For each={d.items}>{(it) => <Row it={it} day={d.date} color={color(it.cal)} />}</For>
+                <For each={d.items}>{(it) => <Row it={it} day={d.date} color={color(it.cal)} now={p.now} />}</For>
               </div>
             )}
           </For>
           <Show when={(v()?.more ?? 0) > 0}><div class="cal-more">{t("cards.calendar.more", "+ další {n}", { n: v()!.more })}</div></Show>
         </Show>
-        <For each={problems()}>{(c) => <div class="sub err">{t("cards.calendar.problem", "{name}: {error}", { name: c.name, error: c.error! })}</div>}</For>
+        <For each={problems()}>
+          {(c) => (
+            <div class="cal-problem">
+              <span class="sub err">{t("cards.calendar.problem", "{name}: {error}", { name: c.name, error: c.error! })}</span>
+              <Show when={c.hint === "outlook-closed"}>
+                <button class="mini" disabled={olBusy() || v()?.loading} onClick={() => loadOutlook(setOlBusy)}>
+                  {olBusy() ? t("cards.calendar.outlookLoading", "Načítám z Outlooku…") : t("cards.calendar.outlookLoad", "Načíst z Outlooku")}
+                </button>
+              </Show>
+            </div>
+          )}
+        </For>
         <div class="cal-foot">
           <For each={cals()}>
             {(c, i) => (
               <button
                 class="cal-chip"
                 classList={{ "cal-chip-off": !c.enabled, "cal-chip-bad": !!c.error }}
-                title={c.enabled
-                  ? t("cards.calendar.chipOff", "{name} ({domain}) — kliknutím vypneš", { name: c.name, domain: c.domain })
+                title={c.account
+                  ? t("cards.calendar.chipAccount", "{name} ({domain}) — účet nastavíš v Nastavení → Účty", { name: c.name, domain: c.domain })
+                  : c.enabled
+                  ? c.domain
+                    ? t("cards.calendar.chipOff", "{name} ({domain}) — kliknutím vypneš", { name: c.name, domain: c.domain })
+                    : t("cards.calendar.chipOffLocal", "{name} — kliknutím vypneš", { name: c.name })
                   : t("cards.calendar.chipOn", "{name} je vypnutý — kliknutím zapneš", { name: c.name })}
-                onClick={() => setEnabled(i(), !c.enabled, c.name, p.s.cfgError)}
+                onClick={() => (c.account ? openAccountSettings(p.onSettings, c.account) : setEnabled(i(), !c.enabled, c.name, p.s.cfgError))}
               >
                 <span class="cal-dot" style={{ background: color(i()) }} />
                 {c.name}

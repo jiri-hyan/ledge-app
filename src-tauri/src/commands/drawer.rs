@@ -20,6 +20,7 @@ pub(crate) fn set_mode(mode: String) {
     *core().mode.lock() = id;
     maybe_refresh_weather(false);
     crate::calendar::live::maybe_refresh(false);
+    crate::widgets::live::wake_if_used(&core().cfg.read());
     mark_dirty();
 }
 

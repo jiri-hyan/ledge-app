@@ -49,6 +49,8 @@ pub(crate) fn apply_config(mut new: Config) {
         maybe_refresh_weather(false);
     }
     crate::calendar::live::on_config(&old, &new);
+    crate::accounts::calsync::on_config(&old, &new);
+    crate::accounts::mail::on_config(&old, &new);
     if old.personal.links != new.personal.links {
         reclassify_links();
     }
@@ -58,6 +60,8 @@ pub(crate) fn apply_config(mut new: Config) {
     if old.scripts != new.scripts {
         crate::scripts::refresh_async();
     }
+    // widgety: jiná složka = sken znovu; nová karta / položka proužku = probudit plánovač
+    crate::widgets::live::on_config(&old, &new);
     if old.drawer.sections != new.drawer.sections || old.modes != new.modes {
         // právě hraje / hlasitost / baterie: vypnutá karta = konec odběrů (`media.rs` a spol.)
         crate::media::sync(&new);
@@ -74,6 +78,11 @@ pub(crate) fn apply_config(mut new: Config) {
     }
     if old.update != new.update {
         c.updater.set_config(new.update.clone());
+    }
+    // karty GitHub / Systém: nová volba = čerstvá data; položka proužku zapne / vypne plánovač
+    crate::github::on_config(&old.github, &new.github);
+    if old.strip != new.strip || old.github != new.github || old.system != new.system {
+        crate::integrations::sync(&new);
     }
     mark_dirty();
 }

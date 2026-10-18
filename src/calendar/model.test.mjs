@@ -3,7 +3,7 @@
 //   node --experimental-strip-types --test src/calendar/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CAL_COLORS, calColor, domainOf, nextColor, normalizeUrl, provider, timeLabel, withCalendar } from "./model.ts";
+import { CAL_COLORS, calColor, domainOf, joinable, nextColor, normalizeUrl, outlookFeed, placeLabel, provider, providerName, remindOf, remindOptions, sourceOf, startsIn, timeLabel, withCalendar } from "./model.ts";
 
 const SECRET = "https://calendar.google.com/calendar/ical/jana%40example.com/private-0123456789abcdef/basic.ics";
 
@@ -75,4 +75,54 @@ test("withCalendar mění jedno pole jednoho kalendáře a nesahá na vstup", ()
   assert.equal(out.personal.weather, cfg.personal.weather);
   assert.equal(withCalendar(cfg, 5, { enabled: false }), cfg);
   assert.equal(withCalendar({}, 0, { enabled: false }).personal, undefined);
+});
+
+test("zdroj: starý config = ICS, Outlook v PC a účty poznané", () => {
+  assert.equal(sourceOf({}), "ics");
+  assert.equal(sourceOf(null), "ics");
+  assert.equal(sourceOf({ source: "outlook-local" }), "outlook-local");
+  assert.equal(sourceOf({ source: "google" }), "google");
+  assert.equal(sourceOf({ source: "nesmysl" }), "ics");
+  const o = outlookFeed("#60a5fa");
+  assert.deepEqual([o.source, o.url, o.remindMin, o.remindToast, o.enabled], ["outlook-local", "", 5, false, true]);
+});
+
+test("Připojit: jen s odkazem a do konce události; místo = odkaz se neukazuje", () => {
+  const join = { provider: "zoom", url: "https://zoom.us/j/1" };
+  const cases = [
+    [{ start: 0, end: 1000, join }, 500, true],
+    [{ start: 0, end: 120_000, join }, 120_000, false],
+    [{ start: 0, end: 0, join }, 59_999, true],
+    [{ start: 0, end: 1000, join: null }, 500, false],
+    [{ start: 0, end: 1000 }, 500, false],
+  ];
+  for (const [it, now, want] of cases) assert.equal(joinable(it, now), want, JSON.stringify([it, now]));
+  assert.equal(placeLabel({ location: "https://zoom.us/j/1", join }), "");
+  assert.equal(placeLabel({ location: "https://zoom.us/j/1", join: null }), "https://zoom.us/j/1");
+  assert.equal(placeLabel({ location: " Zasedačka ", join }), "Zasedačka");
+  assert.equal(providerName("teams"), "Teams");
+  assert.equal(providerName("x"), "");
+});
+
+test("začíná za: do 15 min nahoru zaokrouhleno, celodenní a probíhající ne", () => {
+  const m = 60_000;
+  const cases = [
+    [{ start: 5 * m, allDay: false }, 0, 15, 5],
+    [{ start: 5 * m, allDay: false }, 1, 15, 5],
+    [{ start: 5 * m, allDay: false }, 4 * m + 1, 15, 1],
+    [{ start: 16 * m, allDay: false }, 0, 15, null],
+    [{ start: 0, allDay: false }, 0, 15, null],
+    [{ start: 5 * m, allDay: true }, 0, 15, null],
+  ];
+  for (const [it, now, within, want] of cases) assert.equal(startsIn(it, now, within), want, JSON.stringify([it, now]));
+});
+
+test("připomínka: volby, vlastní hodnota z configu, výchozí 5", () => {
+  assert.deepEqual(remindOptions(5), [0, 1, 5, 10, 15, 30]);
+  assert.deepEqual(remindOptions(7), [0, 1, 5, 7, 10, 15, 30]);
+  assert.deepEqual(remindOptions(500), [0, 1, 5, 10, 15, 30]);
+  assert.deepEqual(remindOptions(undefined), [0, 1, 5, 10, 15, 30]);
+  assert.equal(remindOf({}), 5);
+  assert.equal(remindOf({ remindMin: 0 }), 0);
+  assert.equal(remindOf(null), 5);
 });

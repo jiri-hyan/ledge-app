@@ -14,7 +14,7 @@ bez UI. Architektura je v hlavičkách souborů `src-tauri/src/*.rs`.
 (záložky, karty, přihrádka) · **Vzhled** (4 kroky: Zavřený — vzhled zavřeného Ledge a celý proužek; Po najetí; Otevřený — styl, šířka a hustota na monitoru ve skutečném poměru, barvy; Pohyb — animace; jazyk) · **Projekty,
 akce a odkazy** (projekty se autodetekcí ze složky, jeden seznam akcí — odkaz je akce —, skripty) · **Claude**
 (schvalování, otázky, limity, útrata, hlídač, hooky) · **Osobní** (počasí, kalendář, přehrávač, časovač,
-historie schránky) · **Poznámky** (i sync) · **Chování** (otevírání, zkratky, paleta, herní režim, šuplík nad
+historie schránky, GitHub, Systém) · **Poznámky** (i sync) · **Chování** (otevírání, zkratky, paleta, herní režim, šuplík nad
 prohlížečem, spouštění po startu, šetřit paměť) · **Záloha a aplikace** (export / import s výběrem částí /
 obnova výchozích, verze, aktualizace). Hledání (Ctrl+F) najde i staré názvy voleb. Ruční
 úprava souboru níže je pro pokročilé a pro agenty; Nastavení ukáže chybu validace přímo u pole.
@@ -54,6 +54,15 @@ Typické úpravy:
   manifestu a obvyklé soubory (`public/favicon.*`, `build/icon.*`, `src-tauri/icons/…`), SVG a větší
   PNG mají přednost. Rastry se převádí na PNG ≤ 128 px. `logo` uváděj jen, když autodetekce vybere
   špatně. Přepočet: po změně configu, po klonu a při otevření šuplíku nejvýš 1× za 5 min.
+- **Vzhled jednotlivé dlaždice** (`look`, projekt i akce, `src-tauri/src/tilelook.rs`; chybí = automaticky
+  jako dřív, nic se nepíše): `"look": { "icon": { "kind": "emoji", "value": "🎮" }, "color": "#2563eb",
+  "shape": "circle", "label": "Web", "hideLabel": true }`. `icon.kind`: `emoji` (≤ 8 znaků) | `glyph`
+  (systémová ikona Segoe Fluent Icons, kód `E80F`, rozsah E000–F8FF) | `image` (klíč 16 hex — obrázek
+  vybraný v šuplíku, zmenšený přes WIC do `%LOCALAPPDATA%\Ledge\looks\<klíč>.png`; ručně ho nezadávej,
+  chybějící soubor = Auto). `color` = podklad `#rrggbb` (kresba černá / bílá podle kontrastu ≥ 4.5:1),
+  `shape` `rounded` (výchozí) | `circle` | `square` | `glass`, `label` ≤ 40 znaků. Mění se v šuplíku: pravý
+  klik na dlaždici / ⋯ v akcích dlaždice → „Upravit vzhled…“ (v režimu úprav stačí klik); přehled a
+  „Obnovit vše“ v Nastavení → Šuplík a karty → Upravené karty a zástupci.
 - **Projekt, který na tomhle PC není** (dlaždice „nenalezeno“), má v rychlých akcích **Naklonovat**:
   `gh repo clone <owner/repo>` (jiný hostitel než GitHub: `git clone <url>`) do první složky z `roots`
   (kolize jména → `<repo>-<owner>`, `<repo>-2`…), bez okna, termín 15 min, pak se projekt dohledá sám.
@@ -64,7 +73,9 @@ Typické úpravy:
     "pages": [
       { "id": "prace", "name": "", "cards": [{ "id": "projects", "size": "xl" }, { "id": "claude", "size": "m", "h": 3 }] },
       { "id": "osobni", "name": "", "cards": [{ "id": "projects", "size": "xl",
-          "tiles": { "size": "small", "label": true, "git": false, "hidden": ["harbor"] } }] },
+          "tiles": { "size": "small", "label": true, "git": false, "hidden": ["harbor"],
+            "folders": [{ "id": "slozka", "name": "Weby", "items": ["ledge", "kino"] }] } },
+        { "id": "repos", "size": "m", "look": { "accent": "teal", "bg": "tint", "hideHead": true, "density": "compact", "view": "tiles" } }] },
       { "id": "hry", "name": "Hry", "icon": "🎮", "cards": [{ "id": "media", "size": "m" }] }
     ],
     "hiddenParts": ["claudeCosts"],
@@ -74,7 +85,10 @@ Typické úpravy:
   Záložky v pořadí (1–9, klávesy 1–9 / paleta „Přejít na záložku“); `prace` a `osobni` jsou vestavěné
   (prázdný `name` = „Práce“ / „Osobní“ podle jazyka), vlastní záložka potřebuje `name`, `id` = `a-z0-9-`.
   Karty: `projects`, `running`, `claude`, `repos`, `notes`, `actions`, `shelf`, `clock`, `timer`, `weather`,
-  `calendar`, `links`, `media` (Právě hraje + hlasitost); stejná karta smí být na víc záložkách, na jedné
+  `calendar`, `links`, `media` (Právě hraje + hlasitost), `github`, `system`, `mail` (Pošta — účet Microsoft;
+  ty tři jsou jen v katalogu, na žádné záložce ve výchozím rozložení nejsou — `layout::OPT_IN`) a **dynamické** `widget:<soubor>` (widget ze
+  skriptu ve složce widgetů — jen jméno souboru, bez cesty; katalog je nabízí podle složky, viz „Widgety ze
+  skriptů“); stejná karta smí být na víc záložkách, na jedné
   jen jednou. `size`: `s` (1 sloupec), `m` (2), `l` (3), `xl` (celá řada) z `--deck-cols` (výchozí 4 — počet
   sloupců určuje styl rozložení ve Vzhledu). **Řada nikdy nekončí prázdným místem:** karty jdou v pořadí
   záložky a volné sloupce řady, do které se další karta nevejde, dostanou karty té řady (pořadí se nemění).
@@ -82,13 +96,22 @@ Typické úpravy:
   výškou obsah scrolluje uvnitř karty, ne celý šuplík. `tiles` (jen karta `projects` = zástupci, volby
   pro tu záložku): `size` `small` (malé ikony) | `tile` (výchozí) | `large`, `label` (název pod ikonou,
   výchozí `true`), `git` (větev a stav gitu, výchozí `true`), `hidden` = id projektů, které tu nejsou
-  (prázdné = všechny, nový projekt se ukáže sám). `upgrades` = jednorázové úpravy rozložení po aktualizaci,
+  (prázdné = všechny, nový projekt se ukáže sám), `folders` = složky zástupců (v režimu úprav tah dlaždice
+  na jinou = složka, na složku = do ní, ze složky ven = vyjmout; `id` `a-z0-9-`, `name` ≤ 32 znaků, projekt
+  jen v jedné složce, prázdná složka zmizí; chybí = žádné). `look` (volitelné, každá karta zvlášť — i nové
+  karty; chybí = podle design stylu): `accent` (`accent`, `blue`, `green`, `amber`, `red`, `violet`, `teal`
+  = barvy motivu, nebo `#rrggbb`), `bg` (`tint` jemný tón akcentu | `solid` plné | `clear` průhledné),
+  `hideHead` (bez hlavičky, ⋯ zůstane při najetí), `density` (`compact` | `airy`), `view` jen u karet
+  `projects` (výchozí `tiles`), `repos` a `notes` (výchozí `list`), `actions` (výchozí `tiles`): `list` |
+  `tiles` | `compact`. V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu).
+  `upgrades` = jednorázové úpravy rozložení po aktualizaci,
   které už proběhly — neměň ručně: `personalProjects` dá kartu Projekty nahoru na Osobní, když
   tam nikdy nebyla (jen když ji uživatel používá na jiné záložce a Osobní existuje); odebereš-li ji
   potom, už se nevrátí.
   Karta, která není na žádné záložce, je skrytá a nic nepočítá: skryté počasí ani kalendář se nestahují
   (stahují se, jen když je karta na otevřené záložce), skrytá útrata / karta Claude neindexuje transcripty,
-  skryté Právě hraje / hlasitost / Čas (baterie) zruší odběry událostí Windows. `hiddenParts` = skryté části
+  skryté Právě hraje / hlasitost / Čas (baterie) zruší odběry událostí Windows, skrytý GitHub / Systém
+  nevolá `gh` ani nevzorkuje. `hiddenParts` = skryté části
   karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude), `nowPlaying`, `sound`
   (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (přetáhnout, **tah za pravý okraj karty
   = šířka, za spodní = výška, za roh = obojí** s obrysem „2 × 3“, ⇔ / ↕ klikem, × do katalogu, „+ Přidat
@@ -111,8 +134,13 @@ Typické úpravy:
   Ledge už má (nic nestahuje, fokus nebere); ve hře / herním režimu se neukáže. Bez myši:
   `POST /ctl/open {"view":"compact"}` / `{"view":"island"}`.
 - **Proužek** — `strip.items` (pořadí): `mode`, `clock`, `running`, `claude`, `waiting`, `repos`, volitelně
-  `limits` (limity Claude 5h / týden), `custom` (vlastní text), `timer` (časovač) a `media` (právě hraje:
-  „♪ Název · Interpret“ jen při přehrávání, pauza / nic = žádný segment) — ve výchozím stavu vypnuté. Config proužku žije v `src-tauri/src/stripconf.rs` (re-export z `config.rs`). Další pole:
+  `limits` (limity Claude 5h / týden), `custom` (vlastní text), `timer` (časovač), `media` (právě hraje:
+  „♪ Název · Interpret“ jen při přehrávání, pauza / nic = žádný segment), `mail` (pošta účtu Microsoft:
+  „✉ 3“ jen při nepřečtených; s touto položkou se pošta obnovuje nejvýš 1× za 5 min i se zavřeným šuplíkem,
+  jen ve stylu `classic`), `github` („GitHub: 2× čeká na revizi“,
+  jen když > 0 a jen se zapnutým `github.enabled`) a `system` („CPU 23 % · RAM 61 %“) — ve výchozím stavu vypnuté — a
+  parametrizovaná `widget:<soubor>` (text widgetu ze skriptu ≤ 24 znaků, barva výstupu jako tečka; jde i do
+  `strip.colors` / `strip.quiet` jako klíč). Config proužku žije v `src-tauri/src/stripconf.rs` (re-export z `config.rs`). Další pole:
   - `strip.custom` — text položky `custom`: krátký text a/nebo emoji, nejvýš 24 znaků (víc = chyba
     validace); prázdný = položka nic neukáže. Emoji kreslí proužek jednobarevně (DirectWrite bez barevných fontů).
   - `strip.colors` — barva textu položky, `{"clock": "teal", "custom": "accent"}`; předvolby `accent`
@@ -122,7 +150,7 @@ Typické úpravy:
   - `strip.quiet` — položky skryté „v klidu“, ukážou se jen, když se něco děje: běží server, Claude
     pracuje / čeká / je hotový, běží časovač, hraje hudba (`media`), limity ≥ 70 %, připomínka po termínu nebo barevná linka
     (neuložená repa se jako událost nepočítají — je to trvalý stav). Smysl má u `mode`, `clock`, `custom`,
-    `limits`; `running`, `claude`, `waiting`, `repos`, `timer`, `media` se v klidu neukazují samy. Výchozí `[]`.
+    `limits`; `running`, `claude`, `waiting`, `repos`, `timer`, `media`, `github` se v klidu neukazují samy (`system` je stálá, smysl má „Jen při dění“ i u ní). Výchozí `[]`.
   - Nastavení → Vzhled → Zavřený → Pokročilé → Co proužek ukazuje (celý proužek je v panelu Vzhled): řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
     náhled s ukázkovými texty (přepínač „V klidu / Když se něco děje“).
   - `strip.look` — **styl zavřeného Ledge** (vlna 7, `src-tauri/src/looks/*`, kreslí `stripdraw.rs`): jedna volba
@@ -154,7 +182,7 @@ Typické úpravy:
   odpočet přežije restart Ledge (aktualizace); doběhl-li mezitím, ukáže se jen tiše „čas vypršel“. Smazání
   souboru = nic neběží po dalším startu.
 - **Kalendář (jen čtení, bez přihlášení)** — `personal.calendars` (Nastavení → Osobní → Kalendáře; kód
-  `src-tauri/src/calendar/`, mapa `docs/codemap/calendar.md`): seznam `{ "name", "url", "color", "enabled" }`
+  `src-tauri/src/calendar/`, mapa `docs/codemap/calendar.md`): seznam `{ "name", "url", "color", "enabled", "source", "remindMin", "remindToast" }`
   (nejvýš 8). `url` = **tajná adresa ve formátu iCal** (Google: Nastavení kalendáře → Integrovat kalendář;
   Outlook: Nastavení → Kalendář → Sdílené kalendáře → Publikovat kalendář → ICS), jen `https://`
   (`webcal://` se bere jako https, `http://` neprojde validací). Adresa je tajemství: Ledge ji neloguje, v chybách
@@ -167,6 +195,43 @@ Typické úpravy:
   zapnutou kartou, když jsou data starší 15 min (po pokusu 2 min pauza), odpověď nejvýš 5 MB / 15 s; v klidu
   nic. Opakování (RRULE běžné tvary, EXDATE, RECURRENCE-ID) a pásma (VTIMEZONE z feedu, běžné IANA
   i Windows názvy; neznámé = místní čas, karta ho označí „≈“).
+  - **Zdroj** `source` (výchozí `"ics"` = starý config beze změny): `"outlook-local"` = výchozí kalendář
+    **klasického Outlooku v tomto PC** přes COM (bez přihlášení a sítě; `url` se nepoužije, v seznamu nejvýš
+    jednou). Automaticky se načte jen když Outlook běží (připojí se, žádné okno ani fokus); zavřený Outlook
+    jen po kliku „Načíst z Outlooku“ (COM ho spustí na pozadí). Text pozvánky (odkaz Teams) čte jen když
+    Outlook volajícímu věří (`Application.IsTrusted`) — jinak by vyskočila bezpečnostní výzva Outlooku.
+    Nový Outlook COM nemá → odkaz ICS. `"graph"` / `"google"` + `account` = účty Microsoft / Google
+    (`calendar/graph.rs`, `google.rs` přes `source::adapter`; přihlášení v Nastavení → Účty). Bez řádku tady
+    dá kalendář účtu do karty přepínač `accounts.*.calendar` (bez připomínky); je-li zapnutý řádek téhož
+    účtu tady, vede ho tenhle (připomínka, Připojit) a přepínač účtu se nezdvojí.
+  - **Připojit:** z vlastností schůzky (`X-MICROSOFT-SKYPETEAMSMEETINGURL`, `X-GOOGLE-CONFERENCE`,
+    `CONFERENCE`), `URL`, místa a popisu (i HTML, Safe Links) Ledge vezme odkaz Teams / Meet / Zoom / Webex /
+    Jitsi a u události ukáže tlačítko Připojit (Teams rovnou v aplikaci `msteams:`, jinak https; Tauri
+    `calendar_join` otevře jen ověřený odkaz známé služby).
+  - **Připomínka:** `remindMin` (výchozí `5`, `0` = vypnuto, nejvýš `120`) minut před začátkem časové
+    události proužek ukáže „📅 Název za 5 min“ (modře, i s vypnutým proužkem; priorita mezi „čeká na
+    tebe“ a „hotovo“), blikne a pulsne; `remindToast: true` (výchozí `false`) navíc pošle toast Windows
+    s tlačítkem Připojit. Budík jen na čas připomínky, nic se kvůli ní nestahuje (data z posledního
+    načtení / cache). Ve fullscreen hře / herním režimu nic, toast ani při „nerušit“ nebo otevřeném šuplíku.
+- **Účty Microsoft a Google (OAuth)** — sekce `accounts` (Nastavení → Účty; kód `src-tauri/src/accounts/`,
+  mapa `docs/codemap/accounts.md`, návod pro uživatele `docs/ucty.md`). Výchozí = nic nepřihlášeno, žádná síť.
+  ```json
+  "accounts": {
+    "microsoft": { "clientId": "", "tenant": "common", "calendar": true, "mail": true, "color": null },
+    "google": { "clientId": "", "calendar": true, "calendars": [], "color": null }
+  }
+  ```
+  `clientId` = Client ID **vlastní registrace aplikace** uživatele (Ledge žádné výchozí nemá — veřejná
+  open-source appka bez ověřeného OAuth klienta): Microsoft = GUID z Azure Portal (veřejný klient, redirect
+  `http://localhost`), Google = `….apps.googleusercontent.com` (klient „Desktop app“). `tenant` = `common` /
+  `organizations` / `consumers` / ID tenantu. `calendar` = události účtu v kartě Kalendář (za odkazy ICS),
+  `mail` = karta Pošta + položka proužku `mail`; `calendars` = id kalendářů Google (prázdné = hlavní, nejvýš
+  10); `color` `#rrggbb` nebo `null`. **Přihlášení samo v configu není:** refresh token (a u Google „client
+  secret“, který u desktopových klientů tajný není) leží ve Správci pověření Windows (`Ledge/accounts/<účet>`),
+  access token jen v paměti; config, log ani chyby žádné tokeny neobsahují. Oprávnění: Microsoft `offline_access
+  User.Read Calendars.Read Mail.ReadBasic`, Google `calendar.readonly` (Gmail ne — „restricted“ scopes chtějí
+  audit). Stahuje se jen s viditelnou kartou (kalendář jako ICS: 15 min, pošta 2 min), termín 15 s na dotaz.
+  Tauri: `accounts_status`, `account_connect`, `account_cancel`, `account_disconnect`, `account_google_calendars`.
 - **Připomínka resetu limitu** — `claude.limitsReminder` (výchozí `true`): když 5h nebo týdenní limit
   Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
 - **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
@@ -198,6 +263,9 @@ Typické úpravy:
   uložení poznámky, zkratka znovu) ho vrátí aplikaci, ve které jsi byl — jen pokud je Ledge pořád v
   popředí a to okno ještě existuje; spuštění akce nebo projektu fokus nechá novému oknu.
   `hotkeys.gameMode` (výchozí prázdné = bez zkratky) přepíná herní režim a platí i v něm.
+  `hotkeys.notePassthrough` (výchozí `Ctrl+Alt+P`, prázdné = bez zkratky) přepne průchozí režim u všech
+  lístků na ploše — **výjimka z `enabled`**: registruje se jen, když je na ploše aspoň jeden lístek, i se
+  zkratkami vypnutými (na průchozí lístek nejde kliknout). Kolize se hlásí jen při `enabled: true`.
 - **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Chování →
   Kompaktní paleta příkazů): `Ctrl+K` / 🔍 ukáže jen vyhledávací pole, výsledky se rozbalí až při psaní,
   s prázdným polem šipka dolů ukáže nedávné. Chybějící sekce `palette` = dnešní chování.
@@ -254,6 +322,10 @@ Typické úpravy:
   se neukáže, dokud složka neexistuje), `dir` (chybí = `%USERPROFILE%\Ledge\scripts`, `%PROMĚNNÉ%` se
   rozbalí, jinak absolutní cesta), `inActions` (výchozí `false`; `true` = i dlaždice v kartě Rychlé
   akce). Formát skriptů viz „Skripty (Script Commands)“ níže.
+- **Widgety ze skriptů** — sekce `widgets` (Nastavení → Projekty, akce a odkazy → Widgety ze skriptů):
+  `enabled` (výchozí `true`, ale nic neběží, dokud widget nepřidáš na záložku / do proužku a nepovolíš ho),
+  `dir` (chybí = `%USERPROFILE%\Ledge\widgets`, `%PROMĚNNÉ%` se rozbalí, jinak absolutní cesta). Starý
+  config bez `widgets` = výchozí. Formát viz „Widgety ze skriptů“ níže a `docs/widgets.md`.
 
 ## Právě hraje, hlasitost, baterie (záložka Osobní)
 
@@ -280,6 +352,29 @@ Typické úpravy:
   s ozdobou ▂▅▃ místo ♪). Změna skladby / pauza → událost GSMTC → `mark_dirty` → překreslení; čas jen po minutách
   (≤ 1 probuzení vlákna `emit` za minutu při přehrávání), sekundy proužek neukazuje. Ve fullscreen hře / herním režimu je proužek pryč jako vždy.
 
+## GitHub a Systém (karty `github`, `system`; Nastavení → Osobní)
+
+Dvě karty z katalogu (✎ → + Přidat kartu), **výchozí na žádné záložce**. Starý config se nemění.
+
+- **GitHub** — sekce `github`: `enabled` (výchozí `false`!), `review` / `mine` / `notifications` (výchozí `true`: co
+  ukázat), `refreshMin` (výchozí `5`, 2–60). Zdroj je přihlášené **`gh`** (GitHub CLI; hledá se v `PATH`, pak
+  `%ProgramFiles%GitHub CLI`, `%LOCALAPPDATA%ProgramsGitHub CLI` a `…MicrosoftWinGetLinks`) — Ledge nemá vlastní
+  OAuth, žádný token nevidí ani neukládá. Tři dotazy souběžně, bez okna, termín 15 s každý: `gh search prs
+  --review-requested=@me` (čeká na tvoji revizi), `gh api graphql` `viewer.pullRequests` (tvoje otevřená PR se stavem
+  CI z `statusCheckRollup`) a `gh api notifications` (počet + 5 nejnovějších, nad 50 „50+“). Klik na položku ji otevře
+  v prohlížeči (jen `https://github.com/…`). Obnova jen když je karta vidět (otevřený šuplík) nebo je zapnutá položka
+  proužku `github`, vždy po `refreshMin` (tlačítko Obnovit nejdřív po 10 s); data jsou jen v paměti. Prázdné stavy:
+  vypnuto („Zapnout GitHub“ jedním klikem s větou, co se čte), `gh` chybí, nepřihlášeno („gh auth login“ + Kopírovat),
+  offline (zůstanou poslední data + chyba). Tauri: `github_view(force)`, `github_open(url)`, `github_copy_login`.
+- **Systém** — sekce `system`: `disks` (písmena disků, prázdné = všechny pevné), `netUnit` (`bytes` = MB/s, `bits` =
+  Mbit/s). CPU % z dvou vzorků `GetSystemTimes`, paměť `GlobalMemoryStatusEx`, volné místo pevných disků
+  (`GetDiskFreeSpaceExW`, čte se nejvýš 1× za 30 s), síť `GetIfTable2` (jen fyzické adaptéry nahoře). Žádné WMI, žádný
+  proces. Vzorkuje se **jen** s viditelnou kartou (1× za 2 s) nebo se zapnutou položkou proužku `system` (1× za 10 s);
+  sparkline = posledních 60 vzorků karty v paměti. Klik na CPU / paměť otevře Správce úloh. Teplota a GPU záměrně
+  ne (nespolehlivé). Tauri: `system_view`, `system_taskmgr`.
+- **Proužek:** položky `github` a `system` (výchozí vypnuté) drží plánovač `integrations.rs`; bez nich žádné vlákno
+  neběží. Ve fullscreen hře (Ledge „mrtvý“) se nevzorkuje ani nevolá `gh`.
+
 ## Rychlé akce (`actions`)
 
 Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a položky palety příkazů
@@ -304,7 +399,8 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   `web` (http/https ve vlastním malém okně Ledge, viz níže).
 - Volitelné: `args` (pole, bez uvozovek), `cwd` (absolutní; výchozí domovská složka), `icon`
   (chybí/`"auto"` = favicon webu nebo ikona souboru, `"monogram"`, nebo cesta k png/ico/jpg/svg),
-  `group`, `confirm` (ptát se před každým spuštěním), `showOn` (`work`/`personal`/`both`).
+  `group`, `confirm` (ptát se před každým spuštěním), `showOn` (`work`/`personal`/`both`), `look`
+  (vlastní vzhled dlaždice — stejný tvar jako u projektů výš; přebije `icon`).
   Výchozí hodnoty se do souboru nepíšou. `id` = a–z, 0–9, `-`, `_`, jednoznačné; nejvýš 64 akcí.
 - **Agent smí akce přidávat a měnit** (web, složka, soubor, aplikace bez argumentů se spouští hned).
   **Příkaz a aplikace s argumenty se bez souhlasu člověka vždy ptají** — souhlas uděluje jen člověk
@@ -377,6 +473,58 @@ Get-ChildItem $env:TEMP | Where-Object LastWriteTime -lt (Get-Date).AddDays(-$Da
   hlavička + hash jen u souborů se změněným mtime / velikostí. Nejvýš 200 skriptů (podle jména),
   soubor nad 1 MB se nespustí.
 
+### Widgety ze skriptů
+
+Jako xbar / SwiftBar / Übersicht: soubor ve složce widgetů (`.ps1`, `.cmd`/`.bat`, `.py`, `.js`/`.mjs`,
+`.exe`) s hlavičkou `@ledge.widget` vypíše na stdout data → Ledge z nich nakreslí **kartu** (`widget:<soubor>`
+v `layout`) a/nebo **položku proužku** (`widget:<soubor>` v `strip.items`). Návod pro lidi: `docs/widgets.md`,
+mapa kódu `docs/codemap/widgets.md`.
+
+```powershell
+# @ledge.widget Docker
+# @ledge.icon 🐳
+# @ledge.refresh 1m
+# @ledge.show both
+# @ledge.timeout 15
+@{ title = 'Docker'; strip = '🐳 2 běží'; items = @(@{ label = 'web'; value = 'Up 2h'; color = 'green'; copy = 'a1b2' }) } | ConvertTo-Json -Depth 5 -Compress
+```
+
+- Hlavička (komentáře jako u skriptů, prvních 4 KB): `widget` (**název**, povinný; prázdný = `title`) ·
+  `icon` · `description` · `refresh` (`30s`, `5m`, `1h`, `1h30m`; výchozí `5m`, kratší než 30 s = 30 s,
+  nejvýš `24h`) · `show` (`card` výchozí, `strip`, `both` — kam ho katalog / proužek nabídne) · `timeout`
+  (1–120 s, výchozí 10) · `args`. Soubor bez `@ledge.widget` není widget. **`.exe`** má hlavičku vedle
+  sebe v `<jméno>.exe.ledge` (holé řádky `@ledge.…`); otisk = program + hlavička.
+- **Výstup JSON** (doporučený): `title`, `text` (víc řádků), `badge`, `progress` (0–1, nebo `"42%"`),
+  `strip` (≤ 24 znaků; chybí = `badge`, pak první řádek `text`), `color`, `items[]` = `{label, value, icon,
+  color, url | action}` (nejvýš 50); `action` = `{"type":"open","path":"C:\\…"}` (složka / dokument z
+  allowlistu odkazů, žádné programy) · `{"type":"copy","text":"…"}` · `{"type":"run","script":"x.ps1","arg":"…"}`
+  (skript ze složky **skriptů**, který člověk už povolil z palety, bez `@ledge.confirm`; `arg` se přidá za jeho
+  `@ledge.args`). Zkratky na položce: `copy`, `open`, `run` + `arg`. `url` jen http(s). Barvy = předvolby
+  `accent text muted violet blue teal green amber red` (+ aliasy `ok`, `warn`, `error`, `gray`… a `#rrggbb`
+  podle odstínu). Pole položek, samotný text i rozbitý JSON projdou (rozbitý = text s poznámkou).
+- **Výstup text** (à la xbar): 1. řádek = proužek (`| color=…`), další řádky do `---` = text karty, za `---`
+  položky `Popisek | href=… color=… copy=… open=… run=… arg=… icon=… value=…` (hodnoty s mezerou v uvozovkách),
+  `---` = oddělovač, `--` na začátku (podmenu) se zploští. `bash=` / `shell=` / `terminal=` Ledge **nikdy
+  nespouští** (karta to řekne).
+- **Běh**: jen když je karta na otevřené záložce (šuplík otevřený) nebo widget v zapnutém proužku a Ledge není
+  mrtvý (fullscreen hra / herní režim); jinak vlákno `widgets` spí bez časovače. Další běh = konec + interval +
+  jitter (≤ 10 % intervalu, nejvýš 15 s); nikdy dvakrát souběžně, nejvýš 3 widgety naráz. Bez okna
+  (`CREATE_NO_WINDOW`), stdin prázdný, pracovní složka = složka widgetu, termín → zabití celého stromu (Job
+  Object), stdout nad 256 KB = chyba, žádné zvýšení práv. Interprety jako u skriptů (PowerShell s UTF-8
+  výstupem; `.ps1` s diakritikou = UTF-8 s BOM). Data jen v paměti, nic se nikam neposílá.
+- **Souhlas**: nový / změněný soubor se **nespustí** — karta (nebo Nastavení) ukáže začátek skriptu a otisk
+  (cesta + začátek SHA-256) a čeká na klik „Povolit a spustit“. Otisk (cesta, obsah, druh, argumenty) se
+  ukládá mimo config do `%LOCALAPPDATA%\Ledge\widgets-consent.json` (jeden na soubor); před každým během se
+  soubor čte a hashuje znovu. Agent smí widgety do složky psát (i z galerie), povolit je jen člověk; soubor
+  souhlasů nikdy nezapisuj.
+- **Galerie** (Nastavení → Widgety → Galerie příkladů, zakompilované `src-tauri/src/widgets/templates/*`):
+  kurz ČNB (ps1 + py, síť www.cnb.cz), počasí jinde přes Open-Meteo (ps1 + py), Docker, GitHub CI přes `gh`,
+  ping (ps1 + py), síť a VPN, místo na disku (ps1 + py), uptime (ps1 + py), odpočet (ps1 + py, py = textový
+  formát). Kopie do složky nikdy nepřepíše existující soubor a sama se nespustí.
+- Tauri: `widgets_list`, `widget_consent(id, confirmed)`, `widget_refresh`, `widget_output`, `widget_edit`
+  (sloveso `edit`, jinak Poznámkový blok — nikdy „otevřít“, to by `.py` spustilo), `widgets_open_dir`,
+  `widget_templates`, `widget_install(file)`, `widget_click(id, index, label)`.
+
 ## Poznámky
 
 Rychlé poznámky a připomínky žijí **centrálně mimo repa projektů** (vlastní repo poznámek — viz Synchronizace níž): `%USERPROFILE%\Ledge\notes\`
@@ -429,6 +577,25 @@ Zavolat Řehořovi kvůli fakturám
   formátu a pojmenování (`YYYY-MM-DD-HHMMSS-slug.md`, slug ASCII malými písmeny). Ledge složku sleduje:
   nová poznámka se hned ukáže v kartě a `remind` v proužku / peeku.
 - Hotovou poznámku označ `done: true`. **Nemaž** poznámky ani obrázky — mazání je jen na uživateli.
+
+### Lístky na plochu (overlay okna)
+
+Kteroukoli poznámku jde **připnout na plochu** jako malé okno bez rámu přes ostatní okna (špendlík u
+řádku v kartě Poznámky / v editoru, ⋯ karty → „Nový lístek na plochu“, Ctrl+K → „Nový lístek na plochu“ /
+„Připnout na plochu: …“). Lístek je **ta samá poznámka** — čte a ukládá se stejně (otisk, konflikt →
+načíst znovu / kopie), úkoly se odklikávají, „+ bod“ přidá `- [ ] …`, Ctrl+V vloží snímek obrazovky
+(PNG vedle poznámky jako v editoru) nebo text na konec. Agent na lístky nesahá — stačí upravit `.md`,
+otevřený lístek se sám obnoví.
+
+- Okna `note-<klíč>` (`pins/win.rs`): bez fokusu při otevření, mimo hlavní panel, volby per lístek:
+  vždy navrchu / normálně, zamknout na místě, průchozí (myš jde na stránku pod ním; vypne zkratka
+  `hotkeys.notePassthrough` nebo Ctrl+K „Lístky: vypnout průchozí režim“), průhlednost pozadí a textu
+  (text nejníž 50 %), sbalení na lištu (dvojklik). Ve fullscreenu / herním režimu lístky přestanou být
+  navrchu a nové se neotevřou.
+- Stav (pozice ve fyzických px, velikost v logických, volby) je v `%LOCALAPPDATA%\Ledge\note-pins.json`
+  (zápis se zpožděním ~0,4 s, ne v configu — je to stav okna, ne nastavení). Po startu Ledge se připnuté
+  lístky vrátí na místo; mimo obrazovku → monitor proužku. ✕ = odepnout, poznámka zůstane.
+  Uživatelský návod: [`docs/listky.md`](docs/listky.md).
 
 ### Synchronizace mezi PC (`notes.sync`)
 
@@ -717,6 +884,16 @@ snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
 - **Kam se instaluje:** NSIS `installMode: currentUser` → `%LOCALAPPDATA%\Ledge\ledge.exe` (bez admina).
   Skutečné místo zapisuje instalátor do `HKCU\…\Uninstall\Ledge` (`InstallLocation`, `MainBinaryName`).
   Aktualizace = spustit novější setup přes starou instalaci; config v `%APPDATA%\Ledge` zůstává.
+- **Vzhled a chování průvodce** (`src-tauri/installer/`, náhled A): česky + anglicky s výběrem jazyka,
+  obrázky `sidebar.bmp`/`header.bmp` (BMP 24 bit; po změně `.svg` → `node scripts/installer-art.mjs`,
+  `--check` ověří shodu), texty `Czech.nsh`/`English.nsh` (`customLanguageFiles` = celá sada řetězců
+  šablony Tauri + naše `ledge*`), úpravy stránek `hooks.nsh` (přepsaná makra MUI2, ne kopie šablony).
+  Dokončení: „Spustit Ledge“ + „Spouštět s Windows“ (místo zástupce na ploše) — zapíše Run `Ledge` jako
+  appka (`"<instalace>\ledge.exe" --autostart`) a stejnou hodnotu `autostart` do configu
+  (`installer/autostart.ps1`), protože appka config při startu promítá do Run. Výchozí stav = config.
+  Odinstalace: „Ponechat nastavení“ (výchozí ano) = zaškrtávátko Tauri „smazat data“ s obráceným
+  významem; odškrtnuté smaže `%APPDATA%\Ledge`, `%LOCALAPPDATA%\Ledge` a `…\cz.hyan.ledge` (WebView2),
+  poznámky v `%USERPROFILE%\Ledge` nikdy. Tichý běh (`/S`, aktualizace z Ledge) nic z toho nemění.
 - **Autostart** (`HKCU\…\Run`, hodnota `Ledge`, `src-tauri/src/autostart.rs`): existuje-li nainstalovaná
   kopie, míří Run **vždy na ni** — i když běží vývojový release z `target\release`, ten Run na sebe
   nepřepíše, takže dev build nemusí zastavovat „produkční“ Ledge. Bez instalace míří na běžící exe.

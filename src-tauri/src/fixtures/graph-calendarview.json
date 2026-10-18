@@ -1,0 +1,67 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('x')/calendarView(subject,start,end,isAllDay,isCancelled,location,onlineMeeting,onlineMeetingUrl)",
+  "value": [
+    {
+      "@odata.etag": "W/\"abc\"",
+      "id": "AAMkAGI2THVSAAA=",
+      "subject": "Standup týmu",
+      "isAllDay": false,
+      "isCancelled": false,
+      "start": { "dateTime": "2026-10-19T07:00:00.0000000", "timeZone": "UTC" },
+      "end": { "dateTime": "2026-10-19T07:15:00.0000000", "timeZone": "UTC" },
+      "location": { "displayName": "Microsoft Teams Meeting", "locationType": "default" },
+      "onlineMeeting": { "joinUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0" },
+      "onlineMeetingUrl": null
+    },
+    {
+      "id": "AAMkAGI2THVSAAB=",
+      "subject": "Dovolená",
+      "isAllDay": true,
+      "isCancelled": false,
+      "start": { "dateTime": "2026-10-20T00:00:00.0000000", "timeZone": "UTC" },
+      "end": { "dateTime": "2026-10-22T00:00:00.0000000", "timeZone": "UTC" },
+      "location": { "displayName": "" },
+      "onlineMeeting": null,
+      "onlineMeetingUrl": null
+    },
+    {
+      "id": "AAMkAGI2THVSAAC=",
+      "subject": "Svátek (převedený)",
+      "isAllDay": true,
+      "isCancelled": false,
+      "start": { "dateTime": "2026-10-27T23:00:00.0000000", "timeZone": "UTC" },
+      "end": { "dateTime": "2026-10-28T23:00:00.0000000", "timeZone": "UTC" },
+      "location": null,
+      "onlineMeeting": null
+    },
+    {
+      "id": "AAMkAGI2THVSAAD=",
+      "subject": "Oběd",
+      "isAllDay": false,
+      "isCancelled": false,
+      "start": { "dateTime": "2026-10-19T12:00:00.0000000", "timeZone": "Central Europe Standard Time" },
+      "end": { "dateTime": "2026-10-19T13:00:00.0000000", "timeZone": "Central Europe Standard Time" },
+      "location": { "displayName": "Bistro\nU rohu" },
+      "onlineMeeting": { "joinUrl": "http://nesifrovane.example.com/x" }
+    },
+    {
+      "id": "AAMkAGI2THVSAAE=",
+      "subject": "Starý odkaz",
+      "isAllDay": false,
+      "isCancelled": false,
+      "start": { "dateTime": "2026-10-21T09:00:00.0000000", "timeZone": "UTC" },
+      "end": { "dateTime": "2026-10-21T09:30:00.0000000", "timeZone": "UTC" },
+      "onlineMeeting": null,
+      "onlineMeetingUrl": "https://contoso.zoom.us/j/123"
+    },
+    {
+      "id": "AAMkAGI2THVSAAF=",
+      "subject": "Zrušená porada",
+      "isAllDay": false,
+      "isCancelled": true,
+      "start": { "dateTime": "2026-10-19T09:00:00.0000000", "timeZone": "UTC" },
+      "end": { "dateTime": "2026-10-19T10:00:00.0000000", "timeZone": "UTC" }
+    }
+  ],
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/calendarView?$skiptoken=abc"
+}

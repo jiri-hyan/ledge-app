@@ -2,10 +2,24 @@
 // šířka s|m|l|xl, výška `h` 1–4 řádky / podle obsahu, u Projektů volby dlaždic `tiles`) a skryté části karet. JEDINÝ model pro to, co šuplík ukazuje — `drawer.sections` je
 // odvozené v Rustu (karta = na nějaké záložce). Čistá logika bez importů za běhu (test `model.test.mjs`):
 // normalizace, úpravy (přesun, velikost, odebrat/přidat, záložky), katalog, co stránka ukáže, cíl tažení.
-// Texty jako páry klíč + čeština, přeloží se až při vykreslení.
+// Texty jako páry klíč + čeština, přeloží se až při vykreslení. Vedle vestavěných karet (`CARD_IDS`) jsou
+// DYNAMICKÉ karty s id podle prefixu (dnes widgety ze skriptů `widget:<soubor>`, `widgets/model.ts`) —
+// katalog je nabízí podle toho, co je na disku; Rust `layout::is_dynamic` hlídá stejný tvar.
+import { isWidgetId } from "../widgets/model.ts";
+// Texty jako páry klíč + čeština, přeloží se až při vykreslení. Vzhled karty (`look`) a složky dlaždic
+// (`tiles.folders`) mají vlastní moduly `look.ts` a `folders.ts`; tady se jen normalizují a klonují.
+import { normalizeCardLook, type CardLook } from "./look.ts";
+import { normalizeFolders, type TileFolder } from "./folders.ts";
 
-export const CARD_IDS = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media"] as const;
-export type CardId = (typeof CARD_IDS)[number];
+
+export const CARD_IDS = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail"] as const;
+export type BuiltinCardId = (typeof CARD_IDS)[number];
+/** Dynamická karta: widget ze skriptu (`widget:<soubor>`). */
+export type DynCardId = `widget:${string}`;
+export type CardId = BuiltinCardId | DynCardId;
+/** Dynamická karta (id podle prefixu, ne z `CARD_IDS`)? */
+export const isDynamic = (id: unknown): id is DynCardId => isWidgetId(id);
+export const isBuiltin = (id: unknown): id is BuiltinCardId => typeof id === "string" && (CARD_IDS as readonly string[]).includes(id);
 export const SIZES = ["s", "m", "l", "xl"] as const;
 export type CardSize = (typeof SIZES)[number];
 /** Výška karty v řádcích mřížky (`--deck-row`); chybí = podle obsahu. */
@@ -14,9 +28,10 @@ export type CardHeight = (typeof HEIGHTS)[number];
 /** Velikost dlaždic v kartě Projekty (zástupci). */
 export const TILE_SIZES = ["small", "tile", "large"] as const;
 export type TileSize = (typeof TILE_SIZES)[number];
-/** Volby karty Projekty na jedné záložce: velikost dlaždic, popisek, git, skryté projekty (prázdné = všechny). */
-export type TileOpts = { size: TileSize; label: boolean; git: boolean; hidden: string[] };
-export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts };
+/** Volby karty Projekty na jedné záložce: velikost dlaždic, popisek, git, skryté projekty (prázdné = všechny),
+ *  složky zástupců (chybí = žádné). */
+export type TileOpts = { size: TileSize; label: boolean; git: boolean; hidden: string[]; folders?: TileFolder[] };
+export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts; look?: CardLook };
 export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[] };
 /** `upgrades` = jednorázové úpravy, které už proběhly (Rust `apply_upgrades`) — musí přežít každé uložení. */
 export type Layout = { pages: LayoutPage[]; hiddenParts: string[]; upgrades?: string[] };
@@ -45,7 +60,7 @@ const PARTS_ONLY: readonly CardId[] = ["media"];
 
 export type Text = readonly [string, string];
 /** Název, jednořádkový popis a výchozí velikost karty (katalog, Nastavení, potvrzení „… odebrána“). */
-export const CARD_INFO: Record<CardId, { name: Text; desc: Text; size: CardSize }> = {
+export const CARD_INFO: Record<BuiltinCardId, { name: Text; desc: Text; size: CardSize }> = {
   projects: { name: ["cards.layout.card.projects", "Projekty"], desc: ["cards.layout.desc.projects", "Dlaždice projektů — spustit, zastavit, otevřít"], size: "xl" },
   running: { name: ["cards.layout.card.running", "Běží"], desc: ["cards.layout.desc.running", "Servery spuštěné z Ledge; bez nich se neukáže"], size: "xl" },
   claude: { name: ["cards.layout.card.claude", "Claude"], desc: ["cards.layout.desc.claude", "Session, subagenti, schvalování, limity a útrata"], size: "m" },
@@ -59,6 +74,10 @@ export const CARD_INFO: Record<CardId, { name: Text; desc: Text; size: CardSize 
   calendar: { name: ["cards.layout.card.calendar", "Kalendář"], desc: ["cards.layout.desc.calendar", "Dnes a zítra z odkazu ICS (Google, Outlook)"], size: "s" },
   links: { name: ["cards.layout.card.links", "Odkazy"], desc: ["cards.layout.desc.links", "Weby, složky a soubory z tvých akcí, s ikonou webu"], size: "m" },
   media: { name: ["cards.layout.card.media", "Právě hraje"], desc: ["cards.layout.desc.media", "Skladba nebo video z libovolné aplikace a hlasitost"], size: "m" },
+  github: { name: ["cards.layout.card.github", "GitHub"], desc: ["cards.layout.desc.github", "PR k revizi, tvoje PR s CI a notifikace z přihlášeného gh (výchozí vypnuto)"], size: "m" },
+  system: { name: ["cards.layout.card.system", "Systém"], desc: ["cards.layout.desc.system", "CPU, paměť, disky a síť s malými grafy; měří jen když je vidět"], size: "m" },
+  // výchozí nepřidaná (Rust `layout::OPT_IN`) — potřebuje přihlášený účet Microsoft
+  mail: { name: ["cards.layout.card.mail", "Pošta"], desc: ["cards.layout.desc.mail", "Nepřečtené a nejnovější předměty z Outlooku (účet Microsoft)"], size: "m" },
 };
 export const PART_INFO: Record<PartKey, Text> = {
   claudeLimits: ["cards.layout.part.claudeLimits", "Limity 5h / týden"],
@@ -72,11 +91,13 @@ export const PART_INFO: Record<PartKey, Text> = {
 /** Malá sada ikon pro vlastní záložku (emoji, žádný soubor). */
 export const PAGE_ICONS = ["", "💼", "🏠", "🎮", "🎵", "📚", "🛠️", "⭐", "🌿", "💬"] as const;
 
-const isCard = (x: unknown): x is CardId => typeof x === "string" && (CARD_IDS as readonly string[]).includes(x);
+const isCard = (x: unknown): x is CardId => isBuiltin(x) || isDynamic(x);
 const isSize = (x: unknown): x is CardSize => typeof x === "string" && (SIZES as readonly string[]).includes(x);
 const isHeight = (x: unknown): x is CardHeight => (HEIGHTS as readonly unknown[]).includes(x);
 const isTileSize = (x: unknown): x is TileSize => typeof x === "string" && (TILE_SIZES as readonly string[]).includes(x);
-const card = (id: CardId, size: CardSize = CARD_INFO[id].size): LayoutCard => ({ id, size });
+/** Výchozí velikost karty (dynamická = střední). */
+export const defaultSize = (id: CardId): CardSize => (isBuiltin(id) ? CARD_INFO[id].size : "m");
+const card = (id: CardId, size: CardSize = defaultSize(id)): LayoutCard => ({ id, size });
 
 /** Výchozí rozložení = dnešní Práce + Osobní (zrcadlo `layout::from_legacy(Null)`; test hlídá tvar). */
 export function defaultLayout(): Layout {
@@ -98,12 +119,15 @@ export function defaultLayout(): Layout {
 export function normalizeTiles(raw: unknown): TileOpts {
   const r = (raw ?? {}) as Partial<Record<string, unknown>>;
   const hidden = (Array.isArray(r.hidden) ? r.hidden : []).filter((h): h is string => typeof h === "string" && !!h);
-  return {
+  const out: TileOpts = {
     size: isTileSize(r.size) ? r.size : DEFAULT_TILES.size,
     label: typeof r.label === "boolean" ? r.label : DEFAULT_TILES.label,
     git: typeof r.git === "boolean" ? r.git : DEFAULT_TILES.git,
     hidden: [...new Set(hidden)],
   };
+  const folders = normalizeFolders(r.folders);
+  if (folders.length) out.folders = folders;
+  return out;
 }
 /** Volby dlaždic karty (bez `tiles` = výchozí). */
 export const tilesOf = (c: LayoutCard | undefined): TileOpts => normalizeTiles(c?.tiles);
@@ -120,9 +144,11 @@ export function normalizeLayout(raw: unknown): Layout {
     for (const c of Array.isArray(x.cards) ? x.cards : []) {
       const id = (c as any)?.id;
       if (!isCard(id) || cards.some((k) => k.id === id)) continue;
-      const out: LayoutCard = { id, size: isSize((c as any).size) ? (c as any).size : CARD_INFO[id].size };
+      const out: LayoutCard = { id, size: isSize((c as any).size) ? (c as any).size : defaultSize(id) };
       if (isHeight((c as any).h)) out.h = (c as any).h;
       if ((c as any).tiles && typeof (c as any).tiles === "object") out.tiles = normalizeTiles((c as any).tiles);
+      const look = normalizeCardLook((c as any).look, id);
+      if (look) out.look = look;
       cards.push(out);
     }
     const page: LayoutPage = { id: x.id as string, name: typeof x.name === "string" ? x.name : "", cards };
@@ -137,7 +163,12 @@ export function normalizeLayout(raw: unknown): Layout {
   return out;
 }
 
-const cloneCard = (c: LayoutCard): LayoutCard => (c.tiles ? { ...c, tiles: { ...c.tiles, hidden: [...c.tiles.hidden] } } : { ...c });
+const cloneCard = (c: LayoutCard): LayoutCard => {
+  const out = { ...c };
+  if (c.tiles) out.tiles = { ...c.tiles, hidden: [...c.tiles.hidden], ...(c.tiles.folders ? { folders: c.tiles.folders.map((f) => ({ ...f, items: [...f.items] })) } : {}) };
+  if (c.look) out.look = { ...c.look };
+  return out;
+};
 export const clone = (l: Layout): Layout => {
   const out: Layout = { pages: l.pages.map((p) => ({ ...p, cards: p.cards.map(cloneCard) })), hiddenParts: [...l.hiddenParts] };
   if (l.upgrades) out.upgrades = [...l.upgrades];

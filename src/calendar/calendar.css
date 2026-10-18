@@ -31,3 +31,19 @@
 .cal-help ol { margin: 6px 0 0; padding-left: 20px; }
 .cal-help li + li { margin-top: 3px; }
 .cal-help h5 { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--t1); }
+
+/* vlna 8: Připojit, Outlook v PC, zdroje a připomínky */
+.cal-join { flex-shrink: 0; }
+.cal-problem { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: 4px; }
+.cal-set-feed { display: flex; flex-direction: column; gap: 4px; }
+.cal-set-remind { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding-left: 30px; }
+.cal-set-lbl { font-size: var(--fs-sm); color: var(--t2); }
+.cal-src { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--s2); width: 100%; }
+.cal-src-tile { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: var(--s2); align-items: center; text-align: left; padding: 10px 12px; border-radius: var(--r-sm); background: var(--card-2); border: 1px solid transparent; color: var(--t1); transition: background var(--fast), border-color var(--fast); }
+.cal-src-tile:hover { background: var(--card-3); }
+.cal-src-tile.on { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 10%, var(--card-2)); }
+.cal-src-ic { grid-row: 1 / span 2; font-size: 18px; }
+.cal-src-t { font-weight: 600; font-size: var(--fs-sm); }
+.cal-src-d { font-size: var(--fs-xs); color: var(--t3); }
+.cal-src-info { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); font-size: var(--fs-sm); color: var(--t2); }
+.cal-src-note { font-size: var(--fs-xs); color: var(--t3); }

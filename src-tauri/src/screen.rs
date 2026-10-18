@@ -7,7 +7,7 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{
-    QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN, SHQueryUserNotificationState,
+    QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN, SHQueryUserNotificationState,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -68,21 +68,26 @@ pub fn cursor() -> Option<POINT> {
     unsafe { GetCursorPos(&mut p).ok().map(|_| p) }
 }
 
+/// Co je přes celou obrazovku: exkluzivní režim (D3D, prezentace), okno popředí pokrývající monitor, nic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FsState {
+    None,
+    Exclusive,
+    Covering,
+}
+
 /// Běží na daném monitoru něco přes celou obrazovku?
-/// Kombinace: stav notifikací Windows (D3D exkluzivní fullscreen, prezentace, „busy“)
-/// + popředí okno pokrývá celý monitor (borderless fullscreen hry a video).
-pub fn fullscreen_on(mon: &Monitor) -> bool {
+/// Kombinace: stav notifikací Windows (D3D exkluzivní fullscreen, prezentace)
+/// + popředí okno pokrývá celý monitor (borderless fullscreen hry, video, prohlížeč po F11).
+pub fn fullscreen_state(mon: &Monitor) -> FsState {
     unsafe {
-        if let Ok(state) = SHQueryUserNotificationState() {
-            if state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE {
-                return true;
-            }
-            if state == QUNS_BUSY && foreground_covers(mon) {
-                return true;
-            }
+        if let Ok(state) = SHQueryUserNotificationState()
+            && (state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE)
+        {
+            return FsState::Exclusive;
         }
-        foreground_covers(mon)
     }
+    if foreground_covers(mon) { FsState::Covering } else { FsState::None }
 }
 
 fn foreground_covers(mon: &Monitor) -> bool {

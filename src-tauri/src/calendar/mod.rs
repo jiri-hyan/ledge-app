@@ -4,11 +4,21 @@
 //! (`ics.rs`), rozbalí opakování (`expand.rs`) v pásmu události (`tz.rs`) a nechá si jen výskyty
 //! v okně −`PAST_DAYS` / +`AHEAD_DAYS` dní (`collect`). Karta pak ukáže Dnes / Zítra / Příští
 //! (`view.rs`). Config a ochrana adresy (tajemství: nelogovat, v UI jen doména) v `conf.rs`.
+//! Zdroje jako abstrakce (`source.rs`: odkaz ICS, klasický Outlook v PC `outlook.rs`, místo pro účty
+//! Microsoft/Google), odkaz „Připojit“ (`meeting.rs`) a připomínka schůzky (`remind.rs`).
 
+pub mod cache;
 pub mod conf;
 pub mod expand;
+// adaptéry kalendářů účtů (Microsoft Graph, Google) — zapojené v `source::adapter` a `accounts::calsync`
+pub mod google;
+pub mod graph;
 pub mod ics;
 pub mod live;
+pub mod meeting;
+pub mod outlook;
+pub mod remind;
+pub mod source;
 pub mod tz;
 pub mod view;
 
@@ -23,12 +33,12 @@ pub const PAST_DAYS: i64 = 1;
 pub const AHEAD_DAYS: i64 = 14;
 /// Nejvíc výskytů z jednoho feedu (paměť i velikost cache).
 pub const MAX_OCCS: usize = 1500;
-const MAX_TITLE: usize = 120;
-const MAX_LOCATION: usize = 120;
+pub(crate) const MAX_TITLE: usize = 120;
+pub(crate) const MAX_LOCATION: usize = 120;
 
 /// Jeden výskyt v okně. Časy v ms epochy (UTC); celodenní = půlnoc data brané jako UTC (datum bez
 /// pásma — `view.rs` ho čte zpět jako datum), `end` výlučně.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Occ {
     pub start: i64,
@@ -42,6 +52,9 @@ pub struct Occ {
     /// pásmo události Ledge nezná → čas je brán jako místní
     #[serde(default)]
     pub tz_guess: bool,
+    /// odkaz „Připojit“ (Teams, Meet, Zoom, Webex, Jitsi — `meeting.rs`); stará cache bez pole = žádný
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub join: Option<meeting::Join>,
 }
 
 #[derive(Debug)]
@@ -114,6 +127,7 @@ fn expand_event(e: &Event, recurring: bool, skip: &[&Dt], zones: &Zones, (ws, we
     let rule = e.rrule.as_deref().filter(|_| recurring).and_then(|r| expand::parse_rule(r).ok());
     let title = clip(&e.summary, MAX_TITLE);
     let location = clip(e.location.lines().find(|l| !l.trim().is_empty()).unwrap_or(""), MAX_LOCATION);
+    let join = e.join.as_ref().map(|(_, j)| j.clone());
     let mut keep = None;
     let (tz, local_start) = zones.resolve(start, &mut keep);
     let until = |u: &expand::Until| match u {
@@ -144,7 +158,7 @@ fn expand_event(e: &Event, recurring: bool, skip: &[&Dt], zones: &Zones, (ws, we
         for s in starts.into_iter().filter(|s| !gone.contains(&s.date())) {
             let en = s + dur;
             if en > ws && s < we {
-                out.push(Occ { start: ms(s), end: ms(en), all_day: true, title: title.clone(), location: location.clone(), tz_guess: false });
+                out.push(Occ { start: ms(s), end: ms(en), all_day: true, title: title.clone(), location: location.clone(), tz_guess: false, join: join.clone() });
             }
         }
         return;
@@ -179,7 +193,7 @@ fn expand_event(e: &Event, recurring: bool, skip: &[&Dt], zones: &Zones, (ws, we
         }
         let en = s + dur;
         if en.max(s + Duration::seconds(1)) > ws && s < we {
-            out.push(Occ { start: ms(s), end: ms(en), all_day: false, title: title.clone(), location: location.clone(), tz_guess: tz.guess() });
+            out.push(Occ { start: ms(s), end: ms(en), all_day: false, title: title.clone(), location: location.clone(), tz_guess: tz.guess(), join: join.clone() });
         }
     }
 }

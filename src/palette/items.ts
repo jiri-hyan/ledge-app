@@ -16,6 +16,7 @@ import { timerItems } from "./timer";
 import { normalizeLayout, pageOf } from "../layout/model";
 import { pageName } from "../layout/text";
 import { styleItems } from "./styles";
+import { isPinned, newPin, throughAll, throughLabel, togglePin } from "../notes/pins";
 
 export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows" | "calc" | "convert" | "emoji" | "clip";
 export interface PItem extends Item {
@@ -92,9 +93,15 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
   if (s.notesEnabled) {
     add({ id: "note:new", section: "note", order: 0, title: t("palette.note.new", "Nová poznámka"), keywords: "poznamka zapsat napsat", run: () => nav.onNote() });
     add({ id: "note:all", section: "note", order: 4, title: t("palette.note.all", "Všechny poznámky"), keywords: "seznam", run: () => nav.onAllNotes() });
+    // lístky na plochu (`notes/pins.ts`): nový, připnout / odepnout poznámku, průchozí režim
+    add({ id: "pin:new", section: "note", order: 0, title: t("palette.pin.new", "Nový lístek na plochu"), sub: t("palette.pin.newSub", "Poznámka přes ostatní okna — checklist k QA, Ctrl+V vloží snímek"), keywords: "listek plocha pripnout sticky overlay qa checklist navrchu", run: () => newPin() });
+    if (s.pins?.open.length) add({ id: "pin:through", section: "note", order: 1, title: throughLabel(s), keywords: "listky pruchozi mys click through klikat skrz", run: () => throughAll() });
     for (const n of notes) {
       const proj = n.project ? (s.projects.find((x) => x.id === n.project)?.name ?? n.project) : "";
       add({ id: `note:${n.path}`, section: "note", order: 5, title: n.title || t("palette.note.untitled", "(bez názvu)"), sub: [proj, n.kind, n.done ? t("palette.note.done", "hotovo") : ""].filter(Boolean).join(" · "), run: () => nav.onOpenNote(n) });
+      const name = n.title || t("palette.note.untitled", "(bez názvu)");
+      const pinned = isPinned(s.pins, n.path);
+      add({ id: `pin:${n.path}`, section: "note", order: 6, title: pinned ? t("palette.pin.unpin", "Odepnout z plochy: {name}", { name }) : t("palette.pin.pin", "Připnout na plochu: {name}", { name }), keywords: "listek plocha pripnout odepnout sticky", run: () => togglePin(n.path) });
     }
   }
 

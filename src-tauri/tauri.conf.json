@@ -29,7 +29,20 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp",
+        "languages": [
+          "Czech",
+          "English"
+        ],
+        "displayLanguageSelector": true,
+        "customLanguageFiles": {
+          "Czech": "installer/Czech.nsh",
+          "English": "installer/English.nsh"
+        },
+        "installerHooks": "installer/hooks.nsh"
       }
     }
   }

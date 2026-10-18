@@ -19,3 +19,6 @@
 .lmono { width: 28px; height: 28px; border-radius: var(--r-sm); display: grid; place-items: center; flex-shrink: 0; font: 650 var(--fs-xs) var(--display); background: var(--card-2); color: var(--t1); transition: background var(--fast); }
 .lkind { color: var(--t3); flex-shrink: 0; display: grid; }
 .lkind svg { width: 15px; height: 15px; }
+
+/* vlna 8 P: v režimu úprav šuplíku klik na odkaz = jeho vzhled (karta jinak klik nepropouští) */
+.lnk-card[data-edit] .link-row { pointer-events: auto; }

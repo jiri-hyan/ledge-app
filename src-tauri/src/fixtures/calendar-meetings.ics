@@ -1,0 +1,119 @@
+BEGIN:VCALENDAR
+METHOD:PUBLISH
+PRODID:Microsoft Exchange Server 2010
+VERSION:2.0
+X-WR-CALNAME:Schůzky
+BEGIN:VTIMEZONE
+TZID:Central Europe Standard Time
+BEGIN:STANDARD
+DTSTART:16010101T030000
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+RRULE:FREQ=YEARLY;INTERVAL=1;BYDAY=-1SU;BYMONTH=10
+END:STANDARD
+BEGIN:DAYLIGHT
+DTSTART:16010101T020000
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+RRULE:FREQ=YEARLY;INTERVAL=1;BYDAY=-1SU;BYMONTH=3
+END:DAYLIGHT
+END:VTIMEZONE
+BEGIN:VEVENT
+DESCRIPTION:\n________________________________________________________________
+ ________________\nMicrosoft Teams meeting\nJoin on your computer\, mobile a
+ pp or room device\nClick here to join the meeting<https://teams.microsoft.c
+ om/l/meetup-join/19%3ameeting_NjM4ZTk1YjQtZmQ0Ni00ZWM2%40thread.v2/0?contex
+ t=%7b%22Tid%22%3a%2272f988bf%22%2c%22Oid%22%3a%22a1b2c3%22%7d>\nMeeting ID:
+  346 123 456 789\nPasscode: aB3cD4\nDownload Teams<https://www.microsoft.c
+ om/microsoft-teams/download-app> | Join on the web<https://www.microsoft.co
+ m/microsoft-teams/join-a-meeting>\nLearn More<https://aka.ms/JoinTeamsMeet
+ ing> | Meeting options<https://teams.microsoft.com/meetingOptions/?organize
+ rId=a1b2c3&tenantId=72f988bf>\n__________________________________________
+ ______________________________________\n
+UID:040000008200E00074C5B7101A82E00800000000E1B2C3D4E5F6A70100000000000000001
+SUMMARY;LANGUAGE=cs-CZ:Týmová porada
+DTSTART;TZID=Central Europe Standard Time:20261019T100000
+DTEND;TZID=Central Europe Standard Time:20261019T103000
+DTSTAMP:20261018T070000Z
+STATUS:CONFIRMED
+LOCATION;LANGUAGE=cs-CZ:Microsoft Teams Meeting
+X-MICROSOFT-CDO-BUSYSTATUS:BUSY
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Plán sprintu.\nNeed help?<https://aka.ms/JoinTeamsMeeting>\n
+UID:040000008200E00074C5B7101A82E00800000000F1B2C3D4E5F6A70100000000000000001
+SUMMARY;LANGUAGE=cs-CZ:Plánování sprintu
+DTSTART;TZID=Central Europe Standard Time:20261020T130000
+DTEND;TZID=Central Europe Standard Time:20261020T140000
+DTSTAMP:20261018T070000Z
+STATUS:CONFIRMED
+LOCATION;LANGUAGE=cs-CZ:Microsoft Teams Meeting
+X-MICROSOFT-SKYPETEAMSMEETINGURL:https://teams.microsoft.com/l/meetup-join/
+ 19%3ameeting_Sprint%40thread.v2/0?context=%7b%22Tid%22%3a%2272f988bf%22%7d
+X-MICROSOFT-ONLINEMEETINGCONFLINK:conf:sip:jana@example.com\;gruu\;opaque=a
+ pp:conf:focus:id:ABC123
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261019T120000Z
+DTEND:20261019T123000Z
+DTSTAMP:20261018T070000Z
+UID:kafe-1@google.com
+DESCRIPTION:Další informace o Meet: https://support.google.com/a/users/answ
+ er/9282720\n\n-::~:~::~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~:~
+ :~:~::~:~::-\nPřipojit se přes Google Meet: https://meet.google.com/xyz-abc
+ d-efg\nNebo vytočte: (CZ) +420 2 3900 1234 PIN: 123456789#\n-::~:~::~:~:~:~
+ :~::-
+X-GOOGLE-CONFERENCE:https://meet.google.com/xyz-abcd-efg
+SEQUENCE:0
+STATUS:CONFIRMED
+SUMMARY:Kafe s Janou
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261021T090000Z
+DTEND:20261021T100000Z
+DTSTAMP:20261018T070000Z
+UID:zoom-2@google.com
+DESCRIPTION:<a href="https://www.google.com/url?q=https%3A%2F%2Fus02web.zoo
+ m.us%2Fj%2F81234567890%3Fpwd%3DQWErty12&amp\;sa=D&amp\;source=calendar">Zo
+ om</a>
+LOCATION:https://us02web.zoom.us/j/81234567890?pwd=QWErty12
+STATUS:CONFIRMED
+SUMMARY:Zoom s klientem
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Školení přes Webex: <https://eur01.safelinks.protection.outlook
+ .com/?url=https%3A%2F%2Ffirma.webex.com%2Ffirma%2Fj.php%3FMTID%3Dm0123abcd&
+ data=05%7C01%7C&reserved=0>
+UID:040000008200E00074C5B7101A82E0080000000011B2C3D4E5F6A70100000000000000001
+SUMMARY;LANGUAGE=cs-CZ:Webex školení
+DTSTART:20261022T080000Z
+DTEND:20261022T090000Z
+DTSTAMP:20261018T070000Z
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:retro-5@example.com
+SUMMARY:Retro
+URL:https://meet.jit.si/LedgeRetro
+DTSTART:20261023T150000Z
+DTEND:20261023T160000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:obed-6@example.com
+SUMMARY:Oběd
+LOCATION:Lokál
+DESCRIPTION:Menu: https://www.lokal-dlouha.cz/
+DTSTART:20261019T110000Z
+DTEND:20261019T120000Z
+END:VEVENT
+BEGIN:VEVENT
+UID:040000008200E00074C5B7101A82E0080000000021B2C3D4E5F6A70100000000000000001
+SUMMARY;LANGUAGE=cs-CZ:Konzultace
+DTSTART:20261024T090000Z
+DTEND:20261024T093000Z
+DESCRIPTION:Odkaz v HTML verzi.
+X-ALT-DESC;FMTTYPE=text/html:<html><body><p><a href="https://teams.microsof
+ t.com/meet/34567890123?p=AbCdEf123" target="_blank">Připojit se ke schůzce
+ </a></p></body></html>
+END:VEVENT
+END:VCALENDAR

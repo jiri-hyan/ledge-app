@@ -27,7 +27,18 @@ use serde_json::Value;
 pub const WORK: &str = "prace";
 pub const PERSONAL: &str = "osobni";
 /// Karty, které jde dát na záložku (zrcadlo `CARD_IDS` v `src/layout/model.ts`).
-pub const CARDS: [&str; 13] = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media"];
+pub const CARDS: [&str; 16] = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail"];
+/// Karty, které nejsou ve výchozím rozložení: uživatel je přidá z katalogu (GitHub a Systém — nové
+/// funkce, které nemají měnit dnešní šuplík; Pošta — potřebuje přihlášený účet Microsoft).
+/// `Sections::default()` je má vypnuté.
+pub const OPT_IN: [&str; 3] = ["github", "system", "mail"];
+/// Dynamická karta: id s prefixem (dnes jen widgety ze skriptů `widget:<soubor>`, `widgets/`).
+/// Validace hlídá jen tvar — soubor nemusí existovat (karta pak ukáže, že chybí). Katalog je nabízí
+/// podle toho, co je na disku (zrcadlo `isDynamic` v `src/layout/model.ts`).
+pub fn is_dynamic(id: &str) -> bool {
+    crate::widgets::plan::file_of(id).is_some()
+}
+
 /// Části karet, které jdou skrýt zvlášť: (klíč, karta). Klíče = pole `drawer.sections`.
 pub const PARTS: [(&str, &str); 7] = [
     ("claudeLimits", "claude"),
@@ -80,11 +91,14 @@ pub struct TileOpts {
     pub git: bool,
     /// Id projektů, které na téhle záložce nejsou (prázdné = všechny; nový projekt se ukáže sám).
     pub hidden: Vec<String>,
+    /// Složky zástupců (přetažení dlaždice na jinou, `tilelook.rs`). Chybí = žádné.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub folders: Vec<crate::tilelook::TileFolder>,
 }
 
 impl Default for TileOpts {
     fn default() -> Self {
-        Self { size: TileSize::Tile, label: true, git: true, hidden: Vec::new() }
+        Self { size: TileSize::Tile, label: true, git: true, hidden: Vec::new(), folders: Vec::new() }
     }
 }
 
@@ -92,7 +106,7 @@ impl Default for TileOpts {
 #[serde(default, rename_all = "camelCase")]
 pub struct LayoutCard {
     /// Id karty: `projects`, `running`, `claude`, `repos`, `notes`, `actions`, `shelf`, `clock`, `timer`,
-    /// `weather`, `calendar`, `links`, `media`.
+    /// `weather`, `calendar`, `links`, `media`, `github`, `system`, `mail` (poslední tři na žádné záložce nejsou, dokud je uživatel nepřidá).
     pub id: String,
     /// `s` / `m` / `l` / `xl` (celá řada).
     pub size: CardSize,
@@ -102,6 +116,9 @@ pub struct LayoutCard {
     /// Jen karta `projects`: velikost dlaždic, popisek, git, skryté projekty. Chybí = výchozí.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tiles: Option<TileOpts>,
+    /// Vzhled karty (akcent, pozadí, hlavička, hustota, varianta — `tilelook.rs`). Chybí = podle stylu.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub look: Option<crate::tilelook::CardLook>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -322,7 +339,7 @@ pub fn validate(l: &LayoutConfig) -> Result<(), FieldError> {
         }
         let mut seen = std::collections::HashSet::new();
         for (j, c) in p.cards.iter().enumerate() {
-            if !CARDS.contains(&c.id.as_str()) {
+            if !CARDS.contains(&c.id.as_str()) && !is_dynamic(&c.id) {
                 return Err(fe(format!("layout.pages.{i}.cards.{j}.id"), trf!("Karta „{}“ neexistuje (jde: {}).", "Card “{}” doesn't exist (available: {}).", c.id, CARDS.join(", "))));
             }
             if !seen.insert(c.id.as_str()) {
@@ -372,12 +389,12 @@ mod tests {
             shape(&d, PERSONAL),
             s(&[("projects", Xl), ("clock", S), ("timer", S), ("weather", S), ("calendar", S), ("media", M), ("links", M), ("actions", Xl), ("shelf", Xl), ("notes", Xl)])
         );
-        assert!(d.pages.iter().flat_map(|p| &p.cards).all(|c| c.h.is_none() && c.tiles.is_none()), "výška podle obsahu, výchozí dlaždice");
+        assert!(d.pages.iter().flat_map(|p| &p.cards).all(|c| c.h.is_none() && c.tiles.is_none() && c.look.is_none()), "výška podle obsahu, výchozí dlaždice i vzhled");
         assert!(d.hidden_parts.is_empty());
         assert!(validate(&d).is_ok());
-        // každá karta je ve výchozím rozložení (katalog je na začátku prázdný)
+        // každá karta kromě opt-in (GitHub, Systém, Pošta) je ve výchozím rozložení; ty jsou jen v katalogu
         for c in CARDS {
-            assert!(placed(&d, c), "{c}");
+            assert_eq!(placed(&d, c), !OPT_IN.contains(&c), "{c}");
         }
     }
 
@@ -529,6 +546,17 @@ mod tests {
             ("emoji ikona", Box::new(|l| l.pages[0].icon = "🎮".into()), None),
             ("ikona text", Box::new(|l| l.pages[0].icon = "hry hry".into()), Some("layout.pages.0.icon")),
             ("neznámá karta", Box::new(|l| l.pages[0].cards.push(card("pocasi", S))), Some("layout.pages.0.cards.7.id")),
+            ("widget ze skriptu", Box::new(|l| l.pages[0].cards.push(card("widget:kurz-cnb.ps1", M))), None),
+            ("widget na dvou záložkách", Box::new(|l| {
+                l.pages[0].cards.push(card("widget:kurz-cnb.ps1", M));
+                l.pages[1].cards.push(card("widget:kurz-cnb.ps1", S));
+            }), None),
+            ("widget s cestou", Box::new(|l| l.pages[0].cards.push(card(r"widget:..\x.ps1", M))), Some("layout.pages.0.cards.7.id")),
+            ("widget bez souboru", Box::new(|l| l.pages[0].cards.push(card("widget:", M))), Some("layout.pages.0.cards.7.id")),
+            ("widget dvakrát", Box::new(|l| {
+                l.pages[0].cards.push(card("widget:a.ps1", M));
+                l.pages[0].cards.push(card("widget:a.ps1", S));
+            }), Some("layout.pages.0.cards.8.id")),
             ("karta dvakrát", Box::new(|l| l.pages[0].cards.push(card("claude", S))), Some("layout.pages.0.cards.7.id")),
             ("stejná karta na dvou záložkách", Box::new(|l| l.pages[1].cards.push(card("claude", L))), None),
             ("neznámá část", Box::new(|l| l.hidden_parts = vec!["git".into()]), Some("layout.hiddenParts.0")),
@@ -621,13 +649,13 @@ mod tests {
                 "dlaždice jen část",
                 json!({"id":"projects","size":"xl","tiles":{"size":"small","git":false}}),
                 None,
-                Some(TileOpts { size: TileSize::Small, label: true, git: false, hidden: vec![] }),
+                Some(TileOpts { size: TileSize::Small, label: true, git: false, hidden: vec![], folders: vec![] }),
             ),
             (
                 "dlaždice celé",
                 json!({"id":"projects","size":"xl","h":2,"tiles":{"size":"large","label":false,"git":true,"hidden":["harbor"]}}),
                 Some(2),
-                Some(TileOpts { size: TileSize::Large, label: false, git: true, hidden: vec!["harbor".into()] }),
+                Some(TileOpts { size: TileSize::Large, label: false, git: true, hidden: vec!["harbor".into()], folders: vec![] }),
             ),
         ];
         for (name, v, h, tiles) in cases {

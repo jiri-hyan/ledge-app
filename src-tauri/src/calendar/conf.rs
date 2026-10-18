@@ -1,7 +1,10 @@
 //! Config kalendářů (`personal.calendars`) a zacházení s adresou: tajná adresa ICS je **tajemství**
 //! (kdo ji zná, čte celý kalendář). Proto: nikdy v logu ani v textu chyby, v UI jen doména (`domain`),
 //! v cache na disku jen otisk (`key`). `webcal://` se bere jako `https://`, `http://` se odmítne.
+//! Zdroj kalendáře (`source`: odkaz ICS, klasický Outlook v PC, účty) a připomínka schůzky
+//! (`remindMin`, `remindToast`) — viz `source.rs` a `remind.rs`.
 
+use super::source::SourceKind;
 use crate::i18n::tr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -10,6 +13,10 @@ use serde::{Deserialize, Serialize};
 pub const MAX_CALENDARS: usize = 8;
 /// Nejdelší adresa (znaky).
 pub const MAX_URL: usize = 2048;
+/// Nejdřívější připomínka schůzky (minuty před začátkem).
+pub const MAX_REMIND_MIN: u32 = 120;
+/// Výchozí připomínka (minuty před začátkem).
+pub const DEFAULT_REMIND_MIN: u32 = 5;
 
 /// Kalendář z odkazu ICS (Google: Nastavení kalendáře → „Tajná adresa ve formátu iCal“; Outlook:
 /// Nastavení → Kalendář → Sdílené kalendáře → Publikovat kalendář → odkaz ICS).
@@ -25,11 +32,21 @@ pub struct CalendarFeed {
     pub color: Option<String>,
     /// Vypnutý kalendář se nestahuje ani neukazuje.
     pub enabled: bool,
+    /// Odkud kalendář je: `ics` (tajný odkaz, výchozí — starý config), `outlook-local` (klasický
+    /// Outlook v tomto PC, bez přihlášení; `url` se nepoužije), `graph` / `google` (účet Microsoft /
+    /// Google — `account`).
+    pub source: SourceKind,
+    /// Účet pro `graph` / `google` (id z modulu účtů); u ostatních zdrojů prázdné.
+    pub account: String,
+    /// Připomínka schůzky: kolik minut před začátkem (0 = vypnuto, nejvýš 120). Výchozí 5.
+    pub remind_min: u32,
+    /// K připomínce i oznámení Windows s tlačítkem Připojit (výchozí vypnuto).
+    pub remind_toast: bool,
 }
 
 impl Default for CalendarFeed {
     fn default() -> Self {
-        Self { name: String::new(), url: String::new(), color: None, enabled: true }
+        Self { name: String::new(), url: String::new(), color: None, enabled: true, source: SourceKind::Ics, account: String::new(), remind_min: DEFAULT_REMIND_MIN, remind_toast: false }
     }
 }
 
@@ -81,11 +98,28 @@ pub fn validate(list: &[CalendarFeed]) -> Result<(), (String, String)> {
         if c.name.chars().count() > 60 {
             return Err((format!("personal.calendars.{i}.name"), trf!("Kalendář č. {n}: název je delší než 60 znaků.", "Calendar no. {n}: the name is longer than 60 characters.")));
         }
-        if c.url.chars().count() > MAX_URL {
-            return Err((format!("personal.calendars.{i}.url"), trf!("Kalendář {}: adresa je delší než {MAX_URL} znaků.", "Calendar {}: the address is longer than {MAX_URL} characters.", label)));
+        if c.remind_min > MAX_REMIND_MIN {
+            return Err((format!("personal.calendars.{i}.remindMin"), trf!("Kalendář {}: připomínka nejvýš {MAX_REMIND_MIN} minut předem.", "Calendar {}: the reminder can be at most {MAX_REMIND_MIN} minutes ahead.", label)));
         }
-        if let Err(why) = normalize_url(&c.url) {
-            return Err((format!("personal.calendars.{i}.url"), trf!("Kalendář {}: {why}.", "Calendar {}: {why}.", label)));
+        match c.source {
+            SourceKind::Ics => {
+                if c.url.chars().count() > MAX_URL {
+                    return Err((format!("personal.calendars.{i}.url"), trf!("Kalendář {}: adresa je delší než {MAX_URL} znaků.", "Calendar {}: the address is longer than {MAX_URL} characters.", label)));
+                }
+                if let Err(why) = normalize_url(&c.url) {
+                    return Err((format!("personal.calendars.{i}.url"), trf!("Kalendář {}: {why}.", "Calendar {}: {why}.", label)));
+                }
+            }
+            SourceKind::OutlookLocal => {
+                if list[..i].iter().any(|o| o.source == SourceKind::OutlookLocal) {
+                    return Err((format!("personal.calendars.{i}.source"), trf!("Kalendář {}: Outlook v tomto PC už v seznamu je.", "Calendar {}: Outlook on this PC is already in the list.", label)));
+                }
+            }
+            SourceKind::Graph | SourceKind::Google => {
+                if c.account.trim().is_empty() || c.account.chars().count() > 200 {
+                    return Err((format!("personal.calendars.{i}.account"), trf!("Kalendář {}: chybí účet.", "Calendar {}: the account is missing.", label)));
+                }
+            }
         }
         if let Some(col) = &c.color {
             let ok = col.len() == 7 && col.starts_with('#') && col[1..].chars().all(|x| x.is_ascii_hexdigit());
@@ -140,7 +174,8 @@ mod tests {
 
     #[test]
     fn validate_table_never_leaks_url() {
-        let feed = |name: &str, url: &str, color: Option<&str>| CalendarFeed { name: name.into(), url: url.into(), color: color.map(Into::into), enabled: true };
+        let feed = |name: &str, url: &str, color: Option<&str>| CalendarFeed { name: name.into(), url: url.into(), color: color.map(Into::into), ..CalendarFeed::default() };
+        let outlook = || CalendarFeed { source: SourceKind::OutlookLocal, ..CalendarFeed::default() };
         let cases: Vec<(Vec<CalendarFeed>, Option<&str>)> = vec![
             (vec![], None),
             (vec![feed("Osobní", SECRET, Some("#3b82f6"))], None),
@@ -153,6 +188,13 @@ mod tests {
             (vec![feed("A", SECRET, Some("modrá"))], Some("personal.calendars.0.color")),
             (vec![feed("A", &format!("https://x.cz/{}", "a".repeat(MAX_URL)), None)], Some("personal.calendars.0.url")),
             ((0..=MAX_CALENDARS).map(|i| feed(&format!("K{i}"), SECRET, None)).collect(), Some("personal.calendars")),
+            // Outlook v PC: bez adresy, ale jen jednou
+            (vec![feed("A", SECRET, None), outlook()], None),
+            (vec![outlook(), outlook()], Some("personal.calendars.1.source")),
+            // účty: bez účtu ne
+            (vec![CalendarFeed { source: SourceKind::Graph, ..CalendarFeed::default() }], Some("personal.calendars.0.account")),
+            (vec![CalendarFeed { source: SourceKind::Google, account: "acc-1".into(), ..CalendarFeed::default() }], None),
+            (vec![CalendarFeed { remind_min: MAX_REMIND_MIN + 1, ..feed("A", SECRET, None) }], Some("personal.calendars.0.remindMin")),
         ];
         for (list, want) in cases {
             let got = validate(&list);
@@ -164,5 +206,11 @@ mod tests {
         // starý config bez pole `enabled` = zapnuto
         let c: CalendarFeed = serde_json::from_str(r#"{"name":"A","url":"https://x.cz/a.ics"}"#).unwrap();
         assert!(c.enabled && c.color.is_none());
+        // starý config (vlna 5) bez zdroje a připomínky: ICS, připomínka 5 min, bez toastu
+        let old: CalendarFeed = serde_json::from_str(r##"{"name":"Práce","url":"https://outlook.office365.com/owa/calendar/a/b/calendar.ics","color":"#60a5fa","enabled":false}"##).unwrap();
+        assert_eq!((old.source, old.remind_min, old.remind_toast, old.enabled, old.account.as_str()), (SourceKind::Ics, DEFAULT_REMIND_MIN, false, false, ""));
+        let o: CalendarFeed = serde_json::from_str(r#"{"source":"outlook-local","remindMin":0,"remindToast":true}"#).unwrap();
+        assert_eq!((o.source, o.remind_min, o.remind_toast), (SourceKind::OutlookLocal, 0, true));
+        assert_eq!(serde_json::to_value(&o).unwrap()["source"], "outlook-local");
     }
 }

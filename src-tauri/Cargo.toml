@@ -54,8 +54,14 @@ features = [
   # loga projektů: dekódování/zmenšení/PNG přes WIC (součást Windows — žádná crate navíc)
   "Win32_Graphics_Imaging",
   "Win32_NetworkManagement_IpHelper",
+  # karta Systém (`sysmon/`): rychlost sítě z GetIfTable2 (MIB_IF_ROW2 chce typy Ndis)
+  "Win32_NetworkManagement_Ndis",
   "Win32_Networking_WinSock",
   "Win32_Security",
+  # účty Microsoft/Google (`accounts/`): refresh tokeny ve Správci pověření (CredWriteW/CredReadW),
+  # náhoda pro PKCE a state ze systémového CSPRNG (BCryptGenRandom)
+  "Win32_Security_Credentials",
+  "Win32_Security_Cryptography",
   # rychlé akce: ikona souboru/složky (SHGetFileInfo + seznam ikon 48 px), výběr cesty (IFileOpenDialog); průvodce: IShellLinkW::GetPath
   "Win32_Storage_FileSystem",
   "Win32_System_Com",

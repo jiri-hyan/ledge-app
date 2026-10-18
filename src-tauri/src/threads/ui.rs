@@ -47,10 +47,14 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                             if c.cfg.read().scripts.in_actions {
                                 crate::scripts::refresh_async();
                             }
+                            // widgety na otevřené záložce: data starší než interval se obnoví hned
+                            crate::widgets::live::wake_opening(&c.cfg.read());
                         }
                         // počasí (jen Full na Osobní) dřív než snapshot — karta hned ukáže „načítám“
                         maybe_refresh_weather(view == View::Full);
                         crate::calendar::live::maybe_refresh(view == View::Full);
+                        crate::accounts::calsync::maybe_refresh(view == View::Full);
+                        crate::accounts::mail::maybe_refresh(view == View::Full);
                         // stav do šuplíku dřív, než vyjede
                         let _ = c.app.emit_to(drawer::LABEL, "state", snapshot());
                         c.drawer.show(view, opener, &mon, width, anim, c.strip_logical(&mon));

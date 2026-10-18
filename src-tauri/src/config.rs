@@ -45,6 +45,8 @@ pub struct Config {
     pub palette: crate::paletteconf::PaletteConfig,
     /// Script Commands: složka skriptů s hlavičkou `@ledge.*` → paleta (`scripts/`).
     pub scripts: crate::scripts::ScriptsConfig,
+    /// Widgety ze skriptů: složka s hlavičkou `@ledge.widget` → karty a položky proužku (`widgets/`).
+    pub widgets: crate::widgets::WidgetsConfig,
     /// Přihrádka na soubory: tah z Průzkumníka na proužek uloží cesty (`shelf/`).
     pub shelf: crate::shelf::ShelfConfig,
     /// Časovač: předvolby odpočtu, toast po doběhnutí, segment v proužku (`timer.rs`).
@@ -53,9 +55,16 @@ pub struct Config {
     pub clipboard: crate::cliphist::ClipboardConfig,
     /// Právě hraje: vzhled karty, čas a ozdoba v proužku (`mediaconf.rs`).
     pub media: crate::mediaconf::MediaConfig,
+    /// GitHub: PR k revizi, vlastní PR s CI a notifikace z přihlášeného `gh` (`github/`). Výchozí vypnuto.
+    pub github: crate::github::GithubConfig,
+    /// Systém: které disky a jednotky sítě v kartě Systém (`sysmon/`).
+    pub system: crate::sysmon::SystemConfig,
     /// Rozložení šuplíku: záložky, karty na nich (pořadí, velikost), skryté části karet (`layout.rs`).
     /// Jediný zdroj pravdy pro to, co šuplík ukazuje — `drawer.sections` se z něj odvozuje.
     pub layout: crate::layout::LayoutConfig,
+    /// Účty Microsoft a Google (OAuth, `accounts/`): vlastní registrace aplikace (Client ID), co Ledge
+    /// z účtu čte. Přihlášení samo je ve Správci pověření Windows, nikdy tady. Výchozí = nic nepřihlášeno.
+    pub accounts: crate::accounts::conf::AccountsConfig,
 }
 
 impl Default for Config {
@@ -79,11 +88,15 @@ impl Default for Config {
             onboarding: Default::default(),
             palette: Default::default(),
             scripts: Default::default(),
+            widgets: Default::default(),
             shelf: Default::default(),
             timer: Default::default(),
             clipboard: Default::default(),
             media: Default::default(),
+            github: Default::default(),
+            system: Default::default(),
             layout: Default::default(),
+            accounts: Default::default(),
         }
     }
 }
@@ -218,6 +231,8 @@ pub enum Glass {
 /// stahování/odběry, a starší Ledge; ruční změna se přepíše. Starý config bez `layout` se z něj převede.
 /// Nová karta / část = řádek v `sections!` níže + `layout::CARDS` / `PARTS` (+ zrcadla v `src/cards/sections.ts`
 /// `SECTION_KEYS` a `src/layout/model.ts`).
+/// Výchozí hodnota je `true`; karta, která ve výchozím rozložení není (katalog ji jen nabídne,
+/// `layout::OPT_IN`), je `false` — musí sedět s `layout::derive` nad výchozím rozložením.
 macro_rules! sections {
     ($($(#[$doc:meta])* $field:ident,)*) => {
         #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -228,7 +243,9 @@ macro_rules! sections {
 
         impl Default for Sections {
             fn default() -> Self {
-                Self { $($field: true,)* }
+                // karty mimo výchozí rozložení (`layout::OPT_IN`) jsou vypnuté — odvozené pole musí sedět
+                // s výchozím `layout` (jinak by se `Config::default()` lišil od načteného)
+                Self { $($field: !crate::layout::OPT_IN.contains(&stringify!($field)),)* }
             }
         }
 
@@ -279,6 +296,12 @@ sections! {
     sound,
     /// Osobní: stav baterie v kartě Čas — jen na stroji s baterií (`battery.rs`).
     battery,
+    /// Karta „GitHub“ (PR k revizi, vlastní PR s CI, notifikace; `github/`). Výchozí na žádné záložce; skrytá = nic se nestahuje.
+    github,
+    /// Karta „Systém“ (CPU, paměť, disky, síť; `sysmon/`). Výchozí na žádné záložce; skrytá = nic se nevzorkuje.
+    system,
+    /// Karta „Pošta“ (účet Microsoft: nepřečtené a 5 nejnovějších předmětů, `accounts/mail.rs`). Výchozí na žádné záložce (`layout::OPT_IN`).
+    mail,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -436,6 +459,10 @@ pub struct HotkeyConfig {
     pub note: String,
     /// Herní režim zapnout / vypnout (`gamemode.rs`). Prázdné = bez zkratky. Funguje i v herním režimu.
     pub game_mode: String,
+    /// Lístky na plochu (`pins/`): průchozí režim u všech lístků zapnout / vypnout. Výjimka z
+    /// `enabled`: registruje se, JEN když je na ploše aspoň jeden lístek, i s vypnutými zkratkami —
+    /// na průchozí lístek nejde kliknout, tohle je cesta ven. Prázdné = bez zkratky (zbývá Ctrl+K).
+    pub note_passthrough: String,
 }
 
 impl Default for HotkeyConfig {
@@ -447,6 +474,7 @@ impl Default for HotkeyConfig {
             deny: "Ctrl+Alt+D".into(),
             note: "Ctrl+Alt+N".into(),
             game_mode: String::new(),
+            note_passthrough: "Ctrl+Alt+P".into(),
         }
     }
 }
@@ -626,6 +654,9 @@ pub struct Project {
     /// Odkazy v rychlých akcích (staging, prod, docs…).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<Link>,
+    /// Vzhled dlaždice (ikona, barva, tvar, popisek — `tilelook.rs`). Chybí = automaticky (logo, `accent`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub look: Option<crate::tilelook::TileLook>,
 }
 
 fn yes() -> bool {
@@ -795,11 +826,16 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     hotkey_collision(cfg)?;
     crate::actions::validate(&cfg.actions)?;
     crate::scripts::validate(&cfg.scripts).map_err(|e| fe("scripts.dir", e))?;
+    crate::widgets::validate(&cfg.widgets).map_err(|e| fe("widgets.dir", e))?;
     crate::appearance::validate(&cfg.appearance)?;
     crate::stripconf::validate(&cfg.strip)?;
     crate::timer::validate(&cfg.timer)?;
     crate::cliphist::validate(&cfg.clipboard)?;
+    crate::github::conf::validate(&cfg.github)?;
+    crate::sysmon::conf::validate(&cfg.system)?;
     crate::layout::validate(&cfg.layout)?;
+    crate::accounts::conf::validate(&cfg.accounts)?;
+    crate::tilelook::validate(cfg)?;
     Ok(())
 }
 
@@ -835,6 +871,9 @@ fn hotkey_actions(cfg: &Config) -> Vec<(&'static str, &str)> {
         v.push(("note", h.note.as_str()));
     }
     v.push(("gameMode", h.game_mode.as_str()));
+    if cfg.notes.enabled {
+        v.push(("notePassthrough", h.note_passthrough.as_str()));
+    }
     v
 }
 
@@ -853,13 +892,27 @@ fn hotkey_collision(cfg: &Config) -> Result<(), FieldError> {
 
 /// Zkratky, které mají být právě zaregistrované: s `hotkeys.enabled = false` žádné; jinak toggle
 /// vždy, note se zapnutými poznámkami, approve/deny jen když čeká žádost Claude (`approve`).
+/// Průchozí režim lístků sem nepatří — ten přidává `active_hotkeys_pins`, jen když jsou lístky na ploše.
 pub fn active_hotkeys(cfg: &Config, approve: bool) -> Vec<(&'static str, String)> {
     hotkey_actions(cfg)
         .into_iter()
         .filter(|(a, _)| approve || !matches!(*a, "approve" | "deny"))
+        .filter(|(a, _)| *a != "notePassthrough")
         .filter(|(_, k)| !k.trim().is_empty())
         .map(|(a, k)| (a, k.to_string()))
         .collect()
+}
+
+/// `active_hotkeys` + zkratka průchozího režimu lístků, když je na ploše aspoň jeden lístek
+/// (`pins_open`) — i s `hotkeys.enabled = false` (jediná cesta z průchozího lístku myší nevede).
+/// Stejnou zkratku jako jiná registrovaná akce nepřidá (kolizi hlásí validace jen se zapnutými zkratkami).
+pub fn active_hotkeys_pins(cfg: &Config, approve: bool, pins_open: bool) -> Vec<(&'static str, String)> {
+    let mut v = active_hotkeys(cfg, approve);
+    let k = cfg.hotkeys.note_passthrough.trim();
+    if pins_open && cfg.notes.enabled && !k.is_empty() && !v.iter().any(|(_, o)| normalize_hotkey(o) == normalize_hotkey(k)) {
+        v.push(("notePassthrough", k.to_string()));
+    }
+    v
 }
 
 /// Plán přeregistrace: beze změny nic; jinak odregistrovat VŠECHNY staré a pak zaregistrovat celou
@@ -974,6 +1027,7 @@ mod tests {
             monogram: None,
             logo: None,
             links: vec![],
+            look: None,
         });
         save(&path, &cfg).unwrap();
         let names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
@@ -1004,6 +1058,7 @@ mod tests {
             monogram: None,
             logo: None,
             links: vec![],
+            look: None,
         };
         cfg.projects = vec![p.clone(), p.clone()];
         assert!(validate(&cfg).unwrap_err().contains("dvakrát"));
@@ -1045,7 +1100,7 @@ mod tests {
         let d = serde_json::to_value(Sections::default()).unwrap();
         let obj = d.as_object().unwrap();
         assert_eq!(obj.len(), Sections::FIELDS.len());
-        assert!(obj.values().all(|v| v == &serde_json::Value::Bool(true)), "{d}");
+        assert!(obj.iter().all(|(k, v)| v == &serde_json::Value::Bool(!crate::layout::OPT_IN.contains(&k.as_str()))), "{d}");
         // (JSON drawer.sections, pole → očekávaná hodnota)
         let cases: &[(&str, &[(&str, bool)])] = &[
             // starý config jen se 4 poli: nová pole zapnutá
@@ -1174,6 +1229,38 @@ mod tests {
         // starý config s kolizí se nenačte (zůstane poslední dobrý) — jen se zapnutými zkratkami
         assert!(load_str(r#"{"hotkeys":{"enabled":true,"toggle":"Ctrl+Alt+N"}}"#).is_err());
         assert!(load_str(r#"{"hotkeys":{"toggle":"Ctrl+Alt+N"}}"#).is_ok());
+    }
+
+    /// Zkratka průchozího režimu lístků: jen s lístkem na ploše, i s vypnutými zkratkami (cesta ven),
+    /// starý config ji dostane výchozí, kolize se hlásí jen se zapnutými zkratkami.
+    #[test]
+    fn pin_passthrough_hotkey() {
+        let keys = |v: &[(&'static str, String)]| v.iter().map(|(a, k)| format!("{a}={k}")).collect::<Vec<_>>();
+        let old = load_str(r#"{"hotkeys":{"toggle":"Ctrl+Alt+Space","note":"Ctrl+Alt+N"}}"#).unwrap();
+        assert_eq!(old.hotkeys.note_passthrough, "Ctrl+Alt+P");
+        let cases: &[(bool, bool, bool, &[&str])] = &[
+            // (zkratky zapnuté, poznámky zapnuté, lístek na ploše, registrované)
+            (false, true, false, &[]),
+            (false, true, true, &["notePassthrough=Ctrl+Alt+P"]),
+            (false, false, true, &[]),
+            (true, true, false, &["toggle=Ctrl+Alt+Space", "note=Ctrl+Alt+N"]),
+            (true, true, true, &["toggle=Ctrl+Alt+Space", "note=Ctrl+Alt+N", "notePassthrough=Ctrl+Alt+P"]),
+        ];
+        for (enabled, notes, open, want) in cases {
+            let mut cfg = old.clone();
+            cfg.hotkeys.enabled = *enabled;
+            cfg.notes.enabled = *notes;
+            assert_eq!(keys(&active_hotkeys_pins(&cfg, false, *open)), *want, "{enabled} {notes} {open}");
+        }
+        // prázdná = žádná zkratka
+        let mut cfg = old.clone();
+        cfg.hotkeys.note_passthrough = " ".into();
+        assert!(active_hotkeys_pins(&cfg, false, true).is_empty());
+        // kolize: se zapnutými zkratkami chyba u pole, s vypnutými ne (registruje se sama)
+        assert!(load_str(r#"{"hotkeys":{"enabled":true,"notePassthrough":"Alt+Ctrl+N"}}"#).unwrap_err().contains("hotkeys.notePassthrough"));
+        assert!(load_str(r#"{"hotkeys":{"notePassthrough":"Ctrl+Alt+N"}}"#).is_ok());
+        // vypnuté poznámky = lístky neexistují → žádná kolize
+        assert!(load_str(r#"{"notes":{"enabled":false},"hotkeys":{"enabled":true,"notePassthrough":"Ctrl+Alt+Space"}}"#).is_ok());
     }
 
     fn load_str(s: &str) -> Result<Config, String> {

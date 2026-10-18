@@ -103,6 +103,7 @@ pub(crate) fn set(on: bool) {
         c.send_ui(UiCmd::Hide);
     }
     crate::stripview::refresh_strip();
+    crate::pins::win::sync_dead();
     // vypnutí → emit vlákno dožene peek připomínek a stav
     mark_dirty();
 }

@@ -40,7 +40,7 @@ function Find-Denied([string]$dir, [string[]]$deny) {
   Get-ChildItem -Path $dir -Recurse -File -Force | Where-Object { $_.FullName -notmatch '\\\.git\\' } | ForEach-Object {
     $rel = $_.FullName.Substring($dir.Length + 1)
     foreach ($d in $deny) { if ($rel -match "(?i)$d") { $hits += "jméno souboru: $rel ~ $d" } }
-    if ($_.Extension -notin '.png', '.ico', '.icns', '.jpg', '.webp') {
+    if ($_.Extension -notin '.png', '.ico', '.icns', '.jpg', '.webp', '.bmp') {
       $text = [IO.File]::ReadAllText($_.FullName)
       foreach ($d in $deny) { if ($text -match "(?i)$d") { $hits += "$rel ~ $d" } }
     }

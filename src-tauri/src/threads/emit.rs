@@ -28,7 +28,7 @@ pub(crate) fn next_wake(now_ms: i64, deadlines: impl IntoIterator<Item = Option<
 }
 
 /// Termíny pro `next_wake` ze stavu jádra (jen čtení paměti).
-fn deadlines(last_git: Instant) -> [Option<i64>; 8] {
+fn deadlines(last_git: Instant) -> [Option<i64>; 11] {
     let c = core();
     let now = now_ms();
     let in_ms = |left: Duration| now + left.as_millis() as i64 + 1;
@@ -42,8 +42,9 @@ fn deadlines(last_git: Instant) -> [Option<i64>; 8] {
     };
     // časovač: konec odpočtu a změny minuty v proužku jen, když běží (`timer::next_deadline`);
     // kalendář jen s viditelnou kartou (`calendar::live::next_deadline`); čas skladby v proužku po minutách
-    // jen když hraje a proužek ho ukazuje (`media::next_deadline_live`)
-    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline(), crate::media::next_deadline_live()]
+    // jen když hraje a proužek ho ukazuje (`media::next_deadline_live`); připomínka schůzky jen na čas
+    // okna připomínky / začátku (`calendar::remind::next_deadline`, bez kalendáře s připomínkou nic)
+    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline(), crate::media::next_deadline_live(), crate::calendar::remind::next_deadline(), crate::accounts::calsync::next_deadline(), crate::accounts::mail::next_deadline()]
 }
 
 pub(crate) fn spawn_emit_thread() {
@@ -66,9 +67,13 @@ pub(crate) fn spawn_emit_thread() {
                 crate::limitslive::tick(now_ms());
                 crate::timer::tick_live(now_ms());
                 crate::calendar::live::tick(now_ms());
+                crate::calendar::remind::tick(now_ms());
                 // počasí na Osobní: jen porovnání času, stahuje až backoff/30 min (žádný nový interval)
                 maybe_refresh_weather(false);
                 crate::calendar::live::maybe_refresh(false);
+                // účty: kalendář jen s viditelnou kartou, pošta s kartou nebo položkou proužku `mail`
+                crate::accounts::calsync::maybe_refresh(false);
+                crate::accounts::mail::maybe_refresh(false);
                 let since = last_emit.elapsed();
                 if since < Duration::from_millis(120) {
                     std::thread::sleep(Duration::from_millis(120) - since);

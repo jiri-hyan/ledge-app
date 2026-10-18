@@ -24,6 +24,12 @@ const SHARED = {
   "notes-page": { files: ["notes/notes.css", "fit.css"], why: "posuvná plocha stránky poznámek" },
   "note-page": { files: ["notes/notes.css", "fit.css"], why: "posuvná plocha editoru poznámky" },
   st: { files: ["settings.css", "fit.css"], why: "Nastavení se vejde pod strop výšky" },
+  // okno lístku na plochu (`pin.html`) je samostatná stránka bez styles.css a notes.css: stejné třídy, vlastní vzhled
+  md: { files: ["notes/notes.css", "pin/pin.css"], why: "HTML náhledu dělá Rust `md::to_html` pro šuplík i lístek; lístek ho kreslí svými tokeny" },
+  "md-alt": { files: ["notes/notes.css", "pin/pin.css"], why: "jako `.md` — zástupný text obrázku z `notes/Markdown.tsx`" },
+  "md-check": { files: ["notes/notes.css", "pin/pin.css"], why: "jako `.md` — zaškrtávátko úkolu z `md::to_html`" },
+  "md-link": { files: ["notes/notes.css", "pin/pin.css"], why: "jako `.md` — odkaz z `md::to_html`" },
+  toast: { files: ["styles.css", "pin/pin.css"], why: "hlášky `ui/toast.tsx` i v okně lístku (bez styles.css)" },
 };
 
 // Třídy, které kód přiděluje, ale žádné CSS pravidlo je nezmiňuje: jen JS/test háčky nebo stav bez vlastního
@@ -34,7 +40,7 @@ const HOOKS = {};
 // hodnoty, které výraz může dát (z typu/tabulky v `why`). Hodnoty se ověří jako definované modifikátory, které
 // žádný soubor nevlastní (jinak na prvek padnou cizí pravidla — `ap-strip pill` bral písmo z `.pill`).
 const DYNAMIC = [
-  { file: "cards/Projects.tsx", expr: "class={`ring ${pc().phase}`}", values: ["preparing", "starting", "ready", "running", "exited", "failed"], why: "`Phase` v types.ts" },
+  { file: "cards/ProjectTile.tsx", expr: "class={`ring ${pc().phase}`}", values: ["preparing", "starting", "ready", "running", "exited", "failed"], why: "`Phase` v types.ts" },
   { file: "cards/Running.tsx", expr: "class={`pill ${ph()[0]}`}", values: ["a", "g", "n", "r"], why: "tabulka `PHASE` + záloha \"n\"" },
   { file: "ClaudeSessions.tsx", expr: "class={`pill ${st()[0]}`}", values: ["a", "v", "n", "r"], why: "tabulka `STATUS`" },
   { file: "notes/NotesCard.tsx", expr: "class={`pill ${l()[0]}`}", values: ["a", "b", "n", "r"], why: "`remindLabel` (a/b/n) a `syncLabel` (a/n/r) v notes/store.ts" },

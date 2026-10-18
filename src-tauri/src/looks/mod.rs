@@ -238,7 +238,8 @@ pub fn without(mut f: Facts, hide: &[StripItem]) -> Facts {
                 f.date.clear();
             }
             StripItem::Mode => f.mode.clear(),
-            StripItem::Custom => {}
+            // GitHub, Systém, widgety ze skriptů a poštu styly zavřeného Ledge (zatím) nekreslí
+            StripItem::Custom | StripItem::Github | StripItem::System | StripItem::Widget(_) | StripItem::Mail => {}
         }
     }
     f

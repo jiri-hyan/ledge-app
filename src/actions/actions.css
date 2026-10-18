@@ -72,3 +72,11 @@
 .act-check input { margin-top: 2px; }
 .act-actions { display: flex; gap: var(--s2); justify-content: flex-end; align-items: center; }
 .act-actions .msg { margin-right: auto; font-size: var(--fs-md); color: var(--t3); }
+
+/* vlna 8 P: varianty zobrazení karty (vzhled karty → Zobrazení) a režim úprav šuplíku (klik = vzhled dlaždice) */
+.act-card[data-edit] .act-tile { pointer-events: auto; }
+.act-card[data-view="list"] .act-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--s1); }
+.act-card[data-view="list"] .act-tile { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 6px 10px; }
+.act-card[data-view="compact"] .act-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: var(--s1); }
+.act-card[data-view="compact"] .act-tile { padding: 6px 4px; }
+.act-card[data-view="compact"] .act-label { display: none; }

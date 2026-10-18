@@ -111,6 +111,9 @@ pub struct Action {
     /// Jen `web`: výška okna v logických px (240–2160, výchozí 720).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+    /// Vzhled dlaždice (ikona, barva, tvar, popisek — `tilelook.rs`). Chybí = automaticky (`icon`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub look: Option<crate::tilelook::TileLook>,
 }
 
 impl Default for Action {
@@ -131,6 +134,7 @@ impl Default for Action {
             timeout_s: DEFAULT_TIMEOUT_S,
             width: None,
             height: None,
+            look: None,
         }
     }
 }

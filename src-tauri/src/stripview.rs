@@ -34,8 +34,12 @@ pub(crate) fn refresh_strip() {
         let st = c.notes.lock();
         (st.due.first().map(|n| n.title.clone()), st.due.len())
     };
+    // schůzka za chvíli (`calendar::remind`): priorita mezi „čeká na tebe“ a pádem / bliknutím „hotovo“
+    let meeting = crate::calendar::remind::strip_now(&cfg, crate::state::now_ms());
     let ambient = if !pending.is_empty() || !asks.is_empty() || due_count > 0 {
         Some(Rgba::AMBER)
+    } else if meeting.is_some() {
+        Some(Rgba::BLUE)
     } else if failed {
         Some(Rgba::RED)
     } else {
@@ -149,8 +153,16 @@ pub(crate) fn refresh_strip() {
             config::StripItem::Timer => segs.extend(crate::timer::strip_segments(&timer, now_ms)),
             // jen paměť (`media.rs` ji přepíše při události přehrávače → `mark_dirty`); nic nehraje = nic
             config::StripItem::Media => segs.extend(crate::media::strip_now(&cfg, now_ms)),
+            // jen paměť (`github/` ji plní karta nebo plánovač `integrations.rs`); bez dat nebo bez revizí nic
+            config::StripItem::Github => segs.extend(crate::github::strip_now(&cfg.github)),
+            config::StripItem::System => segs.extend(crate::sysmon::strip_now()),
+            // widget ze skriptu: jen paměť (`widgets::live`; běhy plánuje vlákno `widgets`)
+            config::StripItem::Widget(_) if cfg.widgets.enabled => segs.extend(crate::widgets::live::strip_segments(&item.key())),
+            config::StripItem::Widget(_) => {}
+            // jen paměť (`accounts/mail.rs`); 0 nepřečtených / nepřihlášeno = nic
+            config::StripItem::Mail => segs.extend(crate::accounts::mail::strip_segment(&cfg)),
         }
-        parts.push((*item, segs));
+        parts.push((item.clone(), segs));
     }
     let look = &cfg.appearance;
     let palette = geom::palette(look.theme);
@@ -164,6 +176,10 @@ pub(crate) fn refresh_strip() {
         let more = if due_count > 1 { format!(" +{}", due_count - 1) } else { String::new() };
         segs.insert(0, seg(format!("🔔 {text}{more}"), Rgba::AMBER, Some(Rgba::AMBER), true, true));
     }
+    if let Some(text) = &meeting {
+        let at = usize::from(due_count > 0);
+        segs.insert(at, seg(text.clone(), Rgba::BLUE, Some(Rgba::BLUE), true, true));
+    }
     // mrtvý Ledge (fullscreen hra nebo herní režim) = proužek pryč
     let dead = c.dead();
     let drawer_open = c.drawer.view() != View::Hidden;
@@ -174,7 +190,7 @@ pub(crate) fn refresh_strip() {
     let closed = cfg.strip.look;
     let looked = closed != crate::looks::Look::Classic && cfg.strip.enabled && !(retreat && closed.retreats());
     let show = looked.then(|| {
-        let f = look_facts(&cfg, &pending, &asks, &procs, due_first.as_deref(), due_count, &mode_title, accent);
+        let f = look_facts(&cfg, &pending, &asks, &procs, due_first.as_deref(), due_count, meeting.as_deref(), &mode_title, accent);
         crate::looks::show(closed, &crate::looks::without(f, &cfg.strip.look_hide))
     });
     let hidden = show.as_ref().is_some_and(|s| s.hidden);
@@ -221,6 +237,7 @@ fn look_facts(
     procs: &[procman::ProcView],
     due_first: Option<&str>,
     due_count: usize,
+    meeting: Option<&str>,
     mode_title: &str,
     accent: Rgba,
 ) -> crate::looks::Facts {
@@ -260,6 +277,9 @@ fn look_facts(
         }
         (s, due_count)
     });
+    // připomínka schůzky (`calendar::remind`) i ve stylech zavřeného Ledge (ostrůvek…): jako připomínka
+    // poznámky (stav „čeká na tebe“), jen když žádná poznámka po termínu není
+    let reminder = reminder.or_else(|| meeting.map(|m| (m.to_string(), 1)));
     use windows::Win32::System::SystemInformation::GetLocalTime;
     let lt = unsafe { GetLocalTime() };
     Facts {

@@ -40,6 +40,22 @@ export interface ProjectView {
   links: Link[];
   git: GitInfo | null;
   run: string | null;
+  /** vlastní vzhled dlaždice (`tilelook.rs`); chybí = automaticky */
+  look?: TileLook;
+}
+
+// --- vzhled zástupců (zrcadlo `src-tauri/src/tilelook.rs`, logika `src/tilelook/model.ts`) ---
+/** Ikona místo automatické: emoji, systémová ikona (kód Segoe Fluent Icons) nebo vlastní obrázek (klíč v cache). */
+export type LookIcon = { kind: "emoji" | "glyph" | "image"; value: string };
+export type TileShape = "rounded" | "circle" | "square" | "glass";
+export interface TileLook {
+  icon?: LookIcon;
+  /** barva podkladu `#rrggbb` */
+  color?: string;
+  shape?: TileShape;
+  /** vlastní popisek */
+  label?: string;
+  hideLabel?: boolean;
 }
 
 export interface ProcView {
@@ -232,6 +248,12 @@ export interface SaveNote {
 }
 export type SaveOutcome = { outcome: "saved"; note: NoteDetail } | { outcome: "changed" };
 
+/** Volby lístku na plochu (Rust `pins::PinPrefs`). `bg` 0–100 %, `text` 50–100 % neprůhlednost. */
+export interface PinPrefs { onTop: boolean; locked: boolean; through: boolean; bg: number; text: number; collapsed: boolean }
+export interface PinsView { open: { path: string; through: boolean }[]; key: string }
+/** Start okna lístku (`pin_init`): poznámka, volby, zkratka průchozího režimu (a jestli je zaregistrovaná). */
+export interface PinInit { path: string; prefs: PinPrefs; key: string; keyOk: boolean; hintSeen: boolean; lang: "cs" | "en"; fresh: boolean }
+
 export interface NoteQuery { kind?: string | null; project?: string | null; includeDone?: boolean; limit?: number }
 export interface QueryResult { notes: NoteView[]; total: number }
 
@@ -336,6 +358,31 @@ export interface PersonalView {
   battery: BatteryView | null;
   /** karta Kalendář (Rust `calendar::live::view`); starý snapshot bez pole = nic */
   calendar?: CalendarView;
+  /** karta Pošta — účet Microsoft (Rust `accounts::mail::view`); starý snapshot bez pole = nic */
+  mail?: MailView;
+}
+
+/** Zpráva v kartě Pošta (jen hlavička — tělo Ledge nečte). */
+export interface MailItem {
+  subject: string;
+  from: string;
+  receivedMs: number;
+  unread: boolean;
+  /** odkaz na zprávu v Outlooku na webu (https) */
+  link: string | null;
+}
+
+/** Karta Pošta (Rust `accounts::mail::MailView`). */
+export interface MailView {
+  status: "off" | "unset" | "idle" | "loading" | "ok" | "stale" | "unavailable";
+  account: string;
+  unread: number | null;
+  items: MailItem[];
+  fetchedMs: number | null;
+  error: string | null;
+  loading: boolean;
+  /** kam vede „Otevřít Outlook“ */
+  web: string;
 }
 
 /** Výskyt události na kartě Kalendář (Rust `calendar::view::Item`). */
@@ -351,7 +398,18 @@ export interface CalendarItem {
   ongoing: boolean;
   /** pásmo události Ledge nezná → čas brán jako místní */
   tzGuess: boolean;
+  /** odkaz Připojit (Rust `calendar::meeting::Join`); null / starý snapshot bez pole = žádný */
+  join?: CalendarJoin | null;
 }
+
+/** Odkaz na schůzku (ověřený Rustem: jen https známé služby). */
+export interface CalendarJoin {
+  provider: "teams" | "meet" | "zoom" | "webex" | "jitsi";
+  url: string;
+}
+
+/** Zdroj kalendáře (`personal.calendars[].source`, Rust `calendar::source::SourceKind`). */
+export type CalendarSource = "ics" | "outlook-local" | "graph" | "google";
 
 export interface CalendarDay {
   kind: "today" | "tomorrow" | "later";
@@ -365,11 +423,17 @@ export interface CalendarInfo {
   name: string;
   color: string | null;
   domain: string;
+  /** starý snapshot bez pole = ics */
+  source?: CalendarSource;
+  /** `outlook-closed` = Outlook v PC je zavřený (karta nabídne Načíst z Outlooku) */
+  hint?: "outlook-closed" | null;
   enabled: boolean;
   status: "off" | "invalid" | "ok" | "stale" | "loading" | "unavailable" | "idle";
   error: string | null;
   fetchedMs: number | null;
   events: number;
+  /** zdroj z přihlášeného účtu (Nastavení → Účty); chybí = odkaz ICS z `personal.calendars` */
+  account?: "microsoft" | "google";
 }
 
 export interface CalendarView {
@@ -378,6 +442,12 @@ export interface CalendarView {
   more: number;
   calendars: CalendarInfo[];
   loading: boolean;
+}
+
+/** `calendar_outlook_probe`: klasický Outlook nainstalovaný / běží. */
+export interface OutlookProbe {
+  installed: boolean;
+  running: boolean;
 }
 
 /** Výsledek `calendar_test` (Nastavení: přidání / Otestovat). */
@@ -455,6 +525,8 @@ export interface Snapshot {
   notesKindCounts: Record<string, number>;
   /** roste s každým přenačtením poznámek */
   notesRev: number;
+  /** lístky na plochu: připnuté poznámky (a jestli průchozí) a zkratka průchozího režimu (Rust `pins::win::view`) */
+  pins?: PinsView;
   /** záložka Osobní */
   personal: PersonalView;
   notesSync: NotesSyncView;
@@ -523,6 +595,8 @@ export interface ActionCfg {
   /** jen `web`: velikost okna v logických px (320–3840 × 240–2160, výchozí 480 × 720) */
   width?: number;
   height?: number;
+  /** vlastní vzhled dlaždice (`tilelook.rs`) */
+  look?: TileLook;
 }
 /** Akce ve snapshotu (dlaždice, paleta). */
 export interface ActionView {
@@ -544,6 +618,8 @@ export interface ActionView {
   confirmNote?: string | null;
   /** položka je skript ze složky skriptů (`ScriptView`), ne akce z configu */
   script?: boolean;
+  /** vlastní vzhled dlaždice (`tilelook.rs`); chybí = automaticky */
+  look?: TileLook;
 }
 /** Skript ze složky skriptů (`scripts/mod.rs` → `ScriptView`): tvar akce + pár polí navíc. */
 export interface ScriptView extends ActionView {
@@ -786,3 +862,81 @@ export interface PersonalView {
 }
 /** Akce `api.mediaControl` (Rust `media::Control`). */
 export type MediaAction = "toggle" | "next" | "prev" | { seek: number } | { shuffle: boolean } | { repeat: import("./media/timeline").MediaRepeat };
+
+// --- widgets ---
+/** Barva z výstupu widgetu (předvolba, Rust `widgets::output::Tone`). */
+export type WidgetTone = "accent" | "text" | "muted" | "violet" | "blue" | "teal" | "green" | "amber" | "red";
+/** Akce položky widgetu — jen tyhle (Rust `widgets::output::Act`). */
+export type WidgetAct = { type: "open"; path: string } | { type: "copy"; text: string } | { type: "run"; script: string; arg: string | null };
+export interface WidgetItem {
+  label: string;
+  value?: string;
+  icon?: string;
+  color?: WidgetTone;
+  url?: string;
+  action?: WidgetAct;
+  /** oddělovač */
+  sep?: boolean;
+}
+/** Co widget vypsal (Rust `widgets::output::WidgetData`). */
+export interface WidgetData {
+  title: string | null;
+  text: string | null;
+  items: WidgetItem[];
+  badge: string | null;
+  /** 0–1 */
+  progress: number | null;
+  strip: string | null;
+  color: WidgetTone | null;
+  /** co z výstupu nešlo použít */
+  notes?: string[];
+}
+export type WidgetStatus = "off" | "missing" | "problem" | "consent" | "loading" | "error" | "ok" | "idle";
+export type WidgetKind = "powershell" | "cmd" | "python" | "node" | "exe";
+/** Widget pro UI (Rust `widgets::live::WidgetView`). */
+export interface WidgetView {
+  /** `widget:<soubor>` — id karty i položky proužku */
+  id: string;
+  file: string;
+  title: string;
+  icon: string | null;
+  description: string | null;
+  show: "card" | "strip" | "both";
+  intervalS: number;
+  kind: WidgetKind | null;
+  status: WidgetStatus;
+  problem: string | null;
+  consent: { changed: boolean; note: string; confirmText: string; preview: string } | null;
+  data: WidgetData | null;
+  error: string | null;
+  updatedMs: number | null;
+  running: boolean;
+  hasOutput: boolean;
+  /** je položkou proužku (`strip.items`) */
+  inStrip: boolean;
+}
+/** `widgets_list`: co je ve složce widgetů (katalog, Nastavení). */
+export interface WidgetsListing {
+  enabled: boolean;
+  dir: string;
+  exists: boolean;
+  widgets: WidgetView[];
+  skipped: number;
+  error: string | null;
+}
+/** Příklad z galerie (Rust `widgets::templates::TemplateView`). */
+export interface WidgetTemplate {
+  file: string;
+  title: string;
+  description: string | null;
+  icon: string | null;
+  kind: WidgetKind;
+  /** kam sahá po síti (null = nikam) */
+  net: string | null;
+  installed: boolean;
+  body: string;
+}
+export interface Snapshot {
+  /** widgety umístěné na záložce nebo v proužku (chybí = žádné) */
+  widgets?: WidgetView[];
+}

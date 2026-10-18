@@ -3,20 +3,24 @@
 // záložku, odebrat, přidat z katalogu), výška karty, volby karty Projekty (zástupci: velikost dlaždic,
 // název, git, které projekty na téhle záložce) a skryté části karet. Mění jen draft Nastavení (`c.set("layout")`),
 // zapíše společná lišta Uložit. Velké tlačítko „Upravit přímo v šuplíku“ = režim úprav (`askEdit`).
-import { createMemo, For, Show } from "solid-js";
+// Pod tím přehled „Upravené karty a zástupci“ (vzhled karet a dlaždic, vlna 8 P — `LooksOverview.tsx`).
+import { createMemo, For, onMount, Show } from "solid-js";
 import { t } from "../i18n";
 import { base, offerUndo, useSettings } from "../settings/ctx";
 import { Section } from "../settings/fields/Row";
 import { SortList } from "../settings/fields/SortList";
 import { askEdit } from "./edit";
 import {
-  addCard, addPage, catalog, CARD_INFO, HEIGHTS, MAX_PAGES, moveCard, movePage, moveToPage, normalizeLayout, PAGE_ICONS, PART_KEYS, PARTS, partHidden,
+  addCard, addPage, catalog, CARD_INFO, HEIGHTS, isDynamic, MAX_PAGES, moveCard, movePage, moveToPage, normalizeLayout, PAGE_ICONS, PART_KEYS, PARTS, partHidden,
   removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, SIZES, tilesOf, TILE_SIZES,
   type CardHeight, type CardId, type CardSize, type Layout, type LayoutCard, type PartKey, type TileSize,
 } from "./model";
 import { heightLabel } from "./Deck";
 import { tileSizeName } from "../cards/TileOptions";
+import { catalogWidgets } from "../widgets/model";
+import { loadWidgets, widgetsListing } from "../widgets/registry";
 import { cardDesc, cardName, pageName, partName } from "./text";
+import LooksOverview from "./LooksOverview";
 import "./layout.css";
 
 const sizeName = (s: CardSize) =>
@@ -26,6 +30,12 @@ export default function LayoutEditor() {
   const c = useSettings();
   const L = createMemo(() => normalizeLayout(c.cfg.layout));
   const put = (l: Layout) => c.set("layout", l);
+  // widgety ze skriptů do nabídky „+ Přidat kartu“ (sken složky jednou při otevření panelu)
+  onMount(() => void loadWidgets().catch(() => null));
+  const addable = (pageId: string) => [
+    ...catalog(L(), pageId).map((x) => ({ id: x.id as CardId, name: cardName(x.id), hidden: !x.on.length })),
+    ...catalogWidgets(widgetsListing()?.widgets ?? [], L().pages, pageId).map((x) => ({ id: x.id as CardId, name: `${x.icon ? `${x.icon} ` : ""}${x.title}`, hidden: !x.on.length })),
+  ];
   /** draft rozložení se liší od uloženého → režim úprav v šuplíku by ho neviděl */
   const unsaved = () => {
     const b = base();
@@ -152,7 +162,7 @@ export default function LayoutEditor() {
                 )}
               </SortList>
               <Show when={pg.cards.length === 0}><p class="st-empty">{t("settings.layout.emptyTab", "Na záložce zatím nic není.")}</p></Show>
-              <Show when={catalog(L(), pg.id).length > 0}>
+              <Show when={addable(pg.id).length > 0}>
                 <select
                   class="lay-st-add"
                   aria-label={t("cards.layout.add", "+ Přidat kartu")}
@@ -160,11 +170,11 @@ export default function LayoutEditor() {
                   onChange={(e) => {
                     const id = e.currentTarget.value as CardId;
                     e.currentTarget.value = "";
-                    if (id in CARD_INFO) put(addCard(L(), pg.id, id));
+                    if (id in CARD_INFO || isDynamic(id)) put(addCard(L(), pg.id, id));
                   }}
                 >
                   <option value="">{t("cards.layout.add", "+ Přidat kartu")}</option>
-                  <For each={catalog(L(), pg.id)}>{(x) => <option value={x.id}>{cardName(x.id)}{x.on.length ? "" : ` (${t("settings.layout.hidden", "skrytá")})`}</option>}</For>
+                  <For each={addable(pg.id)}>{(x) => <option value={x.id}>{x.name}{x.hidden ? ` (${t("settings.layout.hidden", "skrytá")})` : ""}</option>}</For>
                 </select>
               </Show>
             </div>
@@ -173,6 +183,14 @@ export default function LayoutEditor() {
         <Show when={L().pages.length < MAX_PAGES}>
           <button class="mini" onClick={newTab}>{t("cards.layout.tab.addMore", "+ Nová záložka")}</button>
         </Show>
+      </Section>
+
+      <Section
+        id="layout.looks"
+        title={t("settings.f.layout.looks", "Upravené karty a zástupci")}
+        desc={t("settings.looks.desc", "Karty a dlaždice s vlastním vzhledem. Měníš ho v šuplíku: ⋯ na kartě → Vzhled karty…, pravý klik na dlaždici → Upravit vzhled… (v režimu úprav stačí klik).")}
+      >
+        <LooksOverview />
       </Section>
 
       <Section id="layout.hiddenParts" title={t("settings.layout.parts", "Části karet")} desc={t("settings.layout.parts.desc", "Skrytá část se nevykreslí ani nepočítá (skrytá útrata nečte transcripty). Jde i přímo v šuplíku: ⋯ v hlavičce karty.")}>

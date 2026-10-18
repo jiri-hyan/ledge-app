@@ -37,6 +37,10 @@ export function HotkeysSection() {
           )}
         </For>
       </Show>
+      {/* lístky na plochu: registruje se jen s lístkem na ploše, i s vypnutými zkratkami (cesta z průchozího režimu) */}
+      <Row id="hotkeys.notePassthrough" dim={!c.cfg.notes?.enabled} hint={!c.cfg.notes?.enabled ? t("settings.hotkeys.noteOff", "Poznámky jsou vypnuté — tahle zkratka se neregistruje") : undefined}>
+        <HotkeyInput value={h().notePassthrough ?? ""} onChange={(v) => c.set("hotkeys.notePassthrough", v)} label={fieldLabel("hotkeys.notePassthrough")} conflict={h().enabled ? conflict("notePassthrough") : null} />
+      </Row>
     </Section>
   );
 }

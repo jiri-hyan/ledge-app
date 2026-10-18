@@ -14,6 +14,8 @@ import Markdown, { toggleLocal } from "./Markdown";
 import ProjectPicker from "./ProjectPicker";
 import RemindPicker from "./RemindPicker";
 import { remindDefault } from "./remind";
+import { IconPin } from "../pin/icons";
+import { isPinned, togglePin } from "./pins";
 import { editPath, notePreset, openExternal, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
 
 export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => void }) {
@@ -191,6 +193,13 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
         </div>
         <Show when={editing() && D.edBase()}>
           {(b) => <button class="icon-btn" title={t("notes.editor.openExternal", "Otevřít v editoru\n{path}", { path: b().path })} onClick={() => openExternal(b().path)}><IconFile /></button>}
+        </Show>
+        <Show when={editing() && D.edBase()}>
+          {(b) => (
+            <button class="icon-btn" classList={{ on: isPinned(p.s.pins, b().path) }} aria-pressed={isPinned(p.s.pins, b().path)} title={isPinned(p.s.pins, b().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.editorPin", "Připnout na plochu — lístek přes ostatní okna (uložené znění)")} onClick={() => togglePin(b().path)}>
+              <IconPin />
+            </button>
+          )}
         </Show>
       </div>
       <Show when={preview()} fallback={

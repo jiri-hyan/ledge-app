@@ -131,6 +131,7 @@ mod tests {
             monogram: None,
             logo: None,
             links: vec![],
+            look: None,
         }
     }
 

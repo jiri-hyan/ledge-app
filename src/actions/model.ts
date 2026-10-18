@@ -86,6 +86,8 @@ export function cleanAction(a: ActionCfg): ActionCfg {
     if (w && w !== WEB_SIZE.w) out.width = w;
     if (h && h !== WEB_SIZE.h) out.height = h;
   }
+  // vzhled dlaždice (šuplík → Upravit vzhled…) editor akce nemění, jen ho přenese
+  if (a.look && Object.keys(a.look).length) out.look = a.look;
   if (a.kind === "command") {
     if (a.shell === "powershell") out.shell = "powershell";
     if (a.terminal) out.terminal = true;

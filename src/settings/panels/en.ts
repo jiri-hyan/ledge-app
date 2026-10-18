@@ -284,7 +284,7 @@ registerDict("en", {
   "settings.layout.parts.desc": "A hidden part is neither drawn nor computed (hidden spend doesn't read transcripts). You can also do it right in the drawer: ⋯ in the card header.",
   "settings.layout.partOf": "In the {card} card",
   // Osobní
-  "settings.personal.desc": "Things outside work: weather, calendar, music, timer and clipboard history.",
+  "settings.personal.desc": "Things outside work: weather, calendar, music, timer, clipboard history and the GitHub and System cards.",
   "settings.personal.layoutNote": "Which card sits on which tab (and whether the Personal tab exists at all) is set in the Drawer and cards panel or right in the drawer via ✎. Links are in the Projects, actions and links panel.",
   "settings.personal.place": "Location",
   "settings.personal.place.hint": "The name is only a label on the card. Find coordinates on a map site, e.g. mapy.cz (right-click the place).",
@@ -425,4 +425,13 @@ registerDict("en", {
   "settings.start.tips": "Tips",
   "settings.start.news": "What's new",
   "actions.panel.order": "Drag the handle (or Alt+arrow) to reorder — cards and the palette use this order.",
+  "settings.looks.desc": "Cards and tiles with their own look. You change it in the drawer: ⋯ on a card → Card look…, right-click a tile → Edit look… (in edit mode a click is enough).",
+  "settings.looks.none": "Nothing customized — change the look in the drawer: ⋯ on a card → Card look…, right-click a tile → Edit look…",
+  "settings.looks.cardOn": "Card on the {tab} tab",
+  "settings.looks.reset": "Reset",
+  "settings.looks.project": "Project tile",
+  "settings.looks.action": "Action / link tile",
+  "settings.looks.allHint": "Cards follow the design style again, tiles get the automatic icon. Folders stay.",
+  "settings.looks.resetAll": "Reset all",
+  "settings.looks.resetDone": "Look of cards and tiles reset",
 });

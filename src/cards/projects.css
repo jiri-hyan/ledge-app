@@ -56,3 +56,36 @@
 @media (prefers-reduced-motion: reduce) {
   .proj:hover, .proj:active, .proj:hover .logo { transform: none; }
 }
+
+/* ---------- vlna 8 P: vlastní vzhled dlaždice, složky, varianty zobrazení ---------- */
+/* prstenec běhu sleduje tvar ikony s vlastním vzhledem (`TileIcon` dává `data-shape` na `.logo`) */
+.logo[data-shape="circle"] .ring { border-radius: 50%; }
+.logo[data-shape="square"] .ring { border-radius: calc(var(--r-xs) + 4px); }
+/* režim úprav šuplíku: dlaždice jdou chytit (klik = vzhled, tah = složka) — karta jinak klik nepropouští */
+.projects[data-edit] .proj { pointer-events: auto; cursor: grab; touch-action: none; }
+.proj-lifted { opacity: 0.4; }
+.proj-drop { outline: 2px dashed var(--accent); outline-offset: 2px; }
+/* složka: mřížka 2 × 2 malých ikon místo loga; tón dlaždice v akcentu */
+.proj-folder { --a: var(--accent); }
+.proj-fbox { width: var(--logo); height: var(--logo); display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 3px; padding: calc(var(--logo) * 0.09); border-radius: var(--r-xl); background: var(--well-2); box-shadow: inset 0 0 0 1px var(--line-2); transition: transform var(--dur-5) var(--spring), box-shadow var(--dur-2); }
+.proj:hover .proj-fbox { transform: translateZ(18px) scale(1.06); }
+.proj-open .proj-fbox { box-shadow: inset 0 0 0 2px var(--accent); }
+.proj-fmini { display: grid; place-items: center; min-width: 0; min-height: 0; overflow: hidden; border-radius: var(--r-xs); color: var(--white); font: 650 calc(var(--logo) * 0.15) var(--display); }
+.proj-fmini img { width: 70%; height: 70%; object-fit: contain; }
+.proj-fpanel { pointer-events: auto; margin-top: var(--s2); padding: var(--s2); border-radius: var(--r-lg); background: var(--well); border: 1px solid var(--line-2); animation: drop var(--dur-2) var(--ease); }
+.proj-fhead { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); }
+.proj-fhead small { font-size: var(--fs-xs); color: var(--t3); }
+.proj-fhead .grow { flex: 1; }
+input.proj-fname { width: 170px; padding: 3px 8px; font-size: var(--fs-ui); font-weight: 600; }
+/* varianta Seznam: řádky s malým logem, název a větev vlevo vedle sebe nad sebou */
+.projects[data-view="list"] { --tile-min: 200px; --logo: 34px; --logo-img: 22px; }
+.projects[data-view="list"] .proj { flex-direction: row; padding: 6px 8px; text-align: left; }
+.projects[data-view="list"] .proj-hit { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 1px; align-items: center; justify-items: start; }
+.projects[data-view="list"] .proj-hit > :first-child { grid-row: span 2; }
+.projects[data-view="list"] .nm, .projects[data-view="list"] .br { padding: 0; max-width: 100%; }
+.projects[data-view="list"] .logo { font-size: calc(13px * var(--fz)); }
+/* varianta Kompaktní: jen ikony */
+.projects[data-view="compact"] { --tile-min: 52px; --logo: 34px; --logo-img: 22px; gap: var(--s1); }
+.projects[data-view="compact"] .proj { padding: 6px 2px; gap: 0; }
+.projects[data-view="compact"] .nm, .projects[data-view="compact"] .br { display: none; }
+.projects[data-view="compact"] .logo { font-size: calc(12px * var(--fz)); }

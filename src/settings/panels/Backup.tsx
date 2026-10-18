@@ -22,6 +22,8 @@ const SECTION_NAMES: Record<string, readonly [string, string]> = {
   hotkeys: ["settings.section.hotkeys", "Zkratky"],
   notes: ["settings.section.notes", "Poznámky"],
   personal: ["settings.section.personal", "Osobní"],
+  github: ["settings.section.github", "GitHub"],
+  system: ["settings.section.system", "Karta Systém"],
   autostart: ["settings.section.autostart", "Spouštění po startu Windows"],
   update: ["settings.section.update", "Aktualizace"],
   appearance: ["settings.section.appearance", "Vzhled a animace"],
@@ -29,6 +31,7 @@ const SECTION_NAMES: Record<string, readonly [string, string]> = {
   questions: ["settings.section.questions", "Otázky Clauda"],
   onboarding: ["settings.section.onboarding", "Průvodce"],
   ui: ["settings.section.ui", "Jazyk"],
+  accounts: ["settings.section.accounts", "Účty (Client ID — přihlášení se nezálohuje)"],
 };
 export const sectionName = (k: string) => {
   const n = SECTION_NAMES[k];

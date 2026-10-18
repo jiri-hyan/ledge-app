@@ -14,6 +14,8 @@ const PATHS: Record<string, string> = {
   claude: "M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8",
   // Osobní: postava
   osobni: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 21a7 7 0 0 1 14 0",
+  // Účty: klíč
+  ucty: "M14.5 9.5a4 4 0 1 1-1.2-2.8M13.3 6.7L20 13.4V17h-3v-2h-2v-2h-1.7",
   // Poznámky: list s přehnutým rohem
   poznamky: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5",
   // Chování: posuvníky

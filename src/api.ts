@@ -5,9 +5,10 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
 import type { StatusLineStatus, TimerOp, TimerState } from "./types";
 import type { EditPreview, GitView } from "./types";
-import type { CalendarTest } from "./types";
+import type { CalendarTest, OutlookProbe } from "./types";
 import type { MediaAction } from "./types";
 import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
+import type { PinInit, PinPrefs } from "./types";
 
 export type * from "./types";
 
@@ -66,6 +67,20 @@ export const api = {
   noteDraftClear: () => call("note_draft_clear"),
   /** Synchronizace poznámek hned — počká na doběhnutí, vrátí krátký výsledek (chyba = text). */
   notesSyncNow: () => call<string>("notes_sync_now"),
+  // --- lístky na plochu (Rust `pins/`, `commands/pins.rs`) ---
+  /** Šuplík: připnout poznámku na plochu / odepnout; true = je připnutá. */
+  pinToggle: (path: string) => call<boolean>("pin_toggle", { path }),
+  /** Šuplík / paleta: nová poznámka hned jako lístek na ploše (s fokusem). Vrací cestu. */
+  pinNew: () => call<string>("pin_new"),
+  /** Průchozí režim u všech lístků přepnout; null = žádný lístek není na ploše. */
+  pinThroughAll: () => call<boolean | null>("pin_through_all"),
+  /** Okno lístku: start (poznámka, volby, zkratka). Rust pozná lístek podle volajícího okna. */
+  pinInit: () => call<PinInit>("pin_init"),
+  pinSet: (patch: Partial<PinPrefs>) => call<PinPrefs>("pin_set", { patch }),
+  /** Okno lístku: tah za lištu (zamčený / průchozí se nehne). */
+  pinDrag: () => call("pin_drag"),
+  pinUnpin: () => call("pin_unpin"),
+  pinHintSeen: () => call("pin_hint_seen"),
   takePage: () => call<string | null>("take_page"),
   /** Rust ověří, že na `index` je pořád tenhle `target` (config se mezitím mohl změnit). */
   openLink: (index: number, target: string) => call("open_link", { index, target }),
@@ -103,6 +118,12 @@ export const api = {
   volumeMute: (muted: boolean) => call("volume_mute", { muted }),
   /** Kalendář: jedno zkušební stažení odkazu ICS (nic se neukládá); chyba = lidská věta bez adresy. */
   calendarTest: (url: string) => call<CalendarTest>("calendar_test", { url }),
+  /** Kalendář: Připojit ke schůzce — Rust otevře jen ověřený odkaz Teams/Meet/Zoom/Webex/Jitsi. */
+  calendarJoin: (url: string) => call("calendar_join", { url }),
+  /** Kalendář: je tu klasický Outlook (registr, nic nespouští) a běží? */
+  calendarOutlookProbe: () => call<OutlookProbe>("calendar_outlook_probe"),
+  /** Kalendář: výslovné „Načíst z Outlooku“ (smí Outlook spustit na pozadí); počet nadcházejících výskytů. */
+  calendarOutlookLoad: () => call<number>("calendar_outlook_load"),
   // --- settings ---
   /** Ověří rozpracovaný config (nic nezapisuje): první chyba s polem, `null` = v pořádku. */
   checkConfig: (cfg: any) => call<FieldError | null>("check_config", { cfg }),
@@ -111,6 +132,9 @@ export const api = {
   configImportPreview: (path: string) => call<ImportPreview>("config_import_preview", { path }),
   /** Nativní dialog nad šuplíkem; zrušení = null. */
   pickPath: (kind: PickKind, title?: string, start?: string) => call<string | null>("pick_path", { kind, title, start }),
+  /** Vzhled zástupce: vybraný obrázek → zmenšený do cache → klíč (`tilelook.rs`); data URL podle klíče. */
+  lookImageAdd: (path: string) => call<string>("look_image_add", { path }),
+  lookImage: (key: string) => call<string | null>("look_image", { key }),
   pickSave: (name: string) => call<string | null>("pick_save", { name }),
   projectDetect: (path: string) => call<DetectedProject>("project_detect", { path }),
   projectCandidates: () => call<RepoCandidate[]>("project_candidates"),

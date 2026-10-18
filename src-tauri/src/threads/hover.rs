@@ -40,15 +40,32 @@ pub(crate) fn spawn_hover_thread() {
                 }
                 if last_fs_check.elapsed() > Duration::from_millis(500) {
                     last_fs_check = Instant::now();
-                    let fs = screen::fullscreen_on(&mon);
+                    let state = screen::fullscreen_state(&mon);
+                    let fs = state != screen::FsState::None;
+                    // pro lístky: co přesně leží přes monitor (prohlížeč ve F11 ≠ hra); okno v popředí se
+                    // čte jen při pokrytí a exe je v cache podle HWND — žádný nový polling
+                    let kind = match state {
+                        screen::FsState::None => crate::pins::FsKind::None,
+                        screen::FsState::Exclusive => crate::pins::FsKind::Exclusive,
+                        screen::FsState::Covering => match fg.read() {
+                            Some(f) => crate::pins::cover_kind(f.pid == own_pid, f.exe),
+                            None => crate::pins::FsKind::CoverOther,
+                        },
+                    };
+                    let kind_changed = crate::pins::win::set_fs_kind(kind);
                     if c.fullscreen.swap(fs, Ordering::Relaxed) != fs {
                         log(&format!("fullscreen: {fs}"));
                         if fs && c.drawer.view() != View::Hidden {
                             c.send_ui(UiCmd::Hide);
                         }
                         refresh_strip();
+                        // lístky „Vždy navrchu“ hře ustoupí (a pak se vrátí)
+                        crate::pins::win::sync_dead();
                         // konec fullscreenu → emit vlákno hned dožene peek připomínky (`check_reminders`)
                         mark_dirty();
+                    } else if kind_changed {
+                        // fullscreen trvá, ale změnilo se okno v popředí (prohlížeč ↔ hra)
+                        crate::pins::win::sync_dead();
                     }
                 }
                 // mrtvý Ledge (fullscreen hra nebo herní režim): myš nic, kontrola fullscreenu jede dál

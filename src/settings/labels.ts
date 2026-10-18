@@ -11,6 +11,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "onboarding.wizard": { panel: "zaciname", label: "Průvodce prvním spuštěním", kw: "průvodce onboarding znovu spustit nastavit od začátku vítejte" },
   // Šuplík a karty
   "layout": { panel: "suplik", label: "Záložky a karty", hint: "Co šuplík ukazuje, na které záložce a jak velké", kw: "karty záložky rozložení pořadí velikost skrýt zobrazit přidat katalog běží claude poznámky projekty repa akce přihrádka hodiny počasí odkazy limity útrata git subagenti osobní práce" },
+  "layout.looks": { panel: "suplik", label: "Upravené karty a zástupci", hint: "Vlastní vzhled karet a dlaždic — přehled a obnovení", kw: "vzhled karty akcent pozadí hlavička hustota zobrazení seznam dlaždice ikona emoji barva tvar kruh sklo popisek zástupce obnovit" },
   "shelf.enabled": { panel: "suplik", label: "Přihrádka na soubory", hint: "Přetáhni soubory z Průzkumníka na proužek nahoře — uloží se jen odkazy (cesty) do karty Přihrádka. Kopírování cesty pro Claude Code, otevření, tah ven.", kw: "shelf přihrádka soubory přetáhnout drag drop cesta schránka claude" },
   // Vzhled (panel `Appearance.tsx` ve 4 krocích: Zavřený · Po najetí · Otevřený · Pohyb; krok každé kotvy
   // a co je v „Pokročilé“ je v `appearanceModel.ts` `ANCHOR_STEP`) — i celý proužek (`StripSettings.tsx`)
@@ -46,6 +47,10 @@ export const FIELDS: Record<string, FieldDef> = {
   "scripts.enabled": { panel: "akce", label: "Skripty v paletě", hint: "Skripty ze složky skriptů jako položky palety (Ctrl+K). Dokud složka neexistuje, nic se neukáže.", kw: "script commands raycast skript powershell python node cmd bat" },
   "scripts.dir": { panel: "akce", label: "Složka skriptů", hint: "Prázdné = Ledge\\scripts ve tvém profilu. %PROMĚNNÉ% se rozbalí.", kw: "složka cesta skripty" },
   "scripts.inActions": { panel: "akce", label: "Skripty i v kartě Rychlé akce", hint: "Dlaždice skriptů ve skupině Skripty (jinak jen v paletě)", kw: "dlaždice karta skripty" },
+  widgets: { panel: "akce", label: "Widgety ze skriptů", hint: "Karta nebo položka proužku z vlastního skriptu (JSON nebo text). Spustí se až po povolení, jen když je vidět.", kw: "widget widgety xbar swiftbar übersicht skript karta proužek json docker github kurz čnb ping disk uptime vpn odpočet" },
+  "widgets.enabled": { panel: "akce", label: "Widgety ze skriptů", hint: "Vypnuto = žádný widget se nespouští ani neukazuje", kw: "widget zapnout vypnout" },
+  "widgets.dir": { panel: "akce", label: "Složka widgetů", hint: "Prázdné = Ledge\\widgets ve tvém profilu. %PROMĚNNÉ% se rozbalí.", kw: "složka cesta widgety" },
+  "widgets.gallery": { panel: "akce", label: "Galerie příkladů widgetů", hint: "Kurz ČNB, počasí jinde, Docker, GitHub CI, ping, síť a VPN, disk, uptime, odpočet — jedním klikem do složky", kw: "příklady šablony galerie widget kurz počasí docker github ping vpn disk uptime odpočet" },
   // Claude (i otázky Clauda, `Questions.tsx`)
   "claude.enabled": { panel: "claude", label: "Schvalování z Ledge", hint: "Žádosti Clauda o povolení se objeví v šuplíku", kw: "povolit most" },
   "claude.port": { panel: "claude", label: "Port pro spojení s Claude Code", hint: "Číslo, přes které se Claude Code hlásí Ledge (jen tento počítač, 127.0.0.1). Změna platí po restartu Ledge a znovu zapojených hookách.", kw: "port most" },
@@ -59,7 +64,23 @@ export const FIELDS: Record<string, FieldDef> = {
   "claude.enforceCommit": { panel: "claude", label: "Hlídat nedokončenou práci", hint: "Soubory, které session upravila a nezacommitovala, a její nepushnuté commity", kw: "nedokončené session commit push hlídač" },
   // Osobní
   "personal.weather": { panel: "osobni", label: "Místo pro počasí", hint: "Open-Meteo, bez klíče. Prázdné = nic se nestahuje (polohu podle IP Ledge nezjišťuje).", kw: "počasí souřadnice šířka délka město" },
-  "personal.calendars": { panel: "osobni", label: "Kalendáře", hint: "Google nebo Outlook z tajného odkazu ICS — jen čtení, bez přihlášení. Vlož odkaz a klikni na Přidat.", kw: "kalendář google outlook ics ical webcal události schůzky" },
+  "personal.calendars": { panel: "osobni", label: "Kalendáře", hint: "Google nebo Outlook z tajného odkazu ICS, nebo klasický Outlook v tomto PC — jen čtení, bez přihlášení. U schůzky tlačítko Připojit a připomínka pár minut předem.", kw: "kalendář google outlook ics ical webcal události schůzky teams zoom meet webex připojit připomínka" },
+  "github.enabled": { panel: "osobni", label: "GitHub", hint: "Zapnuto: Ledge přes tvoje přihlášené gh (GitHub CLI) přečte PR čekající na tvoji revizi, tvoje otevřené PR a nepřečtené notifikace. Data jen zobrazí — nic neodesílá, heslo ani token nevidí. Vypnuto: žádný dotaz na GitHub.", kw: "github gh pull request pr revize review notifikace ci karta proužek" },
+  "github.review": { panel: "osobni", label: "Čeká na tvoji revizi", hint: "PR, u kterých tě někdo žádá o revizi. Jejich počet ukáže i položka GitHub v proužku.", kw: "github revize review pull request žádost" },
+  "github.mine": { panel: "osobni", label: "Tvoje otevřená PR", hint: "Se stavem kontrol (CI): zelená prošly, červená selhaly, žlutá běží.", kw: "github moje pr ci kontroly actions build" },
+  "github.notifications": { panel: "osobni", label: "Nepřečtené notifikace", hint: "Počet a pět nejnovějších.", kw: "github notifikace oznámení nepřečtené" },
+  "github.refreshMin": { panel: "osobni", label: "Jak často obnovovat", hint: "Jen když je karta vidět nebo je v proužku položka GitHub — zavřený šuplík bez ní nedělá nic. Nejméně každé 2 minuty; v kartě je i tlačítko Obnovit.", kw: "github obnovit interval minuty frekvence" },
+  "system.disks": { panel: "osobni", label: "Které disky ukázat", hint: "Volné místo na pevných discích v kartě Systém. Nic nevybráno = všechny.", kw: "systém disk disky volné místo písmeno c d" },
+  "system.netUnit": { panel: "osobni", label: "Jednotky rychlosti sítě", hint: "Bajty (MB/s), nebo bity (Mbit/s) — tak rychlost uvádí poskytovatel připojení.", kw: "systém síť rychlost mbit bity bajty jednotky" },
+  // Účty (panel `ucty`, `accounts/AccountsSettings.tsx`)
+  "accounts.microsoft": { panel: "ucty", label: "Účet Microsoft", hint: "Outlook a Microsoft 365: kalendář a počet nepřečtených v poště. Přihlášení v prohlížeči přes tvou vlastní registraci aplikace.", kw: "microsoft outlook office 365 hotmail live účet přihlásit kalendář pošta e-mail teams" },
+  "accounts.microsoft.clientId": { panel: "ucty", label: "Application (client) ID", hint: "Z Azure Portal → App registrations → tvoje aplikace → Overview. Ledge žádné výchozí nemá.", kw: "client id azure entra registrace aplikace guid" },
+  "accounts.microsoft.calendar": { panel: "ucty", label: "Kalendář v kartě Kalendář", hint: "Události kalendáře účtu se ukážou vedle odkazů ICS.", kw: "kalendář outlook události schůzky teams" },
+  "accounts.microsoft.mail": { panel: "ucty", label: "Pošta v kartě Pošta", hint: "Počet nepřečtených a předměty 5 nejnovějších zpráv. Kartu přidáš v Šuplík a karty, do proužku položkou Pošta.", kw: "pošta e-mail mail nepřečtené doručená outlook" },
+  "accounts.google": { panel: "ucty", label: "Účet Google", hint: "Kalendář Google (jen čtení). Přihlášení v prohlížeči přes tvou vlastní registraci aplikace.", kw: "google gmail kalendář účet přihlásit" },
+  "accounts.google.clientId": { panel: "ucty", label: "Client ID", hint: "Z Google Cloud Console → Clients → klient typu Desktop app. Ledge žádné výchozí nemá.", kw: "client id google cloud console desktop app oauth" },
+  "accounts.google.calendar": { panel: "ucty", label: "Kalendář v kartě Kalendář", hint: "Události vybraných kalendářů se ukážou vedle odkazů ICS.", kw: "kalendář google události" },
+  "accounts.google.calendars": { panel: "ucty", label: "Které kalendáře", hint: "Nic nevybráno = jen hlavní kalendář účtu.", kw: "kalendáře výběr rodina svátky sdílené" },
   "media.variant": { panel: "osobni", label: "Vzhled přehrávače", hint: "Karta Právě hraje: kompaktní řádek, karta s průběhem, velký obal, vinyl, nebo jen v proužku. Přepneš i ikonkou v rohu karty.", kw: "přehrávač hudba spotify youtube vinyl obal vzhled karta právě hraje" },
   "media.stripTime": { panel: "osobni", label: "Čas skladby v proužku", hint: "Po minutách (třeba „1/4 min“) a jen když přehrávač čas hlásí. Sekundy proužek neukazuje, aby zbytečně nepracoval.", kw: "proužek čas skladby minuty průběh" },
   "media.equalizer": { panel: "osobni", label: "Ozdoba ekvalizéru", hint: "Jen ozdoba — neukazuje skutečný zvuk. V proužku stojí, v šuplíku se hýbe jen při přehrávání.", kw: "ekvalizér animace ozdoba proužek" },
@@ -88,6 +109,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "hotkeys.approve": { panel: "chovani", label: "Povolit žádost Clauda", hint: "Registruje se jen, když nějaká žádost čeká", kw: "zkratka schválit" },
   "hotkeys.deny": { panel: "chovani", label: "Zamítnout žádost Clauda", hint: "Registruje se jen, když nějaká žádost čeká", kw: "zkratka zamítnout" },
   "hotkeys.gameMode": { panel: "chovani", label: "Herní režim zapnout / vypnout", hint: "Platí i v herním režimu — tou se z něj dostaneš", kw: "zkratka hra game" },
+  "hotkeys.notePassthrough": { panel: "chovani", label: "Lístky na ploše: průchozí režim zapnout / vypnout", hint: "Platí jen, když je na ploše lístek — i s vypnutými zkratkami (na průchozí lístek nejde kliknout)", kw: "zkratka listek plocha pruchozi" },
   "palette.compact": { panel: "chovani", label: "Kompaktní paleta příkazů", hint: "Ctrl+K a 🔍 ukážou jen vyhledávací pole; výsledky se rozbalí až při psaní, nedávné šipkou dolů", kw: "paleta příkazů ctrl+k hledání powertoys malá jen pole" },
   "palette.winSettings": { panel: "chovani", label: "Nastavení Windows v paletě", hint: "Při psaní v paletě najde i stránky Nastavení Windows (Bluetooth, Zvuk, Wi-Fi…) a klasické ovládací panely", kw: "windows settings ms-settings ovládací panely control bluetooth zvuk wifi" },
   fullscreen: { panel: "chovani", label: "Hry a video na celou obrazovku", hint: "Ledge je při nich vždy neaktivní: nic neukazuje a nebere myš ani fokus", kw: "fullscreen hra celá obrazovka" },

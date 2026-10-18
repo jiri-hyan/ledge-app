@@ -233,14 +233,22 @@ pub fn gh_error(stderr: &str) -> String {
 
 // ---------- gh ----------
 
-/// `gh.exe` z PATH (absolutní cesta — nikdy ne z cwd), záložně výchozí instalace GitHub CLI.
-fn gh_exe() -> Option<PathBuf> {
+/// `gh.exe` z PATH (absolutní cesta — nikdy ne z cwd), záložně výchozí instalace GitHub CLI (instalátor
+/// MSI, per-user instalace, `winget` odkaz). Používá i karta GitHub (`github/`).
+pub(crate) fn gh_exe() -> Option<PathBuf> {
     let from_path = std::env::var_os("PATH").and_then(|p| std::env::split_paths(&p).map(|d| d.join("gh.exe")).find(|p| p.is_absolute() && p.is_file()));
     from_path.or_else(|| {
         ["ProgramFiles", "LOCALAPPDATA"]
             .iter()
             .filter_map(std::env::var_os)
-            .flat_map(|base| [PathBuf::from(&base).join("GitHub CLI").join("gh.exe"), PathBuf::from(&base).join("Programs").join("GitHub CLI").join("gh.exe")])
+            .flat_map(|base| {
+                let base = PathBuf::from(base);
+                [
+                    base.join("GitHub CLI").join("gh.exe"),
+                    base.join("Programs").join("GitHub CLI").join("gh.exe"),
+                    base.join("Microsoft").join("WinGet").join("Links").join("gh.exe"),
+                ]
+            })
             .find(|p| p.is_file())
     })
 }

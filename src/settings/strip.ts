@@ -3,12 +3,12 @@
 // náhled (ukázkové texty, ne skutečná data — v UI označené jako ukázka). Bez importů za běhu (`strip.test.mjs`).
 
 /** Všechny položky v pořadí editoru (Rust `StripItem`, camelCase). */
-export const STRIP_ITEM_IDS = ["mode", "clock", "running", "claude", "repos", "limits", "waiting", "custom", "timer", "media"] as const;
+export const STRIP_ITEM_IDS = ["mode", "clock", "running", "claude", "repos", "limits", "waiting", "custom", "timer", "media", "github", "system", "mail"] as const;
 export type StripItemId = (typeof STRIP_ITEM_IDS)[number];
 
 /** Položky, které se v klidu ukazují samy — volba „jen při dění“ má smysl jen u nich (Rust `is_event` = false
  *  nebo limity pod 70 %). Ostatní se ukážou jen, když mají co hlásit. */
-export const QUIETABLE: readonly string[] = ["mode", "clock", "custom", "limits"];
+export const QUIETABLE: readonly string[] = ["mode", "clock", "custom", "limits", "system"];
 
 /** Předvolby barvy (Rust `StripColor`) a CSS proměnná pro náhled. */
 export const STRIP_COLORS = ["accent", "text", "muted", "violet", "blue", "teal", "green", "amber", "red"] as const;

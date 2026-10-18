@@ -1,5 +1,6 @@
-/* Rozložení karet a režim úprav (layout/*). Jen mechanika mřížky a ovládání úprav — vzhled karet
-   (barvy, rohy, stíny, šířky podle stylu šuplíku) patří stylům; tady jen tokeny ze styles.css.
+/* Rozložení karet a režim úprav (layout/*). Mechanika mřížky a ovládání úprav — vzhled karet
+   (barvy, rohy, stíny, šířky podle stylu šuplíku) patří stylům; tady jen tokeny ze styles.css a přebití
+   stylu pro JEDNU kartu z `look` (`data-cl-*`, vlna 8 P).
    Rozhraní: `.deck` > `.deck-item[data-size][data-card]`, počet sloupců `--deck-cols` (výchozí 4). */
 .deck { --dg: var(--deck-gap, var(--s3)); --deck-row: calc(104px * var(--dens, 1)); display: grid; grid-template-columns: repeat(var(--deck-cols, 4), minmax(0, 1fr)); grid-auto-flow: row; gap: var(--s3); position: relative; }
 /* rozpětí `--span` počítá Deck (`size.ts` `packSpans`): řada bez prázdného místa — volné sloupce dostanou
@@ -13,6 +14,27 @@
 .deck-item[data-h] > ::-webkit-scrollbar { width: 6px; }
 .deck-item[data-h] > ::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 3px; }
 .lay-probe { position: absolute; visibility: hidden; height: var(--deck-row); width: 1px; }
+
+/* ---------- vzhled karty (`look`, layout/look.ts) — obecně pro každou kartu na `.deck-item` ----------
+   Karta = první dítě položky; bez atributů `data-cl-*` se nic nemění (karta podle design stylu).
+   `.deck > .deck-item[…] > :first-child` přebije i `html[data-style] .card` (0,3,0 > 0,2,1). */
+/* akcent: `--accent` na položce (Deck); tečka v hlavičce karty ho převezme i tam, kde má karta vlastní barvu */
+.deck-item[data-cl-accent] > :first-child > h4 > .ic { background: var(--accent) !important; }
+.deck > .deck-item[data-cl-bg="tint"] > :first-child { background: linear-gradient(color-mix(in srgb, var(--accent) 13%, transparent), color-mix(in srgb, var(--accent) 6%, transparent)), var(--m-card-bg, var(--card)); border-color: color-mix(in srgb, var(--accent) 32%, var(--line)); }
+.deck > .deck-item[data-cl-bg="solid"] > :first-child { background: var(--raised); }
+.deck > .deck-item[data-cl-bg="clear"] > :first-child { background: transparent; border-color: transparent; box-shadow: none; }
+/* skrytá hlavička: zůstane jen ⋯ (vidět při najetí) v pravém horním rohu */
+.deck > .deck-item[data-cl-head="off"] > :first-child > h4 { position: absolute; top: var(--s1); right: var(--s1); z-index: 3; margin: 0; gap: 0; font-size: 0; }
+.deck > .deck-item[data-cl-head="off"] > :first-child > h4::before { content: none; }
+.deck > .deck-item[data-cl-head="off"] > :first-child > h4 > :not([data-cmenu]) { display: none; }
+/* hustota karty: mezery a odsazení × 0.7 / 1.3 vůči hustotě vzhledu */
+.deck-item[data-cl-dens="compact"] { --cl-k: 0.7; }
+.deck-item[data-cl-dens="airy"] { --cl-k: 1.3; }
+.deck-item[data-cl-dens] {
+  --s1: calc(4px * var(--dens) * var(--cl-k)); --s2: calc(8px * var(--dens) * var(--cl-k)); --s3: calc(12px * var(--dens) * var(--cl-k));
+  --s4: calc(16px * var(--dens) * var(--cl-k)); --s5: calc(22px * var(--dens) * var(--cl-k)); --gap-section: calc(14px * var(--dens) * var(--cl-k));
+  --pad-card: calc(14px * var(--dens) * var(--cl-k)) calc(15px * var(--dens) * var(--cl-k));
+}
 
 /* ---------- režim úprav ---------- */
 .deck.editing .deck-item > :not(.lay-tools, .lay-rs) { pointer-events: none; user-select: none; }
@@ -82,3 +104,13 @@ input.lay-st-name { width: 180px; }
 .lay-st-tiles label { display: inline-flex; align-items: center; gap: var(--s1); }
 .lay-st-which { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); }
 .lay-st-which small { flex-basis: 100%; color: var(--t3); }
+
+/* katalog: nadpis skupiny „Widgety ze skriptů“ (dynamické karty) */
+.lay-cat-group {
+  margin: 10px 2px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t2);
+}

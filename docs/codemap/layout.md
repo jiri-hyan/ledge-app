@@ -5,9 +5,15 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 
 ## Rozhodnutí: jeden model
 
-- `layout` (`pages[] { id, name, icon?, cards[] { id, size, h?, tiles? } }`, `hiddenParts[]`, `upgrades[]`) je
+- `layout` (`pages[] { id, name, icon?, cards[] { id, size, h?, tiles?, look? } }`, `hiddenParts[]`, `upgrades[]`) je
   JEDINÝ zdroj pravdy. Karta, která není na žádné záložce, je skrytá (katalog ji nabídne). `h` = výška
-  1–4 řádky (`--deck-row`), chybí = podle obsahu; `tiles` = volby karty Projekty (zástupci) na té záložce.
+  1–4 řádky (`--deck-row`), chybí = podle obsahu; `tiles` = volby karty Projekty (zástupci) na té záložce
+  (i `folders` = složky zástupců); `look` = vzhled té karty (vlna 8 P, typy v `tilelook.rs`).
+- **Vzhled karty obecně na `.deck-item`** (rozhodnutí vlny 8 P): `Deck` dává položce `data-cl-bg|head|dens|accent`
+  a `--accent`, pravidla jsou v `layout.css` (`.deck > .deck-item[…] > :first-child` přebije `html[data-style] .card`,
+  hustota přepočítá `--s*` / `--pad-card` × 0.7 / 1.3, skrytá hlavička nechá jen `[data-cmenu]` = ⋯). Funguje tedy
+  pro každou kartu, i nové karty jiných modulů; per karta je jen varianta zobrazení (`look.ts` `VIEW_CARDS`:
+  Projekty, Repa, Poznámky, Akce → prop `view` → `data-view` v CSS karty). Karta bez `look` = žádný atribut.
 - **Jednorázové úpravy po aktualizaci** (`layout::apply_upgrades` v `upgrade_loaded`, značka v `upgrades`):
   `personalProjects` = karta Projekty nahoru na Osobní, když tam nebyla (jen když je na jiné záložce a Osobní
   existuje). Značka se zapíše prvním uložením; co uživatel pak odebere, se nevrací. **Frontend musí
@@ -27,12 +33,17 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
   downgradu vidí stejné karty. Ruční změna `drawer.sections` se přepíše.
 - Počasí a kalendář se stahují jen, když je karta na **otevřené** záložce (`layout::page_has(cfg.layout, mode, …)`).
 - Režim (`core.mode`, `Snapshot.mode`) = id záložky; neznámé (smazaná záložka) = první (`layout::page_id`).
+- **Dynamické karty** (vlna 8): vedle `CARDS` smí být karta s id podle prefixu — dnes jen widget ze skriptu
+  `widget:<soubor>` (`layout::is_dynamic` → `widgets::plan::file_of`, UI `isDynamic` / `CardId`). Validace
+  hlídá jen tvar, katalog je nabízí podle složky widgetů (`widgets_list`), vykreslí `widgets/WidgetCard.tsx`.
+  Do `drawer.sections` se nepromítají. Mapa: [widgets.md](widgets.md).
 
 ## Soubory
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
 | `src-tauri/src/layout.rs` | struktura, výchozí rozložení, převod starého configu, jednorázové úpravy, odvozená pole, validace (i `h` 1–4), záložka pro režim, název pro proužek; testy (tabulka starých configů, migrace Projekty → Osobní, tvar `h`/`tiles`, `load`/`save`) | `LayoutConfig` `LayoutPage` `LayoutCard` `CardSize` `TileOpts` `TileSize` `MAX_H` `UP_PERSONAL_PROJECTS` `CARDS` `PARTS` `from_legacy` `apply_upgrades` `upgrade_loaded` `derive` `validate` `page` `page_id` `page_has` `title` `row_sizes` |
+| `src-tauri/src/tilelook.rs` | typy a validace vzhledu (`TileLook` zástupce, `CardLook` karty, `TileFolder`), kontrast kresby `ink_dark` (test), vlastní obrázky do cache `looks` (WIC); testy (serde výchozí = nic se nepíše, starý config `load → save → load`, tabulky validace, kontrast přes celé RGB, cache) | `TileLook` `LookIcon` `TileShape` `CardLook` `CardBg` `CardDensity` `CardView` `TileFolder` `TILE_COLORS` `CARD_ACCENTS` `validate` `import_image` `image_url` |
 | `src/layout/model.ts` | zrcadlo modelu + čistá logika: normalizace, úpravy karet a záložek (s Vrátit), výška, volby dlaždic, katalog, co záložka ukáže, cíl tažení, `withLayout` (jedno pole configu); test `model.test.mjs` (i shoda `CARDS`/`PARTS`/`UP_PERSONAL_PROJECTS`/`MAX_H` s Rustem) | `CARD_IDS` `CARD_INFO` `PARTS` `PART_INFO` `HEIGHTS` `TILE_SIZES` `DEFAULT_TILES` `QUICK_HEIGHTS` `defaultLayout` `normalizeLayout` `normalizeTiles` `tilesOf` `moveCard` `setSize` `nextSize` `setHeight` `nextHeight` `setTiles` `showProject` `visibleProjects` `removeCard` `restoreCard` `addCard` `moveToPage` `setPartHidden` `catalog` `addPage` `renamePage` `removePage` `restorePage` `movePage` `pageKind` `shownCards` `gridDropIndex` `keyMove` |
 | `src/layout/edit.ts` | stav režimu úprav: draft, záložka v úpravách, katalog, lišta Vrátit, cíl tažení; Hotovo / Zrušit; jedna změna mimo úpravy (⋯) | `beginEdit` `change` `finishEdit` `cancelEdit` `offerUndo` `saveLayout` `askEdit` `editAsk` |
 | `src/layout/Deck.tsx` · `layout.css` | mřížka záložky `.deck` > `.deck-item[data-size][data-card][data-h]` (rozhraní pro styly: `--deck-cols`, výchozí 4; rozpětí `--span` z `packSpans`, výška `--h` × `--deck-row`, obsah s výškou scrolluje uvnitř), v úpravách úchyt ⠿ (pointer, i na záložku), **úchyty okrajů `.lay-rs-e/-s/-se`** (tah = šířka / výška / obojí, obrys `.lay-target` s „2 × 3“, Esc zruší, dvojklik spodní = auto), ⇔, ↕, ×, zástupce karty bez dat, „+ Přidat kartu“, klidný přerušovaný obrys bez pohybu | `Deck` `sizeLabel` `heightLabel` |
@@ -41,8 +52,11 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 | `src/layout/Tabs.tsx` | záložky v hlavičce (N), v úpravách přejmenovat dvojklikem, smazat, pořadí tažením, nová záložka s ikonou; cíl tažení karty (`data-tab`) | `Tabs` |
 | `src/layout/Catalog.tsx` · `EditBar.tsx` | katalog karet (název, popis, kde je) · lišta úprav (výrazně „Táhni za okraj karty = velikost“, Zrušit / Hotovo) + Vrátit | |
 | `src/layout/LayoutEditor.tsx` | editor stejného modelu v Nastavení (panel Šuplík a karty, `SortList`): velikost, výška, u Projektů volby dlaždic a které projekty, části karet, „Upravit přímo v šuplíku“ | |
-| `src/cards/CardMenu.tsx` · `TileOptions.tsx` · `cardmenu.css` | ⋯ karty (Portal, pevná pozice — neořízne ho karta s výškou, u spodu nahoru): Velikost S/M/L/XL, Výška Auto/Nízká/Vysoká, u Projektů Dlaždice (Malé ikony/Dlaždice/Velké), název, git, které projekty; ukládá hned (`saveLayout`) | `CardMenu` `MenuChoice` `TileOptions` `tileSizeName` |
+| `src/cards/CardMenu.tsx` · `TileOptions.tsx` · `cardmenu.css` | ⋯ karty (Portal, pevná pozice — neořízne ho karta s výškou, u spodu nahoru; kořen `[data-cmenu]`): Velikost S/M/L/XL, Výška Auto/Nízká/Vysoká, u Projektů Dlaždice (Malé ikony/Dlaždice/Velké), název, git, které projekty, „Vzhled karty…“; ukládá hned (`saveLayout`) | `CardMenu` `MenuChoice` `TileOptions` `tileSizeName` |
 | `src/layout/text.ts` | lidské názvy z párů v modelu (překlad až při vykreslení) | `tx` `cardName` `partName` `pageName` |
+| `src/layout/look.ts` · `CardLook.tsx` | vzhled karty: čistá logika (normalizace, varianty `VIEW_CARDS`, atributy pro `.deck-item`, přehled, Obnovit vše; test `look.test.mjs`) · panel „Vzhled karty…“ pod mřížkou (živý náhled `lookFor`, Hotovo / klik mimo = uložit, v úpravách do draftu, Esc = zahodit) | `normalizeCardLook` `patchCardLook` `cardLookAttrs` `setCardLook` `viewOf` `customizedCards` `resetCardLooks` · `CardLookPanel` `openCardLook` `closeCardLook` `lookFor` |
+| `src/layout/folders.ts` | složky zástupců (`tiles.folders`): tah dlaždice na dlaždici = složka, na složku = do ní, vyjmout, prázdná zmizí, uspořádání dlaždic; test `folders.test.mjs` | `normalizeFolders` `dropOnTile` `addToFolder` `takeOut` `renameFolder` `removeFolder` `arrange` `folderOf` |
+| `src/layout/LooksOverview.tsx` | Nastavení → Šuplík a karty → „Upravené karty a zástupci“ (Obnovit jednotlivě / vše, draft Nastavení) | |
 
 ## Toky
 
@@ -58,6 +72,12 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
   úpravy ⋯ → `saveLayout`. Projekty: `MainPage` předá kartě `tilesOf(karta)`, dlaždice filtruje `visibleProjects`.
 - **Prohlídka**: `MainPage` → `Tour` (mimo úpravy) → jednou `get_config` → `shouldShow` → po otevření šuplíku
   (`view` = full) a 700 ms bubliny; Hotovo / Přeskočit → `withTip` → `save_config`.
+- **Vzhled karty**: ⋯ → „Vzhled karty…“ → `openCardLook` → panel `CardLookPanel` (MainPage pod `Deck`) → změny jen
+  v draftu panelu (`lookFor` → `Deck` atributy, `viewOf` → prop `view` karet) → Hotovo / klik mimo: mimo úpravy
+  `saveLayout(setCardLook)`, v úpravách `change`. Jiná záložka / konec úprav = uložit a zavřít (MainPage).
+- **Složky zástupců**: jen v režimu úprav (`Projects.tsx` `startDrag`: posluchače na `window` bez pointer capture —
+  klik bez pohybu musí dojít na tlačítko dlaždice = „Upravit vzhled…“) → `dropOnTile` / `addToFolder` / `takeOut`
+  → `change` (s Vrátit); mimo úpravy přejmenování / zrušení / vyjmutí (pravý klik) → `saveLayout`.
 - **Klávesy**: 1–9 = záložka (App), v úpravách Esc = Zrušit (během tahu za okraj jen zruší tah), Alt+šipky na úchytu = přesun karty.
 - **Nastavení**: panel Šuplík a karty → `LayoutEditor` mění draft Nastavení (`c.set("layout")`), uloží
   společná lišta. Pořadí karet ve Vzhledu už není.
@@ -65,9 +85,14 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 ## Invarianty a pasti
 
 - HTML5 drag&drop v okně Tauri nefunguje → jen pointer události (`Deck`, `Tabs`, `SortList`).
+- Nová dynamická rodina karet = prefix v `layout::is_dynamic` + `model.ts` `isDynamic` + větev `default` v `MainPage` `card`.
 - Nová karta = id do `layout::CARDS` + `model.ts` `CARD_IDS`/`CARD_INFO` + případně pole `sections!`
   v `config.rs` (+ `SECTION_KEYS`) + větev v `MainPage` `card`. Nová část = `PARTS` v obou + pole `sections!`.
 - Vzhled karet (barvy, rohy, šířky podle stylu) patří stylům; `layout.css` drží jen mechaniku mřížky a ovládání úprav.
+- Karta mimo výchozí rozložení (GitHub, Systém, Pošta) = id i v `layout::OPT_IN`: `Sections::default()` ji má vypnutou, `from_legacy` ji nepřidá,
+  katalog ji nabídne. Detail [integrations.md](integrations.md).
+- Vzhled karet (barvy, rohy, šířky podle stylu) patří stylům; `layout.css` drží mechaniku mřížky, ovládání úprav a
+  jen PŘEBITÍ stylu pro jednu kartu z `look` (`data-cl-*`) — bez atributu se pravidla neuplatní.
 - Akce dlaždice projektu jsou UVNITŘ dlaždice (`.acts` absolutně dole přes název a větev) — nikdy přes kartu
   pod ní; nová akce = ikona s `title`/`aria-label`, ne text (dlaždice je úzká).
 - Menu a bubliny nad kartami kresli přes `Portal` do `.shell` s `position: fixed` (karta s výškou má
@@ -80,4 +105,6 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 řady, migrace Projekty → Osobní včetně „odebrané se nevrací“ přes `load` → `save` → `load`, tvar `h`/`tiles`,
 odvozená pole, validace), `cargo test uiconf` (`ui.tips`). `corepack pnpm test:ui` → `src/layout/model.test.mjs`,
 `size.test.mjs` (řada bez děr, tah za okraj), `tips.test.mjs` (prohlídka),
-`src/cards/sections.test.mjs` (shoda polí `drawer.sections` s modelem), hlídače CSS tříd a překladů.
+`src/cards/sections.test.mjs` (shoda polí `drawer.sections` s modelem), `look.test.mjs` (karta bez vzhledu = žádný
+atribut, varianty, zrcadlo `CARD_ACCENTS`), `folders.test.mjs` (vytvoření / vyjmutí / smazání prázdné), hlídače CSS
+tříd a překladů. `cargo test tilelook` (starý config `load → save → load` beze změny, vzhledy tam a zpět).

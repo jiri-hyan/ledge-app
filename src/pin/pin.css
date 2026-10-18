@@ -1,0 +1,221 @@
+/* Okno lístku na plochu (`pin.html`): průhledné okno, karta s vlastní lištou. Barvy z průhledností
+   (`model.ts` `pinColors` → `--pin-bg`, `--pin-bar`, `--pin-fg`, `--pin-shadow`). Vlastní styly —
+   lístek nenačítá styly šuplíku. */
+:root {
+  color-scheme: dark;
+  --pin-accent: #7ab8ff;
+  --pin-green: #3ecf8e;
+  --pin-line: rgba(255, 255, 255, 0.14);
+  --pin-well: rgba(255, 255, 255, 0.08);
+  font: 13px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body, #root { height: 100%; background: transparent; overflow: hidden; }
+button, input, textarea { font: inherit; color: inherit; }
+
+.pin {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--pin-bg);
+  color: var(--pin-fg);
+  text-shadow: var(--pin-shadow);
+  border: 1px solid var(--pin-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.pin.collapsed { border-radius: 8px; }
+
+/* lišta: 28 px = `pins::BAR_H` (sbalený lístek je jen ona) */
+.pin-bar {
+  flex: 0 0 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px 0 10px;
+  background: var(--pin-bar);
+  border-bottom: 1px solid var(--pin-line);
+  cursor: grab;
+  user-select: none;
+}
+.pin.collapsed .pin-bar { border-bottom: 0; }
+.pin.locked .pin-bar, .pin.through .pin-bar { cursor: default; }
+.pin-title { flex: 1; min-width: 0; font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pin-state { display: inline-flex; width: 16px; height: 16px; opacity: 0.75; }
+.pin-ic {
+  flex: 0 0 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.pin-ic:hover { opacity: 1; background: var(--pin-well); }
+.pin-ic.on { opacity: 1; color: var(--pin-accent); }
+.pin-ic svg, .pin-state svg, .pin-btn svg { width: 15px; height: 15px; }
+
+.pin-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; }
+.pin-md { min-height: 100%; }
+.pin-text {
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  resize: none;
+  border: 1px solid var(--pin-line);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 6px 8px;
+  outline: none;
+  text-shadow: none;
+}
+.pin-text:focus, .pin-add:focus { border-color: var(--pin-accent); }
+
+.pin-foot { flex: 0 0 auto; display: flex; gap: 6px; padding: 0 8px 8px; }
+.pin-add {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  border: 1px solid var(--pin-line);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0 8px;
+  outline: none;
+  text-shadow: none;
+}
+.pin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--pin-line);
+  border-radius: 6px;
+  background: var(--pin-well);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pin-btn:hover { border-color: rgba(255, 255, 255, 0.3); }
+.pin-btn.pri { background: var(--pin-accent); border-color: transparent; color: #0b1220; text-shadow: none; }
+.pin-btn.ghost { background: transparent; }
+
+.pin-banner, .pin-gone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(240, 170, 60, 0.18);
+  border: 1px solid rgba(240, 170, 60, 0.45);
+}
+.pin-gone { margin-top: 0; }
+
+/* ⋯ volby a nápověda: přes tělo lístku, u malého lístku se posouvá */
+.pin-menu {
+  position: absolute;
+  inset: 28px 0 0 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(20, 22, 28, 0.97);
+  color: #f4f5f8;
+  text-shadow: none;
+  z-index: 5;
+}
+.pin-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.pin-menu > button:hover { background: var(--pin-well); }
+.pin-menu .box { flex: 0 0 14px; height: 14px; border-radius: 4px; border: 1.5px solid rgba(255, 255, 255, 0.4); }
+.pin-menu [role="menuitem"] { padding-left: 30px; }
+.pin-menu button.on .box { background: var(--pin-green); border-color: transparent; }
+.pin-range { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px; }
+.pin-range span { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.85; }
+.pin-range input { width: 100%; accent-color: var(--pin-accent); }
+.pin-hint { gap: 8px; padding: 10px 12px; }
+.pin-hint p { font-size: 12.5px; }
+.pin-hint .warn { color: #ffc56b; }
+.pin-hint .pin-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* průchozí: jemný štítek v rohu (myš lístek nevidí — jen text, jak ven) */
+.pin-through {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 12px);
+  padding: 1px 7px 1px 4px;
+  border-radius: 999px;
+  background: rgba(20, 22, 28, 0.82);
+  color: #f4f5f8;
+  font-size: 11px;
+  text-shadow: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+.pin-through svg { flex: 0 0 13px; width: 13px; height: 13px; }
+.pin.collapsed .pin-through { bottom: 6px; right: 70px; }
+
+/* Markdown (HTML z Rustu `md::to_html`) — jako v šuplíku, tokeny lístku */
+.md { overflow-wrap: anywhere; user-select: text; }
+.md > * + * { margin-top: 6px; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { font-weight: 650; line-height: 1.25; font-size: 14px; }
+.md h1 { font-size: 16px; }
+.md code { font: 12px "Cascadia Mono", Consolas, monospace; background: rgba(0, 0, 0, 0.3); border-radius: 4px; padding: 1px 4px; }
+.md pre { background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 6px 8px; overflow: auto; }
+.md pre code { background: none; padding: 0; white-space: pre; }
+.md ul, .md ol { padding-left: 18px; }
+.md li { margin: 2px 0; }
+.md li.d1 { margin-left: 16px; }
+.md li.d2 { margin-left: 32px; }
+.md li.d3 { margin-left: 48px; }
+.md li[data-task] { list-style: none; margin-left: -18px; display: flex; gap: 7px; align-items: flex-start; }
+.md li[data-task].d1 { margin-left: -2px; }
+.md li[data-task].d2 { margin-left: 14px; }
+.md li[data-task].d3 { margin-left: 30px; }
+.md-check { width: 15px; height: 15px; margin-top: 3px; border-radius: 4px; border: 1.5px solid rgba(255, 255, 255, 0.55); flex-shrink: 0; position: relative; cursor: pointer; }
+.md-check:hover { border-color: #fff; }
+.md-check.on { background: var(--pin-green); border-color: transparent; }
+.md-check.on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #0b1220; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.md li[data-task]:has(.md-check.on) > span:last-child { opacity: 0.55; text-decoration: line-through; }
+.md-link { color: var(--pin-accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.md blockquote { border-left: 3px solid var(--pin-line); padding-left: 8px; opacity: 0.85; }
+.md hr { border: 0; border-top: 1px solid var(--pin-line); }
+.md img { max-width: 100%; border-radius: 6px; border: 1px solid var(--pin-line); display: block; }
+.md-alt { opacity: 0.6; font-style: italic; }
+
+.toast {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 38px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(20, 22, 28, 0.95);
+  color: #f4f5f8;
+  font-size: 12px;
+  text-shadow: none;
+  z-index: 6;
+}
+.toast.err { background: rgba(120, 30, 30, 0.95); }

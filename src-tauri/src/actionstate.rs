@@ -151,6 +151,9 @@ pub struct ActionView {
     problem: Option<String>,
     /// skrytý příkaz právě běží
     running: bool,
+    /// vzhled dlaždice (`tilelook::TileLook`); chybí = automaticky
+    #[serde(skip_serializing_if = "Option::is_none")]
+    look: Option<crate::tilelook::TileLook>,
 }
 
 /// Snapshot: jen paměť (store, souhlasy, běžící). Neznámý souhlas = ptát se.
@@ -173,6 +176,7 @@ pub fn views(list: &[Action]) -> Vec<ActionView> {
                 confirm_text: actions::confirm_text(a),
                 problem: s.problems.get(&a.id).cloned(),
                 running: running.contains(&a.id),
+                look: a.look.clone(),
             })
             .collect()
     })

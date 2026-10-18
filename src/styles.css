@@ -46,6 +46,8 @@
   --on-light: #111;
   --pri-hover: #fff;
   --white: #fff;
+  /* černá kresba na světlém podkladu zástupce s vlastní barvou (`tilelook`, kontrast ≥ 4.5:1) */
+  --black: #000;
   /* stavové barvy; *-ink = světlý text na tónovaném podkladu (chipy) */
   --green: #4ade80;
   --amber: #fbbf24;

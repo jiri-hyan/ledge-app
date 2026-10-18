@@ -79,7 +79,10 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
 
 test("katalog: co na záložce není a kde to je", () => {
   const d = defaultLayout();
-  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media"]);
+  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail"]);
+  // GitHub, Systém a Pošta jsou v katalogu, ale na žádné záložce (výchozí rozložení se nemění)
+  assert.deepEqual(catalog(d, "prace").filter((x) => ["github", "system", "mail"].includes(x.id)).map((x) => x.on), [[], [], []]);
+  assert.deepEqual(catalog(d, "osobni").find((x) => x.id === "mail").on, []);
   assert.deepEqual(catalog(d, "prace").find((x) => x.id === "weather").on, ["osobni"]);
   const hidden = removeCard(removeCard(d, "prace", "notes").layout, "osobni", "notes").layout;
   assert.deepEqual(catalog(hidden, "prace").find((x) => x.id === "notes").on, [], "nikde = skrytá");
@@ -167,6 +170,26 @@ test("tažení v mřížce: nejbližší střed; Alt+šipky", () => {
     ["Enter", 1, 3, null],
   ];
   for (const [k, i, n, want] of keys) assert.equal(keyMove(k, i, n), want, `${k} ${i}`);
+});
+
+test("dynamické karty: widget ze skriptu na libovolné záložce, neplatné id pryč, katalog jen vestavěné", () => {
+  const raw = {
+    pages: [
+      { id: "prace", cards: [{ id: "widget:kurz-cnb.ps1", size: "s" }, { id: "widget:..\\zlo.ps1" }, { id: "widget:" }, { id: "widget:kurz-cnb.ps1" }, { id: "widget:docker.ps1" }] },
+      { id: "osobni", cards: [{ id: "widget:kurz-cnb.ps1", size: "xl" }] },
+    ],
+  };
+  const l = normalizeLayout(raw);
+  assert.deepEqual(pageOf(l, "prace").cards, [{ id: "widget:kurz-cnb.ps1", size: "s" }, { id: "widget:docker.ps1", size: "m" }], "bez velikosti = střední, cesta a prázdné pryč, bez duplicit");
+  assert.deepEqual(ids(l, "osobni"), ["widget:kurz-cnb.ps1"], "stejný widget na dvou záložkách");
+  const added = addCard(l, "osobni", "widget:ping.ps1");
+  assert.deepEqual(pageOf(added, "osobni").cards.at(-1), { id: "widget:ping.ps1", size: "m" });
+  const { layout, undo } = removeCard(added, "osobni", "widget:ping.ps1");
+  assert.deepEqual(ids(restoreCard(layout, undo), "osobni"), ["widget:kurz-cnb.ps1", "widget:ping.ps1"]);
+  assert.ok(catalog(l, "prace").every((x) => !x.id.startsWith("widget:")), "widgety nabízí katalog ze složky (widgets/model.ts)");
+  // Rust layout.rs přijímá stejný tvar (is_dynamic → widgets::plan::file_of)
+  const rs = readFileSync(new URL("../../src-tauri/src/layout.rs", import.meta.url), "utf8");
+  assert.match(rs, /pub fn is_dynamic\(id: &str\) -> bool/);
 });
 
 test("výška karty: normalizace, nastavení, kruh ↕, rychlé volby", () => {

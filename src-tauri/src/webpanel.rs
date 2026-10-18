@@ -422,7 +422,8 @@ mod tests {
     }
 
     /// Stránka v okně s webem nesmí dostat IPC: žádná capability nesmí jmenovat okna `web-*`,
-    /// zástupné `*` ani povolovat vzdálené adresy (`remote`). Tauri ≥ 2.11 pak z ne-lokálního
+    /// zástupné `*` (jediná výjimka: `note-*` = lístky na plochu, `pins/`, s vlastním UI Ledge)
+    /// ani povolovat vzdálené adresy (`remote`). Tauri ≥ 2.11 pak z ne-lokálního
     /// původu odmítne i vlastní příkazy aplikace (`Webview::on_message`, „not allowed by ACL“).
     #[test]
     fn capabilities_never_reach_web_windows() {
@@ -439,7 +440,8 @@ mod tests {
             for key in ["windows", "webviews"] {
                 for w in v.get(key).and_then(|x| x.as_array()).into_iter().flatten() {
                     let w = w.as_str().unwrap_or("");
-                    assert!(!w.contains('*') && !w.starts_with(LABEL_PREFIX), "{p:?}: {key} {w}");
+                    let pins = w == format!("{}*", crate::pins::LABEL_PREFIX);
+                    assert!((pins || !w.contains('*')) && !w.starts_with(LABEL_PREFIX), "{p:?}: {key} {w}");
                 }
             }
         }

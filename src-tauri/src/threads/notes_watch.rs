@@ -74,6 +74,8 @@ pub(crate) fn reload_notes() {
     if none_due && !c.claude.attention() && c.drawer.view() == View::Peek {
         c.send_ui(UiCmd::Hide);
     }
+    // lístky na plochu si podle otisku přečtou svou poznámku znovu (jen když nějaký je)
+    crate::pins::win::on_notes_changed();
     mark_dirty();
 }
 

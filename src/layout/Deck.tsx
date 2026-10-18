@@ -8,6 +8,8 @@
 // (živý obrys cíle s popiskem „2 × 3“, dvojklik na spodní okraj = výška podle obsahu), ⇔ / ↕ = totéž
 // klikem a z klávesnice, × do katalogu (s Vrátit), Alt+šipky na úchytu = přesun; karta bez dat je vidět
 // jako zástupce; dlaždice „+ Přidat kartu“ = katalog.
+// Vzhled karty (vlna 8 P, `look.ts`): `data-cl-bg` / `data-cl-head` / `data-cl-dens` / `data-cl-accent` a
+// `--accent` na `.deck-item` (živý náhled z panelu `CardLook.tsx`); karta bez vzhledu = žádný atribut.
 import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { t, tp } from "../i18n";
 import { change, dropTab, editPage, offerUndo, setCatalogOpen, setDropTab } from "./edit";
@@ -17,6 +19,8 @@ import {
 } from "./model";
 import { deckCols, heightPx, packSpans, resizeTo, spanOf, spanPx, type DeckMetrics, type Dim, type Edge } from "./size";
 import { cardName, pageName } from "./text";
+import { cardLookAttrs } from "./look";
+import { lookFor } from "./CardLook";
 import "./layout.css";
 
 type Drag = { from: number; to: number; x: number; y: number };
@@ -37,6 +41,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   const cardOf = (id: CardId) => p.page.cards.find((c) => c.id === id);
   const sizeOf = (id: CardId) => cardOf(id)?.size ?? "m";
   const hOf = (id: CardId) => cardOf(id)?.h;
+  const cl = (id: CardId) => cardLookAttrs(lookFor(p.page.id, id, cardOf(id)?.look));
   const spans = createMemo(() => packSpans(ids().map(sizeOf), cols()));
 
   // sloupce určuje styl (`--deck-cols` na <html>): přečíst při startu a při změně vzhledu
@@ -182,7 +187,11 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
             data-size={sizeOf(id)}
             data-card={id}
             data-h={hOf(id)}
-            style={{ "--span": String(spans()[i()] ?? 1), "--h": hOf(id) === undefined ? undefined : String(hOf(id)) }}
+            data-cl-bg={cl(id).attrs["data-cl-bg"]}
+            data-cl-head={cl(id).attrs["data-cl-head"]}
+            data-cl-dens={cl(id).attrs["data-cl-dens"]}
+            data-cl-accent={cl(id).attrs["data-cl-accent"]}
+            style={{ "--span": String(spans()[i()] ?? 1), "--h": hOf(id) === undefined ? undefined : String(hOf(id)), "--accent": cl(id).style["--accent"] }}
             classList={{ lifted: drag()?.from === i(), "drop-at": !!drag() && drag()!.to === i() && drag()!.from !== i() }}
           >
             <Show when={p.shown(id)} fallback={

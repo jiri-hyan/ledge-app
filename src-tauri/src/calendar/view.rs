@@ -20,6 +20,8 @@ pub struct Item {
     pub cal: usize,
     pub ongoing: bool,
     pub tz_guess: bool,
+    /// odkaz „Připojit“ (`meeting::Join`), `null` = událost žádný nemá
+    pub join: Option<super::meeting::Join>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -78,6 +80,7 @@ pub fn pick(occs: &[(usize, &Occ)], now: i64, local: &dyn LocalTz, max_rows: usi
                 cal,
                 ongoing: !o.all_day && o.start <= now && now < eff_end(o),
                 tz_guess: o.tz_guess,
+                join: o.join.clone(),
             })
             .collect();
         v.sort_by(|a, b| (!a.all_day, a.start, &a.title, a.cal).cmp(&(!b.all_day, b.start, &b.title, b.cal)));
@@ -130,10 +133,10 @@ mod tests {
         ms(NaiveDate::from_ymd_opt(2026, 10, d).unwrap().and_hms_opt(h, mi, 0).unwrap())
     }
     fn timed(title: &str, start: i64, end: i64) -> Occ {
-        Occ { start, end, all_day: false, title: title.into(), location: String::new(), tz_guess: false }
+        Occ { start, end, title: title.into(), ..Occ::default() }
     }
     fn allday(title: &str, from: u32, to: u32) -> Occ {
-        Occ { start: utc(from, 0, 0), end: utc(to, 0, 0), all_day: true, title: title.into(), location: String::new(), tz_guess: false }
+        Occ { start: utc(from, 0, 0), end: utc(to, 0, 0), all_day: true, title: title.into(), ..Occ::default() }
     }
     /// (druh dne, názvy, probíhající názvy)
     fn shape(p: &Picked) -> Vec<(&'static str, Vec<String>, Vec<String>)> {

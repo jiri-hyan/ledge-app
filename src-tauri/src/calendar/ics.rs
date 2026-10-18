@@ -1,6 +1,7 @@
 //! Parser ICS (RFC 5545) — jen to, co karta Kalendář potřebuje: rozbalení zalomených řádků (na bajtech,
 //! takže zalomení uprostřed UTF-8 znaku nic nerozbije), parametry s uvozovkami, escapování textu,
-//! VEVENT (SUMMARY, LOCATION, DTSTART/DTEND/DURATION, RRULE, RDATE, EXDATE, RECURRENCE-ID, STATUS)
+//! VEVENT (SUMMARY, LOCATION, DTSTART/DTEND/DURATION, RRULE, RDATE, EXDATE, RECURRENCE-ID, STATUS;
+//! z vlastností schůzky, URL, místa a popisu jen odkaz „Připojit“ — `meeting.rs`, popis se nedrží)
 //! a VTIMEZONE (STANDARD/DAYLIGHT s TZOFFSETFROM/TO, RRULE, RDATE). Vnořené VALARM se přeskočí.
 //!
 //! `parse` dostane filtr `keep`: událost, kterou volající nepotřebuje (jednorázová mimo okno), se do
@@ -50,6 +51,8 @@ pub struct Event {
     pub recurrence_id: Option<Dt>,
     /// `STATUS:CANCELLED`
     pub cancelled: bool,
+    /// odkaz na schůzku (pořadí zdroje `meeting::RANK_*`, odkaz) — nejlepší z vlastností události
+    pub join: Option<(u8, super::meeting::Join)>,
 }
 
 /// Jeden přechod pásma (STANDARD nebo DAYLIGHT) z VTIMEZONE.
@@ -355,7 +358,10 @@ pub fn parse(bytes: &[u8], keep: &mut dyn FnMut(&Event) -> bool) -> Result<Feed,
             Some("VEVENT") if stack.len() >= 2 && stack[stack.len() - 2] == "VCALENDAR" => match p.name.as_str() {
                 "UID" => ev.uid = p.value.trim().to_string(),
                 "SUMMARY" => ev.summary = unescape(p.value),
-                "LOCATION" => ev.location = unescape(p.value),
+                "LOCATION" => {
+                    ev.location = unescape(p.value);
+                    super::meeting::offer(&mut ev.join, super::meeting::RANK_LOCATION, &ev.location);
+                }
                 "DTSTART" => ev.start = prop_dt(&p),
                 "DTEND" => ev.end = prop_dt(&p),
                 "DURATION" => ev.duration = parse_duration(p.value),
@@ -364,7 +370,11 @@ pub fn parse(bytes: &[u8], keep: &mut dyn FnMut(&Event) -> bool) -> Result<Feed,
                 "EXDATE" => ev.exdates.extend(parse_dt_list(&p)),
                 "RECURRENCE-ID" => ev.recurrence_id = prop_dt(&p),
                 "STATUS" => ev.cancelled = p.value.trim().eq_ignore_ascii_case("CANCELLED"),
-                _ => {}
+                other => {
+                    if let Some(rank) = super::meeting::rank_of(other) {
+                        super::meeting::offer(&mut ev.join, rank, &unescape(p.value));
+                    }
+                }
             },
             Some("VCALENDAR") if stack.len() == 1 && p.name == "X-WR-CALNAME" => feed.name = unescape(p.value).trim().to_string(),
             Some("VTIMEZONE") => {

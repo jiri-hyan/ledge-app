@@ -51,6 +51,9 @@ Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.a
 `settings.rs` (změna `scripts` → `refresh_async`), `threads/ui.rs` (otevření šuplíku s `inActions` →
 `refresh_async`), `i18n.ts` (`tIn`), `i18n/load.ts` (`en-winsettings`, `en-quick`; `en-emoji` ne — líně s tabulkou).
 
+Widgety ze skriptů (spouštěné samy, karta / proužek) mají vlastní mapu [widgets.md](widgets.md); sdílí
+`scripts::meta::fields`, `scripts::run::{interp, plan}` a pro klik `run` souhlasy skriptů (`CONSENTS`).
+
 ## Toky
 
 - **Spuštění**: dlaždice/paleta → `runAction` (problém → hláška; `needsConfirm` → `ConfirmAction`) →

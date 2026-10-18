@@ -361,7 +361,7 @@ impl Store {
     }
 }
 
-fn fnv1a(b: &[u8]) -> u64 {
+pub(crate) fn fnv1a(b: &[u8]) -> u64 {
     b.iter().fold(0xcbf2_9ce4_8422_2325, |h, &x| (h ^ x as u64).wrapping_mul(0x0000_0100_0000_01b3))
 }
 
@@ -475,6 +475,7 @@ mod tests {
             monogram: None,
             logo: None,
             links: vec![],
+            look: None,
         };
         assert_eq!(exe_policy(&p), ExeIcon::First);
         p.exe = Some("node_modules/electron/dist/electron.exe".into());

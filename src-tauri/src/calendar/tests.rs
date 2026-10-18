@@ -6,6 +6,7 @@ use super::*;
 
 const GOOGLE: &[u8] = include_bytes!("../fixtures/calendar-google.ics");
 const OUTLOOK: &[u8] = include_bytes!("../fixtures/calendar-outlook.ics");
+const MEETINGS: &[u8] = include_bytes!("../fixtures/calendar-meetings.ics");
 
 fn prague() -> Zone {
     builtin("Europe/Prague").unwrap()
@@ -86,6 +87,30 @@ fn outlook_sample() {
     same(&r, want);
     let guess: Vec<bool> = r.iter().map(|x| x.5).collect();
     assert_eq!(guess, [false, false, true, false]);
+}
+
+/// Odkaz Připojit na reálných tvarech pozvánek: popis Outlooku s `<https://…>` přes zalomené řádky,
+/// `X-MICROSOFT-SKYPETEAMSMEETINGURL`, `X-GOOGLE-CONFERENCE`, Zoom v místě, Safe Links, URL, HTML popis.
+#[test]
+fn meeting_links_sample() {
+    use super::meeting::Provider::*;
+    let p = collect(MEETINGS, now(), &prague()).unwrap();
+    type Got<'a> = Vec<(String, &'a str, Option<(meeting::Provider, &'a str)>)>;
+    let got: Got = p.occs.iter().map(|o| (iso(o.start), o.title.as_str(), o.join.as_ref().map(|j| (j.provider, j.url.as_str())))).collect();
+    let teams = "https://teams.microsoft.com/l/meetup-join/19%3ameeting_NjM4ZTk1YjQtZmQ0Ni00ZWM2%40thread.v2/0?context=%7b%22Tid%22%3a%2272f988bf%22%2c%22Oid%22%3a%22a1b2c3%22%7d";
+    let want: Got = vec![
+        ("2026-10-19T08:00Z".into(), "Týmová porada", Some((Teams, teams))),
+        ("2026-10-19T11:00Z".into(), "Oběd", None),
+        ("2026-10-19T12:00Z".into(), "Kafe s Janou", Some((Meet, "https://meet.google.com/xyz-abcd-efg"))),
+        ("2026-10-20T11:00Z".into(), "Plánování sprintu", Some((Teams, "https://teams.microsoft.com/l/meetup-join/19%3ameeting_Sprint%40thread.v2/0?context=%7b%22Tid%22%3a%2272f988bf%22%7d"))),
+        ("2026-10-21T09:00Z".into(), "Zoom s klientem", Some((Zoom, "https://us02web.zoom.us/j/81234567890?pwd=QWErty12"))),
+        ("2026-10-22T08:00Z".into(), "Webex školení", Some((Webex, "https://firma.webex.com/firma/j.php?MTID=m0123abcd"))),
+        ("2026-10-23T15:00Z".into(), "Retro", Some((Jitsi, "https://meet.jit.si/LedgeRetro"))),
+        ("2026-10-24T09:00Z".into(), "Konzultace", Some((Teams, "https://teams.microsoft.com/meet/34567890123?p=AbCdEf123"))),
+    ];
+    assert_eq!(got, want);
+    // popis se v paměti nedrží: místo zůstává jen první řádek
+    assert_eq!(p.occs[0].location, "Microsoft Teams Meeting");
 }
 
 fn cal(body: &str) -> String {

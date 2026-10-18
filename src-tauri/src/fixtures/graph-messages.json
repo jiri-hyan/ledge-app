@@ -1,0 +1,52 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('x')/mailFolders('inbox')/messages(subject,from,receivedDateTime,isRead,webLink)",
+  "value": [
+    {
+      "@odata.etag": "W/\"CQAAABYAAAA\"",
+      "id": "AAMkAGVmMDEzMTM4LTZmYWUtNDdkNC1hMDZiLTU1OGY5OTZhYmY4OABGAAAAAAAiQ8W967B7TKBjgx9rVEURBwAiIsqMbYjsT5e-T7KzowPTAAAAAAEMAAAiIsqMbYjsT5e-T7KzowPTAAAYbvZDAAA=",
+      "subject": "Faktura za říjen",
+      "isRead": false,
+      "receivedDateTime": "2026-10-18T07:00:00Z",
+      "from": { "emailAddress": { "name": "Účtárna", "address": "uctarna@contoso.com" } },
+      "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkAGVm%2Fx&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "id": "AAMk2",
+      "subject": "Re: oběd",
+      "isRead": true,
+      "receivedDateTime": "2026-10-18T06:30:00Z",
+      "from": { "emailAddress": { "name": "", "address": "petr@example.com" } },
+      "webLink": "https://outlook.office365.com/owa/?ItemID=AAMk2&exvsurl=1&viewmodel=ReadMessageItem"
+    },
+    {
+      "id": "AAMk3",
+      "subject": "(bez předmětu\nna řádku)",
+      "isRead": false,
+      "receivedDateTime": "2026-10-17T20:00:00Z",
+      "from": { "emailAddress": { "name": "Jana", "address": "jana@example.com" } },
+      "webLink": "https://evil.example.com/x"
+    },
+    {
+      "id": "AAMk4",
+      "subject": null,
+      "isRead": true,
+      "receivedDateTime": "nesmysl",
+      "from": null
+    },
+    {
+      "id": "AAMk5",
+      "subject": "Pátá",
+      "isRead": true,
+      "receivedDateTime": "2026-10-17T10:00:00Z",
+      "from": { "emailAddress": { "name": "Pět", "address": "pet@example.com" } },
+      "webLink": "https://outlook.office365.com/owa/?ItemID=AAMk5"
+    },
+    {
+      "id": "AAMk6",
+      "subject": "Šestá",
+      "isRead": true,
+      "receivedDateTime": "2026-10-16T10:00:00Z",
+      "from": { "emailAddress": { "name": "Šest", "address": "sest@example.com" } }
+    }
+  ]
+}

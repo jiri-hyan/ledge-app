@@ -60,7 +60,7 @@ const DYNAMIC = [
   { file: "theme/label.ts", key: "p[0]", why: "styly, písma, materiály, rozložení, šířky (theme/looks.ts) a animace (AppearanceMotion.tsx) — " + PAIRS },
   { file: "onboarding/steps/Basics.tsx", key: "THEMES[id()].key", why: "motivy v theme/themes.ts — " + PAIRS },
   { file: "settings/panels/AppearanceOpen.tsx", key: "key", why: "akcenty ACCENTS [hex, key, cs] — " + PAIRS },
-  { file: "layout/text.ts", key: "x[0]", why: "názvy karet, částí a záložek z layout/model.ts (CARD_INFO, PART_INFO, builtinName) — " + PAIRS },
+  { file: "layout/text.ts", key: "x[0]", why: "názvy karet, částí a záložek z layout/model.ts (CARD_INFO, PART_INFO, builtinName), volby vzhledu karty z layout/look.ts (ACCENT_NAMES, BG_NAMES, DENSITY_NAMES, VIEW_NAMES) a vzhledu zástupce z tilelook/ (SHAPE_NAMES, GLYPHS, MODES) — " + PAIRS },
   { file: "settings/panels/Backup.tsx", key: "n[0]", why: "názvy sekcí SECTION_NAMES — " + PAIRS },
   { file: "settings/panels/Claude.tsx", key: "...HOOKS_TEXT[h().state]", why: PAIRS },
   { file: "settings/panels/StripSettings.tsx", key: "x.key", why: "položky proužku STRIP_ITEMS — " + PAIRS },

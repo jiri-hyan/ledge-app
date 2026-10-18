@@ -1,0 +1,7 @@
+/* Karta Repa (Repos.tsx): varianty zobrazení z vzhledu karty (vlna 8 P). „Seznam“ = dnešní řádky ze
+   styles.css beze změny; dlaždice = mřížka rámečků; kompaktní = jeden řádek (štítky vedle názvu). Tokeny ze styles.css. */
+.repo-list[data-view="tiles"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--s2); }
+.repo-list[data-view="tiles"] > * { align-items: flex-start; padding: var(--s2); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--well); }
+.repo-list[data-view="compact"] > * { padding-block: 3px; }
+.repo-list[data-view="compact"] > * > .grow { display: flex; align-items: center; gap: var(--s2); }
+.repo-list[data-view="compact"] > * > .grow > :not(:first-child) { margin-top: 0; flex-wrap: nowrap; overflow: hidden; }

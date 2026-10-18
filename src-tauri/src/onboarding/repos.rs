@@ -288,6 +288,7 @@ fn base_project(name: &str, path: &str, remote: Option<&str>, kind: ProjectKind)
         monogram: None,
         logo: None,
         links: vec![],
+        look: None,
     }
 }
 

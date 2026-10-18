@@ -50,6 +50,10 @@ Konfigurace). Výchozí = vzhled před zavedením sekce (styl `classic`). Pořad
    (jen statické — žádná animace v klidu); nový materiál / písmo / rozložení = záznam v `MATERIALS` / `FONTS` /
    `LAYOUTS` + varianta enumu v `appearance/look.rs` (test zrcadel).
 
+Vzhled JEDNÉ karty (akcent, pozadí, hlavička, hustota — vlna 8 P) přebíjí styl jen na `.deck-item[data-cl-*]`
+(`layout.css`, [layout.md](layout.md)); karta bez `look` kreslí přesně styl. Token `--black` (`:root`, mimo motivy jako
+`--white`) = černá kresba na světlém podkladu zástupce s vlastní barvou.
+
 Rozhraní k mřížce karet (`.deck` > `.deck-item[data-size]`, mechanika v `layout/layout.css` → [layout.md](layout.md)):
 styl dává `--deck-cols` (Klasický ho nevydá = 4), `--deck-gap` a `--deck-pad` (místo na stíny krajních karet;
 čte je `html[data-layout] .deck` ve `styles.css`, `deck` je v SHARED hlídače); `--span-*` jsou k dispozici,

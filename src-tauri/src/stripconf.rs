@@ -67,8 +67,10 @@ impl Default for StripConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[serde(rename_all = "camelCase")]
+/// Položka proužku. V configu text: vestavěná jménem (`mode`, `clock`…), widget ze skriptu jako
+/// `widget:<soubor>` (parametrizovaná položka, `widgets/`). Serde ručně (`key` / `parse`), ať jde
+/// položka použít i jako klíč mapy `colors`.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StripItem {
     Mode,
     /// čas + den a datum
@@ -88,6 +90,102 @@ pub enum StripItem {
     Timer,
     /// právě hraje: „♪ Název · Interpret“ jen při přehrávání (`media::strip_segment`); výchozí vypnuto
     Media,
+    /// kolik PR čeká na tvoji revizi: „GitHub: 2× čeká na revizi“, jen když > 0 (`github::strip_now`); výchozí
+    /// vypnuto a vyžaduje zapnuté `github.enabled`. Zapnutá položka obnovuje data i se zavřeným šuplíkem.
+    Github,
+    /// CPU a paměť: „CPU 23 % · RAM 61 %“ (`sysmon::strip_now`), vzorek 1× za 10 s, jen s touhle položkou; výchozí vypnuto
+    System,
+    /// pošta účtu Microsoft: „✉ 3“ jen při nepřečtených (`accounts::mail::strip_segment`); výchozí vypnuto.
+    /// Jediné čtení na pozadí: s touto položkou se pošta obnovuje nejvýš 1× za 5 min i se zavřeným šuplíkem.
+    Mail,
+    /// widget ze skriptu: soubor ve složce widgetů (`widget:<soubor>`, `widgets::live::strip_segments`)
+    Widget(String),
+}
+
+// ---------- položka jako text (config) ----------
+
+impl StripItem {
+    /// Vestavěné položky (bez widgetů) v pořadí výčtu.
+    pub const BUILTIN: [StripItem; 13] = [
+        StripItem::Mode,
+        StripItem::Clock,
+        StripItem::Running,
+        StripItem::Claude,
+        StripItem::Repos,
+        StripItem::Limits,
+        StripItem::Waiting,
+        StripItem::Custom,
+        StripItem::Timer,
+        StripItem::Media,
+        StripItem::Github,
+        StripItem::System,
+        StripItem::Mail,
+    ];
+
+    fn name(&self) -> &'static str {
+        match self {
+            StripItem::Mode => "mode",
+            StripItem::Clock => "clock",
+            StripItem::Running => "running",
+            StripItem::Claude => "claude",
+            StripItem::Repos => "repos",
+            StripItem::Limits => "limits",
+            StripItem::Waiting => "waiting",
+            StripItem::Custom => "custom",
+            StripItem::Timer => "timer",
+            StripItem::Media => "media",
+            StripItem::Github => "github",
+            StripItem::System => "system",
+            StripItem::Mail => "mail",
+            StripItem::Widget(_) => "widget",
+        }
+    }
+
+    /// Text v configu: `clock`, `widget:kurz-cnb.ps1`.
+    pub fn key(&self) -> String {
+        match self {
+            StripItem::Widget(f) => format!("{}{f}", crate::widgets::plan::PREFIX),
+            b => b.name().to_string(),
+        }
+    }
+
+    /// Z textu configu; widget jen se jménem souboru (bez cesty, nejvýš 200 znaků).
+    pub fn parse(s: &str) -> Option<StripItem> {
+        if s.starts_with(crate::widgets::plan::PREFIX) {
+            return crate::widgets::plan::file_of(s).map(|f| StripItem::Widget(f.to_string()));
+        }
+        Self::BUILTIN.iter().find(|b| b.name() == s).cloned()
+    }
+}
+
+impl Serialize for StripItem {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.key())
+    }
+}
+
+impl<'de> Deserialize<'de> for StripItem {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(d)?;
+        StripItem::parse(&s).ok_or_else(|| serde::de::Error::custom(trf!("neznámá položka proužku „{s}“", "unknown strip item “{s}”")))
+    }
+}
+
+impl JsonSchema for StripItem {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "StripItem".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let names: Vec<&str> = Self::BUILTIN.iter().map(|b| b.name()).collect();
+        schemars::json_schema!({
+            "description": "Položka proužku: vestavěná jménem, nebo widget ze skriptu `widget:<soubor>` (soubor ve složce widgetů).",
+            "anyOf": [
+                { "type": "string", "enum": names },
+                { "type": "string", "pattern": "^widget:[^\\\\/:]+$" }
+            ]
+        })
+    }
 }
 
 /// Předvolby barvy položky (žádný volný hex — kontrast hlídá `appearance::geom::readable`).
@@ -152,11 +250,12 @@ pub(crate) fn custom_segment(text: &str) -> Option<Segment> {
 /// nikdy; repa také ne — neuložená práce je stav, který trvá, ne událost. Limity jen při ≥ 70 %
 /// (jantarová / červená tečka z `limitslive::strip_segments`). Právě hraje jen při přehrávání (pauza /
 /// nic = žádný segment).
-pub(crate) fn is_event(item: StripItem, segs: &[Segment]) -> bool {
+pub(crate) fn is_event(item: &StripItem, segs: &[Segment]) -> bool {
     match item {
-        StripItem::Mode | StripItem::Clock | StripItem::Custom | StripItem::Repos => false,
+        // widget = stav ze skriptu (jako vlastní text), ne událost; nepřečtená pošta je stav, který trvá (jako repa)
+        StripItem::Mode | StripItem::Clock | StripItem::Custom | StripItem::Repos | StripItem::System | StripItem::Widget(_) | StripItem::Mail => false,
         StripItem::Limits => segs.iter().any(|s| s.dot == Some(Rgba::AMBER) || s.dot == Some(Rgba::RED)),
-        StripItem::Running | StripItem::Claude | StripItem::Waiting | StripItem::Timer | StripItem::Media => !segs.is_empty(),
+        StripItem::Running | StripItem::Claude | StripItem::Waiting | StripItem::Timer | StripItem::Media | StripItem::Github => !segs.is_empty(),
     }
 }
 
@@ -164,7 +263,7 @@ pub(crate) fn is_event(item: StripItem, segs: &[Segment]) -> bool {
 /// (`busy_extra` = připomínka / barevná linka / jiná událost mimo položky), a položkám s volbou barvy
 /// přebarví text (`color_of` = předvolba → čitelná barva pro motiv).
 pub(crate) fn compose(parts: Vec<(StripItem, Vec<Segment>)>, s: &StripConfig, busy_extra: bool, color_of: impl Fn(StripColor) -> Rgba) -> Vec<Segment> {
-    let busy = busy_extra || parts.iter().any(|(it, segs)| is_event(*it, segs));
+    let busy = busy_extra || parts.iter().any(|(it, segs)| is_event(it, segs));
     let mut out = Vec::new();
     for (it, mut segs) in parts {
         if !busy && s.quiet.contains(&it) {
@@ -290,8 +389,31 @@ mod tests {
             (Media, &[], false),
         ];
         for (it, segs, want) in cases {
-            assert_eq!(is_event(it, segs), want, "{it:?} {segs:?}");
+            assert_eq!(is_event(&it, segs), want, "{it:?} {segs:?}");
         }
+        assert!(!is_event(&Widget("a.ps1".into()), &one), "widget = stav, ne událost");
+    }
+
+    #[test]
+    fn widget_item_as_text() {
+        // parametrizovaná položka: v položkách, barvách i „v klidu skrytých“ jako `widget:<soubor>`
+        let s: StripConfig = serde_json::from_str(r#"{"items":["clock","widget:kurz-cnb.ps1"],"colors":{"widget:kurz-cnb.ps1":"teal"},"quiet":["widget:kurz-cnb.ps1"]}"#).unwrap();
+        let w = Widget("kurz-cnb.ps1".into());
+        assert_eq!(s.items, vec![Clock, w.clone()]);
+        assert_eq!(s.colors.get(&w), Some(&StripColor::Teal));
+        assert_eq!(s.quiet, vec![w.clone()]);
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["items"][1], "widget:kurz-cnb.ps1");
+        assert_eq!(v["colors"]["widget:kurz-cnb.ps1"], "teal");
+        // (text, platné?)
+        for (t, ok) in [("widget:a.ps1", true), ("widget:", false), ("widget:..\\a.ps1", false), ("widget:C:a", false), ("widget:.skryty", false), ("Clock", false), ("widgets", false)] {
+            assert_eq!(StripItem::parse(t).is_some(), ok, "{t}");
+        }
+        for b in StripItem::BUILTIN {
+            assert_eq!(StripItem::parse(&b.key()), Some(b.clone()), "{b:?}");
+        }
+        let schema = crate::config::schema_json();
+        assert!(schema.contains("widget:") && schema.contains("\"waiting\""), "schéma položek");
     }
 
     #[test]

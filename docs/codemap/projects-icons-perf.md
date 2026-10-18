@@ -12,7 +12,9 @@
 | `src-tauri/src/resolve.rs` | repo index podle remote, appka podle jména | `RepoIndex::build`/`resolve`/`clones`, `parse_remote`, `owner_repo_raw`, `installed_app_exe` |
 | `src-tauri/src/state.rs`, `refresh.rs`, `snapshot.rs`, `commands/projects.rs` | lepidlo | `Core.logos`, `Core::rebuild_index`, `refresh_logos`, `snapshot` (blok `projects`), `ProjectView`, `github_url`, příkazy `project_logo`, `clone_project`, `launch`, `open_in` → `open_dir` (sdílí panel Git session) |
 | `src-tauri/src/onboarding/repos.rs` | návrh projektů z rep na disku (průvodce) — viz [onboarding.md](onboarding.md) | `discover`, `suggest` |
-| `src/cards/Projects.tsx` · `src/logos.ts` | dlaždice · cache log | `Projects`, `cloneProject`, `launch` · `logoSrc`, `logoUrls` |
+| `src/cards/Projects.tsx` · `ProjectTile.tsx` · `src/logos.ts` | karta (složky, tah v úpravách, menu pravého kliku, panel vzhledu) · jedna dlaždice (logo nebo `TileIcon`, akce uvnitř, ⋯ = Upravit vzhled) · cache log | `Projects` `startDrag` `applyTiles` · `ProjectTile` `launch` `tilt` `projectAuto` · `logoSrc`, `logoUrls` |
+| `src/tilelook/*` | vzhled jednotlivého zástupce (vlna 8 P): čistá logika `model.ts` (normalizace, předvolby, `inkDark` kontrast, `withTileLook`, přehled; test `model.test.mjs`), `glyphs.ts` (77 ikon Segoe Fluent Icons ověřených v `SegoeIcons.ttf` i `segmdl2.ttf`, hledání), `state.ts` (který zástupce se upravuje, živý náhled `lookOf`, uložení jen `look`, obrázky z cache), `TileIcon.tsx` (kresba), `LookEditor.tsx` (panel pod dlaždicemi), `TileMenu.tsx` (pravý klik), `tilelook.css` (`tl-`), `en.ts` | `normalizeTileLook` `inkDark` `TILE_COLORS` `GLYPHS` `searchGlyphs` `lookOf` `openLook` `closeLook` `saveTileLook` `pickLookImage` `TileIcon` `LookEditor` `openTileMenu` |
+| `src-tauri/src/tilelook.rs` · `commands/tilelook.rs` | typy a validace `look` (projekt, akce, karta, složky); vlastní obrázek → WIC (`iconimg::to_png`) → `%LOCALAPPDATA%\Ledge\looks\<fnv>.png` (SVG beze změny ≤ 512 KB); příkazy `look_image_add`, `look_image` | `import_image` `image_url` `key_ok` `glyph_ok` |
 | `src/api.ts` | typy + IPC | `ProjectView` (`logoKey`, `clonable`, `cloning`), `api.projectLogo`, `api.cloneProject` |
 
 ## Tok loga
@@ -30,6 +32,12 @@ seřazeno SVG > větší rastr do 128 px > deklarované; protáhlé obrázky = n
 `ExeIcon::Fallback` (vlastní exe, ne `electron.exe`).
 
 ## Invarianty a pasti
+
+- **Vzhled zástupce** (`look`): chybí = dlaždice jde PŮVODNÍ cestou (`.logo` s přechodem barvy projektu) —
+  `TileIcon` se kreslí jen pro neprázdný vzhled. Kresba na barevném podkladu je černá / bílá (`inkDark`,
+  ≥ 4.5:1 pro každou barvu); obrázek, který by s podkladem splynul, dostane podložku (`useTone`). Snapshot
+  nese `look` (malý), obrázek jen klíč → data URL `look_image` jednou na klíč (jako loga). Chybějící
+  soubor v cache = Auto. Vybraný soubor se čte jen na klik (`pick_path` → `look_image_add`), nikdy periodicky.
 
 - Loga se **nikdy** nepočítají v `snapshot`/na UI vlákně — čte disk, registr a COM.
 - Hledání je mělké: kořen, přímé podsložky s `public/` nebo `index.html`, `apps/*`, `packages/*`;

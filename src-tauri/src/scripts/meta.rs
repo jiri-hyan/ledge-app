@@ -147,7 +147,7 @@ pub fn split_args(s: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-fn flag(v: &str) -> Option<bool> {
+pub(crate) fn flag(v: &str) -> Option<bool> {
     match v.to_ascii_lowercase().as_str() {
         "" | "true" | "yes" | "ano" | "1" => Some(true),
         "false" | "no" | "ne" | "0" => Some(false),
@@ -155,14 +155,13 @@ fn flag(v: &str) -> Option<bool> {
     }
 }
 
-fn cut(s: &str, max: usize) -> String {
+pub(crate) fn cut(s: &str, max: usize) -> String {
     if s.chars().count() <= max { s.to_string() } else { format!("{}…", s.chars().take(max - 1).collect::<String>()) }
 }
 
-/// Metadata z textu hlavičky. `Ok(None)` = žádné `@ledge.` (není to skript Ledge), `Err` = hlavička
-/// je, ale chybná (skript se ukáže s problémem a nespustí se). Neznámé klíče se přeskočí (novější
-/// verze), u opakovaného klíče platí první.
-pub fn parse(text: &str, lang: Lang) -> Result<Option<Meta>, String> {
+/// Řádky `@ledge.<klíč> <hodnota>` z komentářů hlavičky (klíč malými, u opakovaného platí první).
+/// Sdílí ho hlavička skriptu (`parse`) i widgetu (`widgets::meta`).
+pub(crate) fn fields(text: &str, lang: Lang) -> Vec<(String, String)> {
     let mut seen: Vec<(String, String)> = Vec::new();
     for line in text.lines() {
         let Some(rest) = strip_comment(line, lang) else { continue };
@@ -174,6 +173,14 @@ pub fn parse(text: &str, lang: Lang) -> Result<Option<Meta>, String> {
             seen.push((k, v.to_string()));
         }
     }
+    seen
+}
+
+/// Metadata z textu hlavičky. `Ok(None)` = žádné `@ledge.` (není to skript Ledge), `Err` = hlavička
+/// je, ale chybná (skript se ukáže s problémem a nespustí se). Neznámé klíče se přeskočí (novější
+/// verze), u opakovaného klíče platí první.
+pub fn parse(text: &str, lang: Lang) -> Result<Option<Meta>, String> {
+    let seen = fields(text, lang);
     if seen.is_empty() {
         return Ok(None);
     }

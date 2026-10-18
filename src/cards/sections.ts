@@ -24,6 +24,9 @@ export const SECTION_KEYS = [
   "nowPlaying",
   "sound",
   "battery",
+  "github",
+  "system",
+  "mail",
 ] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 export type SectionMap = Record<SectionKey, boolean>;

@@ -1,5 +1,6 @@
 //! Globální zkratky: registrace podle configu (`sync_hotkeys`, plán v `config::rebind_plan`),
-//! approve/deny jen při čekající žádosti (`sync_approve_keys`) a obsluha stisku (`on_shortcut`).
+//! approve/deny jen při čekající žádosti (`sync_approve_keys`), průchozí režim lístků jen s lístkem na
+//! ploše (`config::active_hotkeys_pins`) a obsluha stisku (`on_shortcut`).
 
 use crate::claude::Decision;
 use crate::config;
@@ -30,7 +31,9 @@ pub(crate) fn sync_approve_keys() {
 /// dvou zkratek tak nikdy neskončí bez registrace. Chyby (obsazená zkratka, nečitelný zápis) do logu.
 pub(crate) fn sync_hotkeys() {
     let c = core();
-    let new = config::active_hotkeys(&c.cfg.read(), c.approve_keys.load(Ordering::SeqCst));
+    // lístek na ploše = i zkratka průchozího režimu (`pins/`), i s vypnutými zkratkami
+    let pins_open = crate::pins::win::any_open();
+    let new = config::active_hotkeys_pins(&c.cfg.read(), c.approve_keys.load(Ordering::SeqCst), pins_open);
     let mut reg = c.hotkeys.lock();
     let (unreg, regs) = config::rebind_plan(&reg, &new);
     let gs = c.app.global_shortcut();
@@ -54,9 +57,19 @@ pub(crate) fn sync_hotkeys() {
     *reg = new;
 }
 
+/// Je zkratka `k` zaregistrovaná Ledgem (obsazená jinou aplikací → ne)?
+pub(crate) fn is_registered(k: &str) -> bool {
+    parse_shortcut(k).is_some_and(|sc| core().app.global_shortcut().is_registered(sc))
+}
+
 pub(crate) fn on_shortcut(sc: &Shortcut) {
     let c = core();
     let hk = c.cfg.read().hotkeys.clone();
+    // průchozí režim lístků: platí i s vypnutými zkratkami a v herním režimu (cesta ven z průchozího)
+    if parse_shortcut(&hk.note_passthrough).as_ref() == Some(sc) && crate::pins::win::any_open() {
+        crate::pins::win::toggle_through_all();
+        return;
+    }
     if !hk.enabled {
         return; // vypnuto za běhu: registrace už se ruší v `sync_hotkeys`
     }

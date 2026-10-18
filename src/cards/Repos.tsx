@@ -1,13 +1,15 @@
 // Karta Repa: projekty s neuloženou / nepushnutou prací nebo pozadu za remote (z `ProjectView.git`);
-// Pull jen u čistého repa, které je pozadu.
+// Pull jen u čistého repa, které je pozadu. Varianta zobrazení (vzhled karty): seznam / dlaždice / kompaktní.
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { api, type ProjectView, type Snapshot } from "../api";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
+import type { CardView } from "../layout/look";
+import "./repos.css";
 
 /** Repa s neuloženou / nepushnutou prací a ta, co zaostávají za remote. */
-export default function Repos(p: { s: Snapshot; menu?: JSX.Element; onSettings?: () => void }) {
+export default function Repos(p: { s: Snapshot; view?: CardView; menu?: JSX.Element; onSettings?: () => void }) {
   const [busy, setBusy] = createSignal<string | null>(null);
   const list = () =>
     p.s.projects
@@ -27,14 +29,16 @@ export default function Repos(p: { s: Snapshot; menu?: JSX.Element; onSettings?:
   return (
     <div class="card" data-anim>
       <h4><span class="ic" style="background:var(--amber)" />{t("cards.repos.title", "Repa")} <span class="n">{list().length || ""}</span>{p.menu}</h4>
-      <For each={list()} fallback={
+      <Show when={!list().length}>
         <div class="empty">
           {p.s.projects.some((x) => x.git) ? t("cards.repos.empty", "Všechna repa čistá a srovnaná s remote.") : t("cards.repos.none", "Žádný projekt zatím není git repo.")}
           <Show when={!p.s.projects.length && p.onSettings}>
             <button class="mini ok" onClick={() => { p.onSettings?.(); gotoSettingsPanel("f-projects.add"); }}>{t("cards.projects.add", "Přidat projekt")}</button>
           </Show>
         </div>
-      }>
+      </Show>
+      <div class="repo-list" data-view={p.view ?? "list"}>
+      <For each={list()}>
         {(pr) => (
           <div class="row">
             <div class="grow">
@@ -55,6 +59,7 @@ export default function Repos(p: { s: Snapshot; menu?: JSX.Element; onSettings?:
           </div>
         )}
       </For>
+      </div>
     </div>
   );
 }

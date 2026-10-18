@@ -29,6 +29,9 @@ pub(crate) struct ProjectView {
     links: Vec<config::Link>,
     git: Option<GitInfo>,
     run: Option<String>,
+    /// vzhled dlaždice (`tilelook::TileLook`); chybí = automaticky
+    #[serde(skip_serializing_if = "Option::is_none")]
+    look: Option<crate::tilelook::TileLook>,
 }
 
 #[derive(Serialize, Clone)]
@@ -77,6 +80,8 @@ pub(crate) struct Snapshot {
     notes_kind_counts: std::collections::BTreeMap<String, usize>,
     /// roste s každým přenačtením poznámek — UI podle něj obnoví výběr záložky (`note_query`)
     notes_rev: u64,
+    /// lístky na plochu (`pins/`): připnuté poznámky a zkratka průchozího režimu
+    pins: crate::pins::win::PinsView,
     personal: PersonalView,
     /// synchronizace poznámek mezi PC (štítek v kartě Poznámky)
     notes_sync: notesync::Status,
@@ -84,6 +89,9 @@ pub(crate) struct Snapshot {
     update: update::UpdateView,
     /// rychlé akce (karta, paleta) — ikony jen jako `iconKey` (`action_icon`)
     actions: Vec<crate::actionstate::ActionView>,
+    /// widgety ze skriptů umístěné na záložce nebo v proužku (`widgets::live`, jen paměť)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    widgets: Vec<crate::widgets::live::WidgetView>,
 }
 
 #[derive(Serialize, Clone)]
@@ -105,6 +113,8 @@ pub(crate) struct PersonalView {
     battery: Option<crate::battery::BatteryView>,
     /// karta Kalendář (`calendar::live::view`, jen paměť)
     calendar: crate::calendar::live::CalendarView,
+    /// karta Pošta (účet Microsoft, `accounts::mail::view`, jen paměť)
+    mail: crate::accounts::mail::MailView,
 }
 
 #[derive(Serialize, Clone)]
@@ -168,6 +178,7 @@ pub(crate) fn snapshot() -> Snapshot {
             links: p.links.clone(),
             git: git.get(&p.id).and_then(|(_, g)| g.clone()),
             run: p.run.clone(),
+            look: p.look.clone(),
         });
     }
     let sessions = {
@@ -223,10 +234,12 @@ pub(crate) fn snapshot() -> Snapshot {
         note_kinds: cfg.notes.kinds.clone(),
         notes_kind_counts,
         notes_rev,
+        pins: crate::pins::win::view(&cfg.hotkeys.note_passthrough),
         personal,
         notes_sync: c.notes_sync.lock().clone(),
         update: c.updater.view(),
         actions: crate::actionstate::views(&cfg.actions),
+        widgets: crate::widgets::live::snapshot_views(&cfg),
     }
 }
 
@@ -297,5 +310,6 @@ pub(crate) fn personal_view(cfg: &Config, (notes, notes_more): (Vec<notes::NoteV
         volume: crate::volume::view().filter(|_| sec.sound),
         battery: crate::battery::view().filter(|_| sec.battery),
         calendar: crate::calendar::live::view(cfg, now),
+        mail: crate::accounts::mail::view(cfg, now),
     }
 }

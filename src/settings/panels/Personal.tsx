@@ -12,6 +12,7 @@ import { parsePresets } from "../../timer/model";
 import CalendarSettings from "../../calendar/CalendarSettings";
 import MediaSettings from "../../media/MediaSettings";
 import { ClipSettings } from "../../cliphist/ClipSettings";
+import { GithubSettings, SystemSettings } from "../../integrations/IntegrationsSettings";
 
 /** Pár měst pro rychlé vyplnění (souřadnice jsou veřejné, nic se nezjišťuje). */
 const PLACES: [string, number, number][] = [
@@ -27,7 +28,7 @@ export default function PersonalPanel(_p: PanelProps) {
   const w = () => c.cfg.personal.weather;
   return (
     <>
-      <PanelHead title={t("settings.nav.osobni", "Osobní")} desc={t("settings.personal.desc", "Věci mimo práci: počasí, kalendář, hudba, časovač a historie schránky.")} />
+      <PanelHead title={t("settings.nav.osobni", "Osobní")} desc={t("settings.personal.desc", "Věci mimo práci: počasí, kalendář, hudba, časovač, historie schránky a karty GitHub a Systém.")} />
       <p class="st-note">{t("settings.personal.layoutNote", "Na které záložce která karta je (i jestli záložka Osobní vůbec je), upravíš v panelu Šuplík a karty nebo přímo v šuplíku přes ✎. Odkazy najdeš v panelu Projekty, akce a odkazy.")}</p>
       <>
         <Section title={fieldLabel("personal.weather")} desc={fieldHint("personal.weather")}>
@@ -50,6 +51,12 @@ export default function PersonalPanel(_p: PanelProps) {
         </Section>
         <Section title={t("settings.media.section", "Přehrávač")} desc={t("settings.media.desc", "Jak vypadá karta Právě hraje. Vzhled přepneš i přímo v kartě — ikonkou v jejím rohu.")}>
           <MediaSettings />
+        </Section>
+        <Section title={t("settings.github.section", "GitHub")} desc={t("settings.github.desc", "Karta GitHub a položka v proužku: PR čekající na tvoji revizi, tvoje PR s CI a notifikace. Výchozí vypnuto; karta se přidá v katalogu karet.")}>
+          <GithubSettings />
+        </Section>
+        <Section title={t("settings.system.section", "Systém")} desc={t("settings.system.desc", "Karta Systém: CPU, paměť, disky a síť. Přidáš ji v katalogu karet (✎ v šuplíku).")}>
+          <SystemSettings />
         </Section>
         <Section title={t("settings.timer.section", "Časovač")} desc={t("settings.timer.desc", "Odpočet a stopky v kartě Časovač, v paletě (Ctrl+K) a v proužku. Běží i se zavřeným šuplíkem a přes restart Ledge.")}>
           <Row id="timer.presets">

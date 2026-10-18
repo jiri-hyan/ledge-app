@@ -1,0 +1,49 @@
+/* Vzhled zástupců (tilelook/*): ikona s vlastním vzhledem (`TileIcon`), panel „Upravit vzhled…“
+   (`LookEditor`), malé menu pravého kliku (`TileMenu`) a tažená dlaždice. Jen tokeny ze styles.css;
+   barva podkladu `--tl-c` je data uživatele (jako barva projektu), kresba `--black` / `--white` podle kontrastu. */
+
+/* ---------- ikona ---------- */
+.tl-ico { --tl-s: 30px; width: var(--tl-s); height: var(--tl-s); flex-shrink: 0; position: relative; display: grid; place-items: center; border-radius: var(--r-xl); background: var(--tl-c); color: var(--white); font: 650 calc(var(--tl-s) * 0.34) var(--display); box-shadow: var(--ring-logo); }
+.tl-ico[data-shape="circle"] { border-radius: 50%; }
+.tl-ico[data-shape="square"] { border-radius: var(--r-xs); }
+/* sklo: průsvitný tón barvy s okrajem a odleskem — bez rozmazání (software rendering WebView2) */
+.tl-ico[data-shape="glass"] { background: linear-gradient(160deg, color-mix(in srgb, var(--tl-c) 34%, transparent), color-mix(in srgb, var(--tl-c) 14%, transparent)); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--white) 30%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--tl-c) 55%, transparent); }
+.tl-ico[data-ink="dark"] { color: var(--black); }
+.tl-ico[data-ink="theme"] { color: var(--t1); }
+.tl-ico[data-plate] { background: var(--logo-plate); }
+.tl-mono { line-height: 1; }
+.tl-emoji { font-size: calc(var(--tl-s) * 0.56); line-height: 1; font-family: "Segoe UI Emoji", var(--sans); }
+.tl-glyph { font: 400 calc(var(--tl-s) * 0.5) / 1 "Segoe Fluent Icons", "Segoe MDL2 Assets"; }
+.tl-img { width: 66%; height: 66%; object-fit: contain; }
+
+/* ---------- panel Upravit vzhled ---------- */
+.tl-ed { grid-column: 1 / -1; pointer-events: auto; user-select: none; margin-top: var(--s2); padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow-toast); animation: drop var(--dur-2) var(--ease); text-align: left; }
+.tl-card { margin-top: var(--s3); }
+.tl-ed-head { display: flex; align-items: center; gap: var(--s3); }
+.tl-ed-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tl-ed-title b { font-size: var(--fs-ui); color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-ed-title small { font-size: var(--fs-sm); color: var(--t3); }
+.tl-ed-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); }
+.tl-ed-cap { min-width: 64px; font-size: var(--fs-xs); font-weight: 600; color: var(--t3); }
+.tl-ed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 1fr)); gap: 2px; max-height: 132px; overflow-y: auto; overscroll-behavior: contain; padding: 2px; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.tl-ed-grid button { height: 30px; border-radius: var(--r-xs); font-size: var(--fs-md); color: var(--t1); display: grid; place-items: center; }
+.tl-ed-grid button:hover { background: var(--card-2); }
+.tl-ed-grid button.on { background: var(--card-3); box-shadow: inset 0 0 0 1px var(--accent); }
+.tl-ed-g { font: 400 calc(16px * var(--fz)) / 1 "Segoe Fluent Icons", "Segoe MDL2 Assets"; }
+.tl-ed-e { font: calc(17px * var(--fz)) / 1 "Segoe UI Emoji", var(--sans); }
+.tl-sw { width: 20px; height: 20px; border-radius: 50%; background: var(--tl-c); box-shadow: inset 0 0 0 1px var(--line-2); }
+.tl-sw.on { box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px var(--accent); }
+.tl-sw-auto { display: grid; place-items: center; width: auto; min-width: 20px; padding: 0 8px; border-radius: var(--r-pill); background: var(--well); font-size: var(--fs-xs); color: var(--t2); }
+.tl-custom { position: relative; display: inline-flex; align-items: center; gap: var(--s1); font-size: var(--fs-xs); color: var(--t2); }
+.tl-custom input[type="color"] { width: 22px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; }
+input.tl-ed-in { flex: 1; min-width: 80px; padding: 4px 8px; font-size: var(--fs-sm); }
+.tl-ed-check { display: inline-flex; align-items: center; gap: var(--s1); font-size: var(--fs-sm); color: var(--t2); }
+.tl-ed-foot { display: flex; align-items: center; gap: var(--s2); padding-top: var(--s1); border-top: 1px solid var(--line); }
+.tl-ed-foot .grow { flex: 1; }
+.tl-ed-note { font-size: var(--fs-xs); color: var(--t3); }
+
+/* ---------- menu pravého kliku a tažení ---------- */
+.tl-menu { position: fixed; z-index: 60; display: flex; flex-direction: column; min-width: 160px; padding: var(--s1); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: var(--shadow-toast); animation: drop var(--dur-2) var(--ease); }
+.tl-menu button { text-align: left; font-size: var(--fs-sm); color: var(--t1); padding: 6px 10px; border-radius: var(--r-sm); white-space: nowrap; }
+.tl-menu button:hover { background: var(--card-2); }
+.tl-float { position: fixed; z-index: 60; pointer-events: none; transform: translate(14px, 14px); font-size: var(--fs-sm); font-weight: 600; color: var(--t1); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 4px 10px; box-shadow: var(--shadow-toast); white-space: nowrap; }

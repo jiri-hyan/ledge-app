@@ -2,8 +2,9 @@
 // položky s náhledem (V klidu / Když se něco děje), pořadí přetažením, barva a „Jen při dění“ u položky
 // (čistá logika `settings/strip.ts` + `strip.test.mjs`), vlastní text, časovač v proužku a monitor.
 // Leží v kroku Zavřený → Pokročilé (`AppearanceClosed.tsx`) spolu s tvarem, linkou a krytím; pozice
-// a velikost jsou hned pod galerií vzhledů — celý proužek je tak na jednom místě.
-import { createSignal, For, Show } from "solid-js";
+// a velikost jsou hned pod galerií vzhledů — celý proužek je tak na jednom místě. Widgety ze skriptů
+// (`widget:<soubor>`, `widgets/`) jsou v seznamu za vestavěnými položkami.
+import { createSignal, For, onMount, Show } from "solid-js";
 import { t } from "../../i18n";
 import { useSettings } from "../ctx";
 import { Seg, Select, Text, Toggle } from "../fields/controls";
@@ -12,6 +13,8 @@ import { SortList } from "../fields/SortList";
 import { fieldLabel } from "../labels";
 import { moveItem } from "../model";
 import { clipCustom, COLOR_VAR, CUSTOM_MAX, customLen, previewSegments, QUIETABLE, STRIP_COLORS, withColor, withQuiet, type StripColorId } from "../strip";
+import { isWidgetId, stripWidgetIds, widgetFile } from "../../widgets/model";
+import { loadWidgets, widgetInfo, widgetsListing } from "../../widgets/registry";
 
 const STRIP_ITEMS: { id: string; key: string; cs: string }[] = [
   { id: "mode", key: "settings.strip.item.mode", cs: "Záložka (Práce, Osobní nebo vlastní)" },
@@ -24,6 +27,9 @@ const STRIP_ITEMS: { id: string; key: string; cs: string }[] = [
   { id: "custom", key: "settings.strip.item.custom", cs: "Vlastní text" },
   { id: "timer", key: "settings.strip.item.timer", cs: "Časovač (odpočet, stopky)" },
   { id: "media", key: "settings.strip.item.media", cs: "Právě hraje (skladba · interpret)" },
+  { id: "github", key: "settings.strip.item.github", cs: "GitHub (PR čekající na tvoji revizi)" },
+  { id: "system", key: "settings.strip.item.system", cs: "Systém (CPU a paměť)" },
+  { id: "mail", key: "settings.strip.item.mail", cs: "Pošta — nepřečtené (účet Microsoft)" },
 ];
 
 /** Název předvolby barvy (literály kvůli hlídači překladů). */
@@ -52,19 +58,31 @@ const sampleTexts = (custom: string, busy: boolean): Record<string, string> => (
   custom: clipCustom(custom).trim(),
   timer: busy ? t("settings.strip.sample.timer", "⏱ 18 min") : "",
   media: busy ? t("settings.strip.sample.media", "♪ Skladba · Interpret") : "",
+  github: busy ? t("settings.strip.sample.github", "GitHub: 2× čeká na revizi") : "",
+  system: t("settings.strip.sample.system", "CPU 23 % · RAM 61 %"),
+  mail: t("settings.strip.sample.mail", "✉ 3"),
 });
 const stripLabel = (id: string) => {
   const x = STRIP_ITEMS.find((i) => i.id === id);
-  return x ? t(x.key, x.cs) : id;
+  if (x) return t(x.key, x.cs);
+  if (isWidgetId(id)) return t("settings.strip.item.widget", "Widget: {name}", { name: widgetInfo(id)?.title ?? widgetFile(id) ?? id });
+  return id;
 };
+/** Widget je stav (jako vlastní text) — „jen při dění“ dává smysl. */
+const quietable = (id: string) => QUIETABLE.includes(id) || isWidgetId(id);
 
 export default function StripSettings() {
   const c = useSettings();
   // zapnuté v pořadí z configu, pak vypnuté
+  onMount(() => void loadWidgets().catch(() => null));
   const stripAll = () => {
     const on: string[] = c.cfg.strip.items ?? [];
-    return [...on, ...STRIP_ITEMS.map((x) => x.id).filter((x) => !on.includes(x))];
+    const widgets = stripWidgetIds(widgetsListing()?.widgets ?? [], on);
+    return [...on, ...STRIP_ITEMS.map((x) => x.id).filter((x) => !on.includes(x)), ...widgets.filter((x) => !on.includes(x))];
   };
+  /** ukázka widgetu = jeho poslední skutečný text do proužku (jinak název) */
+  const widgetSample = (): Record<string, string> =>
+    Object.fromEntries((widgetsListing()?.widgets ?? []).map((w) => [w.id, w.data?.strip ?? w.data?.badge ?? `${w.icon ?? "🧩"} ${w.title}`]));
   const stripOn = (id: string) => (c.cfg.strip.items ?? []).includes(id);
   const setStrip = (all: string[], on: (id: string) => boolean) => c.set("strip.items", all.filter(on));
   const quiet = (id: string) => (c.cfg.strip.quiet ?? []).includes(id);
@@ -90,7 +108,7 @@ export default function StripSettings() {
             </div>
             <div class="st-strip-pv-bar">
               <For
-                each={previewSegments(c.cfg.strip, sampleTexts(c.cfg.strip.custom ?? "", pvMode() === "busy"), pvMode() === "busy").filter((x) => !x.hidden)}
+                each={previewSegments(c.cfg.strip, { ...widgetSample(), ...sampleTexts(c.cfg.strip.custom ?? "", pvMode() === "busy") }, pvMode() === "busy").filter((x) => !x.hidden)}
                 fallback={<span class="st-strip-pv-empty">{t("settings.strip.preview.empty", "prázdný proužek")}</span>}
               >
                 {(x) => <span class="st-strip-pv-seg" style={{ color: x.color ? COLOR_VAR[x.color as StripColorId] : undefined }}>{x.text}</span>}
@@ -103,9 +121,9 @@ export default function StripSettings() {
                 {handle()}
                 <span class="grow">
                   {stripLabel(id)}
-                  <Show when={stripOn(id) && !QUIETABLE.includes(id)}><small>{t("settings.strip.eventOnly", "jen když se něco děje")}</small></Show>
+                  <Show when={stripOn(id) && !quietable(id)}><small>{t("settings.strip.eventOnly", "jen když se něco děje")}</small></Show>
                 </span>
-                <Show when={stripOn(id) && QUIETABLE.includes(id)}>
+                <Show when={stripOn(id) && quietable(id)}>
                   <button
                     class="mini st-strip-quiet"
                     classList={{ "st-strip-on": quiet(id) }}

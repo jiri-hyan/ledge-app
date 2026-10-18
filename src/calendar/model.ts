@@ -82,3 +82,49 @@ export function withCalendar<T extends Record<string, any>>(cfg: T, i: number, p
   list[i] = { ...list[i], ...patch };
   return { ...cfg, personal: { ...personal, calendars: list } };
 }
+
+// --- vlna 8: zdroje, Připojit, připomínky ---
+
+export type Source = "ics" | "outlook-local" | "graph" | "google";
+
+/** Zdroj kalendáře z configu (starý config bez pole = odkaz ICS). */
+export const sourceOf = (f: { source?: string | null } | null | undefined): Source =>
+  f?.source === "outlook-local" || f?.source === "graph" || f?.source === "google" ? f.source : "ics";
+
+/** Název služby u tlačítka Připojit (vlastní jména, nepřekládají se). */
+export const PROVIDER_NAME: Record<string, string> = { teams: "Teams", meet: "Google Meet", zoom: "Zoom", webex: "Webex", jitsi: "Jitsi" };
+export const providerName = (p: string | null | undefined): string => (p && PROVIDER_NAME[p]) || "";
+
+/** Místo pod názvem: když je to jen odkaz na schůzku (Zoom v místě), neukazovat ho — je na tlačítku. */
+export function placeLabel(it: { location: string; join?: { url: string } | null }): string {
+  const l = it.location.trim();
+  if (it.join && /^https?:\/\//i.test(l)) return "";
+  return l;
+}
+
+/** Tlačítko Připojit: událost má odkaz a ještě neskončila (nulová „trvá“ minutu). */
+export const joinable = (it: { end: number; start: number; join?: { url: string } | null }, now: number): boolean =>
+  !!it.join?.url && now < Math.max(it.end, it.start + 60_000);
+
+/** Za kolik minut začne (zaokrouhleno nahoru), když je to do `within` minut; jinak null. */
+export function startsIn(it: { start: number; allDay: boolean }, now: number, within = 15): number | null {
+  if (it.allDay || it.start <= now) return null;
+  const m = Math.ceil((it.start - now) / 60_000);
+  return m <= within ? m : null;
+}
+
+/** Volby připomínky (minuty předem; 0 = nepřipomínat). Hodnota z configu mimo nabídku se přidá. */
+export const REMIND_MINUTES = [0, 1, 5, 10, 15, 30] as const;
+export function remindOptions(cur: number | null | undefined): number[] {
+  const set = new Set<number>(REMIND_MINUTES);
+  if (typeof cur === "number" && Number.isInteger(cur) && cur >= 0 && cur <= 120) set.add(cur);
+  return [...set].sort((a, b) => a - b);
+}
+
+/** Výchozí připomínka nového i starého kalendáře (Rust `conf::DEFAULT_REMIND_MIN`). */
+export const DEFAULT_REMIND = 5;
+export const remindOf = (f: { remindMin?: number | null } | null | undefined): number =>
+  typeof f?.remindMin === "number" ? f.remindMin : DEFAULT_REMIND;
+
+/** Nový kalendář „Outlook v tomto PC“ (bez adresy). */
+export const outlookFeed = (color: string) => ({ name: "", url: "", color, enabled: true, source: "outlook-local" as const, remindMin: DEFAULT_REMIND, remindToast: false });

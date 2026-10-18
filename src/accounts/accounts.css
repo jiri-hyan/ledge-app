@@ -1,0 +1,37 @@
+/* Karta Pošta (MailCard) a Nastavení → Účty (AccountsSettings). Tokeny ze styles.css; jen vlastní třídy
+   `mail-*` a `acc-*` (globální CSS — cizí třídy se tu nezmiňují, viz cssClasses.test.mjs). */
+.mail-row { width: 100%; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 6px 0; border-radius: var(--r-xs); }
+.mail-row:hover { background: var(--card-2); }
+.mail-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: transparent; }
+.mail-unread .mail-dot { background: var(--blue); }
+.mail-unread { font-weight: 600; }
+.mail-time { font: var(--fs-xs) var(--mono); color: var(--t3); white-space: nowrap; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.mail-lead { font-size: var(--fs-sm); color: var(--t2); margin-bottom: 2px; }
+.mail-empty { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); }
+.mail-foot { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s1); margin-top: 10px; }
+.mail-meta { font: var(--fs-xs) var(--mono); color: var(--t3); margin-left: auto; white-space: nowrap; }
+
+/* Nastavení → Účty */
+.acc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s2); width: 100%; }
+.acc-tile { display: flex; flex-direction: column; gap: 4px; text-align: left; background: var(--card-2); border: 1px solid transparent; border-radius: var(--r-sm); padding: 12px; color: var(--t1); font: inherit; cursor: pointer; transition: background var(--fast), border-color var(--fast); }
+.acc-tile:hover { background: var(--card-3); }
+.acc-tile-on { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.acc-tile-h { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.acc-logo { width: 18px; height: 18px; flex-shrink: 0; }
+.acc-tile small { color: var(--t3); }
+.acc-state { font-size: var(--fs-sm); color: var(--t2); }
+.acc-state-ok { color: var(--green); }
+.acc-state-bad { color: var(--red); }
+.acc-reads { margin: 4px 0 0; padding-left: 18px; font-size: var(--fs-sm); color: var(--t2); }
+.acc-bar { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; margin-top: 6px; }
+.acc-wait { font-size: var(--fs-sm); color: var(--t2); }
+.acc-why { font-size: var(--fs-sm); color: var(--t2); margin: 0 0 var(--s2); }
+.acc-guide { margin-top: var(--s2); font-size: var(--fs-sm); color: var(--t2); }
+.acc-guide summary { cursor: pointer; color: var(--t1); }
+.acc-guide ol { margin: 6px 0 0; padding-left: 20px; }
+.acc-guide li + li { margin-top: 4px; }
+.acc-guide code { font: var(--fs-xs) var(--mono); background: var(--card-2); border-radius: 4px; padding: 0 4px; color: var(--t1); }
+.acc-cals { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.acc-cal { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--t1); }
+.acc-cal-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.acc-secret { font: var(--fs-sm) var(--mono); background: var(--card-2); color: var(--t0); border: 1px solid var(--line); border-radius: var(--r-xs); padding: 4px 8px; min-width: 0; flex: 1; }

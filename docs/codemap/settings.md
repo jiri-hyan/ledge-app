@@ -12,7 +12,8 @@ otázky Clauda, rozložení, schránka, přehrávač, kalendář) jen skládají
 | `vzhled` | Vzhled | `panels/Appearance.tsx` (4 kroky) → `AppearanceClosed.tsx` (+ `StripSettings.tsx` v Pokročilé: celý proužek), `AppearanceHover.tsx`, `AppearanceOpen.tsx` (+ `AppearanceStyles`, `AppearanceLayout`), `AppearanceMotion.tsx`; náhledy `settings/previews/*` — mapa [appearance.md](appearance.md) |
 | `akce` | Projekty, akce a odkazy | `panels/ProjectsActions.tsx` → `Projects.tsx` (+`ProjectEditor`), `Actions.tsx` (jeden seznam; odkaz = akce, `SortList`), `actions/ScriptsSettings.tsx`, `LegacyLinks.tsx` (jen nepřevedené `personal.links`) |
 | `claude` | Claude | `panels/Claude.tsx` (`HooksSetup`) + `panels/Questions.tsx` (otázky Clauda, `claude.questionHoldS`) |
-| `osobni` | Osobní | `panels/Personal.tsx` + `calendar/CalendarSettings`, `media/MediaSettings`, časovač, `cliphist/ClipSettings` |
+| `osobni` | Osobní | `panels/Personal.tsx` + `calendar/CalendarSettings`, `media/MediaSettings`, časovač, `cliphist/ClipSettings`, `integrations/IntegrationsSettings` (GitHub, Systém — [integrations.md](integrations.md)) |
+| `ucty` | Účty | `panels/Accounts.tsx` → `accounts/AccountsSettings.tsx` (přihlášení Microsoft / Google, průvodce Client ID) — mapa [accounts.md](accounts.md) |
 | `poznamky` | Poznámky | `panels/Notes.tsx` (kategorie a sync jsou rozsáhlé → vlastní panel) |
 | `chovani` | Chování | `panels/Behavior.tsx` + `panels/Hotkeys.tsx` (`HotkeysSection`) + `pkgctx/BubbleNotice.tsx` |
 | `aplikace` | Záloha a aplikace | `panels/AppPanel.tsx` → `Backup.tsx`, `About.tsx` |

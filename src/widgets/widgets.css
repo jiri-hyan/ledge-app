@@ -1,0 +1,51 @@
+/* Karta widgetu ze skriptu (`WidgetCard.tsx`) a sekce Widgety v Nastavení (`WidgetsSettings.tsx`).
+   Barvy jen z tokenů motivu; barva z výstupu skriptu = předvolba (`TONE_VAR`), nikdy volný hex. */
+.wg { min-width: 0; }
+.wg-ico { margin-right: 6px; }
+.wg-badge { margin-left: 6px; }
+.wg-spin { display: inline-block; margin-left: 6px; animation: wg-spin 1.2s linear infinite; }
+@keyframes wg-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wg-spin { animation: none; } }
+
+.wg-text { white-space: pre-line; color: var(--t1); font-size: var(--fs-ui); line-height: 1.45; margin: 2px 0 6px; user-select: text; -webkit-user-select: text; }
+.wg-msg { margin: 2px 0 6px; white-space: pre-line; }
+.wg-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+
+.wg-err { display: flex; align-items: center; gap: var(--s2); margin: 2px 0 6px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--well); color: var(--red); font-size: var(--fs-sm); }
+
+.wg-bar { height: 6px; border-radius: 3px; background: var(--well-2); overflow: hidden; margin: 4px 0 8px; }
+.wg-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width var(--fast); }
+
+.wg-items { display: flex; flex-direction: column; }
+.wg-item { width: 100%; text-align: left; border-radius: var(--r-sm); gap: 8px; cursor: default; }
+.wg-item:disabled { opacity: 1; }
+.wg-click { cursor: pointer; }
+.wg-click:hover { background: var(--card-2); }
+.wg-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.wg-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wg-value { flex: none; font: var(--fs-sm) var(--mono); color: var(--t2); white-space: nowrap; }
+.wg-sep { border: 0; border-top: 1px solid var(--line-soft); margin: 4px 0; }
+
+.wg-notes { margin-top: 6px; font-size: var(--fs-xs); color: var(--t3); }
+.wg-notes summary { cursor: pointer; }
+.wg-out { max-height: 160px; }
+
+.wg-foot { display: flex; align-items: center; gap: var(--s2); margin-top: 8px; }
+.wg-meta { font: var(--fs-xs) var(--mono); color: var(--t3); margin-left: auto; white-space: nowrap; }
+
+/* souhlas: věta, začátek skriptu, co přesně se povoluje */
+.wg-consent { display: flex; flex-direction: column; gap: 6px; }
+.wg-note { font-size: var(--fs-sm); color: var(--t1); line-height: 1.4; }
+.wg-changed { color: var(--amber); }
+.wg-pre { margin: 0; font: var(--fs-2xs)/1.45 var(--mono); color: var(--t2); background: var(--well-2); border-radius: var(--r-sm); padding: var(--s2) 10px; max-height: 150px; overflow: auto; white-space: pre-wrap; word-break: break-word; user-select: text; -webkit-user-select: text; }
+.wg-fp { font-family: var(--mono); word-break: break-all; }
+
+/* Nastavení: seznam widgetů a galerie příkladů */
+.wg-st-row { display: flex; align-items: center; gap: var(--s2); padding: 6px 0; }
+.wg-st-row + .wg-st-row { border-top: 1px solid var(--line-soft); }
+.wg-st-ico { width: 26px; text-align: center; font-size: 18px; flex: none; }
+.wg-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s2); margin-top: 6px; }
+.wg-tpl { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: var(--r-md); background: var(--card-2); border: 1px solid var(--line-soft); }
+.wg-tpl-head { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--t1); }
+.wg-tpl-desc { font-size: var(--fs-xs); color: var(--t2); line-height: 1.4; flex: 1; }
+.wg-tpl-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

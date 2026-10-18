@@ -13,6 +13,7 @@
 //! - `cliphist` — historie schránky: jen se zapnutým `clipboard.enabled`, spí do `WM_CLIPBOARDUPDATE`
 //! - `claude-bridge` — HTTP pro hooky
 //! - `notes-watch` — sleduje složku poznámek (události, žádný poll) a přepočítá připomínky
+//! - `pins-save` — zpožděný zápis stavu lístků na plochu (`pins/`); vznikne s prvním lístkem, spí na kanálu
 //! - `media` / `volume` (záložka Osobní) — vzniknou až při prvním zobrazení záložky (`personal_live`),
 //!   pak jen čekají na události GSMTC / Core Audio; baterie = callback Windows, žádné vlákno
 //! - počasí (záložka Osobní) — žádné vlákno navíc: jedno stažení na runtime Tauri, jen při otevření
@@ -21,6 +22,7 @@
 // první: makro `trf!` (texty podle jazyka) musí být definované před moduly, které ho používají
 #[macro_use]
 mod i18n;
+mod accounts;
 mod actionicons;
 mod actionrun;
 mod actions;
@@ -47,8 +49,10 @@ mod edge;
 mod focusreturn;
 mod gamemode;
 mod gitinfo;
+mod github;
 mod hooksetup;
 mod hotkeys;
+mod integrations;
 mod hovermode;
 mod iconimg;
 mod icons;
@@ -67,6 +71,7 @@ mod onboarding;
 mod outside;
 mod paletteconf;
 mod personal;
+mod pins;
 mod pkgctx;
 mod ports;
 mod procman;
@@ -90,7 +95,9 @@ mod stripconf;
 mod stripdraw;
 mod stripview;
 mod subagents;
+mod sysmon;
 mod threads;
+mod tilelook;
 mod timer;
 mod toast;
 mod uiconf;
@@ -100,6 +107,7 @@ mod volume;
 mod updatenet;
 mod weather;
 mod webpanel;
+mod widgets;
 mod winfocus;
 mod winsettings;
 
@@ -249,13 +257,23 @@ pub fn run() {
             limitslive::start_watch();
             // právě hraje v proužku (`strip.items` + `media`): odběry GSMTC hned, ne až po záložce Osobní
             media::sync(&core().cfg.read());
+            // položky proužku GitHub / Systém: plánovač vznikne jen s nimi (`integrations.rs`)
+            let cfg_now = core().cfg.read().clone();
+            integrations::sync(&cfg_now);
             // historie schránky: listener jen se zapnutou funkcí (výchozí vypnuto)
             let clip = core().cfg.read().clipboard.clone();
             cliphist::sync(&clip);
+            // widgety ze skriptů: vlákno jen, když je nějaký widget na záložce nebo v proužku
+            widgets::live::wake_if_used(&core().cfg.read());
             if let Err(e) = autostart::apply(cfg.autostart) {
                 log(&format!("autostart: {e}"));
             }
             refresh_strip();
+            // lístky na plochu z minula zpátky na místa (po předehřátí šuplíku — jeden proces WebView2)
+            std::thread::spawn(|| {
+                std::thread::sleep(Duration::from_millis(2500));
+                pins::win::restore_all();
+            });
             // šuplík připravit na pozadí (studený start WebView2 trvá sekundy) — ne v úsporném režimu
             if cfg.drawer.keep_warm_s == 0 {
                 std::thread::spawn(|| {
@@ -320,6 +338,14 @@ pub fn run() {
             commands::notes::note_draft_images,
             commands::notes::note_draft_clear,
             commands::notes::notes_sync_now,
+            commands::pins::pin_toggle,
+            commands::pins::pin_new,
+            commands::pins::pin_through_all,
+            commands::pins::pin_init,
+            commands::pins::pin_set,
+            commands::pins::pin_drag,
+            commands::pins::pin_unpin,
+            commands::pins::pin_hint_seen,
             commands::drawer::take_page,
             commands::drawer::open_link,
             commands::update::update_check_now,
@@ -351,6 +377,19 @@ pub fn run() {
             commands::media::volume_set,
             commands::media::volume_mute,
             commands::calendar::calendar_test,
+            commands::integrations::system_view,
+            commands::integrations::system_taskmgr,
+            commands::integrations::github_view,
+            commands::integrations::github_open,
+            commands::integrations::github_copy_login,
+            commands::calendar::calendar_join,
+            commands::calendar::calendar_outlook_probe,
+            commands::calendar::calendar_outlook_load,
+            commands::accounts::accounts_status,
+            commands::accounts::account_connect,
+            commands::accounts::account_cancel,
+            commands::accounts::account_disconnect,
+            commands::accounts::account_google_calendars,
             commands::actions::run_action,
             commands::shelf::shelf_list,
             commands::shelf::shelf_icon,
@@ -368,6 +407,8 @@ pub fn run() {
             commands::cliphist::clip_enable,
             commands::cliphist::clip_apps,
             commands::actions::action_icon,
+            commands::tilelook::look_image_add,
+            commands::tilelook::look_image,
             commands::actions::action_icon_refresh,
             commands::actions::action_consent,
             commands::actions::action_check,
@@ -375,6 +416,15 @@ pub fn run() {
             commands::scripts::run_script,
             commands::scripts::scripts_open_dir,
             commands::scripts::win_settings_open,
+            commands::widgets::widgets_list,
+            commands::widgets::widget_consent,
+            commands::widgets::widget_refresh,
+            commands::widgets::widget_output,
+            commands::widgets::widget_edit,
+            commands::widgets::widgets_open_dir,
+            commands::widgets::widget_templates,
+            commands::widgets::widget_install,
+            commands::widgets::widget_click,
             commands::onboarding::onboarding_repos,
             commands::onboarding::onboarding_apps,
             commands::onboarding::onboarding_icons,
@@ -395,6 +445,8 @@ pub fn run() {
                 && let Some(c) = CORE.get()
             {
                 c.procs.stop_all();
+                // poslední posun lístku mohl čekat na zpožděný zápis
+                pins::win::flush();
             }
         });
 }

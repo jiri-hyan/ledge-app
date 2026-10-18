@@ -1,17 +1,20 @@
 // Panel „Projekty, akce a odkazy“: všechno, co se otevírá jedním klikem, na jednom místě — projekty
 // (`Projects.tsx`, hlavička panelu s přidáním), jeden seznam akcí a odkazů (`Actions.tsx`; odkaz = akce
 // typu web / složka / soubor), skripty (`actions/ScriptsSettings.tsx`, v sekci akcí) a jen když nějaké
-// zbyly, starší odkazy, které se nepřevedly na akce (`LegacyLinks.tsx`).
+// zbyly, starší odkazy, které se nepřevedly na akce (`LegacyLinks.tsx`). Pod akcemi widgety ze skriptů
+// (`widgets/WidgetsSettings.tsx`) — widget je skript, který se spouští sám a kreslí kartu / položku proužku.
 import type { PanelProps } from "../types";
 import ProjectsPanel from "./Projects";
 import ActionsPanel from "./Actions";
 import LegacyLinks from "./LegacyLinks";
+import WidgetsSettings from "../../widgets/WidgetsSettings";
 
 export default function ProjectsActionsPanel(p: PanelProps) {
   return (
     <>
       <ProjectsPanel {...p} />
       <ActionsPanel {...p} />
+      <WidgetsSettings />
       <LegacyLinks />
     </>
   );

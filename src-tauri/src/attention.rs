@@ -1,6 +1,9 @@
 //! Pozornost Clauda pro proužek: kolik session čeká na člověka (segment `strip.items` „waiting“),
 //! přechody „čeká na tebe“ (nové schválení / otázka) a „hotovo“ (konec turnu, hook `Stop`) →
 //! krátký puls proužku a volitelný toast Windows (`claude.toast`, výchozí vypnuto).
+//! Třetí událost je **schůzka za chvíli** (`calendar::remind`): stejný signál (`signal`), priorita
+//! **mezi** „čeká na tebe“ a „hotovo“ (`Event::rank`): čekající Claude > schůzka > hotovo. V proužku
+//! totéž pořadí ambientní barvy (`stripview`: čeká/připomínka poznámky > schůzka > pád serveru).
 //!
 //! Všechno je čistá logika (tabulkové testy) kromě `on_change`, které volá `refresh::on_claude_change`
 //! — žádné vlastní vlákno ani časovač: puls má termín (`PULSE_MS`, animuje ho vlákno `strip` jen po
@@ -24,13 +27,24 @@ pub(crate) enum Event {
     NeedsInput,
     /// session dokončila turn (Working → Idle, ne ukončením session)
     Done,
+    /// schůzka z kalendáře začne za `remindMin` minut (`calendar::remind`)
+    Meeting,
 }
 
 impl Event {
     pub(crate) fn color(self) -> Rgba {
         match self {
             Event::NeedsInput => Rgba::AMBER,
+            Event::Meeting => Rgba::BLUE,
             Event::Done => Rgba::TEAL,
+        }
+    }
+    /// Priorita při souběhu (nižší = důležitější): čeká na tebe · schůzka · hotovo.
+    pub(crate) fn rank(self) -> u8 {
+        match self {
+            Event::NeedsInput => 0,
+            Event::Meeting => 1,
+            Event::Done => 2,
         }
     }
 }
@@ -187,6 +201,7 @@ pub(crate) fn toast_text(ev: Event, asks: bool, where_: &str) -> (String, String
         (Event::NeedsInput, false) => tr("Claude čeká na schválení", "Claude is waiting for approval"),
         (Event::NeedsInput, true) => tr("Claude se ptá", "Claude has a question"),
         (Event::Done, _) => tr("Claude je hotový", "Claude is done"),
+        (Event::Meeting, _) => tr("Schůzka za chvíli", "Meeting soon"),
     };
     (title.to_string(), where_.to_string())
 }
@@ -268,8 +283,8 @@ pub(crate) fn on_change() {
         return;
     }
     let toast_on = c.cfg.read().claude.toast;
-    // „čeká“ má přednost (barva pulsu), pak hotovo
-    let first = events.iter().find(|(_, e)| *e == Event::NeedsInput).or(events.first()).cloned();
+    // „čeká“ má přednost (barva pulsu), pak hotovo (`Event::rank`)
+    let first = events.iter().min_by_key(|(_, e)| e.rank()).cloned();
     let Some((_, ev)) = first else { return };
     if signal(ev.color(), toast_on) {
         let cfg = c.cfg.read();
@@ -423,6 +438,15 @@ mod tests {
             let l = pulse_level(t).unwrap();
             assert!((0.0..=1.0).contains(&l), "{t}: {l}");
         }
+    }
+
+    #[test]
+    fn meeting_ranks_between_waiting_and_done() {
+        let mut evs = [Event::Done, Event::Meeting, Event::NeedsInput];
+        evs.sort_by_key(|e| e.rank());
+        assert_eq!(evs, [Event::NeedsInput, Event::Meeting, Event::Done]);
+        assert_eq!(Event::Meeting.color(), Rgba::BLUE);
+        assert_ne!(Event::Meeting.color(), Event::NeedsInput.color());
     }
 
     #[test]

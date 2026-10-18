@@ -5,19 +5,24 @@
 //! než `MAX_AGE_MS` (po pokusu aspoň `RETRY_MS` pauza). Skrytá karta = nic se nestahuje. Emit vlákno se
 //! kvůli kalendáři probudí jen při otevřené kartě, a to v čase další změny výběru (`view::pick`
 //! `next_change`: začátek/konec dnešní události, půlnoc). Adresa feedu se nikde neloguje; stav i cache
-//! (`%LOCALAPPDATA%\Ledge\calendar-cache.json`) jsou klíčované otiskem adresy (`conf::key`).
+//! (`%LOCALAPPDATA%\Ledge\calendar-cache.json`) jsou klíčované otiskem adresy (`conf::key`; jiné zdroje
+//! `source::key`). Načítání podle zdroje: `source::fetch` (ICS zde `fetch_parse`, Outlook v PC jen když
+//! běží — jinak nápověda `HINT_OUTLOOK_CLOSED` a tlačítko „Načíst z Outlooku“ → `load_outlook`).
+//! Připomínky (`remind.rs`) čtou výskyty přes `reminder_feeds` / `with_reminders` a po startu si
+//! vyžádají cache z disku (`ensure_cache`) — nic se kvůli nim nestahuje.
 
-use super::conf::{self, CalendarFeed};
+use super::conf;
+use super::source::{self, Target};
 use super::tz::SystemLocal;
+use super::cache::{CacheFeed, cache_path, decode_cache, encode_cache};
 use super::{Occ, Parsed, view};
 use crate::config::Config;
 use crate::drawer::View;
 use crate::i18n::tr;
 use crate::state::{core, log, mark_dirty, now_ms};
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::Duration;
 
 /// Data mladší než tohle se při otevření znovu nestahují.
@@ -29,8 +34,8 @@ pub const TIMEOUT: Duration = Duration::from_secs(15);
 pub const MAX_BYTES: usize = 5 * 1024 * 1024;
 /// Nejvíc řádků na kartě (zbytek jako „+ další“).
 pub const CARD_ROWS: usize = 10;
-/// Starší cache se po startu nepoužije (okno výskytů už by nesedělo).
-const CACHE_MAX_AGE_MS: i64 = 7 * 86_400_000;
+/// Outlook v PC je zavřený — automaticky se nespouští (karta nabídne „Načíst z Outlooku“).
+pub const HINT_OUTLOOK_CLOSED: &str = "outlook-closed";
 
 #[derive(Default)]
 struct FeedState {
@@ -42,6 +47,8 @@ struct FeedState {
     attempt_ms: Option<i64>,
     loading: bool,
     error: Option<String>,
+    /// nápověda pro UI bez chyby (`HINT_OUTLOOK_CLOSED`)
+    hint: Option<&'static str>,
 }
 
 #[derive(Default, PartialEq)]
@@ -135,42 +142,7 @@ fn too_big() -> String {
     tr("Kalendář je moc velký (přes 5 MB) — Ledge ho nestáhne.", "The calendar is too big (over 5 MB) — Ledge won't download it.").into()
 }
 
-// ---------- cache na disku ----------
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct CacheFeed {
-    pub key: String,
-    pub fetched_ms: i64,
-    #[serde(default)]
-    pub events: usize,
-    #[serde(default)]
-    pub name: String,
-    #[serde(default)]
-    pub occs: Vec<Occ>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct CacheFile {
-    v: u32,
-    feeds: Vec<CacheFeed>,
-}
-
-pub fn cache_path() -> PathBuf {
-    crate::actionrun::local_dir().join("calendar-cache.json")
-}
-
-pub fn encode_cache(feeds: Vec<CacheFeed>) -> String {
-    serde_json::to_string(&CacheFile { v: 1, feeds }).unwrap_or_default()
-}
-
-/// Čitelné, verze 1, ne starší než `CACHE_MAX_AGE_MS`. Cokoli jiného = prázdno (nikdy chyba).
-pub fn decode_cache(text: &str, now: i64) -> Vec<CacheFeed> {
-    match serde_json::from_str::<CacheFile>(text) {
-        Ok(f) if f.v == 1 => f.feeds.into_iter().filter(|c| now - c.fetched_ms < CACHE_MAX_AGE_MS && c.fetched_ms <= now).collect(),
-        _ => Vec::new(),
-    }
-}
+// ---------- cache na disku (formát v `cache.rs`) ----------
 
 fn save_cache() {
     let feeds: Vec<CacheFeed> = with(|l| {
@@ -269,7 +241,7 @@ async fn download(url: &str) -> Result<Vec<u8>, String> {
 }
 
 /// Stažení + rozparsování (parsování mimo async vlákna).
-async fn fetch_parse(url: &str, now: i64) -> Result<Parsed, String> {
+pub(crate) async fn fetch_parse(url: &str, now: i64) -> Result<Parsed, String> {
     let bytes = download(url).await?;
     let parsed = tauri::async_runtime::spawn_blocking(move || super::collect(&bytes, now, &SystemLocal))
         .await
@@ -311,11 +283,6 @@ fn card_visible(cfg: &Config, opening: bool) -> bool {
     crate::layout::page_has(&cfg.layout, &c.mode.lock(), "calendar") && (opening || c.drawer.view() == View::Full)
 }
 
-/// (klíč, adresa) zapnutých kalendářů s platnou adresou.
-fn targets(list: &[CalendarFeed]) -> Vec<(String, String)> {
-    list.iter().filter(|f| f.enabled).filter_map(|f| conf::normalize_url(&f.url).ok()).map(|u| (conf::key(&u), u)).collect()
-}
-
 /// Stáhne zastaralé kalendáře, když je karta vidět. Výsledek přes `mark_dirty`. Jinak nic.
 pub(crate) fn maybe_refresh(opening: bool) {
     let feeds = {
@@ -323,11 +290,13 @@ pub(crate) fn maybe_refresh(opening: bool) {
         if !card_visible(&cfg, opening) {
             return;
         }
-        targets(&cfg.personal.calendars)
+        source::targets(&cfg.personal.calendars)
     };
     if feeds.is_empty() {
         return;
     }
+    // Outlook v PC se automaticky jen připojí k běžícímu (nikdy ho nespouští)
+    let outlook_up = feeds.iter().any(|(_, t)| matches!(t, Target::OutlookLocal)) && super::outlook::running();
     let now = now_ms();
     let mut start = Vec::new();
     let (load, dirty) = with(|l| {
@@ -342,8 +311,13 @@ pub(crate) fn maybe_refresh(opening: bool) {
                 dirty = true;
             }
             if needs_fetch(now, st.fetched_ms, st.attempt_ms, st.loading) {
-                st.loading = true;
                 st.attempt_ms = Some(now);
+                if matches!(u, Target::OutlookLocal) && !outlook_up {
+                    dirty |= st.hint != Some(HINT_OUTLOOK_CLOSED);
+                    st.hint = Some(HINT_OUTLOOK_CLOSED);
+                    continue;
+                }
+                st.loading = true;
                 start.push((k.clone(), u.clone()));
             }
         }
@@ -355,30 +329,88 @@ pub(crate) fn maybe_refresh(opening: bool) {
     if dirty || !start.is_empty() {
         mark_dirty();
     }
-    for (k, u) in start {
+    for (k, t) in start {
         tauri::async_runtime::spawn(async move {
-            let res = fetch_parse(&u, now_ms()).await;
-            let ok = res.is_ok();
-            with(|l| {
-                let Some(st) = l.feeds.get_mut(&k) else { return };
-                if st.attempt_ms != Some(now) {
-                    return; // mezitím novější pokus (tenhle už watchdog odepsal)
-                }
-                st.loading = false;
-                match res {
-                    Ok(p) => {
-                        (st.occs, st.events, st.name) = (p.occs, p.events, p.name);
-                        st.fetched_ms = Some(now_ms());
-                        st.error = None;
-                    }
-                    Err(e) => st.error = Some(e),
-                }
-            });
-            if ok {
-                save_cache();
-            }
-            mark_dirty();
+            let res = source::fetch(t, now_ms(), false).await;
+            store(&k, now, res);
         });
+    }
+}
+
+/// Výsledek pokusu `attempt` do stavu (starší pokus, který mezitím odepsal watchdog, se zahodí).
+fn store(k: &str, attempt: i64, res: Result<Parsed, String>) {
+    let ok = res.is_ok();
+    with(|l| {
+        let Some(st) = l.feeds.get_mut(k) else { return };
+        if st.attempt_ms != Some(attempt) {
+            return; // mezitím novější pokus (tenhle už watchdog odepsal)
+        }
+        st.loading = false;
+        match res {
+            Ok(p) => {
+                (st.occs, st.events, st.name) = (p.occs, p.events, p.name);
+                st.fetched_ms = Some(now_ms());
+                (st.error, st.hint) = (None, None);
+            }
+            Err(e) => st.error = Some(e),
+        }
+    });
+    if ok {
+        save_cache();
+    }
+    mark_dirty();
+}
+
+/// Výslovný klik „Načíst z Outlooku“: smí Outlook spustit na pozadí. Vrací počet výskytů od teď.
+pub async fn load_outlook() -> Result<usize, String> {
+    if !super::outlook::installed() {
+        return Err(super::outlook::missing().into());
+    }
+    let now = now_ms();
+    let k = "outlook-local";
+    with(|l| {
+        let st = l.feeds.entry(k.into()).or_default();
+        (st.loading, st.attempt_ms, st.hint) = (true, Some(now), None);
+    });
+    mark_dirty();
+    let res = source::fetch(Target::OutlookLocal, now, true).await;
+    let n = res.as_ref().map(|p| p.occs.iter().filter(|o| o.end > now).count()).map_err(Clone::clone);
+    store(k, now, res);
+    n
+}
+
+/// Kalendáře se zapnutou připomínkou: (index, klíč stavu, předstih ms). Karta / záložka vypnutá = nic.
+pub(crate) fn reminder_feeds(cfg: &Config) -> Vec<(usize, String, i64)> {
+    if !(cfg.modes.personal_enabled && cfg.drawer.sections.calendar) {
+        return Vec::new();
+    }
+    let list = &cfg.personal.calendars;
+    list.iter().enumerate().filter(|(_, f)| f.enabled && f.remind_min > 0).filter_map(|(i, f)| Some((i, source::key(f).ok()?, f.remind_min as i64 * 60_000))).collect()
+}
+
+/// Výskyty kalendářů z `reminder_feeds` (jen paměť).
+pub(crate) fn with_reminders<R>(feeds: &[(usize, String, i64)], f: impl FnOnce(&[(usize, &Occ, i64)]) -> R) -> R {
+    with(|l| {
+        let occs: Vec<(usize, &Occ, i64)> = feeds.iter().filter_map(|(i, k, lead)| Some((*i, l.feeds.get(k)?, *lead))).flat_map(|(i, st, lead)| st.occs.iter().map(move |o| (i, o, lead))).collect();
+        f(&occs)
+    })
+}
+
+/// Po startu jednou cache z disku i pro skrytou kartu (připomínky) — pro všechny zapnuté kalendáře,
+/// ať ji pozdější otevření karty nemine; bez sítě.
+pub(crate) fn ensure_cache(cfg: &Config) {
+    let load = with(|l| {
+        if l.cache != CacheLoad::No {
+            return false;
+        }
+        l.cache = CacheLoad::Started;
+        for k in cfg.personal.calendars.iter().filter(|f| f.enabled).filter_map(|f| source::key(f).ok()) {
+            l.feeds.entry(k).or_default();
+        }
+        true
+    });
+    if load {
+        load_cache_async();
     }
 }
 
@@ -388,7 +420,7 @@ pub(crate) fn on_config(old: &Config, new: &Config) {
     if o == n && old.layout == new.layout && old.drawer.sections.calendar == new.drawer.sections.calendar {
         return;
     }
-    let keep: Vec<String> = n.iter().filter_map(|f| conf::normalize_url(&f.url).ok()).map(|u| conf::key(&u)).collect();
+    let keep: Vec<String> = n.iter().filter_map(|f| source::key(f).ok()).collect();
     let removed = with(|l| {
         let before = l.feeds.len();
         l.feeds.retain(|k, _| keep.contains(k));
@@ -442,14 +474,21 @@ pub struct CalInfo {
     /// název z configu, jinak z feedu, jinak doména
     pub name: String,
     pub color: Option<String>,
-    /// jen doména adresy (celá adresa je tajemství)
+    /// jen doména adresy (celá adresa je tajemství); jiné zdroje než ICS prázdné
     pub domain: String,
+    /// zdroj: ics · outlook-local · graph · google (`source::SourceKind`)
+    pub source: &'static str,
+    /// nápověda bez chyby: `outlook-closed` (karta nabídne „Načíst z Outlooku“)
+    pub hint: Option<&'static str>,
     pub enabled: bool,
     /// off (vypnutý) · invalid (špatná adresa) · ok · stale · loading · unavailable · idle
     pub status: &'static str,
     pub error: Option<String>,
     pub fetched_ms: Option<i64>,
     pub events: usize,
+    /// w8: Q — zdroj z přihlášeného účtu (`microsoft` / `google`, `accounts::calsync`); `None` = odkaz ICS
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<&'static str>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -469,28 +508,38 @@ pub(crate) fn view(cfg: &Config, now: i64) -> CalendarView {
     if !(cfg.modes.personal_enabled && cfg.drawer.sections.calendar) {
         return CalendarView { status: "off", days: vec![], more: 0, calendars: vec![], loading: false };
     }
+    // w8: Q — kalendáře přihlášených účtů (jen paměť) jako další zdroje za odkazy ICS
+    let accounts = crate::accounts::calsync::infos(cfg, now);
     with(|l| {
         let mut cals = Vec::new();
         let mut occs: Vec<(usize, &Occ)> = Vec::new();
         let mut loading = false;
         for (i, f) in cfg.personal.calendars.iter().enumerate() {
-            let url = conf::normalize_url(&f.url);
-            let st = url.as_ref().ok().and_then(|u| l.feeds.get(&conf::key(u)));
+            let key = source::unavailable(f).map_or_else(|| source::key(f), Err);
+            let st = key.as_ref().ok().and_then(|k| l.feeds.get(k));
             let feed_name = st.map(|s| s.name.as_str()).unwrap_or("");
-            let name = [f.name.trim(), feed_name].into_iter().find(|n| !n.is_empty()).map_or_else(|| conf::domain(&f.url), str::to_string);
-            let (status, error, fetched_ms, events) = match (&url, st) {
+            let name = [f.name.trim(), feed_name].into_iter().find(|n| !n.is_empty()).map_or_else(|| source::fallback_name(f), str::to_string);
+            let hint = st.and_then(|s| s.hint);
+            let (status, error, fetched_ms, events) = match (&key, st) {
                 _ if !f.enabled => ("off", None, None, 0),
                 (Err(e), _) => ("invalid", Some(e.clone()), None, 0),
                 (Ok(_), None) => ("idle", None, None, 0),
                 (Ok(_), Some(s)) => {
                     let live = loading_live(s.loading, s.attempt_ms, now);
                     loading |= live;
-                    let error = s.error.clone().or_else(|| (s.loading && !live).then(|| stuck().to_string()));
+                    let error = s.error.clone().or_else(|| (s.loading && !live).then(|| stuck().to_string())).or_else(|| s.hint.map(|_| super::outlook::closed().to_string()));
                     occs.extend(s.occs.iter().map(|o| (i, o)));
                     (feed_status(s.fetched_ms.is_some(), error.is_some(), live, is_old(s.fetched_ms, now)), error, s.fetched_ms, s.events)
                 }
             };
-            cals.push(CalInfo { name, color: f.color.clone(), domain: conf::domain(&f.url), enabled: f.enabled, status, error, fetched_ms, events });
+            let source = f.source.id();
+            cals.push(CalInfo { name, color: f.color.clone(), domain: source::domain(f), source, hint, enabled: f.enabled, status, error, fetched_ms, events, account: None });
+        }
+        for (info, list) in &accounts {
+            let i = cals.len();
+            loading |= info.status == "loading";
+            occs.extend(list.iter().map(|o| (i, o)));
+            cals.push(info.clone());
         }
         let picked = view::pick(&occs, now, &SystemLocal, CARD_ROWS);
         l.next_change = picked.next_change;
@@ -559,22 +608,4 @@ mod tests {
         assert!(http_error(404).contains("nový"));
     }
 
-    #[test]
-    fn cache_roundtrip_and_age() {
-        let now = 1_800_000_000_000;
-        let occ = Occ { start: now, end: now + 1, all_day: false, title: "A".into(), location: String::new(), tz_guess: false };
-        let feeds = vec![
-            CacheFeed { key: "k1".into(), fetched_ms: now - 1000, events: 3, name: "Rodina".into(), occs: vec![occ.clone()] },
-            CacheFeed { key: "old".into(), fetched_ms: now - CACHE_MAX_AGE_MS, events: 1, name: String::new(), occs: vec![] },
-            CacheFeed { key: "budoucí".into(), fetched_ms: now + 60_000, events: 1, name: String::new(), occs: vec![] },
-        ];
-        let text = encode_cache(feeds);
-        assert!(!text.contains("https://"), "cache nesmí nést adresu");
-        let back = decode_cache(&text, now);
-        assert_eq!(back.len(), 1);
-        assert_eq!((back[0].key.as_str(), back[0].events, back[0].name.as_str(), &back[0].occs[0]), ("k1", 3, "Rodina", &occ));
-        for bad in ["", "{", r#"{"v":2,"feeds":[]}"#, "[]"] {
-            assert!(decode_cache(bad, now).is_empty(), "{bad}");
-        }
-    }
 }

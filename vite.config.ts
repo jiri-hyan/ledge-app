@@ -9,7 +9,8 @@ export default defineConfig(() => ({
   plugins: [solid()],
   // relativní cesty — absolutní dávají v produkčním buildu Tauri bílou obrazovku
   base: "./",
-  build: { target: "chrome120" },
+  // dvě stránky: šuplík (index.html) a okno lístku na plochu (pin.html → src/pin/main.tsx, jen jeho kód)
+  build: { target: "chrome120", rolldownOptions: { input: { index: "index.html", pin: "pin.html" } } },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
