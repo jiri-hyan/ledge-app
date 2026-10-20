@@ -1,18 +1,33 @@
-// Tažení karet v režimu úprav bez DOM (test `drag.test.mjs`): co udělá puštění / zrušení, náhled pořadí
-// během tahu (tažená karta je hned na místě dopadu, ostatní se posunou), posun mřížky u okraje a klávesy
-// na úchytu ⠿. `Deck.tsx` jen měří a volá tyhle funkce — HTML5 drag&drop v okně Tauri nefunguje, tah je
+// Tažení karet v režimu úprav bez DOM (test `drag.test.mjs`): co udělá puštění / zrušení (na místo, na
+// ouško záložky, do mřížky jiné záložky, na zónu Skrýt), náhled pořadí během tahu (tažená karta je hned na
+// místě dopadu, ostatní se posunou), posun mřížky u okraje a klávesy na úchytu ⠿. Měření a gesto dělá
+// `cardDrag.ts`, ostatní čistá logika tahu je v `dnd.ts` — HTML5 drag&drop v okně Tauri nefunguje, tah je
 // na pointer událostech.
 import { moveItem } from "./model.ts";
 
 export type DragState = { from: number; to: number };
 /** Jak tah skončil: `up` = puštěno, `cancel` = systém vzal ukazatel (pointercancel), `escape` = Esc. */
 export type DragEnd = "up" | "cancel" | "escape";
-export type DropAction = { kind: "none" } | { kind: "move"; from: number; to: number } | { kind: "page"; tab: string };
+export type DropAction =
+  | { kind: "none" }
+  | { kind: "move"; from: number; to: number }
+  /** pustit přímo na ouško záložky: karta na konec té záložky */
+  | { kind: "page"; tab: string }
+  /** pustit v mřížce jiné záložky (tah se tam přepnul po prodlevě nad ouškem): na určené místo */
+  | { kind: "insert"; page: string; index: number }
+  /** karta už na té záložce je — nic se nezmění, uživatel dostane vysvětlení */
+  | { kind: "blocked"; page: string }
+  /** pustit na zónu „Skrýt kartu“: do katalogu (vratné) */
+  | { kind: "hide" };
+/** Kde tah skončil mimo mřížku domovské záložky: zóna „Skrýt kartu“, nebo mřížka jiné záložky. */
+export type DropWhere = { zone?: boolean; foreign?: { page: string; blocked: boolean } };
 
 /** Co udělat po konci tahu. Jen puštění něco mění; zrušení nikdy (karta zůstane, kde byla). */
-export function dropAction(d: DragState | null, tab: string | null, how: DragEnd): DropAction {
+export function dropAction(d: DragState | null, tab: string | null, how: DragEnd, where: DropWhere = {}): DropAction {
   if (!d || how !== "up") return { kind: "none" };
+  if (where.zone) return { kind: "hide" };
   if (tab) return { kind: "page", tab };
+  if (where.foreign) return where.foreign.blocked ? { kind: "blocked", page: where.foreign.page } : { kind: "insert", page: where.foreign.page, index: d.to };
   return d.to !== d.from ? { kind: "move", from: d.from, to: d.to } : { kind: "none" };
 }
 

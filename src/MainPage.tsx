@@ -33,6 +33,7 @@ import BgLaunch from "./sessions/BgLaunch";
 import CardMenu, { HiddenNotice } from "./cards/CardMenu";
 import TileOptions from "./cards/TileOptions";
 import Tour from "./layout/Tour";
+import HoldTip from "./layout/HoldTip";
 import CardLookPanel, { closeCardLook, lookFor } from "./layout/CardLook";
 import { viewOf } from "./layout/look";
 import TileMenu from "./tilelook/TileMenu";
@@ -146,7 +147,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       <BgLaunch s={p.s} />
       {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
       <Show when={has("media") || has("clock")}><PersonalLive /></Show>
-      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} />
+      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} begin={() => edit()} />
       <CardLookPanel page={page().id} />
       <TileMenu />
       <Show when={editing() && catalogOpen()}><Catalog layout={layout()} /></Show>
@@ -170,6 +171,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       </Show>
       <HiddenNotice cfgError={p.s.cfgError} />
       <Show when={!editing()}><Tour cfgError={p.s.cfgError} /></Show>
+      <HoldTip cfgError={p.s.cfgError} />
     </>
   );
 }

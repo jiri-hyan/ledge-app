@@ -17,7 +17,8 @@
 //!
 //! Časy jsou vždy ISO 8601 s lokálním offsetem (žádné naivní časy). Parser frontmatteru je ruční a
 //! tolerantní: neznámé klíče a pořadí řádků se při přepisu (`done`) zachovají, tělo zůstane bajtově
-//! stejné. Mazání záměrně neexistuje — jen `done`.
+//! stejné. Mazání jde přes odklad do Koše Windows (`lifecycle`, `recycle`) s krátkým Zpět; archiv je
+//! podsložka `_archiv` vedle poznámky (`lifecycle`).
 //!
 //! Čisté jádro (parsování, slug, cesty, výběr připomínek, předvyplnění projektu) je oddělené od I/O
 //! (`create`, `scan`, `set_done`), aby šlo testovat bez disku a nikdy ne v reálném `%USERPROFILE%`.
@@ -29,7 +30,9 @@
 mod draft;
 pub mod edit;
 mod frontmatter;
+pub mod lifecycle;
 pub mod md;
+mod recycle;
 mod reminders;
 mod store;
 #[cfg(test)]
@@ -37,6 +40,7 @@ mod testkit;
 
 pub use draft::*;
 pub use frontmatter::*;
+pub use recycle::recycle;
 pub use reminders::*;
 pub use store::*;
 

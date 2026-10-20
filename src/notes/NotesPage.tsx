@@ -5,7 +5,7 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import ProjectPicker from "./ProjectPicker";
 import { NoteRow, Tabs, tabsOf } from "./NotesCard";
-import { pageProject, setPageProject, setTab, tab } from "./store";
+import { pageArchive, pageProject, setPageArchive, setPageProject, setTab, tab } from "./store";
 import { t } from "../i18n";
 
 const PAGE_LIMIT = 300;
@@ -22,25 +22,37 @@ export default function NotesPage(p: { s: Snapshot; now: number; onOpen: (n: Not
   };
   const project = () => (pageProject() === "*" ? null : pageProject() === "" ? "_obecne" : pageProject());
   const [res] = createResource(
-    () => ({ kind: cur() === "all" ? null : cur(), project: project(), includeDone: withDone(), rev: p.s.notesRev }),
-    (q) => api.noteQuery({ kind: q.kind, project: q.project, includeDone: q.includeDone, limit: PAGE_LIMIT }),
+    () => ({ kind: pageArchive() || cur() === "all" ? null : cur(), project: project(), includeDone: withDone() || pageArchive(), archived: pageArchive(), rev: p.s.notesRev }),
+    (q) => api.noteQuery({ kind: q.kind, project: q.project, includeDone: q.includeDone, archived: q.archived, limit: PAGE_LIMIT }),
   );
   const list = () => res.latest?.notes ?? [];
   return (
     <div class="card notes-page" data-anim>
-      <div class="note-bar">
-        <Tabs tabs={allTabs()} value={cur()} onChange={setTab} />
-      </div>
+      <Show when={!pageArchive()} fallback={
+        <div class="note-bar">
+          <b class="note-archive-title">{t("notes.page.archiveTitle", "Archiv")}</b>
+          <span class="hint">{t("notes.page.archiveHint", "Archivované poznámky nejsou na kartě ani v přehledu. Vrátíš je ✓ na řádku nebo přes ⋯.")}</span>
+        </div>
+      }>
+        <div class="note-bar">
+          <Tabs tabs={allTabs()} value={cur()} onChange={setTab} />
+        </div>
+      </Show>
       <div class="note-bar">
         <ProjectPicker projects={p.s.projects} value={pageProject()} onChange={setPageProject} all label={t("notes.project", "Projekt")} />
-        <button class="opt-inline" onClick={() => setWithDone(!withDone())} role="switch" aria-checked={withDone()}>
-          <span class="switch" classList={{ on: withDone() }} /> {t("notes.page.withDone", "i hotové")}
+        <Show when={!pageArchive()}>
+          <button class="opt-inline" onClick={() => setWithDone(!withDone())} role="switch" aria-checked={withDone()}>
+            <span class="switch" classList={{ on: withDone() }} /> {t("notes.page.withDone", "i hotové")}
+          </button>
+        </Show>
+        <button class="opt-inline" onClick={() => setPageArchive(!pageArchive())} role="switch" aria-checked={pageArchive()} title={t("notes.page.archiveToggle", "Ukázat archivované poznámky")}>
+          <span class="switch" classList={{ on: pageArchive() }} /> {t("notes.page.archive", "Archiv")}
         </button>
-        <button class="mini push" onClick={() => p.onNew(cur() === "all" ? undefined : cur())}>{t("notes.card.new", "+ Nová")}</button>
+        <button class="mini push" onClick={() => p.onNew(pageArchive() || cur() === "all" ? undefined : cur())}>{t("notes.card.new", "+ Nová")}</button>
       </div>
       <div class="notes-list">
-        <For each={list()} fallback={<div class="empty">{res.loading ? t("notes.page.loading", "Načítám…") : t("notes.page.empty", "Nic tu není.")}</div>}>
-          {(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}
+        <For each={list()} fallback={<div class="empty">{res.loading ? t("notes.page.loading", "Načítám…") : pageArchive() ? t("notes.page.archiveEmpty", "Archiv je prázdný — poznámku do něj pošleš přes ⋯ → Archivovat.") : t("notes.page.empty", "Nic tu není.")}</div>}>
+          {(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} archived={pageArchive()} />}
         </For>
       </div>
       <Show when={(res.latest?.total ?? 0) > list().length}>

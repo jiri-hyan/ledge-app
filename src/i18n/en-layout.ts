@@ -116,9 +116,9 @@ registerDict("en", {
   "cards.tour.next": "Next",
   "cards.tour.done": "Done",
   // vlna 9: rozložení, které vždy poslechne
-  "cards.layout.grip2": "Drag to another place or onto a tab (Esc cancels). Keys: arrows move, + / − width, PageUp / PageDown height",
+  "cards.layout.grip3": "Grab the card (anywhere on it) and drag it to another place, onto a tab or down to “Hide card” (Esc cancels). Keys: arrows move, + / − width, PageUp / PageDown height",
   "cards.layout.grip.aria2": "Move {name}: arrows, width + and −, height PageUp and PageDown",
-  "cards.layout.bar.hint3": "⠿ moves it elsewhere or onto a tab (Esc cancels the drag), × removes it. Keyboard: arrows move, + / − width, PageUp / PageDown height.",
+  "cards.layout.bar.hint3": "Grab a card anywhere and drag it elsewhere, onto a tab or down to “Hide card” (Esc cancels the drag), × removes it. Keyboard: arrows move, + / − width, PageUp / PageDown height.",
   "cards.layout.undo": "Undo",
   "cards.layout.undoTitle": "Undo the last change (Ctrl+Z)",
   "cards.layout.reset": "Restore default",
@@ -147,4 +147,14 @@ registerDict("en", {
   "cards.menu.limitAllDone": "“{name}”: all rows",
   "cards.cap.more": "Show more ({n})",
   "cards.cap.less": "Less",
+  // kolo 10: přirozený drag & drop karet (podržení hlavičky, duch, zóna Skrýt, přepnutí záložky tahem)
+  "cards.layout.dragMoved": "Card “{name}” moved",
+  "cards.layout.zone": "Hide card",
+  "cards.layout.zone.hint": "to the catalogue · can be undone",
+  "cards.layout.alreadyHere": "already here — stays on its original tab",
+  "cards.layout.pencil": "Edit layout",
+  "cards.layout.pencil.title": "Edit layout — then drag cards anywhere. Quicker: hold a card by its header and drag.",
+  "cards.tip.hold.title": "Move cards by dragging",
+  "cards.tip.hold.body": "Hold a card by its header and drag it — elsewhere, to another tab or down to “Hide card”. Esc cancels the drag.",
+  "cards.tip.hold.ok": "Got it",
 });

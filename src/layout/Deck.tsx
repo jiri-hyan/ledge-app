@@ -3,11 +3,15 @@
 // obsah pak scrolluje uvnitř karty). Rozpětí počítá `size.ts` `packSpans` (řada bez prázdného místa —
 // volné sloupce dostane největší karta řady), sloupce se čtou z `--deck-cols` při změně vzhledu
 // (MutationObserver na `<html>`, žádné časovače).
-// Režim úprav (vlna 9 — „rozložení, které vždy poslechne“): klidný přerušovaný obrys (bez kývání), úchyt ⠿
-// = pointer tažení (HTML5 drag&drop v okně Tauri nefunguje) s ŽIVÝM náhledem: tažená karta je hned na místě
-// dopadu jako přerušovaný zástupce, ostatní se krátce posunou (FLIP přes Web Animations, `motionNow`),
-// u horního / spodního okraje se mřížka posouvá sama, Esc / ztráta ukazatele = zrušit (karta zůstane),
-// puštění daleko mimo karty = nic, na ouško záložky = přesun tam (kde už karta je, se neztratí — nápověda).
+// Režim úprav (vlna 9 — „rozložení, které vždy poslechne“; kolo 10 — přirozený drag & drop): klidný
+// přerušovaný obrys (bez kývání). Kartu chytíš kdekoli na prázdném místě (nebo za ⠿), mimo úpravy ji zvedne
+// podržení hlavičky (~400 ms, rovnou zapne úpravy). Gesto řídí `cardDrag.ts` (pointer události — HTML5
+// drag&drop v okně Tauri nefunguje), logika je v `dnd.ts` / `drag.ts`. Živý náhled: poloprůhledný „duch“ pod
+// kurzorem, na místě dopadu mezera velikosti karty (`.lifted`, CSS `order`), ostatní se plynule odsunou (FLIP
+// přes Web Animations, `motionNow` + reduced-motion), u okraje se mřížka posouvá sama, dole zóna „Skrýt
+// kartu“, ouško záložky = přesun na její konec, prodleva nad ouškem záložku přepne a tah pokračuje v její
+// mřížce (karta se vloží na určené místo). Esc / ztráta ukazatele = zrušit (karta zůstane), puštění daleko mimo
+// karty = nic (kde už karta je, se neztratí — nápověda). Po dopadu lišta „… · Vrátit“.
 // Tah za pravý okraj = šířka, za spodní = výška, za roh = obojí: karta se mění ŽIVĚ, přichytí se na sloupce
 // a řádky a ukazuje „2 × 3“; dvojklik na spodní okraj = výška podle obsahu. ⇔ / ↕ = totéž klikem (jen
 // velikosti, které vypadají jinak). Klávesy na úchytu: šipky přesun, + / − šířka, PageUp / PageDown výška.
@@ -17,47 +21,74 @@
 import { batch, createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { t, tp } from "../i18n";
 import { motionNow } from "../motion";
-import { change, dropTab, editPage, offerUndo, setCatalogOpen, setDropTab } from "./edit";
+import { change, dropTab, editPage, offerUndo, setCatalogOpen } from "./edit";
 import {
-  gridDropIndex, moveCard, nextHeight, moveToPage, pageMoveBlock, pageOf, removeCard, restoreCard, setHeight, setSize,
-  type CardHeight, type CardId, type CardSize, type Layout, type LayoutPage, type Rect,
+  moveCard, moveToPageAt, nextHeight, pageMoveBlock, pageOf, removeCard, restoreCard, setHeight, setSize,
+  type CardHeight, type CardId, type CardSize, type Layout, type LayoutPage,
 } from "./model";
 import { deckCols, nextSizeFor, packSpans, resizeTo, sizeOutcome, stepHeight, stepSize, type DeckMetrics, type Dim, type Edge } from "./size";
-import { autoScrollStep, dropAction, keyAction, previewOrder, type DragEnd } from "./drag";
+import { keyAction, previewOrder, type DropAction } from "./drag";
+import { flipDeltas, flipPlan, insertAt } from "./dnd";
+import { createCardDrag, type Drag } from "./cardDrag";
 import { cardName, pageName, sizeName, sizeNoteText } from "./text";
 import { cardLookAttrs } from "./look";
 import { lookFor } from "./CardLook";
 import "./layout.css";
 
-type Drag = { id: CardId; from: number; to: number; x: number; y: number };
 type Resize = { id: CardId; edge: Edge; dim: Dim };
 
-/** Kolik px musí ukazatel ujet, než se z kliknutí na úchyt stane tah (klik = fokus pro klávesy). */
-const DRAG_START = 4;
+const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export const sizeLabel = (s: CardSize) => sizeName(s);
 export const heightLabel = (h: CardHeight | undefined) =>
   h === undefined ? t("cards.layout.height.autoLong", "podle obsahu") : tp("cards.layout.height.rows", h, ["{n} řádek", "{n} řádky", "{n} řádků"]);
 
-export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boolean; shown: (id: CardId) => boolean; render: (id: CardId) => JSX.Element }) {
+export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boolean; shown: (id: CardId) => boolean; render: (id: CardId) => JSX.Element; begin?: () => void }) {
   let box!: HTMLDivElement;
-  const [drag, setDrag] = createSignal<Drag | null>(null);
+  let zoneEl: HTMLDivElement | undefined;
   const [rs, setRs] = createSignal<Resize | null>(null);
   const [cols, setCols] = createSignal(4);
   // For podle id (řetězce), ne objektů: změna velikosti, klon rozložení ani nový snapshot kartu nepřestaví
   const ids = () => (p.editing ? p.page.cards : p.page.cards.filter((c) => p.shown(c.id))).map((c) => c.id);
   const cardOf = (id: CardId) => p.page.cards.find((c) => c.id === id);
-  const sizeOf = (id: CardId) => cardOf(id)?.size ?? "m";
-  const hOf = (id: CardId) => cardOf(id)?.h;
+  const blocked = (d: Drag, page: string) => pageMoveBlock(p.layout, d.home, d.id, page) === "there";
+  const cd = createCardDrag({
+    box: () => box,
+    zone: () => zoneEl,
+    editing: () => p.editing,
+    page: () => p.page,
+    ids,
+    cardOf,
+    begin: () => p.begin?.(),
+    blocked,
+    flip: (update) => flip(update),
+    commit: (a, d) => commit(a, d),
+  });
+  const drag = cd.drag;
+  const dragging = createMemo(() => !!drag());
+  onCleanup(() => cd.abort());
+  // tažená karta, která na zobrazené záložce ještě není (tah pokračuje v mřížce jiné záložky), si nese velikost sama
+  const dragged = (id: CardId) => (!cardOf(id) && drag()?.id === id ? drag() : null);
+  const sizeOf = (id: CardId) => cardOf(id)?.size ?? dragged(id)?.size ?? "m";
+  const hOf = (id: CardId) => cardOf(id)?.h ?? dragged(id)?.h;
   // během tahu za okraj se karta mění živě (náhled), uloží se až po puštění
   const sizeNow = (id: CardId) => (rs()?.id === id ? rs()!.dim.size : sizeOf(id));
   const hNow = (id: CardId) => (rs()?.id === id ? rs()!.dim.h : hOf(id));
   const cl = (id: CardId) => cardLookAttrs(lookFor(p.page.id, id, cardOf(id)?.look));
-  // náhled pořadí během tahu: DOM se nepřeskládá (CSS `order`), takže ukazatel ani fokus o úchyt nepřijdou
+  // náhled pořadí během tahu: DOM se nepřeskládá (CSS `order`), takže ukazatel ani fokus o úchyt nepřijdou;
+  // nad ouškem záložky / zónou Skrýt se karty vrátí na původní místa (tažená je „v ruce“)
+  const parked = () => !!dropTab() || cd.zoneOn();
   const view = createMemo(() => {
     const d = drag();
     const base = ids();
-    return d && !dropTab() ? previewOrder(base, d.from, d.to) : base;
+    if (!d || parked()) return base;
+    if (d.home === p.page.id) return previewOrder(base, d.from, d.to);
+    return blocked(d, p.page.id) ? base : insertAt(base, d.to, d.id);
+  });
+  /** tažená karta patřící jiné záložce, než kterou teď vidíš: v mřížce jí patří zástupná mezera */
+  const slotOn = createMemo(() => {
+    const d = drag();
+    return !!d && !parked() && d.home !== p.page.id && !blocked(d, p.page.id);
   });
   const spans = createMemo(() => {
     const v = view();
@@ -74,21 +105,25 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
     onCleanup(() => mo.disconnect());
   });
 
-  const items = () => Array.from(box.querySelectorAll<HTMLElement>(":scope > .deck-item"));
-  /** změna pořadí / velikosti s krátkým posunem ostatních karet (bez kývání; „bez animací“ = hned) */
+  const items = () => Array.from(box.querySelectorAll<HTMLElement>(":scope > .deck-item:not(.lay-fly)"));
+  /** změna pořadí / velikosti s krátkým posunem ostatních karet (FLIP transformem; bez kývání; „bez animací“
+   *  a systémové omezení pohybu = hned). Rozběhlý posun se zruší a nový začne z místa, kde karta právě je. */
   function flip(update: () => void) {
     const m = motionNow();
-    if (m.style === "none") return update();
+    const plan = flipPlan(m.style, m.speed, reducedMotion());
+    if (!plan) return update();
     const els = items();
-    const first = els.map((el) => el.getBoundingClientRect());
+    const at = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top };
+    };
+    const first = els.map(at);
+    for (const el of els) el.getAnimations?.().forEach((a) => a.id === "lay-flip" && a.cancel());
     update();
-    const ms = Math.round(160 / m.speed);
-    els.forEach((el, k) => {
-      const b = el.getBoundingClientRect();
-      const dx = first[k].left - b.left;
-      const dy = first[k].top - b.top;
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-      el.animate?.([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: ms, easing: "cubic-bezier(.2,.7,.2,1)" });
+    flipDeltas(first, els.map(at)).forEach((d, k) => {
+      if (!d || !els[k].isConnected) return;
+      const a = els[k].animate?.([{ transform: `translate(${d.dx}px, ${d.dy}px)` }, { transform: "none" }], { duration: plan.ms, easing: plan.easing });
+      if (a) a.id = "lay-flip";
     });
   }
 
@@ -98,87 +133,6 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
     const text = sizeNoteText(o, want, cols());
     if (text) offerUndo(text);
     return o.size;
-  }
-
-  function start(e: PointerEvent, i: number) {
-    if (e.button !== 0) return;
-    const id = ids()[i];
-    if (!id) return;
-    // rozměry karet v původním pořadí (cíl tahu = místo karty; náhled ho nemění → žádné přeskakování)
-    const rects: Rect[] = items().map((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.left, y: r.top, w: r.width, h: r.height };
-    });
-    const pageId = p.page.id;
-    const x0 = e.clientX;
-    const y0 = e.clientY;
-    const scroll0 = box.scrollTop;
-    let last = { x: x0, y: y0 };
-    let raf = 0;
-    const tabAt = (x: number, y: number) => {
-      const tab = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>("[data-tab]")?.dataset.tab ?? null;
-      return tab && tab !== pageId ? tab : null;
-    };
-    const retarget = () => {
-      const d = drag();
-      if (!d) return;
-      const tab = tabAt(last.x, last.y);
-      const to = tab ? d.from : gridDropIndex(rects, i, last.x, last.y + (box.scrollTop - scroll0));
-      if (tab !== dropTab()) setDropTab(tab);
-      if (to !== d.to) flip(() => setDrag({ ...d, to, x: last.x, y: last.y }));
-      else setDrag({ ...d, x: last.x, y: last.y });
-    };
-    // posun mřížky u horního / spodního okraje — smyčka běží jen během tahu
-    const tick = () => {
-      const r = box.getBoundingClientRect();
-      const step = autoScrollStep(last.y, r.top, r.bottom);
-      if (step) {
-        box.scrollTop += step;
-        retarget();
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    const move = (ev: PointerEvent) => {
-      last = { x: ev.clientX, y: ev.clientY };
-      if (!drag()) {
-        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < DRAG_START) return;
-        setDrag({ id, from: i, to: i, x: ev.clientX, y: ev.clientY });
-        raf = requestAnimationFrame(tick);
-      }
-      retarget();
-    };
-    const finish = (how: DragEnd) => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", cancel);
-      window.removeEventListener("keydown", key, true);
-      cancelAnimationFrame(raf);
-      const d = drag();
-      const a = dropAction(d, dropTab(), how);
-      const apply = () =>
-        batch(() => {
-          if (a.kind === "move") change((l) => moveCard(l, pageId, a.from, a.to));
-          setDrag(null);
-          setDropTab(null);
-        });
-      // zrušeno po posunu náhledu: karty se plynule vrátí na svá místa; puštění = náhled už je výsledek
-      if (a.kind === "none" && d && d.to !== d.from) flip(apply);
-      else apply();
-      if (a.kind === "page") toPage(id, a.tab);
-    };
-    const up = () => finish("up");
-    const cancel = () => finish("cancel");
-    // Esc zruší jen tah, ne celé úpravy (dřív Esc během tahu zavřel režim úprav)
-    const key = (ev: KeyboardEvent) => {
-      if (ev.key !== "Escape") return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      finish("escape");
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", cancel);
-    window.addEventListener("keydown", key, true);
   }
 
   /** rozměry mřížky v okamžiku chycení okraje (řádek `--deck-row` změří sonda — proměnná je calc) */
@@ -241,21 +195,42 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
     window.addEventListener("keydown", key, true);
   }
 
-  /** přesun na jinou záložku (tažením na její název) — s Vrátit; kde už karta je, nic se nezmění */
-  function toPage(id: CardId, tab: string) {
-    const from = p.page.id;
+  /** přesun na konec jiné záložky (puštění na její ouško) — s Vrátit; kde už karta je, nic se nezmění */
+  function toPage(id: CardId, from: string, tab: string, index = Number.MAX_SAFE_INTEGER) {
     const prev = p.layout;
     const target = pageName(pageOf(prev, tab));
     if (pageMoveBlock(prev, from, id, tab) === "there") {
       offerUndo(t("cards.layout.already", "„{name}“ už na záložce {tab} je — na jedné záložce smí být jen jednou, takže zůstává tady.", { name: cardName(id), tab: target }));
       return;
     }
-    change((l) => moveToPage(l, from, id, tab));
+    change((l) => moveToPageAt(l, from, id, tab, index));
     offerUndo(t("cards.layout.moved", "„{name}“ přesunuta na záložku {tab}", { name: cardName(id), tab: target }), () => change(() => prev));
   }
 
-  function remove(id: CardId) {
-    const r = removeCard(p.layout, p.page.id, id);
+  /** konec tahu: co se stane (`drag.ts` `dropAction`) a krátká lišta „… · Vrátit“ */
+  function commit(a: DropAction, d: Drag) {
+    switch (a.kind) {
+      case "move":
+        change((l) => moveCard(l, d.home, a.from, a.to));
+        offerUndo(t("cards.layout.dragMoved", "Karta „{name}“ přesunuta", { name: cardName(d.id) }), () => change((l) => moveCard(l, d.home, a.to, a.from)));
+        break;
+      case "page":
+        toPage(d.id, d.home, a.tab);
+        break;
+      case "insert":
+        toPage(d.id, d.home, a.page, a.index);
+        break;
+      case "blocked":
+        offerUndo(t("cards.layout.already", "„{name}“ už na záložce {tab} je — na jedné záložce smí být jen jednou, takže zůstává tady.", { name: cardName(d.id), tab: pageName(pageOf(p.layout, a.page)) }));
+        break;
+      case "hide":
+        remove(d.id, d.home);
+        break;
+    }
+  }
+
+  function remove(id: CardId, pageId = p.page.id) {
+    const r = removeCard(p.layout, pageId, id);
     if (!r.undo) return;
     const u = r.undo;
     flip(() => change(() => r.layout));
@@ -290,18 +265,30 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   };
 
   const dimText = (id: CardId, d: Dim) => t("cards.layout.dim", "{w} × {h}", { w: spans().get(id) ?? 1, h: d.h ?? t("cards.layout.height.autoShort", "auto") });
-  const dragName = () => {
+  /** štítek u kurzoru: kam se karta pustí, když to není obyčejné místo v mřížce */
+  const flyLabel = () => {
     const d = drag();
-    return d ? cardName(d.id) : "";
-  };
-  const dragBlocked = () => {
-    const d = drag();
+    if (!d) return null;
+    if (cd.zoneOn()) return { text: t("cards.layout.zone", "Skrýt kartu"), blocked: false };
     const tab = dropTab();
-    return !!d && !!tab && pageMoveBlock(p.layout, p.page.id, d.id, tab) === "there";
+    const there = (page: string) => blocked(d, page);
+    if (tab) return { text: `→ ${pageName(pageOf(p.layout, tab))}${there(tab) ? ` (${t("cards.layout.alreadyShort", "už tam je")})` : ""}`, blocked: there(tab) };
+    if (d.home !== p.page.id && there(p.page.id)) return { text: t("cards.layout.alreadyHere", "už tu je — zůstane na původní záložce"), blocked: true };
+    return null;
+  };
+  const slotStyle = () => {
+    const d = drag();
+    if (!d) return {};
+    return {
+      "--span": String(spans().get(d.id) ?? 1),
+      "--h": d.h === undefined ? undefined : String(d.h),
+      "min-height": d.h === undefined ? `${d.px}px` : undefined,
+      order: String(view().indexOf(d.id)),
+    };
   };
 
   return (
-    <div class="deck" classList={{ editing: p.editing, dragging: !!drag(), resizing: !!rs() }} ref={box} data-page={p.page.id}>
+    <div class="deck" classList={{ editing: p.editing, dragging: dragging(), resizing: !!rs() }} ref={box} data-page={p.page.id}>
       <For each={ids()}>
         {(id, i) => (
           <div
@@ -319,7 +306,8 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
               "--accent": cl(id).style["--accent"],
               order: String(view().indexOf(id)),
             }}
-            classList={{ lifted: drag()?.id === id && !dropTab() }}
+            classList={{ lifted: drag()?.id === id && drag()?.home === p.page.id }}
+            onPointerDown={(e) => cd.down(e, id)}
           >
             <Show when={p.shown(id)} fallback={
               <div class="card lay-ghost">
@@ -333,9 +321,8 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
               <div class="lay-tools">
                 <button
                   class="lay-grip"
-                  title={t("cards.layout.grip2", "Přetáhni na jiné místo nebo na záložku (Esc zruší). Klávesy: šipky přesun, + / − šířka, PageUp / PageDown výška")}
+                  title={t("cards.layout.grip3", "Chyť kartu (i kdekoli na ní) a přetáhni ji na jiné místo, na záložku nebo dolů na „Skrýt kartu“ (Esc zruší). Klávesy: šipky přesun, + / − šířka, PageUp / PageDown výška")}
                   aria-label={t("cards.layout.grip.aria2", "Přesunout {name}: šipky, šířka + a −, výška PageUp a PageDown", { name: cardName(id) })}
-                  onPointerDown={(e) => start(e, i())}
                   onKeyDown={(e) => key(e, i())}
                 >⠿</button>
                 <button
@@ -373,16 +360,22 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
           </div>
         )}
       </For>
+      {/* tah pokračuje na jiné záložce: mezera velikosti karty na místě, kam by dopadla */}
+      <Show when={slotOn()}>
+        <div class="deck-item lifted lay-slot" data-size={drag()?.size} data-card={drag()?.id} data-h={drag()?.h} style={slotStyle()} aria-hidden="true" />
+      </Show>
       <Show when={p.editing && editPage() === p.page.id}>
         <button class="lay-add" style={{ order: "9999" }} onClick={() => setCatalogOpen(true)}>{t("cards.layout.add", "+ Přidat kartu")}</button>
       </Show>
-      <Show when={drag()}>
-        {(d) => (
-          <div class="lay-float" classList={{ blocked: dragBlocked() }} style={{ left: `${d().x}px`, top: `${d().y}px` }} aria-hidden="true">
-            {dragName()}
-            <Show when={dropTab()}>
-              {(tab) => <span> → {pageName(pageOf(p.layout, tab()))}{dragBlocked() ? ` (${t("cards.layout.alreadyShort", "už tam je")})` : ""}</span>}
-            </Show>
+      <Show when={dragging()}>
+        <div class="lay-zone" classList={{ on: cd.zoneOn() }} ref={zoneEl} aria-hidden="true">
+          <b>×</b> {t("cards.layout.zone", "Skrýt kartu")} <small>{t("cards.layout.zone.hint", "do katalogu · jde vrátit")}</small>
+        </div>
+      </Show>
+      <Show when={flyLabel()}>
+        {(l) => (
+          <div class="lay-float" classList={{ blocked: l().blocked }} style={{ left: `${cd.ptr().x}px`, top: `${cd.ptr().y}px` }} aria-hidden="true">
+            {l().text}
           </div>
         )}
       </Show>

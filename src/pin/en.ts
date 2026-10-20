@@ -56,6 +56,11 @@ registerDict("en", {
   "notes.pin.throughOff": "Click-through off — you can use the stickies with the mouse again.",
   "notes.pin.throughAllOff": "Stickies: turn off click-through{key}",
   "notes.pin.throughAllOn": "Stickies: turn on click-through{key}",
+  // automatické uložení
+  "notes.pin.savePending": "Typing…",
+  "notes.pin.saving": "Saving…",
+  "notes.pin.saved": "Saved ✓",
+  "notes.pin.unpinBlocked": "Unpinning waits — the text you were typing couldn't be saved (see the warning in the sticky).",
   // paleta
   "palette.pin.new": "New desktop sticky",
   "palette.pin.newSub": "A note over other windows — QA checklist, Ctrl+V pastes a screenshot",

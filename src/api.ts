@@ -7,7 +7,7 @@ import type { StatusLineStatus, TimerOp, TimerState } from "./types";
 import type { EditPreview, GitView } from "./types";
 import type { CalendarTest, OutlookProbe } from "./types";
 import type { MediaAction } from "./types";
-import type { Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
+import type { Deleted, Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
 import type { PinInit, PinPrefs } from "./types";
 import type { FolderCandidates, PortHolder } from "./types";
 
@@ -66,6 +66,10 @@ export const api = {
   noteQuery: (q: NoteQuery) => call<QueryResult>("note_query", { q }),
   noteRead: (path: string) => call<NoteDetail>("note_read", { path }),
   noteSave: (note: SaveNote, copy = false) => call<SaveOutcome>("note_save", { note, copy }),
+  noteArchive: (path: string, keepPin = false) => call<string>("note_archive", { path, keepPin }),
+  noteUnarchive: (path: string) => call<string>("note_unarchive", { path }),
+  noteDelete: (path: string, keepPin = false) => call<Deleted>("note_delete", { path, keepPin }),
+  noteDeleteUndo: (id: string) => call<string>("note_delete_undo", { id }),
   noteToggleTask: (path: string, line: number, checked: boolean, expectedHash: string) => call<SaveOutcome>("note_toggle_task", { path, line, checked, expectedHash }),
   noteRender: (body: string) => call<string>("note_render", { body }),
   noteEditDraftSave: (draft: EditDraft | null) => call("note_edit_draft_save", { draft }),

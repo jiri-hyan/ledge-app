@@ -274,6 +274,8 @@ pub struct NoteQuery {
     pub project: Option<String>,
     /// i hotové (na konci, nejnovější první)
     pub include_done: bool,
+    /// archivované poznámky (`_archiv`) místo aktivních
+    pub archived: bool,
     pub limit: Option<usize>,
 }
 
@@ -345,6 +347,14 @@ pub fn edit_draft_save(root: &Path, d: Option<&EditDraft>) -> Result<(), String>
             let _ = std::fs::remove_dir(&dir); // jen když je prázdná
             Ok(())
         }
+    }
+}
+
+/// Rozepsanou úpravu zahodit, patří-li poznámce `path` (poznámka zmizela: archiv, smazání).
+pub fn edit_draft_forget(root: &Path, path: &Path) -> Result<(), String> {
+    match edit_draft_load(root) {
+        Some(d) if crate::pins::same_note(&d.path, &path.to_string_lossy()) => edit_draft_save(root, None),
+        _ => Ok(()),
     }
 }
 
@@ -512,6 +522,33 @@ mod tests {
         std::fs::write(&p, "---\n---\n![](./../ven.png)\n![](C:/x.png)").unwrap();
         std::fs::write(outer.path().join("ven.png"), b"x").unwrap();
         assert!(read(&root, &p).unwrap().image_data.is_empty());
+    }
+
+    /// Cesta lístku: „Nový lístek“ (`create`) → text a obrázek přes `save` → editor v šuplíku (`read`)
+    /// i řádek karty (`scan`) vidí totéž. Ztráta byla v rozepsané úpravě editoru, ne v zápisu lístku.
+    #[test]
+    fn sticky_text_and_image_reach_the_note_the_editor_reads() {
+        let root = tmp_root();
+        let now = at("2026-10-18T20:50:49+02:00");
+        let path = create(root.path(), &NewNote { text: "Lístek 18. 10. 20:50".into(), ..Default::default() }, &now).unwrap();
+        let first = read(root.path(), &path).unwrap();
+        let mut png = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+        png.extend([3u8; 32]);
+        let mut r = req(&path, &first.hash, "Dashboard - sekce úkoly\n\n- [ ] bod");
+        r.images = vec![b64_encode(&png)];
+        let SaveOutcome::Saved { note } = save(root.path(), &r, &now).unwrap() else { panic!("changed") };
+        // druhé čtení (editor) = to, co lístek právě uložil
+        let again = read(root.path(), &path).unwrap();
+        assert_eq!((again.body.as_str(), again.hash.as_str()), (note.body.as_str(), note.hash.as_str()));
+        assert!(again.body.starts_with("Dashboard - sekce úkoly") && again.body.contains("- [ ] bod"), "{}", again.body);
+        assert_eq!(again.image_data.len(), 1);
+        // řádek karty
+        let row = scan(root.path()).into_iter().next().unwrap();
+        assert_eq!((row.title.as_str(), row.images, row.tasks_total), ("Dashboard - sekce úkoly", 1, 1));
+        // zastaralá otevřená úprava (starý otisk) nepřepíše nic — vrátí Changed
+        let mut stale = req(&path, &first.hash, "starý text");
+        stale.images = vec![];
+        assert_eq!(save(root.path(), &stale, &now).unwrap(), SaveOutcome::Changed);
     }
 
     #[test]

@@ -145,3 +145,16 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-list[data-view="tiles"] > * { align-items: flex-start; padding: var(--s2); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--well); }
 .note-list[data-view="compact"] > * { padding-block: 3px; }
 .note-list[data-view="compact"] .note-open > :not(:first-child) { display: none; }
+
+/* akce nad poznámkou: ✓ Splnit a ⋯ (Splnit · Archivovat · Smazat) — jako špendlík, vidět při najetí na řádek / fokusu */
+.note-act { width: 24px; height: 24px; flex-shrink: 0; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--t3); font-size: var(--fs-ui); line-height: 1; opacity: 0; transition: opacity var(--fast), color var(--fast), background var(--fast); }
+.note-row:hover .note-act, .note-act:focus-visible, .note-act.on { opacity: 1; }
+.note-act:hover, .note-act.on { color: var(--t1); background: var(--card-2); }
+.note-act svg { width: 15px; height: 15px; }
+.note-act-list button { display: flex; align-items: center; gap: 8px; }
+.note-act-list button svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--t3); }
+.note-act-list button.danger { color: var(--red); }
+.note-act-list button.danger svg { color: inherit; }
+.note-archive-title { font-size: var(--fs-ui); }
+/* tlačítka akcí v liště editoru (Splnit · Archivovat · Smazat) */
+.note-life-del:hover { color: var(--red); }

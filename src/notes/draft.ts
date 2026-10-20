@@ -7,6 +7,7 @@ import { api, type NoteDetail } from "../api";
 import { say } from "../ui/toast";
 import { fromMs } from "./remind";
 import { DEFAULT_KIND } from "./kinds";
+import { planOther, planSame } from "./editdraft";
 import { t } from "../i18n";
 
 // ---------- nová poznámka ----------
@@ -105,7 +106,8 @@ let editTimer: number | undefined;
 function persistEdit() {
   const b = edBase();
   if (!b) return;
-  const d = edDirty() ? { path: b.path, hash: edHash(), text: edText(), project: edProj(), kind: edKind(), remind: edRemind() } : null;
+  // prázdný text nejde uložit — takovou úpravu na disku nedržet (dřív přebila skutečný obsah poznámky)
+  const d = edDirty() && edText().trim() ? { path: b.path, hash: edHash(), text: edText(), project: edProj(), kind: edKind(), remind: edRemind() } : null;
   api.noteEditDraftSave(d).catch(() => {});
 }
 export function scheduleEdit() {
@@ -125,41 +127,65 @@ function flushEdit() {
 export function resetEdit() {
   clearTimeout(editTimer);
   editTimer = undefined;
+  setEdStale(false);
   setEdBase(null);
   setOrig(null);
   setEdImgs([]);
   api.noteEditDraftSave(null).catch(() => {});
 }
 
+/** Úprava na disku je zastaralá: soubor se od ní změnil (lístek, sync) — editor ukáže konflikt hned. */
+export const [edStale, setEdStale] = createSignal(false);
+const dropDiskEdit = () => api.noteEditDraftSave(null).catch(() => {});
+const fieldsOf = (n: NoteDetail) => ({ path: n.path, hash: n.hash, text: n.body, project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs) });
+
 /** Otevře úpravu `path`. Vrací cestu, která se má upravovat doopravdy: rozepsaná úprava JINÉ
- *  poznámky má přednost (jinak by se tiše ztratila). */
+ *  poznámky s nějakým textem má přednost (jinak by se tiše ztratila). Prázdná nebo zastaralá úprava
+ *  obsah poznámky nepřebije (`editdraft.ts`) — dřív ji přebíjela a editor byl prázdný, ač lístek
+ *  na ploše ukazoval text i obrázek. */
 export async function openEdit(path: string): Promise<string | null> {
   const cur = edBase();
   if (cur && edDirty()) {
     if (cur.path !== path) say(t("notes.draft.otherEdit", "Máš rozepsanou úpravu jiné poznámky — dokonči ji, nebo ji Esc zahodí."));
     return cur.path;
   }
-  const disk = await api.noteEditDraftLoad().catch(() => null);
-  if (disk && disk.path !== path) {
-    say(t("notes.draft.otherEdit", "Máš rozepsanou úpravu jiné poznámky — dokonči ji, nebo ji Esc zahodí."));
-    path = disk.path;
+  setEdStale(false);
+  let disk = (await api.noteEditDraftLoad().catch(() => null)) ?? null;
+  let n: NoteDetail | null = null;
+  const other = planOther(disk, path);
+  if (other.do === "redirect") {
+    n = (await api.noteRead(other.path).catch(() => null)) ?? null;
+    if (n) {
+      say(t("notes.draft.otherEdit", "Máš rozepsanou úpravu jiné poznámky — dokonči ji, nebo ji Esc zahodí."));
+      path = other.path;
+    } else {
+      // rozepsaná poznámka mezitím zmizela (smazaná, archivovaná) → úprava už nemá komu patřit
+      void dropDiskEdit();
+      disk = null;
+    }
+  } else if (other.do === "drop") {
+    void dropDiskEdit();
+    disk = null;
   }
   try {
-    const n = await api.noteRead(path);
+    n ??= (await api.noteRead(path)) ?? null;
     if (!n) return null;
     loadEditFrom(n);
   } catch (e) {
     say(String(e), true);
-    if (disk) api.noteEditDraftSave(null).catch(() => {});
+    if (disk && disk.path === path) void dropDiskEdit();
     return null;
   }
-  if (disk && disk.path === path) {
+  const plan = planSame(disk, fieldsOf(n));
+  if (plan.do === "drop") void dropDiskEdit();
+  else if (plan.do === "restore" && disk) {
     setEdHash(disk.hash);
     setEdText(disk.text);
     setEdProj(disk.project);
     setEdKind(disk.kind || DEFAULT_KIND);
     setEdRemind(disk.remind);
-    say(t("notes.draft.restored", "Obnovena rozepsaná úprava."));
+    setEdStale(plan.stale);
+    say(plan.stale ? t("notes.draft.restoredStale", "Poznámka se od rozepsané úpravy změnila (třeba lístkem na ploše) — tvoje úprava zůstala tady, „Načíst znovu“ ukáže novou verzi.") : t("notes.draft.restored", "Obnovena rozepsaná úprava."));
   }
   return path;
 }

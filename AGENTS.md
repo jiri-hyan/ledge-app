@@ -32,7 +32,8 @@ pak při prvním otevření ukáže **průvodce** (jazyk `ui.lang`, repa na disk
 hooky Claude Code, odkazy, motiv) — každý krok se hned ukládá, nic nemaže, duplicity přeskočí. Po průvodci
 (a u stávajícího uživatele jednou po aktualizaci) krátká **prohlídka** 3 bublin (✎ úpravy, ⋯ menu karty,
 Ctrl+K) — přeskočitelná, bez modalu a bez braní fokusu; dokončení i přeskočení zapíše `"ui": { "tips":
-["tour1"] }` a už se neukáže (smazáním `tour1` z `ui.tips` se ukáže znovu).
+["tour1"] }` a už se neukáže (smazáním `tour1` z `ui.tips` se ukáže znovu). Po prohlídce jednou ještě
+tip „Podrž kartu a přetáhni ji“ (značka `hold1` v `ui.tips`, stejně: smazáním se ukáže znovu).
 Ručně: Nastavení → Začínáme → Spustit průvodce. **Existující config se nemění:** chybějící `onboarding` = `done: true`
 (průvodce se neukáže); chybějící `notes.sync.remote` se při načtení vezme z `origin` pracovní kopie
 poznámek (kde sync běžel, běží dál), jinak zůstane sync vypnutý; `update.repo` = dřívější
@@ -141,7 +142,11 @@ Typické úpravy:
   skryté Právě hraje / hlasitost / Čas (baterie) zruší odběry událostí Windows, skrytý GitHub / Systém
   nevolá `gh` ani nevzorkuje. `hiddenParts` = skryté části
   karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude), `nowPlaying`, `sound`
-  (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (přetáhnout, **tah za pravý okraj karty
+  (karta Právě hraje), `battery` (karta Čas). Úpravy: v šuplíku ✎ (nebo tužka v liště záložek, nebo **podržení
+  ~0,4 s na hlavičce karty** — zapne úpravy a rovnou zvedne kartu; v úpravách jde kartu chytit kdekoli, ne jen za ⠿:
+  poloprůhledný duch pod kurzorem, mezera na místě dopadu, ostatní se plynule odsunou; dole zóna „Skrýt kartu“,
+  tah na ouško záložky = přesun, po ~0,6 s nad ouškem se záložka přepne a tah pokračuje v její mřížce; Esc tah
+  zruší, po dopadu lišta „… · Vrátit“) (**tah za pravý okraj karty
   = šířka, za spodní = výška, za roh = obojí** — karta se mění živě s „2 × 3“, ⇔ / ↕ klikem, × do katalogu,
   „+ Přidat kartu“, vlastní záložky, Zpět / Ctrl+Z po každé změně, Obnovit výchozí s potvrzením, klávesy na ⠿:
   šipky přesun, + / − šířka, PageUp / PageDown výška; Hotovo uloží jen `layout`), ⋯ na kartě (Velikost S/M/L/XL, Výška Auto/Nízká/
@@ -608,7 +613,17 @@ Zavolat Řehořovi kvůli fakturám
 - Poznámky **smíš číst** (třeba „co si uživatel poznamenal k tomuhle projektu“) a **vytvářet** ve stejném
   formátu a pojmenování (`YYYY-MM-DD-HHMMSS-slug.md`, slug ASCII malými písmeny). Ledge složku sleduje:
   nová poznámka se hned ukáže v kartě a `remind` v proužku / peeku.
-- Hotovou poznámku označ `done: true`. **Nemaž** poznámky ani obrázky — mazání je jen na uživateli.
+- Hotovou poznámku označ `done: true`. **Nemaž** poznámky ani obrázky a **nepřesouvej** je do `_archiv` —
+  smazání a archivace jsou na uživateli (v Ledge: ⋯ na řádku, v editoru a v lístku).
+- **Splnit · Archivovat · Smazat** (Ledge): Splnit = `done: true` (poznámka zmizí pod „i hotové“). Archivovat =
+  přesun `.md` i jejích obrázků do podsložky `_archiv` vedle poznámky (`atlas\_archiv\x.md`; poznámka přímo v
+  kořeni jde do `_obecne\_archiv`) — z karty i přehledu zmizí, najdeš ji ve stránce Poznámky → „Archiv“, odkud
+  jde vrátit. Starší Ledge na druhém PC `_archiv` nevidí (skenuje jednu úroveň složek), poznámka mu prostě
+  zmizí; sync to přenese jako přejmenování. Smazat = **Koš Windows** (jde obnovit z Koše) s lištou „Zpět“
+  ~8 s: soubory nejdřív do odkladu `.smazane\<id>\` v kořeni (v `.gitignore`, mimo sync), po ~10 s se vrátí
+  na původní místo a jdou do Koše (jen místní disky; selže-li Koš, poznámka zůstane), zbytky po pádu
+  dokončí start. Obrázek se maže/archivuje s poznámkou jen když ho nepoužívá jiná poznámka ve složce.
+  `.smazane\` ani `_archiv\` ručně neupravuj.
 
 ### Lístky na plochu (overlay okna)
 
@@ -616,7 +631,9 @@ Kteroukoli poznámku jde **připnout na plochu** jako malé okno bez rámu přes
 řádku v kartě Poznámky / v editoru, ⋯ karty → „Nový lístek na plochu“, Ctrl+K → „Nový lístek na plochu“ /
 „Připnout na plochu: …“). Lístek je **ta samá poznámka** — čte a ukládá se stejně (otisk, konflikt →
 načíst znovu / kopie), úkoly se odklikávají, „+ bod“ přidá `- [ ] …`, Ctrl+V vloží snímek obrazovky
-(PNG vedle poznámky jako v editoru) nebo text na konec. Agent na lístky nesahá — stačí upravit `.md`,
+(PNG vedle poznámky jako v editoru) nebo text na konec. **Co se napíše, se samo uloží do `.md`** (pauza
+v psaní ~0,6 s, ztráta fokusu, odepnutí; štítek „Uloženo ✓“); nový lístek se rovnou píše. ⋯ lístku má
+Splnit · Archivovat · Smazat — lístek zůstane pár sekund s lištou „Zpět“ a pak se zavře. Agent na lístky nesahá — stačí upravit `.md`,
 otevřený lístek se sám obnoví.
 
 - Okna `note-<klíč>` (`pins/win.rs`): bez fokusu při otevření, mimo hlavní panel, volby per lístek:
@@ -642,7 +659,7 @@ ručně „Synchronizovat teď“ v Nastavení. Cyklus: `add -A` → commit `led
 - První sync: kořen bez repa + prázdný remote → `git init`; kořen bez repa + remote s commity (druhé
   PC) → clone vedle, lokální poznámky se sloučí (stejná cesta s jiným obsahem → lokální jako
   `<jméno>-<COMPUTERNAME>.md` i s obrázky), stará složka zůstane jako `notes.pred-sync-<čas>`.
-- `.draft\`, `.state.json`, `*.tmp`, `PRESUNUTO-DO-LEDGE.txt` jsou v `.gitignore` — patří jen tomuto PC.
+- `.draft\`, `.state.json`, `*.tmp`, `PRESUNUTO-DO-LEDGE.txt`, `.smazane\` jsou v `.gitignore` — patří jen tomuto PC.
 - Konflikt (stejná poznámka změněná na dvou PC) → rebase se přeruší, lokální verze zůstane
   v lokálním commitu, štítek v kartě ukáže „konflikt: …“. Vyřešit ručně, pak se sync rozjede sám.
 - **Claude poznámky smí vytvářet a upravovat (`done`, `kind`), Ledge je sám commitne a pushne.** Claude

@@ -14,6 +14,7 @@ pub(crate) mod limits;
 pub(crate) mod mcp;
 pub(crate) mod media;
 pub(crate) mod notes;
+pub(crate) mod noteslife;
 pub(crate) mod onboarding;
 pub(crate) mod pins;
 pub(crate) mod pkgctx;

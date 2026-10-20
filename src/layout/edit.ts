@@ -38,7 +38,11 @@ let before: Layout | null = null;
 let resumeTimer: number | undefined;
 let undoTimer: number | undefined;
 
-export { draft, editPage, setEditPage, catalogOpen, setCatalogOpen, saving, undoBar, dropTab, setDropTab, resumed, askDiscard, setAskDiscard };
+/** Kolikrát uživatel zahájil tah podržením karty (tip „Podrž kartu“ se pak už nepotřebuje ukazovat). */
+const [holdDrags, setHoldDrags] = createSignal(0);
+export const noteHoldDrag = () => setHoldDrags((n) => n + 1);
+
+export { draft, editPage, setEditPage, catalogOpen, setCatalogOpen, saving, undoBar, dropTab, setDropTab, resumed, askDiscard, setAskDiscard, holdDrags };
 export const editing = () => draft() !== null;
 
 type Src = { layout: unknown; mode: string; cfgError: string | null };

@@ -14,6 +14,8 @@ export const [notePreset, setNotePreset] = createSignal<NotePreset | null>(null)
 export const [editPath, setEditPath] = createSignal<string | null>(null);
 /** Filtr projektu stránky Poznámky: "*" = všechny, "" = bez projektu, jinak id. */
 export const [pageProject, setPageProject] = createSignal("*");
+/** Stránka Poznámky ukazuje Archiv (poznámky z `_archiv`) místo aktivních. */
+export const [pageArchive, setPageArchive] = createSignal(false);
 /** Kam se editor vrátí po uložení / Esc. */
 export const [returnTo, setReturnTo] = createSignal<"main" | "notes">("main");
 

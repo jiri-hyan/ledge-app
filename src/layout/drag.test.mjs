@@ -18,6 +18,24 @@ test("případ 5: pustit = přesun, zrušení (pointercancel, Esc) = nic", () =>
   for (const [name, d, tab, how, want] of cases) assert.deepEqual(dropAction(d, tab, how), want, name);
 });
 
+test("kolo 10: zóna Skrýt, mřížka jiné záložky, Esc všude nic", () => {
+  const d = { from: 1, to: 3 };
+  const there = { foreign: { page: "hry", blocked: false } };
+  const dup = { foreign: { page: "hry", blocked: true } };
+  const cases = [
+    ["pustit na zónu Skrýt", d, null, "up", { zone: true }, { kind: "hide" }],
+    ["zóna má přednost před záložkou", d, "hry", "up", { zone: true }, { kind: "hide" }],
+    ["tah přepnutý na jinou záložku: vložit na určené místo", d, null, "up", there, { kind: "insert", page: "hry", index: 3 }],
+    ["tam, kde karta už je: nic se nestěhuje, jen vysvětlení", d, null, "up", dup, { kind: "blocked", page: "hry" }],
+    ["přímo na ouško má přednost před mřížkou", d, "osobni", "up", there, { kind: "page", tab: "osobni" }],
+    ["Esc na zóně", d, null, "escape", { zone: true }, { kind: "none" }],
+    ["ztráta ukazatele na jiné záložce", d, null, "cancel", there, { kind: "none" }],
+    ["Esc na jiné záložce", d, "hry", "escape", there, { kind: "none" }],
+    ["bez tahu na zóně", null, null, "up", { zone: true }, { kind: "none" }],
+  ];
+  for (const [name, st, tab, how, where, want] of cases) assert.deepEqual(dropAction(st, tab, how, where), want, name);
+});
+
 test("náhled pořadí: tažená karta je hned na místě dopadu, ostatní se posunou", () => {
   assert.deepEqual(previewOrder(["a", "b", "c", "d"], 0, 2), ["b", "c", "a", "d"]);
   assert.deepEqual(previewOrder(["a", "b", "c", "d"], 3, 0), ["d", "a", "b", "c"]);

@@ -27,6 +27,7 @@ import { isHoverView, smallWidth } from "./hover/model";
 import { asPage, typing, type Page } from "./nav";
 import { EMPTY_SNAPSHOT } from "./snapshot";
 import { Toast } from "./ui/toast";
+import UndoBar from "./notes/UndoBar";
 import Palette from "./palette/Palette";
 import { gotoSettingsPanel } from "./palette/goto";
 import Wizard from "./onboarding/Wizard";
@@ -284,6 +285,7 @@ export default function App() {
           <SmallView view={view()} s={s} now={now()} expandMs={expandMs()} />
         </Show>
       </div>
+      <UndoBar />
       <Toast />
     </div>
   );

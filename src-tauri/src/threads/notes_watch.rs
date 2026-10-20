@@ -25,6 +25,8 @@ pub(crate) struct NotesState {
     pub(crate) peeked: HashSet<String>,
     /// nehotové podle kategorie (záložky karty) — počítá se jen při přenačtení
     pub(crate) kind_counts: std::collections::BTreeMap<String, usize>,
+    /// archivované poznámky (`<složka>\_archiv`) — jen pro Archiv na stránce Poznámky, nikdy v kartě ani připomínkách
+    pub(crate) archived: Vec<notes::NoteView>,
     /// číslo přenačtení (UI podle něj obnoví záložku)
     pub(crate) rev: u64,
 }
@@ -59,7 +61,9 @@ pub(crate) fn request_notes_reload() {
 
 /// Znovu načte poznámky z disku a přepočítá připomínky. Nic po termínu → peek připomínky zmizí.
 pub(crate) fn reload_notes() {
-    let all = notes_root().map(|r| notes::scan(&r)).unwrap_or_default();
+    let root = notes_root();
+    let all = root.as_deref().map(notes::scan).unwrap_or_default();
+    let archived = root.as_deref().map(notes::lifecycle::scan_archive).unwrap_or_default();
     let (due, next) = notes::due_split(&all, now_ms());
     let c = core();
     let none_due = due.is_empty();
@@ -68,6 +72,7 @@ pub(crate) fn reload_notes() {
         st.kind_counts = notes::edit::open_kind_counts(&all);
         st.rev += 1;
         st.all = all;
+        st.archived = archived;
         st.due = due;
         st.next_due = next;
     }
@@ -124,7 +129,7 @@ pub(crate) fn notes_event_relevant(paths: &[PathBuf]) -> bool {
     paths.is_empty()
         || paths.iter().any(|p| {
             let s = p.to_string_lossy().to_lowercase().replace('/', "\\");
-            !(s.contains("\\.draft") || in_git_dir(&s) || s.ends_with(".state.json") || s.ends_with(".tmp") || s.ends_with(".png"))
+            !(s.contains("\\.draft") || s.contains("\\.smazane") || in_git_dir(&s) || s.ends_with(".state.json") || s.ends_with(".tmp") || s.ends_with(".png"))
         })
 }
 
@@ -137,7 +142,7 @@ pub(crate) fn notes_event_syncable(paths: &[PathBuf]) -> bool {
     paths.is_empty()
         || paths.iter().any(|p| {
             let s = p.to_string_lossy().to_lowercase().replace('/', "\\");
-            !(s.contains("\\.draft") || in_git_dir(&s) || s.ends_with(".state.json") || s.ends_with(".tmp"))
+            !(s.contains("\\.draft") || s.contains("\\.smazane") || in_git_dir(&s) || s.ends_with(".state.json") || s.ends_with(".tmp"))
         })
 }
 
@@ -150,6 +155,7 @@ pub(crate) fn spawn_notes_watch(rx: mpsc::Receiver<NotesMsg>, tx: mpsc::Sender<N
             let mut _watcher: Option<notify::RecommendedWatcher> = None;
             let mut rewatch = true;
             let mut last_rewatch = Instant::now() - Duration::from_secs(60);
+            let mut swept = false;
             loop {
                 if rewatch {
                     _watcher = None;
@@ -177,6 +183,10 @@ pub(crate) fn spawn_notes_watch(rx: mpsc::Receiver<NotesMsg>, tx: mpsc::Sender<N
                         }
                     }
                     reload_notes();
+                    if !std::mem::replace(&mut swept, true) {
+                        // zbytky smazání z minula (pád uprostřed lhůty „Zpět“) jdou do Koše
+                        std::thread::spawn(crate::commands::noteslife::sweep_trash);
+                    }
                 }
                 let Ok(msg) = rx.recv() else { break };
                 // chyby watcheru můžou chodit v sérii → kvůli nim znovu sledovat nejvýš jednou za 5 s
@@ -205,7 +215,7 @@ mod tests {
         let p = |s: &str| vec![PathBuf::from(s)];
         let root = r"C:\Users\x\Ledge\notes";
         // vnitřek .git (každá operace syncu) ani lokální stav nepřenačítá a nespouští sync
-        for s in [r"\.git\index", r"\.git\refs\heads\main", r"\.git", r"\.draft\draft.json", r"\.state.json", r"\_obecne\a.md.1-0.tmp"] {
+        for s in [r"\.git\index", r"\.git\refs\heads\main", r"\.git", r"\.draft\draft.json", r"\.state.json", r"\_obecne\a.md.1-0.tmp", r"\.smazane\1-1\app\a.md"] {
             let full = p(&format!("{root}{s}"));
             assert!(!notes_event_relevant(&full) && !notes_event_syncable(&full), "{s}");
         }

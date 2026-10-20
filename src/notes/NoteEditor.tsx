@@ -16,6 +16,9 @@ import RemindPicker from "./RemindPicker";
 import { remindDefault } from "./remind";
 import { IconPin } from "../pin/icons";
 import { isPinned, togglePin } from "./pins";
+import { isArchivedPath, lifeActions, type LifeAction } from "./lifeactions";
+import { actionIcon, actionText } from "./lifelabels";
+import { runAction } from "./RowMenu";
 import { editPath, notePreset, openExternal, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
 
 export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => void }) {
@@ -59,6 +62,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
       const real = await D.openEdit(path);
       if (real === null) return p.onLeave();
       if (real !== path) return setEditPath(real);
+      if (D.edStale()) setConflict(true);
     } else {
       await D.restoreDraft();
       const pre = notePreset();
@@ -125,6 +129,23 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     D.resetEdit();
     say(copy ? t("notes.editor.savedCopy", "Uloženo jako nová poznámka vedle původní.") : t("notes.editor.saved", "Uloženo"));
     p.onLeave();
+  }
+
+  /** Splnit · Archivovat · Smazat z editoru; po akci zpět na seznam (lišta „Zpět“ zůstane). */
+  async function lifeAct(a: LifeAction) {
+    const b = D.edBase();
+    if (!b || busy()) return;
+    // úprava se k archivu / splnění nenese — nejdřív uložit (smazání zahodí všechno, tam to nevadí)
+    if (a !== "delete" && D.edDirty()) return say(t("notes.life.saveFirst", "Nejdřív ulož úpravu (Ctrl+Enter)."));
+    setBusy(true);
+    try {
+      if (await runAction(a, b)) {
+        D.resetEdit();
+        p.onLeave();
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function reload() {
@@ -199,6 +220,17 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
             <button class="icon-btn" classList={{ on: isPinned(p.s.pins, b().path) }} aria-pressed={isPinned(p.s.pins, b().path)} title={isPinned(p.s.pins, b().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.editorPin", "Připnout na plochu — lístek přes ostatní okna (uložené znění)")} onClick={() => togglePin(b().path)}>
               <IconPin />
             </button>
+          )}
+        </Show>
+        <Show when={editing() && D.edBase()}>
+          {(b) => (
+            <For each={lifeActions(b().done, isArchivedPath(b().path))}>
+              {(a) => (
+                <button class="icon-btn" classList={{ "note-life-del": a === "delete" }} disabled={busy()} title={actionText(a)} aria-label={actionText(a)} onClick={() => void lifeAct(a)}>
+                  {actionIcon(a)}
+                </button>
+              )}
+            </For>
           )}
         </Show>
       </div>

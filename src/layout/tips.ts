@@ -35,6 +35,19 @@ export function seen(cfg: unknown, id = TOUR_ID): boolean {
 /** Ukázat prohlídku? Ne při chybě configu (uložení „viděno“ by neprošlo), ne s průvodcem a ne podruhé. */
 export const shouldShow = (cfg: unknown, wizard: boolean, cfgError: string | null): boolean => !!cfg && !cfgError && !wizard && !seen(cfg);
 
+/** Id jednorázového tipu „Podrž kartu a přetáhni ji“ v `ui.tips` (kolo 10). */
+export const HOLD_TIP = "hold1";
+/** Ukázat tip o podržení karty? Až když uživatel prohlídku už viděl (bubliny se nepletou), ne s průvodcem,
+ *  ne při chybě configu (uložení „viděno“ by neprošlo) a ne podruhé. */
+export const shouldShowHold = (cfg: unknown, wizard: boolean, cfgError: string | null): boolean =>
+  !!cfg && !cfgError && !wizard && seen(cfg, TOUR_ID) && !seen(cfg, HOLD_TIP);
+/** Texty tipu (klíč + čeština jako u prohlídky). */
+export const HOLD_TEXT: { title: Text; body: Text; ok: Text } = {
+  title: ["cards.tip.hold.title", "Karty přesuneš tahem"],
+  body: ["cards.tip.hold.body", "Podrž kartu za hlavičku a přetáhni ji — jinam, na jinou záložku nebo dolů na „Skrýt kartu“. Esc tah zruší."],
+  ok: ["cards.tip.hold.ok", "Rozumím"],
+};
+
 /** Config se značkou „viděno“ v `ui.tips` (vstup zůstane netknutý; jen jedno pole). */
 export function withTip<T extends Record<string, any>>(cfg: T, id = TOUR_ID): T {
   const ui = { ...(cfg.ui ?? {}) };

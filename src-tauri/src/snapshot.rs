@@ -86,6 +86,8 @@ pub(crate) struct Snapshot {
     notes_kind_counts: std::collections::BTreeMap<String, usize>,
     /// roste s každým přenačtením poznámek — UI podle něj obnoví výběr záložky (`note_query`)
     notes_rev: u64,
+    /// kolik poznámek je v archivu (`_archiv`) — odkaz „Archiv“ v kartě se ukáže jen s nimi
+    notes_archived: usize,
     /// lístky na plochu (`pins/`): připnuté poznámky a zkratka průchozího režimu
     pins: crate::pins::win::PinsView,
     personal: PersonalView,
@@ -198,9 +200,9 @@ pub(crate) fn snapshot() -> Snapshot {
     };
     let mode = c.mode.lock().clone();
     // snapshot má pevný strop — neroste s počtem poznámek (zbytek přes note_list); platí i pro Osobní
-    let (notes_kind_counts, notes_rev) = {
+    let (notes_kind_counts, notes_rev, notes_archived) = {
         let st = c.notes.lock();
-        (st.kind_counts.clone(), st.rev)
+        (st.kind_counts.clone(), st.rev, st.archived.len())
     };
     let ((notes_card, notes_more), reminders, reminders_count, personal_notes) = if cfg.notes.enabled {
         let st = c.notes.lock();
@@ -245,6 +247,7 @@ pub(crate) fn snapshot() -> Snapshot {
         note_kinds: cfg.notes.kinds.clone(),
         notes_kind_counts,
         notes_rev,
+        notes_archived,
         pins: crate::pins::win::view(&cfg.hotkeys.note_passthrough),
         personal,
         notes_sync: c.notes_sync.lock().clone(),

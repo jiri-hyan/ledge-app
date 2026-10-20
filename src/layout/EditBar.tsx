@@ -26,7 +26,7 @@ export default function EditBar() {
       <div class="lay-bar" role="toolbar" aria-label={t("cards.layout.bar.aria", "Úpravy šuplíku")} data-anim>
         <span class="lay-bar-text">
           {rich(t("cards.layout.bar.resize", "<b>Táhni za okraj karty = velikost</b> (pravý okraj šířka, spodní výška, roh obojí)."))}{" "}
-          {t("cards.layout.bar.hint3", "⠿ přesune jinam nebo na záložku (Esc tah zruší), × odebere. Z klávesnice: šipky přesun, + / − šířka, PageUp / PageDown výška.")}
+          {t("cards.layout.bar.hint3", "Kartu chytíš kdekoli a přetáhneš jinam, na záložku nebo dolů na „Skrýt kartu“ (Esc tah zruší), × ji odebere. Z klávesnice: šipky přesun, + / − šířka, PageUp / PageDown výška.")}
         </span>
         <button class="btn" disabled={!canUndo()} title={t("cards.layout.undoTitle", "Vrátit poslední změnu (Ctrl+Z)")} onClick={undoLast}>{t("cards.layout.undo", "Zpět")}</button>
         <Show when={asking()} fallback={

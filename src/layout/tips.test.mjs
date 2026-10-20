@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/layout/tips.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bubblePos, seen, shouldShow, STEPS, TOUR_ID, withTip } from "./tips.ts";
+import { bubblePos, HOLD_TEXT, HOLD_TIP, seen, shouldShow, shouldShowHold, STEPS, TOUR_ID, withTip } from "./tips.ts";
 
 test("kdy se prohlídka ukáže", () => {
   // (popis, config, průvodce otevřený, chyba configu, ukázat)
@@ -51,4 +51,24 @@ test("pozice bubliny: pod cílem, jinak nad; vždy celá v okně", () => {
     assert.ok(got.arrow >= 12 && got.arrow <= 248, `${name}: šipka`);
     assert.ok(got.left >= 8 && got.left + 260 <= vw - 8, `${name}: v okně`);
   }
+});
+
+test("tip „Podrž kartu a přetáhni ji“: až po prohlídce, jednou, nezávisle na prohlídce", () => {
+  // (popis, config, průvodce otevřený, chyba configu, ukázat)
+  const cases = [
+    ["po prohlídce poprvé", { ui: { tips: [TOUR_ID] } }, false, null, true],
+    ["prohlídka ještě neproběhla (bubliny by se pletly)", { ui: { lang: "cs" } }, false, null, false],
+    ["už viděl", { ui: { tips: [TOUR_ID, HOLD_TIP] } }, false, null, false],
+    ["viděl jen tip (prohlídku smazal) — prohlídka má přednost", { ui: { tips: [HOLD_TIP] } }, false, null, false],
+    ["s průvodcem ne", { ui: { tips: [TOUR_ID] } }, true, null, false],
+    ["chyba configu ne (nešlo by uložit)", { ui: { tips: [TOUR_ID] } }, false, "config.json: …", false],
+    ["config nejde přečíst", null, false, null, false],
+  ];
+  for (const [name, cfg, wiz, err, want] of cases) assert.equal(shouldShowHold(cfg, wiz, err), want, name);
+  const out = withTip({ ui: { tips: [TOUR_ID] } }, HOLD_TIP);
+  assert.deepEqual(out.ui.tips, [TOUR_ID, HOLD_TIP]);
+  assert.ok(seen(out, HOLD_TIP) && seen(out, TOUR_ID));
+  assert.deepEqual(withTip(out, HOLD_TIP).ui.tips, [TOUR_ID, HOLD_TIP], "podruhé beze změny");
+  for (const x of Object.values(HOLD_TEXT)) assert.ok(x[0].startsWith("cards.tip.hold.") && x[1], x[0]);
+  assert.match(HOLD_TEXT.body[1], /Podrž kartu/);
 });

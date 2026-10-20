@@ -313,11 +313,18 @@ export function pageMoveBlock(l: Layout, fromPage: string, id: CardId, toPage: s
 
 /** Přesun karty na jinou záložku (tažením na záložku): pryč ze zdrojové, na konec cílové se stejnou
  *  velikostí. Když už tam je, NIC se nezmění (vlna 9: dřív jen zmizela ze zdrojové — „karta zmizela“). */
-export function moveToPage(l: Layout, fromPage: string, id: CardId, toPage: string): Layout {
+export const moveToPage = (l: Layout, fromPage: string, id: CardId, toPage: string): Layout => moveToPageAt(l, fromPage, id, toPage, Number.MAX_SAFE_INTEGER);
+
+/** Totéž, ale na určené místo cílové záložky (tah pokračoval v její mřížce); index mimo rozsah = na okraj. */
+export function moveToPageAt(l: Layout, fromPage: string, id: CardId, toPage: string, index: number): Layout {
   if (pageMoveBlock(l, fromPage, id, toPage)) return l;
   const { layout, undo } = removeCard(l, fromPage, id);
   if (!undo) return l;
-  return mapPage(layout, toPage, (p) => ({ ...p, cards: [...p.cards, undo.card] }));
+  return mapPage(layout, toPage, (p) => {
+    const cards = [...p.cards];
+    cards.splice(Math.max(0, Math.min(index, cards.length)), 0, undo.card);
+    return { ...p, cards };
+  });
 }
 
 /** Skrýt / ukázat část karty (`layout.hiddenParts`). */
@@ -433,9 +440,17 @@ export const withLayout = <T extends Record<string, any>>(cfg: T, l: Layout): T 
 export type Rect = { x: number; y: number; w: number; h: number };
 /** Jak daleko za kartami ještě platí cíl tažení (px); dál = karta zůstane, kde byla. */
 export const DROP_MARGIN = 48;
-/** Cílový index při tažení karty `from` na bod (px, py): karta, jejíž střed je nejblíž (mřížka se
- *  zalamuje, takže rozhoduje vzdálenost, ne jen osa). Bez karet nebo daleko mimo karty
- *  (víc než `DROP_MARGIN` za jejich obrysem) = `from` (vlna 9: dřív i tah mimo šuplík kartu přesunul). */
+/** Vzdálenost bodu od obdélníku (0 uvnitř). */
+export function rectGap(r: Rect, x: number, y: number): number {
+  const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
+  const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+  return Math.hypot(dx, dy);
+}
+
+/** Cílový index při tažení karty `from` na bod (px, py): karta, nad kterou ukazatel je; v mezeře mezi kartami
+ *  (i v prázdném místě řady) ta, ke které má blíž (vzdálenost k obrysu, ne ke středu — široká karta tak nepřebije
+ *  úzkou vedle sebe). Bez karet nebo daleko mimo karty (víc než `DROP_MARGIN` za jejich obrysem) = `from`
+ *  (vlna 9: dřív i tah mimo šuplík kartu přesunul). */
 export function gridDropIndex(rects: readonly Rect[], from: number, px: number, py: number): number {
   if (!rects.length) return from;
   const left = Math.min(...rects.map((r) => r.x)) - DROP_MARGIN;
@@ -446,9 +461,7 @@ export function gridDropIndex(rects: readonly Rect[], from: number, px: number, 
   let best = from;
   let bestD = Infinity;
   rects.forEach((r, i) => {
-    const dx = px - (r.x + r.w / 2);
-    const dy = py - (r.y + r.h / 2);
-    const d = dx * dx + dy * dy;
+    const d = rectGap(r, px, py);
     if (d < bestD) {
       bestD = d;
       best = i;

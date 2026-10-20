@@ -2,11 +2,12 @@
 // na které záložce šuplík je), klávesy 1–9 obsluhuje `App`. V režimu úprav: klik přepne rozpracovanou
 // záložku, dvojklik = přejmenovat (Enter / Esc), × = smazat (karty do katalogu, s Vrátit), tažení =
 // pořadí, „+“ = nová záložka (název + volitelná ikona z malé sady). Záložka je i cíl tažení karty
-// (`data-tab`, zvýraznění z `dropTab`).
+// (`data-tab`, zvýraznění z `dropTab`; prodleva nad ní záložku přepne — `cardDrag.ts`). Mimo úpravy se
+// při najetí na záložky ukáže tužka „Upravit rozložení“.
 import { createSignal, For, onMount, Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { t } from "../i18n";
-import { change, draft, dropTab, editing, editPage, offerUndo, setEditPage } from "./edit";
+import { beginEdit, change, draft, dropTab, editing, editPage, offerUndo, setEditPage } from "./edit";
 import { addPage, MAX_PAGES, movePage, normalizeLayout, PAGE_ICONS, pageNameError, pageOf, removePage, renamePage, restorePage, WORK, PERSONAL, type LayoutPage } from "./model";
 import { pageName } from "./text";
 
@@ -143,6 +144,12 @@ export default function Tabs(p: { s: Snapshot }) {
             </span>
           )}
         </For>
+        {/* objevitelnost: při najetí na záložky se objeví tužka = rovnou úpravy (tažení karet, velikosti, záložky) */}
+        <Show when={!editing()}>
+          <span class="lay-tab lay-tab-pencil">
+            <button class="lay-tab-edit" title={t("cards.layout.pencil.title", "Upravit rozložení — karty pak přetáhneš kamkoli. Rychleji: podrž kartu za hlavičku a táhni.")} aria-label={t("cards.layout.pencil", "Upravit rozložení")} onClick={() => beginEdit(p.s)}>✎</button>
+          </span>
+        </Show>
         <Show when={editing() && l().pages.length < MAX_PAGES}>
           <span class="lay-tab">
             <button class="lay-tab-add" title={t("cards.layout.tab.add", "Nová záložka")} aria-label={t("cards.layout.tab.add", "Nová záložka")} aria-expanded={adding()} onClick={() => setAdding(!adding())}>+</button>

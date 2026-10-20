@@ -274,7 +274,9 @@ export interface PinsView { open: { path: string; through: boolean }[]; key: str
 /** Start okna lístku (`pin_init`): poznámka, volby, zkratka průchozího režimu (a jestli je zaregistrovaná). */
 export interface PinInit { path: string; prefs: PinPrefs; key: string; keyOk: boolean; hintSeen: boolean; lang: "cs" | "en"; fresh: boolean }
 
-export interface NoteQuery { kind?: string | null; project?: string | null; includeDone?: boolean; limit?: number }
+export interface NoteQuery { kind?: string | null; project?: string | null; includeDone?: boolean; /** archivované místo aktivních */ archived?: boolean; limit?: number }
+/** Výsledek smazání poznámky: id pro „Zpět“ a titulek pro lištu. */
+export interface Deleted { id: string; title: string }
 export interface QueryResult { notes: NoteView[]; total: number }
 
 /** Rozepsaná úprava existující poznámky (`<root>\.draft\edit.json`). */
@@ -545,6 +547,8 @@ export interface Snapshot {
   notesKindCounts: Record<string, number>;
   /** roste s každým přenačtením poznámek */
   notesRev: number;
+  /** kolik poznámek je v archivu (`_archiv`) */
+  notesArchived: number;
   /** lístky na plochu: připnuté poznámky (a jestli průchozí) a zkratka průchozího režimu (Rust `pins::win::view`) */
   pins?: PinsView;
   /** záložka Osobní */

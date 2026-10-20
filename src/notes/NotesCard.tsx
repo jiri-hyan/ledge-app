@@ -8,20 +8,25 @@ import { api, type NoteView, type Snapshot } from "../api";
 import { ago } from "../format";
 import { IconBell } from "../icons";
 import { KindBadge, kindOf, kindColor, KindIcon } from "./kinds";
-import { doneBusy, openExternal, projName, remindLabel, setDone, setTab, tab } from "./store";
+import { doneBusy, openExternal, projName, remindLabel, setDone, setPageArchive, setTab, tab } from "./store";
 import { t, tp } from "../i18n";
 import type { CardView } from "../layout/look";
 import { IconPin } from "../pin/icons";
 import { isPinned, newPin, togglePin } from "./pins";
+import { completeNote, unarchiveNote } from "./lifecycle";
+import { IconCheck, IconUnarchive } from "./lifeicons";
+import RowMenu from "./RowMenu";
 
 /** Kolik řádků má karta (stejně jako `notes::CARD_ROWS`). */
 const CARD_ROWS = 8;
 
-export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: NoteView) => void }) {
+export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: NoteView) => void; /** řádek v Archivu: bez zaškrtnutí a lístku, ⋯ nabídne Vrátit z archivu */ archived?: boolean }) {
   const n = () => p.n;
   return (
-    <div class="row note-row" classList={{ done: n().done }}>
-      <button class="check" classList={{ on: n().done }} role="checkbox" aria-checked={n().done} disabled={doneBusy().has(n().path)} title={n().done ? t("notes.row.undo", "Vrátit mezi nehotové") : t("notes.done", "Hotovo")} onClick={() => setDone(n(), !n().done)} />
+    <div class="row note-row" classList={{ done: n().done && !p.archived }}>
+      <Show when={!p.archived}>
+        <button class="check" classList={{ on: n().done }} role="checkbox" aria-checked={n().done} disabled={doneBusy().has(n().path)} title={n().done ? t("notes.row.undo", "Vrátit mezi nehotové") : t("notes.done", "Hotovo")} onClick={() => (n().done ? setDone(n(), false) : void completeNote(n()))} />
+      </Show>
       <KindBadge kinds={p.s.noteKinds} id={n().kind} />
       <button class="grow note-open" title={t("notes.row.edit", "Upravit v Ledge")} onClick={() => p.onOpen(n())}>
         <div class="name">{n().title || t("notes.imageOnly", "(jen obrázek)")}</div>
@@ -31,7 +36,16 @@ export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: 
         <span class="pill" classList={{ g: n().tasksDone === n().tasksTotal, n: n().tasksDone < n().tasksTotal }} title={t("notes.row.tasks", "Splněné úkoly")}>{n().tasksDone}/{n().tasksTotal}</span>
       </Show>
       <Show when={remindLabel(n(), p.now)}>{(l) => <span class={`pill ${l()[0]}`}>{l()[1]}</span>}</Show>
-      <button class="note-pin" classList={{ on: isPinned(p.s.pins, n().path) }} aria-pressed={isPinned(p.s.pins, n().path)} title={isPinned(p.s.pins, n().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.rowPin", "Připnout na plochu — lístek přes ostatní okna")} onClick={() => togglePin(n().path)}><IconPin /></button>
+      <Show when={!p.archived && !n().done}>
+        <button class="note-act" title={t("notes.life.actDone", "Splnit")} aria-label={t("notes.life.actDone", "Splnit")} onClick={() => void completeNote(n())}><IconCheck /></button>
+      </Show>
+      <Show when={p.archived}>
+        <button class="note-act" title={t("notes.life.actUnarchive", "Vrátit z archivu")} aria-label={t("notes.life.actUnarchive", "Vrátit z archivu")} onClick={() => void unarchiveNote(n())}><IconUnarchive /></button>
+      </Show>
+      <Show when={!p.archived}>
+        <button class="note-pin" classList={{ on: isPinned(p.s.pins, n().path) }} aria-pressed={isPinned(p.s.pins, n().path)} title={isPinned(p.s.pins, n().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.rowPin", "Připnout na plochu — lístek přes ostatní okna")} onClick={() => togglePin(n().path)}><IconPin /></button>
+      </Show>
+      <RowMenu n={n()} archived={!!p.archived} />
     </div>
   );
 }
@@ -119,13 +133,17 @@ export function NotesCard(p: {
         <div class="empty">
           {t("notes.card.emptyShort", "Zatím žádné poznámky — i s obrázkem ze schránky.")}
           <button class="mini ok" onClick={() => p.onNew(newKind())}>{t("notes.card.add", "Přidat poznámku")}</button>
+          <button class="mini" onClick={() => newPin()} title={t("notes.pin.newTitle", "Nový lístek na plochu — poznámka přes ostatní okna (QA, checklist)")}>{t("notes.card.addPin", "Nový lístek na plochu")}</button>
         </div>
       </Show>
       <div class="note-list" data-view={p.view ?? "list"}>
         <For each={items()}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
       </div>
       <Show when={moreCount() > 0 || (!p.personal && items().length > 0)}>
-        <button class="mini note-more-btn" onClick={p.onAll}>{moreCount() > 0 ? tp("notes.card.more", moreCount(), "+{n} dalších") : t("notes.card.all", "Všechny poznámky")}</button>
+        <button class="mini note-more-btn" onClick={() => { setPageArchive(false); p.onAll(); }}>{moreCount() > 0 ? tp("notes.card.more", moreCount(), "+{n} dalších") : t("notes.card.all", "Všechny poznámky")}</button>
+      </Show>
+      <Show when={!p.personal && p.s.notesArchived > 0}>
+        <button class="mini note-more-btn" title={t("notes.card.archiveTitle", "Archivované poznámky — jdou vrátit nebo smazat")} onClick={() => { setPageArchive(true); p.onAll(); }}>{t("notes.card.archive", "Archiv ({n})", { n: p.s.notesArchived })}</button>
       </Show>
       <Show when={syncLabel(p.s, p.now)}>
         {(l) => <div style={{ "margin-top": "6px" }}><span class={`pill ${l()[0]}`} title={l()[2]}>{l()[1]}</span></div>}

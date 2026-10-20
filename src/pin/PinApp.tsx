@@ -5,16 +5,30 @@
 // Lišta: tah = posun (`pin_drag`), dvojklik = sbalit; ⋯ = volby (navrchu, zámek, průchozí,
 // průhlednosti); ✕ = odepnout (poznámka zůstane). Průchozí lístek myš nevidí — vypíná ho zkratka
 // (`hotkeys.notePassthrough`) nebo Ctrl+K v Ledge; nápověda se ukáže při prvním zapnutí.
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api, on, type NoteDetail, type PinInit, type PinPrefs } from "../api";
 import Markdown from "../notes/Markdown";
 import { b64Of, pasteImages } from "../notes/draft";
 import { fromMs } from "../notes/remind";
 import { setLang, t } from "../i18n";
 import { errorText, say, sayError, Toast } from "../ui/toast";
+import UndoBar from "../notes/UndoBar";
+import { archiveNote, completeNote, deleteNote, reopenNote } from "../notes/lifecycle";
+import { lifeActions, type LifeAction } from "../notes/lifeactions";
+import { actionText } from "../notes/lifelabels";
 import { IconX } from "../icons";
 import { IconEdit, IconLock, IconMore, IconPin, IconPlus, IconThrough } from "./icons";
-import { appendLine, pinColors, taskLine, TEXT_MIN } from "./model";
+import { appendLine, pinColors, SAVE_DELAY, taskLine, TEXT_MIN, type SaveState } from "./model";
+
+/** Štítek zápisu v patičce — jen to, co se opravdu děje (žádné „uloženo“ dřív, než se uložilo). */
+function saveLabel(st: SaveState): string {
+  switch (st) {
+    case "pending": return t("notes.pin.savePending", "Rozepsáno…");
+    case "saving": return t("notes.pin.saving", "Ukládám…");
+    case "saved": return t("notes.pin.saved", "Uloženo ✓");
+    default: return "";
+  }
+}
 
 export default function PinApp() {
   const [init, setInit] = createSignal<PinInit | null>(null);
@@ -27,6 +41,8 @@ export default function PinApp() {
   const [adding, setAdding] = createSignal(false);
   const [addText, setAddText] = createSignal("");
   const [menu, setMenu] = createSignal(false);
+  /** po Splnit / Archivovat / Smazat: lišta „Zpět“, lístek se po ní sám zavře */
+  const [after, setAfter] = createSignal(false);
   /** nápověda před prvním průchozím režimem (s čerstvým stavem zkratky) */
   const [hint, setHint] = createSignal<PinInit | null>(null);
   /** posuvníky průhledností: náhled během tahu, uloží se až po puštění */
@@ -37,6 +53,9 @@ export default function PinApp() {
   let saving = 0;
   let pendingHash: string | null = null;
   let editTimer: number | undefined;
+  /** stav zápisu pro štítek v patičce: čeká na uložení / ukládá se / uloženo */
+  const [saveState, setSaveState] = createSignal<SaveState>("idle");
+  let savedTimer: number | undefined;
 
   const p = () => prefs();
   const through = () => !!p()?.through;
@@ -71,6 +90,7 @@ export default function PinApp() {
 
   /** Otisk souboru po přenačtení poznámek: jiný → přečíst znovu (rozepsaná úprava → banner). */
   function external(hash: string) {
+    if (after()) return; // poznámka se právě splnila / archivovala / smazala — lišta „Zpět“ rozhoduje
     if (saving) {
       pendingHash = hash;
       return;
@@ -81,12 +101,22 @@ export default function PinApp() {
     void load();
   }
 
+  /** „Uloženo ✓“ na pár sekund — jen po zápisu, který opravdu doběhl. */
+  function markSaved() {
+    if (dirty()) return setSaveState("pending"); // mezitím se psalo dál
+    setSaveState("saved");
+    clearTimeout(savedTimer);
+    savedTimer = window.setTimeout(() => setSaveState("idle"), 2500);
+  }
+
   async function busy<T>(f: () => Promise<T>): Promise<T> {
     saving++;
+    setSaveState("saving");
     try {
       return await f();
     } finally {
       saving--;
+      if (!saving && saveState() === "saving") setSaveState("idle");
       if (!saving && pendingHash !== null) {
         const h = pendingHash;
         pendingHash = null;
@@ -117,7 +147,10 @@ export default function PinApp() {
         const n = note();
         if (!n) return false;
         const r = await write(appendLine(editing() ? text() : n.body, line), images);
-        if (r === "saved") return true;
+        if (r === "saved") {
+          markSaved();
+          return true;
+        }
         if (editing()) {
           setConflict(true);
           return false;
@@ -137,7 +170,11 @@ export default function PinApp() {
     try {
       await busy(async () => {
         const r = await api.noteToggleTask(n.path, line, checked, n.hash);
-        if (r?.outcome === "saved") return setNote(r.note);
+        if (r?.outcome === "saved") {
+          setNote(r.note);
+          markSaved();
+          return;
+        }
         await load();
         say(t("notes.pin.reloaded", "Poznámka se mezitím změnila — načetl jsem novou verzi."), true);
       });
@@ -161,16 +198,22 @@ export default function PinApp() {
     editTimer = undefined;
     if (!dirty()) return true;
     try {
-      if ((await write(text())) === "saved") return true;
+      if ((await write(text())) === "saved") {
+        markSaved();
+        return true;
+      }
       setConflict(true);
     } catch (e) {
       sayError(e);
     }
+    setSaveState("pending");
     return false;
   }
+  /** Automatické uložení: po chvíli ticha při psaní (a vždy při odepnutí, Hotovo, ztrátě fokusu). */
   const schedule = () => {
     clearTimeout(editTimer);
-    editTimer = window.setTimeout(() => void flush(), 900);
+    setSaveState("pending");
+    editTimer = window.setTimeout(() => void flush(), SAVE_DELAY);
   };
   async function finishEdit() {
     if (await flush()) setEditing(false);
@@ -245,7 +288,46 @@ export default function PinApp() {
     await api.pinHintSeen().catch(() => {});
     await patch({ through: true });
   }
-  const unpin = () => api.pinUnpin().catch(sayError);
+  /** Rozepsané (text v úpravě, napsaný bod) se uloží do poznámky dřív, než okno zmizí. */
+  async function settle(): Promise<boolean> {
+    if (!(await flush())) return false;
+    const line = adding() ? taskLine(addText()) : "";
+    if (!line) return true;
+    if (!(await add(line))) return false;
+    setAddText("");
+    return true;
+  }
+  /** Splnit · Archivovat · Smazat z lístku: lístek zůstane na pár sekund s lištou „Zpět“, pak se zavře. */
+  async function life(a: LifeAction) {
+    setMenu(false);
+    const n = note();
+    if (!n || a === "unarchive") return;
+    if (a === "delete") {
+      clearTimeout(editTimer);
+    } else if (!(await settle())) {
+      return say(t("notes.pin.unpinBlocked", "Odepnutí počká — rozepsaný text se nepodařilo uložit (viz upozornění v lístku)."), true);
+    }
+    if (a === "undone") {
+      if (await reopenNote(n)) await load();
+      return;
+    }
+    setAfter(true);
+    const opts = {
+      keepPin: true,
+      onExpire: () => void api.pinUnpin().catch(sayError),
+      onUndone: () => {
+        setAfter(false);
+        void load();
+      },
+    };
+    const ok = a === "done" ? await completeNote(n, opts) : a === "archive" ? await archiveNote(n, opts) : await deleteNote(n, opts);
+    if (!ok) setAfter(false);
+  }
+
+  async function unpin() {
+    if (!(await settle())) return say(t("notes.pin.unpinBlocked", "Odepnutí počká — rozepsaný text se nepodařilo uložit (viz upozornění v lístku)."), true);
+    await api.pinUnpin().catch(sayError);
+  }
 
   onMount(() => {
     const offs = [on<string>("pin-note", external), on<PinPrefs>("pin-prefs", setPrefs)];
@@ -257,12 +339,17 @@ export default function PinApp() {
       else if (adding()) setAdding(false);
       else if (editing()) void finishEdit();
     };
+    // klik jinam = rozepsané hned do poznámky (nečekat na pauzu v psaní)
+    const blur = () => void flush();
     window.addEventListener("keydown", key);
+    window.addEventListener("blur", blur);
     document.addEventListener("paste", paste);
     onCleanup(() => {
       window.removeEventListener("keydown", key);
+      window.removeEventListener("blur", blur);
       document.removeEventListener("paste", paste);
       clearTimeout(editTimer);
+      clearTimeout(savedTimer);
     });
     void api.pinInit().then(
       async (i) => {
@@ -271,7 +358,11 @@ export default function PinApp() {
         setInit(i);
         setPrefs(i.prefs);
         await load();
-        if (i.fresh) openAdd();
+        // nový lístek: rovnou se píše (předvyplněný titulek je vybraný a přepíše se prvním písmenem)
+        if (i.fresh) {
+          startEdit();
+          queueMicrotask(() => ta?.select());
+        }
       },
       (e) => setGone(errorText(e)),
     );
@@ -283,7 +374,7 @@ export default function PinApp() {
   return (
     <div
       class="pin"
-      classList={{ through: through(), collapsed: !!p()?.collapsed, locked: !!p()?.locked }}
+      classList={{ through: through(), collapsed: !!p()?.collapsed, locked: !!p()?.locked, after: after() }}
       style={{ "--pin-bg": colors().background, "--pin-bar": colors().bar, "--pin-fg": colors().color, "--pin-shadow": colors().shadow }}
     >
       <div class="pin-bar" onMouseDown={barDown} title={p()?.locked ? t("notes.pin.lockedTitle", "Zamčeno na místě") : t("notes.pin.barTitle", "Táhni = posunout · dvojklik = sbalit / rozbalit")}>
@@ -348,6 +439,9 @@ export default function PinApp() {
               <Show when={editing()} fallback={<button class="pin-btn ghost" onClick={startEdit} title={t("notes.pin.editTitle", "Upravit text (nebo dvojklik do lístku)")}><IconEdit /></button>}>
                 <button class="pin-btn pri" onClick={finishEdit}>{t("notes.pin.done", "Hotovo")}</button>
               </Show>
+              <Show when={saveState() !== "idle"}>
+                <span class="pin-save" classList={{ ok: saveState() === "saved" }} role="status">{saveLabel(saveState())}</span>
+              </Show>
             </div>
           }>
             <div class="pin-foot">
@@ -393,6 +487,10 @@ export default function PinApp() {
             <button role="menuitem" onClick={() => { setMenu(false); void patch({ collapsed: true }); }}>{t("notes.pin.collapse", "Sbalit na lištu (dvojklik na lištu)")}</button>
             <button role="menuitem" onClick={() => { setMenu(false); const n = note(); if (n) api.noteOpen(n.path).catch(sayError); }}>{t("notes.pin.openExternal", "Otevřít v editoru")}</button>
             <button role="menuitem" onClick={unpin}>{t("notes.pin.unpinLong", "Odepnout z plochy (poznámka zůstane)")}</button>
+            <span class="pin-sep" />
+            <For each={lifeActions(!!note()?.done, false)}>
+              {(a) => <button role="menuitem" classList={{ danger: a === "delete" }} onClick={() => void life(a)}>{actionText(a)}</button>}
+            </For>
           </div>
         )}
       </Show>
@@ -419,6 +517,7 @@ export default function PinApp() {
           {keyText() ? t("notes.pin.throughBadge", "průchozí · {key} vypne", { key: keyText() }) : t("notes.pin.throughBadgeNoKey", "průchozí · vypneš v Ledge (Ctrl+K)")}
         </span>
       </Show>
+      <UndoBar pin />
       <Toast />
     </div>
   );

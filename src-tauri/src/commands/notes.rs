@@ -48,7 +48,8 @@ pub(crate) fn note_done(path: String, done: bool) -> Result<(), String> {
 /// Výběr poznámek pro záložku karty / stránku Poznámky (z paměti, bez I/O).
 #[tauri::command]
 pub(crate) fn note_query(q: notes::edit::NoteQuery) -> notes::edit::QueryResult {
-    let all = &core().notes.lock().all;
+    let st = core().notes.lock();
+    let all = if q.archived { &st.archived } else { &st.all };
     notes::edit::query(all, &q, notes::end_of_day_ms(&notes::now_local()))
 }
 

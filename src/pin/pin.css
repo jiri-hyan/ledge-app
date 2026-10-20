@@ -102,6 +102,14 @@ button, input, textarea { font: inherit; color: inherit; }
 .pin-btn:hover { border-color: rgba(255, 255, 255, 0.3); }
 .pin-btn.pri { background: var(--pin-accent); border-color: transparent; color: #0b1220; text-shadow: none; }
 .pin-btn.ghost { background: transparent; }
+/* po Splnit / Archivovat / Smazat: lišta „Zpět“ přes spodek lístku, obsah se nedá ovládat */
+.pin-undo { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 6px 10px; border: 1px solid var(--pin-line); border-radius: 8px; background: rgba(16, 18, 24, 0.97); text-shadow: none; }
+.pin.after .pin-body, .pin.after .pin-foot { pointer-events: none; opacity: 0.45; }
+.pin-sep { height: 1px; margin: 4px 0; background: var(--pin-line); }
+.pin-menu button.danger { color: #ff8a8a; }
+/* stav automatického uložení (Rozepsáno… / Ukládám… / Uloženo) */
+.pin-save { margin-left: auto; align-self: center; font-size: 11px; opacity: 0.65; white-space: nowrap; }
+.pin-save.ok { opacity: 0.9; color: var(--pin-accent); }
 
 .pin-banner, .pin-gone {
   display: flex;

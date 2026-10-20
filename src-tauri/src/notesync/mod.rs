@@ -42,8 +42,9 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-/// Řádky `.gitignore` v kořeni poznámek: lokální koncept, stav peeku, tmp zápisů, značka migrace.
-pub const IGNORE: [&str; 4] = [".draft/", ".state.json", "*.tmp", "PRESUNUTO-DO-LEDGE.txt"];
+/// Řádky `.gitignore` v kořeni poznámek: lokální koncept, stav peeku, tmp zápisů, značka migrace,
+/// odklad smazaných poznámek (`.smazane/`, než jdou do Koše).
+pub const IGNORE: [&str; 5] = [".draft/", ".state.json", "*.tmp", "PRESUNUTO-DO-LEDGE.txt", ".smazane/"];
 /// Žádné převody konců řádků: poznámka je na obou PC bajtově stejná (jinak falešné změny a konflikty).
 const ATTRIBUTES: &str = "* -text\n";
 const LOCAL_DEADLINE: Duration = Duration::from_secs(30);

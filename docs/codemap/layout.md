@@ -51,12 +51,14 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 | `src/layout/model.ts` | zrcadlo modelu + čistá logika: normalizace, úpravy karet a záložek (s Vrátit), výška, volby dlaždic, katalog, co záložka ukáže, cíl tažení, `withLayout` (jedno pole configu); test `model.test.mjs` (i shoda `CARDS`/`PARTS`/`UP_PERSONAL_PROJECTS`/`MAX_H` s Rustem) | `CARD_IDS` `CARD_INFO` `PARTS` `PART_INFO` `HEIGHTS` `TILE_SIZES` `DEFAULT_TILES` `QUICK_HEIGHTS` `defaultLayout` `normalizeLayout` `normalizeTiles` `tilesOf` `moveCard` `setSize` `nextSize` `setHeight` `nextHeight` `setTiles` `showProject` `visibleProjects` `removeCard` `restoreCard` `addCard` `moveToPage` `setPartHidden` `catalog` `addPage` `renamePage` `removePage` `restorePage` `movePage` `pageKind` `shownCards` `gridDropIndex` `keyMove` |
 | `src/layout/keep.ts` | čistá pravidla „nic se neztratí“ (test `keep.test.mjs`): skrytí / blur / znovuotevření draft nezahodí, zahodí jen Zrušit a odchod na jinou stránku; `escAction` (Esc se změnami se ptá), `showResume` | `discards` `isDirty` `escAction` `showResume` |
 | `src/layout/edit.ts` | stav režimu úprav: draft, záložka v úpravách, katalog, lišta Vrátit / nápověda, cíl tažení, zásobník Zpět; Hotovo (s `layoutProblem`) / Zrušit; jedna změna odkudkoli (`applyLayout`) | `beginEdit` `change` `undoLast` `canUndo` `resetToDefault` `finishEdit` `cancelEdit` `resumeEdit` `escEdit` `offerUndo` `saveLayout` `applyLayout` `askEdit` `editAsk` |
-| `src/layout/history.ts` · `drag.ts` · `validate.ts` · `cap.ts` · `cols.ts` | vlna 9, čisté funkce: Zpět (`pushUndo` / `popUndo`, `resetLayout` drží `upgrades`) · tah (`dropAction` — zrušení nic nemění, `previewOrder`, `autoScrollStep`, `keyAction`) · zrcadlo `layout::validate` (fixture `src-tauri/src/fixtures/layout-validate.json` čtou oba testy) · strop řádků (`capList`, `capKey`) · sloupce teď (`colsNow`) | testy `history` `drag` `validate` `cap` `wiring` `.test.mjs` |
+| `src/layout/history.ts` · `drag.ts` · `validate.ts` · `cap.ts` · `cols.ts` | vlna 9, čisté funkce: Zpět (`pushUndo` / `popUndo`, `resetLayout` drží `upgrades`) · tah (`dropAction` — zrušení nic nemění, na zónu `hide`, do mřížky jiné záložky `insert` / `blocked`; `previewOrder`, `autoScrollStep`, `keyAction`) · zrcadlo `layout::validate` (fixture `src-tauri/src/fixtures/layout-validate.json` čtou oba testy) · strop řádků (`capList`, `capKey`) · sloupce teď (`colsNow`) | testy `history` `drag` `validate` `cap` `wiring` `.test.mjs` |
+| `src/layout/dnd.ts` · `cardDrag.ts` | kolo 10, přirozený drag & drop karet. `dnd.ts` = čisté funkce (test `dnd.test.mjs`): podržení (`holdStep`, `canHold`, `HOLD_MS` 400 / `HOLD_SLOP` 6 px, selektory hlavičky a ovládacích prvků), cíl vložení na jiné záložce (`insertIndex`, `insertAt`), prodleva nad ouškem (`dwellStep`, `DWELL_MS` 600), zóna (`inBox`), souřadnice mřížky (`contentPoint`), duch (`grabOffset`, `flyPos`), FLIP (`flipDeltas`, `flipPlan`). `cardDrag.ts` = řadič gesta (`createCardDrag`): pointer události na `window`, měření `offsetLeft/Top`, duch = klon `.deck-item.lay-fly`, rAF jen během tahu | `createCardDrag` `Drag` `DragEnv` |
 | `src/layout/ShowMore.tsx` | „Zobrazit další (k) · souhrn“ ↔ „Méně“ a háček `useCap` (karty Claude, Repa, Běží); rozbalení v paměti per záložka + karta | `ShowMore` `useCap` |
-| `src/layout/Deck.tsx` · `layout.css` | mřížka záložky `.deck` > `.deck-item[data-size][data-card][data-h]` (rozhraní pro styly: `--deck-cols`, výchozí 4; rozpětí `--span` z `packSpans`, výška `--h` × `--deck-row`, obsah s výškou scrolluje uvnitř), v úpravách úchyt ⠿ (pointer, i na záložku), **úchyty okrajů `.lay-rs-e/-s/-se`** (tah = šířka / výška / obojí, obrys `.lay-target` s „2 × 3“, Esc zruší, dvojklik spodní = auto), ⇔, ↕, ×, zástupce karty bez dat, „+ Přidat kartu“, klidný přerušovaný obrys bez pohybu | `Deck` `sizeLabel` `heightLabel` |
+| `src/layout/Deck.tsx` · `layout.css` | mřížka záložky `.deck` > `.deck-item[data-size][data-card][data-h]` (rozhraní pro styly: `--deck-cols`, výchozí 4; rozpětí `--span` z `packSpans`, výška `--h` × `--deck-row`, obsah s výškou scrolluje uvnitř), v úpravách tah celou kartou (`onPointerDown` na `.deck-item` → `cardDrag.down`; úchyt ⠿ zůstává pro klávesy), mimo úpravy podržení hlavičky (prop `begin` zapne úpravy), mezera `.lifted` / `.lay-slot`, duch `.lay-fly`, zóna `.lay-zone`, **úchyty okrajů `.lay-rs-e/-s/-se`** (tah = šířka / výška / obojí, obrys `.lay-target` s „2 × 3“, Esc zruší, dvojklik spodní = auto), ⇔, ↕, ×, zástupce karty bez dat, „+ Přidat kartu“, klidný přerušovaný obrys bez pohybu | `Deck` `sizeLabel` `heightLabel` |
 | `src/layout/size.ts` | čistá mechanika mřížky: rozpětí velikosti, řada bez děr, co udělá volba velikosti, cíl tahu za okraj, px ↔ řádky, kroky velikosti / výšky; test `size.test.mjs` | `spanOf` `packSpans` `usableSizes` `fitSize` `sizeOutcome` `nextSizeFor` `stepSize` `stepHeight` `sizeForSpan` `resizeTo` `rowsForPx` `heightPx` `deckCols` |
 | `src/layout/Tour.tsx` · `tips.ts` · `tour.css` | prohlídka 3 bublin (✎ `data-tip="edit"`, ⋯ první karty, 🔍 `data-tip="palette"`) při prvním otevření; viditelnost z událostí `view`/`closing`, stav `ui.tips` (`tour1`); čistá logika + test `tips.test.mjs` | `Tour` `TOUR_ID` `STEPS` `shouldShow` `withTip` `bubblePos` |
-| `src/layout/Tabs.tsx` | záložky v hlavičce (N), v úpravách přejmenovat dvojklikem, smazat, pořadí tažením, nová záložka s ikonou; cíl tažení karty (`data-tab`) | `Tabs` |
+| `src/layout/HoldTip.tsx` | jednorázový tip „Podrž kartu a přetáhni ji“ (`ui.tips` `hold1`, `tips.ts` `shouldShowHold`): až po prohlídce, při prvním najetí na hlavičku karty; zavře ho „Rozumím“, 9 s, ✎ nebo první tah podržením (`edit.ts` `holdDrags`) | `HoldTip` `HOLD_TIP` `HOLD_TEXT` |
+| `src/layout/Tabs.tsx` | záložky v hlavičce (N), v úpravách přejmenovat dvojklikem, smazat, pořadí tažením (už umí — kolo 10 nic nepřidávalo), nová záložka s ikonou; cíl tažení karty (`data-tab`, zvýraznění + proužek prodlevy `.lay-tab.drop::after`); mimo úpravy tužka „Upravit rozložení“ při najetí na záložky | `Tabs` |
 | `src/layout/Catalog.tsx` · `EditBar.tsx` | katalog karet (název, popis, kde je) · lišta úprav (výrazně „Táhni za okraj karty = velikost“, Zrušit / Hotovo) + Vrátit | |
 | `src/layout/LayoutEditor.tsx` | editor stejného modelu v Nastavení (panel Šuplík a karty, `SortList`): velikost, výška, u Projektů volby dlaždic a které projekty, části karet, „Upravit přímo v šuplíku“ | |
 | `src/cards/CardMenu.tsx` · `TileOptions.tsx` · `cardmenu.css` | ⋯ karty (Portal, pevná pozice — neořízne ho karta s výškou, u spodu nahoru; kořen `[data-cmenu]`): Velikost S/M/L/XL, Výška Auto/Nízká/Vysoká, u Projektů Dlaždice (Malé ikony/Dlaždice/Velké), název, git, které projekty, „Vzhled karty…“; ukládá hned (`saveLayout`) | `CardMenu` `MenuChoice` `TileOptions` `tileSizeName` |
@@ -87,16 +89,27 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
   → `change` (s Vrátit); mimo úpravy přejmenování / zrušení / vyjmutí (pravý klik) → `saveLayout`.
 - **Klávesy**: 1–9 = záložka (App), v úpravách Esc = Zrušit (se změnami po potvrzení; během tahu karty / za okraj jen zruší tah), Ctrl+Z = Zpět;
   na úchytu ⠿ šipky = přesun, + / − = šířka, PageUp / PageDown = výška (`drag.ts` `keyAction`).
-- **Tah karty** (vlna 9): pointer na `window` (ne capture — náhled by ho ztratil), od 4 px; cíl = místo karty
-  v PŮVODNÍM pořadí (`gridDropIndex`, rozměry z chycení + posun scrollu; daleko mimo = nic); náhled = CSS `order`
-  (DOM se nepřeskládá) + FLIP `el.animate` 160 ms / `motionNow` (styl `none` = bez animace); posun u okraje
-  smyčkou rAF jen během tahu; konec `dropAction` (pointercancel / Esc = nic); záložka, kde karta už je = nápověda.
+- **Tah karty** (vlna 9, kolo 10): vstup `cardDrag.down` z `onPointerDown` na `.deck-item`. V úpravách se karta chytí na prázdném
+  místě (obsah má `pointer-events: none` → cíl je sama položka; tlačítka a okraje `EDIT_CONTROL_SELECTOR` ne; dlaždice
+  s vlastní úpravou si tah berou samy) nebo za ⠿, od 4 px. Mimo úpravy podržení `HOLD_MS` na hlavičce (`HEADER_SELECTOR`, ne na
+  `CONTROL_SELECTOR`): posun nad `HOLD_SLOP` před časem = obyčejný klik / výběr textu; po čase `begin` (`beginEdit`) a
+  rovnou tah (místo chycení se zapamatuje ještě před zapnutím lišty úprav; následný klik se spolkne). Pointer na `window`
+  (ne capture — náhled by ho ztratil); cíl = karta pod kurzorem v PŮVODNÍM pořadí (`gridDropIndex`, rámečky z
+  `offsetLeft/Top` = souřadnice obsahu mřížky, nezávislé na posunu i rozběhlém FLIPu; mezera = nejbližší obrys; daleko mimo =
+  nic); náhled = CSS `order` (DOM se nepřeskládá), tažená karta je v původním místě `.lifted` jako mezera velikosti karty
+  a duch (klon `.deck-item.lay-fly`, `pointer-events: none`) jede pod kurzorem; FLIP `el.animate` (id `lay-flip`, rozběhlý se
+  před novým měřením zruší) podle `flipPlan(motionNow, reduced-motion)`; smyčka rAF JEN během tahu (posun u okraje — nad
+  zónou ne — a `dwellStep`). Cíle: zóna `.lay-zone` dole (= `remove`, vratné), ouško záložky (`dropTab`; puštění = na konec),
+  prodleva `DWELL_MS` nad ouškem → `setEditPage`, `rects` se přeměří a tah pokračuje v mřížce té záložky (`insertIndex`,
+  zástupná mezera `.lay-slot`, puštění = `moveToPageAt`); karta, která tam už je, se nestěhuje (`blocked` + nápověda).
+  Konec `dropAction`: Esc / pointercancel / pustit mimo okno (`buttons === 0`) = nic (vrátí se i na domovskou záložku); po
+  dopadu `offerUndo` „… · Vrátit“ (přesun v záložce = inverzní `moveCard`).
 - **Nastavení**: panel Šuplík a karty → `LayoutEditor` mění draft Nastavení (`c.set("layout")`), uloží
   společná lišta. Pořadí karet ve Vzhledu už není.
 
 ## Invarianty a pasti
 
-- HTML5 drag&drop v okně Tauri nefunguje → jen pointer události (`Deck`, `Tabs`, `SortList`); hlídá `wiring.test.mjs`.
+- HTML5 drag&drop v okně Tauri nefunguje → jen pointer události (`cardDrag`, `Deck`, `Tabs`, `SortList`); hlídá `wiring.test.mjs`.
 - Nové pole karty = `layout.rs` + `model.ts` `normalizeLayout` + `validate.ts` + řádek ve fixture `layout-validate.json`.
 - Nová dynamická rodina karet = prefix v `layout::is_dynamic` + `model.ts` `isDynamic` + větev `default` v `MainPage` `card`.
 - Nová karta = id do `layout::CARDS` + `model.ts` `CARD_IDS`/`CARD_INFO` + případně pole `sections!`
@@ -117,7 +130,8 @@ Konfigurace). Cituj symbolem, ne číslem řádku.
 `cargo test layout` (výchozí = dnešní šuplík, převod starých configů — tabulka se skutečnými tvary, velikosti
 řady, migrace Projekty → Osobní včetně „odebrané se nevrací“ přes `load` → `save` → `load`, tvar `h`/`tiles`,
 odvozená pole, validace), `cargo test uiconf` (`ui.tips`). `corepack pnpm test:ui` → `src/layout/model.test.mjs`,
-`size.test.mjs` (řada bez děr, tah za okraj), `tips.test.mjs` (prohlídka),
+`size.test.mjs` (řada bez děr, tah za okraj), `tips.test.mjs` (prohlídka + tip o podržení), `dnd.test.mjs` + `drag.test.mjs`
+(podržení vs klik, cíle tahu, prodleva nad ouškem, zóna, FLIP), `wiring.test.mjs` (jen pointer, rAF jen v tahu, zapojení),
 `src/cards/sections.test.mjs` (shoda polí `drawer.sections` s modelem), `look.test.mjs` (karta bez vzhledu = žádný
 atribut, varianty, zrcadlo `CARD_ACCENTS`), `folders.test.mjs` (vytvoření / vyjmutí / smazání prázdné), hlídače CSS
 tříd a překladů. `cargo test tilelook` (starý config `load → save → load` beze změny, vzhledy tam a zpět).

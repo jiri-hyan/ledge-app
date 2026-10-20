@@ -4,6 +4,10 @@
 
 /** Průhlednost textu nejníž sem (%) — stejně jako Rust `pins::TEXT_MIN`. */
 export const TEXT_MIN = 50;
+/** Pauza v psaní (ms), po které se rozepsaný text uloží do poznámky. */
+export const SAVE_DELAY = 600;
+export type SaveState = "idle" | "pending" | "saving" | "saved";
+
 /** Barva pozadí a textu lístku (RGB) — tmavé sklo, světlý text. */
 export const BG_RGB = "24, 26, 32";
 export const FG_RGB = "244, 245, 248";

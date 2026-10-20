@@ -26,11 +26,12 @@ Nový lístek se objeví vpravo nahoře. Připnutí lístku ti nevezme fokus —
 | odškrtnout bod | klikni na čtvereček |
 | vložit snímek obrazovky | Win+Shift+S, pak klikni do lístku a Ctrl+V — obrázek se uloží k poznámce |
 | vložit odkaz nebo text | klikni do lístku a Ctrl+V — přidá se na konec |
-| upravit celý text | tužka dole, nebo dvojklik do textu; Hotovo / Esc / Ctrl+Enter uloží |
+| upravit celý text | tužka dole, nebo dvojklik do textu — ukládá se samo (štítek „Uloženo ✓“), Hotovo / Esc / Ctrl+Enter ukončí úpravu |
 | mít lístek vždy navrchu / jako běžné okno | špendlík na liště |
 | zamknout na místě | ⋯ → Zamknout na místě (nejde posunout ani zvětšit, lišta ukáže zámek) |
 | průhlednost | ⋯ → Pozadí a Text (text zůstane vždy čitelný) |
 | zavřít | ✕ — lístek zmizí z plochy, **poznámka zůstane** v kartě Poznámky |
+| splnit, archivovat nebo smazat poznámku | ⋯ → Splnit · Archivovat · Smazat — lístek zůstane pár sekund s lištou „Zpět“ a pak se zavře. Smazaná poznámka jde do Koše Windows |
 
 ## Průchozí režim — klikání skrz lístek
 

@@ -138,7 +138,7 @@ pub fn ensure_lines(existing: &str, lines: &[&str]) -> Option<String> {
 /// Soubor patří jen tomuto PC (gitignore) — při slučování se přenese beze změny jména.
 pub(super) fn local_only(rel: &str) -> bool {
     let name = rel.rsplit('/').next().unwrap_or(rel);
-    rel.split('/').any(|c| c == ".draft") || name == ".state.json" || name == "PRESUNUTO-DO-LEDGE.txt"
+    rel.split('/').any(|c| c == ".draft" || c == ".smazane") || name == ".state.json" || name == "PRESUNUTO-DO-LEDGE.txt"
 }
 
 pub(super) fn is_tmp(rel: &str) -> bool {
@@ -331,10 +331,12 @@ mod tests {
         assert_eq!(sanitize_pc(" Jirkův PC "), "Jirk-v-PC");
         assert_eq!(sanitize_pc("  "), "pc");
         assert_eq!(commit_message("PC1", &now()), "ledge: PC1 2026-10-16T14:03:22+02:00");
-        assert_eq!(ensure_lines(".draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n", &IGNORE), None);
-        assert_eq!(ensure_lines("", &IGNORE).unwrap(), ".draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n");
-        assert_eq!(ensure_lines("vlastni\n.draft/", &IGNORE).unwrap(), "vlastni\n.draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n");
-        assert!(local_only(".draft/draft.json") && local_only(".state.json") && local_only("PRESUNUTO-DO-LEDGE.txt"));
+        assert_eq!(ensure_lines(".draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n.smazane/\n", &IGNORE), None);
+        assert_eq!(ensure_lines("", &IGNORE).unwrap(), ".draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n.smazane/\n");
+        // starý .gitignore bez odkladu smazaných se doplní
+        assert_eq!(ensure_lines(".draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n", &IGNORE).unwrap(), ".draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n.smazane/\n");
+        assert_eq!(ensure_lines("vlastni\n.draft/", &IGNORE).unwrap(), "vlastni\n.draft/\n.state.json\n*.tmp\nPRESUNUTO-DO-LEDGE.txt\n.smazane/\n");
+        assert!(local_only(".draft/draft.json") && local_only(".state.json") && local_only("PRESUNUTO-DO-LEDGE.txt") && local_only(".smazane/1-1/app/a.md"));
         assert!(!local_only("_obecne/x.md") && !local_only(".gitignore"));
     }
 
