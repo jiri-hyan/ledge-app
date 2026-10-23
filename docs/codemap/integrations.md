@@ -26,7 +26,7 @@ Cituj symbolem, ne číslem řádku.
 | `src/integrations/IntegrationsSettings.tsx` | Nastavení → Osobní → GitHub a Systém (přepínač s větou, sekce, frekvence, disky jako dlaždice, jednotky) | `GithubSettings` `SystemSettings` |
 | `src/integrations/integrations.css` · `src/i18n/en-integrations.ts` | styly (`sys-*`, `gh-*`, `int-*`) · angličtina `cards.github.*`, `cards.system.*`, `settings.github.*`, `settings.f.github.*`… | |
 
-Napojení (jednořádkové): `config.rs` (`Config.github` / `.system`, `sections!` `github` / `system` s výchozím `false`
+Napojení (jednořádkové): `config/*` (`Config.github` / `.system`, `sections!` `github` / `system` s výchozím `false`
 přes `layout::OPT_IN`, validace), `layout.rs` (`CARDS`, `OPT_IN`), `stripconf.rs` + `stripview.rs` (`StripItem::Github` /
 `System`; `Github` je „událost“ jako Čeká, `System` stálá), `settings.rs` `apply_config` (`github::on_config` +
 `integrations::sync`), `lib.rs` (moduly, příkazy, `integrations::sync` při startu), `update.rs` (`gh_exe` je `pub(crate)`,
@@ -36,6 +36,9 @@ hledá i WinGet Links), `Cargo.toml` (`Win32_NetworkManagement_Ndis` pro `MIB_IF
 
 ## Toky
 
+- **Návrhy a puls z GitHubu:** po každém načtení (`refresh`, po uvolnění zámku) `suggest::on_github_refreshed` → `pulse::on_refreshed`
+  (nové PR k revizi / nově spadlé CI na mém PR → `attention::signal`, jen když `suggest.githubPulse`; první pozorování jen založí
+  paměť) a `mark_dirty` (pruh návrhů čte `github::cached_prs`). Žádný dotaz navíc — [suggest.md](suggest.md).
 - **Systém, karta:** `SystemCard` (`drawerShown()`) → `system_view` po 2 s → `sysmon::poll(record=true)` → `SystemView`
   (filtrované disky podle `system.disks`, `allDisks` pro Nastavení). Zavřený šuplík = žádný časovač, žádné čtení.
 - **Systém, proužek:** položka `system` v zapnutém proužku → `integrations::sync` spustí vlákno → `poll(record=false)` po

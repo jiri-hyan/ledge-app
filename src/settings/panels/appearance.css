@@ -143,3 +143,29 @@
 .ap-shape[data-shape="dot"] i { width: 34%; }
 .ap-shape[data-shape="block"] i { box-shadow: 2px 2px 0 var(--t1); }
 .ap-shape[data-shape="glow"] i { box-shadow: 0 0 6px var(--accent); }
+
+/* ---------- vlastní motivy (AppearanceThemes.tsx) ---------- */
+.ap-own { display: block; font-size: var(--fs-xs); font-weight: 500; color: var(--t3); }
+.ap-tbar { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s2); }
+.ap-tio { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); margin-bottom: var(--s2); }
+.ap-tarea { width: 100%; min-height: 84px; resize: vertical; font: var(--fs-sm) var(--mono); color: var(--t1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 6px 8px; }
+.ap-ted { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3); margin-bottom: var(--s2); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--well); }
+.ap-tname { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.ap-tname input[type="text"] { flex: 1 1 160px; min-width: 0; }
+.ap-tcolors { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s2); }
+.ap-tcolor { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: var(--s2); padding: 4px 6px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--card); }
+.ap-tcolor.bad { border-color: var(--red); }
+.ap-tcolor input[type="color"] { width: 30px; height: 24px; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: none; cursor: pointer; }
+.ap-tkey { font-size: var(--fs-sm); color: var(--t2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-ratio { font: var(--fs-xs) var(--mono); color: var(--t3); }
+.ap-ratio.warn { color: var(--red); font-weight: 700; }
+
+/* ---------- vzhled záložek (AppearancePages.tsx) ---------- */
+.ap-prows { display: flex; flex-direction: column; gap: var(--s2); }
+.ap-prow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3); padding: var(--s2) var(--s3); border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--well); }
+.ap-prow.own { border-color: var(--accent); }
+.ap-pname { flex: 1 1 100px; align-self: center; font-size: var(--fs-body); font-weight: 600; color: var(--t1); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-pctl { display: flex; flex-direction: column; gap: 3px; }
+.ap-pctl > small { color: var(--t3); font-size: var(--fs-xs); }
+.ap-pacc { display: inline-flex; align-items: center; gap: var(--s2); min-height: 28px; }
+

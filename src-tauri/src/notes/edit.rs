@@ -108,7 +108,8 @@ fn detail(path: &Path, real: &Path, real_root: &Path, bytes: &[u8]) -> NoteDetai
     let folder = (parent != real_root).then(|| parent.file_name().map(|n| n.to_string_lossy().into_owned())).flatten();
     let view = parse_note(path, &text, folder.as_deref(), mtime_ms(real));
     let (_, body) = split(&text);
-    let body = body_view(body).1;
+    // do UI jde tělo bez koncových \n (soubor je drží, `compose_body` je při uložení vrátí)
+    let body = body_view(body).1.trim_end_matches(['\n', '\r']);
     NoteDetail { view, body: body.to_string(), hash: hash(bytes), image_data: load_images(real_root, parent, body) }
 }
 
@@ -429,7 +430,7 @@ mod tests {
         std::fs::write(&p, NOTE).unwrap();
         std::fs::write(dir.join("n-1.png"), [0x89, b'P', b'N', b'G']).unwrap();
         let d = read(root.path(), &p).unwrap();
-        assert_eq!(d.body, "Text\n\n- [ ] úkol\n\n![](./n-1.png)\n");
+        assert_eq!(d.body, "Text\n\n- [ ] úkol\n\n![](./n-1.png)", "tělo pro UI je bez koncového \\n");
         assert_eq!(d.image_data.len(), 1);
         assert!(d.image_data[0].data.starts_with("data:image/png;base64,"));
         assert_eq!(d.view.path, p.to_string_lossy());

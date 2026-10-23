@@ -1,7 +1,7 @@
 # Codemapa: účty Microsoft a Google (OAuth) — kalendář, pošta
 
 Uživatel si přináší vlastní registraci aplikace (Client ID; Ledge nemá ověřeného klienta, výchozí je
-prázdné). Návod pro uživatele [`docs/ucty.md`](../ucty.md), config `accounts` v AGENTS.md (Konfigurace).
+prázdné). Návod pro uživatele [`docs/ucty.md`](../ucty.md), config `accounts`: [config-personal.md](../agents/config-personal.md).
 
 ## Rust `src-tauri/src/accounts/`
 
@@ -25,7 +25,7 @@ podle data, `onlineMeeting.joinUrl`, další stránky jen na Graph), `calendar/g
 `personal.calendars` se `source` `graph`/`google` — ty mají přednost před `calsync`). Připojit: `graph::join_of`
 (`https_only` + `meeting::classify`, záloha `meeting::find` z místa) → `Occ.join`.
 
-Napojení (jednořádkové): `config.rs` (`accounts`, `sections!` `mail` vypnuté přes `layout::OPT_IN`, `validate_field`),
+Napojení (jednořádkové): `config/*` (`accounts`, `sections!` `mail` vypnuté přes `layout::OPT_IN`, `validate_field`),
 `layout.rs` (`CARDS` + `OPT_IN`), `stripconf.rs` (`StripItem::Mail`), `stripview.rs`, `looks/mod.rs`
 (`without`), `snapshot.rs` (`PersonalView.mail`), `calendar/live.rs` (`CalInfo.account`, `view` přidá
 `calsync::infos`), `settings.rs` (`on_config`), `threads/ui.rs` + `threads/emit.rs` (`maybe_refresh`,

@@ -27,6 +27,8 @@ const [saving, setSaving] = createSignal(false);
 const [undoBar, setUndoBar] = createSignal<{ text: string; restore?: () => void } | null>(null);
 /** během tažení karty: záložka pod kurzorem (pustit = přesunout kartu tam) */
 const [dropTab, setDropTab] = createSignal<string | null>(null);
+/** záložka, jejíž název se má hned začít přepisovat (karta přetažená na „+“ vytvoří „Nová záložka“) */
+const [renameAsk, setRenameAsk] = createSignal<string | null>(null);
 /** předchozí rozložení v úpravách (Zpět) */
 const [undoStack, setUndoStack] = createSignal<Layout[]>([]);
 export const canUndo = () => undoStack().length > 0;
@@ -42,7 +44,7 @@ let undoTimer: number | undefined;
 const [holdDrags, setHoldDrags] = createSignal(0);
 export const noteHoldDrag = () => setHoldDrags((n) => n + 1);
 
-export { draft, editPage, setEditPage, catalogOpen, setCatalogOpen, saving, undoBar, dropTab, setDropTab, resumed, askDiscard, setAskDiscard, holdDrags };
+export { renameAsk, setRenameAsk, draft, editPage, setEditPage, catalogOpen, setCatalogOpen, saving, undoBar, dropTab, setDropTab, resumed, askDiscard, setAskDiscard, holdDrags };
 export const editing = () => draft() !== null;
 
 type Src = { layout: unknown; mode: string; cfgError: string | null };

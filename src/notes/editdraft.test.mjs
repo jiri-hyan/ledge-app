@@ -3,7 +3,7 @@
 // úprava jiné poznámky navíc přesměrovala každé otevření.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { draftIsJunk, planOther, planSame } from "./editdraft.ts";
+import { draftIsJunk, planOther, planSame, trimBody } from "./editdraft.ts";
 
 const note = { path: "C:\\n\\a.md", hash: "h2", text: "Dlouhý text z lístku\n\n![](./a-1.png)", project: "", kind: "info", remind: "" };
 const draft = (o = {}) => ({ path: note.path, hash: "h1", text: "rozepsáno", project: "", kind: "info", remind: "", ...o });
@@ -37,4 +37,15 @@ test("úprava téže poznámky proti disku", () => {
     ["změněná kategorie", draft({ text: note.text, kind: "napad", hash: "h2" }), { do: "restore", stale: false }],
   ];
   for (const [name, d, want] of cases) assert.deepEqual(planSame(d, note), want, name);
+});
+
+test("cesty se porovnávají jako Windows cesty (velikost písmen, lomítka)", () => {
+  const other = "c:/n/A.md";
+  assert.deepEqual(planOther(draft({ path: other }), "C:\\n\\a.md"), { do: "ignore" });
+  assert.deepEqual(planSame(draft({ path: other, text: "rozepsáno" }), note), { do: "restore", stale: true });
+});
+
+test("trimBody: koncová zalomení pryč (Rust je dřív vracel), vnitřní zůstanou", () => {
+  const cases = [["a\n", "a"], ["a\r\n\r\n", "a"], ["a\n\nb\n", "a\n\nb"], ["a  ", "a  "], ["", ""], ["\n", ""]];
+  for (const [inp, want] of cases) assert.equal(trimBody(inp), want, JSON.stringify(inp));
 });

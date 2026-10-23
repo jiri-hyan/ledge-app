@@ -3,7 +3,7 @@
 import { t, tp } from "../i18n";
 import { widgetInfo } from "../widgets/registry";
 import { widgetFile } from "../widgets/model";
-import { builtinName, CARD_INFO, isBuiltin, PART_INFO, type CardId, type CardSize, type LayoutPage, type PartKey, type Text } from "./model";
+import { BODY, builtinName, CARD_INFO, isBuiltin, PART_INFO, type CardId, type CardSize, type LayoutPage, type PartKey, type Text } from "./model";
 import type { SizeOutcome } from "./size";
 
 export const tx = (x: Text): string => t(x[0], x[1]);
@@ -17,6 +17,8 @@ export const cardDesc = (id: CardId): string => {
   return widgetInfo(id)?.description ?? t("cards.layout.desc.widget", "Widget ze skriptu ve složce widgetů");
 };
 export const partName = (k: PartKey): string => (PART_INFO[k] ? tx(PART_INFO[k]) : k);
+/** Název části karty v pořadí částí (`model.ts` `CARD_SLOTS`): skrytelné části mají svůj, `body` je hlavní obsah karty. */
+export const slotName = (k: string): string => (k === BODY ? t("cards.layout.part.body", "Obsah karty") : partName(k as PartKey));
 /** Název záložky (bez ikony); vestavěná bez názvu podle jazyka. */
 export const pageName = (p: LayoutPage): string => {
   const b = builtinName(p);

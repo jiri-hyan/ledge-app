@@ -3,11 +3,12 @@
 // Win+Shift+S ukradne fokus a šuplík se zavře — rozepsané nesmí zmizet. Plus obrázky ze schránky.
 
 import { createSignal } from "solid-js";
-import { api, type NoteDetail } from "../api";
+import { api, type EditDraft, type NoteDetail } from "../api";
 import { say } from "../ui/toast";
 import { fromMs } from "./remind";
 import { DEFAULT_KIND } from "./kinds";
-import { planOther, planSame } from "./editdraft";
+import { planOther, planSame, trimBody } from "./editdraft";
+import { samePath } from "../pin/model";
 import { t } from "../i18n";
 
 // ---------- nová poznámka ----------
@@ -89,9 +90,9 @@ export const edDirty = () => {
   return !!o && (edImgs().length > 0 || o.text !== edText() || o.project !== edProj() || o.kind !== edKind() || o.remind !== edRemind());
 };
 
-/** Naplní úpravu z poznámky na disku (po čtení, přepnutí úkolu). */
+/** Naplní úpravu z poznámky na disku (po čtení, přepnutí úkolu). Tělo bez koncových zalomení. */
 export function loadEditFrom(n: NoteDetail) {
-  const f: Fields = { text: n.body, project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs) };
+  const f: Fields = { text: trimBody(n.body), project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs) };
   setEdBase(n);
   setEdHash(n.hash);
   setOrig(f);
@@ -102,12 +103,37 @@ export function loadEditFrom(n: NoteDetail) {
   setEdImgs([]);
 }
 
+/** Rozepsaná úprava, která se nenechá přepsat otevřením jiné poznámky: čeká v liště editoru
+ *  („Máš rozepsanou úpravu «název» — Otevřít ji · Zahodit“), dokud šéf nerozhodne. Jen v paměti
+ *  (na disku drží `edit.json` tu nejnovější) — po restartu se vrátí z disku jako jedna. */
+export type ParkedEdit = { base: NoteDetail; hash: string; text: string; project: string; kind: string; remind: string; imgs: string[] };
+export const [parked, setParked] = createSignal<ParkedEdit[]>([]);
+export const parkedTop = (): ParkedEdit | null => {
+  const a = parked();
+  return a.length ? a[a.length - 1] : null;
+};
+const hasParked = (path: string) => parked().some((x) => samePath(x.base.path, path));
+function park(x: ParkedEdit) {
+  setParked([...parked().filter((y) => !samePath(y.base.path, x.base.path)), x]);
+}
+
+/** Rozepsaná úprava právě otevřené poznámky (null = nic, co by stálo za uložení: bez změny nebo bez textu). */
+function snapshot(): ParkedEdit | null {
+  const b = edBase();
+  if (!b || !edDirty() || !edText().trim()) return null;
+  return { base: b, hash: edHash(), text: edText(), project: edProj(), kind: edKind(), remind: edRemind(), imgs: edImgs() };
+}
+
+/** Co má být na disku v `edit.json`: rozepsaná otevřená úprava, jinak nejnovější odložená, jinak nic. */
+function diskEdit(): EditDraft | null {
+  const s = snapshot() ?? parkedTop();
+  return s ? { path: s.base.path, hash: s.hash, text: s.text, project: s.project, kind: s.kind, remind: s.remind } : null;
+}
+
 let editTimer: number | undefined;
 function persistEdit() {
-  const b = edBase();
-  if (!b) return;
-  // prázdný text nejde uložit — takovou úpravu na disku nedržet (dřív přebila skutečný obsah poznámky)
-  const d = edDirty() && edText().trim() ? { path: b.path, hash: edHash(), text: edText(), project: edProj(), kind: edKind(), remind: edRemind() } : null;
+  const d = diskEdit();
+  if (!edBase() && !d) return;
   api.noteEditDraftSave(d).catch(() => {});
 }
 export function scheduleEdit() {
@@ -131,63 +157,149 @@ export function resetEdit() {
   setEdBase(null);
   setOrig(null);
   setEdImgs([]);
-  api.noteEditDraftSave(null).catch(() => {});
+  api.noteEditDraftSave(diskEdit()).catch(() => {}); // odložená úprava na disku přežije
 }
 
 /** Úprava na disku je zastaralá: soubor se od ní změnil (lístek, sync) — editor ukáže konflikt hned. */
 export const [edStale, setEdStale] = createSignal(false);
-const dropDiskEdit = () => api.noteEditDraftSave(null).catch(() => {});
-const fieldsOf = (n: NoteDetail) => ({ path: n.path, hash: n.hash, text: n.body, project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs) });
+const dropDiskEdit = () => api.noteEditDraftSave(diskEdit()).catch(() => {});
+const fieldsOf = (n: NoteDetail) => ({ path: n.path, hash: n.hash, text: trimBody(n.body), project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs) });
 
-/** Otevře úpravu `path`. Vrací cestu, která se má upravovat doopravdy: rozepsaná úprava JINÉ
- *  poznámky s nějakým textem má přednost (jinak by se tiše ztratila). Prázdná nebo zastaralá úprava
- *  obsah poznámky nepřebije (`editdraft.ts`) — dřív ji přebíjela a editor byl prázdný, ač lístek
- *  na ploše ukazoval text i obrázek. */
-export async function openEdit(path: string): Promise<string | null> {
+/** Pořadí otevírání: dokončí se jen poslední čtení — pozdě doběhlé čtení jiné poznámky nesmí přepsat editor
+ *  (a uložení pak zapsat do cizí poznámky). */
+let openSeq = 0;
+/** Zneplatní rozběhnutá čtení (odchod z editoru, otevření nové poznámky). */
+export const cancelOpen = () => void ++openSeq;
+/** Je čtení `id` už přebité novějším? (použije editor po vlastním `await`) */
+export const openSuperseded = (id: number) => id !== openSeq;
+
+/** Otevře úpravu `path`. Vrací cestu (otevřená), `null` (poznámku nejde přečíst) nebo `undefined` (čtení
+ *  mezitím přebilo novější otevření — volající nedělá nic). Soubor se čte VŽDY znovu; rozepsaná úprava téže
+ *  poznámky (paměť i disk) se obnoví až nad čerstvým čtením a otiskem (`planSame`): změnila-li se poznámka
+ *  mezitím, zůstane tvoje úprava a editor ukáže konflikt. Rozepsaná úprava JINÉ poznámky se nikdy tiše
+ *  nepřepne ani neztratí: požadovaná poznámka se otevře a ta rozepsaná čeká v `parked` (lišta editoru). */
+export async function openEdit(path: string): Promise<string | null | undefined> {
+  const id = ++openSeq;
   const cur = edBase();
-  if (cur && edDirty()) {
-    if (cur.path !== path) say(t("notes.draft.otherEdit", "Máš rozepsanou úpravu jiné poznámky — dokonči ji, nebo ji Esc zahodí."));
-    return cur.path;
+  let mem: ParkedEdit | null = null;
+  if (cur) {
+    const snap = snapshot();
+    if (snap) {
+      if (samePath(cur.path, path)) mem = snap;
+      else park(snap);
+    }
+  }
+  if (!mem) {
+    // tuhle poznámku jsme předtím odložili (otevřeli jsme jinou) → rozepsané se vrací, ne ztrácí
+    const pk = parked().find((x) => samePath(x.base.path, path));
+    if (pk) {
+      setParked(parked().filter((x) => x !== pk));
+      mem = pk;
+    }
   }
   setEdStale(false);
-  let disk = (await api.noteEditDraftLoad().catch(() => null)) ?? null;
-  let n: NoteDetail | null = null;
+  let disk = mem ? null : ((await api.noteEditDraftLoad().catch(() => null)) ?? null);
+  if (id !== openSeq) return undefined;
   const other = planOther(disk, path);
-  if (other.do === "redirect") {
-    n = (await api.noteRead(other.path).catch(() => null)) ?? null;
-    if (n) {
-      say(t("notes.draft.otherEdit", "Máš rozepsanou úpravu jiné poznámky — dokonči ji, nebo ji Esc zahodí."));
-      path = other.path;
-    } else {
+  if (other.do === "redirect" && disk) {
+    if (!hasParked(other.path)) {
+      const pn = (await api.noteRead(other.path).catch(() => null)) ?? null;
+      if (id !== openSeq) return undefined;
       // rozepsaná poznámka mezitím zmizela (smazaná, archivovaná) → úprava už nemá komu patřit
-      void dropDiskEdit();
-      disk = null;
+      if (pn) park({ base: pn, hash: disk.hash, text: disk.text, project: disk.project, kind: disk.kind || DEFAULT_KIND, remind: disk.remind, imgs: [] });
+      else void dropDiskEdit();
     }
+    disk = null;
   } else if (other.do === "drop") {
     void dropDiskEdit();
     disk = null;
   }
+  let n: NoteDetail | null = null;
   try {
-    n ??= (await api.noteRead(path)) ?? null;
-    if (!n) return null;
-    loadEditFrom(n);
+    n = (await api.noteRead(path)) ?? null;
   } catch (e) {
+    if (id !== openSeq) return undefined;
     say(String(e), true);
-    if (disk && disk.path === path) void dropDiskEdit();
+    if (disk && samePath(disk.path, path)) void dropDiskEdit();
     return null;
   }
-  const plan = planSame(disk, fieldsOf(n));
-  if (plan.do === "drop") void dropDiskEdit();
-  else if (plan.do === "restore" && disk) {
-    setEdHash(disk.hash);
-    setEdText(disk.text);
-    setEdProj(disk.project);
-    setEdKind(disk.kind || DEFAULT_KIND);
-    setEdRemind(disk.remind);
+  if (id !== openSeq) return undefined;
+  if (!n) return null;
+  loadEditFrom(n);
+  const draft = mem ? { path: mem.base.path, hash: mem.hash, text: mem.text, project: mem.project, kind: mem.kind, remind: mem.remind } : disk;
+  let plan = planSame(draft, fieldsOf(n));
+  if (plan.do === "drop" && mem?.imgs.length) plan = { do: "restore", stale: mem.hash !== n.hash }; // změněný jen obrázky
+  if (plan.do === "drop") {
+    if (!mem) void dropDiskEdit();
+  } else if (plan.do === "restore" && draft) {
+    setEdHash(draft.hash);
+    setEdText(draft.text);
+    setEdProj(draft.project);
+    setEdKind(draft.kind || DEFAULT_KIND);
+    setEdRemind(draft.remind);
+    setEdImgs(mem?.imgs ?? []);
     setEdStale(plan.stale);
-    say(plan.stale ? t("notes.draft.restoredStale", "Poznámka se od rozepsané úpravy změnila (třeba lístkem na ploše) — tvoje úprava zůstala tady, „Načíst znovu“ ukáže novou verzi.") : t("notes.draft.restored", "Obnovena rozepsaná úprava."));
+    if (!mem) say(plan.stale ? t("notes.draft.restoredStale", "Poznámka se od rozepsané úpravy změnila (třeba lístkem na ploše) — tvoje úprava zůstala tady, „Načíst znovu“ ukáže novou verzi.") : t("notes.draft.restored", "Obnovena rozepsaná úprava."));
   }
   return path;
+}
+
+/** Odložená úprava se vrátí do editoru (rozepsaná úprava právě otevřené poznámky se odloží místo ní).
+ *  Vrací cestu k otevření — volající ji nastaví jako `editPath`, `openEdit` nad ní ověří otisk. */
+export function resumeParked(): string | null {
+  const pk = parkedTop();
+  if (!pk) return null;
+  const cur = snapshot();
+  setParked(parked().filter((x) => x !== pk));
+  if (cur) park(cur);
+  loadEditFrom(pk.base);
+  setEdHash(pk.hash);
+  setEdText(pk.text);
+  setEdProj(pk.project);
+  setEdKind(pk.kind || DEFAULT_KIND);
+  setEdRemind(pk.remind);
+  setEdImgs(pk.imgs);
+  return pk.base.path;
+}
+
+/** Odložená úprava se zahodí (lišta „Zahodit“). */
+export function dropParked() {
+  const pk = parkedTop();
+  if (!pk) return;
+  setParked(parked().filter((x) => x !== pk));
+  api.noteEditDraftSave(diskEdit()).catch(() => {});
+}
+
+export type SyncResult = "same" | "reloaded" | "conflict" | "gone";
+/** Poznámka se mezitím mohla změnit zvenku (psaní v lístku, sync z druhého PC): přečte ji a porovná otisk.
+ *  Úprava beze změn se rovnou aktualizuje (`reloaded`), rozepsaná dostane konflikt (`conflict`). */
+export async function syncEdit(): Promise<SyncResult> {
+  const b = edBase();
+  if (!b) return "same";
+  const id = openSeq;
+  let n: NoteDetail | null | undefined;
+  try {
+    n = await api.noteRead(b.path);
+  } catch {
+    return "gone";
+  }
+  if (!n) return "gone";
+  if (id !== openSeq || edBase() !== b) return "same"; // mezitím se otevřelo něco jiného
+  if (n.hash === edHash()) return "same";
+  if (edDirty()) return "conflict";
+  loadEditFrom(n);
+  return "reloaded";
+}
+
+/** „Ponechat moje“: zůstane rozepsaný text, otisk se přepne na aktuální soubor — další uložení ho přepíše. */
+export async function keepMine(): Promise<boolean> {
+  const b = edBase();
+  if (!b) return false;
+  const n = await api.noteRead(b.path);
+  if (!n || edBase() !== b) return false;
+  setEdHash(n.hash);
+  setEdStale(false);
+  return true;
 }
 
 // ---------- obrázky ze schránky ----------

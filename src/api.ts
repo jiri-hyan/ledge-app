@@ -64,6 +64,10 @@ export const api = {
   noteDone: (path: string, done: boolean) => call("note_done", { path, done }),
   noteOpen: (path: string) => call("note_open", { path }),
   noteQuery: (q: NoteQuery) => call<QueryResult>("note_query", { q }),
+  /** Ctrl+K: poznámky s dotazem v titulku / těle + úryvek (min. 2 znaky). */
+  noteSearch: (query: string, limit?: number) => call<(NoteView & { snippet: string })[]>("note_search", { query, limit }),
+  /** Čas v textu („zítra v 10“) → nabídka připomínky `{ label, iso }`, jinak null. */
+  noteSuggestRemind: (text: string) => call<{ label: string; iso: string } | null>("note_suggest_remind", { text }),
   noteRead: (path: string) => call<NoteDetail>("note_read", { path }),
   noteSave: (note: SaveNote, copy = false) => call<SaveOutcome>("note_save", { note, copy }),
   noteArchive: (path: string, keepPin = false) => call<string>("note_archive", { path, keepPin }),
@@ -72,6 +76,12 @@ export const api = {
   noteDeleteUndo: (id: string) => call<string>("note_delete_undo", { id }),
   noteToggleTask: (path: string, line: number, checked: boolean, expectedHash: string) => call<SaveOutcome>("note_toggle_task", { path, line, checked, expectedHash }),
   noteRender: (body: string) => call<string>("note_render", { body }),
+  /** Export poznámky do souboru (dialog Uložit jako): vrací uloženou cestu, null = uživatel zrušil. */
+  noteExport: (path: string, format: "md" | "html") => call<string | null>("note_export", { path, format }),
+  /** Aplikace registrované ve Windows pro `.md` (nabídka „Otevřít v …“). */
+  noteOpenWithApps: () => call<{ id: string; name: string }[]>("note_open_with_apps"),
+  /** Otevře poznámku v aplikaci `app` (id z `noteOpenWithApps`); chyba = český text z jádra. */
+  noteOpenWith: (path: string, app: string) => call("note_open_with", { path, app }),
   noteEditDraftSave: (draft: EditDraft | null) => call("note_edit_draft_save", { draft }),
   noteEditDraftLoad: () => call<EditDraft | null>("note_edit_draft_load"),
   notePrefill: () => call<string | null>("note_prefill"),
@@ -84,6 +94,8 @@ export const api = {
   // --- lístky na plochu (Rust `pins/`, `commands/pins.rs`) ---
   /** Šuplík: připnout poznámku na plochu / odepnout; true = je připnutá. */
   pinToggle: (path: string) => call<boolean>("pin_toggle", { path }),
+  /** Z okna lístku: otevře šuplík na editoru téhle poznámky (Rust pošle šuplíku `edit-note`). */
+  pinEditInLedge: (path: string) => call("pin_edit_in_ledge", { path }),
   /** Šuplík / paleta: nová poznámka hned jako lístek na ploše (s fokusem). Vrací cestu. */
   pinNew: () => call<string>("pin_new"),
   /** Průchozí režim u všech lístků přepnout; null = žádný lístek není na ploše. */

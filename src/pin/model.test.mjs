@@ -1,7 +1,7 @@
 // Lístky na plochu — čistá logika (`model.ts`): přidání bodu / textu, barvy, připnutí ze snapshotu.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anyThrough, appendLine, isPinned, isTaskLine, pinColors, samePath, taskLine, TEXT_MIN } from "./model.ts";
+import { anyThrough, appendLine, caretFromText, isPinned, isTaskLine, pinColors, pointLine, samePath, taskLine, TEXT_MIN } from "./model.ts";
 
 test("taskLine: bod checklistu z textu", () => {
   const cases = [
@@ -28,6 +28,27 @@ test("appendLine: bod pod bod, jinak nový odstavec, prázdné nic", () => {
   assert.ok(isTaskLine("  * [X] x") && !isTaskLine("- [] x") && !isTaskLine("[ ] x"));
 });
 
+test("číslovaný seznam: řádky se lepí a „+ bod“ pokračuje číslováním", () => {
+  assert.ok(isTaskLine("1. a") && isTaskLine("  12) b") && !isTaskLine("1.a") && !isTaskLine("rok 2024. dobrý"));
+  const pointCases = [
+    ["1. a\n2. b\n", "nová položka", "3. nová položka"],
+    ["Seznam\n\n1) a\n2) b", "c", "3) c"],
+    ["  1. vnořená", "x\ny", "  2. x y"],
+    ["9. a", "b", "10. b"],
+    ["- [ ] a", "b", "- [ ] b"],
+    ["text", "b", "- [ ] b"],
+    ["", "b", "- [ ] b"],
+    ["1. a", "  ", ""],
+  ];
+  for (const [body, text, want] of pointCases) assert.equal(pointLine(body, text), want, JSON.stringify([body, text]));
+  const cases = [
+    ["1. a\n2. b\n", "3. c", "1. a\n2. b\n3. c"],
+    ["Lístek\n\n1. a", "- [ ] b", "Lístek\n\n1. a\n- [ ] b"],
+    ["1. a", "text mimo seznam", "1. a\n\ntext mimo seznam"],
+  ];
+  for (const [body, line, want] of cases) assert.equal(appendLine(body, line), want, JSON.stringify([body, line]));
+});
+
 test("pinColors: rozsahy, text nikdy pod hranici, stín u průhledného pozadí", () => {
   assert.deepEqual(pinColors(100, 100), { background: "rgba(24, 26, 32, 1)", bar: "rgba(24, 26, 32, 1)", color: "rgba(244, 245, 248, 1)", shadow: "none" });
   const glass = pinColors(20, 0);
@@ -49,4 +70,20 @@ test("připnutí ze snapshotu: cesty bez ohledu na velikost a lomítka", () => {
   assert.ok(anyThrough(pins));
   assert.ok(!anyThrough({ open: [pins.open[0]], key: "" }));
   assert.ok(!anyThrough(null));
+});
+
+test("caretFromText: dvojklik do vykresleného textu → pozice v těle", () => {
+  const body = "Nadpis\n\n- [ ] koupit **mléko** a chleba\n2. druhý bod\nposlední řádek";
+  const at = (s, i) => body.indexOf(s) + i;
+  const cases = [
+    ["Nadpis", 3, 3],
+    ["koupit ", 3, at("koupit", 3)],
+    [" a chleba", 3, at(" a chleba", 3)],
+    ["druhý bod", 0, at("druhý bod", 0)],
+    ["druhý bod", 9, at("druhý bod", 9)],
+    ["poslední řádek", 14, body.length],
+    ["neexistuje", 2, null],
+    ["   ", 1, null],
+  ];
+  for (const [node, off, want] of cases) assert.equal(caretFromText(body, node, off), want, JSON.stringify([node, off]));
 });

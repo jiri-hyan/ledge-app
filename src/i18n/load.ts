@@ -17,6 +17,7 @@ import "./en-costs";
 import "./en-shelf";
 import "./en-cliphist";
 import "./en-media";
+import "./en-suggest";
 import "./en-calendar";
 import "./en-integrations";
 import "../accounts/en";

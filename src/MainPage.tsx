@@ -8,7 +8,7 @@
 // Vlna 8 P: vzhled karty (⋯ → „Vzhled karty…“, panel `layout/CardLook.tsx` pod mřížkou, varianty zobrazení
 // karet `viewOf`) a vzhled zástupců (pravý klik → `tilelook/TileMenu.tsx`).
 // Dynamické karty (widgety ze skriptů `widget:<soubor>`) kreslí `widgets/WidgetCard.tsx` z `Snapshot.widgets`.
-import { createEffect, createMemo, on as onChange, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, on as onChange, onCleanup, Show, type JSX } from "solid-js";
 import type { Snapshot } from "./api";
 import type { NotesNav } from "./nav";
 import ClaudeSessions, { ClaudeInbox } from "./ClaudeSessions";
@@ -38,6 +38,7 @@ import CardLookPanel, { closeCardLook, lookFor } from "./layout/CardLook";
 import { viewOf } from "./layout/look";
 import TileMenu from "./tilelook/TileMenu";
 import { closeLook } from "./tilelook/state";
+import { setActivePage } from "./theme/apply";
 import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
 import { isLink, visibleGroups } from "./actions/model";
 import { lastResult } from "./actions/api";
@@ -51,6 +52,7 @@ import { colsNow } from "./layout/cols";
 import { t } from "./i18n";
 import WidgetCard from "./widgets/WidgetCard";
 import { rememberWidgets } from "./widgets/registry";
+import SuggestBar from "./suggest/SuggestBar";
 
 export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
   // stejné rozložení = stejný objekt (nový snapshot karty nepřestaví)
@@ -66,7 +68,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     actions: visibleGroups([...(p.s.actions ?? []).filter((a) => !(has("links") && isLink(a))), ...(p.s.scripts ?? [])], page().id).reduce((n, g) => n + g.items.length, 0),
     scriptOut: !!lastResult()?.id.startsWith("script:"),
     shelf: shelfShown(),
-    media: !!((on("nowPlaying") && p.s.personal.media) || (on("sound") && p.s.personal.volume)),
+    media: !!((on("nowPlaying") && p.s.personal.media) || (on("sound") && p.s.personal.volume) || (on("favorites") && p.s.personal.mediaLook?.favorites?.length)),
   });
   const shown = () => shownCards(page(), facts()).map((c) => c.id);
   const shows = (id: CardId) => shown().includes(id);
@@ -80,6 +82,9 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const tiles = () => tilesOf(cardOf("projects"));
   /** varianta zobrazení karty (vzhled karty; i rozpracovaný v panelu) */
   const view = (id: CardId) => viewOf(id, lookFor(page().id, id, cardOf(id)?.look));
+  // vzhled záložky (`appearance.pages`, `theme/pages.ts`): platí, dokud je hlavní stránka vidět
+  createEffect(() => setActivePage(page().id));
+  onCleanup(() => setActivePage(""));
   // jiná záložka / konec úprav: otevřené panely vzhledu se uloží a zavřou
   createEffect(onChange([() => page().id, editing], () => {
     void closeLook(true, editing());
@@ -94,6 +99,11 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   );
   /** baterie v kartě Čas: jen stroj s baterií a zapnutá část */
   const battery = () => (on("battery") ? p.s.personal.battery : null);
+  /** části karty Právě hraje, které jdou v ⋯ skrýt (hlasitost, oblíbené) — vždy zbyde jiná část */
+  const mediaParts = (): PartKey[] => [
+    ...(on("nowPlaying") && on("sound") && p.s.personal.volume ? (["sound"] as const) : []),
+    ...(on("favorites") && (on("nowPlaying") || on("sound")) ? (["favorites"] as const) : []),
+  ];
   const inbox = () => p.s.pending.length + p.s.questions.length > 0;
   const has = (id: CardId) => pageHas(page(), id);
   // názvy umístěných widgetů pro katalog a „karta odebrána“
@@ -117,7 +127,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       case "shelf":
         return <ShelfCard wide menu={menu("shelf")} />;
       case "clock":
-        return <ClockCard now={p.now} battery={battery()} menu={menu("clock", battery() ? ["battery"] : [])} />;
+        return <ClockCard now={p.now} battery={battery()} hideBattery={!on("battery")} menu={menu("clock", battery() ? ["battery"] : [])} />;
       case "timer":
         return <TimerCard s={p.s} now={p.now} menu={menu("timer")} />;
       case "weather":
@@ -129,7 +139,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       case "mail":
         return <MailCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("mail")} />;
       case "media":
-        return <MediaCard s={p.s} menu={menu("media", on("nowPlaying") && on("sound") && p.s.personal.volume ? ["sound"] : [])} />;
+        return <MediaCard s={p.s} menu={menu("media", mediaParts())} />;
       case "github":
         return <GithubCard now={p.now} cfgError={p.s.cfgError} menu={menu("github")} />;
       case "system":
@@ -147,8 +157,10 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       <BgLaunch s={p.s} />
       {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
       <Show when={has("media") || has("clock")}><PersonalLive /></Show>
+      {/* kontextové návrhy (max 3 chipy) — jen z reálných událostí, `src/suggest/` */}
+      <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
       <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} begin={() => edit()} />
-      <CardLookPanel page={page().id} />
+      <CardLookPanel page={page().id} s={p.s} />
       <TileMenu />
       <Show when={editing() && catalogOpen()}><Catalog layout={layout()} /></Show>
       <Show when={!editing() && page().cards.length === 0}>
@@ -165,8 +177,8 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       </Show>
       <Show when={editing() && page().cards.length === 0 && !catalogOpen()}>
         <div class="empty page-empty">
-          {t("cards.layout.emptyTabEdit", "Prázdná záložka — přidej kartu z katalogu.")}
-          <button class="mini" onClick={() => setCatalogOpen(true)}>{t("cards.layout.firstCard", "Přidej první kartu")}</button>
+          {t("cards.layout.emptyTabEdit2", "Prázdná záložka — přetáhni sem kartu z jiné záložky (pusť ji na ouško této záložky) nebo ji přidej z katalogu.")}
+          <button class="mini" onClick={() => setCatalogOpen(true)}>{t("cards.layout.openCatalog", "Otevřít katalog")}</button>
         </div>
       </Show>
       <HiddenNotice cfgError={p.s.cfgError} />

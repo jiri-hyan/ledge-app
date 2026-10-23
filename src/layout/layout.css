@@ -49,6 +49,11 @@
 .deck.editing .deck-item.lifted { outline: none; }
 .deck-item.lifted > * { visibility: hidden; }
 .lay-slot { pointer-events: none; }
+/* velikost karty po dopadu (`2 × 3`) uprostřed mezery — `Deck` dává `data-dim` jen zvednuté položce */
+.deck-item.lifted[data-dim]::before { content: attr(data-dim); position: absolute; left: 50%; top: 50%; z-index: 1; transform: translate(-50%, -50%); font: 700 var(--fs-md) var(--mono); color: var(--t0); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 2px 8px; box-shadow: var(--shadow-toast); pointer-events: none; }
+/* hlavičkou se karta zvedne podržením (mimo úpravy) — ukazatel to naznačí, ovládací prvky v ní zůstanou */
+.deck:not(.editing) .deck-item > :first-child > h4 { cursor: grab; }
+.deck:not(.editing) .deck-item > :first-child > h4 :is(button, a, input, [data-cmenu]) { cursor: pointer; }
 .deck-item.lifted::after { content: ""; position: absolute; inset: 0; border: 2px dashed var(--accent); border-radius: var(--r-xl); background: color-mix(in srgb, var(--accent) 9%, transparent); pointer-events: none; }
 /* „duch“ (kopie karty z cardDrag.ts): pevně pod kurzorem, poloprůhledný, nic nezachytává */
 .deck > .deck-item.lay-fly { position: fixed; left: 0; top: 0; z-index: 70; margin: 0; max-height: none; pointer-events: none; opacity: 0.78; box-shadow: var(--shadow-pop); will-change: transform; }
@@ -98,7 +103,9 @@
 /* prodleva nad ouškem při tahu karty: proužek se plní 600 ms (= `DWELL_MS` v dnd.ts), pak se záložka přepne */
 .lay-tab.drop::after { content: ""; position: absolute; left: 4px; right: 4px; bottom: -4px; height: 3px; border-radius: 2px; background: var(--accent); transform-origin: left; animation: lay-dwell 600ms linear forwards; }
 @keyframes lay-dwell { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.lay-tab.drag-to { box-shadow: inset 2px 0 0 var(--accent); }
+/* záložku chytíš tahem (v úpravách) / podržením (mimo ně) — `tabDrag.ts`; ukazatel to říká */
+.lay-tabs.editing .lay-tab > button[data-tab] { cursor: grab; touch-action: none; user-select: none; }
+.lay-tabs.dragging .lay-tab > button[data-tab] { cursor: grabbing; }
 .lay-tab-icon { margin-right: var(--s1); }
 .lay-tabs .lay-tab-x { padding: 2px 6px; margin-left: -4px; font-size: var(--fs-sm); color: var(--t3); }
 .lay-tabs .lay-tab-x:hover { color: var(--red); }

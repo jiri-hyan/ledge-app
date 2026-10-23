@@ -1,0 +1,17 @@
+/* Pruh kontextových návrhů nahoře v šuplíku (SuggestBar): až 3 chipy pod sebou, jen tokeny ze styles.css.
+   Prefix `sg-`. Žádná animace kromě přechodu pozadí (chip se objeví a zmizí se snapshotem). */
+.sg-bar { display: flex; flex-direction: column; gap: var(--s1); margin-bottom: var(--s2); min-width: 0; }
+.sg-chip { display: flex; align-items: center; gap: var(--s2); min-width: 0; padding: 5px 6px 5px 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); font-size: var(--fs-sm); color: var(--t1); }
+.sg-ico { display: grid; flex-shrink: 0; color: var(--t3); }
+.sg-ico svg { width: 15px; height: 15px; }
+.sg-chip[data-kind="ghCi"] .sg-ico { color: var(--red); }
+.sg-chip[data-kind="reminder"] .sg-ico { color: var(--amber); }
+.sg-chip[data-kind="ghReview"] .sg-ico { color: var(--violet); }
+.sg-chip[data-kind="dev"] .sg-ico { color: var(--green); }
+.sg-chip[data-kind="clip"] .sg-ico { color: var(--accent); }
+.sg-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sg-more { flex-shrink: 0; font: var(--fs-2xs) var(--mono); color: var(--t3); }
+.sg-act { flex-shrink: 0; color: var(--t0); }
+.sg-x { flex-shrink: 0; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--t3); font-size: 15px; line-height: 1; transition: background var(--fast), color var(--fast); }
+.sg-x:hover { background: var(--card-2); color: var(--t1); }
+.sg-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }

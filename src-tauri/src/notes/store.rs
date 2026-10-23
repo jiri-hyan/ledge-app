@@ -87,7 +87,7 @@ pub fn parse_note(path: &Path, text: &str, folder_project: Option<&str>, fallbac
 
 // ---------- jména a cesty ----------
 
-fn fold(c: char) -> char {
+pub(crate) fn fold(c: char) -> char {
     match c {
         'á' | 'ä' | 'à' | 'â' => 'a',
         'č' | 'ç' => 'c',

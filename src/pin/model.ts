@@ -13,16 +13,31 @@ export const BG_RGB = "24, 26, 32";
 export const FG_RGB = "244, 245, 248";
 
 const TASK = /^\s*[-*+] \[[ xX]\]/;
-export const isTaskLine = (l: string) => TASK.test(l);
+const NUMBERED = /^(\s*)(\d+)([.)])\s/;
+/** Řádek seznamu, který se za sebe lepí bez prázdného řádku: bod checklistu `- [ ]` nebo číslovaná položka `1.` / `1)`. */
+export const isTaskLine = (l: string) => TASK.test(l) || NUMBERED.test(l);
+
+const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 
 /** Bod checklistu z napsaného textu (víc řádků = jeden bod). Prázdný text = "". */
 export function taskLine(text: string): string {
-  const t = text.replace(/\s+/g, " ").trim();
+  const t = flat(text);
   return t ? `- [ ] ${t}` : "";
 }
 
-/** Přidá řádek(y) na konec těla. Bod za bodem jde hned pod něj (jeden seznam), cokoli jiného
- *  odděluje prázdný řádek (nový odstavec / nový seznam). Prázdné přidání tělo nezmění. */
+/** Řádek pro „+ bod“ za konec `body`: končí-li tělo číslovanou položkou, pokračuje číslováním (`N+1. text`,
+ *  stejné odsazení a oddělovač) — šéf píše čísla; jinak bod checklistu. Prázdný text = "". */
+export function pointLine(body: string, text: string): string {
+  const t = flat(text);
+  if (!t) return "";
+  const base = body.replace(/\s+$/, "");
+  const last = base.slice(base.lastIndexOf("\n") + 1);
+  const m = NUMBERED.exec(last);
+  return m ? `${m[1]}${Number(m[2]) + 1}${m[3]} ${t}` : `- [ ] ${t}`;
+}
+
+/** Přidá řádek(y) na konec těla. Položka za položkou (bod, číslo) jde hned pod ni (jeden seznam), cokoli
+ *  jiného odděluje prázdný řádek (nový odstavec / nový seznam). Prázdné přidání tělo nezmění. */
 export function appendLine(body: string, line: string): string {
   const add = line.replace(/\r\n?/g, "\n").replace(/\s+$/, "").replace(/^\n+/, "");
   if (!add.trim()) return body;
@@ -58,3 +73,43 @@ export type PinsLike = { open: PinRef[]; key: string } | undefined | null;
 
 export const isPinned = (pins: PinsLike, path: string) => !!pins?.open.some((p) => samePath(p.path, path));
 export const anyThrough = (pins: PinsLike) => !!pins?.open.some((p) => p.through);
+
+/** Začátek textu řádku Markdownu (odsazení, odrážka / číslo / úkol / nadpis / citace). */
+const LEAD = /^(?:\s*(?:[-*+] \[[ xX]\] |[-*+] |\d+[.)] |#{1,6} |> ?))*\s*/;
+const INLINE = "*_`~";
+
+/** Řádek bez značek Markdownu + pro každý znak jeho pozice v původním řádku. */
+function plainOf(line: string): { plain: string; at: number[] } {
+  const at: number[] = [];
+  let plain = "";
+  for (let i = LEAD.exec(line)![0].length; i < line.length; i++) {
+    if (INLINE.includes(line[i])) continue;
+    plain += line[i];
+    at.push(i);
+  }
+  return { plain, at };
+}
+
+/** Kam v těle poznámky dát kurzor při dvojkliku do vykresleného textu: `nodeText` je text uzlu pod
+ *  kurzorem myši, `offset` pozice v něm. Najde řádek těla, který ten text obsahuje (bez značek Markdownu),
+ *  a vrátí pozici v těle; `null` = nenašel (volající dá kurzor na konec). Best-effort: odkazy a tabulky
+ *  nemapuje přesně, shodné řádky vezme první. */
+export function caretFromText(body: string, nodeText: string, offset: number): number | null {
+  const full = nodeText.replace(/\s+/g, " ");
+  const needle = full.trim();
+  if (!needle) return null;
+  const lead = full.length - full.trimStart().length;
+  const pre = nodeText.slice(0, Math.max(0, offset)).replace(/\s+/g, " ").length;
+  const pos = Math.min(needle.length, Math.max(0, pre - lead));
+  let start = 0;
+  for (const line of body.split("\n")) {
+    const { plain, at } = plainOf(line);
+    const hit = plain.replace(/\s+/g, " ").indexOf(needle);
+    if (hit >= 0 && plain.length === plain.replace(/\s+/g, " ").length) {
+      const i = hit + pos;
+      return start + (i < at.length ? at[i] : at.length ? at[at.length - 1] + 1 : line.length);
+    }
+    start += line.length + 1;
+  }
+  return null;
+}

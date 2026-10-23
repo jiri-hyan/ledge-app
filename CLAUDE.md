@@ -5,7 +5,9 @@ Always-on „šuplík“ u horního okraje obrazovky (Windows; Tauri 2 + Rust v 
 
 **Začni levně:** [`docs/codemap/README.md`](docs/codemap/README.md) → mapa tvé oblasti → teprve pak
 konkrétní soubory. Moduly jsou malé (většinou < 500 řádků) — čti jen ty, které mapa jmenuje.
-[`AGENTS.md`](AGENTS.md) (config, formát poznámek, API, instalace) čti jen v potřebné sekci.
+Symbol nebo slovo najdeš jedním příkazem: `node scripts/kde.mjs <symbol>` (definice `soubor:řádek` + které
+mapy ho zmiňují). [`AGENTS.md`](AGENTS.md) je rozcestník k `docs/agents/*.md` (config, formát poznámek,
+API/MCP, instalace) — čti jen potřebný soubor, ne celý.
 Historie kol a backlog nejsou v repu (interní předávka mimo strom).
 
 ## Nepřekročitelná pravidla
@@ -23,5 +25,15 @@ Historie kol a backlog nejsou v repu (interní předávka mimo strom).
 - Commity česky, Conventional Commits, explicitní `git add <cesty>`, nikdy `--no-verify`.
 - Nová logika = čistá funkce + tabulkový test; moduly pod ~600 řádků; při změně oblasti oprav její
   codemapu.
-- Ověření: `cd src-tauri && cargo test`, `cargo clippy --all-targets`, `npx tsc --noEmit`,
-  `corepack pnpm build`. Vydání: `powershell -File scripts/publish.ps1` (viz `AGENTS.md`).
+- Ověření: `node scripts/brany.mjs --changed` (rychlá brána podle změněných souborů), plně `node scripts/brany.mjs`
+  (= `cargo test`, `cargo clippy --all-targets`, `npx tsc --noEmit`, `test:ui` vč. testu hniloby codemap,
+  `corepack pnpm build`). Vydání: `powershell -File scripts/publish.ps1` (viz `docs/agents/install.md`).
+
+## Workeři a kola
+
+- Worker má větev `wN/<oblast>` (worktree `notch-wt/wN-<oblast>`); necommituje mimo ni a nepushuje.
+- Lead merguje non-ff: `merge: <popis> (kolo N)`. Worker na konci aktualizuje codemapu své oblasti
+  (`scripts/codemap.test.mjs` hlídá, že neodkazuje na neexistující soubory ani symboly).
+- Sdílený `CARGO_TARGET_DIR=src-tauri/target-agents`. Orientace: `node scripts/kde.mjs <symbol>`.
+- Worktree past: `node_modules` je junction — před `git worktree remove` nejdřív
+  `cmd //c rmdir <wt>\node_modules`, jinak se smaže i obsah cíle.

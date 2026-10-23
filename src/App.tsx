@@ -59,12 +59,13 @@ export default function App() {
     api.focusDrawer();
   }
   /** Úprava poznámky v Ledge (klik na řádek) — po uložení / Esc zpět, odkud se přišlo. */
-  function editNote(n: NoteView) {
+  function editNotePath(path: string) {
     setReturnTo(page() === "notes" ? "notes" : "main");
-    setEditPath(n.path);
+    setEditPath(path);
     setPage("note");
     api.focusDrawer();
   }
+  const editNote = (n: NoteView) => editNotePath(n.path);
   /** Celá stránka Poznámky („+N dalších“); `general` = jen bez projektu (záložka Osobní). */
   function allNotes(general = false) {
     setPageProject(general ? "" : "*");
@@ -148,7 +149,7 @@ export default function App() {
         easing: breath.easing,
       });
     }
-    revealContent(content, 60);
+    revealContent(content, 60, plan.reveal);
     measure("open", plan.duration + 120);
   }
 
@@ -177,6 +178,8 @@ export default function App() {
       on<ViewMsg>("closing", closing),
       on<boolean>("glass", (g) => (document.documentElement.dataset.glass = g ? "on" : "off")),
       on<string>("page", (p) => setPage(asPage(p))),
+      // lístek na ploše → „Upravit v Ledge“ (Rust pošle cestu poznámky, šuplík se otevře na jejím editoru)
+      on<string>("edit-note", editNotePath),
       initAppearance(),
     );
 

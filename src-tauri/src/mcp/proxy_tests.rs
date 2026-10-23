@@ -88,10 +88,12 @@ fn real_pipes() {
     let srv = Arc::new(super::super::tests::server());
     let key = srv.keys.ensure().unwrap();
     let host = Arc::new(super::super::tests::MemHost::new(true));
-    let port = crate::ports::ephemeral().unwrap();
-    let claude = crate::claude::Claude::new(Arc::new(|| {}), Duration::from_secs(1));
     let (s2, h2) = (srv.clone(), host.clone());
-    crate::claude::serve(port, claude, Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(move |r: &super::super::HttpReq| super::super::handle_http(&s2, h2.as_ref(), r))).unwrap();
+    let (port, ()) = crate::ports::with_free_port(|port| {
+        let claude = crate::claude::Claude::new(Arc::new(|| {}), Duration::from_secs(1));
+        let (s3, h3) = (s2.clone(), h2.clone());
+        crate::claude::serve(port, claude, Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(move |r: &super::super::HttpReq| super::super::handle_http(&s3, h3.as_ref(), r)))
+    });
 
     let mut child = Command::new(std::env::current_exe().unwrap())
         .args(["--exact", "mcp::proxy::tests::pipe_child", "--nocapture", "--test-threads=1", "-q"])

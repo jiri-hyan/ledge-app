@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DWELL_MS, HOLD_MS, HOLD_SLOP, NO_DWELL, canHold, contentPoint, dwellStep, flipDeltas, flipPlan, flyPos, grabOffset, holdStep, inBox, insertAt, insertIndex,
-  CONTROL_SELECTOR, EDIT_CONTROL_SELECTOR, HEADER_SELECTOR,
+  CONTROL_SELECTOR, EDIT_CONTROL_SELECTOR, HEADER_SELECTOR, NEW_TAB, dropHint, landTransforms, nearestCenter, offsetRect,
 } from "./dnd.ts";
 import { gridDropIndex, moveToPage, moveToPageAt, normalizeLayout, pageOf, rectGap } from "./model.ts";
 
@@ -177,4 +177,36 @@ test("FLIP plán: délka z rychlosti Ledge, „bez animací“ a omezení pohybu
   ];
   for (const [style, speed, reduced, ms] of cases) assert.equal(flipPlan(style, speed, reduced)?.ms ?? null, ms, `${style} ${speed} ${reduced}`);
   assert.ok(flipPlan("spring", 1, false).easing.startsWith("cubic-bezier"));
+});
+
+test("přistání ducha: posun na mezeru, při jiné velikosti i scale; offsetRect nezávisí na animacích", () => {
+  const ghost = { w: 300, h: 120 };
+  // stejná velikost = čistý posun; jinak scale z levého horního rohu
+  assert.deepEqual(landTransforms({ x: 10.4, y: 20.6 }, ghost, { x: 100, y: 200, w: 300, h: 120 }), { from: "translate(10px, 21px)", to: "translate(100px, 200px)" });
+  assert.deepEqual(landTransforms({ x: 0, y: 0 }, ghost, { x: 50, y: 60, w: 150, h: 240 }), { from: "translate(0px, 0px)", to: "translate(50px, 60px) scale(0.5, 2)" });
+  assert.equal(landTransforms({ x: 0, y: 0 }, { w: 0, h: 0 }, { x: 1, y: 2, w: 10, h: 10 }).to, "translate(1px, 2px)", "nulový duch nedělí nulou");
+  const host = { left: 10, top: 80, clientLeft: 1, clientTop: 1, scrollLeft: 0, scrollTop: 150 };
+  assert.deepEqual(offsetRect(host, { offsetLeft: 112, offsetTop: 400, offsetWidth: 300, offsetHeight: 100 }), { x: 123, y: 331, w: 300, h: 100 });
+});
+
+test("záložky: nejbližší střed; zástupná záložka „+“ se liší od každého id", () => {
+  const centers = [40, 120, 200, 280];
+  const cases = [["před první", -50, 0], ["první", 60, 0], ["přesně mezi = první z dvojice", 80, 0], ["za polovinou", 81, 1], ["poslední", 400, 3]];
+  for (const [name, x, want] of cases) assert.equal(nearestCenter(centers, x), want, name);
+  assert.equal(nearestCenter([], 5), 0);
+  assert.ok(!/^[a-z0-9-]+$/.test(NEW_TAB), "není platné id záložky (a-z, 0-9, pomlčka) — nesplete se s žádnou");
+});
+
+test("popisek zóny při tahu: Skrýt, Na záložku, Nová záložka, už tam je", () => {
+  const base = { zone: false, tab: null, tabHas: false, foreignHas: false };
+  const cases = [
+    ["obyčejné místo v mřížce = bez štítku", base, null],
+    ["zóna Skrýt má přednost", { ...base, zone: true, tab: "hry" }, { kind: "hide" }],
+    ["ouško záložky", { ...base, tab: "hry" }, { kind: "tab", tab: "hry", there: false }],
+    ["ouško záložky, kde karta už je", { ...base, tab: "hry", tabHas: true }, { kind: "tab", tab: "hry", there: true }],
+    ["tlačítko +", { ...base, tab: NEW_TAB, tabHas: true }, { kind: "newTab" }],
+    ["cizí záložka, kde karta už je", { ...base, foreignHas: true }, { kind: "alreadyHere" }],
+    ["ouško má přednost před cizí mřížkou", { ...base, tab: "hry", foreignHas: true }, { kind: "tab", tab: "hry", there: false }],
+  ];
+  for (const [name, i, want] of cases) assert.deepEqual(dropHint(i), want, name);
 });

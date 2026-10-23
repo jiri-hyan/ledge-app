@@ -24,6 +24,7 @@
 .tl-ed-title b { font-size: var(--fs-ui); color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl-ed-title small { font-size: var(--fs-sm); color: var(--t3); }
 .tl-ed-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); }
+.tl-ed-col { display: flex; flex-direction: column; gap: var(--s1); }
 .tl-ed-cap { min-width: 64px; font-size: var(--fs-xs); font-weight: 600; color: var(--t3); }
 .tl-ed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 1fr)); gap: 2px; max-height: 132px; overflow-y: auto; overscroll-behavior: contain; padding: 2px; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-sm); }
 .tl-ed-grid button { height: 30px; border-radius: var(--r-xs); font-size: var(--fs-md); color: var(--t1); display: grid; place-items: center; }

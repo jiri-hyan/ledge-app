@@ -23,18 +23,29 @@ oprav i jeho mapu (je to součást hotové práce).
 | Osobní: kalendář — zdroje (ICS, Outlook v PC, místo pro účty), parser, opakování, pásma, Připojit, připomínky, karta, editor | [calendar.md](calendar.md) | `calendar/*` (ics, expand, tz, view, conf, source, outlook, meeting, remind, live, cache), `commands/calendar.rs`, `src/calendar/*` |
 | Účty Microsoft / Google (OAuth PKCE, Správce pověření), kalendář účtů, karta Pošta, položka proužku `mail`, Nastavení → Účty | [accounts.md](accounts.md) | `accounts/*`, `calendar/graph.rs`, `calendar/google.rs`, `calendar/source.rs`, `commands/accounts.rs`, `src/accounts/*` |
 | Osobní: právě hraje (GSMTC, průběh skladby, 5 vzhledů karty), hlasitost (Core Audio), baterie — události, žádný polling | [media.md](media.md) | `media.rs`, `mediatime.rs`, `mediaconf.rs`, `volume.rs`, `battery.rs`, `commands/media.rs`, `src/media/*` |
+| Kontextové návrhy: pruh nahoře v šuplíku (max 3 chipy z reálných událostí: připomínka, PR k revizi / spadlé CI, dev server, odkaz ze schránky), `pick`, zavření na 24 h; puls proužku u GitHubu | [suggest.md](suggest.md) | `suggest/*`, `attention.rs` (nové události), `src/suggest/*`, `src/types/suggest.ts` |
 | Integrace: karta GitHub (`gh`, PR k revizi / vlastní PR s CI / notifikace), karta Systém (CPU, paměť, disky, síť z WinAPI), plánovač položek proužku | [integrations.md](integrations.md) | `github/*`, `sysmon/*`, `integrations.rs`, `commands/integrations.rs`, `src/integrations/*` |
 | MCP server pro Clauda: `/mcp` na mostu, JSON-RPC, nástroje (zástupci, akce, rozložení, proužek, vzhled), klíč ve Správci pověření, Vrátit, stdio proxy `ledge.exe --mcp`, Nastavení → Claude (MCP) | [mcp.md](mcp.md) | `mcp/*`, `commands/mcp.rs`, `src/mcp/*` |
 | Jádro: stav, vlákna, příkazy, okna (vč. náhledu po najetí `drawer.hover`), proužek, trigger, procesy | [core.md](core.md) | `lib.rs`, `state.rs`, `snapshot.rs`, `threads/*`, `commands/*`, `drawer.rs`, `hovermode.rs`, `strip.rs`, `edge.rs`, `screen.rs`, `procman.rs` |
 
-Mimo mapy: `AGENTS.md` = config, formát poznámek, lokální API, instalace, pravidla (čti jen potřebnou
-sekci).
+Mimo mapy: [`AGENTS.md`](../../AGENTS.md) = rozcestník k `docs/agents/*.md` (config, formát poznámek, lokální API,
+MCP, instalace, pravidla) — čti jen potřebný soubor.
+
+## Najdi symbol
+
+```
+node scripts/kde.mjs <symbol|slovo>   # definice (soubor:řádek) + které mapy / docs/agents ho zmiňují
+```
+
+Mapy hlídá `scripts/codemap.test.mjs` (součást `test:ui`): soubory ve sloupci „soubor“ musí existovat
+(`x.rs` ≙ `x/mod.rs`, `x.ts` ≙ `x/index.ts`), identifikátory ve „klíčových symbolech“ musí být v kódu.
 
 ## Ověření
 
 ```
 node scripts/brany.mjs            # test, clippy, tsc, ui, build — jeden řádek na bránu, log jen při selhání
 node scripts/brany.mjs test ui    # jen vybrané
+node scripts/brany.mjs --changed  # jen to, co změněné soubory vyžadují (src → tsc ui; src-tauri → test clippy; docs → ui)
 ```
 
 Ručně postaru: `cd src-tauri && cargo test` (+ `cargo clippy --all-targets`), `npx tsc --noEmit`,

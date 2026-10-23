@@ -3,13 +3,15 @@
 //! nevydává) start, volby, posun, odepnutí. Obsah poznámky jde přes příkazy poznámek (`note_read`,
 //! `note_save`, `note_toggle_task`) — žádný druhý zápis.
 
+use crate::drawer::{self, Opener, View};
 use crate::i18n::tr;
 use crate::notes;
 use crate::pins::{self, PinPatch, PinPrefs, win};
-use crate::state::{core, mark_dirty};
+use crate::state::{UiCmd, core, mark_dirty};
 use crate::threads::notes_sync::{SyncMsg, send_sync};
 use crate::threads::notes_watch::{notes_root, reload_notes};
-use tauri::WebviewWindow;
+use std::path::Path;
+use tauri::{Emitter, WebviewWindow};
 
 fn off() -> &'static str {
     tr("Poznámky jsou vypnuté v Nastavení.", "Notes are off in Settings.")
@@ -93,6 +95,20 @@ pub(crate) fn pin_drag(window: WebviewWindow) -> Result<(), String> {
         return Ok(());
     }
     window.start_dragging().map_err(|e| e.to_string())
+}
+
+/// Okno lístku: „Upravit v Ledge“ = otevře poznámku v editoru šuplíku. Cesta se ověří jako u
+/// `note_open` (jen soubor v úložišti), šuplík se zobrazí jako po zkratce (výslovný klik uživatele →
+/// smí vzít fokus) a editor dostane událost `edit-note` s cestou (string).
+#[tauri::command(async)]
+pub(crate) fn pin_edit_in_ledge(window: WebviewWindow, path: String) -> Result<(), String> {
+    pin_label(&window)?;
+    let root = notes_root().ok_or_else(off)?;
+    // jen ověření; UI dostane cestu tak, jak ji zná (klíč karty), ne kanonickou
+    notes::check_note_path(&root, Path::new(&path))?;
+    let c = core();
+    c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
+    c.app.emit_to(drawer::LABEL, "edit-note", path).map_err(|e| e.to_string())
 }
 
 /// Okno lístku: ✕ = odepnout (poznámka zůstane v kartě Poznámky).

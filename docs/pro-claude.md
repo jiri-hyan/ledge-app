@@ -110,12 +110,21 @@ Everything you may do is the tool list below. The names are exact.
 | `layout_get` / `layout_preview` / `layout_apply` | tabs, cards, widths / heights; `layout_preview` validates without writing | apply |
 | `strip_get` / `strip_set` | items of the closed strip | set |
 | `appearance_get` / `appearance_set` | design style, theme, accent (only values from the catalogue) | set |
+| `notes_list` / `notes_read` | the person's notes: compact list (title, kind, project, reminder, tasks done/total), one note with body and tasks (`line`, `done`, `text`) | no |
+| `notes_create` / `notes_append` / `notes_toggle_task` / `notes_pin` | new note (text, kind, project, reminder), add text / bullets / tasks at the end (continues a bullet or numbered list), tick a task, pin a note on the desktop as a sticky | yes |
 | `undo_last` | reverts the last change made over MCP (about 20 steps, in memory) | yes |
 | `open_drawer` | opens the drawer to show the result | no |
 
 Every write goes through the same validation and saving as the UI; an invalid request returns a plain
 sentence (what is wrong, allowed values) - read it and fix the call. Ledge never runs anything because of MCP;
 an action with a command asks the person for consent the first time it is run, exactly like a hand-made one.
+
+**Notes.** The `notes_*` tools work on the person's real notes (the same files as the Notes card). Only touch
+notes when asked ("add milk to my shopping note", "what is on my list today"): `notes_list` first, then
+`notes_read` for the path and the task `line` numbers. `notes_append` refuses when the note changed on disk
+since it was read (sync, an edit in Ledge) - read it again and retry, never overwrite. `project` must be a
+project id from `tiles_list`, `kind` a category id; a reminder is an ISO time (`2026-10-25T09:00`). Notes
+changes are not covered by `undo_last`, so do not create or append speculatively.
 
 **Script:**
 

@@ -130,8 +130,9 @@ mod tests {
     fn bridge(timeout_ms: u64) -> (Claude, u16) {
         // inline: baseline z prvního eventu musí být hotová dřív, než přijde Stop
         let c = Claude::new(Arc::new(|| {}), Duration::from_millis(timeout_ms)).inline().patient();
-        let port = crate::ports::ephemeral().unwrap();
-        serve(port, c.clone(), Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(|_: &crate::mcp::HttpReq| crate::mcp::HttpResp { code: 404, body: String::new(), header: None })).unwrap();
+        let (port, ()) = crate::ports::with_free_port(|port| {
+            serve(port, c.clone(), Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(|_: &crate::mcp::HttpReq| crate::mcp::HttpResp { code: 404, body: String::new(), header: None }))
+        });
         (c, port)
     }
 

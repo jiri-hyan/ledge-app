@@ -72,6 +72,27 @@ impl Host for LiveHost {
         Ok(if on.is_empty() { tr("Šuplík je otevřený.", "The drawer is open.").into() } else { trf!("Šuplík je otevřený na záložce {on}.", "The drawer is open on the {on} tab.") })
     }
 
+    fn notes_root(&self) -> Option<std::path::PathBuf> {
+        crate::threads::notes_watch::notes_root()
+    }
+
+    fn notes_changed(&self) {
+        crate::threads::notes_watch::reload_notes();
+        crate::threads::notes_sync::send_sync(crate::threads::notes_sync::SyncMsg::Local);
+    }
+
+    fn pin_note(&self, path: &std::path::Path, pin: bool) -> Result<String, String> {
+        use crate::pins::win;
+        let p = path.to_string_lossy();
+        if pin {
+            win::open(&p, false)?;
+            Ok(tr("Lístek je na ploše.", "The sticky is on the desktop.").into())
+        } else {
+            win::close(&p);
+            Ok(tr("Lístek je odepnutý (poznámka zůstala).", "The sticky is unpinned (the note stays).").into())
+        }
+    }
+
     fn discover(&self, repos: bool) -> Value {
         let apps = crate::commands::onboarding::scan_apps();
         let taken: Vec<String> = apps.iter().map(|a| a.name.to_lowercase()).collect();

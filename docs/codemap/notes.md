@@ -1,6 +1,6 @@
 # Codemapa: poznámky a připomínky
 
-Formát souboru a pravidla pro agenty: `AGENTS.md` → „Poznámky“. Cituj symbolem, ne číslem řádku.
+Formát souboru a pravidla pro agenty: [agents/notes.md](../agents/notes.md) → „Poznámky“. Cituj symbolem, ne číslem řádku.
 
 ## Soubory
 
@@ -11,32 +11,40 @@ Formát souboru a pravidla pro agenty: `AGENTS.md` → „Poznámky“. Cituj sy
 | `src-tauri/src/notes/store.rs` | `NoteView`, jména a cesty, vytvoření, sken, `done` | `parse_note` `slug` `project_dir_name` `inside` `check_note_path` `NewNote` `valid_kind` `unique_base` `create` `scan` `set_done` |
 | `src-tauri/src/notes/reminders.rs` · `draft.rs` | karta a připomínky, stav peeku · koncept nové, předvyplnění projektu | `due_split` `card` `CARD_ROWS` `reminder_key` `load_peeked` · `Draft*` `draft_*` `preselect` |
 | `src-tauri/src/notes/md.rs` | Markdown → bezpečné HTML, úkoly, titulek karty (čisté funkce) | `to_html` `tasks` `toggle_line` `title` `plain` `image_refs` `relative_image` `esc` |
+| `src-tauri/src/notes/md_list.rs` | zásobník seznamů pro `to_html`: skutečné vnoření `<ul>`/`<ol>`, `start`, pokračovací řádky (čisté) | `Lists` `indent_width` |
+| `src-tauri/src/notes/export.rs` | export poznámky: md bez frontmatteru s titulkem, samostatné HTML s obrázky (čisté) | `Format` `export_md` `export_html` `render` `default_name` `with_ext` |
+| `src-tauri/src/notes/openwith.rs` | „Otevřít v …“: aplikace registrované pro `.md` (`OpenWithProgids`), příkaz z registru → exe + argumenty, jméno do nabídky (čisté) | `MD_PROGIDS_KEY` `expand_env` `command_for` `display_name` |
+| `src-tauri/src/notes/when.rs` | čas v českém textu („zítra v 10“, „v pondělí“, „za 2 h“, „25. 10. v 14:00“, „večer“) → rozsah shody v originálu + čas; složený text bez diakritiky (`search::Folded`), vždy budoucnost, datum bez času = 9:00, ochrana proti verzím / %, telefonům / kapitolám; popisek chipu (`label`, cs + en) | `parse_when` `When` `label` `suggest` `Suggest` |
+| `src-tauri/src/notes/search.rs` | hledání v těle poznámek pro Ctrl+K: `fold_text` / `Folded` (bez diakritiky, 1 znak = 1 znak, mapa bajtů zpět), `words` `matches` `snippet`, `Index` (tělo bez obrázků, líně přestavěný při změně `rev`; hotové se nehledají) | `Index::{build, search}` `Hit` `fold_text` `Folded` `snippet` |
 | `src-tauri/src/notes/edit.rs` | úpravy: čtení s obrázky, uložení s otiskem, kopie, úkol, filtr záložek, rozepsaná úprava | `read` `save` `save_copy` `toggle_task` `apply_meta` `body_view` `hash` `query` `open_kind_counts` `EditDraft` `SaveOutcome` |
 | `src-tauri/src/notes/lifecycle.rs` · `recycle.rs` | archiv (`_archiv`) a smazání: čisté plány přesunu (`rel_of` `refs_of` `split_images` `plan_move` `archive_dir`), přesun s vrácením (`apply`), `archive` `unarchive` `scan_archive`, odklad `.smazane\<id>\` (`park` `unpark` `commit` `sweep`); Koš Windows `SHFileOperationW` + `FOF_ALLOWUNDO` jen na místních discích (`recycle`, do `lifecycle` jde jako parametr — testy na Koš nesahají) | `ARCHIVE_DIR` `TRASH_DIR` `valid_id` `Plan` `Mv` |
 | `src-tauri/src/commands/noteslife.rs` | příkazy `note_archive` `note_unarchive` `note_delete` `note_delete_undo` (+ `keepPin`), čekající smazání `PENDING`, vlákno lhůty `notes-trash` (spí 10 s, pak `commit`), `sweep_trash` při startu z `notes-watch` | `settle` `GRACE` |
 | `src-tauri/src/notesync/mod.rs` | sync gitem: výsledek a stav pro UI, plánovač, vstup běhu | `Outcome` `Status` `outcome_text` `Wake` `Sched` `Ctx` `Syncer::sync` `IGNORE` |
 | `src-tauri/src/notesync/plan.rs` | čisté rozhodování (tabulkové testy) | `plan_init` `classify` `short_err` `sanitize_pc` `ensure_lines` `merge_plan` `Cmp` `Copy` |
 | `src-tauri/src/notesync/git.rs` · `init.rs` · `cycle.rs` | git s termínem a bez promptu · první sync a slučování (clone vedle, prohození, záloha `.pred-sync-…`) · commit → fetch → rebase → push | `git` `setup_repo` `commit_all` · `root_state` `fresh` `clone_merge` `merge_into` · `cycle` |
-| `src-tauri/src/config.rs` | `notes.kinds` (výchozí sada, validace) | `NotesConfig` `NoteKind` `default_note_kinds` `validate_note_kinds` `NOTE_KIND_ICONS` |
-| `src-tauri/src/commands/notes.rs`, `threads/notes_watch.rs`, `snapshot.rs` | tenké příkazy + stav v paměti | `note_create` `note_list` `note_done` `note_open` `note_query` `note_read` `note_save` `note_toggle_task` `note_render` `note_edit_draft_*` `NotesState` `reload_notes` `snapshot` (pole `notes*`, `note_kinds`) |
+| `src-tauri/src/config/notes.rs` | `notes.kinds` (výchozí sada, validace) | `NotesConfig` `NoteKind` `default_note_kinds` `validate_note_kinds` `NOTE_KIND_ICONS` |
+| `src-tauri/src/commands/notes.rs`, `threads/notes_watch.rs`, `snapshot.rs` | tenké příkazy + stav v paměti | `note_create` `note_list` `note_done` `note_open` `note_export` `note_open_with_apps` `note_open_with` `note_query` `note_search` `note_suggest_remind` `note_read` `note_save` `note_toggle_task` `note_render` `note_edit_draft_*` `NotesState` `reload_notes` `snapshot` (pole `notes*`, `note_kinds`) |
 | `src/notes/store.ts` | sdílený stav: preset, `editPath`, návrat, záložka (localStorage), `setDone`, `openExternal` | |
-| `src/notes/draft.ts` · `editdraft.ts` | koncept nové + rozepsaná úprava (paměť + disk), vložení obrázků · čisté rozhodnutí, co s úpravou z disku (prázdná / zastaralá / jiné poznámky) | `openEdit` `loadEditFrom` `edDirty` `edStale` `restoreDraft` `pasteImages` · `planOther` `planSame` |
+| `src/notes/draft.ts` · `editdraft.ts` | koncept nové + rozepsaná úprava (paměť + disk), vložení obrázků · čisté rozhodnutí, co s úpravou z disku (prázdná / zastaralá / jiné poznámky), `trimBody`. `openEdit` čte vždy znovu, řadí otevírání (`openSeq`, `cancelOpen`) a rozepsanou úpravu JINÉ poznámky odloží do `parked` (lišta editoru), nepřepíná tiše | `openEdit` `loadEditFrom` `edDirty` `edStale` `restoreDraft` `pasteImages` `parked` `resumeParked` `dropParked` `syncEdit` `keepMine` `cancelOpen` · `planOther` `planSame` `trimBody` |
 | `src/notes/lifecycle.ts` · `lifeactions.ts` · `lifelabels.tsx` · `lifeicons.tsx` | Splnit · Archivovat · Smazat: akce + lišta „Zpět“ (`notice`, `offerUndo`), čisté `lifeActions` / `isArchivedPath` / `shortTitle`, popisky a ikony | `completeNote` `archiveNote` `unarchiveNote` `deleteNote` `reopenNote` `runUndo` `UNDO_MS` |
 | `src/notes/RowMenu.tsx` · `UndoBar.tsx` | ⋯ řádku (Portal, `placePopup`) · lišta Zpět (šuplík ve `App`, `pin` varianta v lístku) | `runAction` |
-| `src/notes/NoteEditor.tsx` | stránka „note“ (nová i úprava), konflikt, náhled, klávesy Esc / Ctrl+Enter | |
+| `src/notes/NoteEditor.tsx` | stránka „note“ (nová i úprava): název poznámky v hlavičce, konflikt (Načíst · Ponechat moje · kopie), lišta odložené úpravy, živá aktualizace při změně z lístku (`notesRev` → `runSync`), „Uložit a připnout“, náhled, klávesy Esc / Ctrl+Enter, chytré seznamy | |
+| `src/notes/lists.ts` · `listkeys.ts` | chytré seznamy v textarea (editor i lístek): čisté `onEnter` (pokračuje `1.` / `-` / `- [ ]`, prázdná položka seznam ukončí) a `onTab` (vnoření, číslování od `1.`) · napojení na klávesy | `onEnter` `onTab` `parseItem` · `listKey` |
+| `src/notes/NoteMenu.tsx` · `exportActions.ts` | ⋯ editoru (Export) · Markdown / HTML do souboru (`note_export`), kopie do schránky, Otevřít v … (`note_open_with_apps`, `note_open_with`) — sdílí lístek | `exportItems` `exportNote` `copyMarkdown` `openWith` |
 | `src/notes/NotesCard.tsx` | karta se záložkami, `NoteRow`, `Tabs`, `tabsOf`, `ReminderPeek` | |
 | `src/notes/NotesPage.tsx` | stránka „notes“ (záložky, projekt, „i hotové“, přepínač „Archiv“ → `note_query {archived}`) | `pageArchive` |
 | `src/notes/ProjectPicker.tsx` · `RemindPicker.tsx` · `kinds.tsx` | výběry (projekt, připomínka, kategorie pilulkami), ikony kategorií | |
+| `src/notes/RemindSuggest.tsx` · `suggest.ts` | chip „⏰ Připomenout zítra 10:00?“ pod textem editoru: po 450 ms ticha, jen bez připomínky a když text vypadá časově (`looksTimed`), jinak jádro (`note_suggest_remind`) nevolá; klik nastaví pole připomínky, × zavře | `RemindSuggest` · `looksTimed` `wantsAsk` `toLocalValue` `visibleSuggest` `SUGGEST_DELAY` |
 | `src/notes/remind.ts` | čisté funkce času (rychlé volby, mřížka měsíce, české popisky) | `quickPicks` `monthGrid` `remindText` `withDay` `withTime` |
 | `src/notes/popup.ts` · `Markdown.tsx` · `notes.css` | panely výběrů v toku stránky; náhled (HTML z Rustu); styly | `usePopup` `scrollWithin` `toggleLocal` |
 | `src-tauri/src/pins/mod.rs` | lístky na plochu — čisté: stav lístku, soubor `note-pins.json`, label okna, geometrie (DPI, mimo obrazovku) | `Pin` `PinPrefs` `PinPatch` `PinsFile` `load` `save` `label_for` `key` `same_note` `place_new` `restore` `monitor_of` `Mon` `Place` `BAR_H` `TEXT_MIN` |
 | `src-tauri/src/pins/win.rs` | okna `note-<klíč>`: vznik bez fokusu, příznaky, geometrie z událostí, zpožděný zápis (`pins-save`), obnova po startu, fullscreen, otisk do okna | `open` `close` `set` `apply` `watch` `toggle_through_all` `sync_dead` `restore_all` `on_notes_changed` `view` `PinsView` `flush` `take_fresh` |
-| `src-tauri/src/commands/pins.rs` | příkazy: šuplík (`pin_toggle` `pin_new` `pin_through_all`), okno lístku podle volajícího labelu (`pin_init` `pin_set` `pin_drag` `pin_unpin` `pin_hint_seen`) | `PinInit` `pin_label` |
+| `src-tauri/src/commands/pins.rs` | příkazy: šuplík (`pin_toggle` `pin_new` `pin_through_all`), okno lístku podle volajícího labelu (`pin_init` `pin_set` `pin_drag` `pin_unpin` `pin_hint_seen`, `pin_edit_in_ledge` → šuplík `edit-note`) | `PinInit` `pin_label` |
 | `pin.html` · `src/pin/main.tsx` · `PinApp.tsx` · `pin.css` · `icons.tsx` · `en.ts` | okno lístku (vlastní vstup Vite, jen jeho kód a styly): lišta, ⋯ volby, + bod, úprava, schránka, průchozí s nápovědou | |
-| `src/pin/model.ts` | čisté: přidání bodu / textu, barvy z průhledností, porovnání cest, připnutí ze snapshotu | `appendLine` `taskLine` `pinColors` `samePath` `isPinned` `anyThrough` |
+| `src/pin/model.ts` | čisté: přidání bodu / textu (číslovaný seznam pokračuje číslem), kurzor z dvojkliku, barvy z průhledností, porovnání cest, připnutí ze snapshotu | `appendLine` `taskLine` `pointLine` `caretFromText` `pinColors` `samePath` `isPinned` `anyThrough` |
 | `src/notes/pins.ts` | šuplík: připnout / odepnout, nový lístek, průchozí u všech, volby ⋯ karty | `togglePin` `newPin` `throughAll` `throughLabel` `pinMenuItems` |
 
-`App.tsx` jen přepíná stránky (`Page` = `main|settings|note|notes`) a volá `startNote` / `editNote` / `allNotes`.
+`App.tsx` jen přepíná stránky (`Page` = `main|settings|note|notes`) a volá `startNote` / `editNote` / `allNotes`; událost `edit-note` (cesta) otevře editor poznámky — vysílač (Rust, „Upravit v Ledge“ z lístku) zatím chybí.
 
 ## Toky
 - **Karta**: Rust `reload_notes` → `NotesState.all` (+ `kind_counts`, `rev`) → snapshot: `notes` (strop `CARD_ROWS`),
@@ -97,9 +105,9 @@ Formát souboru a pravidla pro agenty: `AGENTS.md` → „Poznámky“. Cituj sy
 `cargo test notes` — `notes::{frontmatter,store,reminders,draft}::tests` + `notes::tests` (čas, base64, kořen;
 pomůcky `notes/testkit.rs`), `notes::md::tests` (HTML tabulka, XSS, úkoly, titulky), `notes::edit::tests`
 (round-trip s neznámými klíči, detekce změny, kopie, úkol, obrázky mimo kořen, `query`, rozepsaná úprava);
-`config::tests::note_kinds_validation`. Lístky: `cargo test pins` (label, volby a meze, soubor starý / rozbitý /
+`config::tests::note_kinds_validation`; `notes::when::tests` (tabulka 60+ případů vč. negativních, rozsah v bajtech originálu, popisky cs / en), `notes::search::tests` (fold, mapa bajtů, úryvky, index nad dočasným kořenem); UI `src/notes/suggest.test.mjs`. Lístky: `cargo test pins` (label, volby a meze, soubor starý / rozbitý /
 duplicity, kaskáda nových, obnova na monitoru / mimo obrazovku / DPI), `config::tests::pin_passthrough_hotkey`,
-`webpanel::tests::capabilities_never_reach_web_windows` (výjimka `note-*`); UI `src/pin/model.test.mjs`. Životní cyklus: `cargo test notes::lifecycle` (odkazy, vlastní × sdílené obrázky, archiv a návrat, kolize, odklad / Zpět / Koš s falešným Koše, sweep, cesty mimo kořen), `notes::recycle` (jen místní disky), UI `src/notes/{editdraft,lifeactions}.test.mjs`; cesta lístku → editor: `notes::edit::tests::sticky_text_and_image_reach_the_note_the_editor_reads`. Sync: `cargo test notesync` — `notesync::plan::tests` (tabulky),
+`webpanel::tests::capabilities_never_reach_web_windows` (výjimka `note-*`); UI `src/pin/model.test.mjs`, `src/notes/lists.test.mjs`. Životní cyklus: `cargo test notes::lifecycle` (odkazy, vlastní × sdílené obrázky, archiv a návrat, kolize, odklad / Zpět / Koš s falešným Koše, sweep, cesty mimo kořen), `notes::recycle` (jen místní disky), UI `src/notes/{editdraft,lifeactions}.test.mjs`; cesta lístku → editor: `notes::edit::tests::sticky_text_and_image_reach_the_note_the_editor_reads`. Sync: `cargo test notesync` — `notesync::plan::tests` (tabulky),
 `notesync::tests` (plánovač, stav, integrace nad bare repem v temp). Frontend: `npx tsc --noEmit`.
 
 ## Co nečíst

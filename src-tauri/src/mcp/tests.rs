@@ -12,13 +12,19 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub struct MemHost {
     pub cfg: Mutex<Config>,
     pub saves: AtomicUsize,
+    /// kořen poznámek (dočasná složka testu); `None` = poznámky vypnuté
+    pub notes: Mutex<Option<std::path::PathBuf>>,
+    /// kolikrát se po zápisu do poznámek volalo `notes_changed`
+    pub note_writes: AtomicUsize,
+    /// (cesta, připnout?) z `pin_note`
+    pub pins: Mutex<Vec<(std::path::PathBuf, bool)>>,
 }
 
 impl MemHost {
     pub fn new(enabled: bool) -> Self {
         let mut cfg = Config::default();
         cfg.mcp.enabled = enabled;
-        Self { cfg: Mutex::new(cfg), saves: AtomicUsize::new(0) }
+        Self { cfg: Mutex::new(cfg), saves: AtomicUsize::new(0), notes: Mutex::new(None), note_writes: AtomicUsize::new(0), pins: Mutex::new(Vec::new()) }
     }
 }
 
@@ -42,6 +48,16 @@ impl Host for MemHost {
     }
     fn open_drawer(&self, tab: Option<&str>) -> Result<String, String> {
         Ok(format!("open {}", tab.unwrap_or("")))
+    }
+    fn notes_root(&self) -> Option<std::path::PathBuf> {
+        self.notes.lock().clone()
+    }
+    fn notes_changed(&self) {
+        self.note_writes.fetch_add(1, Ordering::SeqCst);
+    }
+    fn pin_note(&self, path: &std::path::Path, pin: bool) -> Result<String, String> {
+        self.pins.lock().push((path.to_path_buf(), pin));
+        Ok(format!("pin {pin}"))
     }
     fn discover(&self, _repos: bool) -> Value {
         json!({ "apps": [{ "name": "Poznámkový blok", "exe": "C:\\Windows\\notepad.exe", "alreadyInLedge": false }], "repos": [] })
@@ -91,10 +107,11 @@ fn over_real_bridge() {
     let srv = Arc::new(server());
     let key = srv.keys.ensure().unwrap();
     let host = Arc::new(MemHost::new(true));
-    let port = crate::ports::ephemeral().unwrap();
-    let (s2, h2) = (srv.clone(), host.clone());
-    let claude = crate::claude::Claude::new(Arc::new(|| {}), std::time::Duration::from_secs(1));
-    crate::claude::serve(port, claude, Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(move |r: &HttpReq| handle_http(&s2, h2.as_ref(), r))).unwrap();
+    let (port, ()) = crate::ports::with_free_port(|port| {
+        let (s2, h2) = (srv.clone(), host.clone());
+        let claude = crate::claude::Claude::new(Arc::new(|| {}), std::time::Duration::from_secs(1));
+        crate::claude::serve(port, claude, Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(move |r: &HttpReq| handle_http(&s2, h2.as_ref(), r)))
+    });
     let post = |extra: &str, body: &str| {
         use std::io::{Read, Write};
         let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
@@ -135,8 +152,8 @@ fn tools_list_matches_contract() {
     let names: Vec<&str> = list.as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap()).collect();
     let contract = [
         "ledge_status", "apps_discover", "tiles_list", "tiles_add", "tiles_update", "tiles_remove", "actions_list", "actions_add", "actions_update",
-        "actions_remove", "layout_get", "layout_preview", "layout_apply", "strip_get", "strip_set", "appearance_get", "appearance_set", "undo_last",
-        "open_drawer",
+        "actions_remove", "layout_get", "layout_preview", "layout_apply", "strip_get", "strip_set", "appearance_get", "appearance_set",
+        "notes_list", "notes_read", "notes_create", "notes_append", "notes_toggle_task", "notes_pin", "undo_last", "open_drawer",
     ];
     assert_eq!(names, contract);
     for t in list.as_array().unwrap() {

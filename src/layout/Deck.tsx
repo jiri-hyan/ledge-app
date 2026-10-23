@@ -17,27 +17,32 @@
 // velikosti, které vypadají jinak). Klávesy na úchytu: šipky přesun, + / − šířka, PageUp / PageDown výška.
 // Volba bez viditelného efektu se ohlásí v liště (`sizeOutcome` → `sizeNoteText`). × do katalogu (s Vrátit).
 // Vzhled karty (vlna 8 P, `look.ts`): `data-cl-bg` / `data-cl-head` / `data-cl-dens` / `data-cl-accent` a
+// Části karet (kolo 13): `PartsCtx.Provider` dává obalům `PartSlot` v kartách pořadí, skrytí a lištu pro tah
+// (`partDrag.ts`, stejný motor jako karty: duch, mezera, FLIP, zóna Skrýt); klávesy na úchytu části ve `partKey`.
 // `--accent` na `.deck-item` (živý náhled z panelu `CardLook.tsx`); karta bez vzhledu = žádný atribut.
 import { batch, createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { t, tp } from "../i18n";
-import { motionNow } from "../motion";
-import { change, dropTab, editPage, offerUndo, setCatalogOpen } from "./edit";
+import { change, dropTab, editPage, offerUndo, setCatalogOpen, setEditPage, setRenameAsk } from "./edit";
 import {
-  moveCard, moveToPageAt, nextHeight, pageMoveBlock, pageOf, removeCard, restoreCard, setHeight, setSize,
+  BODY, MAX_PAGES, moveCard, movePart, moveToNewPage, moveToPageAt, nextHeight, pageMoveBlock, pageOf, partsOf, removeCard, restoreCard, setHeight, setPartHidden, setSize,
   type CardHeight, type CardId, type CardSize, type Layout, type LayoutPage,
 } from "./model";
 import { deckCols, nextSizeFor, packSpans, resizeTo, sizeOutcome, stepHeight, stepSize, type DeckMetrics, type Dim, type Edge } from "./size";
 import { keyAction, previewOrder, type DropAction } from "./drag";
-import { flipDeltas, flipPlan, insertAt } from "./dnd";
+import { NEW_TAB, dropHint, insertAt } from "./dnd";
+import { flipEls } from "./flip";
 import { createCardDrag, type Drag } from "./cardDrag";
-import { cardName, pageName, sizeName, sizeNoteText } from "./text";
+import { createPartDrag, type PartDrag } from "./partDrag";
+import { PartsCtx, type PartsCtl } from "./PartSlot";
+import { partKeyAction } from "./parts";
+import { cardName, pageName, sizeName, sizeNoteText, slotName } from "./text";
 import { cardLookAttrs } from "./look";
+import type { PartKey } from "./model";
 import { lookFor } from "./CardLook";
 import "./layout.css";
+import "./dnd.css";
 
 type Resize = { id: CardId; edge: Edge; dim: Dim };
-
-const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export const sizeLabel = (s: CardSize) => sizeName(s);
 export const heightLabel = (h: CardHeight | undefined) =>
@@ -66,7 +71,25 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   });
   const drag = cd.drag;
   const dragging = createMemo(() => !!drag());
-  onCleanup(() => cd.abort());
+  // části karet (sekce uvnitř karty): pořadí a skrytí tahem stejným motorem; obaly `PartSlot` si berou stav z kontextu
+  const pd = createPartDrag({ box: () => box, zone: () => zoneEl, orderOf: (card) => partsOf(cardOf(card), card), commit: (a, d) => commitPart(a, d) });
+  const partDragging = createMemo(() => !!pd.drag());
+  const pctl: PartsCtl = {
+    editing: () => p.editing,
+    order: (card) => pd.preview(card) ?? partsOf(cardOf(card), card),
+    flex: (card) => p.editing || !!cardOf(card)?.parts,
+    lifted: (card, k) => pd.drag()?.card === card && pd.drag()?.key === k,
+    down: (e, card, k) => pd.down(e, card, k),
+    key: (e, card, k) => partKey(e, card, k),
+    show: (k) => {
+      change((l) => setPartHidden(l, k as PartKey, false));
+      offerUndo(t("cards.layout.partShown", "Sekce „{name}“ je zase vidět", { name: slotName(k) }), () => change((l) => setPartHidden(l, k as PartKey, true)));
+    },
+  };
+  onCleanup(() => {
+    cd.abort();
+    pd.abort();
+  });
   // tažená karta, která na zobrazené záložce ještě není (tah pokračuje v mřížce jiné záložky), si nese velikost sama
   const dragged = (id: CardId) => (!cardOf(id) && drag()?.id === id ? drag() : null);
   const sizeOf = (id: CardId) => cardOf(id)?.size ?? dragged(id)?.size ?? "m";
@@ -108,24 +131,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   const items = () => Array.from(box.querySelectorAll<HTMLElement>(":scope > .deck-item:not(.lay-fly)"));
   /** změna pořadí / velikosti s krátkým posunem ostatních karet (FLIP transformem; bez kývání; „bez animací“
    *  a systémové omezení pohybu = hned). Rozběhlý posun se zruší a nový začne z místa, kde karta právě je. */
-  function flip(update: () => void) {
-    const m = motionNow();
-    const plan = flipPlan(m.style, m.speed, reducedMotion());
-    if (!plan) return update();
-    const els = items();
-    const at = (el: HTMLElement) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.left, y: r.top };
-    };
-    const first = els.map(at);
-    for (const el of els) el.getAnimations?.().forEach((a) => a.id === "lay-flip" && a.cancel());
-    update();
-    flipDeltas(first, els.map(at)).forEach((d, k) => {
-      if (!d || !els[k].isConnected) return;
-      const a = els[k].animate?.([{ transform: `translate(${d.dx}px, ${d.dy}px)` }, { transform: "none" }], { duration: plan.ms, easing: plan.easing });
-      if (a) a.id = "lay-flip";
-    });
-  }
+  const flip = (update: () => void) => flipEls(items(), update);
 
   /** nápověda v liště úprav, když volba velikosti nemá viditelný efekt */
   function note(sizes: CardSize[], i: number, want: CardSize) {
@@ -197,6 +203,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
 
   /** přesun na konec jiné záložky (puštění na její ouško) — s Vrátit; kde už karta je, nic se nezmění */
   function toPage(id: CardId, from: string, tab: string, index = Number.MAX_SAFE_INTEGER) {
+    if (tab === NEW_TAB) return toNewPage(id, from);
     const prev = p.layout;
     const target = pageName(pageOf(prev, tab));
     if (pageMoveBlock(prev, from, id, tab) === "there") {
@@ -205,6 +212,55 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
     }
     change((l) => moveToPageAt(l, from, id, tab, index));
     offerUndo(t("cards.layout.moved", "„{name}“ přesunuta na záložku {tab}", { name: cardName(id), tab: target }), () => change(() => prev));
+  }
+
+  /** puštění na „+“: vznikne záložka „Nová záložka“ s kartou a jde rovnou přejmenovat */
+  function toNewPage(id: CardId, from: string) {
+    const prev = p.layout;
+    const r = moveToNewPage(prev, from, id, t("cards.layout.tab.newName", "Nová záložka"));
+    if (!r) {
+      offerUndo(t("cards.layout.tab.full", "Víc než {n} záložek nejde — karta „{name}“ zůstává, kde byla.", { n: MAX_PAGES, name: cardName(id) }));
+      return;
+    }
+    change(() => r.layout);
+    setEditPage(r.id);
+    setRenameAsk(r.id);
+    offerUndo(t("cards.layout.tab.newFrom", "„{name}“ je na nové záložce — pojmenuj ji", { name: cardName(id) }), () => {
+      change(() => prev);
+      setEditPage(from);
+    });
+  }
+
+  /** konec tahu části: pořadí v kartě nebo skrytí (zóna Skrýt) — s Vrátit */
+  function commitPart(a: DropAction, d: PartDrag) {
+    const page = p.page.id;
+    if (a.kind === "move") {
+      change((l) => movePart(l, page, d.card, a.from, a.to));
+      offerUndo(t("cards.layout.partMoved", "Sekce „{name}“ přesunuta", { name: slotName(d.key) }), () => change((l) => movePart(l, page, d.card, a.to, a.from)));
+    } else if (a.kind === "hide" && d.key !== BODY) {
+      const k = d.key as PartKey;
+      change((l) => setPartHidden(l, k, true));
+      offerUndo(t("cards.hide.doneSection", "Sekce „{name}“ skryta", { name: slotName(k) }), () => change((l) => setPartHidden(l, k, false)));
+    }
+  }
+
+  /** klávesy na úchytu části: šipky přesun v kartě, Delete skrýt */
+  function partKey(e: KeyboardEvent, card: CardId, k: string) {
+    const a = partKeyAction(e);
+    if (!a) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const order = partsOf(cardOf(card), card);
+    const i = order.indexOf(k);
+    const lpbox = box.querySelector<HTMLElement>(`.lp-box[data-pcard="${CSS.escape(card)}"]`);
+    const slots = () => Array.from(lpbox?.querySelectorAll<HTMLElement>(":scope > .lp-slot") ?? []);
+    if ("move" in a) {
+      const to = i + a.move;
+      if (i < 0 || to < 0 || to >= order.length) return;
+      flipEls(slots(), () => commitPart({ kind: "move", from: i, to }, { card, key: k, from: i, to, order }));
+    } else if (k !== BODY) flipEls(slots(), () => commitPart({ kind: "hide" }, { card, key: k, from: i, to: i, order }));
+    // úchyt části zpět do fokusu
+    requestAnimationFrame(() => box.querySelector<HTMLElement>(`.lp-box[data-pcard="${CSS.escape(card)}"] .lp-slot[data-part="${CSS.escape(k)}"] .lp-grip`)?.focus());
   }
 
   /** konec tahu: co se stane (`drag.ts` `dropAction`) a krátká lišta „… · Vrátit“ */
@@ -267,14 +323,29 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   const dimText = (id: CardId, d: Dim) => t("cards.layout.dim", "{w} × {h}", { w: spans().get(id) ?? 1, h: d.h ?? t("cards.layout.height.autoShort", "auto") });
   /** štítek u kurzoru: kam se karta pustí, když to není obyčejné místo v mřížce */
   const flyLabel = () => {
+    const pdr = pd.drag();
+    if (pdr && pd.zoneOn()) return { text: t("cards.layout.zonePartTip", "Skrýt sekci „{name}“ · jde vrátit", { name: slotName(pdr.key) }), blocked: false };
     const d = drag();
     if (!d) return null;
-    if (cd.zoneOn()) return { text: t("cards.layout.zone", "Skrýt kartu"), blocked: false };
     const tab = dropTab();
-    const there = (page: string) => blocked(d, page);
-    if (tab) return { text: `→ ${pageName(pageOf(p.layout, tab))}${there(tab) ? ` (${t("cards.layout.alreadyShort", "už tam je")})` : ""}`, blocked: there(tab) };
-    if (d.home !== p.page.id && there(p.page.id)) return { text: t("cards.layout.alreadyHere", "už tu je — zůstane na původní záložce"), blocked: true };
-    return null;
+    const h = dropHint({ zone: cd.zoneOn(), tab, tabHas: !!tab && tab !== NEW_TAB && blocked(d, tab), foreignHas: d.home !== p.page.id && blocked(d, p.page.id) });
+    switch (h?.kind) {
+      case "hide":
+        return { text: t("cards.layout.zoneTip", "Skrýt kartu · jde vrátit"), blocked: false };
+      case "newTab":
+        return { text: t("cards.layout.tab.newName", "Nová záložka"), blocked: false };
+      case "tab":
+        return { text: `${t("cards.layout.toTab", "Na záložku {tab}", { tab: pageName(pageOf(p.layout, h.tab)) })}${h.there ? ` (${t("cards.layout.alreadyShort", "už tam je")})` : ""}`, blocked: h.there };
+      case "alreadyHere":
+        return { text: t("cards.layout.alreadyHere", "už tu je — zůstane na původní záložce"), blocked: true };
+      default:
+        return null;
+    }
+  };
+  /** velikost karty v mezeře cíle („2 × 3“): tak velká bude po puštění */
+  const gapDim = (id: CardId) => {
+    const d = drag();
+    return d && d.id === id && d.home === p.page.id ? dimText(id, { size: sizeOf(id), h: hOf(id) }) : undefined;
   };
   const slotStyle = () => {
     const d = drag();
@@ -288,7 +359,8 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   };
 
   return (
-    <div class="deck" classList={{ editing: p.editing, dragging: dragging(), resizing: !!rs() }} ref={box} data-page={p.page.id}>
+    <div class="deck" classList={{ editing: p.editing, dragging: dragging() || partDragging(), resizing: !!rs() }} ref={box} data-page={p.page.id}>
+      <PartsCtx.Provider value={pctl}>
       <For each={ids()}>
         {(id, i) => (
           <div
@@ -296,6 +368,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
             data-size={sizeNow(id)}
             data-card={id}
             data-h={hNow(id)}
+            data-dim={gapDim(id)}
             data-cl-bg={cl(id).attrs["data-cl-bg"]}
             data-cl-head={cl(id).attrs["data-cl-head"]}
             data-cl-dens={cl(id).attrs["data-cl-dens"]}
@@ -360,21 +433,24 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
           </div>
         )}
       </For>
+      </PartsCtx.Provider>
       {/* tah pokračuje na jiné záložce: mezera velikosti karty na místě, kam by dopadla */}
       <Show when={slotOn()}>
-        <div class="deck-item lifted lay-slot" data-size={drag()?.size} data-card={drag()?.id} data-h={drag()?.h} style={slotStyle()} aria-hidden="true" />
+        <div class="deck-item lifted lay-slot" data-size={drag()?.size} data-card={drag()?.id} data-h={drag()?.h} data-dim={dimText(drag()!.id, { size: drag()!.size, h: drag()!.h })} style={slotStyle()} aria-hidden="true" />
       </Show>
       <Show when={p.editing && editPage() === p.page.id}>
         <button class="lay-add" style={{ order: "9999" }} onClick={() => setCatalogOpen(true)}>{t("cards.layout.add", "+ Přidat kartu")}</button>
       </Show>
-      <Show when={dragging()}>
-        <div class="lay-zone" classList={{ on: cd.zoneOn() }} ref={zoneEl} aria-hidden="true">
-          <b>×</b> {t("cards.layout.zone", "Skrýt kartu")} <small>{t("cards.layout.zone.hint", "do katalogu · jde vrátit")}</small>
+      <Show when={dragging() || pd.hideable()}>
+        <div class="lay-zone" classList={{ on: cd.zoneOn() || pd.zoneOn() }} ref={zoneEl} aria-hidden="true">
+          <Show when={dragging()} fallback={<><b>×</b> {t("cards.layout.zonePart", "Skrýt sekci")} <small>{t("cards.layout.zonePart.hint", "jde vrátit")}</small></>}>
+            <b>×</b> {t("cards.layout.zone", "Skrýt kartu")} <small>{t("cards.layout.zone.hint", "do katalogu · jde vrátit")}</small>
+          </Show>
         </div>
       </Show>
       <Show when={flyLabel()}>
         {(l) => (
-          <div class="lay-float" classList={{ blocked: l().blocked }} style={{ left: `${cd.ptr().x}px`, top: `${cd.ptr().y}px` }} aria-hidden="true">
+          <div class="lay-float" classList={{ blocked: l().blocked }} style={{ left: `${(pd.drag() ? pd.ptr() : cd.ptr()).x}px`, top: `${(pd.drag() ? pd.ptr() : cd.ptr()).y}px` }} aria-hidden="true">
             {l().text}
           </div>
         )}

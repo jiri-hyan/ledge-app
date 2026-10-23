@@ -269,7 +269,18 @@ pub fn refresh(cfg: &GithubConfig, mode: Mode) -> GithubView {
     if matches!(status, Status::Ok) {
         st.fetched_at = Some(crate::state::now_ms());
     }
-    view(&st, cfg, crate::state::now_ms())
+    let out = view(&st, cfg, crate::state::now_ms());
+    drop(st);
+    // návrhy a puls proužku (`suggest/`): nové PR k revizi / spadlé CI na mém PR; zámek už je pryč
+    crate::suggest::on_github_refreshed();
+    out
+}
+
+/// Paměť bez sahání na síť: (PR k revizi, vlastní PR, čas posledního úspěšného načtení) — jen při zapnutém
+/// GitHubu a stavu `Ok`, jinak `None`. Pro návrhy a puls (`suggest/`); nic nespouští.
+pub fn cached_prs(cfg: &GithubConfig) -> Option<(Vec<Pr>, Vec<Pr>, Option<i64>)> {
+    let st = STATE.lock();
+    (cfg.any() && st.status == Status::Ok).then(|| (st.data.review.clone(), st.data.mine.clone(), st.fetched_at))
 }
 
 /// Kdy plánovač proužku smí příště sáhnout na GitHub; `None` = nic se nemá číst.
@@ -291,13 +302,19 @@ pub fn on_config(old: &GithubConfig, new: &GithubConfig) {
     if old == new {
         return;
     }
-    let mut st = STATE.lock();
-    st.attempt_at = None;
+    {
+        let mut st = STATE.lock();
+        st.attempt_at = None;
+        if !new.any() {
+            st.data = EMPTY;
+            st.error = None;
+            st.status = Status::Off;
+            st.fetched_at = None;
+        }
+    }
     if !new.any() {
-        st.data = EMPTY;
-        st.error = None;
-        st.status = Status::Off;
-        st.fetched_at = None;
+        // po vypnutí GitHubu se pozorování PR zahodí — po zapnutí se zase nejdřív jen načte (bez pulsu)
+        crate::suggest::reset_github();
     }
 }
 

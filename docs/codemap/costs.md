@@ -3,7 +3,7 @@
 Sekce „Útrata Claude (odhad)“ dole v kartě Claude: tokeny a odhad ceny **v cenách API, ne účet**
 (předplatné Pro/Max se po tokenech neúčtuje) — dnes / 7 dní / 30 dní, top projekty, modely a sloupce po
 dnech. Zdroj = lokální transcripty Claude Code `~/.claude/projects/<slug>/**/*.jsonl` (session i
-`subagents/…`). Návod a config: `AGENTS.md` → „Útrata Claude (odhad)“.
+`subagents/…`). Návod a config: [agents/sessions.md](../agents/sessions.md) → „Útrata Claude (odhad)“.
 
 ## Soubory
 
@@ -15,7 +15,7 @@ dnech. Zdroj = lokální transcripty Claude Code `~/.claude/projects/<slug>/**/*
 | `src-tauri/src/usage/view.rs` | index → přehled (rozsahy, top projekty/modely + „ostatní“, dny) | `build`, `Summary`, `Range`, `Line`, `Day`, `Split`, `TOP`, `date_of` |
 | `src-tauri/src/costslive.rs` | za běhu: žádost s omezením, vlákno s nízkou prioritou, průběh, přehled v paměti, projekt z `cwd` | `request`, `view`, `CostsView`, `compute`, `project_name`, `local_day`, `THROTTLE` |
 | `src-tauri/src/commands/costs.rs` | Tauri příkaz | `costs_refresh` |
-| lepidlo | `lib.rs` (`mod usage`, `mod costslive`, registrace `costs_refresh`), `snapshot.rs` (`Snapshot.costs`), `config.rs` (`ClaudeConfig.costs`), `Cargo.toml` (`memchr`, už ve stromu přes regex) | |
+| lepidlo | `lib.rs` (`mod usage`, `mod costslive`, registrace `costs_refresh`), `snapshot.rs` (`Snapshot.costs`), `config/*` (`ClaudeConfig.costs`), `Cargo.toml` (`memchr`, už ve stromu přes regex) | |
 | `src/costs/model.ts` | čistá logika UI + typy zrcadla (`CostsView`) — test `model.test.mjs` | `compact`, `usdDigits`, `bars`, `share`, `progressPct`, `pickRange` |
 | `src/costs/CostsSection.tsx` · `costs.css` | sekce v kartě Claude (`ClaudeSessions.tsx` dole), rozbalení a rozsah v `localStorage` (jen pohodlí) · styly `cost-*` | `CostsSection`, `usd`, `tok` |
 | `src/i18n/en-costs.ts` | angličtina, klíče `sessions.costs.*` (Nastavení: `settings.f.claude.costs` v `settings/en.ts`, `settings.claude.costs` v `settings/panels/en.ts`) | |

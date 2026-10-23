@@ -1,0 +1,55 @@
+/* Sdílené prvky tahu v šuplíku (layout/tabDrag.ts, partDrag.ts, PartSlot.tsx): duch záložky, mezera po zvednuté
+   záložce / části, cíl „+“ a sekce uvnitř karet. Jen tokeny ze styles.css. Výkon (software render WebView2):
+   animuje se výhradně transform / opacity / grid-template-rows u sbalení a jen na klik nebo během tahu,
+   v klidu nic. `prefers-reduced-motion` a `html[data-motion="none"]` vypnou i tohle. */
+
+/* mezera po zvednuté záložce / části karty: obsah skrytý, přerušovaný obrys v barvě akcentu */
+.lp-gap { position: relative; }
+.lp-gap > * { visibility: hidden; }
+.lp-gap::after { content: ""; position: absolute; inset: 0; border: 2px dashed var(--accent); border-radius: var(--r-md); background: color-mix(in srgb, var(--accent) 9%, transparent); pointer-events: none; }
+
+/* duch záložky pod kurzorem (kopie záložky, leží v `.lay-tabs`, pevně vůči oknu) */
+.lp-tabfly { position: fixed; left: 0; top: 0; z-index: 70; margin: 0; pointer-events: none; opacity: 0.85; background: var(--card-3); border-radius: calc(var(--r-md) - 3px); box-shadow: var(--shadow-pop); will-change: transform; }
+.lp-tabfly > button { color: var(--t1); }
+
+/* tlačítko „+“ jako cíl tažené karty: vznikne nová záložka */
+.lp-newdrop { outline: 2px solid var(--accent); outline-offset: 1px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+/* ---------- části (sekce) uvnitř karet — PartSlot.tsx ----------
+   Ve výchozím pořadí a mimo úpravy obaly nemají box (`display: contents`) → vzhled karty beze změny. Jakmile je
+   pořadí jiné nebo se upravuje (`data-flex`), je obal sloupec a pořadí řeší `order` na částech. */
+.lp-box, .lp-slot { display: contents; }
+.lp-box[data-flex] { display: flex; flex-direction: column; position: relative; gap: var(--s1); }
+.lp-box[data-flex] > .lp-slot { display: block; min-width: 0; }
+
+/* lišta části v úpravách: úchyt + název (+ „Ukázat“ u skryté); chytá se za celou lištu */
+.lp-edit { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s1); padding: 2px var(--s2); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--t2); background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--line-2)); border-radius: var(--r-sm); cursor: grab; touch-action: none; user-select: none; pointer-events: auto; }
+.lp-edit:hover { border-style: solid; border-color: var(--accent); color: var(--t1); }
+.lp-edit.lp-off { cursor: default; opacity: 0.7; background: transparent; }
+.lp-edit.lp-off:hover { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--line-2)); }
+.lp-edit small { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--t3); }
+.lp-edit button { font: inherit; color: inherit; background: none; border: 0; padding: 0 2px; }
+.lp-grip { cursor: grab; }
+.lp-grip:disabled { cursor: default; opacity: 0.5; }
+.lp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-edit .lp-show { margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--accent); cursor: pointer; }
+.lp-edit .lp-show:hover { text-decoration: underline; }
+
+/* duch části pod kurzorem: kopie v obalu, který nese styly karty (třída karty je jen kvůli potomkům) */
+.lp-fly { position: fixed !important; left: 0; top: 0; z-index: 70; margin: 0 !important; padding: 0 !important; box-sizing: border-box; pointer-events: none; opacity: 0.88; background: var(--raised) !important; border: 1px solid var(--accent) !important; border-radius: var(--r-md) !important; box-shadow: var(--shadow-pop) !important; will-change: transform; overflow: hidden; }
+.lp-fly .lp-slot { display: block; }
+.lp-fly .lp-edit { margin: 0; border-radius: 0; border-width: 0 0 1px; }
+
+/* nadpis části s klikem = sbalit / rozbalit (jen mimo úpravy); sbalení animuje výšku přes grid-template-rows,
+   jen na klik — v klidu se nic nehýbe */
+.lp-head { display: flex; align-items: center; gap: var(--s1); width: 100%; margin: 0 0 var(--s1); padding: 2px 0; font: 700 var(--fs-2xs) var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--t3); text-align: left; border-bottom: 1px solid var(--line-soft); transition: color var(--fast); }
+.lp-head:hover { color: var(--t1); }
+.lp-chev { display: inline-block; width: 1em; text-align: center; transition: transform var(--fast) var(--ease); }
+.lp-chev.on { transform: rotate(90deg); }
+.lp-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--dur-2) var(--ease); }
+.lp-fold-in { min-height: 0; overflow: hidden; transition: visibility 0s; }
+.lp-fold[data-open="false"] { grid-template-rows: 0fr; }
+.lp-fold[data-open="false"] > .lp-fold-in { visibility: hidden; transition: visibility 0s var(--dur-2); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-fold, .lp-chev, .lp-fold-in { transition: none !important; }
+}

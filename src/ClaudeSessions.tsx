@@ -27,6 +27,7 @@ import { sectionOn } from "./cards/sections";
 import "./sessions.css";
 import { gotoSettingsPanel } from "./palette/goto";
 import ShowMore, { useCap } from "./layout/ShowMore";
+import { PartSlot, PartsBox } from "./layout/PartSlot";
 import { hiddenSummary, needsYou, orderSessions } from "./sessions/order";
 
 /** stav → barva pilulky a popisek (funkce, ať se popisek přeloží až při vykreslení) */
@@ -77,8 +78,11 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
   return (
     <div class="card" data-anim>
       <h4><span class="ic" style="background:var(--violet)" />Claude <span class="n">{live() ? tp("sessions.count", live(), "{n} session") : ""}</span>{p.menu}</h4>
-      {/* sekce karty jdou skrýt (`drawer.sections.claude*`); skrytá útrata nespouští přepočet (`costs_refresh`) */}
-      <Show when={sectionOn(p.s.sections, "claudeLimits")}><LimitsRow s={p.s} now={p.now} onSettings={p.onSettings} /></Show>
+      {/* části karty jdou skrýt (`drawer.sections.claude*`) i přeskládat (`layout…parts`, `layout/PartSlot.tsx`);
+          skrytá útrata nespouští přepočet (`costs_refresh`), skryté části se nekreslí vůbec */}
+      <PartsBox card="claude">
+      <PartSlot card="claude" k="claudeLimits" hidden={!sectionOn(p.s.sections, "claudeLimits")} titled empty={!p.s.limits}><LimitsRow s={p.s} now={p.now} onSettings={p.onSettings} /></PartSlot>
+      <PartSlot card="claude" k="body">
       <For each={orphans()}>{(pd) => <PendingRow pd={pd} />}</For>
       <For each={orphanAsks()}>{(a) => <QuestionCard ask={a} s={p.s} />}</For>
       <For each={cap.shown()}>{row}</For>
@@ -101,7 +105,9 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
       }>
         <div class="empty">{t("sessions.bridgeOff", "Most pro Claude je vypnutý v Nastavení — bez schvalování a subagentů.")}</div>
       </Show>
-      <Show when={sectionOn(p.s.sections, "claudeCosts")}><CostsSection s={p.s} now={p.now} /></Show>
+      </PartSlot>
+      <PartSlot card="claude" k="claudeCosts" hidden={!sectionOn(p.s.sections, "claudeCosts")}><CostsSection s={p.s} now={p.now} /></PartSlot>
+      </PartsBox>
     </div>
   );
 }

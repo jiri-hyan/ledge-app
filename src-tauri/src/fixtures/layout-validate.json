@@ -566,5 +566,157 @@
    ]
   },
   "field": "layout.pages.0.id"
+ },
+ {
+  "name": "pořadí částí platné",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "parts": [
+        "claudeCosts",
+        "body",
+        "claudeLimits"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "pořadí částí neúplné",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "media",
+       "size": "m",
+       "parts": [
+        "sound"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "neznámá část karty",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "parts": [
+        "claudeLimits",
+        "nope"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.parts.1"
+ },
+ {
+  "name": "část jiné karty",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "clock",
+       "size": "s",
+       "parts": [
+        "claudeLimits"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.parts.0"
+ },
+ {
+  "name": "část bez řazení (git je u každé session)",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "claude",
+       "size": "m",
+       "parts": [
+        "claudeGit"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.parts.0"
+ },
+ {
+  "name": "dvojitá část",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "clock",
+       "size": "s",
+       "parts": [
+        "body",
+        "battery",
+        "body"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.parts.2"
+ },
+ {
+  "name": "části na kartě bez částí",
+  "layout": {
+   "pages": [
+    {
+     "id": "prace",
+     "name": "",
+     "cards": [
+      {
+       "id": "notes",
+       "size": "xl",
+       "parts": [
+        "body"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.parts.0"
  }
 ]

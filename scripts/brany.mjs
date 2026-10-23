@@ -5,12 +5,14 @@
 //
 // Použití: node scripts/brany.mjs                 → test, clippy, tsc, ui, build
 //          node scripts/brany.mjs test ui         → jen vybrané (test | clippy | tsc | ui | build)
+//          node scripts/brany.mjs --changed       → brány podle změněných souborů (výběr: scripts/brany-select.mjs)
 // CARGO_TARGET_DIR se bere z prostředí (workeři: sdílený src-tauri\target-agents). Exit 0 = vše prošlo.
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { selectGates } from './brany-select.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = path.join(root, 'src-tauri')
@@ -86,8 +88,24 @@ function run(name) {
   })
 }
 
-const wanted = process.argv.slice(2).filter((a) => a in GATES)
-const names = wanted.length ? wanted : Object.keys(GATES)
+// --changed: brány podle `git diff --name-only main...HEAD` + necommitnutých a nových souborů (viz brany-select.mjs).
+function changedFiles() {
+  const git = (args) => execFileSync('git', ['-c', 'core.quotepath=off', ...args], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
+  const base = ['main', 'origin/main'].find((b) => { try { git(['rev-parse', '--verify', '--quiet', b]); return true } catch { return false } })
+  const files = new Set([...(base ? git(['diff', '--name-only', `${base}...HEAD`]) : []), ...git(['diff', '--name-only', 'HEAD']), ...git(['ls-files', '--others', '--exclude-standard'])])
+  return [...files]
+}
+
+const args = process.argv.slice(2)
+let names
+if (args.includes('--changed')) {
+  const { gates, why } = selectGates(changedFiles())
+  console.log(`BRÁNY --changed: ${gates.length ? gates.join(' ') : '(žádná)'} — ${why}`)
+  names = gates
+} else {
+  const wanted = args.filter((a) => a in GATES)
+  names = wanted.length ? wanted : Object.keys(GATES)
+}
 let allOk = true
 for (const n of names) allOk = (await run(n)) && allOk
 console.log(allOk ? 'BRÁNY: vše prošlo' : 'BRÁNY: SELHALO — viz výše')

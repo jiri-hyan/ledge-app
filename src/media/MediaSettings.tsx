@@ -1,6 +1,8 @@
 // Nastavení → Osobní → Přehrávač: vzhled karty Právě hraje s náhledy (`media.variant`), čas skladby
 // v proužku (`media.stripTime`) a ozdoba ekvalizéru (`media.equalizer`). Mění se jen návrh Nastavení —
-// uloží (a vrátí) ho společná lišta Uložit / Zahodit / Vrátit.
+// uloží (a vrátí) ho společná lišta Uložit / Zahodit / Vrátit. Pod tím oblíbené playlisty a stanice
+// (`FavoritesSettings.tsx`). Totéž pole `media.variant` mění i panel
+// „Vzhled karty…“ na kartě (`layout/CardLook.tsx`) a ikonka v jejím rohu — jeden zdroj v configu.
 import { For, Show } from "solid-js";
 import { t } from "../i18n";
 import { useSettings } from "../settings/ctx";
@@ -10,6 +12,7 @@ import { Row } from "../settings/fields/Row";
 import type { MediaStripTime, MediaVariant } from "../api";
 import { VARIANTS, variantOf } from "./timeline";
 import { Thumb, variantHint, variantName } from "./VariantPicker";
+import FavoritesSettings from "./FavoritesSettings";
 import "./media.css";
 
 export default function MediaSettings() {
@@ -35,12 +38,14 @@ export default function MediaSettings() {
           </For>
         </div>
       </Row>
+      <p class="med-cardnote">{t("settings.media.cardLook", "Akcent, pozadí a hlavičku karty nastavíš na kartě: ⋯ → Vzhled karty… (tam je i tento výběr).")}</p>
       <Row id="media.stripTime">
         <Select path="media.stripTime" label={fieldLabel("media.stripTime")} options={timeOpts()} />
       </Row>
       <Show when={current() === "strip"}>
         <Row id="media.equalizer"><Toggle path="media.equalizer" label={fieldLabel("media.equalizer")} /></Row>
       </Show>
+      <FavoritesSettings id="media.favorites" />
     </>
   );
 }

@@ -23,6 +23,7 @@ export const SECTION_KEYS = [
   "claudeSubagents",
   "nowPlaying",
   "sound",
+  "favorites",
   "battery",
   "github",
   "system",

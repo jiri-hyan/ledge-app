@@ -9,6 +9,9 @@ import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api, on, type NoteDetail, type PinInit, type PinPrefs } from "../api";
 import Markdown from "../notes/Markdown";
 import { b64Of, pasteImages } from "../notes/draft";
+import { trimBody } from "../notes/editdraft";
+import { exportItems } from "../notes/exportActions";
+import { listKey } from "../notes/listkeys";
 import { fromMs } from "../notes/remind";
 import { setLang, t } from "../i18n";
 import { errorText, say, sayError, Toast } from "../ui/toast";
@@ -18,7 +21,7 @@ import { lifeActions, type LifeAction } from "../notes/lifeactions";
 import { actionText } from "../notes/lifelabels";
 import { IconX } from "../icons";
 import { IconEdit, IconLock, IconMore, IconPin, IconPlus, IconThrough } from "./icons";
-import { appendLine, pinColors, SAVE_DELAY, taskLine, TEXT_MIN, type SaveState } from "./model";
+import { appendLine, caretFromText, pinColors, pointLine, SAVE_DELAY, TEXT_MIN, type SaveState } from "./model";
 
 /** Štítek zápisu v patičce — jen to, co se opravdu děje (žádné „uloženo“ dřív, než se uložilo). */
 function saveLabel(st: SaveState): string {
@@ -59,7 +62,7 @@ export default function PinApp() {
 
   const p = () => prefs();
   const through = () => !!p()?.through;
-  const dirty = () => editing() && text().trimEnd() !== (note()?.body ?? "").trimEnd();
+  const dirty = () => editing() && text().trimEnd() !== trimBody(note()?.body ?? "").trimEnd();
   const colors = () => {
     const l = look();
     return pinColors(l?.bg ?? p()?.bg ?? 88, l?.text ?? p()?.text ?? 100);
@@ -80,9 +83,17 @@ export default function PinApp() {
     try {
       const n = await api.noteRead(i.path);
       if (!n) return;
+      // čistý text (nic nepřipsáno) vs. dosud známá verze — rozhoduje se PŘED setNote
+      const clean = editing() && !dirty();
       setNote(n);
       setGone(null);
-      if (editing() && !dirty()) setText(n.body);
+      // text se přepíše jen při skutečné změně zvenku (editor, sync); shodný až na koncové mezery / zalomení
+      // zůstane, jak ho šéf píše — jinak by mu load() žral mezeru a skákal kurzor
+      if (clean && text().trimEnd() !== trimBody(n.body).trimEnd()) {
+        const sel = ta ? { a: ta.selectionStart, b: ta.selectionEnd } : null;
+        setText(trimBody(n.body));
+        if (ta && sel) ta.setSelectionRange(Math.min(sel.a, ta.value.length), Math.min(sel.b, ta.value.length));
+      }
     } catch (e) {
       setGone(errorText(e));
     }
@@ -135,7 +146,8 @@ export default function PinApp() {
       if (r?.outcome !== "saved") return "changed";
       setNote(r.note);
       // přidání během úpravy (bod, obrázek): pole převezme uložené tělo — jen když se mezitím nepsalo
-      if (editing() && (body !== before || images.length) && text() === before) setText(r.note.body);
+      const nb = trimBody(r.note.body);
+      if (editing() && (body !== before || images.length) && text() === before && text().trimEnd() !== nb.trimEnd()) setText(nb);
       return "saved";
     });
   }
@@ -184,14 +196,29 @@ export default function PinApp() {
   }
 
   // ---------- úprava textu ----------
-  function startEdit() {
+  /** `caret` = pozice v těle (dvojklik do textu), jinak konec; kurzor nikdy za koncové zalomení. */
+  function startEdit(caret: number | null = null) {
     const n = note();
     if (!n || through()) return;
     setMenu(false);
-    setText(n.body);
+    const body = trimBody(n.body);
+    setText(body);
     setConflict(false);
     setEditing(true);
-    queueMicrotask(() => ta?.focus());
+    queueMicrotask(() => {
+      if (!ta) return;
+      ta.focus();
+      const at = Math.min(caret ?? body.length, body.length);
+      ta.setSelectionRange(at, at);
+    });
+  }
+  /** Dvojklik do vykresleného textu → kam v těle dát kurzor (text uzlu pod myší najde řádek těla). */
+  function caretAt(e: MouseEvent): number | null {
+    const n = note();
+    const r = n ? document.caretRangeFromPoint?.(e.clientX, e.clientY) : null;
+    const node = r?.startContainer;
+    if (!n || !r || !node || node.nodeType !== Node.TEXT_NODE) return null;
+    return caretFromText(trimBody(n.body), node.textContent ?? "", r.startOffset);
   }
   async function flush(): Promise<boolean> {
     clearTimeout(editTimer);
@@ -243,7 +270,7 @@ export default function PinApp() {
     queueMicrotask(() => addInput?.focus());
   }
   async function submitAdd() {
-    const line = taskLine(addText());
+    const line = pointLine(editing() ? text() : note()?.body ?? "", addText());
     if (!line) return setAdding(false);
     if (await add(line)) setAddText("");
     addInput?.focus();
@@ -291,7 +318,7 @@ export default function PinApp() {
   /** Rozepsané (text v úpravě, napsaný bod) se uloží do poznámky dřív, než okno zmizí. */
   async function settle(): Promise<boolean> {
     if (!(await flush())) return false;
-    const line = adding() ? taskLine(addText()) : "";
+    const line = adding() ? pointLine(editing() ? text() : note()?.body ?? "", addText()) : "";
     if (!line) return true;
     if (!(await add(line))) return false;
     setAddText("");
@@ -400,7 +427,7 @@ export default function PinApp() {
           <Show when={!gone() && note()}>
             {(n) => (
               <Show when={editing()} fallback={
-                <div class="pin-md" onDblClick={(e) => !(e.target as HTMLElement).closest(".md-check, .md-link") && startEdit()}>
+                <div class="pin-md" onDblClick={(e) => !(e.target as HTMLElement).closest(".md-check, .md-link") && startEdit(caretAt(e))}>
                   <Markdown body={n().body} images={n().imageData} onToggle={toggle} />
                 </div>
               }>
@@ -417,6 +444,11 @@ export default function PinApp() {
                     if (e.key === "Enter" && e.ctrlKey) {
                       e.preventDefault();
                       void finishEdit();
+                    } else {
+                      listKey(e, e.currentTarget, (v) => {
+                        setText(v);
+                        schedule();
+                      });
                     }
                   }}
                 />
@@ -436,7 +468,7 @@ export default function PinApp() {
           <Show when={adding()} fallback={
             <div class="pin-foot">
               <button class="pin-btn" onClick={openAdd} title={t("notes.pin.addTitle", "Přidat bod checklistu (- [ ])")}><IconPlus /> {t("notes.pin.add", "bod")}</button>
-              <Show when={editing()} fallback={<button class="pin-btn ghost" onClick={startEdit} title={t("notes.pin.editTitle", "Upravit text (nebo dvojklik do lístku)")}><IconEdit /></button>}>
+              <Show when={editing()} fallback={<button class="pin-btn ghost" onClick={() => startEdit()} title={t("notes.pin.editTitle", "Upravit text (nebo dvojklik do lístku)")}><IconEdit /></button>}>
                 <button class="pin-btn pri" onClick={finishEdit}>{t("notes.pin.done", "Hotovo")}</button>
               </Show>
               <Show when={saveState() !== "idle"}>
@@ -483,11 +515,23 @@ export default function PinApp() {
               <span>{t("notes.pin.text", "Text")} <b>{look()?.text ?? pr().text} %</b></span>
               <input type="range" min={TEXT_MIN} max="100" step="5" value={pr().text} onInput={(e) => setLook({ bg: look()?.bg ?? pr().bg, text: +e.currentTarget.value })} onChange={(e) => patch({ text: +e.currentTarget.value }).then(() => setLook(null))} />
             </label>
-            <button role="menuitem" onClick={startEdit}>{t("notes.pin.editText", "Upravit text")}</button>
+            <button role="menuitem" onClick={() => startEdit()}>{t("notes.pin.editText", "Upravit text")}</button>
             <button role="menuitem" onClick={() => { setMenu(false); void patch({ collapsed: true }); }}>{t("notes.pin.collapse", "Sbalit na lištu (dvojklik na lištu)")}</button>
-            <button role="menuitem" onClick={() => { setMenu(false); const n = note(); if (n) api.noteOpen(n.path).catch(sayError); }}>{t("notes.pin.openExternal", "Otevřít v editoru")}</button>
+            <button role="menuitem" onClick={() => { setMenu(false); const n = note(); if (n) void settle().then((ok) => ok && api.pinEditInLedge(n.path).catch(sayError)); }}>{t("notes.pin.editInLedge", "Upravit v Ledge")}</button>
+            <button role="menuitem" onClick={() => { setMenu(false); const n = note(); if (n) api.noteOpen(n.path).catch(sayError); }}>{t("notes.pin.openExternal", "Otevřít v externím editoru")}</button>
             <button role="menuitem" onClick={unpin}>{t("notes.pin.unpinLong", "Odepnout z plochy (poznámka zůstane)")}</button>
             <span class="pin-sep" />
+            <Show when={note()}>
+              {(n) => (
+                <>
+                  <span class="pin-cap">{t("notes.export.title", "Export")}</span>
+                  <For each={exportItems(n().path, () => (editing() ? text() : n().body))}>
+                    {(it) => <button role="menuitem" onClick={() => { setMenu(false); void settle().then((ok) => ok && it.run()); }}>{it.label}</button>}
+                  </For>
+                  <span class="pin-sep" />
+                </>
+              )}
+            </Show>
             <For each={lifeActions(!!note()?.done, false)}>
               {(a) => <button role="menuitem" classList={{ danger: a === "delete" }} onClick={() => void life(a)}>{actionText(a)}</button>}
             </For>

@@ -6,7 +6,7 @@
 //! - Bezpečnost: `mcp.enabled` výchozí vypnuto (pak 404), klíč 32 B ve Správci pověření `Ledge/mcp`,
 //!   `Authorization: Bearer`, porovnání v konstantním čase, 401 bez detailu. MCP nic nespouští.
 //! - Logika: čisté funkce nad `Host` (config, uložení, sken) — `rpc` (JSON-RPC), `tools` (katalog a
-//!   volání), `edit` (zástupci, akce), `look` (rozložení, proužek, vzhled), `undo`, `auth`, `proxy`
+//!   volání), `edit` (zástupci, akce), `look` (rozložení, proužek, vzhled), `notes` (poznámky), `undo`, `auth`, `proxy`
 //!   (`ledge.exe --mcp`). Skutečný `Host` je `host.rs`, testy jedou nad `tests::MemHost`.
 
 pub mod auth;
@@ -14,6 +14,7 @@ pub mod discover;
 pub mod edit;
 pub mod host;
 pub mod look;
+pub mod notes;
 pub mod proxy;
 pub mod round;
 pub mod rpc;
@@ -21,6 +22,8 @@ pub mod schema;
 pub mod tools;
 pub mod undo;
 
+#[cfg(test)]
+mod notes_tests;
 #[cfg(test)]
 mod tests;
 
@@ -66,6 +69,16 @@ pub trait Host: Send + Sync {
     /// Příkazy, které Ledge SÁM najde ve složce projektu (`run`, `args`) — jen ty smí MCP zástupci dát.
     fn detected_runs(&self, dir: &std::path::Path) -> Vec<(String, Vec<String>)> {
         edit::detected_runs(dir)
+    }
+    /// Kořen poznámek; `None` = poznámky vypnuté (nástroje `notes_*` pak vrátí větu místo práce).
+    fn notes_root(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+    /// Po zápisu do poznámek: přenačíst je v Ledge (karta, připomínky) a pustit synchronizaci.
+    fn notes_changed(&self) {}
+    /// Připnout poznámku na plochu jako lístek, nebo ji odepnout (cesta je už ověřená).
+    fn pin_note(&self, _path: &std::path::Path, _pin: bool) -> Result<String, String> {
+        Err(crate::i18n::tr("Lístky tu nejsou k dispozici.", "Stickies aren't available here.").into())
     }
 }
 

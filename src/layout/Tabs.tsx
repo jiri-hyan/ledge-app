@@ -1,15 +1,22 @@
 // Záložky v hlavičce šuplíku (N záložek z `layout.pages`). Mimo úpravy: klik = `set_mode` (Rust drží,
 // na které záložce šuplík je), klávesy 1–9 obsluhuje `App`. V režimu úprav: klik přepne rozpracovanou
-// záložku, dvojklik = přejmenovat (Enter / Esc), × = smazat (karty do katalogu, s Vrátit), tažení =
-// pořadí, „+“ = nová záložka (název + volitelná ikona z malé sady). Záložka je i cíl tažení karty
-// (`data-tab`, zvýraznění z `dropTab`; prodleva nad ní záložku přepne — `cardDrag.ts`). Mimo úpravy se
-// při najetí na záložky ukáže tužka „Upravit rozložení“.
-import { createSignal, For, onMount, Show } from "solid-js";
+// záložku, dvojklik = přejmenovat (Enter / Esc), × = smazat (karty do katalogu, s Vrátit), „+“ = nová záložka
+// (název + volitelná ikona z malé sady). Pořadí záložek se mění tahem stejným motorem jako u karet
+// (`tabDrag.ts`: duch, mezera, FLIP, Esc zruší; v úpravách tahem, mimo ně podržením ~0,4 s, které úpravy
+// zapne); z klávesnice Alt + ← →. Záložka je i cíl tažení karty (`data-tab`, zvýraznění z `dropTab`; prodleva
+// nad ní záložku přepne — `cardDrag.ts`); karta puštěná na „+“ (`data-newtab`) vytvoří „Novou záložku“ a ta se
+// hned přejmenovává (`renameAsk`). Mimo úpravy se při najetí na záložky ukáže tužka „Upravit rozložení“.
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { t } from "../i18n";
-import { beginEdit, change, draft, dropTab, editing, editPage, offerUndo, setEditPage } from "./edit";
+import { beginEdit, change, draft, dropTab, editing, editPage, offerUndo, renameAsk, setEditPage, setRenameAsk } from "./edit";
 import { addPage, MAX_PAGES, movePage, normalizeLayout, PAGE_ICONS, pageNameError, pageOf, removePage, renamePage, restorePage, WORK, PERSONAL, type LayoutPage } from "./model";
 import { pageName } from "./text";
+import { NEW_TAB } from "./dnd";
+import { previewOrder } from "./drag";
+import { flipEls } from "./flip";
+import { createTabDrag } from "./tabDrag";
+import "./dnd.css";
 
 /** Pole pro název záložky: fokus po otevření (otevírá se jen výslovným klikem), Enter / Esc. */
 function NameInput(p: { value: string; placeholder: string; onDone: (v: string | null) => void }) {
@@ -45,9 +52,30 @@ export default function Tabs(p: { s: Snapshot }) {
   const [renaming, setRenaming] = createSignal<string | null>(null);
   const [adding, setAdding] = createSignal(false);
   const [icon, setIcon] = createSignal("");
-  const [drag, setDrag] = createSignal<{ from: number; to: number } | null>(null);
   let box!: HTMLDivElement;
-  let moved = false;
+  const td = createTabDrag({
+    box: () => box,
+    editing,
+    begin: () => beginEdit(p.s),
+    busy: () => renaming() !== null,
+    flip: (update) => flipEls(Array.from(box.querySelectorAll<HTMLElement>(":scope > .lay-tab[data-page]")), update),
+    commit: (from, to) => movedTab(from, to),
+  });
+  const drag = td.drag;
+  onCleanup(() => td.abort());
+  /** pořadí záložek během tahu (náhled přes CSS `order`; DOM se nepřeskládá, takže fokus ani ukazatel nepřijdou o prvek) */
+  const view = createMemo(() => {
+    const ids = l().pages.map((x) => x.id);
+    const d = drag();
+    return d ? previewOrder(ids, d.from, d.to) : ids;
+  });
+  // karta puštěná na „+“ vytvořila záložku: její název se hned přepisuje
+  createEffect(() => {
+    const id = renameAsk();
+    if (!id) return;
+    setRenameAsk(null);
+    if (l().pages.some((x) => x.id === id)) setRenaming(id);
+  });
 
   const go = (id: string) => (editing() ? setEditPage(id) : void api.setMode(id));
   const title = (pg: LayoutPage, i: number) => `${pageName(pg)} (${i + 1})`;
@@ -84,52 +112,39 @@ export default function Tabs(p: { s: Snapshot }) {
     offerUndo(t("cards.layout.tab.removed", "Záložka „{name}“ smazána — její karty jsou v katalogu", { name: pageName(pg) }), () => change((x) => restorePage(x, u)));
   }
 
-  /** tažení záložky = pořadí (od posunu o pár px; jinak je to klik) */
-  function start(e: PointerEvent, i: number) {
-    if (!editing() || e.button !== 0 || renaming()) return;
-    const el = e.currentTarget as HTMLElement;
-    const tabs = Array.from(box.querySelectorAll<HTMLElement>(".lay-tab"));
-    const centers = tabs.map((x) => {
-      const r = x.getBoundingClientRect();
-      return r.left + r.width / 2;
-    });
-    const x0 = e.clientX;
-    moved = false;
-    el.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => {
-      if (!moved && Math.abs(ev.clientX - x0) < 5) return;
-      moved = true;
-      let to = 0;
-      centers.forEach((c, j) => Math.abs(ev.clientX - c) < Math.abs(ev.clientX - centers[to]) && (to = j));
-      setDrag({ from: i, to });
-    };
-    const end = () => {
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", end);
-      el.removeEventListener("pointercancel", end);
-      const d = drag();
-      setDrag(null);
-      if (d && d.to !== d.from) change((x) => movePage(x, d.from, d.to));
-    };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
+  /** pořadí záložek se změnilo (tahem nebo Alt + šipkou) — s Vrátit */
+  function movedTab(from: number, to: number) {
+    const pg = l().pages[from];
+    if (!pg) return;
+    change((x) => movePage(x, from, to));
+    offerUndo(t("cards.layout.tab.moved", "Záložka „{name}“ přesunuta", { name: pageName(pg) }), () => change((x) => movePage(x, to, from)));
+  }
+  /** Alt + ← → na záložce v úpravách: o místo vedle; fokus zůstane na záložce */
+  function key(e: KeyboardEvent, id: string, i: number) {
+    if (!editing() || !e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    const to = i + (e.key === "ArrowLeft" ? -1 : 1);
+    if (to < 0 || to >= l().pages.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    flipEls(Array.from(box.querySelectorAll<HTMLElement>(":scope > .lay-tab[data-page]")), () => movedTab(i, to));
+    requestAnimationFrame(() => box.querySelector<HTMLElement>(`[data-tab="${CSS.escape(id)}"]`)?.focus());
   }
 
   return (
     <Show when={editing() || l().pages.length > 1}>
-      <div class="seg lay-tabs" classList={{ editing: editing() }} role="group" aria-label={t("cards.head.tab", "Záložka")} ref={box}>
+      <div class="seg lay-tabs" classList={{ editing: editing(), dragging: !!drag() }} role="group" aria-label={t("cards.head.tab", "Záložka")} ref={box}>
         <For each={l().pages}>
           {(pg, i) => (
-            <span class="lay-tab" classList={{ drop: dropTab() === pg.id, "drag-to": !!drag() && drag()!.to === i() && drag()!.from !== i() }}>
+            <span class="lay-tab" data-page={pg.id} style={{ order: String(view().indexOf(pg.id)) }} classList={{ drop: dropTab() === pg.id, "lp-gap": drag()?.id === pg.id }}>
               <Show when={renaming() === pg.id} fallback={
                 <button
                   data-tab={pg.id}
                   classList={{ on: cur() === pg.id }}
                   aria-pressed={cur() === pg.id}
-                  title={editing() ? t("cards.layout.tab.editTitle", "{name} — dvojklik přejmenuje, tažení změní pořadí", { name: pageName(pg) }) : title(pg, i())}
-                  onPointerDown={(e) => start(e, i())}
-                  onClick={() => !moved && go(pg.id)}
+                  title={editing() ? t("cards.layout.tab.editTitle", "{name} — dvojklik přejmenuje, tažení změní pořadí (Alt + ← →)", { name: pageName(pg) }) : title(pg, i())}
+                  onPointerDown={(e) => td.down(e, pg.id, i())}
+                  onClick={() => go(pg.id)}
+                  onKeyDown={(e) => key(e, pg.id, i())}
                   onDblClick={() => editing() && setRenaming(pg.id)}
                 >
                   <Show when={pg.icon}><span class="lay-tab-icon">{pg.icon}</span></Show>
@@ -146,13 +161,13 @@ export default function Tabs(p: { s: Snapshot }) {
         </For>
         {/* objevitelnost: při najetí na záložky se objeví tužka = rovnou úpravy (tažení karet, velikosti, záložky) */}
         <Show when={!editing()}>
-          <span class="lay-tab lay-tab-pencil">
+          <span class="lay-tab lay-tab-pencil" style={{ order: "100" }}>
             <button class="lay-tab-edit" title={t("cards.layout.pencil.title", "Upravit rozložení — karty pak přetáhneš kamkoli. Rychleji: podrž kartu za hlavičku a táhni.")} aria-label={t("cards.layout.pencil", "Upravit rozložení")} onClick={() => beginEdit(p.s)}>✎</button>
           </span>
         </Show>
         <Show when={editing() && l().pages.length < MAX_PAGES}>
-          <span class="lay-tab">
-            <button class="lay-tab-add" title={t("cards.layout.tab.add", "Nová záložka")} aria-label={t("cards.layout.tab.add", "Nová záložka")} aria-expanded={adding()} onClick={() => setAdding(!adding())}>+</button>
+          <span class="lay-tab" style={{ order: "101" }} classList={{ "lp-newdrop": dropTab() === NEW_TAB }}>
+            <button class="lay-tab-add" data-newtab="1" title={t("cards.layout.tab.add", "Nová záložka")} aria-label={t("cards.layout.tab.add", "Nová záložka")} aria-expanded={adding()} onClick={() => setAdding(!adding())}>+</button>
           </span>
         </Show>
         <Show when={adding()}>

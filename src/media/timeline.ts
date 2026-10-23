@@ -20,6 +20,8 @@ export interface MediaLook {
   variant: MediaVariant;
   stripTime: MediaStripTime;
   equalizer: boolean;
+  /** oblíbené (Rust `mediaconf::Favorite`); prázdné se neposílá */
+  favorites?: import("./favorites").Favorite[];
 }
 
 /** Pořadí vzhledů v přepínači (cyklí se tímhle směrem). */

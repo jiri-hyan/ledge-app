@@ -32,7 +32,7 @@ export type TileSize = (typeof TILE_SIZES)[number];
  *  složky zástupců (chybí = žádné). */
 export type TileOpts = { size: TileSize; label: boolean; git: boolean; hidden: string[]; folders?: TileFolder[] };
 /** `limit` = kolik řádků karta ukáže, než nabídne „Zobrazit další“ (0 = bez stropu, chybí = `DEFAULT_LIMIT`). */
-export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts; look?: CardLook; limit?: number };
+export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts; look?: CardLook; limit?: number; parts?: string[] };
 export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[] };
 /** `upgrades` = jednorázové úpravy, které už proběhly (Rust `apply_upgrades`) — musí přežít každé uložení. */
 export type Layout = { pages: LayoutPage[]; hiddenParts: string[]; upgrades?: string[] };
@@ -58,10 +58,21 @@ export const PARTS = {
   claudeSubagents: "claude",
   nowPlaying: "media",
   sound: "media",
+  favorites: "media",
   battery: "clock",
 } as const satisfies Record<string, CardId>;
 export type PartKey = keyof typeof PARTS;
 export const PART_KEYS = Object.keys(PARTS) as PartKey[];
+/** Pseudo-část „hlavní obsah karty“ (seznam session, hodiny) — drží své místo v pořadí částí (`parts`). */
+export const BODY = "body";
+/** Části karty, které jdou v šuplíku přetahovat — výchozí pořadí shora dolů (zrcadlo `layout::card_slots`).
+ *  `claudeGit` a `claudeSubagents` tu nejsou: kreslí se u každé session zvlášť, nejsou to bloky. */
+export const CARD_SLOTS: Readonly<Record<string, readonly string[]>> = {
+  claude: ["claudeLimits", BODY, "claudeCosts"],
+  media: ["nowPlaying", "sound", "favorites"],
+  clock: [BODY, "battery"],
+};
+export const slotsOf = (id: CardId): readonly string[] => CARD_SLOTS[id] ?? [];
 /** Karta, která bez svých částí nic neukáže (vrácená z katalogu = s částmi). */
 const PARTS_ONLY: readonly CardId[] = ["media"];
 
@@ -93,6 +104,7 @@ export const PART_INFO: Record<PartKey, Text> = {
   claudeSubagents: ["cards.layout.part.claudeSubagents", "Subagenti"],
   nowPlaying: ["cards.layout.part.nowPlaying", "Skladba"],
   sound: ["cards.layout.part.sound", "Hlasitost"],
+  favorites: ["cards.layout.part.favorites", "Oblíbené"],
   battery: ["cards.layout.part.battery", "Baterie"],
 };
 /** Malá sada ikon pro vlastní záložku (emoji, žádný soubor). */
@@ -158,6 +170,8 @@ export function normalizeLayout(raw: unknown): Layout {
       if ((c as any).tiles && typeof (c as any).tiles === "object") out.tiles = normalizeTiles((c as any).tiles);
       const look = normalizeCardLook((c as any).look, id);
       if (look) out.look = look;
+      const parts = savedParts((c as any).parts, id);
+      if (parts) out.parts = parts;
       cards.push(out);
     }
     const page: LayoutPage = { id: x.id as string, name: typeof x.name === "string" ? x.name : "", cards };
@@ -176,6 +190,7 @@ const cloneCard = (c: LayoutCard): LayoutCard => {
   const out = { ...c };
   if (c.tiles) out.tiles = { ...c.tiles, hidden: [...c.tiles.hidden], ...(c.tiles.folders ? { folders: c.tiles.folders.map((f) => ({ ...f, items: [...f.items] })) } : {}) };
   if (c.look) out.look = { ...c.look };
+  if (c.parts) out.parts = [...c.parts];
   return out;
 };
 export const clone = (l: Layout): Layout => {
@@ -205,6 +220,43 @@ export function moveItem<T>(list: readonly T[], from: number, to: number): T[] {
   const [x] = out.splice(from, 1);
   out.splice(to, 0, x);
   return out;
+}
+
+// ---------- pořadí částí karty ----------
+
+/** Pořadí částí karty shora dolů: uložené (neznámé a dvojité pryč), chybějící na konec ve výchozím pořadí. */
+export function orderParts(saved: unknown, id: CardId): string[] {
+  const slots = slotsOf(id);
+  const out: string[] = [];
+  for (const k of Array.isArray(saved) ? saved : []) if (typeof k === "string" && slots.includes(k) && !out.includes(k)) out.push(k);
+  for (const k of slots) if (!out.includes(k)) out.push(k);
+  return out;
+}
+/** Uložené pole `parts` v čisté podobě: úplné pořadí, a když je výchozí (nebo karta nemá části), `undefined`. */
+function savedParts(raw: unknown, id: CardId): string[] | undefined {
+  if (!Array.isArray(raw) || !raw.length) return undefined;
+  const o = orderParts(raw, id);
+  return o.length && o.some((k, i) => k !== slotsOf(id)[i]) ? o : undefined;
+}
+/** Pořadí částí karty na záložce (bez `parts` = výchozí). */
+export const partsOf = (c: LayoutCard | undefined, id: CardId | undefined = c?.id): string[] => (id ? orderParts(c?.parts, id) : []);
+/** Nastaví pořadí částí karty (výchozí pořadí = pole `parts` pryč). */
+export const setParts = (l: Layout, pageId: string, id: CardId, order: readonly string[]): Layout =>
+  mapPage(l, pageId, (p) => ({
+    ...p,
+    cards: p.cards.map((c) => {
+      if (c.id !== id) return c;
+      const out = { ...c };
+      const next = savedParts(order, id);
+      if (next) out.parts = next;
+      else delete out.parts;
+      return out;
+    }),
+  }));
+/** Přesun části v rámci karty (index → index v úplném pořadí). */
+export function movePart(l: Layout, pageId: string, id: CardId, from: number, to: number): Layout {
+  const c = pageOf(l, pageId).cards.find((x) => x.id === id);
+  return c ? setParts(l, pageId, id, moveItem(partsOf(c), from, to)) : l;
 }
 
 /** Přesun karty v rámci záložky (index → index). */
@@ -325,6 +377,15 @@ export function moveToPageAt(l: Layout, fromPage: string, id: CardId, toPage: st
     cards.splice(Math.max(0, Math.min(index, cards.length)), 0, undo.card);
     return { ...p, cards };
   });
+}
+
+/** Karta přetažená na „+“: vznikne nová záložka s tímto názvem a karta se do ní přesune (jinak nic — plno
+ *  záložek, karta na zdroji není). */
+export function moveToNewPage(l: Layout, fromPage: string, id: CardId, name: string): { layout: Layout; id: string } | null {
+  if (!pageHas(pageOf(l, fromPage), id)) return null;
+  const added = addPage(l, name);
+  if (!added) return null;
+  return { layout: moveToPageAt(added.layout, fromPage, id, added.id, 0), id: added.id };
 }
 
 /** Skrýt / ukázat část karty (`layout.hiddenParts`). */

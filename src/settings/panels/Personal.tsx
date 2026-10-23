@@ -11,6 +11,7 @@ import type { PanelProps } from "../types";
 import { parsePresets } from "../../timer/model";
 import CalendarSettings from "../../calendar/CalendarSettings";
 import MediaSettings from "../../media/MediaSettings";
+import SuggestSettings from "../../suggest/SuggestSettings";
 import { ClipSettings } from "../../cliphist/ClipSettings";
 import { GithubSettings, SystemSettings } from "../../integrations/IntegrationsSettings";
 
@@ -51,6 +52,9 @@ export default function PersonalPanel(_p: PanelProps) {
         </Section>
         <Section title={t("settings.media.section", "Přehrávač")} desc={t("settings.media.desc", "Jak vypadá karta Právě hraje. Vzhled přepneš i přímo v kartě — ikonkou v jejím rohu.")}>
           <MediaSettings />
+        </Section>
+        <Section title={t("settings.suggest.section", "Kontextové návrhy")} desc={t("settings.suggest.desc", "Malý pruh nahoře v šuplíku (až 3 chipy) — jen z reálných událostí, bez zdroje se nic neukáže. Chip jde zavřít na 24 hodin.")}>
+          <SuggestSettings />
         </Section>
         <Section title={t("settings.github.section", "GitHub")} desc={t("settings.github.desc", "Karta GitHub a položka v proužku: PR čekající na tvoji revizi, tvoje PR s CI a notifikace. Výchozí vypnuto; karta se přidá v katalogu karet.")}>
           <GithubSettings />

@@ -3,7 +3,9 @@
 // a presety pružin (`springPreset`). Design styly (tabulka, písmo, materiál, rozložení) jsou v
 // `looks.ts`, výběr stylu v `styles.ts`. DOM a události řeší `apply.ts`.
 import type { Appearance, MotionStyle, StripStyle } from "../types.ts";
-import { THEMES, THEME_IDS } from "./themes.ts";
+import { THEME_IDS } from "./themes.ts";
+import { normalizeCustomThemes, themeOf } from "./customThemes.ts";
+import { normalizePages } from "./pages.ts";
 import { CLASSIC, FONTS, LAYOUTS, MATERIALS, STYLE_IDS, WIDTHS, lookVars } from "./looks.ts";
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -20,13 +22,16 @@ export const DEFAULT_APPEARANCE: Appearance = {
   material: "solid",
   layout: "classic",
   width: "custom",
+  pages: {},
+  customThemes: [],
+  customTheme: "",
 };
 
 export const DENSITY = { compact: 0.78, normal: 1, comfy: 1.22 } as const;
 export const RADIUS = { sharp: 0.35, normal: 1, round: 1.4 } as const;
 export const STRIP_SIZE = { small: 0.85, normal: 1, large: 1.2 } as const;
 /** Styly animací v pořadí panelu (zrcadlo `MotionStyle` v appearance.rs). */
-export const MOTION_STYLES: MotionStyle[] = ["spring", "smooth", "snappy", "bounce", "fade", "notch", "none"];
+export const MOTION_STYLES: MotionStyle[] = ["spring", "smooth", "snappy", "bounce", "fade", "notch", "drop", "unfold", "none"];
 export const STRIP_STYLES: StripStyle[] = ["pill", "line", "dot", "term", "tag", "glow", "block", "drop"];
 const keysOf = <T extends string>(o: Record<T, unknown>) => Object.keys(o) as T[];
 
@@ -38,6 +43,7 @@ export const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0
 export function normalizeAppearance(raw: any): Appearance {
   const d = DEFAULT_APPEARANCE;
   const r = raw ?? {};
+  const customThemes = normalizeCustomThemes(r.customThemes);
   return {
     style: pick(r.style, STYLE_IDS, CLASSIC),
     theme: pick(r.theme, THEME_IDS, d.theme),
@@ -57,6 +63,9 @@ export function normalizeAppearance(raw: any): Appearance {
     material: pick(r.material, keysOf(MATERIALS), d.material),
     layout: pick(r.layout, keysOf(LAYOUTS), d.layout),
     width: pick(r.width, keysOf(WIDTHS), d.width),
+    pages: normalizePages(r.pages, customThemes),
+    customThemes,
+    customTheme: customThemes.some((c) => c.id === r.customTheme) ? r.customTheme : "",
   };
 }
 
@@ -98,6 +107,8 @@ const CSS_EASE: Record<Exclude<MotionStyle, "none">, { spring: string; ease: str
   bounce: { spring: "cubic-bezier(0.34, 1.9, 0.6, 1)", ease: "cubic-bezier(0.25, 1.15, 0.4, 1.08)" },
   fade: { spring: "cubic-bezier(0.25, 0.8, 0.3, 1)", ease: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
   notch: { spring: "cubic-bezier(0.3, 1.35, 0.5, 1)", ease: "cubic-bezier(0.2, 0.9, 0.25, 1.05)" },
+  drop: { spring: "cubic-bezier(0.34, 1.6, 0.64, 1)", ease: "cubic-bezier(0.2, 0.9, 0.25, 1.05)" },
+  unfold: { spring: "cubic-bezier(0.25, 0.8, 0.3, 1)", ease: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
 };
 
 export type WidenMotion = { shrinkMs: number; fadeMs: number; restoreMs: number; easing: string };
@@ -115,8 +126,7 @@ export function widenMotion(style: MotionStyle, speed: number, reduced: boolean)
 
 /** Všechny CSS proměnné vzhledu (bez `--`) → hodnota. Výchozí vzhled = hodnoty ze `styles.css`. */
 export function appearanceVars(a: Appearance, reducedMotion = false): Record<string, string> {
-  const theme = THEMES[a.theme] ?? THEMES.dark;
-  const out: Record<string, string> = { ...theme.vars };
+  const out: Record<string, string> = { ...themeOf(a).vars };
   if (isHex(a.accent)) {
     const [c1, c2] = accentPair(a.accent);
     out.accent = c1;

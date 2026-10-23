@@ -5,6 +5,8 @@
 //  - z výřezu: nejdřív roztažení do šířky ve výšce proužku, pak rozbalení dolů (Dynamic Island);
 //  - odskok: celý šuplík spadne shora a dvakrát odskočí;
 //  - rozplynutí: jen průhlednost a jemné zvětšení;
+//  - pád: celý šuplík spadne shora, jednou se jemně odrazí a usadí (jen posun a průhlednost);
+//  - rozvinutí: tvar se rozvine shora dolů bez překmitu a karty naskakují jedna po druhé (`Plan.reveal`);
 //  - žádná (i systémové „omezit pohyb“): `null` = okamžitě.
 // Stejný plán přehrává náhled v Nastavení (`settings/panels/AppearanceMotion.tsx`) na malém šuplíku.
 import type { MotionStyle } from "../types.ts";
@@ -21,11 +23,15 @@ export type Plan = {
   start: Partial<Record<"clipPath" | "transform" | "opacity", string>>;
   /** celá plocha se zároveň „nadechne“ (jen u morfu tvaru) */
   breath: boolean;
+  /** postupné naskakování obsahu: `step` ms mezi kartami, `blur` = jako výchozí (jemné rozmazání); bez pole = výchozí */
+  reveal?: { step: number; blur: boolean };
 };
 
 /** Pojistka zavření v Rustu (`Drawer::hide`) je 600 ms — zavírací plán se do ní vždy vejde. */
 export const CLOSE_CAP_MS = 540;
 
+/** Odstup naskočení karet u rozvinutí (20–30 ms na kartu). */
+export const UNFOLD_STEP_MS = 25;
 const ms = (base: number, speed: number) => Math.round(base / (Number.isFinite(speed) && speed > 0 ? speed : 1));
 const clipMorph = new Set<MotionStyle>(["spring", "smooth", "snappy"]);
 
@@ -68,6 +74,38 @@ export function openPlan(style: MotionStyle, speed: number, g: Geo, fromVisible 
       breath: false,
     };
   }
+  if (style === "drop") {
+    // gravitace: pomalý start, rychlý dopad, jeden jemný odraz nahoru a usazení (transform + opacity, nic víc)
+    return {
+      frames: [
+        { transform: "translateY(-60%)", opacity: 0, offset: 0, easing: "cubic-bezier(0.5, 0, 0.9, 0.5)" },
+        { opacity: 1, offset: 0.3 },
+        { transform: "translateY(0%)", opacity: 1, offset: 0.58, easing: "cubic-bezier(0.1, 0.6, 0.4, 1)" },
+        { transform: "translateY(-2.5%)", opacity: 1, offset: 0.78, easing: "cubic-bezier(0.5, 0, 0.9, 0.5)" },
+        { transform: "translateY(0%)", opacity: 1, offset: 1 },
+      ],
+      duration: ms(520, speed),
+      easing: "linear",
+      delay: 0,
+      start: { transform: "translateY(-60%)", opacity: "0" },
+      breath: false,
+    };
+  }
+  if (style === "unfold") {
+    return {
+      frames: [
+        { clipPath: g.collapsed, offset: 0, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
+        { clipPath: g.band, offset: 0.22, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
+        { clipPath: g.full, offset: 1 },
+      ],
+      duration: ms(520, speed),
+      easing: "linear",
+      delay: 0,
+      start: { clipPath: g.collapsed },
+      breath: false,
+      reveal: { step: UNFOLD_STEP_MS, blur: false },
+    };
+  }
   // fade
   return {
     frames: [
@@ -105,6 +143,14 @@ export function closePlan(style: MotionStyle, speed: number, g: Geo): Plan | nul
       frames: [{ transform: "translateY(0%)" }, { transform: "translateY(2%)", offset: 0.25 }, { transform: "translateY(-100%)" }],
       duration: cap(ms(280, speed)),
       easing: "cubic-bezier(0.5, 0, 0.8, 0.2)",
+    };
+  }
+  if (style === "drop") {
+    return {
+      ...base,
+      frames: [{ transform: "translateY(0%)", opacity: 1 }, { transform: "translateY(-40%)", opacity: 0 }],
+      duration: cap(ms(240, speed)),
+      easing: "cubic-bezier(0.5, 0, 0.9, 0.5)",
     };
   }
   if (style === "fade") {

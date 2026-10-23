@@ -8,12 +8,14 @@
 //  - tah: poloprůhledný duch pod kurzorem, na místě dopadu mezera velikosti karty (CSS `order`, DOM se
 //    nepřeskládá), ostatní se plynule odsunou (FLIP z `Deck`), zóna „Skrýt kartu“ dole, ouško záložky = přesun
 //    na její konec, prodleva `DWELL_MS` nad ouškem záložku přepne a tah pokračuje v její mřížce,
-//  - Esc / ztráta ukazatele = nic se nezmění; puštění → `env.commit`.
+//  - tlačítko „+“ (nová záložka) = zástupná záložka `NEW_TAB`: pustit na něj vytvoří záložku s kartou,
+//  - Esc / ztráta ukazatele = nic se nezmění; puštění → `env.commit`; duch po puštění pružinou dosedne na mezeru
+//    (nebo zhasne, když karta mizí) — sdílený motor `flip.ts`.
 import { batch, createSignal } from "solid-js";
-import { dur } from "../motion";
 import { dropTab, noteHoldDrag, setDropTab, setEditPage } from "./edit";
 import { dropAction, autoScrollStep, type DragEnd, type DropAction } from "./drag";
-import { CONTROL_SELECTOR, DWELL_MS, EDIT_CONTROL_SELECTOR, GRAB_PX, HEADER_SELECTOR, HOLD_MS, NO_DWELL, canHold, contentPoint, dwellStep, flyPos, grabOffset, holdStep, inBox, insertIndex, type ScrollBox } from "./dnd";
+import { CONTROL_SELECTOR, DWELL_MS, EDIT_CONTROL_SELECTOR, GRAB_PX, HEADER_SELECTOR, HOLD_MS, NEW_TAB, NO_DWELL, canHold, contentPoint, dwellStep, flyPos, grabOffset, holdStep, inBox, insertIndex, offsetRect, type ScrollBox } from "./dnd";
+import { landGhost } from "./flip";
 import { gridDropIndex, type CardHeight, type CardId, type CardSize, type LayoutCard, type LayoutPage, type Rect } from "./model";
 
 /** Stav rozdělaného tahu (mění se jen při změně cíle — poloha ukazatele je zvlášť). */
@@ -156,7 +158,8 @@ export function createCardDrag(env: DragEnv) {
       setPtr(last);
     };
     const tabAt = (x: number, y: number) => {
-      const t = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>("[data-tab]")?.dataset.tab ?? null;
+      const hit = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>("[data-tab], [data-newtab]");
+      const t = hit ? (hit.dataset.newtab ? NEW_TAB : (hit.dataset.tab ?? null)) : null;
       return t && t !== viewId ? t : null;
     };
     const retarget = () => {
@@ -203,7 +206,8 @@ export function createCardDrag(env: DragEnv) {
         box.scrollTop += step;
         retarget();
       }
-      const w = dwellStep(dwell, tab, now, DWELL_MS);
+      // nad „+“ se záložka nepřepíná (nová ještě není)
+      const w = dwellStep(dwell, tab === NEW_TAB ? null : tab, now, DWELL_MS);
       dwell = w.dwell;
       if (w.fire) switchTo(w.fire);
       raf = requestAnimationFrame(tick);
@@ -242,11 +246,10 @@ export function createCardDrag(env: DragEnv) {
       // zrušeno / zahozeno: karty se plynule vrátí; puštění na místo: náhled už je výsledek
       if (a.kind === "none" || a.kind === "hide" || a.kind === "blocked") env.flip(apply);
       else apply();
-      const ms = dur(120);
-      if (ms > 0 && ghost.animate) {
-        const f = ghost.animate([{ opacity: 0.78 }, { opacity: 0 }], { duration: ms, fill: "forwards" });
-        f.onfinish = () => ghost.remove();
-      } else ghost.remove();
+      // duch dosedne tam, kde karta teď je (po puštění i po zrušení); mizí-li (skrytá, přesunutá na jinou záložku), zhasne
+      const el = a.kind === "hide" ? null : box.querySelector<HTMLElement>(`:scope > .deck-item[data-card="${CSS.escape(id)}"]:not(.lay-fly):not(.lay-slot)`);
+      const br = box.getBoundingClientRect();
+      landGhost(ghost, flyPos(grab, last.x, last.y), el ? offsetRect({ left: br.left, top: br.top, clientLeft: box.clientLeft, clientTop: box.clientTop, scrollLeft: box.scrollLeft, scrollTop: box.scrollTop }, el) : null);
       if (fromHold) {
         // po tahu z podržení nesmí z puštění vzniknout klik na hlavičku pod kurzorem
         const eat = (c: Event) => (c.stopPropagation(), c.preventDefault());

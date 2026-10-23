@@ -96,6 +96,7 @@ mod stripconf;
 mod stripdraw;
 mod stripview;
 mod subagents;
+mod suggest;
 mod sysmon;
 mod threads;
 mod tilelook;
@@ -336,8 +337,13 @@ pub fn run() {
             commands::notes::note_list,
             commands::notes::note_done,
             commands::notes::note_open,
+            commands::notes::note_open_with_apps,
+            commands::notes::note_open_with,
+            commands::notes::note_export,
             commands::notes::note_prefill,
             commands::notes::note_query,
+            commands::notes::note_search,
+            commands::notes::note_suggest_remind,
             commands::notes::note_read,
             commands::notes::note_save,
             commands::notes::note_toggle_task,
@@ -360,6 +366,7 @@ pub fn run() {
             commands::pins::pin_set,
             commands::pins::pin_drag,
             commands::pins::pin_unpin,
+            commands::pins::pin_edit_in_ledge,
             commands::pins::pin_hint_seen,
             commands::drawer::take_page,
             commands::drawer::open_link,
@@ -389,6 +396,7 @@ pub fn run() {
             commands::media::personal_live,
             commands::media::media_control,
             commands::media::media_cover,
+            commands::media::media_favorite_open,
             commands::media::volume_set,
             commands::media::volume_mute,
             commands::calendar::calendar_test,

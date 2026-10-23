@@ -125,3 +125,55 @@ export function flipPlan(style: string, speed: number, reduced: boolean): { ms: 
   if (style === "none" || reduced) return null;
   return { ms: Math.max(1, Math.round(160 / (speed > 0 ? speed : 1))), easing: "cubic-bezier(.2,.7,.2,1)" };
 }
+
+// ---------- přistání ducha ----------
+
+export type LandBox = { x: number; y: number; w: number; h: number };
+/** Transformace ducha (`left: 0; top: 0; transform-origin: 0 0`) na začátku a na konci přistání: duch o rozměrech
+ *  `ghost` letí z bodu `from` (levý horní roh) na mezeru `to` a přizpůsobí se jí velikostí — karta, která
+ *  v cíli vyjde širší nebo nižší, na ni tak plynule „dosedne“. Stejné rozměry = čistý posun bez `scale`. */
+export function landTransforms(from: { x: number; y: number }, ghost: { w: number; h: number }, to: LandBox): { from: string; to: string } {
+  const sx = ghost.w > 0 ? to.w / ghost.w : 1;
+  const sy = ghost.h > 0 ? to.h / ghost.h : 1;
+  const same = Math.abs(sx - 1) < 0.005 && Math.abs(sy - 1) < 0.005;
+  return {
+    from: `translate(${Math.round(from.x)}px, ${Math.round(from.y)}px)`,
+    to: `translate(${Math.round(to.x)}px, ${Math.round(to.y)}px)${same ? "" : ` scale(${+sx.toFixed(4)}, ${+sy.toFixed(4)})`}`,
+  };
+}
+/** Obdélník prvku ve viewportu z jeho `offset*` v rámci hostitele (`offsetParent`): nezávislý na rozběhlých
+ *  animacích (FLIP) prvku i posunu hostitele. */
+export function offsetRect(host: { left: number; top: number; clientLeft: number; clientTop: number; scrollLeft: number; scrollTop: number }, el: { offsetLeft: number; offsetTop: number; offsetWidth: number; offsetHeight: number }): LandBox {
+  return { x: host.left + host.clientLeft - host.scrollLeft + el.offsetLeft, y: host.top + host.clientTop - host.scrollTop + el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+}
+
+// ---------- záložky ----------
+
+/** Zástupná „záložka“ tlačítka + (nová záložka): `dropTab` je při tahu nad ním rovno tomuhle. */
+export const NEW_TAB = "+new";
+/** Index nejbližšího středu (osa X) — kam v řadě záložek spadne tažená záložka. */
+export function nearestCenter(centers: readonly number[], x: number): number {
+  let best = 0;
+  centers.forEach((c, j) => {
+    if (Math.abs(x - c) < Math.abs(x - centers[best])) best = j;
+  });
+  return best;
+}
+
+// ---------- popisky zón při tahu ----------
+
+export type DropHint =
+  | { kind: "hide" }
+  | { kind: "hidePart" }
+  | { kind: "tab"; tab: string; there: boolean }
+  | { kind: "newTab" }
+  | { kind: "alreadyHere" }
+  | null;
+/** Co má říkat štítek u kurzoru při tahu karty: zóna Skrýt, ouško záložky (a že tam karta už je), tlačítko
+ *  nové záložky, mřížka cizí záložky, kde už karta je. Obyčejné místo v mřížce = žádný štítek. */
+export function dropHint(i: { zone: boolean; tab: string | null; tabHas: boolean; foreignHas: boolean }): DropHint {
+  if (i.zone) return { kind: "hide" };
+  if (i.tab === NEW_TAB) return { kind: "newTab" };
+  if (i.tab) return { kind: "tab", tab: i.tab, there: i.tabHas };
+  return i.foreignHas ? { kind: "alreadyHere" } : null;
+}

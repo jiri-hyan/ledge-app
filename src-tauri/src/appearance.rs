@@ -12,9 +12,11 @@
 pub mod geom;
 pub mod look;
 pub mod motion;
+pub mod pages;
 pub mod stripdeco;
 
 pub use look::{FontLook, Layout, Material, WidthPreset};
+pub use pages::{CustomTheme, PageLook};
 
 use crate::i18n::tr;
 use schemars::JsonSchema;
@@ -27,7 +29,8 @@ pub struct AppearanceConfig {
     /// `paper`, `neon`, `brutal`, `pastel`. Jen jméno — hodnoty stylu jsou v polích níž (výběr stylu je
     /// do nich zapíše, „Obnovit styl“ je vrátí). Neznámé jméno frontend bere jako `classic`.
     pub style: String,
-    /// Barevný motiv: `dark` (výchozí), `midnight`, `graphite`, `nord`, `light`, `contrast`.
+    /// Barevný motiv: `dark` (výchozí), `midnight`, `graphite`, `nord`, `light`, `contrast`, barvy stylů
+    /// (`terminal`, `paper`, `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`).
     pub theme: Theme,
     /// Barva akcentu `#rrggbb` (podpisová linka, záře, fokus). Prázdné = výchozí fialovo-modrá Ledge.
     pub accent: String,
@@ -53,6 +56,16 @@ pub struct AppearanceConfig {
     pub layout: Layout,
     /// Předvolba šířky šuplíku: `custom` (výchozí = `drawer.width` v px), `narrow`, `medium`, `wide`, `full`.
     pub width: WidthPreset,
+    /// Vzhled jednotlivých záložek (klíč = id záložky z `layout.pages`): styl, motiv a akcent, který se na ní
+    /// použije místo celkového (prázdné pole = jako celek). Chybějící = všechny záložky mají celkový vzhled.
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub pages: std::collections::BTreeMap<String, PageLook>,
+    /// Vlastní motivy (`pages::CustomTheme`): barvy z editoru Nastavení → Vzhled, nejvýš 20.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub custom_themes: Vec<CustomTheme>,
+    /// Vybraný vlastní motiv (`id` z `customThemes`) pro celý vzhled; prázdné = vestavěný `theme`.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub custom_theme: String,
 }
 
 impl Default for AppearanceConfig {
@@ -71,6 +84,9 @@ impl Default for AppearanceConfig {
             material: Material::default(),
             layout: Layout::default(),
             width: WidthPreset::default(),
+            pages: Default::default(),
+            custom_themes: Vec::new(),
+            custom_theme: String::new(),
         }
     }
 }
@@ -101,12 +117,18 @@ pub enum Theme {
     Brutal,
     /// světlé pastelové šedomodré (styl Pastel)
     Pastel,
+    /// hluboká noční modř s tyrkysovo-fialovou polární září (styl Aurora)
+    Aurora,
+    /// jednobarevná šeď na bílé, černý akcent (styl Mono)
+    Mono,
+    /// jantarová na hnědočerné, jako starý monitor (styl Retro)
+    Retro,
 }
 
 #[cfg(test)]
 impl Theme {
     /// Všechny motivy (testy kontrastu a zrcadel TS).
-    pub const ALL: [Theme; 11] = [
+    pub const ALL: [Theme; 14] = [
         Theme::Dark,
         Theme::Midnight,
         Theme::Graphite,
@@ -118,6 +140,9 @@ impl Theme {
         Theme::Neon,
         Theme::Brutal,
         Theme::Pastel,
+        Theme::Aurora,
+        Theme::Mono,
+        Theme::Retro,
     ];
 }
 
@@ -157,7 +182,8 @@ impl Default for GlassLook {
 pub struct MotionLook {
     /// `spring` = pružina s překmitem (výchozí), `smooth` = plynule bez překmitu, `snappy` = svižně,
     /// `bounce` = dopadne a odskočí, `fade` = rozplynutí, `notch` = rozbalení z proužku (nejdřív do
-    /// šířky, pak dolů), `none` = bez animací (okamžitě). Systémové „omezit pohyb“ se chová jako `none`
+    /// šířky, pak dolů), `drop` = pád s jemným doskokem, `unfold` = rozvinutí shora dolů s postupným
+    /// naskakováním karet, `none` = bez animací (okamžitě). Systémové „omezit pohyb“ se chová jako `none`
     /// (frontend i vysunutí okna v Rustu, `motion::anim_ms_now`).
     pub style: MotionStyle,
     /// Rychlost animací (násobek, 0.5–2; 2 = dvakrát rychleji).
@@ -180,6 +206,8 @@ pub enum MotionStyle {
     Bounce,
     Fade,
     Notch,
+    Drop,
+    Unfold,
     None,
 }
 
@@ -268,7 +296,7 @@ pub fn validate(a: &AppearanceConfig) -> Result<(), String> {
     if !c.is_empty() && c != "accent" && !is_hex(c) {
         return Err(trf!("appearance.strip.color „{c}“ chce prázdné, „accent“ nebo #rrggbb.", "appearance.strip.color “{c}” needs empty, “accent” or #rrggbb."));
     }
-    Ok(())
+    pages::validate(a)
 }
 
 #[cfg(test)]
@@ -381,7 +409,7 @@ mod tests {
         for t in ["\"paper\"", "\"neon\"", "\"brutal\"", "\"pastel\""] {
             assert!(serde_json::from_str::<Theme>(t).is_ok(), "{t}");
         }
-        for m in ["\"bounce\"", "\"fade\"", "\"notch\""] {
+        for m in ["\"bounce\"", "\"fade\"", "\"notch\"", "\"drop\"", "\"unfold\""] {
             assert!(serde_json::from_str::<MotionStyle>(m).is_ok(), "{m}");
         }
         for s in ["\"tag\"", "\"glow\"", "\"block\"", "\"drop\""] {

@@ -2,10 +2,10 @@
 // hlídá `settings/segments.test.mjs`), posuvník s hodnotou `Slider`, rozbalovací „Pokročilé“ `Advanced`,
 // přepínač ukázkového dění `StateSwitch` (náhledy kroků Zavřený a Po najetí), zvýraznění kotvy hledání `lit`
 // a formáty hodnot. Jen vzhled — stav drží panel.
-import { For, Show, createSignal, type JSX } from "solid-js";
+import { For, Show, createSignal, onCleanup, type JSX } from "solid-js";
 import { lang, t } from "../../i18n";
 import { PREVIEW_STATES, type PreviewState } from "../appearanceModel";
-import type { Appearance } from "../../types";
+import type { Appearance, CustomTheme } from "../../types";
 import type { PanelProps } from "../types";
 import { hit } from "../ctx";
 
@@ -57,6 +57,39 @@ export function Advanced(q: { id?: string; open: boolean; onToggle: (open: boole
     </details>
   );
 }
+
+/** Dočasný náhled při najetí na dlaždici stylu / motivu: celý šuplík se na chvíli přebarví, odjetí = zpět.
+ *  Panel (`Appearance.tsx`) aplikuje `peek() ?? rozpracovaný vzhled`; klik změní rozpracovaný vzhled. */
+const [peek, setPeek] = createSignal<Appearance | null>(null);
+export { peek };
+/** Klik na dlaždici: náhled končí, platí vybraná hodnota. */
+export const clearPeek = () => setPeek(null);
+/** Prodleva, než se najetí projeví (přejezd myší přes galerii nemá šuplík přebarvovat při každé dlaždici). */
+export const PEEK_DELAY_MS = 160;
+
+/** Obsluha najetí / fokusu dlaždice: `next` vrací vzhled, který se má ukázat. Rozprostře se na tlačítko (`{...peekOn(…)}`). */
+export function peekOn(next: () => Appearance) {
+  let timer = 0;
+  const on = () => {
+    clearTimeout(timer);
+    timer = window.setTimeout(() => setPeek(next()), PEEK_DELAY_MS);
+  };
+  const off = () => {
+    clearTimeout(timer);
+    setPeek(null);
+  };
+  onCleanup(off);
+  return { onPointerEnter: on, onPointerLeave: off, onFocus: on, onBlur: off };
+}
+
+/** Rozpracovaný vlastní motiv v editoru (ještě neuložený do vzhledu): náhled ho vidí, config ne. */
+const [themeDraft, setThemeDraft] = createSignal<CustomTheme | null>(null);
+export { themeDraft, setThemeDraft };
+/** Vzhled s rozpracovaným motivem z editoru (pro náhled a miniatury). */
+export const withThemeDraft = (a: Appearance): Appearance => {
+  const d = themeDraft();
+  return d && a.customThemes.some((c) => c.id === d.id) ? { ...a, customThemes: a.customThemes.map((c) => (c.id === d.id ? d : c)) } : a;
+};
 
 /** Co se v náhledech zrovna „děje“ — sdílí kroky Zavřený a Po najetí (přepnutí kroku ho nezahodí). */
 const [previewState, setPreviewState] = createSignal<PreviewState>("work");

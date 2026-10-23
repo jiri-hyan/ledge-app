@@ -377,11 +377,7 @@ pub fn parse(bytes: &[u8], keep: &mut dyn FnMut(&Event) -> bool) -> Result<Feed,
                 }
             },
             Some("VCALENDAR") if stack.len() == 1 && p.name == "X-WR-CALNAME" => feed.name = unescape(p.value).trim().to_string(),
-            Some("VTIMEZONE") => {
-                if p.name == "TZID" {
-                    tz.tzid = p.value.trim().to_string();
-                }
-            }
+            Some("VTIMEZONE") if p.name == "TZID" => tz.tzid = p.value.trim().to_string(),
             Some("STANDARD" | "DAYLIGHT") if stack.len() >= 2 && stack[stack.len() - 2] == "VTIMEZONE" => match p.name.as_str() {
                 "DTSTART" => part.start = prop_dt(&p).map(|d| d.naive()),
                 "TZOFFSETFROM" => part.from = parse_offset(p.value),

@@ -40,15 +40,30 @@ pub fn is_dynamic(id: &str) -> bool {
 }
 
 /// Části karet, které jdou skrýt zvlášť: (klíč, karta). Klíče = pole `drawer.sections`.
-pub const PARTS: [(&str, &str); 7] = [
+pub const PARTS: [(&str, &str); 8] = [
     ("claudeLimits", "claude"),
     ("claudeCosts", "claude"),
     ("claudeGit", "claude"),
     ("claudeSubagents", "claude"),
     ("nowPlaying", "media"),
     ("sound", "media"),
+    ("favorites", "media"),
     ("battery", "clock"),
 ];
+/// Pseudo-část „hlavní obsah karty“ (seznam session, hodiny) — v pořadí částí `parts` drží své místo mezi
+/// skrytelnými částmi.
+pub const BODY: &str = "body";
+/// Části karty, které jdou v šuplíku přetahovat (pořadí `parts`): výchozí pořadí shora dolů. Zrcadlo
+/// `CARD_SLOTS` v `src/layout/model.ts`. `claudeGit` a `claudeSubagents` v seznamu nejsou — kreslí se u
+/// každé session zvlášť, takže nejsou blok, který by šlo přesunout.
+pub fn card_slots(card: &str) -> &'static [&'static str] {
+    match card {
+        "claude" => &["claudeLimits", BODY, "claudeCosts"],
+        "media" => &["nowPlaying", "sound", "favorites"],
+        "clock" => &[BODY, "battery"],
+        _ => &[],
+    }
+}
 /// Nejvýš záložek (klávesy 1–9).
 pub const MAX_PAGES: usize = 9;
 const MAX_NAME: usize = 32;
@@ -125,6 +140,11 @@ pub struct LayoutCard {
     /// stropu. Chybí = výchozí (4). Session, které čekají na tebe, se nikdy neschovají.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u8>,
+    /// Pořadí částí karty shora dolů (přetažení v režimu úprav): Claude `claudeLimits`, `body`, `claudeCosts`;
+    /// Právě hraje `nowPlaying`, `sound`; Čas `body`, `battery`. `body` = hlavní obsah karty. Chybí nebo
+    /// neúplné = výchozí pořadí (chybějící části se doplní na konec). Neznámá nebo dvojitá část = chyba.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -360,6 +380,17 @@ pub fn validate(l: &LayoutConfig) -> Result<(), FieldError> {
                 && n > MAX_LIMIT
             {
                 return Err(fe(format!("layout.pages.{i}.cards.{j}.limit"), trf!("Strop řádků karty je 0–{} (0 = bez stropu).", "A card row limit is 0–{} (0 = no limit).", MAX_LIMIT)));
+            }
+            let slots = card_slots(&c.id);
+            let mut part_seen = std::collections::HashSet::new();
+            for (k, part) in c.parts.iter().enumerate() {
+                let at = format!("layout.pages.{i}.cards.{j}.parts.{k}");
+                if !slots.contains(&part.as_str()) {
+                    return Err(fe(at, trf!("Karta „{}“ nemá část „{}“ (jde: {}).", "Card “{}” has no part “{}” (available: {}).", c.id, part, slots.join(", "))));
+                }
+                if !part_seen.insert(part.as_str()) {
+                    return Err(fe(at, trf!("Část „{}“ je v kartě dvakrát.", "Part “{}” is in the card twice.", part)));
+                }
             }
         }
     }
@@ -707,6 +738,26 @@ mod tests {
         let c: LayoutCard = serde_json::from_value(json!({"id":"claude","size":"m","limit":0})).unwrap();
         assert_eq!(c.limit, Some(0));
         assert!(crate::config::schema_json().contains("\"limit\""));
+    }
+
+    #[test]
+    fn parts_order_shape() {
+        // starý tvar bez `parts` se nic nového nepíše; pořadí jde tam a zpět
+        let c: LayoutCard = serde_json::from_value(json!({"id":"claude","size":"m"})).unwrap();
+        assert!(c.parts.is_empty());
+        assert_eq!(serde_json::to_value(&c).unwrap(), json!({"id":"claude","size":"m"}));
+        let v = json!({"id":"claude","size":"m","parts":["claudeCosts","body","claudeLimits"]});
+        let c: LayoutCard = serde_json::from_value(v.clone()).unwrap();
+        assert_eq!(c.parts, ["claudeCosts", "body", "claudeLimits"]);
+        assert_eq!(serde_json::to_value(&c).unwrap(), v);
+        assert!(crate::config::schema_json().contains("\"parts\""));
+        // každá přetahovatelná část je skrytelná část téže karty (nebo `body`)
+        for card in CARDS {
+            for k in card_slots(card) {
+                assert!(*k == BODY || PARTS.iter().any(|(p, parent)| p == k && *parent == card), "{card}: {k}");
+            }
+        }
+        assert!(card_slots("notes").is_empty() && card_slots("widget:a.js").is_empty());
     }
 
     #[test]

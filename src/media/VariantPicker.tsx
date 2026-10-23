@@ -1,11 +1,15 @@
 // Výběr vzhledu karty Právě hraje: malé tlačítko v rohu karty (vidět při najetí) → nabídka s miniaturami
 // všech pěti vzhledů; klik = okamžitá změna (uloží jen `media.variant` existující cestou Nastavení:
 // `get_config` → jedno pole → `save_config`), v nabídce pak „Vrátit“. Miniatury (`Thumb`) používá i
-// Nastavení → Osobní. Do potvrzení snapshotem platí vybraný vzhled hned (`shownVariant`).
+// Nastavení → Osobní. Do potvrzení snapshotem platí vybraný vzhled hned (`shownVariant`). Je to zkratka:
+// kompletní vzhled karty (akcent, pozadí, hlavička, hustota + tytéž miniatury) je v panelu „Vzhled karty…“
+// (`layout/CardLook.tsx`), kam vede poslední položka nabídky (`openMediaCardLook`).
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api, type MediaLook, type MediaVariant } from "../api";
 import { t } from "../i18n";
 import { say, sayError } from "../ui/toast";
+import { activePageId } from "../theme/apply";
+import { normalizeLayout, pageOf } from "../layout/model";
 import { VARIANTS, variantOf } from "./timeline";
 
 /** Lidský název vzhledu. */
@@ -83,6 +87,15 @@ export async function saveVariant(v: MediaVariant, cfgError: string | null): Pro
   }
 }
 
+/** Otevře panel „Vzhled karty…“ karty Právě hraje na zobrazené záložce (dynamický import — panel sám používá `Thumb`). */
+export async function openMediaCardLook(cfgError: string | null) {
+  const cfg = await api.getConfig();
+  const l = normalizeLayout(cfg?.layout);
+  const page = pageOf(l, activePageId()).id;
+  const card = pageOf(l, page).cards.find((c) => c.id === "media");
+  (await import("../layout/CardLook")).openCardLook(page, "media", card?.look, cfgError);
+}
+
 const IcLooks = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
     <rect x="4" y="4" width="7" height="7" rx="1.5" />
@@ -134,6 +147,9 @@ export function VariantPicker(p: { current: MediaVariant; cfgError: string | nul
               </button>
             )}
           </For>
+          <button class="med-pick-more" onClick={() => { close(); void openMediaCardLook(p.cfgError); }}>
+            {t("cards.media.more", "Víc možností karty…")}
+          </button>
           <Show when={undo()}>
             {(u) => (
               <button class="med-pick-undo" onClick={() => void saveVariant(u(), p.cfgError).then((ok) => ok && setUndo(null))}>

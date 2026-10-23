@@ -8,7 +8,7 @@ import {
   CARD_IDS, CARD_INFO, DEFAULT_TILES, MAX_PAGES, PARTS, PART_INFO, QUICK_HEIGHTS, UP_PERSONAL_PROJECTS, addCard, addPage, catalog, clone, defaultLayout,
   gridDropIndex, keyMove, pageMoveBlock, moveCard, movePage, moveToPage, nextHeight, nextSize, normalizeLayout, normalizeTiles, pageIdFor, pageKind, pageNameError, pageOf,
   removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, shownCards, tilesOf,
-  visibleProjects, withLayout,
+  visibleProjects, withLayout, BODY, CARD_SLOTS, movePart, moveToNewPage, orderParts, partsOf, setParts, slotsOf,
 } from "./model.ts";
 
 const ids = (l, page) => pageOf(l, page).cards.map((c) => c.id);
@@ -63,8 +63,8 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
   assert.deepEqual(ids(addCard(d, "prace", "weather"), "prace").at(-1), "weather");
   assert.equal(pageOf(addCard(d, "prace", "weather"), "prace").cards.at(-1).size, "s", "výchozí velikost");
   assert.equal(addCard(d, "prace", "claude"), d, "už tam je");
-  // Právě hraje bez obou částí se vrátí celá
-  const noMedia = setPartHidden(setPartHidden(removeCard(d, "osobni", "media").layout, "nowPlaying", true), "sound", true);
+  // Právě hraje bez všech částí (skladba, hlasitost, oblíbené) se vrátí celá
+  const noMedia = ["nowPlaying", "sound", "favorites"].reduce((l, k) => setPartHidden(l, k, true), removeCard(d, "osobni", "media").layout);
   assert.deepEqual(addCard(noMedia, "osobni", "media").hiddenParts, []);
   assert.deepEqual(addCard(setPartHidden(d, "claudeCosts", true), "osobni", "claude").hiddenParts, ["claudeCosts"], "jiné části zůstanou skryté");
 
@@ -253,4 +253,75 @@ test("značka jednorázových úprav přežije normalizaci i uložení (jinak by
   assert.deepEqual(clone(l).upgrades, ["personalProjects"]);
   assert.ok(!("upgrades" in normalizeLayout({ pages: [{ id: "a", name: "A", cards: [] }] })), "chybí = nepsat");
   assert.ok(!sameLayout(l, { ...l, upgrades: [] }), "značka je součást rozložení");
+});
+
+test("zrcadlo Rustu: části karet v pořadí (card_slots) a pseudo-část body", () => {
+  const src = readFileSync(new URL("../../src-tauri/src/layout.rs", import.meta.url), "utf8");
+  assert.equal(src.match(/pub const BODY: &str = "([a-z]+)"/)[1], BODY);
+  const block = src.slice(src.indexOf("pub fn card_slots"), src.indexOf("pub const MAX_PAGES"));
+  const rs = Object.fromEntries([...block.matchAll(/"([a-z]+)" => &\[([^\]]+)\]/g)].map((m) => [m[1], m[2].split(",").map((x) => x.trim().replace(/^"|"$/g, "").replace("BODY", BODY))]));
+  assert.deepEqual(rs, CARD_SLOTS);
+  // každá přetahovatelná část je skrytelná (nebo body) a patří té kartě
+  for (const [card, slots] of Object.entries(CARD_SLOTS)) for (const k of slots) assert.ok(k === BODY || PARTS[k] === card, `${card}: ${k}`);
+});
+
+test("pořadí částí karty: normalizace, doplnění, výchozí pořadí se nepíše", () => {
+  // (popis, uložené, karta, výsledek)
+  const cases = [
+    ["bez pole = výchozí", undefined, "claude", ["claudeLimits", BODY, "claudeCosts"]],
+    ["prohozené", ["claudeCosts", BODY, "claudeLimits"], "claude", ["claudeCosts", BODY, "claudeLimits"]],
+    ["neúplné se doplní ve výchozím pořadí", ["claudeCosts"], "claude", ["claudeCosts", "claudeLimits", BODY]],
+    ["neznámé a dvojité pryč", ["sound", "nope", "sound", 5, "nowPlaying"], "media", ["sound", "nowPlaying", "favorites"]],
+    ["část cizí karty pryč", ["battery"], "media", ["nowPlaying", "sound", "favorites"]],
+    ["karta bez částí", ["body"], "notes", []],
+    ["nesmysl", "claude", "claude", ["claudeLimits", BODY, "claudeCosts"]],
+  ];
+  for (const [name, saved, card, want] of cases) assert.deepEqual(orderParts(saved, card), want, name);
+  assert.deepEqual(slotsOf("widget:x.js"), []);
+  const raw = { pages: [{ id: "osobni", name: "", cards: [{ id: "clock", size: "s", parts: ["battery", "body"] }, { id: "media", size: "m", parts: ["nowPlaying", "sound", "favorites"] }, { id: "notes", size: "xl", parts: ["body"] }] }] };
+  const l = normalizeLayout(raw);
+  const cs = pageOf(l, "osobni").cards;
+  assert.deepEqual(cs[0].parts, ["battery", BODY]);
+  assert.ok(!("parts" in cs[1]), "výchozí pořadí = nepsat");
+  assert.ok(!("parts" in cs[2]), "karta bez částí = nepsat");
+  assert.deepEqual(clone(l).pages[0].cards[0].parts, ["battery", BODY]);
+  assert.notEqual(clone(l).pages[0].cards[0].parts, cs[0].parts, "klon je hluboký");
+});
+
+test("přesun části: movePart / setParts, výchozí pořadí pole smaže, ostatní karty nedotčené", () => {
+  const l = defaultLayout();
+  const card = (x, page = "prace") => pageOf(x, page).cards.find((c) => c.id === "claude");
+  const a = movePart(l, "prace", "claude", 0, 2);
+  assert.deepEqual(card(a).parts, [BODY, "claudeCosts", "claudeLimits"]);
+  assert.deepEqual(partsOf(card(a)), [BODY, "claudeCosts", "claudeLimits"]);
+  assert.ok(!("parts" in card(l)), "původní vstup netknutý");
+  const back = movePart(a, "prace", "claude", 2, 0);
+  assert.ok(!("parts" in card(back)), "zpět na výchozí = pole pryč");
+  assert.deepEqual(partsOf(undefined, "clock"), [BODY, "battery"], "karta bez záznamu = výchozí");
+  assert.equal(movePart(l, "prace", "clock", 0, 1), l, "karta na záložce není = beze změny");
+  const s = setParts(l, "osobni", "clock", ["battery", BODY]);
+  assert.deepEqual(pageOf(s, "osobni").cards.find((c) => c.id === "clock").parts, ["battery", BODY]);
+  assert.ok(!pageOf(s, "prace").cards.some((c) => c.parts), "jiná záložka nedotčená");
+  assert.ok(!sameLayout(l, a), "pořadí částí je součást rozložení");
+  // karta s pořadím se přesune na jinou záložku i s ním
+  const m = moveToPage(a, "prace", "claude", "osobni");
+  assert.deepEqual(pageOf(m, "osobni").cards.at(-1).parts, [BODY, "claudeCosts", "claudeLimits"]);
+});
+
+test("karta přetažená na „+“: nová záložka s kartou, jméno se přejmenuje potom", () => {
+  const l = defaultLayout();
+  const r = moveToNewPage(l, "prace", "claude", "Nová záložka");
+  assert.ok(r, "vznikla");
+  assert.deepEqual(pageOf(r.layout, r.id).cards.map((c) => c.id), ["claude"]);
+  assert.equal(pageOf(r.layout, r.id).name, "Nová záložka");
+  assert.ok(!ids(r.layout, "prace").includes("claude"), "ze zdroje pryč");
+  assert.equal(r.id, "nova-zalozka");
+  // druhá záložka stejného jména dostane jiné id
+  const r2 = moveToNewPage(r.layout, "prace", "repos", "Nová záložka");
+  assert.equal(r2.id, "nova-zalozka-2");
+  // plno záložek = nic, karta zůstane
+  let full = l;
+  while (full.pages.length < MAX_PAGES) full = addPage(full, `Z${full.pages.length}`).layout;
+  assert.equal(moveToNewPage(full, "prace", "claude", "Nová záložka"), null);
+  assert.equal(moveToNewPage(l, "prace", "neexistuje", "Nová záložka"), null, "karta tam není");
 });

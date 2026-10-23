@@ -1,6 +1,6 @@
 // Paleta příkazů (Ctrl+K v šuplíku s fokusem, nebo 🔍 v hlavičce): jedno pole, fuzzy hledání
 // přes všechno (`items.ts` + `search.ts`), šipky / Enter / Esc, nedávno použité nahoře (localStorage,
-// jen pohodlí), zvýraznění shody. Fokus si bere jen po výslovném kliku (`took` → při zavření
+// jen pohodlí) a frecency (četnost × čerstvost použití, `search.ts` `bumpUsage`), zvýraznění shody. Fokus si bere jen po výslovném kliku (`took` → při zavření
 // `releaseFocus`); rychlé akce s potvrzením se potvrzují přímo tady. Kompaktní režim
 // (`s.paletteCompact`): bez dotazu jen pole, seznam až při psaní / šipkou dolů (`compact.ts`).
 // Navíc skripty ze složky skriptů (načtou se při otevření) a s dotazem stránky Nastavení Windows (`more.ts`).
@@ -13,7 +13,8 @@ import { api, on as onEvent, type NoteView, type Snapshot } from "../api";
 import { IconFolder, IconLink, IconNote, IconSettings, IconShield, IconTerminal } from "../icons";
 import { ActionIcon, ConfirmAction, answerConfirm, confirmPending } from "../actions/ui";
 import { buildItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
-import { pushRecent, rank, segments, type Ranked } from "./search";
+import { bumpUsage, cleanUsage, pushRecent, rank, segments, type Ranked, type Usage } from "./search";
+import { mergeNoteHits, type NoteHit } from "./notehits";
 import { arrow, shown, visible } from "./compact";
 import { clipCommand, clipItems, emojiCommand, paletteTips, quickRows, scriptItems, windowsItems } from "./more";
 import { clampSel, clipQuery, clipRows, type ClipList, type ClipRow } from "../cliphist/model";
@@ -34,6 +35,9 @@ export const IconSearch = () => (
 
 const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield, script: IconTerminal, windows: IconSettings, calc: IconSearch, convert: IconSearch, emoji: IconNote, clip: IconNote };
 const RECENT_KEY = "ledge.palette.recent";
+const USAGE_KEY = "ledge.palette.usage";
+/** Ticho po posledním znaku, než se hledá v těle poznámek (psaní nevolá jádro na každý znak). */
+const HIT_DELAY = 180;
 
 function loadRecent(): string[] {
   try {
@@ -66,6 +70,22 @@ async function copyText(text: string, refocus: HTMLElement): Promise<void> {
   if (!ok) throw new Error(t("palette.copyFail", "Do schránky to nejde zapsat."));
 }
 
+function loadUsage(): Usage {
+  try {
+    return cleanUsage(JSON.parse(localStorage.getItem(USAGE_KEY) ?? "{}"));
+  } catch {
+    return {};
+  }
+}
+
+function saveUsage(u: Usage) {
+  try {
+    localStorage.setItem(USAGE_KEY, JSON.stringify(u));
+  } catch {
+    /* bez úložiště jen nebude frecency */
+  }
+}
+
 function saveRecent(ids: string[]) {
   try {
     localStorage.setItem(RECENT_KEY, JSON.stringify(ids));
@@ -80,6 +100,9 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   const [notes, setNotes] = createSignal<NoteView[]>([]);
   const [scripts, setScripts] = createSignal<ScriptView[]>([]);
   const [recent, setRecent] = createSignal(loadRecent());
+  const [usage, setUsage] = createSignal(loadUsage());
+  /** poznámky nalezené podle obsahu (`note_search`) k dotazu `q` */
+  const [hits, setHits] = createSignal<{ q: string; list: NoteHit[] }>({ q: "", list: [] });
   const [waiting, setWaiting] = createSignal(false);
   /** kompaktní paleta s prázdným polem rozbalená šipkou dolů */
   const [browsing, setBrowsing] = createSignal(false);
@@ -104,7 +127,26 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
 
   const base = createMemo(() => [...buildItems(p.s, notes(), p.nav), ...scriptItems(scripts()), emojiCommand(setQ), clipCommand(setQ)]);
   // stránky Nastavení Windows jen s dotazem — přepočet při psaní nesahá na `buildItems`
-  const items = createMemo(() => [...base(), ...windowsItems(p.s, q())]);
+  const items = createMemo(() => [...mergeNoteHits(base(), hits().list, hits().q, p.nav, t("palette.note.untitled", "(bez názvu)")), ...windowsItems(p.s, q())]);
+  // Hledání v těle poznámek: po 180 ms ticha, od 2 znaků, ne v režimu schránky; starší odpověď se zahodí
+  let hitTimer: ReturnType<typeof setTimeout> | undefined;
+  let hitSeq = 0;
+  createEffect(on(q, (text) => {
+    clearTimeout(hitTimer);
+    const id = ++hitSeq;
+    const query = text.trim();
+    if (!p.s.notesEnabled || clipText() !== null || query.length < 2) {
+      setHits((h) => (h.list.length ? { q: "", list: [] } : h));
+      return;
+    }
+    hitTimer = setTimeout(() => {
+      api.noteSearch(query, 8).then(
+        (list) => id === hitSeq && setHits({ q: query, list: list ?? [] }),
+        () => id === hitSeq && setHits({ q: "", list: [] }),
+      );
+    }, HIT_DELAY);
+  }));
+  onCleanup(() => clearTimeout(hitTimer));
   const recentSet = createMemo(() => new Set(recent()));
   const fold = () => ({ compact: p.s.paletteCompact, query: q(), browsing: browsing() });
   // nedávné, které v položkách pořád jsou (smazaná akce / poznámka se nepočítá)
@@ -124,7 +166,7 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
     if (ct !== null) return clipItems(clipRows(clip(), ct, Date.now()));
     const qr = quick();
     if (qr.only) return qr.rows;
-    const list = visible(rank(items(), q(), recent(), 60), what(), recentSet());
+    const list = visible(rank(items(), q(), recent(), 60, usage()), what(), recentSet());
     return qr.rows.length ? [...qr.rows, ...list] : list;
   });
   // jiný dotaz = výběr nahoru; smazaný dotaz kompaktní paletu zase sbalí
@@ -218,6 +260,9 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
     const next = pushRecent(recent(), r.item.id);
     setRecent(next);
     saveRecent(next);
+    const used = bumpUsage(usage(), r.item.id, Date.now());
+    setUsage(used);
+    saveUsage(used);
     if (r.item.action?.needsConfirm) {
       // potvrzení se ukáže v paletě; zavře se až po odpovědi
       setWaiting(true);

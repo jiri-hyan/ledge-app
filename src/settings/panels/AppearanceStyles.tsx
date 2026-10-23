@@ -1,6 +1,6 @@
 // Galerie design stylů nahoře v panelu Vzhled: každý styl jako živá miniatura (proužek + šuplík ve
 // sloupcích jeho rozložení, s jeho barvami, písmem a materiálem přes `scopeStyle`). Klik = náhled na
-// celém šuplíku (panel aplikuje rozpracovaný vzhled); uložit / zahodit / vrátit = společná lišta
+// celém šuplíku (panel aplikuje rozpracovaný vzhled), najetí = dočasný náhled (`peekOn`); uložit / zahodit / vrátit = společná lišta
 // Nastavení. Pod galerií: které složky jsou oproti stylu upravené a „Obnovit styl“.
 import { For, Show } from "solid-js";
 import { t } from "../../i18n";
@@ -9,7 +9,7 @@ import { PARTS, styleChanges, withStyle, type PartId } from "../../theme/styles"
 import { stripShape } from "../../theme/appearance";
 import { scopeStyle } from "../../theme/apply";
 import { lbl } from "../../theme/label";
-import { lit, type Ap } from "./apUi";
+import { clearPeek, lit, peekOn, type Ap } from "./apUi";
 
 const PART_LABEL: Record<PartId, () => string> = {
   colors: () => t("appearance.part.colors", "barvy"),
@@ -46,6 +46,7 @@ export default function AppearanceStyles(q: { ap: Ap; dirty: boolean }) {
   const a = () => q.ap.a();
   const changed = () => styleChanges(a(), q.ap.blur());
   const pick = (id: string) => {
+    clearPeek();
     q.ap.setAll(withStyle(a(), id));
     q.ap.setBlur(styleOf(id).parts.blur);
   };
@@ -55,7 +56,7 @@ export default function AppearanceStyles(q: { ap: Ap; dirty: boolean }) {
       <div class="ap-styles" role="radiogroup" aria-label={t("appearance.style.title", "Design styl")}>
         <For each={STYLES}>
           {(s) => (
-            <button class="ap-style" classList={{ on: a().style === s.id }} role="radio" aria-checked={a().style === s.id} title={lbl(s.desc)} onClick={() => pick(s.id)}>
+            <button class="ap-style" classList={{ on: a().style === s.id }} role="radio" aria-checked={a().style === s.id} title={lbl(s.desc)} {...peekOn(() => withStyle(a(), s.id))} onClick={() => pick(s.id)}>
               <Mini s={s} />
               <span class="ap-name">{lbl(s.name)}</span>
               <small class="ap-desc">{lbl(s.desc)}</small>

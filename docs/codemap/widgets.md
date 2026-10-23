@@ -2,7 +2,7 @@
 
 Skript ve složce widgetů (`widgets.dir`, výchozí `%USERPROFILE%\Ledge\widgets`) s hlavičkou `@ledge.widget`
 vypíše JSON nebo text à la xbar → karta `widget:<soubor>` (dynamická karta v `layout`) a/nebo položka proužku
-`widget:<soubor>` (`StripItem::Widget`). Formát pro agenty: `AGENTS.md` → „Widgety ze skriptů“, pro lidi
+`widget:<soubor>` (`StripItem::Widget`). Formát pro agenty: [agents/actions.md](../agents/actions.md) → „Widgety ze skriptů“, pro lidi
 `docs/widgets.md`. Cituj symbolem, ne číslem řádku.
 
 ## Soubory
@@ -22,9 +22,9 @@ vypíše JSON nebo text à la xbar → karta `widget:<soubor>` (dynamická karta
 | `src/widgets/model.ts` | čistá logika UI (test `model.test.mjs`): id `widget:<soubor>`, barvy, interval, klik, průběh, katalog, položky proužku | `widgetFile`, `isWidgetId`, `TONE_VAR`, `intervalParts`, `itemKind`, `progressPct`, `isStale`, `catalogWidgets`, `stripWidgetIds`, `withStripItem` |
 | `src/widgets/api.ts` · `registry.ts` | invoke · názvy widgetů pro katalog / `layout/text.ts` + poslední seznam ze složky | `widgetsApi` · `rememberWidgets`, `widgetInfo`, `loadWidgets`, `widgetsListing` |
 | `src/widgets/WidgetCard.tsx` · `WidgetsSettings.tsx` · `widgets.css` | karta (souhlas, chyba + výstup, položky, ⋯) · sekce Widgety + galerie v panelu Projekty, akce a odkazy | `WidgetCard`, `WidgetConsent`, `toggleStrip`, `intervalText` · `WidgetsSettings` |
-| `src/types.ts` (blok `// --- widgets ---`), `src/i18n/en-widgets.ts` | typy + `Snapshot.widgets` · angličtina (`cards.widget.*`, `settings.widgets.*`) | `WidgetView`, `WidgetData`, `WidgetItem`, `WidgetsListing`, `WidgetTemplate` |
+| `src/types/widgets.ts`, `src/i18n/en-widgets.ts` | typy + `Snapshot.widgets` · angličtina (`cards.widget.*`, `settings.widgets.*`) | `WidgetView`, `WidgetData`, `WidgetItem`, `WidgetsListing`, `WidgetTemplate` |
 
-Lepidlo: `config.rs` (`Config.widgets` + `widgets::validate`), `layout.rs` (`is_dynamic` ve `validate`),
+Lepidlo: `config/*` (`Config.widgets` + `widgets::validate`), `layout.rs` (`is_dynamic` ve `validate`),
 `stripconf.rs` (`StripItem::Widget`, ruční serde `key` / `parse`, schéma), `stripview.rs` (větev `Widget`),
 `snapshot.rs` (`widgets`), `settings.rs` (`apply_config` → `on_config`), `threads/ui.rs` (otevření šuplíku →
 `wake_if_used`), `commands/drawer.rs` (`set_mode` → `wake_if_used`), `lib.rs` (start + `generate_handler!`),

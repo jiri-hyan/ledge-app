@@ -75,6 +75,8 @@ mod tests {
             (look(MotionStyle::Bounce, 1.0), false, 170),
             (look(MotionStyle::Fade, 2.0), false, 85),
             (look(MotionStyle::Notch, 1.0), false, 170),
+            (look(MotionStyle::Drop, 1.0), false, 170),
+            (look(MotionStyle::Unfold, 2.0), false, 85),
             (look(MotionStyle::None, 1.0), false, 0),
             (look(MotionStyle::None, 2.0), false, 0),
             (look(MotionStyle::Spring, 0.0), false, 170), // nesmysl z ruky → jako rychlost 1, ne dělení nulou

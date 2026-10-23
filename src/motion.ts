@@ -97,10 +97,24 @@ export function preHide(root: HTMLElement) {
   });
 }
 
-/** Postupné naskočení obsahu: hlavička, dlaždice (pop), karty. */
-export function revealContent(root: HTMLElement, startDelay = 70) {
+/** Postupné naskočení obsahu: hlavička, dlaždice (pop), karty. `reveal` (styl „rozvinutí“, `theme/openAnim.ts`)
+ *  naskakuje vše po jednom v pořadí čtení s odstupem `step` ms (strop zpoždění 360 ms) bez rozmazání. */
+export function revealContent(root: HTMLElement, startDelay = 70, reveal?: { step: number; blur: boolean }) {
   const pop = spring(420, 22);
   const soft = spring(260, 26);
+  if (reveal) {
+    let i = 0;
+    root.querySelectorAll<HTMLElement>("[data-anim]").forEach((el) => {
+      el.style.opacity = "";
+      el.animate([{ opacity: 0, transform: "translateY(-8px)" }, { opacity: 1, transform: "translateY(0)" }], {
+        duration: soft.duration,
+        easing: soft.easing,
+        delay: dur(startDelay + Math.min(i++ * reveal.step, 360)),
+        fill: "backwards",
+      });
+    });
+    return;
+  }
   let tile = 0;
   let block = 0;
   root.querySelectorAll<HTMLElement>("[data-anim]").forEach((el) => {

@@ -12,6 +12,8 @@ import { throttle, volumeLevel } from "./model";
 import { Controls, Cover, Equalizer, IcNote, Progress, TimeText, isPlaying, useCover } from "./Player";
 import { VariantPicker, shownVariant } from "./VariantPicker";
 import { drawerShown } from "./shown";
+import { PartSlot, PartsBox } from "../layout/PartSlot";
+import Favorites from "./FavoriteTiles";
 import { live } from "./timeline";
 import "./media.css";
 
@@ -173,6 +175,9 @@ export default function MediaCard(p: { s: Snapshot; menu?: JSX.Element }) {
   const playing = () => sectionOn(p.s.sections, "nowPlaying");
   const m = () => (playing() ? p.s.personal.media : null);
   const vol = () => (sectionOn(p.s.sections, "sound") ? p.s.personal.volume : null);
+  /** oblíbené: jen zapnutá část a (něco uložené, nebo něco hraje — je co přidat); jinak by byl nadpis bez obsahu */
+  const favs = () => (sectionOn(p.s.sections, "favorites") ? p.s.personal.mediaLook?.favorites ?? [] : []);
+  const favsOn = () => sectionOn(p.s.sections, "favorites") && (favs().length > 0 || !!m());
   const v = () => shownVariant(p.s.personal.mediaLook);
   const eq = () => p.s.personal.mediaLook?.equalizer !== false;
   const cover = useCover(() => m()?.coverKey ?? null);
@@ -180,7 +185,7 @@ export default function MediaCard(p: { s: Snapshot; menu?: JSX.Element }) {
   const slim = () => v() === "strip" && !!m();
   const picker = () => <VariantPicker current={v()} cfgError={p.s.cfgError} push={!slim() && !m()?.app} />;
   return (
-    <Show when={m() || vol()}>
+    <Show when={m() || vol() || favsOn()}>
       <div
         class="card med-card"
         classList={{ "med-v-compact": v() === "compact", "med-v-cover": v() === "cover" && !!m(), "med-v-slim": slim() }}
@@ -190,18 +195,28 @@ export default function MediaCard(p: { s: Snapshot; menu?: JSX.Element }) {
         <Show when={!slim()}>
           <h4>
             <span class="ic" style="background:var(--violet)" />
-            {playing() ? t("cards.media.title", "Právě hraje") : t("cards.sound.title", "Zvuk")}
+            {playing() ? t("cards.media.title", "Právě hraje") : vol() ? t("cards.sound.title", "Zvuk") : t("cards.media.fav.title", "Oblíbené")}
             <Show when={m()?.app}>{(a) => <span class="n">{a()}</span>}</Show>
             <Show when={playing()}>{picker()}</Show>
             {p.menu}
           </h4>
         </Show>
-        <Show when={playing()}>
-          <Show when={m()} fallback={<div class="empty">{t("cards.media.none", "Nic nehraje")}</div>}>
-            {(mm) => <Body m={mm()} v={v()} cover={cover()} eq={eq()} menu={slim() ? p.menu : undefined} picker={picker()} />}
-          </Show>
-        </Show>
-        <Show when={vol()}>{(x) => <Volume level={x().level} muted={x().muted} device={x().device} />}</Show>
+        {/* skladba a hlasitost jsou části karty: pořadí a skrytí v úpravách (`layout/PartSlot.tsx`) */}
+        <PartsBox card="media">
+          <PartSlot card="media" k="nowPlaying" hidden={!playing()}>
+            <Show when={m()} fallback={<div class="empty">{t("cards.media.none", "Nic nehraje")}</div>}>
+              {(mm) => <Body m={mm()} v={v()} cover={cover()} eq={eq()} menu={slim() ? p.menu : undefined} picker={picker()} />}
+            </Show>
+          </PartSlot>
+          <PartSlot card="media" k="sound" hidden={!sectionOn(p.s.sections, "sound")} titled={playing() && !slim() && !!m()} empty={!vol()}>
+            <Show when={vol()}>{(x) => <Volume level={x().level} muted={x().muted} device={x().device} />}</Show>
+          </PartSlot>
+          <PartSlot card="media" k="favorites" hidden={!sectionOn(p.s.sections, "favorites")} titled={(!!m() || !!vol()) && !slim()} empty={!favsOn()}>
+            <Show when={favsOn()}>
+              <Favorites list={favs()} playing={m()} cfgError={p.s.cfgError} />
+            </Show>
+          </PartSlot>
+        </PartsBox>
       </div>
     </Show>
   );

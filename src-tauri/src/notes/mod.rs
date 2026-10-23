@@ -29,14 +29,19 @@
 
 mod draft;
 pub mod edit;
+pub mod export;
 mod frontmatter;
 pub mod lifecycle;
+pub mod openwith;
 pub mod md;
+mod md_list;
 mod recycle;
 mod reminders;
+pub mod search;
 mod store;
 #[cfg(test)]
 mod testkit;
+pub mod when;
 
 pub use draft::*;
 pub use frontmatter::*;

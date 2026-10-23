@@ -48,7 +48,8 @@ test("kolo 10: přirozený drag & drop — podržení hlavičky, duch, zóna Skr
   assert.ok(drag.includes("dwellStep(") && drag.includes("setEditPage(tabId)"), "prodleva nad ouškem přepne záložku");
   assert.ok(css.includes(`${dnd.match(/DWELL_MS = (\d+)/)[1]}ms linear`), "proužek prodlevy v CSS trvá stejně jako DWELL_MS");
   // FLIP respektuje nastavení pohybu Ledge a omezení pohybu
-  assert.ok(deck.includes("flipPlan(m.style, m.speed, reducedMotion())"), "FLIP podle motionNow + reduced-motion");
+  const flip = src("./flip.ts");
+  assert.ok(flip.includes("flipPlan(m.style, m.speed, reducedMotion())") && deck.includes("flipEls(items(), update)"), "FLIP podle motionNow + reduced-motion, jeden sdílený motor");
   // po dopadu lišta s Vrátit; Zpět drží history
   assert.ok(deck.includes("cards.layout.dragMoved") && deck.includes("offerUndo("), "po dopadu lišta „… · Vrátit“");
 });
@@ -57,4 +58,19 @@ test("případ 10: lišta úprav má Zpět a Obnovit výchozí s potvrzením", (
   const bar = src("./EditBar.tsx");
   assert.ok(bar.includes("undoLast") && bar.includes("canUndo"), "Zpět");
   assert.ok(bar.includes("resetToDefault") && bar.includes("cards.layout.resetAsk"), "Obnovit výchozí se ptá");
+});
+
+test("kolo 13: záložky jedou na stejném motoru jako karty (jedna cesta), karta puštěná na + vytvoří záložku", () => {
+  const tabs = src("./Tabs.tsx");
+  const td = src("./tabDrag.ts");
+  const deck = src("./Deck.tsx");
+  const drag = src("./cardDrag.ts");
+  assert.ok(!tabs.includes("setPointerCapture") && !tabs.includes("let moved"), "stará jednodušší logika tahu záložek je pryč");
+  assert.ok(tabs.includes("td.down(e, pg.id, i())") && tabs.includes("flipEls("), "tah záložky přes createTabDrag a sdílený FLIP");
+  assert.ok(td.includes("holdStep(") && td.includes("HOLD_MS") && td.includes("env.begin()"), "mimo úpravy podržením, které zapne úpravy");
+  assert.ok(td.includes("landGhost(") && td.includes('finish("escape")') && !td.includes("requestAnimationFrame("), "duch dosedne, Esc zruší, žádné rAF");
+  assert.ok(tabs.includes('data-newtab="1"') && drag.includes("data-newtab") && drag.includes("NEW_TAB"), "tlačítko + je cíl tažené karty");
+  assert.ok(deck.includes("moveToNewPage(") && deck.includes("setRenameAsk(r.id)") && tabs.includes("renameAsk()"), "nová záložka se hned přejmenovává");
+  assert.ok(drag.includes("tab === NEW_TAB ? null : tab"), "nad + se záložka nepřepíná");
+  assert.ok(drag.includes("landGhost(ghost"), "duch karty dosedne pružinou (sdílený flip.ts)");
 });

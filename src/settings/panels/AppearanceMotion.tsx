@@ -1,4 +1,4 @@
-// Výběr animace otevírání v panelu Vzhled: 7 stylů jako malé živé ukázky (výřez nahoře + malý šuplík).
+// Výběr animace otevírání v panelu Vzhled: 9 stylů jako malé živé ukázky (výřez nahoře + malý šuplík).
 // Klik = vybrat a jednou přehrát tentýž plán, jaký použije šuplík (`theme/openAnim.ts` `openPlan`) —
 // v klidu se nic nehýbe. Pod tím rychlost; při systémovém „omezit pohyb“ upozornění (Ledge pak
 // nepřehrává nic, ani vysunutí okna v Rustu).
@@ -18,6 +18,8 @@ const NAME: Record<MotionStyle, Pair> = {
   bounce: ["appearance.motion.bounce", "Odskok"],
   fade: ["appearance.motion.fade", "Rozplynutí"],
   notch: ["appearance.motion.notch", "Z výřezu"],
+  drop: ["appearance.motion.drop", "Pád"],
+  unfold: ["appearance.motion.unfold", "Rozvinutí"],
   none: ["appearance.motion.none", "Žádná"],
 };
 const DESC: Record<MotionStyle, Pair> = {
@@ -27,6 +29,8 @@ const DESC: Record<MotionStyle, Pair> = {
   bounce: ["appearance.motion.bounceDesc", "dopadne a dvakrát odskočí"],
   fade: ["appearance.motion.fadeDesc", "jen se objeví"],
   notch: ["appearance.motion.notchDesc", "rozbalí se z proužku"],
+  drop: ["appearance.motion.dropDesc", "spadne a jednou se odrazí"],
+  unfold: ["appearance.motion.unfoldDesc", "rozvine se, karty naskakují po jedné"],
   none: ["appearance.motion.noneDesc", "okamžitě"],
 };
 /** tvary malé ukázky (výřez 44×8 px nahoře, šuplík s rádiusem 10 px) */
@@ -44,7 +48,12 @@ export default function AppearanceMotion(q: { ap: Ap; reduced: boolean }) {
     if (!el || q.reduced) return;
     el.getAnimations().forEach((x) => x.cancel());
     const plan = openPlan(style, m().speed, GEO);
-    if (plan) el.animate(plan.frames, { duration: plan.duration, easing: plan.easing });
+    if (plan) {
+      el.animate(plan.frames, { duration: plan.duration, easing: plan.easing });
+      // rozvinutí: karty naskakují po jedné (jako v šuplíku, `motion.ts` revealContent)
+      const step = plan.reveal?.step;
+      if (step) el.querySelectorAll("i").forEach((c, i) => c.animate([{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }], { duration: 200, delay: 90 + i * step * 2, fill: "backwards" }));
+    }
   };
   const choose = (style: MotionStyle) => {
     q.ap.set("motion", { ...m(), style });

@@ -2,7 +2,7 @@
 
 Claude Code / Claude Desktop čte a mění nastavení Ledge (zástupci, rychlé akce, rozložení, proužek,
 vzhled) přes MCP. Kontrakt jmen (příkazy, nástroje, `src/mcp/api.ts`) je mezi workery kola 9 — měníš-li
-jméno, změň kontrakt i docs. Formát pro agenty: `AGENTS.md` → „MCP server (`/mcp`)“. Cituj symbolem.
+jméno, změň kontrakt i docs. Formát pro agenty: [agents/api-mcp.md](../agents/api-mcp.md) → „MCP server (`/mcp`)“. Cituj symbolem.
 
 ## Soubory
 
@@ -11,6 +11,7 @@ jméno, změň kontrakt i docs. Formát pro agenty: `AGENTS.md` → „MCP serve
 | `src-tauri/src/mcp/mod.rs` | config `mcp`, `Host` (co MCP potřebuje od Ledge), `Server` (klíč, Vrátit, zámek zápisů), HTTP brána v pořadí vypnuto 404 → klíč 401 → metoda 405 → velikost 413 → verze 400 → JSON-RPC | `McpConfig` `Host` `Server` `HttpReq` `HttpResp` `handle_http` `PATH` `MAX_BODY` |
 | `mcp/rpc.rs` | JSON-RPC 2.0 ručně: `initialize` (vyjednání verze), `ping`, `tools/list`, `tools/call`, notifikace → 202, dávky, kódy chyb | `handle` `Outcome` `Tools` `RpcErr` `VERSIONS` `negotiate` `INSTRUCTIONS` |
 | `mcp/tools.rs` | katalog nástrojů (jméno, popis pro model, schéma vstupu ze schemars, anotace) a volání; společný zápis `write` (validace → snímek → `Host::save` → Vrátit) a `undo`; `slim` zbavuje vložená schémata popisů, `default`, mezí a null variant (`tools/list` < 20 kB) | `TOOLS` `Tool` `Handler` `embed` `slim` `id_and_fields` |
+| `mcp/notes.rs` · `notes_tests.rs` | nástroje `notes_*` nad kořenem poznámek (žádná vlastní logika úložiště — `notes::edit::{query, read, save, toggle_task}`, `notes::create`): výpis, čtení s úkoly, vytvoření (projekt / kategorie proti configu), připsání (`append`: odstavec / odrážka / úkol, naváže na seznam i číslování), odškrtnutí; `Host::{notes_root, notes_changed, pin_note}` | `list` `read` `create` `append` `append_to` `toggle` `note_path` `Style` `BODY_CAP` `LIST_MAX` |
 | `mcp/round.rs` · `discover.rs` | čísla ve výstupu na 2 místa (f32 šum) · výstup `apps_discover` (Start menu + Store `source: "store"`/`aumid` + repa; `alreadyInLedge` jen `true`) | `clean` `two` · `output` |
 | `mcp/edit.rs` | zástupci (`projects`) a akce: přidat (návrh ze složky přes `Host::detect`), upravit (sloučení), odebrat; pravidlo příkazu zástupce; `kind: app` má `passPort`/`openBrowser` vždy `false` | `tile_add` `tile_update` `tile_remove` `action_add` `action_update` `action_remove` `check_cmd` `detected_runs` `PM_SCRIPT` `unique_id` |
 | `mcp/look.rs` | rozložení (celé, `upgrades` se převezmou), proužek (sloučení), vzhled (styl + pole navrch, `blur` = `drawer.glass`); zrcadlo tabulky stylů | `layout_get` `layout_parse` `unknown_cards` `layout_summary` `strip_get` `strip_set` `appearance_get` `appearance_set` `STYLES` `Style` |
@@ -27,7 +28,7 @@ jméno, změň kontrakt i docs. Formát pro agenty: `AGENTS.md` → „MCP serve
 
 Lepidlo: `claude/bridge.rs` (`/mcp` před ostatními cestami, vlastní strop těla, `Mcp` endpoint), `lib.rs`
 (`mod mcp`, `mcp_main`, `serve(…, mcp::host::endpoint())`, příkazy), `main.rs` (`--mcp` před Tauri),
-`config.rs` (`Config.mcp`), `commands/onboarding.rs` (`scan_apps`/`scan_repos` `pub(crate)`),
+`config/*` (`Config.mcp`), `commands/onboarding.rs` (`scan_apps`/`scan_repos` `pub(crate)`),
 `src/Settings.tsx` (`config-changed` → `adoptExternal`), `src/settings/ctx.ts` (`adoptBase`),
 `settings/labels.ts` (`mcp.enabled`), `settings/panels/Claude.tsx`, `i18n/load.ts`, `settings.test.mjs`.
 
@@ -43,6 +44,9 @@ Lepidlo: `claude/bridge.rs` (`/mcp` před ostatními cestami, vlastní strop tě
   `setConflict` (lišta Načíst nové / Přesto uložit). Režim úprav rozložení v šuplíku (`layout/edit.ts`) při
   Hotovo bere `get_config` a přepíše jen `layout` — změna rozložení přes MCP během rozpracované úpravy
   rozložení se Hotovem přepíše (vědomě; jiné sekce zůstanou).
+- **Poznámky:** `Handler::note_write` (zámek zápisů → `Host::notes_root` → `mcp::notes` → `Host::notes_changed`)
+  — mimo Vrátit (zásobník je na části configu); chyba otisku = „načti znovu“. Skutečný `Host` bere kořen z
+  `threads::notes_watch::notes_root`, připnutí z `pins::win::{open, close}`.
 - **Proxy:** `main.rs --mcp` → `proxy::main` (config jen pro port a jazyk, klíč z `WinCred`) → `run` nad
   `stdin().lock()`/`stdout().lock()`; konec stdin = konec procesu.
 

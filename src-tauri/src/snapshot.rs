@@ -100,6 +100,8 @@ pub(crate) struct Snapshot {
     /// widgety ze skriptů umístěné na záložce nebo v proužku (`widgets::live`, jen paměť)
     #[serde(skip_serializing_if = "Vec::is_empty")]
     widgets: Vec<crate::widgets::live::WidgetView>,
+    /// kontextové návrhy: zapnuté zdroje + GitHub z paměti (`suggest::view`); pruh vybírá UI (`src/suggest/`)
+    suggest: crate::suggest::SuggestView,
 }
 
 #[derive(Serialize, Clone)]
@@ -254,6 +256,7 @@ pub(crate) fn snapshot() -> Snapshot {
         update: c.updater.view(),
         actions: crate::actionstate::views(&cfg.actions),
         widgets: crate::widgets::live::snapshot_views(&cfg),
+        suggest: crate::suggest::view(&cfg),
     }
 }
 

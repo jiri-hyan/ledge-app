@@ -94,6 +94,22 @@ pub fn ephemeral() -> Option<u16> {
         .map(|a| a.port())
 }
 
+/// Jen testy: spustí `start(port)` na volném portu. Mezi `ephemeral()` (zjištění čísla) a bindem v `start`
+/// může port zabrat jiný proces (souběžný build / jiný test, os error 10048) — pak se zkusí nový port, až
+/// 10×. `start` musí při chybě nic nenechat běžet (`claude::serve` při selhání bindu nespustí vlákno).
+#[cfg(test)]
+pub fn with_free_port<T>(mut start: impl FnMut(u16) -> Result<T, String>) -> (u16, T) {
+    let mut last = String::new();
+    for _ in 0..10 {
+        let port = ephemeral().expect("OS nedal volný port");
+        match start(port) {
+            Ok(v) => return (port, v),
+            Err(e) => last = e,
+        }
+    }
+    panic!("po 10 pokusech pořád žádný volný port: {last}")
+}
+
 /// Plná cesta k exe procesu (pro „port drží …“).
 pub fn process_image(pid: u32) -> Option<String> {
     unsafe {
@@ -144,6 +160,30 @@ mod tests {
         let port = l.local_addr().unwrap().port();
         assert_eq!(owner(port), Some(std::process::id()));
         assert!(probe(port));
+    }
+
+    #[test]
+    fn with_free_port_retries_when_the_port_is_taken() {
+        // první dva porty „zabere někdo jiný“ (skutečný bind na obsazeném portu selže), třetí projde
+        let mut taken = Vec::new();
+        let mut tries = 0;
+        let (port, listener) = with_free_port(|p| {
+            tries += 1;
+            if tries <= 2 {
+                taken.push(std::net::TcpListener::bind(("127.0.0.1", p)).unwrap());
+                return std::net::TcpListener::bind(("127.0.0.1", p)).map_err(|e| e.to_string());
+            }
+            std::net::TcpListener::bind(("127.0.0.1", p)).map_err(|e| e.to_string())
+        });
+        assert_eq!(tries, 3);
+        assert_eq!(listener.local_addr().unwrap().port(), port);
+        assert!(taken.iter().all(|t| t.local_addr().unwrap().port() != port));
+    }
+
+    #[test]
+    #[should_panic(expected = "žádný volný port")]
+    fn with_free_port_gives_up() {
+        with_free_port::<()>(|_| Err("obsazeno".into()));
     }
 
     #[test]

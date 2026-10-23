@@ -5,6 +5,8 @@
 //! Bezpečnost: veškerý text se escapuje, HTML ze vstupu nikdy neprojde. Odkazy jen http(s) a jen jako
 //! `data-href` (otevírá je UI přes `open_url`), obrázky jen relativní (`data-src`, data URL doplní UI).
 
+use super::md_list::{Lists, indent_width};
+
 /// Escapuje text do HTML (i do atributů).
 pub fn esc(s: &str) -> String {
     let mut o = String::with_capacity(s.len() + 8);
@@ -26,21 +28,26 @@ fn is_fence(line: &str) -> bool {
     t.starts_with("```") || t.starts_with("~~~")
 }
 
-/// Položka seznamu: (odsazení, číslovaná?, zbytek za značkou).
-fn list_item(line: &str) -> Option<(usize, bool, &str)> {
+/// Položka seznamu: (odsazení, číslo u číslované, zbytek za značkou).
+fn list_item(line: &str) -> Option<(usize, Option<u32>, &str)> {
     let indent = line.len() - line.trim_start_matches([' ', '\t']).len();
     let t = &line[indent..];
     if let Some(rest) = t.strip_prefix("- ").or_else(|| t.strip_prefix("* ")).or_else(|| t.strip_prefix("+ ")) {
-        return Some((indent, false, rest));
+        return Some((indent, None, rest));
     }
     let digits = t.bytes().take_while(u8::is_ascii_digit).count();
     if (1..=9).contains(&digits) {
         let rest = &t[digits..];
         if let Some(r) = rest.strip_prefix(". ").or_else(|| rest.strip_prefix(") ")) {
-            return Some((indent, true, r));
+            return Some((indent, digits_val(&t[..digits]), r));
         }
     }
     None
+}
+
+/// Číslo před tečkou (max. 9 číslic, vejde se do `u32`).
+fn digits_val(d: &str) -> Option<u32> {
+    d.parse().ok()
 }
 
 /// `[ ] text` / `[x] text` → (hotovo?, text).
@@ -284,7 +291,7 @@ pub fn title(body: &str) -> String {
 
 // ---------- bloky ----------
 
-fn heading(line: &str) -> Option<(usize, &str)> {
+pub(super) fn heading(line: &str) -> Option<(usize, &str)> {
     let t = line.trim_start();
     let n = t.bytes().take_while(|&c| c == b'#').count();
     if !(1..=6).contains(&n) {
@@ -294,17 +301,21 @@ fn heading(line: &str) -> Option<(usize, &str)> {
     (rest.is_empty() || rest.starts_with(' ')).then(|| (n, rest.trim()))
 }
 
-fn is_hr(line: &str) -> bool {
+pub(super) fn is_hr(line: &str) -> bool {
     let t: String = line.chars().filter(|c| !c.is_whitespace()).collect();
     t.len() >= 3 && (t.chars().all(|c| c == '-') || t.chars().all(|c| c == '*') || t.chars().all(|c| c == '_'))
 }
 
 /// Tělo poznámky → bezpečné HTML pro náhled. Úkoly nesou `data-line` (řádek těla od 0).
+/// Seznamy: vnořené (odsazení ≥ 2) jsou skutečné `<ul>`/`<ol>` v `<li>`, číslovaný začíná na prvním
+/// čísle (`start`), prázdný řádek mezi položkami seznam nezavře a (i odsazený) navazující řádek
+/// patří k poslední položce.
 pub fn to_html(body: &str) -> String {
     let mut out = String::new();
     let mut para: Vec<&str> = Vec::new();
-    // otevřený seznam: číslovaný?
-    let mut list: Option<bool> = None;
+    let mut lists = Lists::default();
+    // od poslední neprázdné řádky byl prázdný řádek
+    let mut blank = false;
     let mut code: Option<String> = None;
     let close_para = |out: &mut String, para: &mut Vec<&str>| {
         if para.is_empty() {
@@ -320,13 +331,8 @@ pub fn to_html(body: &str) -> String {
         out.push_str("</p>");
         para.clear();
     };
-    let close_list = |out: &mut String, list: &mut Option<bool>| {
-        if let Some(ord) = list.take() {
-            out.push_str(if ord { "</ol>" } else { "</ul>" });
-        }
-    };
     for (i, raw) in body.split('\n').enumerate() {
-        let line = raw.trim_end_matches('\r');
+        let line = raw.trim_end_matches('\n');
         if let Some(buf) = code.as_mut() {
             if is_fence(line) {
                 out.push_str(&format!("<pre><code>{}</code></pre>", esc(buf.trim_end_matches('\n'))));
@@ -339,42 +345,49 @@ pub fn to_html(body: &str) -> String {
         }
         if is_fence(line) {
             close_para(&mut out, &mut para);
-            close_list(&mut out, &mut list);
+            // odsazený blok kódu patří do otevřené položky, jinak seznam končí
+            if !(lists.is_open() && indent_width(line) > 0) {
+                lists.close_all(&mut out);
+            }
             code = Some(String::new());
+            blank = false;
             continue;
         }
         if line.trim().is_empty() {
             close_para(&mut out, &mut para);
-            close_list(&mut out, &mut list);
+            blank = true;
             continue;
         }
-        if let Some((indent, ordered, rest)) = list_item(line) {
+        if let Some((_, num, rest)) = list_item(line) {
             close_para(&mut out, &mut para);
-            if list != Some(ordered) {
-                close_list(&mut out, &mut list);
-                out.push_str(if ordered { "<ol>" } else { "<ul>" });
-                list = Some(ordered);
-            }
-            let depth = (indent / 2).min(3);
-            let cls = if depth > 0 { format!(" class=\"d{depth}\"") } else { String::new() };
+            lists.open_item(&mut out, indent_width(line), num);
+            blank = false;
             match task_box(rest) {
                 Some((checked, text)) => {
                     out.push_str(&format!(
-                        "<li{cls} data-task=\"1\"><span class=\"md-check{}\" role=\"checkbox\" aria-checked=\"{checked}\" data-line=\"{i}\"></span><span>",
+                        "<li data-task=\"1\"><span class=\"md-check{}\" role=\"checkbox\" aria-checked=\"{checked}\" data-line=\"{i}\"></span><span>",
                         if checked { " on" } else { "" }
                     ));
                     inline(text, &mut out, false);
-                    out.push_str("</span></li>");
+                    lists.set_item("</span></li>");
                 }
                 None => {
-                    out.push_str(&format!("<li{cls}>"));
+                    out.push_str("<li>");
                     inline(rest, &mut out, false);
-                    out.push_str("</li>");
+                    lists.set_item("</li>");
                 }
             }
             continue;
         }
-        close_list(&mut out, &mut list);
+        let block = heading(line).is_some() || is_hr(line) || line.trim_start().starts_with('>');
+        // navazující řádek položky: odsazený (i po prázdném řádku) nebo bez prázdného řádku
+        if !block && (indent_width(line) > 0 || !blank) && lists.continue_item(&mut out) {
+            inline(line.trim(), &mut out, false);
+            blank = false;
+            continue;
+        }
+        lists.close_all(&mut out);
+        blank = false;
         if let Some((n, text)) = heading(line) {
             close_para(&mut out, &mut para);
             out.push_str(&format!("<h{n}>"));
@@ -396,7 +409,7 @@ pub fn to_html(body: &str) -> String {
         out.push_str(&format!("<pre><code>{}</code></pre>", esc(buf.trim_end_matches('\n'))));
     }
     close_para(&mut out, &mut para);
-    close_list(&mut out, &mut list);
+    lists.close_all(&mut out);
     out
 }
 
@@ -417,7 +430,7 @@ mod tests {
             ("```\n<script>x</script>\n# ne\n```", "<pre><code>&lt;script&gt;x&lt;/script&gt;\n# ne</code></pre>"),
             ("- a\n- b", "<ul><li>a</li><li>b</li></ul>"),
             ("1. a\n2. b", "<ol><li>a</li><li>b</li></ol>"),
-            ("- a\n  - b", "<ul><li>a</li><li class=\"d1\">b</li></ul>"),
+            ("- a\n  - b", "<ul><li>a<ul><li>b</li></ul></li></ul>"),
             ("---", "<hr>"),
             ("> citát", "<blockquote>citát</blockquote>"),
             ("\\*doslova\\*", "<p>*doslova*</p>"),

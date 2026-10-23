@@ -130,3 +130,74 @@ test("model: draftError — tabulka", () => {
   ];
   for (const [a, field] of cases) assert.equal(draftError(a)?.field ?? null, field, JSON.stringify(a));
 });
+
+// ---------- frecency ----------
+import { frecency, bumpUsage, cleanUsage, frecencyBonus, HALF_LIFE_MS, USAGE_MAX } from "./search.ts";
+
+const DAY = 24 * 3600 * 1000;
+const T0 = Date.UTC(2026, 9, 23, 12);
+
+test("frecency: váha půlí po poločasu, bez záznamu 0", () => {
+  assert.equal(frecency(undefined, T0), 0);
+  assert.equal(frecency({ s: 4, t: T0 }, T0), 4);
+  assert.ok(Math.abs(frecency({ s: 4, t: T0 }, T0 + HALF_LIFE_MS) - 2) < 1e-9);
+  assert.ok(Math.abs(frecency({ s: 4, t: T0 }, T0 + 2 * HALF_LIFE_MS) - 1) < 1e-9);
+  assert.equal(frecency({ s: 4, t: T0 }, T0 - DAY), 4, "čas z budoucnosti nezvyšuje");
+  assert.equal(frecency({ s: 0, t: T0 }, T0), 0);
+  assert.equal(frecency({ s: NaN, t: T0 }, T0), 0);
+});
+
+test("bumpUsage: sčítá se zeslabením, nemění vstup, drží strop", () => {
+  const a = bumpUsage({}, "x", T0);
+  assert.deepEqual(a, { x: { s: 1, t: T0 } });
+  const b = bumpUsage(a, "x", T0 + HALF_LIFE_MS);
+  assert.ok(Math.abs(b.x.s - 1.5) < 1e-9 && b.x.t === T0 + HALF_LIFE_MS, JSON.stringify(b));
+  assert.deepEqual(a, { x: { s: 1, t: T0 } });
+  // strop: zahodí nejslabší (nejstarší jednorázové), čerstvé zůstane
+  let u = {};
+  for (let i = 0; i < USAGE_MAX + 5; i++) u = bumpUsage(u, `id${i}`, T0 + i * 1000);
+  assert.equal(Object.keys(u).length, USAGE_MAX);
+  assert.ok(u[`id${USAGE_MAX + 4}`] && !u.id0 && !u.id4 && u.id5);
+  assert.equal(Object.keys(bumpUsage({ a: { s: 1, t: T0 }, b: { s: 9, t: T0 } }, "c", T0, 2)).sort().join(), "b,c");
+});
+
+test("cleanUsage: jen platné záznamy", () => {
+  assert.deepEqual(cleanUsage(null), {});
+  assert.deepEqual(cleanUsage([]), {});
+  assert.deepEqual(cleanUsage("x"), {});
+  assert.deepEqual(cleanUsage({ ok: { s: 2, t: 5 }, nul: null, zle: { s: "a", t: 1 }, nula: { s: 0, t: 1 }, inf: { s: Infinity, t: 1 }, chybi: { s: 1 } }), { ok: { s: 2, t: 5 } });
+});
+
+test("frecencyBonus: roste pomalu a má strop", () => {
+  assert.equal(frecencyBonus(0), 0);
+  assert.ok(frecencyBonus(1) > 9 && frecencyBonus(1) < 11);
+  assert.ok(frecencyBonus(3) > frecencyBonus(1));
+  assert.equal(frecencyBonus(1e6), 30);
+});
+
+test("rank s usage: často používané přebije jednorázové čerstvé, dávné jednorázové ne", () => {
+  const twins = [{ id: "a", title: "Otevřít Ledge" }, { id: "b", title: "Otevřít Ledge" }, { id: "c", title: "Otevřít Ledge" }];
+  const ids = (usage, recent = []) => rank(twins, "ledge", recent, 50, usage, T0).map((r) => r.item.id);
+  // a: 10× před dnem, b: 1× teď, c: 1× před 30 dny
+  let usage = {};
+  for (let i = 0; i < 10; i++) usage = bumpUsage(usage, "a", T0 - DAY + i * 1000);
+  usage = bumpUsage(usage, "b", T0);
+  usage = bumpUsage(usage, "c", T0 - 30 * DAY);
+  assert.deepEqual(ids(usage), ["a", "b", "c"]);
+  // jasně lepší shoda se frecency nepřebije
+  const mixed = [{ id: "x", title: "Ledge nastavení" }, { id: "y", title: "Poznámka o ledge" }];
+  const u = { y: { s: 50, t: T0 } };
+  assert.equal(rank(mixed, "ledge", [], 50, u, T0)[0].item.id, "x");
+  // bez usage se chová jako dřív (jen pořadí v recent)
+  assert.deepEqual(rank(twins, "ledge", ["c"], 50, undefined, T0).map((r) => r.item.id)[0], "c");
+  // položka s recent, ale bez záznamu v usage, dostane starý bonus
+  assert.equal(ids({ b: { s: 0.001, t: T0 } }, ["c"])[0], "c");
+});
+
+test("rank bez dotazu: nedávné podle frecency, často používané výš v rámci sekce", () => {
+  const items = [{ id: "a", title: "A", order: 1 }, { id: "b", title: "B", order: 1 }, { id: "c", title: "C", order: 1 }, { id: "d", title: "D", order: 2 }];
+  const usage = { b: { s: 3, t: T0 }, c: { s: 1, t: T0 } };
+  assert.deepEqual(rank(items, "", ["c", "b"], 50, usage, T0).map((r) => r.item.id), ["b", "c", "a", "d"], "nedávné: b (víc použití) před c");
+  assert.deepEqual(rank(items, "", [], 50, usage, T0).map((r) => r.item.id), ["b", "c", "a", "d"], "mimo recent: sekce, uvnitř frecency");
+  assert.deepEqual(rank(items, "", [], 50, {}, T0).map((r) => r.item.id), ["a", "b", "c", "d"]);
+});

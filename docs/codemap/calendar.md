@@ -25,7 +25,7 @@ crate — parser, opakování i pásma jsou vlastní (chrono z existujících z�
 
 Napojení (jednořádkové): `threads/ui.rs` (otevření šuplíku), `threads/emit.rs` (`deadlines` + `tick` +
 `maybe_refresh`; `remind::next_deadline` + `remind::tick`), `commands/drawer.rs` `set_mode`, `settings.rs`
-`apply_config` → `on_config`, `snapshot.rs` `PersonalView.calendar`, `config.rs` (`sections!` → `calendar`,
+`apply_config` → `on_config`, `snapshot.rs` `PersonalView.calendar`, `config/*` (`sections!` → `calendar`,
 `PersonalConfig.calendars`, `validate_field`), `stripview.rs` (`remind::strip_now`: segment + ambientní
 barva), `attention.rs` (`Event::Meeting`), `toast.rs` (`toast_xml_actions`), `commands/calendar.rs`
 (`calendar_test`, `calendar_join`, `calendar_outlook_probe`, `calendar_outlook_load`), `lib.rs` (registrace).
@@ -96,7 +96,7 @@ zahodí (zůstane jen odkaz Připojit).
 | `model.ts` (+ `model.test.mjs`) | barvy, `normalizeUrl` (zrcadlo Rust), `domainOf`, `timeLabel`, `withCalendar`; `sourceOf`, `providerName`, `placeLabel`, `joinable`, `startsIn`, `remindOptions`, `remindOf`, `outlookFeed` |
 | `calendar.css` | jen třídy `cal-*` |
 
-Angličtina: `src/i18n/en-calendar.ts`. Typy: `types.ts` `CalendarView`, `CalendarItem` (`join`), `CalendarJoin`,
+Angličtina: `src/i18n/en-calendar.ts`. Typy: `types/calendar.ts` `CalendarView`, `CalendarItem` (`join`), `CalendarJoin`,
 `CalendarSource`, `CalendarDay`, `CalendarInfo` (`source`, `hint`), `CalendarTest`, `OutlookProbe`;
 `api.calendarTest`, `api.calendarJoin`, `api.calendarOutlookProbe`, `api.calendarOutlookLoad`. Sekce
 `calendar` v `cards/sections.ts`.

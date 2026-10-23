@@ -1,7 +1,7 @@
 # Codemapa: rychlé akce a paleta příkazů
 
 Config `actions` → karta „Rychlé akce“, karta „Odkazy“ (akce, které jen otevírají), panel Nastavení „akce“ (Projekty, akce a odkazy) a paleta (`Ctrl+K` / 🔍). Formát pro
-agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
+agenty: [agents/actions.md](../agents/actions.md) → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 
 ## Soubory
 
@@ -23,7 +23,8 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku; `skipLinks` = na záložce s kartou Odkazy bez odkazů) | `ActionsCard` |
 | `src/cards/LinksCard.tsx` | karta Odkazy: `linkActions` záložky (favicon `ActionIcon`, klik `runAction`) + nepřevedené `personal.links` postaru (`openLink`) | `LinksCard` |
 | `src-tauri/src/linkmigrate.rs` | `personal.links` → akce při načtení configu a při `save_config` (idempotentní, co neprojde validací, zůstane odkazem) | `migrate`, `guess_kind` |
-| `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné | `fold`, `score`, `segments`, `rank`, `pushRecent` |
+| `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné + frecency (četnost × čerstvost, poločas 7 dní, `Usage` v `localStorage` `ledge.palette.usage`, strop bonusu 30 — řadí mezi podobnými, jasně lepší shodu nepřebije) | `fold`, `score`, `segments`, `rank`, `pushRecent`, `frecency`, `bumpUsage`, `cleanUsage`, `frecencyBonus` |
+| `src/palette/notehits.ts` | poznámky nalezené podle OBSAHU (`note_search`, po 180 ms ticha od 2 znaků): úryvek jako druhý řádek poznámky v paletě, starší poznámky se přidají; `keywords` = dotaz (hledání titulku a podtitulku řadí `rank`) | `mergeNoteHits`, `NoteHit` |
 | `src-tauri/src/scripts/mod.rs` | Script Commands: config `scripts`, složka (`resolve_dir_with`), sken bez watcheru (stat + jen změněné, strop 200, 1 MB), pohled pro UI, stav v paměti | `ScriptsConfig`, `scan_dir`, `load_one`, `Scan`, `Script` (`fingerprint`, `confirm_text`), `ScriptView`, `view`, `problem`, `refresh`, `refresh_async`, `snapshot_views`, `fresh`, `Listing`, `MAX_SCRIPTS`, `MAX_FILE` |
 | `src-tauri/src/scripts/meta.rs` | čistá hlavička `@ledge.*` (komentáře podle jazyka, prvních 4 KB) | `parse`, `header_text`, `split_args`, `Meta`, `Mode`, `Lang`, `HEADER_BYTES` |
 | `src-tauri/src/scripts/run.rs` | interpret z PATH (bez aliasů Storu), program + argumenty, otisk souhlasu, text potvrzení | `find_on_path`, `interp`, `Interp`, `plan`, `Plan`, `fingerprint`, `confirm_text`, `sha256_hex` |
@@ -42,12 +43,12 @@ agenty: `AGENTS.md` → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 | `src-tauri/src/paletteconf.rs` | sekce configu `palette` → `Snapshot.palette_compact` (`paletteCompact`) | `PaletteConfig` |
 | `src/palette/timer.ts` | příkazy časovače: „Časovač N min“ z předvoleb, pauza / pokračovat / +5 min / zrušit podle stavu, stopky; přes `timer/TimerCard.timerDo` | `timerItems` |
 | `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems`, `PItem`, `Nav` · `Palette`, `IconSearch` · `gotoSettingsPanel`, `settingsTarget` |
-| `src/types.ts` (blok `// --- actions ---`) | typy + `Snapshot.actions`/`scripts`/`paletteWinSettings` (sloučení rozhraní) | `ActionCfg`, `ActionView`, `ScriptView`, `ScriptsListing`, `ActionOutcome` |
+| `src/types/actions.ts` | typy + `Snapshot.actions`/`scripts`/`paletteWinSettings` | `ActionCfg`, `ActionView`, `ScriptView`, `ScriptsListing`, `ActionOutcome` |
 
-Lepidlo: `config.rs` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.actions`),
+Lepidlo: `config/*` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.actions`),
 `settings.rs` (`apply_config` → `actionstate::refresh`), `lib.rs` (start + `generate_handler!`),
 `MainPage.tsx` (karta), `Head.tsx` (🔍), `App.tsx` (signál palety, `Ctrl+K`, `palNav`). Skripty:
-`config.rs` (`Config.scripts` + `scripts::validate`), `snapshot.rs` (`scripts`, `palette_win_settings`),
+`config/*` (`Config.scripts` + `scripts::validate`), `snapshot.rs` (`scripts`, `palette_win_settings`),
 `settings.rs` (změna `scripts` → `refresh_async`), `threads/ui.rs` (otevření šuplíku s `inActions` →
 `refresh_async`), `i18n.ts` (`tIn`), `i18n/load.ts` (`en-winsettings`, `en-quick`; `en-emoji` ne — líně s tabulkou).
 
@@ -148,6 +149,7 @@ capabilities), `actionrun::tests` (`resolve`, `shell_cmd`, `tail`, souhlasy v te
 `iconimg::tests::shell_icon_for_folder_and_file`. Frontend:
 `node --experimental-strip-types --test src/palette/search.test.mjs` (search + model, 12 testů),
 `src/actions/webpanel.test.mjs` (okno s webem: `draftError`, `cleanAction`),
+`src/palette/notehits.test.mjs` (zásahy v těle), frecency v `search.test.mjs`,
 `src/palette/compact.test.mjs` (kompaktní režim: `shown`/`visible`/`arrow`, tabulky),
 `src/palette/winsettings.test.mjs` (tabulka proti dokumentaci, tvar cílů, hledání CZ/EN),
 `calc.test.mjs` (výrazy, nevalidní → null, bez eval, formát cs/en), `units.test.mjs` (převody, ne-převody,

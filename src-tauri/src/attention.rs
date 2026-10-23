@@ -2,7 +2,9 @@
 //! přechody „čeká na tebe“ (nové schválení / otázka) a „hotovo“ (konec turnu, hook `Stop`) →
 //! krátký puls proužku a volitelný toast Windows (`claude.toast`, výchozí vypnuto).
 //! Třetí událost je **schůzka za chvíli** (`calendar::remind`): stejný signál (`signal`), priorita
-//! **mezi** „čeká na tebe“ a „hotovo“ (`Event::rank`): čekající Claude > schůzka > hotovo. V proužku
+//! **mezi** „čeká na tebe“ a „hotovo“ (`Event::rank`): čekající Claude > schůzka > spadlé CI > PR k revizi >
+//! hotovo. Čtvrtá a pátá událost jsou z GitHubu (`suggest::pulse`: CI na mém PR nově spadlo, nové PR čeká na
+//! mou revizi) — jen puls a bliknutí, bez toastu. V proužku
 //! totéž pořadí ambientní barvy (`stripview`: čeká/připomínka poznámky > schůzka > pád serveru).
 //!
 //! Všechno je čistá logika (tabulkové testy) kromě `on_change`, které volá `refresh::on_claude_change`
@@ -29,6 +31,10 @@ pub(crate) enum Event {
     Done,
     /// schůzka z kalendáře začne za `remindMin` minut (`calendar::remind`)
     Meeting,
+    /// CI na mém PR nově spadlo (GitHub, `suggest::pulse`)
+    GithubCi,
+    /// nové PR čeká na mou revizi (GitHub, `suggest::pulse`)
+    GithubReview,
 }
 
 impl Event {
@@ -36,15 +42,19 @@ impl Event {
         match self {
             Event::NeedsInput => Rgba::AMBER,
             Event::Meeting => Rgba::BLUE,
+            Event::GithubCi => Rgba::RED,
+            Event::GithubReview => Rgba::VIOLET,
             Event::Done => Rgba::TEAL,
         }
     }
-    /// Priorita při souběhu (nižší = důležitější): čeká na tebe · schůzka · hotovo.
+    /// Priorita při souběhu (nižší = důležitější): čeká na tebe · schůzka · spadlé CI · PR k revizi · hotovo.
     pub(crate) fn rank(self) -> u8 {
         match self {
             Event::NeedsInput => 0,
             Event::Meeting => 1,
-            Event::Done => 2,
+            Event::GithubCi => 2,
+            Event::GithubReview => 3,
+            Event::Done => 4,
         }
     }
 }
@@ -202,6 +212,8 @@ pub(crate) fn toast_text(ev: Event, asks: bool, where_: &str) -> (String, String
         (Event::NeedsInput, true) => tr("Claude se ptá", "Claude has a question"),
         (Event::Done, _) => tr("Claude je hotový", "Claude is done"),
         (Event::Meeting, _) => tr("Schůzka za chvíli", "Meeting soon"),
+        (Event::GithubCi, _) => tr("Spadlo CI na tvém PR", "CI failed on your PR"),
+        (Event::GithubReview, _) => tr("PR čeká na tvou revizi", "A PR is waiting for your review"),
     };
     (title.to_string(), where_.to_string())
 }
@@ -447,6 +459,28 @@ mod tests {
         assert_eq!(evs, [Event::NeedsInput, Event::Meeting, Event::Done]);
         assert_eq!(Event::Meeting.color(), Rgba::BLUE);
         assert_ne!(Event::Meeting.color(), Event::NeedsInput.color());
+    }
+
+    #[test]
+    fn github_events_rank_after_meeting_before_done() {
+        let mut evs = [Event::Done, Event::GithubReview, Event::GithubCi, Event::Meeting, Event::NeedsInput];
+        evs.sort_by_key(|e| e.rank());
+        assert_eq!(evs, [Event::NeedsInput, Event::Meeting, Event::GithubCi, Event::GithubReview, Event::Done]);
+        assert_eq!(Event::GithubCi.color(), Rgba::RED);
+        assert_eq!(Event::GithubReview.color(), Rgba::VIOLET);
+        // žádná z nových událostí nesdílí barvu s „čeká na tebe“ / „hotovo“
+        for e in [Event::GithubCi, Event::GithubReview] {
+            assert!(e.color() != Event::NeedsInput.color() && e.color() != Event::Done.color());
+        }
+        // souběh s Claudem: čekající Claude drží barvu
+        let mixed = [(String::new(), Event::GithubCi), (String::new(), Event::NeedsInput)];
+        assert_eq!(mixed.iter().min_by_key(|(_, e)| e.rank()).map(|(_, e)| *e), Some(Event::NeedsInput));
+    }
+
+    #[test]
+    fn github_toast_texts() {
+        assert_eq!(toast_text(Event::GithubCi, false, "").0, "Spadlo CI na tvém PR");
+        assert_eq!(with_lang(Lang::En, || toast_text(Event::GithubReview, false, "").0), "A PR is waiting for your review");
     }
 
     #[test]

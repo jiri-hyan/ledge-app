@@ -94,6 +94,8 @@
 .med-pick-list button { display: flex; align-items: center; gap: var(--s2); padding: 5px 8px; border-radius: var(--r-sm); font-size: var(--fs-sm); color: var(--t1); text-align: left; white-space: nowrap; }
 .med-pick-list button:hover { background: var(--card-2); }
 .med-pick-list .med-pick-on { background: var(--card-2); color: var(--t0); font-weight: 600; }
+.med-pick-list .med-pick-more { margin-top: 2px; color: var(--t3); justify-content: center; }
+.med-cardnote { margin: 0; font-size: var(--fs-sm); color: var(--t3); }
 .med-pick-list .med-pick-undo { margin-top: 2px; color: var(--accent); justify-content: center; }
 
 /* miniatury vzhledů (jen tvary; `lg` = náhled v Nastavení) */
@@ -141,3 +143,32 @@ h4 + .med-vol { margin-top: 0; }
 .med-bat-low .med-bat-fill { background: var(--red); }
 .med-bat-pct { color: var(--t1); font-variant-numeric: tabular-nums; }
 .med-bat-state { color: var(--t3); }
+
+/* ---------- oblíbené (Favorites.tsx): dlaždice s ikonou zdroje, inline formulář „Přidat“ ---------- */
+.med-favs { display: flex; flex-direction: column; gap: var(--s2); min-width: 0; margin-top: 8px; }
+.med-fav-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: var(--s1); }
+.med-fav { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 8px; border-radius: var(--r-sm); background: var(--card-2); border: 1px solid var(--line); color: var(--t1); font-size: var(--fs-sm); text-align: left; transition: background var(--fast), transform var(--dur-2) var(--spring); }
+.med-fav:hover { background: var(--card-3); }
+.med-fav:active { transform: scale(0.96); }
+.med-fav:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.med-fav-ico { display: grid; flex-shrink: 0; color: var(--t2); }
+.med-fav-ico[data-src="spotify"] { color: var(--green); }
+.med-fav-ico[data-src="ytMusic"] { color: var(--red); }
+.med-fav-ico svg { width: 16px; height: 16px; }
+.med-fav-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.med-fav-add { align-self: flex-start; }
+.med-fav-form { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.med-fav-in { width: 100%; box-sizing: border-box; }
+.med-fav-hint { margin: 0; font-size: var(--fs-xs); color: var(--t3); }
+.med-fav-err { margin: 0; font-size: var(--fs-sm); color: var(--red); }
+.med-fav-btns { display: flex; justify-content: flex-end; gap: var(--s1); }
+
+/* ---------- Nastavení → Oblíbené (FavoritesSettings.tsx) ---------- */
+.med-fs-row { display: flex; align-items: flex-start; gap: var(--s2); padding: 6px 4px; min-width: 0; }
+.med-fs-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.med-fs-sub { font-size: var(--fs-sm); color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.med-fs-sub.err { color: var(--red); }
+.med-fs-name { width: 100%; max-width: 260px; box-sizing: border-box; }
+.med-fs-name.bad { border-color: var(--red); }
+.med-fs-add { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); margin-top: var(--s2); }
+.med-fs-uri { flex: 1; min-width: 180px; max-width: 420px; box-sizing: border-box; }

@@ -2,7 +2,7 @@
 // `src-tauri/src/fixtures/layout-validate.json` jako Rust test `validation_mirror_with_ts`). Vrací pole
 // první chyby ve STEJNÉM pořadí kontrol jako Rust (`layout.pages.0.cards.1.id`), nebo null.
 // Hotovo v režimu úprav se podle ní zeptá dřív, než config pošle (nic se neztratí, úpravy zůstanou otevřené).
-import { CARD_IDS, HEIGHTS, MAX_LIMIT, MAX_NAME, MAX_PAGES, PARTS, PERSONAL, WORK, isDynamic } from "./model.ts";
+import { CARD_IDS, HEIGHTS, MAX_LIMIT, MAX_NAME, MAX_PAGES, PARTS, PERSONAL, WORK, isDynamic, slotsOf } from "./model.ts";
 
 const MAX_ICON = 4;
 const idOk = (id: string) => id.length >= 1 && id.length <= 24 && /^[a-z0-9-]+$/.test(id);
@@ -30,6 +30,12 @@ export function layoutProblem(raw: unknown): string | null {
       seen.add(cid);
       if (c?.h != null && !(HEIGHTS as readonly unknown[]).includes(c.h)) return `layout.pages.${i}.cards.${j}.h`;
       if (c?.limit != null && !(Number.isInteger(c.limit) && c.limit >= 0 && c.limit <= MAX_LIMIT)) return `layout.pages.${i}.cards.${j}.limit`;
+      const slots = slotsOf(cid as never);
+      const partSeen = new Set<string>();
+      for (const [k, part] of (Array.isArray(c?.parts) ? c.parts : []).entries()) {
+        if (typeof part !== "string" || !slots.includes(part) || partSeen.has(part)) return `layout.pages.${i}.cards.${j}.parts.${k}`;
+        partSeen.add(part);
+      }
     }
   }
   for (const [i, h] of (Array.isArray(l.hiddenParts) ? l.hiddenParts : []).entries()) if (!(typeof h === "string" && h in PARTS)) return `layout.hiddenParts.${i}`;

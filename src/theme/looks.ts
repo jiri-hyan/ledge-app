@@ -76,6 +76,24 @@ export const STYLES: readonly StyleDef[] = [
     desc: ["appearance.style.pastel.desc", "Měkké vystouplé dlaždice, velké oblé rohy a pastelové barvy ve třech sloupcích."],
     parts: { theme: "pastel", density: "comfy", fontScale: 1, radius: "round", opacity: 1, strip: "drop", stripSize: "normal", font: "system", material: "soft", layout: "tiles", width: "medium", blur: false },
   },
+  {
+    id: "aurora",
+    name: ["appearance.style.aurora", "Polární záře"],
+    desc: ["appearance.style.aurora.desc", "Měkké přechody tyrkysové a fialové nahoře, oblé průsvitné plochy a vzdušné rozložení."],
+    parts: { theme: "aurora", density: "comfy", fontScale: 1, radius: "round", opacity: 0.9, strip: "pill", stripSize: "normal", font: "system", material: "glass", layout: "panorama", width: "wide", blur: false },
+  },
+  {
+    id: "mono",
+    name: ["appearance.style.mono", "Mono"],
+    desc: ["appearance.style.mono.desc", "Jednobarevný minimalismus: šeď na bílé, tenké linky, žádné stíny a jemné verzálky."],
+    parts: { theme: "mono", density: "comfy", fontScale: 1, radius: "sharp", opacity: 1, strip: "line", stripSize: "small", font: "system", material: "solid", layout: "sheet", width: "medium", blur: false },
+  },
+  {
+    id: "retro",
+    name: ["appearance.style.retro", "Retro"],
+    desc: ["appearance.style.retro.desc", "Jantarová na hnědočerné jako starý monitor: strojové písmo, tvrdé stíny a pixelová linka."],
+    parts: { theme: "retro", density: "normal", fontScale: 1, radius: "sharp", opacity: 1, strip: "block", stripSize: "normal", font: "mono", material: "hard", layout: "mosaic", width: "medium", blur: false },
+  },
 ];
 
 export const STYLE_IDS = STYLES.map((s) => s.id);

@@ -128,6 +128,9 @@ pub fn palette(theme: Theme) -> Palette {
         Theme::Neon => (rgb(0.043, 0.016, 0.094), rgb(0.090, 0.035, 0.170), Rgba(1.0, 0.25, 0.85, 0.45), Rgba(1.0, 0.35, 0.9, 0.85), false),
         Theme::Brutal => (rgb(1.0, 1.0, 1.0), rgb(0.96, 0.96, 0.94), Rgba(0.0, 0.0, 0.0, 1.0), Rgba(0.0, 0.0, 0.0, 1.0), true),
         Theme::Pastel => (rgb(0.914, 0.929, 0.961), rgb(0.875, 0.894, 0.937), Rgba(0.31, 0.37, 0.55, 0.16), Rgba(0.31, 0.37, 0.55, 0.3), true),
+        Theme::Aurora => (rgb(0.020, 0.040, 0.090), rgb(0.055, 0.090, 0.200), Rgba(0.55, 0.9, 1.0, 0.22), Rgba(0.55, 0.9, 1.0, 0.5), false),
+        Theme::Mono => (rgb(0.980, 0.980, 0.976), rgb(0.930, 0.930, 0.920), Rgba(0.0, 0.0, 0.0, 0.14), Rgba(0.0, 0.0, 0.0, 0.3), true),
+        Theme::Retro => (rgb(0.050, 0.030, 0.010), rgb(0.105, 0.062, 0.020), Rgba(1.0, 0.69, 0.0, 0.35), Rgba(1.0, 0.69, 0.0, 0.7), false),
     };
     let hex = |s: &str| parse_hex(s).unwrap_or(Rgba::DIM);
     let accent = match theme {
@@ -143,6 +146,9 @@ pub fn palette(theme: Theme) -> Palette {
         Theme::Neon => [hex("#ff3fd8"), hex("#7a5cff"), hex("#7a5cff")],
         Theme::Brutal => [hex("#ff3d7f"), hex("#ffe600"), hex("#ffe600")],
         Theme::Pastel => [hex("#8b9cff"), hex("#f0a6ca"), hex("#f0a6ca")],
+        Theme::Aurora => [hex("#3ee0c0"), hex("#b480ff"), hex("#b480ff")],
+        Theme::Mono => [hex("#171717"), hex("#737373"), hex("#737373")],
+        Theme::Retro => [hex("#ffb000"), hex("#ff6a00"), hex("#ff6a00")],
     };
     Palette { top, bottom, edge, edge_hot, light, accent }
 }

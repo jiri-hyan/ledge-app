@@ -18,10 +18,10 @@ const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 const PANEL_FILES = {
   zaciname: ["panels/Start.tsx"],
   suplik: ["panels/Drawer.tsx", "../layout/LayoutEditor.tsx"],
-  vzhled: ["panels/Appearance.tsx", "panels/AppearanceClosed.tsx", "panels/AppearanceHover.tsx", "panels/AppearanceOpen.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
+  vzhled: ["panels/Appearance.tsx", "panels/AppearanceClosed.tsx", "panels/AppearanceHover.tsx", "panels/AppearanceOpen.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceThemes.tsx", "panels/AppearancePages.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
   akce: ["panels/ProjectsActions.tsx", "panels/Projects.tsx", "panels/ProjectEditor.tsx", "panels/Actions.tsx", "../actions/ScriptsSettings.tsx", "panels/LegacyLinks.tsx", "../widgets/WidgetsSettings.tsx"],
   claude: ["panels/Claude.tsx", "panels/Questions.tsx", "../mcp/McpSettings.tsx"],
-  osobni: ["panels/Personal.tsx", "../media/MediaSettings.tsx", "../cliphist/ClipSettings.tsx", "../calendar/CalendarSettings.tsx", "../integrations/IntegrationsSettings.tsx"],
+  osobni: ["panels/Personal.tsx", "../media/MediaSettings.tsx", "../suggest/SuggestSettings.tsx", "../cliphist/ClipSettings.tsx", "../calendar/CalendarSettings.tsx", "../integrations/IntegrationsSettings.tsx"],
   ucty: ["panels/Accounts.tsx", "../accounts/AccountsSettings.tsx"],
   poznamky: ["panels/Notes.tsx"],
   chovani: ["panels/Behavior.tsx", "panels/Hotkeys.tsx", "../pkgctx/BubbleNotice.tsx"],

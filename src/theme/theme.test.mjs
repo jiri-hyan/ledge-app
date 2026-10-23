@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { THEMES, THEME_IDS, COLOR_KEYS } from "./themes.ts";
+import { textProblems } from "./contrast.ts";
 import {
   DEFAULT_APPEARANCE, accentPair, appearanceVars, effectiveMotion, hexToHsl, normalizeAppearance, springPreset, stripShape, widenMotion,
 } from "./appearance.ts";
@@ -13,36 +14,7 @@ const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const rootBlock = css.slice(css.indexOf(":root {"), css.indexOf("\n}\n"));
 const cssVar = (k) => rootBlock.match(new RegExp(`\\n\\s*--${k}:\\s*([^;]+);`))?.[1].trim();
 
-// ---------- barvy a kontrast (WCAG) ----------
-function parse(c) {
-  c = c.trim();
-  let m = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (m) {
-    const h = m[1].length === 3 ? [...m[1]].map((x) => x + x).join("") : m[1];
-    const n = parseInt(h, 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
-  }
-  m = c.match(/^rgba?\(([^)]+)\)$/);
-  if (m) {
-    const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
-    return [p[0], p[1], p[2], p[3] ?? 1];
-  }
-  m = c.match(/^(\d+) (\d+) (\d+)$/); // --bg „r g b“
-  if (m) return [+m[1], +m[2], +m[3], 1];
-  throw new Error(`neznámá barva ${c}`);
-}
-const over = (top, bottom) => {
-  const a = top[3];
-  return [0, 1, 2].map((i) => top[i] * a + bottom[i] * (1 - a)).concat(1);
-};
-const lum = ([r, g, b]) => {
-  const f = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-};
-const contrast = (a, b) => {
-  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
-  return (x + 0.05) / (y + 0.05);
-};
+// ---------- barvy a kontrast (WCAG): jedna implementace s editorem vlastních motivů (`contrast.ts`) ----------
 
 test("motiv dark = tokeny ze styles.css (výchozí vzhled se nezmění)", () => {
   for (const k of COLOR_KEYS) {
@@ -63,21 +35,8 @@ test("každý motiv má všechny barevné klíče", () => {
 
 test("kontrast textů ≥ 4.5:1 ve všech motivech (karta i hover, nad tmavou i světlou plochou)", () => {
   for (const id of THEME_IDS) {
-    const v = THEMES[id].vars;
-    const bg = parse(v.bg);
-    for (const desk of [[0, 0, 0, 1], [255, 255, 255, 1]]) {
-      const shell = over([...bg.slice(0, 3), 0.985], desk);
-      for (const layer of ["card", "card-2"]) {
-        const surface = over(parse(v[layer]), shell);
-        for (const t of ["t1", "t2", "t3", "green", "amber", "red", "blue", "violet", "teal", "amber-ink", "red-ink"]) {
-          const k = contrast(parse(v[t]), surface);
-          assert.ok(k >= 4.5, `${id}: --${t} na --${layer} = ${k.toFixed(2)}`);
-        }
-      }
-      // tlačítko .btn.pri: text --on-light na ploše --t1
-      const k = contrast(parse(v["on-light"]), parse(v.t1));
-      assert.ok(k >= 4.5, `${id}: .btn.pri ${k.toFixed(2)}`);
-    }
+    const bad = textProblems(THEMES[id].vars);
+    assert.deepEqual(bad, [], `${id}: ${bad.map((p) => `--${p.key} ${p.ratio.toFixed(2)}`).join(", ")}`);
   }
 });
 
@@ -197,7 +156,8 @@ test("starý config z vlny 5 (bez stylu) vypadá stejně: styl Klasický, stejn�
   const old = { theme: "nord", accent: "#22c55e", density: "compact", fontScale: 1.1, radius: "round", glass: { opacity: 0.8 }, motion: { style: "smooth", speed: 1.5 }, strip: { style: "line", size: "large", color: "accent", position: "left" } };
   const a = normalizeAppearance(old);
   assert.deepEqual([a.style, a.font, a.material, a.layout, a.width], ["classic", "system", "solid", "classic", "custom"]);
-  const { style, font, material, layout, width, ...rest } = a;
+  const { style, font, material, layout, width, pages, customThemes, customTheme, ...rest } = a;
+  assert.deepEqual([pages, customThemes, customTheme], [{}, [], ""], "starý config nemá záložky ani vlastní motivy");
   assert.deepEqual(rest, old, "vlastní hodnoty zůstaly");
   const vars = appearanceVars(a);
   for (const [k, v] of Object.entries(lookVars(DEFAULT_APPEARANCE))) assert.equal(vars[k], v, `--${k}`);
@@ -219,9 +179,17 @@ test("tabulka stylů je úplná a platná", () => {
     // výběr stylu = žádná složka „upravená“
     assert.deepEqual(styleChanges(withStyle({}, s.id), p.blur), [], s.id);
   }
-  // 6 schválených stylů + Klasický, každý jiné rozložení
-  assert.deepEqual(STYLE_IDS, ["classic", "glass", "terminal", "paper", "neon", "brutal", "pastel"]);
-  assert.equal(new Set(STYLES.map((s) => s.parts.layout)).size, STYLES.length);
+  // 6 schválených stylů + Klasický + 3 nové (kolo 13); sestava motiv + rozložení + materiál + písmo je u každého jiná,
+  // každé rozložení je aspoň jednou použité
+  assert.deepEqual(STYLE_IDS, ["classic", "glass", "terminal", "paper", "neon", "brutal", "pastel", "aurora", "mono", "retro"]);
+  const combo = (s) => [s.parts.theme, s.parts.layout, s.parts.material, s.parts.font].join("|");
+  assert.equal(new Set(STYLES.map(combo)).size, STYLES.length);
+  assert.deepEqual([...new Set(STYLES.map((s) => s.parts.layout))].sort(), Object.keys(LAYOUTS).sort());
+  // nový styl = vlastní motiv (barvy) a statická dekorace v CSS
+  for (const id of ["aurora", "mono", "retro"]) {
+    assert.equal(styleOf(id).parts.theme, id, `${id}: vlastní motiv`);
+    assert.ok(css.includes(`html[data-style="${id}"]`), `${id}: blok v styles.css`);
+  }
   assert.equal(styleOf("neexistuje").id, CLASSIC);
 });
 
@@ -309,7 +277,30 @@ test("plán otevření a zavření podle stylu animace", () => {
       if (p) assert.ok(p.duration + p.delay <= CLOSE_CAP_MS && CLOSE_CAP_MS < 600, `${s} ${speed}`);
     }
   }
+  // pád: jen transform + opacity, jeden odraz nahoru a usazení; zavření ho vrací nahoru
+  const drop = openPlan("drop", 1, g);
+  assert.equal(drop.start.transform, "translateY(-60%)");
+  assert.equal(drop.frames.at(-1).transform, "translateY(0%)");
+  assert.ok(drop.frames.some((f) => f.transform === "translateY(-2.5%)"), "jeden odraz");
+  assert.equal(drop.frames.filter((f) => f.transform === "translateY(0%)").length, 2, "dopad a usazení, ne dvojí odskok");
+  assert.ok(drop.frames.every((f) => Object.keys(f).every((k) => ["transform", "opacity", "offset", "easing"].includes(k))), "žádný filtr ani clip");
+  assert.equal(closePlan("drop", 1, g).frames.at(-1).opacity, 0);
+  // rozvinutí: tvar shora dolů bez překmitu, karty po 20–30 ms
+  const unfold = openPlan("unfold", 1, g);
+  assert.deepEqual(unfold.frames.map((f) => f.clipPath), ["C", "B", "F"]);
+  assert.ok(unfold.reveal.step >= 20 && unfold.reveal.step <= 30 && unfold.reveal.blur === false, "odstup karet");
+  assert.equal(unfold.breath, false);
+  assert.equal(openPlan("notch", 1, g).reveal, undefined, "ostatní styly mají výchozí naskakování");
   // dnešní stažení beze změny při rychlosti 1
   const c = closePlan("spring", 1, g);
   assert.deepEqual([c.duration, c.delay, c.frames.map((f) => f.clipPath)], [240, 40, ["F", "C"]]);
+});
+
+test("výkon (software render WebView2): bloky stylů ve styles.css bez filtru, rozmazání a animace", () => {
+  const blocks = css.slice(css.indexOf("/* ---------- Styly (vlna 6)"), css.indexOf("/* CSS animace a přechody pryč")).replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.ok(blocks.includes('html[data-style="retro"]'), "našel jsem bloky stylů");
+  for (const bad of ["backdrop-filter", "filter:", "animation", "@keyframes", "infinite"]) assert.ok(!blocks.includes(bad), `v blocích stylů je ${bad}`);
+  // přechod barev při přepnutí záložky: jen barvy, nikdy transform / filtr, a jen po dobu atributu
+  const shift = css.match(/html\[data-look-shift\][^{]*\{[^}]*\}/)[0];
+  assert.ok(/background-color[^;]*border-color[^;]*color/.test(shift) && !/transform|filter|box-shadow/.test(shift), shift);
 });

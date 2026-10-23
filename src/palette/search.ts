@@ -1,5 +1,5 @@
 // Čistá logika palety příkazů: skládání bez diakritiky (`fold`), fuzzy skóre se zvýrazněním
-// (`score`), řazení s nedávno použitými (`rank`, `pushRecent`). Bez závislostí a bez DOM — ověřuje
+// (`score`), řazení s nedávno použitými a frecency (`rank`, `pushRecent`, `bumpUsage`). Bez závislostí a bez DOM — ověřuje
 // ji `search.test.mjs` (`node --experimental-strip-types --test src/palette/`).
 
 /** Text bez diakritiky, malými písmeny, se zachovanou délkou (index i = znak i originálu). */
@@ -96,6 +96,45 @@ export function segments(text: string, ranges: Range[]): { text: string; hit: bo
   return out;
 }
 
+/** Využití položek pro frecency: `s` = vážený počet použití (každé použití půlí váha všech starších po
+ *  `HALF_LIFE_MS`), `t` = čas posledního použití (ms). Jedno číslo na položku, žádná historie. */
+export type Usage = Record<string, { s: number; t: number }>;
+export const HALF_LIFE_MS = 7 * 24 * 3600 * 1000;
+/** Nejvíc položek v `Usage` (nejméně používané se zahazují). */
+export const USAGE_MAX = 300;
+
+/** Frecency = četnost × čerstvost: `s` zeslabené stářím posledního použití (0 = nikdy / dávno). */
+export function frecency(u: Usage[string] | undefined, now: number): number {
+  if (!u || !(u.s > 0)) return 0;
+  return u.s * Math.pow(0.5, Math.max(0, now - u.t) / HALF_LIFE_MS);
+}
+
+/** Nové `Usage` po použití `id`: dosavadní váha zeslabená stářím + 1. Nad `max` položek zahodí nejslabší. */
+export function bumpUsage(usage: Usage, id: string, now: number, max = USAGE_MAX): Usage {
+  const next: Usage = { ...usage, [id]: { s: frecency(usage[id], now) + 1, t: now } };
+  const ids = Object.keys(next);
+  if (ids.length > max) {
+    ids.sort((a, b) => frecency(next[a], now) - frecency(next[b], now));
+    for (const k of ids.slice(0, ids.length - max)) delete next[k];
+  }
+  return next;
+}
+
+/** `Usage` z uloženého JSON: jen platné záznamy (poškozené úložiště = prázdné). */
+export function cleanUsage(raw: unknown): Usage {
+  const out: Usage = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+    const u = v as { s?: unknown; t?: unknown } | null;
+    if (u && typeof u.s === "number" && typeof u.t === "number" && Number.isFinite(u.s) && Number.isFinite(u.t) && u.s > 0) out[id] = { s: u.s, t: u.t };
+  }
+  return out;
+}
+
+/** Bonus k skóre dotazu z frecency: jedno čerstvé použití ≈ 10, časté ≈ 30 (strop; shoda na začátku slova
+ *  je o 20 a víc výš než uprostřed slova, takže frecency řadí mezi podobnými, ne proti jasně lepší shodě). */
+export const frecencyBonus = (fr: number) => Math.min(30, 10 * Math.log2(1 + fr));
+
 export interface Item {
   id: string;
   title: string;
@@ -111,23 +150,28 @@ export type Ranked<T extends Item> = { item: T; score: number; ranges: Range[] }
 /**
  * Výsledky pro dotaz: titul plnou vahou (se zvýrazněním), podtitul a klíčová slova slaběji.
  * Nedávno použité (`recent`, nejnovější první) dostanou bonus; bez dotazu jdou nahoru a zbytek
- * zůstane v pořadí `order`, pak vstupu.
+ * zůstane v pořadí `order`, pak vstupu. S `usage` řadí frecency (četnost × čerstvost): nedávné nahoře podle
+ * ní, s dotazem bonus `frecencyBonus`; položka bez záznamu v `usage` dostane starý bonus podle pořadí v `recent`.
  */
-export function rank<T extends Item>(items: T[], query: string, recent: string[], limit = 50): Ranked<T>[] {
+export function rank<T extends Item>(items: T[], query: string, recent: string[], limit = 50, usage?: Usage, now = Date.now()): Ranked<T>[] {
   const recentPos = new Map(recent.map((id, i) => [id, i]));
   const q = query.trim();
   const out: Ranked<T>[] = [];
   items.forEach((item, i) => {
     const r = recentPos.get(item.id);
+    const fr = frecency(usage?.[item.id], now);
     if (!q) {
-      out.push({ item, score: r !== undefined ? 1000 - r : -(item.order ?? 0) * 1000 - i / 1000, ranges: [] });
+      // nedávné nahoře (mezi sebou podle frecency, bez usage podle pořadí); ostatní podle sekce, často používané výš
+      const s = r !== undefined ? 1000 + fr * 10 - r * 0.01 : -(item.order ?? 0) * 1000 - i / 1000 + Math.min(fr, 5) * 100;
+      out.push({ item, score: s, ranges: [] });
       return;
     }
     const m = score(q, item.title);
     const extra = m ? null : score(q, `${item.sub ?? ""} ${item.keywords ?? ""}`);
     if (!m && !extra) return;
     const base = m ? m.score : (extra as Match).score * 0.6;
-    out.push({ item, score: base + (r !== undefined ? Math.max(30 - r * 2, 5) : 0), ranges: m ? m.ranges : [] });
+    const bonus = fr > 0 ? frecencyBonus(fr) : r !== undefined ? Math.max(30 - r * 2, 5) : 0;
+    out.push({ item, score: base + bonus, ranges: m ? m.ranges : [] });
   });
   out.sort((a, b) => b.score - a.score);
   return out.slice(0, limit);

@@ -24,6 +24,7 @@ export const ANCHOR_STEP: Record<string, StepId | null> = {
   "appearance.layout": "open",
   "appearance.density": "open",
   "appearance.theme": "open",
+  "appearance.pages": "open",
   "appearance.accent": "open",
   "appearance.details": "open",
   "drawer.width": "open",
@@ -35,7 +36,7 @@ export const ANCHOR_STEP: Record<string, StepId | null> = {
 /** Kotvy schované v rozbalovacím „Pokročilé“ svého kroku (skok na ně ho rozbalí). */
 export const ADVANCED: readonly string[] = [
   "strip.enabled", "strip.items", "strip.custom", "timer.strip", "strip.monitor",
-  "appearance.theme", "appearance.accent", "appearance.details", "drawer.width", "drawer.glass",
+  "appearance.details", "drawer.width", "drawer.glass",
 ];
 
 /** Krok, na který přepnout kvůli kotvě (`undefined` = kotva nepatří žádnému kroku). */

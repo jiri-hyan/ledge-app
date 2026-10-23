@@ -5,7 +5,7 @@
 
 use super::rpc::{self, RpcErr};
 use super::undo::{self, Entry};
-use super::{Host, Server, edit, look, schema};
+use super::{Host, Server, edit, look, notes, schema};
 use crate::actions::Action;
 use crate::config::{Config, Project};
 use crate::i18n::tr;
@@ -149,58 +149,80 @@ fn id_only() -> Value {
 
 pub const TOOLS: &[Tool] = &[
     Tool { name: "ledge_status", title: "Ledge status", write: false, input: no_args,
-        desc: "Read Ledge's current state: version, whether MCP is on, how many shortcuts (tiles), quick actions and tabs there are, the active design style and theme, the strip style, the UI language, whether the drawer is open and how many changes undo_last can revert. Call this first." },
+        desc: "Read Ledge's current state: version, MCP on/off, counts of shortcuts (tiles), quick actions and tabs, design style and theme, strip style, UI language, drawer open, and how many changes undo_last can revert. Call this first." },
     Tool { name: "apps_discover", title: "Discover apps and projects", write: false,
         input: || json!({ "type": "object", "properties": { "repos": { "type": "boolean", "description": "Also scan the user's folders for git repositories and suggest project shortcuts (default true)." } }, "additionalProperties": false }),
-        desc: "List what the user actually has on this PC, read-only: apps from the Start menu (shortcut name and target .exe, user and all-users Start menu), Microsoft Store apps such as Notepad or Calculator (source \"store\", with aumid instead of exe) and git repositories in the usual folders with a ready project suggestion (kind dev/app, run command, port). Nothing comes from the browser. alreadyInLedge (only present when true) marks things Ledge already shows. Use the results for tiles_add (projects, apps; a Store app: kind app + aumid) and actions_add (apps with arguments, websites). Can take a few seconds." },
+        desc: "List what the user has on this PC, read-only: Start menu apps (name and target .exe), Microsoft Store apps such as Notepad (source \"store\", with aumid instead of exe) and git repositories in the usual folders with a ready project suggestion (kind dev/app, run command, port). alreadyInLedge (only when true) marks what Ledge already shows. Use the results for tiles_add and actions_add. Can take a few seconds." },
     Tool { name: "tiles_list", title: "List shortcuts", write: false, input: no_args,
-        desc: "List the shortcuts (tiles) on the Projects card: each with id, name, kind (dev = local dev server with run command and port, app = desktop program with exe or appName), folder, look. Also says on which tabs the Projects card is." },
+        desc: "List the shortcuts (tiles) on the Projects card: id, name, kind (dev = local dev server with run command and port, app = desktop program), folder, look; and on which tabs the card is." },
     Tool { name: "tiles_add", title: "Add a shortcut", write: true,
         input: || embed(schema::of::<Project>(), None, &["name"], &["links", "args"]),
-        desc: "Add a shortcut (tile) to the Projects card. Give name plus either path (an absolute project folder — Ledge then detects kind, run command, port and remote itself, like Settings → Projects → Add) or kind app with exe (absolute path to an .exe, e.g. from apps_discover), appName, or aumid (a Microsoft Store app from apps_discover). Apps never use openBrowser or passPort (Ledge keeps them off). For safety a shortcut's run command can only be a package-manager script (\"npm run dev\", \"pnpm dev\") or a command Ledge itself finds in the folder; anything else belongs to actions_add (kind command), which asks the user before its first run. Example: {\"name\":\"Web shop\",\"path\":\"C:\\\\Users\\\\me\\\\code\\\\shop\"} or {\"name\":\"Notepad\",\"kind\":\"app\",\"exe\":\"C:\\\\Windows\\\\notepad.exe\"}. id is generated from the name when missing." },
+        desc: "Add a shortcut (tile) to the Projects card. Give name plus either path (an absolute project folder; Ledge detects kind, run command, port and remote itself) or kind app with exe (absolute .exe, e.g. from apps_discover), appName, or aumid (a Store app from apps_discover). A run command can only be a package-manager script (\"npm run dev\") or one Ledge finds in the folder; anything else belongs to actions_add (kind command, which asks the user first). Example: {\"name\":\"Web shop\",\"path\":\"C:\\\\code\\\\shop\"}. id is generated from the name." },
     Tool { name: "tiles_update", title: "Change a shortcut", write: true,
         input: || id_and_fields("shortcut"),
-        desc: "Change fields of one shortcut by id (the same fields as tiles_add; only the fields you send; null clears an optional field). Example: {\"id\":\"web-shop\",\"port\":5180,\"look\":{\"icon\":{\"kind\":\"emoji\",\"value\":\"🛒\"},\"color\":\"#2563eb\"}}. Same command rules as tiles_add." },
+        desc: "Change fields of one shortcut by id (same fields as tiles_add; only what you send; null clears an optional field). Example: {\"id\":\"web-shop\",\"port\":5180,\"look\":{\"color\":\"#2563eb\"}}. Same command rules as tiles_add." },
     Tool { name: "tiles_remove", title: "Remove a shortcut", write: true, input: id_only,
-        desc: "Remove one shortcut (tile) from the Projects card by id (see tiles_list). The project folder on disk is not touched. Reversible with undo_last." },
+        desc: "Remove one shortcut from the Projects card by id (see tiles_list). The project folder is not touched. Reversible with undo_last." },
     Tool { name: "actions_list", title: "List quick actions", write: false, input: no_args,
-        desc: "List quick actions and links (one list; a link is an action that opens something): id, label, kind (url, web, file, folder, app, command), target, group, showOn (work / personal / both)." },
+        desc: "List quick actions and links: id, label, kind (url, web, file, folder, app, command), target, group, showOn (work / personal / both)." },
     Tool { name: "actions_add", title: "Add a quick action or link", write: true,
         input: || embed(schema::of::<Action>(), None, &["label", "kind", "target"], &[]),
-        desc: "Add a quick action or link. kind: url (website in the browser, https://…), web (website in a small Ledge window), file / folder (absolute path), app (.exe, optional args), command (cmd or PowerShell line). Websites the user uses belong here as kind url. A command or an app with args is never pre-approved: Ledge asks the user before its first run. Examples: {\"label\":\"Mail\",\"kind\":\"url\",\"target\":\"https://mail.example.com\"}, {\"label\":\"Build\",\"kind\":\"command\",\"target\":\"npm run build\",\"cwd\":\"C:\\\\code\\\\app\"}. id is generated from the label when missing." },
+        desc: "Add a quick action or link. kind: url (website in the browser, https://…), web (website in a small Ledge window), file / folder (absolute path), app (.exe, optional args), command (cmd or PowerShell line). A command or an app with args is never pre-approved: Ledge asks the user before its first run. Example: {\"label\":\"Mail\",\"kind\":\"url\",\"target\":\"https://mail.example.com\"}. id is generated from the label." },
     Tool { name: "actions_update", title: "Change a quick action", write: true,
         input: || id_and_fields("action"),
         desc: "Change fields of one quick action by id (the same fields as actions_add; only the fields you send; null clears an optional field). Changing what a command runs drops any earlier consent, so Ledge asks again." },
     Tool { name: "actions_remove", title: "Remove a quick action", write: true, input: id_only,
         desc: "Remove one quick action or link by id (see actions_list). Any consent the user gave for it stays only for that exact command. Reversible with undo_last." },
     Tool { name: "layout_get", title: "Get the drawer layout", write: false, input: no_args,
-        desc: "Read the drawer layout: tabs (pages, max 9; built-in prace = Work and osobni = Personal) with their cards in order, each card's width (s = 1 column, m = 2, l = 3, xl = whole row), optional height h (1–4 rows), Projects card tile options, card look; hidden card parts. The catalog lists every card id and allowed value. Edit this JSON and pass it whole to layout_preview, then layout_apply." },
+        desc: "Read the drawer layout: tabs (max 9; built-in prace = Work, osobni = Personal) with their cards in order, each card's width (s = 1 column, m = 2, l = 3, xl = whole row), height h (1–4 rows), tile options, card look, hidden card parts. The catalog lists every card id and allowed value. Edit this JSON, pass it whole to layout_preview, then layout_apply." },
     Tool { name: "layout_preview", title: "Check a layout", write: false,
         input: || json!({ "type": "object", "properties": { "layout": { "type": "object" } }, "required": ["layout"], "additionalProperties": false }),
-        desc: "Validate a whole layout, passed as {\"layout\":…} exactly like layout_apply (same rules as Ledge's layout editor) without saving. Returns what each tab would show and which cards become visible or hidden, or a sentence saying what is wrong. Always preview before layout_apply." },
+        desc: "Validate a whole layout, passed as {\"layout\":…} like layout_apply, without saving. Returns what each tab would show and which cards become visible or hidden, or what is wrong. Always preview before layout_apply." },
     Tool { name: "layout_apply", title: "Apply a layout", write: true,
         input: || embed(schema::of::<LayoutConfig>(), Some("layout"), &[], &[]),
-        desc: "Save a whole layout (tabs, cards, sizes) — same validation as layout_preview. A card on no tab is hidden and fetches nothing. Example: {\"layout\":{\"pages\":[{\"id\":\"prace\",\"name\":\"\",\"cards\":[{\"id\":\"projects\",\"size\":\"xl\"},{\"id\":\"claude\",\"size\":\"m\"},{\"id\":\"repos\",\"size\":\"m\"}]}],\"hiddenParts\":[]}}." },
+        desc: "Save a whole layout (tabs, cards, sizes) — same validation as layout_preview. A card on no tab is hidden and fetches nothing. Example: {\"layout\":{\"pages\":[{\"id\":\"prace\",\"cards\":[{\"id\":\"projects\",\"size\":\"xl\"}]}],\"hiddenParts\":[]}}." },
     Tool { name: "strip_get", title: "Get the closed strip", write: false, input: no_args,
-        desc: "Read what the closed Ledge shows at the top edge: strip on/off, items in order (clock, mode, running, claude, waiting, repos, limits, custom, timer, media, github, system, mail, widget:<file>), custom text, per-item colors, items hidden when idle, and the closed look (strip.look). The catalog lists allowed values." },
+        desc: "Read what the closed Ledge shows at the top edge: strip on/off, items in order (clock, mode, running, claude, waiting, repos, limits, custom, timer, media, github, system, mail, widget:<file>), custom text, per-item colors, items hidden when idle, strip.look. The catalog lists allowed values." },
     Tool { name: "strip_set", title: "Change the closed strip", write: true,
         input: || embed(schema::of::<StripConfig>(), None, &[], &["itemsRev"]),
-        desc: "Change the closed strip (only the fields you send). Example: {\"items\":[\"mode\",\"clock\",\"waiting\",\"running\"],\"custom\":\"\",\"look\":\"classic\"}." },
+        desc: "Change the closed strip (only the fields you send). Example: {\"items\":[\"mode\",\"clock\"],\"look\":\"classic\"}." },
     Tool { name: "appearance_get", title: "Get the appearance", write: false, input: no_args,
-        desc: "Read the look: design style, theme, accent, density, font, material, layout of the main page, drawer width preset, corner radius, opacity, animation style and speed, strip shape and position, blur. The catalog lists the design styles and every allowed value." },
+        desc: "Read the look: design style, theme, accent, density, font, material, main page layout, drawer width, corner radius, opacity, animation, strip shape and position, blur. The catalog lists the styles and every allowed value." },
     Tool { name: "appearance_set", title: "Change the appearance", write: true,
         input: || {
-            let mut s = embed(schema::of::<AppearanceConfig>(), None, &[], &[]);
+            // vzhled záložek a vlastní motivy (11 barev) jsou pro MCP moc velké — `tools/list` < 20 kB; mění se v Nastavení
+            let mut s = embed(schema::of::<AppearanceConfig>(), None, &[], &["pages", "customThemes", "customTheme"]);
+            if let Some(d) = s.get_mut("$defs").and_then(Value::as_object_mut) {
+                d.retain(|k, _| !matches!(k.as_str(), "PageLook" | "CustomTheme" | "ThemeColors"));
+            }
             s["properties"]["style"] = json!({ "type": "string", "enum": look::STYLES.iter().map(|s| s.id).collect::<Vec<_>>(), "description": "Design style package; applied first, other fields override it." });
             s["properties"]["blur"] = json!({ "type": "boolean", "description": "Blur the desktop behind the drawer (acrylic)." });
             s
         },
-        desc: "Change the look using only catalog values. style picks a whole design style (classic, glass, terminal, paper, neon, brutal, pastel) exactly like the gallery in Settings; other fields (theme, accent #rrggbb, density, font, material, layout, width, radius, motion, strip) override parts of it. Example: {\"style\":\"paper\"} or {\"theme\":\"nord\",\"accent\":\"#2563eb\",\"motion\":{\"style\":\"none\"}}." },
+        desc: "Change the look using only catalog values. style picks a whole design style like the gallery in Settings; other fields (theme, accent #rrggbb, density, font, material, layout, width, radius, motion, strip) override parts of it. Example: {\"style\":\"paper\"} or {\"theme\":\"nord\",\"accent\":\"#2563eb\"}." },
+    Tool { name: "notes_list", title: "List notes", write: false,
+        input: || json!({ "type": "object", "properties": { "kind": { "type": "string" }, "project": { "type": "string" }, "includeDone": { "type": "boolean" }, "limit": { "type": "integer" } } }),
+        desc: "List notes (open first, today's reminders on top): path, title, kind, project, remind, tasks done/total. project _obecne = none; limit default 30, max 100." },
+    Tool { name: "notes_read", title: "Read a note", write: false,
+        input: || json!({ "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] }),
+        desc: "Read a note by path (from notes_list): metadata, Markdown body, tasks as {line, done, text}." },
+    Tool { name: "notes_create", title: "Create a note", write: true,
+        input: || json!({ "type": "object", "properties": { "text": { "type": "string" }, "kind": { "type": "string" }, "project": { "type": "string" }, "remind": { "type": "string" } }, "required": ["text"] }),
+        desc: "Create a note from Markdown text; optional kind, project id, remind (ISO 8601 time). Returns the path. Not covered by undo_last." },
+    Tool { name: "notes_append", title: "Append to a note", write: true,
+        input: || json!({ "type": "object", "properties": { "path": { "type": "string" }, "text": { "type": "string" }, "style": { "type": "string", "enum": ["text", "bullet", "task"] } }, "required": ["path", "text"] }),
+        desc: "Add text at the end of a note: paragraph (default), bullet or task items, one per line, continuing an existing list. Fails if the note changed since reading. Not covered by undo_last." },
+    Tool { name: "notes_toggle_task", title: "Tick a note task", write: true,
+        input: || json!({ "type": "object", "properties": { "path": { "type": "string" }, "line": { "type": "integer" }, "done": { "type": "boolean" } }, "required": ["path", "line"] }),
+        desc: "Tick or untick a task: line from notes_read, done true/false (omit = flip). Not covered by undo_last." },
+    Tool { name: "notes_pin", title: "Pin a note as sticky", write: true,
+        input: || json!({ "type": "object", "properties": { "path": { "type": "string" }, "pinned": { "type": "boolean" } }, "required": ["path"] }),
+        desc: "Pin a note on the desktop as a sticky (pinned true, default) or unpin it (false). Takes no focus; nothing during a fullscreen game." },
     Tool { name: "undo_last", title: "Undo the last change", write: true, input: no_args,
-        desc: "Revert the most recent change made over MCP (up to 20 kept in memory until Ledge restarts). It only restores the parts that change touched and refuses if the user changed them since in Settings." },
+        desc: "Revert the most recent change made over MCP (up to 20, kept until Ledge restarts). Restores only the parts that change touched; refuses if the user changed them since in Settings." },
     Tool { name: "open_drawer", title: "Show the drawer", write: false,
         input: || json!({ "type": "object", "properties": { "tab": { "type": "string", "description": "Tab id to show (from layout_get), e.g. prace or osobni." } }, "additionalProperties": false }),
-        desc: "Open the Ledge drawer so the user sees the result (it does not take keyboard focus and does nothing while a fullscreen game runs). Optionally on a given tab." },
+        desc: "Open the Ledge drawer so the user sees the result (no keyboard focus; nothing during a fullscreen game). Optionally on a given tab." },
 ];
 
 /// Nástroje pro `rpc` nad stavem serveru a Ledge.
@@ -282,6 +304,15 @@ impl Handler<'_> {
                 let next = look::appearance_set(c, args)?;
                 Ok((next.clone(), trf!("Vzhled změněn (styl {}, motiv {}).", "Appearance changed (style {}, theme {}).", next.appearance.style, serde_json::to_value(next.appearance.theme).unwrap_or_default())))
             }),
+            "notes_list" => {
+                let root = host.notes_root().ok_or_else(notes::off)?;
+                Ok(pretty(&notes::list(&root, args, &crate::notes::now_local())))
+            }
+            "notes_read" => {
+                let root = host.notes_root().ok_or_else(notes::off)?;
+                Ok(pretty(&notes::read(&root, args)?))
+            }
+            "notes_create" | "notes_append" | "notes_toggle_task" | "notes_pin" => self.note_write(name, args),
             "undo_last" => self.undo(),
             "open_drawer" => host.open_drawer(args.get("tab").and_then(Value::as_str)),
             _ => Err(format!("Unknown tool: {name}")),
@@ -320,6 +351,32 @@ impl Handler<'_> {
         let label = summary.lines().next().unwrap_or_default().to_string();
         self.srv.undo.lock().push(Entry { label, parts });
         Ok(format!("{summary}\n{}", tr("(Vrátit jde přes undo_last.)", "(Revert with undo_last.)")))
+    }
+
+    /// Zápisy do poznámek: po jednom (zámek jako u configu), pak `Host::notes_changed`. Úložiště hlídají
+    /// funkce poznámek (cesta v kořeni, otisk obsahu) — `undo_last` je nepokrývá (popisy to říkají).
+    fn note_write(&self, name: &str, args: &Value) -> Result<String, String> {
+        let _one = self.srv.write.lock();
+        let host = self.host;
+        let root = host.notes_root().ok_or_else(notes::off)?;
+        let now = crate::notes::now_local();
+        let msg = match name {
+            "notes_create" => {
+                let cfg = host.config();
+                let projects: Vec<String> = cfg.projects.iter().map(|p| p.id.clone()).collect();
+                let kinds: Vec<String> = cfg.notes.kinds.iter().map(|k| k.id.clone()).collect();
+                notes::create(&root, args, &now, &projects, &kinds)?.1
+            }
+            "notes_append" => notes::append_to(&root, args, &now)?,
+            "notes_toggle_task" => notes::toggle(&root, args, &now)?,
+            _ => {
+                let path = notes::note_path(&root, args)?;
+                let pin = args.get("pinned").and_then(Value::as_bool).unwrap_or(true);
+                return host.pin_note(&path, pin);
+            }
+        };
+        host.notes_changed();
+        Ok(msg)
     }
 
     fn undo(&self) -> Result<String, String> {

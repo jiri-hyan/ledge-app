@@ -6,8 +6,15 @@
 //! je po minutách („1/4 min“): proužek se přepočítá jen při změně minuty (`mediatime::next_minute`),
 //! sekundy by ho budily každou sekundu i se zavřeným šuplíkem. Ozdoba ekvalizéru je jen statický znak
 //! (skutečný zvuk neznázorňuje); rozpohybovaná je jen v šuplíku (CSS, jen když hraje a je vidět).
+//!
+//! **Oblíbené** (`media.favorites`): playlisty a stanice jako dlaždice v kartě Právě hraje. Ledge
+//! nemá vlastní přehrávač — položka jen otevře odkaz (`spotify:…` nebo `http(s)://…`) v aplikaci, která
+//! ho obsluhuje; ovládání pak jde přes GSMTC jako dosud. Validace je tvarová (schéma, host, délka),
+//! disk ani síť se nezkoumají. UI má zrcadlo `favoriteSource` v `src/media/favorites.ts` (stejná tabulka
+//! v testu obou stran).
 
 use crate::config::StripItem;
+use crate::configerr::{FieldError, fe};
 use crate::media::MediaView;
 use crate::strip::{Rgba, Segment};
 use schemars::JsonSchema;
@@ -48,6 +55,95 @@ pub enum StripTime {
     Off,
 }
 
+/// Nejvíc oblíbených položek.
+pub const MAX_FAVORITES: usize = 24;
+/// Nejdelší název a odkaz oblíbené položky (znaky).
+pub const MAX_FAVORITE_NAME: usize = 60;
+pub const MAX_FAVORITE_URI: usize = 2048;
+
+/// Oblíbená položka (`media.favorites[]`): název na dlaždici a odkaz, který se otevře.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Favorite {
+    pub name: String,
+    /// `spotify:playlist:…` / `spotify:album:…` / … nebo `https://…` (Spotify, YouTube Music, jiný web)
+    pub uri: String,
+}
+
+/// Odkud oblíbená položka je (ikona dlaždice).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Source {
+    Spotify,
+    YtMusic,
+    /// jakýkoli jiný http(s) odkaz
+    Web,
+}
+
+/// Druhy objektů ve Spotify URI (`spotify:<druh>:<id>`).
+const SPOTIFY_KINDS: [&str; 7] = ["playlist", "album", "artist", "track", "show", "episode", "user"];
+
+/// Povolený odkaz oblíbené položky a jeho zdroj; `None` = nepovolený tvar (jiné schéma, mezera, jméno
+/// v adrese, prázdný host…). Čistá funkce — rozhoduje validace i otevření.
+pub(crate) fn source_of(uri: &str) -> Option<Source> {
+    if uri.is_empty() || uri.chars().count() > MAX_FAVORITE_URI || uri.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return None;
+    }
+    let lower = uri.to_ascii_lowercase();
+    if let Some(rest) = lower.strip_prefix("spotify:") {
+        let mut parts = rest.split(':');
+        let (kind, id) = (parts.next()?, parts.next()?);
+        let ok = parts.next().is_none() && SPOTIFY_KINDS.contains(&kind) && !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric());
+        return ok.then_some(Source::Spotify);
+    }
+    let rest = lower.strip_prefix("https://").or_else(|| lower.strip_prefix("http://"))?;
+    let authority = rest.split(['/', '?', '#']).next()?;
+    // jméno@host v adrese je klasický trik na zaměnění cíle
+    if authority.contains('@') {
+        return None;
+    }
+    let host = match authority.rsplit_once(':') {
+        Some((h, port)) if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) => h,
+        Some(_) => return None,
+        None => authority,
+    };
+    if host.is_empty() || host.starts_with('.') || host.starts_with('-') || !host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
+        return None;
+    }
+    Some(match host {
+        "open.spotify.com" | "play.spotify.com" | "spotify.link" => Source::Spotify,
+        "music.youtube.com" => Source::YtMusic,
+        _ => Source::Web,
+    })
+}
+
+/// Validace `media.favorites`: strop, neprázdný název, povolený odkaz. Chyba nese cestu k poli.
+pub(crate) fn validate(m: &MediaConfig) -> Result<(), FieldError> {
+    if m.favorites.len() > MAX_FAVORITES {
+        return Err(fe("media.favorites", trf!("media.favorites: nejvýš {MAX_FAVORITES} položek (je jich {}).", "media.favorites: at most {MAX_FAVORITES} items (there are {}).", m.favorites.len())));
+    }
+    for (i, f) in m.favorites.iter().enumerate() {
+        let n = i + 1;
+        if f.name.trim().is_empty() {
+            return Err(fe(format!("media.favorites.{i}.name"), trf!("Oblíbená položka č. {n} nemá název.", "Favorite no. {n} has no name.")));
+        }
+        if f.name.chars().count() > MAX_FAVORITE_NAME {
+            return Err(fe(format!("media.favorites.{i}.name"), trf!("Oblíbená položka „{}“: název je delší než {MAX_FAVORITE_NAME} znaků.", "Favorite “{}”: the name is longer than {MAX_FAVORITE_NAME} characters.", f.name)));
+        }
+        if source_of(&f.uri).is_none() {
+            return Err(fe(
+                format!("media.favorites.{i}.uri"),
+                trf!(
+                    "Oblíbená položka „{}“: odkaz musí být spotify:playlist:… (album, artist, track, show, episode) nebo http(s)://… bez jména v adrese.",
+                    "Favorite “{}”: the link must be spotify:playlist:… (album, artist, track, show, episode) or http(s)://… without a user name in the address.",
+                    f.name
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Sekce `media` v configu.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -59,11 +155,15 @@ pub struct MediaConfig {
     /// Ozdoba ekvalizéru u vzhledu `strip` (znak v proužku, animace v šuplíku). Jen dekorace — neukazuje
     /// skutečný zvuk. Výchozí true.
     pub equalizer: bool,
+    /// Oblíbené playlisty a stanice (dlaždice v kartě Právě hraje, nejvýš 24). Klik otevře odkaz
+    /// v Spotify / prohlížeči; Ledge nic nepřehrává sám. Výchozí prázdné (do souboru se nepíše).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub favorites: Vec<Favorite>,
 }
 
 impl Default for MediaConfig {
     fn default() -> Self {
-        Self { variant: Variant::Card, strip_time: StripTime::Auto, equalizer: true }
+        Self { variant: Variant::Card, strip_time: StripTime::Auto, equalizer: true, favorites: Vec::new() }
     }
 }
 
@@ -145,7 +245,7 @@ mod tests {
         v
     }
     fn cfg(variant: Variant, strip_time: StripTime, equalizer: bool) -> MediaConfig {
-        MediaConfig { variant, strip_time, equalizer }
+        MediaConfig { variant, strip_time, equalizer, favorites: Vec::new() }
     }
 
     #[test]
@@ -250,5 +350,85 @@ mod tests {
         assert_eq!(next_deadline(Some(&with_tl(mv("Song", "Band", "paused"))), &strip, true, NOW), None, "pauza");
         assert_eq!(next_deadline(Some(&mv("Song", "Band", "playing")), &strip, true, NOW), None, "bez timeline");
         assert_eq!(next_deadline(None, &strip, true, NOW), None);
+    }
+
+    /// Tabulka sdílená s `src/media/favorites.test.mjs` (zrcadlo `favoriteSource`): stejné řádky, stejné výsledky.
+    pub(crate) const SOURCE_TABLE: [(&str, Option<Source>); 24] = [
+        ("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M", Some(Source::Spotify)),
+        ("spotify:album:4aawyAB9vmqN3uQ7FjRGTy", Some(Source::Spotify)),
+        ("SPOTIFY:track:abc123", Some(Source::Spotify)),
+        ("spotify:playlist:", None),
+        ("spotify:playlist", None),
+        ("spotify:playlist:abc:play", None),
+        ("spotify:radio:abc", None),
+        ("spotify:playlist:a-b", None),
+        ("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=x", Some(Source::Spotify)),
+        ("https://music.youtube.com/playlist?list=PLabc", Some(Source::YtMusic)),
+        ("https://music.youtube.com:443/watch?v=1", Some(Source::YtMusic)),
+        ("https://www.youtube.com/watch?v=1", Some(Source::Web)),
+        ("http://radia.cz/stream", Some(Source::Web)),
+        ("https://user:pw@music.youtube.com/", None),
+        ("https://music.youtube.com@evil.example/", None),
+        ("https://", None),
+        ("https:///x", None),
+        ("ftp://example.com/a", None),
+        ("file:///C:/Windows/notepad.exe", None),
+        ("javascript:alert(1)", None),
+        (r"C:\Windows\notepad.exe", None),
+        ("https://example.com/a b", None),
+        ("", None),
+        ("https://exa_mple.com", None),
+    ];
+
+    #[test]
+    fn favorite_source_table() {
+        for (uri, want) in SOURCE_TABLE {
+            assert_eq!(source_of(uri), want, "{uri}");
+        }
+        let long = format!("https://example.com/{}", "a".repeat(MAX_FAVORITE_URI));
+        assert_eq!(source_of(&long), None, "příliš dlouhý odkaz");
+    }
+
+    fn fav(name: &str, uri: &str) -> Favorite {
+        Favorite { name: name.into(), uri: uri.into() }
+    }
+
+    #[test]
+    fn favorites_validation_table() {
+        let with = |f: Vec<Favorite>| MediaConfig { favorites: f, ..MediaConfig::default() };
+        let many: Vec<Favorite> = (0..=MAX_FAVORITES).map(|i| fav(&format!("n{i}"), "spotify:playlist:abc")).collect();
+        let full: Vec<Favorite> = (0..MAX_FAVORITES).map(|i| fav(&format!("n{i}"), "spotify:playlist:abc")).collect();
+        // (název, config, cesta chyby nebo None = platí)
+        let cases: Vec<(&str, MediaConfig, Option<&str>)> = vec![
+            ("bez oblíbených", MediaConfig::default(), None),
+            ("playlist a stanice", with(vec![fav("Ráno", "spotify:playlist:abc"), fav("Rádio", "https://music.youtube.com/watch?v=1")]), None),
+            ("na stropu", with(full), None),
+            ("přes strop", with(many), Some("media.favorites")),
+            ("prázdný název", with(vec![fav("  ", "spotify:playlist:abc")]), Some("media.favorites.0.name")),
+            ("dlouhý název", with(vec![fav(&"x".repeat(MAX_FAVORITE_NAME + 1), "spotify:playlist:abc")]), Some("media.favorites.0.name")),
+            ("cizí schéma", with(vec![fav("ok", "spotify:playlist:abc"), fav("zlé", "file:///C:/x.exe")]), Some("media.favorites.1.uri")),
+        ];
+        for (name, m, want) in cases {
+            let got = validate(&m).err();
+            assert_eq!(got.as_ref().and_then(|e| e.field.as_deref()), want, "{name}");
+        }
+    }
+
+    #[test]
+    fn favorites_serde_old_config_and_roundtrip() {
+        // starý config bez `favorites` = prázdné, do souboru se nepíše
+        let m: MediaConfig = serde_json::from_str(r#"{"variant":"vinyl"}"#).unwrap();
+        assert!(m.favorites.is_empty());
+        assert!(serde_json::to_value(&m).unwrap().get("favorites").is_none());
+        let m: MediaConfig = serde_json::from_str(r#"{"favorites":[{"name":"Ráno","uri":"spotify:playlist:abc"}]}"#).unwrap();
+        assert_eq!(m.favorites, vec![fav("Ráno", "spotify:playlist:abc")]);
+        let back: MediaConfig = serde_json::from_value(serde_json::to_value(&m).unwrap()).unwrap();
+        assert_eq!(back, m);
+        assert!(crate::config::schema_json().contains("\"favorites\""));
+        // chyba z validace configu nese cestu k poli
+        let mut c = crate::config::Config::default();
+        c.media.favorites = vec![fav("zlé", "javascript:alert(1)")];
+        let e = crate::config::validate_field(&c).unwrap_err();
+        assert_eq!(e.field.as_deref(), Some("media.favorites.0.uri"));
     }
 }

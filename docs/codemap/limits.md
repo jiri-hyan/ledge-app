@@ -2,7 +2,7 @@
 
 Karta Claude (a volitelně proužek) ukazuje spotřebu 5h a týdenního okna Claude s odpočtem resetu;
 v čase resetu okna, které dosáhlo 100 %, vyjede krátký peek. Zdroj = stavový řádek Claude Code přes
-průchozí wrapper Ledge, záložně `~/.claude/usage-log/latest.json`. Návod: `AGENTS.md` → „Limity Claude 5h / týden“.
+průchozí wrapper Ledge, záložně `~/.claude/usage-log/latest.json`. Návod: [agents/sessions.md](../agents/sessions.md) → „Limity Claude 5h / týden“.
 
 ## Soubory
 
@@ -13,7 +13,7 @@ průchozí wrapper Ledge, záložně `~/.claude/usage-log/latest.json`. Návod: 
 | `src-tauri/src/statuslinesetup.rs` | merge/unmerge/status klíče `statusLine` nad textem (`hooksetup::J`), uložený originál, zápis | `our_command`, `is_ours_cmd`, `merge`, `Merged`, `unmerge`, `status`, `Stored`, `original_command`, `store_path`, `load_stored`, `write_atomic`, `status_at`, `install_at`, `remove_at`, `StatusLineStatus` |
 | `src-tauri/src/limitslive.rs` | za běhu: cache obou souborů (mtime+délka), stav zapojení, watcher, připomínka (peek + FLASH), segment proužku | `tick`, `next_deadline`, `view`, `LimitsView`, `strip_segments`, `start_watch`, `invalidate`, `NOTICE_MS` |
 | `src-tauri/src/commands/limits.rs` | Tauri příkazy Nastavení | `statusline_status`, `statusline_install`, `statusline_remove` |
-| lepidlo | `main.rs` (`--statusline`), `lib.rs` (`statusline_main`, `limitslive::start_watch`, registrace), `snapshot.rs` (`Snapshot.limits`), `threads/emit.rs` (`tick` + `next_deadline` v `deadlines`), `stripview.rs` (`StripItem::Limits`), `config.rs` (`StripItem::Limits`, `ClaudeConfig.limits_reminder`), `hooksetup.rs` (`J::get/get_mut/str/obj`, `parse`, `render`, `read` jsou `pub(crate)`) | |
+| lepidlo | `main.rs` (`--statusline`), `lib.rs` (`statusline_main`, `limitslive::start_watch`, registrace), `snapshot.rs` (`Snapshot.limits`), `threads/emit.rs` (`tick` + `next_deadline` v `deadlines`), `stripview.rs` (`StripItem::Limits`), `config/*` (`StripItem::Limits`, `ClaudeConfig.limits_reminder`), `hooksetup.rs` (`J::get/get_mut/str/obj`, `parse`, `render`, `read` jsou `pub(crate)`) | |
 | `src/limits/model.ts` | čistá logika UI (stav okna, odpočet, pruh, barva) — test `model.test.mjs` | `winState`, `left`, `bar`, `level`, `pctText`, `otherDay` |
 | `src/limits/LimitsRow.tsx` · `LimitsPeek.tsx` · `StatusLineSetup.tsx` · `limits.css` | řádek v kartě Claude (pod hlavičkou) · peek resetu (v `cards/Peek.tsx` před `ReminderPeek`) · zapojení v `settings/panels/Claude.tsx` (kotva `claude.statusLine`, přepínač `claude.limitsReminder`) · styly `lim-*` | `LimitsRow`, `leftText`, `resetClock`, `LimitsPeek`, `StatusLineSetup` |
 | `src/i18n/en-limits.ts` | angličtina, klíče `sessions.limits.*` (Nastavení: `settings.f.claude.statusLine`, `.limitsReminder` v `settings/en.ts`) | |

@@ -28,7 +28,7 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 | `Settings.tsx` · `settings/*` · `fit.ts` | Nastavení → [settings.md](settings.md); `fit.ts` = strop výšky (`--drawer-max-h`) | `Settings` |
 | `notes/*` | poznámky → [notes.md](notes.md) | |
 | `api.ts` | most k Rustu: `api.*` = `invoke`, `on` = `listen`; mimo Tauri no-op | `api` `on` `inTauri` `call` |
-| `types.ts` | typy snapshotu a IPC (zrcadlo serde v Rustu); `api.ts` je re-exportuje | `Snapshot` `ProjectView` `ProcView` `SessionView` `NoteView` `UpdateView` `ViewMsg` |
+| `types/*` (`types.ts` = re-export) | typy snapshotu a IPC po oblastech (zrcadlo serde v Rustu); `api.ts` je re-exportuje | `Snapshot` `ProjectView` `ProcView` `SessionView` `NoteView` `UpdateView` `ViewMsg` |
 | `motion.ts` | pružiny → CSS `linear()` (simulace `theme/springs.ts`), clip-path morf, naskakování `[data-anim]`, měření; styl/rychlost z vzhledu; co se při otevření animuje, určuje `theme/openAnim.ts` | `spring` `collapsedClip` `bandClip` `FULL_CLIP` `OVERLAP` `measure` `preHide` `revealContent` `concealContent` `setMotion` `dur` |
 | `theme/*` | motivy a vzhled (→ [appearance.md](appearance.md)): `themes.ts` sady tokenů, `appearance.ts` čistá logika, `apply.ts` DOM | `THEMES` `appearanceVars` `applyAppearance` `initAppearance` `savedAppearance` |
 | `format.ts` | formátování času a čísel podle jazyka (`t`, `locale()`; čas 24h v obou) | `ago` `uptime` `fmtTime` `fmtDate` `dayNames` `isoWeek` `num` `pad2` |
@@ -124,5 +124,5 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 
 ## Co nečíst
 
-`types.ts` celý (hledej konkrétní typ), `motion.ts` (jen když měníš morf), `icons.tsx`, `Settings.tsx` mimo
+`types/*` celé (hledej konkrétní typ), `motion.ts` (jen když měníš morf), `icons.tsx`, `Settings.tsx` mimo
 sekci, kterou měníš.

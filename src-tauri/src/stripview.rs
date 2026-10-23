@@ -165,7 +165,7 @@ pub(crate) fn refresh_strip() {
         parts.push((item.clone(), segs));
     }
     let look = &cfg.appearance;
-    let palette = geom::palette(look.theme);
+    let palette = crate::appearance::pages::palette_for(look);
     let accent = geom::parse_hex(&look.accent).unwrap_or(palette.accent[0]);
     let mut segs = stripconf::compose(parts, &cfg.strip, ambient.is_some() || due_count > 0, |c| geom::readable(c.base(accent), &palette));
     if let Some(first) = &due_first {

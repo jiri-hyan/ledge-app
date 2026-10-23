@@ -52,7 +52,7 @@ registerDict("en", {
   "appearance.open.width": "Width",
   "appearance.open.widthHint": "How much room the drawer takes on your monitor.",
   "appearance.open.widthCustom": "Custom width {px} px right now (Advanced).",
-  "appearance.open.advHint": "Colours and accent, card layout, custom width, font, corners, opacity and blur",
+  "appearance.open.advHint": "Card layout, custom width, font, corners, opacity and blur",
   "appearance.density.hint": "More cards on screen, or more air.",
   "appearance.layout.pickHint": "How many columns the card grid has — the monitor preview above changes right away.",
   "appearance.width.customOff": "The preset from above applies now — turn on for exact px.",

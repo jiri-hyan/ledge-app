@@ -13,12 +13,16 @@ import { KindPicker } from "./kinds";
 import Markdown, { toggleLocal } from "./Markdown";
 import ProjectPicker from "./ProjectPicker";
 import RemindPicker from "./RemindPicker";
+import RemindSuggest from "./RemindSuggest";
 import { remindDefault } from "./remind";
 import { IconPin } from "../pin/icons";
+import { samePath } from "../pin/model";
 import { isPinned, togglePin } from "./pins";
 import { isArchivedPath, lifeActions, type LifeAction } from "./lifeactions";
 import { actionIcon, actionText } from "./lifelabels";
 import { runAction } from "./RowMenu";
+import NoteMenu from "./NoteMenu";
+import { listKey } from "./listkeys";
 import { editPath, notePreset, openExternal, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
 
 export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => void }) {
@@ -30,6 +34,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   const [preview, setPreview] = createSignal(false);
   const [conflict, setConflict] = createSignal(false);
   const [ready, setReady] = createSignal(false);
+  const [dropAsk, setDropAsk] = createSignal(false);
   const editing = () => editPath() !== null;
 
   // pole podle režimu (nová = koncept, úprava = rozepsaná úprava)
@@ -52,19 +57,41 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   createEffect(onChange([D.edText, D.edProj, D.edKind, D.edRemind], () => ready() && editing() && D.scheduleEdit(), { defer: true }));
   onCleanup(D.flushDraft);
 
-  // otevření: úprava (může přesměrovat na jinou rozepsanou), nebo koncept + předvyplnění
+  // pořadí otevírání: pozdě doběhlé čtení jiné poznámky nesmí přepsat editor (a uložení pak zapsat do cizí)
+  let seq = 0;
+  // vlastní ukládání běží: kontrola změny na disku (níž) počká, jinak by vlastní zápis hlásila jako cizí
+  let saving = 0;
+  let syncPending = false;
+  async function guarded<T>(f: () => Promise<T>): Promise<T> {
+    saving++;
+    try {
+      return await f();
+    } finally {
+      saving--;
+      if (!saving && syncPending) {
+        syncPending = false;
+        void runSync();
+      }
+    }
+  }
+
+  // otevření: úprava (rozepsaná úprava jiné poznámky počká v liště), nebo koncept + předvyplnění
   createEffect(onChange(editPath, async (path) => {
+    const id = ++seq;
     setReady(false);
     setConflict(false);
     setConfirm(false);
     setPreview(false);
+    setDropAsk(false);
     if (path) {
       const real = await D.openEdit(path);
+      if (real === undefined || id !== seq || !samePath(editPath() ?? "", path)) return;
       if (real === null) return p.onLeave();
-      if (real !== path) return setEditPath(real);
       if (D.edStale()) setConflict(true);
     } else {
+      D.cancelOpen();
       await D.restoreDraft();
+      if (id !== seq) return;
       const pre = notePreset();
       setNotePreset(null);
       if (pre) applyPreset(pre);
@@ -74,6 +101,32 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     }
     setReady(true);
   }));
+
+  /** Poznámka se mezitím změnila zvenku (psaní v lístku, sync z druhého PC): bez rozepsané úpravy se editor
+   *  rovnou aktualizuje (kurzor i posun zůstanou), s rozepsanou nabídne Načíst / Ponechat moje. */
+  async function runSync() {
+    if (!ready() || !editing()) return;
+    const id = seq;
+    const sel = ta ? { a: ta.selectionStart, b: ta.selectionEnd, top: ta.scrollTop } : null;
+    const r = await D.syncEdit();
+    if (id !== seq) return;
+    if (r === "conflict") setConflict(true);
+    else if (r === "reloaded" && sel) {
+      queueMicrotask(() => {
+        if (!ta) return;
+        const len = ta.value.length;
+        ta.setSelectionRange(Math.min(sel.a, len), Math.min(sel.b, len));
+        ta.scrollTop = sel.top;
+      });
+    }
+  }
+  createEffect(onChange(() => p.s.notesRev, () => (saving ? (syncPending = true) : void runSync()), { defer: true }));
+
+  /** Chip „Připomenout zítra 10:00?“: čas z textu do pole připomínky, kurzor zpět do textu. */
+  function pickSuggested(v: string) {
+    setRemind(v);
+    queueMicrotask(() => ta?.focus());
+  }
 
   /** Dlaždice projektu / záložka: rozepsaný koncept k JINÉMU projektu se nepřepisuje, jen otevře. */
   function applyPreset(pre: NotePreset) {
@@ -93,13 +146,13 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     } else if (!hasContent()) D.setDraftRemind("");
   }
 
-  async function save() {
-    if (busy() || !hasContent()) return;
+  async function save(pin = false) {
+    if (busy() || !ready() || !hasContent()) return;
     if (editing() && !D.edDirty()) return p.onLeave();
     setBusy(true);
     try {
-      if (editing()) await saveEdit(false);
-      else await saveNew();
+      if (editing()) await guarded(() => saveEdit(false));
+      else await saveNew(pin);
     } catch (e) {
       say(String(e), true);
     } finally {
@@ -107,9 +160,11 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     }
   }
 
-  async function saveNew() {
+  /** Uloží novou poznámku; `pin` ji rovnou připne na plochu jako lístek („Uložit a připnout“). */
+  async function saveNew(pin: boolean) {
     const sent = { ...D.draftMeta(), images: D.draftImgs() };
-    await api.noteCreate({ text: sent.text, project: sent.project || null, remind: sent.remind || null, images: D.b64Of(sent.images), kind: sent.kind || null });
+    const path = await api.noteCreate({ text: sent.text, project: sent.project || null, remind: sent.remind || null, images: D.b64Of(sent.images), kind: sent.kind || null });
+    if (pin && path) await togglePin(path);
     // mezitím dopsané (save je async) nezahodit: reset a zavření jen když se koncept nezměnil
     const same = D.draft() === sent.text && D.draftImgs() === sent.images && D.draftProj() === sent.project && D.draftRemind() === sent.remind;
     if (same) {
@@ -121,10 +176,12 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   async function saveEdit(copy: boolean) {
     const b = D.edBase();
     if (!b) return;
+    const id = seq;
     const out = await api.noteSave(
       { path: b.path, expectedHash: D.edHash(), body: D.edText(), project: D.edProj() || null, kind: D.edKind(), remind: D.edRemind() || null, images: D.b64Of(D.edImgs()) },
       copy,
     );
+    if (id !== seq) return; // mezitím se otevřela jiná poznámka — uložená zůstává uložená, editor se nesahá
     if (out?.outcome === "changed") return setConflict(true);
     D.resetEdit();
     say(copy ? t("notes.editor.savedCopy", "Uloženo jako nová poznámka vedle původní.") : t("notes.editor.saved", "Uloženo"));
@@ -153,17 +210,40 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     D.resetEdit();
     setConflict(false);
     if (!path) return;
+    const id = ++seq;
     const real = await D.openEdit(path);
+    if (real === undefined || id !== seq) return;
     if (real === null) p.onLeave();
+  }
+
+  /** „Ponechat moje“: zůstane rozepsaný text, otisk se přepne na soubor, jaký je teď — další uložení ho přepíše. */
+  async function keepMine() {
+    try {
+      if (await D.keepMine()) setConflict(false);
+    } catch (e) {
+      say(String(e), true);
+    }
+  }
+
+  /** Lišta „rozepsaná úprava jiné poznámky“: Otevřít ji (rozepsané tady se odloží místo ní) · Zahodit (až na druhý klik). */
+  function openParked() {
+    const path = D.resumeParked();
+    setDropAsk(false);
+    if (path && !samePath(editPath() ?? "", path)) setEditPath(path);
+  }
+  function dropParked() {
+    if (!dropAsk()) return setDropAsk(true);
+    setDropAsk(false);
+    D.dropParked();
   }
 
   async function toggleTask(line: number, checked: boolean) {
     const b = D.edBase();
     if (!editing() || !b || D.edDirty()) return setText(toggleLocal(text(), line, checked));
     try {
-      const out = await api.noteToggleTask(b.path, line, checked, D.edHash());
+      const out = await guarded(() => api.noteToggleTask(b.path, line, checked, D.edHash()));
       if (out?.outcome === "changed") setConflict(true);
-      else if (out) D.loadEditFrom(out.note);
+      else if (out && D.edBase() === b) D.loadEditFrom(out.note);
     } catch (e) {
       say(String(e), true);
     }
@@ -206,6 +286,9 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
 
   return (
     <div class="card note-page" ref={root} data-anim onPaste={(e) => pasteImagesHere(e)}>
+      <Show when={editing() && D.edBase()}>
+        {(b) => <div class="note-name" title={b().path}>{b().title || t("notes.imageOnly", "(jen obrázek)")}</div>}
+      </Show>
       <div class="note-top">
         <KindPicker kinds={p.s.noteKinds} value={kind()} onChange={setKind} />
         <div class="seg">
@@ -221,6 +304,9 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
               <IconPin />
             </button>
           )}
+        </Show>
+        <Show when={editing() && D.edBase()}>
+          {(b) => <NoteMenu path={b().path} body={text} />}
         </Show>
         <Show when={editing() && D.edBase()}>
           {(b) => (
@@ -243,6 +329,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
           placeholder={t("notes.editor.placeholder", "Co tě napadlo… Markdown: **tučně**, - [ ] úkol. Obrázek: Win+Shift+S a pak Ctrl+V.")}
           value={text()}
           onInput={(e) => setText(e.currentTarget.value)}
+          onKeyDown={(e) => listKey(e, e.currentTarget, setText)}
         />
       }>
         <div class="note-preview">
@@ -266,18 +353,33 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
       <Show when={conflict()}>
         <div class="banner warn">
           <IconShield />
-          <span>{t("notes.editor.conflict", "Poznámka se mezitím změnila (nejspíš přišla synchronizace z druhého PC). Tvoje úprava zůstala tady.")}</span>
+          <span>{t("notes.editor.conflict", "Poznámka se mezitím změnila (lístek nebo druhé PC). Tvoje úprava zůstala tady.")}</span>
           <button class="mini" onClick={reload}>{t("notes.editor.reload", "Načíst znovu")}</button>
-          <button class="mini ok" onClick={() => saveEdit(true).catch((e) => say(String(e), true))}>{t("notes.editor.saveCopy", "Uložit jako kopii")}</button>
+          <button class="mini" onClick={keepMine}>{t("notes.editor.keepMine", "Ponechat moje")}</button>
+          <button class="mini ok" onClick={() => guarded(() => saveEdit(true)).catch((e) => say(String(e), true))}>{t("notes.editor.saveCopy", "Uložit jako kopii")}</button>
         </div>
       </Show>
+      <Show when={D.parkedTop()}>
+        {(pk) => (
+          <div class="banner warn">
+            <IconShield />
+            <span>{t("notes.editor.parked", "Máš rozepsanou úpravu «{title}».", { title: pk().base.title || t("notes.imageOnly", "(jen obrázek)") })}</span>
+            <button class="mini ok" onClick={openParked}>{t("notes.editor.parkedOpen", "Otevřít ji")}</button>
+            <button class="mini" classList={{ danger: dropAsk() }} onClick={dropParked}>{dropAsk() ? t("notes.editor.parkedDropSure", "Opravdu zahodit?") : t("notes.editor.parkedDrop", "Zahodit")}</button>
+          </div>
+        )}
+      </Show>
+      <RemindSuggest text={text} remind={remind} onPick={pickSuggested} />
       <div class="note-bar">
         <ProjectPicker projects={p.s.projects} value={proj()} onChange={setProj} label={t("notes.project", "Projekt")} />
         <RemindPicker value={remind()} onChange={setRemind} label={t("notes.editor.remind", "Připomenout")} ref={(el) => (remindBtn = el)} />
         <Show when={confirm()} fallback={<span class="hint">{editing() ? t("notes.editor.hintEdit", "Ctrl+Enter uloží · Esc zpět") : t("notes.editor.hintNew", "Ctrl+Enter uloží · Esc zavře")}</span>}>
           <span class="hint warn">{editing() ? t("notes.editor.discardEdit", "Zahodit úpravy?") : t("notes.editor.discardNew", "Zahodit rozepsanou poznámku?")} {t("notes.editor.discardHint", "Esc znovu = zahodit")}</span>
         </Show>
-        <button class="btn pri" disabled={busy() || !hasContent() || (editing() && !D.edDirty())} onClick={save}>{t("notes.editor.save", "Uložit")}</button>
+        <Show when={!editing()}>
+          <button class="btn note-pinsave" disabled={busy() || !ready() || !hasContent()} title={t("notes.editor.savePinTitle", "Uloží poznámku a rovnou ji připne na plochu jako lístek")} onClick={() => save(true)}><IconPin /> {t("notes.editor.savePin", "Uložit a připnout")}</button>
+        </Show>
+        <button class="btn pri" disabled={busy() || !ready() || !hasContent() || (editing() && !D.edDirty())} onClick={() => save()}>{t("notes.editor.save", "Uložit")}</button>
       </div>
     </div>
   );

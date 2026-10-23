@@ -20,7 +20,7 @@ zapnutí i přímo z palety). Cituj symbolem, ne číslem řádku.
 | `src/palette/Palette.tsx` · `more.ts` · `items.ts` | režim `v:` (seznam místo běžných výsledků), Enter / Ctrl+P / Ctrl+Del, patička se zkratkami · `clipCommand`, `clipItems` · `Section` `"clip"`, `PItem.clip` | `chooseClip` `clipKey` |
 | `src/i18n/en-cliphist.ts` | angličtina `palette.clip.*`, `settings.clip.*`, `settings.f.clipboard.*` | |
 
-Lepidlo: `config.rs` (`Config.clipboard` + `cliphist::validate`), `settings.rs` (změna `clipboard` →
+Lepidlo: `config/*` (`Config.clipboard` + `cliphist::validate`), `settings.rs` (změna `clipboard` →
 `cliphist::sync`), `lib.rs` (start `cliphist::sync`, `generate_handler!`), `Cargo.toml` (feature
 `Win32_System_RemoteDesktop`), `settings/labels.ts` (`clipboard.*`), `panels/Personal.tsx` (`<ClipSettings />`),
 `settings/settings.test.mjs` (panel `suplik` vykresluje i `ClipSettings.tsx`), `i18n/load.ts`.

@@ -23,7 +23,7 @@ import AppearanceClosed from "./AppearanceClosed";
 import AppearanceHover from "./AppearanceHover";
 import AppearanceOpen from "./AppearanceOpen";
 import AppearanceMotion from "./AppearanceMotion";
-import { Seg, type Ap } from "./apUi";
+import { Seg, peek, withThemeDraft, type Ap } from "./apUi";
 import "./appearance.css";
 
 /** Názvy jazyků vždy v jejich vlastním jazyce (ať se k češtině vrátí i ten, kdo anglicky neumí). */
@@ -54,8 +54,9 @@ export default function AppearancePanel(p: PanelProps) {
     p.setCfg("appearance", k, structuredClone(v));
   }
 
-  // náhled na celém šuplíku hned; odchod bez uložení → zpět uložený vzhled
-  createEffect(() => applyAppearance(a()));
+  // náhled na celém šuplíku hned (najetí na dlaždici = dočasný náhled `peek`, rozpracovaný vlastní motiv z editoru);
+  // odchod bez uložení → zpět uložený vzhled
+  createEffect(() => applyAppearance(peek() ?? withThemeDraft(a())));
   onCleanup(() => applyAppearance(savedAppearance()));
 
   // skok z hledání / odjinud: přepnout krok a rozbalit jeho Pokročilé

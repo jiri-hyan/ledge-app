@@ -50,6 +50,12 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-bar .push { margin-left: auto; }
 
 /* ---------- editor ---------- */
+.note-sug { display: flex; align-items: center; gap: 2px; margin: -4px 0 -2px; }
+.note-sug-go { height: 24px; padding: 0 10px; border-radius: 12px; font-size: calc(12px * var(--fz)); color: var(--t2); background: var(--card); border: 1px dashed var(--line-2); transition: background var(--dur-1), color var(--dur-1); }
+.note-sug-go:hover { color: var(--t1); background: var(--card-2); }
+.note-sug-x { width: 22px; height: 22px; border-radius: var(--r-xs); display: grid; place-items: center; color: var(--t3); }
+.note-sug-x:hover { color: var(--t1); background: var(--card-2); }
+.note-sug-x svg { width: 12px; height: 12px; }
 .note-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .note-top .kind-pills { flex: 1; min-width: 0; }
 .kind-pills { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -122,13 +128,9 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .md pre code { background: none; padding: 0; white-space: pre; }
 .md ul, .md ol { padding-left: 20px; }
 .md li { margin: 2px 0; }
-.md li.d1 { margin-left: 18px; }
-.md li.d2 { margin-left: 36px; }
-.md li.d3 { margin-left: 54px; }
-.md li[data-task] { list-style: none; margin-left: -20px; display: flex; gap: 8px; align-items: flex-start; }
-.md li[data-task].d1 { margin-left: -2px; }
-.md li[data-task].d2 { margin-left: 16px; }
-.md li[data-task].d3 { margin-left: 34px; }
+.md li > ul, .md li > ol { margin-top: 2px; }
+.md li[data-task] { list-style: none; margin-left: -20px; display: flex; flex-wrap: wrap; gap: 0 8px; align-items: flex-start; }
+.md li[data-task] > ul, .md li[data-task] > ol { flex-basis: 100%; padding-left: 43px; }
 .md-check { width: 15px; height: 15px; margin-top: 3px; border-radius: 4px; border: 1.5px solid var(--line-2); flex-shrink: 0; position: relative; cursor: pointer; transition: background var(--dur-1), border-color var(--dur-1); }
 .md-check:hover { border-color: var(--t2); }
 .md-check.on { background: var(--green); border-color: transparent; }
@@ -158,3 +160,5 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-archive-title { font-size: var(--fs-ui); }
 /* tlačítka akcí v liště editoru (Splnit · Archivovat · Smazat) */
 .note-life-del:hover { color: var(--red); }
+.note-name { font-size: calc(13px * var(--fz)); font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-pinsave svg { width: 14px; height: 14px; }

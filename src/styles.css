@@ -269,6 +269,33 @@ html[data-style="brutal"] .btn { text-transform: uppercase; letter-spacing: 0.04
 /* Pastel: kulatější štítky */
 html[data-style="pastel"] .pill { padding: 3px 9px; }
 
+/* Aurora: tři stuhy polární záře nahoře (tyrkysová, akcent, fialová) a barevná linka dole — statické přechody */
+html[data-style="aurora"] .shell:not([data-glass="on"]) {
+  background:
+    radial-gradient(640px 170px at 16% 0%, color-mix(in srgb, var(--teal) 20%, transparent), transparent 72%),
+    radial-gradient(560px 190px at 58% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 72%),
+    radial-gradient(520px 170px at 98% 4%, color-mix(in srgb, var(--accent-2) 24%, transparent), transparent 72%),
+    var(--tint-solid);
+}
+html[data-style="aurora"] .shell::after { left: 6%; right: 6%; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--teal), var(--accent), var(--accent-2)); opacity: 0.8; }
+/* Mono: bez stínů a podkladů karet, tenká linka přes celou šířku, jemné rozšířené verzálky nadpisů */
+html[data-style="mono"] .shell::after { left: 0; right: 0; height: 1px; border-radius: 0; background: var(--line-2); opacity: 1; }
+html[data-style="mono"] .card { background: transparent; box-shadow: none; }
+html[data-style="mono"] .card h4 { font-weight: 500; letter-spacing: 0.16em; }
+/* Retro: jemné řádky obrazovky (statický přechod, nic se nehýbe) a záře nadpisů; linka dole z „pixelů“ */
+html[data-style="retro"] .shell::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(0deg, color-mix(in srgb, var(--t1) 3.5%, transparent) 0 1px, transparent 1px 3px);
+}
+html[data-style="retro"] .card h4 { text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent); }
+html[data-style="retro"] .shell::after { left: 0; right: 0; height: 3px; border-radius: 0; background: repeating-linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 12px); opacity: 1; }
+
+/* Přepnutí záložky s vlastním vzhledem (`theme/apply.ts` `setActivePage`): barvy plynule přejdou přes tokeny.
+   Atribut je na <html> jen ~450 ms po přepnutí, v klidu žádný přechod (idle CPU); jen barvy, žádný filtr. */
+html[data-look-shift] .shell, html[data-look-shift] .shell * {
+  transition: background-color var(--dur-3) var(--ease), border-color var(--dur-3) var(--ease), color var(--dur-3) var(--ease), fill var(--dur-3) var(--ease);
+}
+
 /* CSS animace a přechody pryč (systémové „omezit pohyb“ nebo appearance.motion.style = none);
    morf šuplíku je Web Animations v motion.ts — styl „none“ ho zkrátí na 0 ms tam */
 @media (prefers-reduced-motion: reduce) {
