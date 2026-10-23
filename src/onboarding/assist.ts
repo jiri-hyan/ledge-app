@@ -36,8 +36,6 @@ export async function chooseClaude(): Promise<void> {
   }
 }
 
-export const chooseManual = () => setAssist("mode", "manual");
-
 /** Vypnout připojení (kdykoli jde i v Nastavení → Claude (MCP)). */
 export async function disableMcp(): Promise<void> {
   if (assist.busy) return;

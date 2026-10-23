@@ -15,7 +15,7 @@ const SHARED = {
   card: { files: ["styles.css", "settings/panels/appearance.css"], why: "náhled vzhledu kreslí skutečné karty (`.ap .card`)" },
   seg: { files: ["styles.css", "settings/panels/appearance.css"], why: "náhled vzhledu kreslí skutečný přepínač (`.ap-head .seg`)" },
   row: { files: ["styles.css", "sessions.css"], why: "řádek sezení je varianta řádku karty (`.row.sess`)" },
-  mini: { files: ["styles.css", "notes/notes.css", "settings.css"], why: "varianty malého tlačítka: `.mini.on` (výběr připomínky), `.mini.danger` (potvrzení)" },
+  mini: { files: ["styles.css", "notes/notes.css"], why: "varianty malého tlačítka: `.mini.on` (výběr připomínky), `.mini.danger` (potvrzení)" },
   banner: { files: ["styles.css", "notes/notes.css"], why: "varianta hlášky `.banner.warn` v editoru poznámky" },
   // strop výšky (fit.ts) je průřezový: ořízne obsah šuplíku a nechá posouvat jen hlavní plochy stránek
   content: { files: ["styles.css", "fit.css"], why: "fit.css doplní obsahu šuplíku strop výšky" },
@@ -25,11 +25,10 @@ const SHARED = {
   "note-page": { files: ["notes/notes.css", "fit.css"], why: "posuvná plocha editoru poznámky" },
   st: { files: ["settings.css", "fit.css"], why: "Nastavení se vejde pod strop výšky" },
   // okno lístku na plochu (`pin.html`) je samostatná stránka bez styles.css a notes.css: stejné třídy, vlastní vzhled
-  md: { files: ["notes/notes.css", "pin/pin.css"], why: "HTML náhledu dělá Rust `md::to_html` pro šuplík i lístek; lístek ho kreslí svými tokeny" },
+  md: { files: ["notes/notes.css", "pin/pin.css", "notes/mdtask.css"], why: "HTML náhledu dělá Rust `md::to_html` pro šuplík i lístek; lístek ho kreslí svými tokeny" },
   "md-alt": { files: ["notes/notes.css", "pin/pin.css"], why: "jako `.md` — zástupný text obrázku z `notes/Markdown.tsx`" },
-  "md-check": { files: ["notes/notes.css", "pin/pin.css"], why: "jako `.md` — zaškrtávátko úkolu z `md::to_html`" },
+  "md-check": { files: ["notes/notes.css", "pin/pin.css", "notes/mdtask.css"], why: "jako `.md` — zaškrtávátko úkolu z `md::to_html`" },
   "md-link": { files: ["notes/notes.css", "pin/pin.css"], why: "jako `.md` — odkaz z `md::to_html`" },
-  toast: { files: ["styles.css", "pin/pin.css"], why: "hlášky `ui/toast.tsx` i v okně lístku (bez styles.css)" },
 };
 
 // Třídy, které kód přiděluje, ale žádné CSS pravidlo je nezmiňuje: jen JS/test háčky nebo stav bez vlastního

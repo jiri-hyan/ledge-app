@@ -12,6 +12,7 @@ import { t } from "../i18n";
 import { beginEdit, change, draft, dropTab, editing, editPage, offerUndo, renameAsk, setEditPage, setRenameAsk } from "./edit";
 import { addPage, MAX_PAGES, movePage, normalizeLayout, PAGE_ICONS, pageNameError, pageOf, removePage, renamePage, restorePage, WORK, PERSONAL, type LayoutPage } from "./model";
 import { pageName } from "./text";
+import { navTarget } from "../ui/popnav";
 import { NEW_TAB } from "./dnd";
 import { previewOrder } from "./drag";
 import { flipEls } from "./flip";
@@ -121,6 +122,17 @@ export default function Tabs(p: { s: Snapshot }) {
   }
   /** Alt + ← → na záložce v úpravách: o místo vedle; fokus zůstane na záložce */
   function key(e: KeyboardEvent, id: string, i: number) {
+    // bez Alt: šipky / Home / End přesouvají fokus mezi záložkami (výběr dělá Enter / mezerník — role tablist)
+    if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+      const nav = ({ ArrowLeft: "ArrowUp", ArrowRight: "ArrowDown", Home: "Home", End: "End" } as Record<string, string>)[e.key];
+      if (!nav) return;
+      const tabs = Array.from(box.querySelectorAll<HTMLElement>(":scope > .lay-tab > button[data-tab]"));
+      const to = navTarget(nav, tabs.findIndex((x) => x.dataset.tab === id), tabs.length);
+      if (to === null) return;
+      e.preventDefault();
+      tabs[to]?.focus();
+      return;
+    }
     if (!editing() || !e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     const to = i + (e.key === "ArrowLeft" ? -1 : 1);
     if (to < 0 || to >= l().pages.length) return;
@@ -132,7 +144,7 @@ export default function Tabs(p: { s: Snapshot }) {
 
   return (
     <Show when={editing() || l().pages.length > 1}>
-      <div class="seg lay-tabs" classList={{ editing: editing(), dragging: !!drag() }} role="group" aria-label={t("cards.head.tab", "Záložka")} ref={box}>
+      <div class="seg lay-tabs" classList={{ editing: editing(), dragging: !!drag() }} role="tablist" aria-label={t("cards.head.tab", "Záložka")} ref={box}>
         <For each={l().pages}>
           {(pg, i) => (
             <span class="lay-tab" data-page={pg.id} style={{ order: String(view().indexOf(pg.id)) }} classList={{ drop: dropTab() === pg.id, "lp-gap": drag()?.id === pg.id }}>
@@ -140,7 +152,8 @@ export default function Tabs(p: { s: Snapshot }) {
                 <button
                   data-tab={pg.id}
                   classList={{ on: cur() === pg.id }}
-                  aria-pressed={cur() === pg.id}
+                  role="tab"
+                  aria-selected={cur() === pg.id}
                   title={editing() ? t("cards.layout.tab.editTitle", "{name} — dvojklik přejmenuje, tažení změní pořadí (Alt + ← →)", { name: pageName(pg) }) : title(pg, i())}
                   onPointerDown={(e) => td.down(e, pg.id, i())}
                   onClick={() => go(pg.id)}

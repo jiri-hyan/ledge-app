@@ -5,7 +5,7 @@ import { createSignal, onMount, Show } from "solid-js";
 import { api, type StatusLineStatus } from "../api";
 import { t } from "../i18n";
 import { say, sayError } from "../ui/toast";
-import { Confirm } from "../settings/fields/Confirm";
+import { Confirm } from "../ui/Confirm";
 
 const stateText = (st: StatusLineStatus["state"]) =>
   st === "full"

@@ -6,8 +6,9 @@ import { api, type HooksStatus } from "../../api";
 import { t } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
 import { useSettings } from "../ctx";
-import { Confirm } from "../fields/Confirm";
+import { Confirm } from "../../ui/Confirm";
 import { Num, Seg, Slider, Toggle } from "../fields/controls";
+import { Advanced } from "../fields/Advanced";
 import { PanelHead, Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
 import StatusLineSetup from "../../limits/StatusLineSetup";
@@ -42,7 +43,7 @@ function HooksSetup() {
   }
   const detail = (h: HooksStatus) => (h.error ? h.error : h.state === "partial" ? t("settings.hooks.missing", "Chybí: {m}", { m: h.missing.join(", ") }) : h.path);
   return (
-    <Row id="claude.hooks" stack>
+    <Row id="claude.hooks" stack live>
       <Show when={st()} fallback={<div class="st-skel" style={{ width: "60%" }} />}>
         {(h) => (
           <>
@@ -84,7 +85,7 @@ export default function ClaudePanel(p: PanelProps) {
     <>
       <PanelHead title={t("settings.nav.claude", "Claude")} desc={t("settings.claude.desc", "Ledge ukazuje session Claude Code a jejich žádosti o povolení. Povolit smí vždy jen člověk.")} />
       <Section title={t("settings.claude.approve", "Schvalování")}>
-        <Row id="claude.enabled" hint={t("settings.claude.enabled.hint", "Žádosti Clauda o povolení se objeví v šuplíku (most na 127.0.0.1:{port})", { port: c.cfg.claude.port })}>
+        <Row id="claude.enabled">
           <Toggle path="claude.enabled" label={fieldLabel("claude.enabled")} />
         </Row>
         <Row id="claude.approvalTimeoutS" dim={!c.cfg.claude.enabled}>
@@ -93,22 +94,19 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.toast" dim={!c.cfg.claude.enabled}>
           <Toggle path="claude.toast" label={fieldLabel("claude.toast")} />
         </Row>
-        <Row id="claude.port" dim={!c.cfg.claude.enabled}>
-          <Num path="claude.port" min={1024} max={65535} label={fieldLabel("claude.port")} width="84px" />
-        </Row>
         <HooksSetup />
       </Section>
       <McpSettings />
       <QuestionsSection s={p.s} />
       <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
-        <Row id="claude.statusLine" stack>
+        <Row id="claude.statusLine" stack live>
           <StatusLineSetup />
         </Row>
         <Row id="claude.limitsReminder">
           <Toggle path="claude.limitsReminder" label={fieldLabel("claude.limitsReminder")} />
         </Row>
       </Section>
-      <Section title={t("settings.claude.costs", "Útrata (odhad v cenách API)")}>
+      <Section title={t("settings.claude.costs", "Hodnota v cenách API")}>
         <Row id="claude.costs">
           <Toggle path="claude.costs" label={fieldLabel("claude.costs")} />
         </Row>
@@ -121,7 +119,7 @@ export default function ClaudePanel(p: PanelProps) {
             options={[
               { v: "off", label: t("settings.claude.enforce.off", "Nehlídat") },
               { v: "notify", label: t("settings.claude.enforce.notify", "Jen ukázat (doporučeno)") },
-              { v: "block", label: t("settings.claude.enforce.block", "Postrčit session") },
+              { v: "block", label: t("settings.claude.enforce.block", "Vrátit session k dokončení") },
             ]}
           />
           <small class="st-note">
@@ -133,6 +131,13 @@ export default function ClaudePanel(p: PanelProps) {
           </small>
         </Row>
       </Section>
+      <Advanced id="claude" hint={t("settings.claude.adv.hint", "Port pro spojení s Claude Code")}>
+        <Section>
+          <Row id="claude.port" dim={!c.cfg.claude.enabled}>
+            <Num path="claude.port" min={1024} max={65535} label={fieldLabel("claude.port")} width="84px" />
+          </Row>
+        </Section>
+      </Advanced>
     </>
   );
 }

@@ -110,8 +110,8 @@ impl Store {
             let Some(old) = map.keys().find(|x| **x != k).cloned() else { break };
             map.remove(&old);
         }
-        let text = serde_json::to_string_pretty(&*map).map_err(|e| e.to_string())?;
-        let fail = |e: std::io::Error| trf!("Souhlas nejde uložit: {e}", "Can't save the consent: {e}");
+        let text = serde_json::to_string_pretty(&*map).map_err(|e| crate::errors::json(tr("Souhlas nejde uložit", "Can't save the consent"), &e))?;
+        let fail = |e: std::io::Error| crate::errors::io(tr("Souhlas nejde uložit", "Can't save the consent"), &e);
         if let Some(dir) = file.parent() {
             std::fs::create_dir_all(dir).map_err(fail)?;
         }

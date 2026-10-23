@@ -8,6 +8,7 @@ import { say, sayError } from "../ui/toast";
 import type { ClaudeInfo, FoundApp, FoundRepo, OnboardingPatch, ThemeOption } from "../types";
 import { ob } from "./api";
 import { linkSuggestions, appProject, defaultRepoSelection, type StepId } from "./logic";
+import { visibleSteps } from "./plan";
 
 type Load = "idle" | "loading" | "ready" | "error";
 
@@ -73,6 +74,12 @@ export function resetWizard() {
   setWiz(fresh());
 }
 
+/** Claude Code je na tomhle počítači (detekce doběhla a našla ho) — jen tak se ukáže krok Claude. */
+export const claudeInstalled = () => wiz.claudeState === "ready" && wiz.claude?.installed === true;
+
+/** Kroky, které se tomuhle uživateli ukážou (`plan.ts`) — jediný zdroj pro hlavičku, Vítej i Wizard. */
+export const steps = () => visibleSteps({ themesReady: wiz.themesState === "ready", themeCount: wiz.themes.length, claudeInstalled: claudeInstalled() });
+
 // ---------- načítání (běží na pozadí od otevření průvodce, ať kroky nečekají) ----------
 
 export async function prefetch() {
@@ -81,8 +88,8 @@ export async function prefetch() {
     setWiz({ trigger: cfg.drawer?.trigger ?? "hover", lang: cfg.ui?.lang === "en" ? "en" : "cs", theme: cfg.appearance?.theme ?? null });
   }
   void loadThemes();
+  void loadClaude(); // hned: podle něj se ukáže krok Claude a karta na Práci
   await loadRepos();
-  void loadClaude();
   await loadApps();
 }
 
@@ -227,10 +234,12 @@ export async function applyStep(id: StepId): Promise<boolean> {
   }
 }
 
-/** Konec (Hotovo i Přeskočit): `onboarding.done = true`, ať se průvodce sám znovu neukáže. */
+/** Konec (Hotovo i Přeskočit průvodce): `onboarding.done = true`, ať se průvodce sám znovu neukáže. Znovu ho
+ *  spustí `startWizard()` (`state.ts`, Nastavení → Začínáme). */
 export async function finish(): Promise<boolean> {
   try {
-    await ob.apply({ done: true });
+    // `claude`: průvodce našel Claude Code → Rust přidá na Práci kartu Claude (jen při prvním dokončení)
+    await ob.apply({ done: true, claude: claudeInstalled() });
     return true;
   } catch (e) {
     sayError(e);

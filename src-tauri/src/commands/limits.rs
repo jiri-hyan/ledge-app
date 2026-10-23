@@ -18,7 +18,7 @@ pub(crate) fn statusline_status() -> Result<StatusLineStatus, String> {
 #[tauri::command]
 pub(crate) fn statusline_install() -> Result<StatusLineStatus, String> {
     let path = settings()?;
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = std::env::current_exe().map_err(|e| crate::errors::io(crate::i18n::tr("Stavový řádek nejde zapojit", "Can't set up the status line"), &e))?;
     let ours = statuslinesetup::our_command(&exe, crate::statusline::git_bash().is_some());
     statuslinesetup::install_at(&path, &statuslinesetup::store_path(), &ours)?;
     log(&format!("stavový řádek Ledge zapojen do {} ({ours})", path.display()));

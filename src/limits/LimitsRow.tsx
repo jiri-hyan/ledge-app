@@ -3,9 +3,9 @@
 // Bez dat „—“; starý vzorek „staré (před X min)“; po resetu procenta neznáme → „obnoveno“.
 import { For, Show } from "solid-js";
 import type { LimitsView, Snapshot } from "../api";
-import { dayNames, fmtTime } from "../format";
+import { dayNames, fmtClock } from "../format";
 import { t } from "../i18n";
-import { bar, left, level, otherDay, pctText, winState, type LimitWindow } from "./model";
+import { bar, left, level, otherDay, pctText, resetHint, winState, type LimitWindow } from "./model";
 import "./limits.css";
 import { gotoSettingsPanel } from "../palette/goto";
 
@@ -21,10 +21,10 @@ export function leftText(resetsAt: number | null | undefined, now: number): stri
 /** Čas resetu místně: „14:30“, jiný den „pátek 14:30“. */
 export function resetClock(ms: number, now: number): string {
   const d = new Date(ms);
-  return otherDay(ms, now) ? `${dayNames()[d.getDay()]} ${fmtTime(d)}` : fmtTime(d);
+  return otherDay(ms, now) ? `${dayNames()[d.getDay()]} ${fmtClock(d)}` : fmtClock(d);
 }
 
-function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now: number }) {
+function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now: number; hot?: boolean }) {
   const st = () => winState(p.w, p.lv.at, p.now, p.lv.staleMs);
   const pct = () => {
     const s = st();
@@ -34,6 +34,8 @@ function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now
     const r = p.w?.resetsAt;
     return r != null && st().kind !== "reset" ? t("sessions.limits.resetsTip", "Reset {when}", { when: resetClock(r, p.now) }) : undefined;
   };
+  /** 5h okno je skoro plné a Claude právě pracuje: čas resetu výrazně (`resetHint`) */
+  const hot = () => p.hot && resetHint(p.w, p.lv.at, p.now, p.lv.staleMs, true) !== null;
   return (
     <div class="lim-row" classList={{ "lim-old": st().kind === "stale" }} title={tip()}>
       <span class="lim-name">{p.label}</span>
@@ -43,10 +45,12 @@ function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now
         </Show>
       </span>
       <span class="lim-pct">{pct() !== null ? `${pctText(pct()!)} %` : st().kind === "reset" ? t("sessions.limits.reset", "obnoveno") : "—"}</span>
-      <span class="lim-when">
+      <span class="lim-when" classList={{ "lim-hot": hot() }}>
         <Show when={st().kind === "stale"} fallback={
           <Show when={p.w?.resetsAt != null && st().kind === "fresh"}>
-            {resetClock(p.w!.resetsAt!, p.now)} · {leftText(p.w!.resetsAt, p.now)}
+            <Show when={hot()} fallback={<>{resetClock(p.w!.resetsAt!, p.now)} · {leftText(p.w!.resetsAt, p.now)}</>}>
+              {t("sessions.limits.resetAt", "reset v {clock}", { clock: resetClock(p.w!.resetsAt!, p.now) })} · {leftText(p.w!.resetsAt, p.now)}
+            </Show>
           </Show>
         }>
           {t("sessions.limits.stale", "staré (před {n} min)", { n: (st() as { ageMin: number }).ageMin })}
@@ -58,9 +62,11 @@ function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now
 
 export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () => void }) {
   const lv = () => p.s.limits;
+  /** pracuje aspoň jedna session (`SessionView.status`) — jen pak má smysl zvýrazňovat reset 5h okna */
+  const working = () => p.s.sessions.some((x) => x.status === "working");
   const rows = () => {
     const l = lv();
-    return l ? [{ label: "5h", w: l.fiveHour }, { label: t("sessions.limits.week", "týden"), w: l.sevenDay }] : [];
+    return l ? [{ label: "5h", w: l.fiveHour, hot: working() }, { label: t("sessions.limits.week", "týden"), w: l.sevenDay, hot: false }] : [];
   };
   return (
     <Show when={lv()}>
@@ -68,14 +74,14 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
         <Show when={l().at != null} fallback={
           <Show when={l().statusLine === "none" || l().statusLine === "foreign"} fallback={
             <Show when={l().statusLine === "full"}>
-              <div class="lim-empty">{t("sessions.limits.waiting", "Limity 5h / týden: — (čekám na první odpověď Clauda)")}</div>
+              <div class="lim-empty">{t("sessions.limits.waiting", "Limity se ukážou po první odpovědi Clauda.")}</div>
             </Show>
           }>
             <button class="hint-link" onClick={() => { p.onSettings(); gotoSettingsPanel("f-claude.statusLine"); }}>{t("sessions.limits.connect", "Zapojit stavový řádek pro limity 5h / týden")}</button>
           </Show>
         }>
           <div class="lim">
-            <For each={rows()}>{(r) => <LimitBar label={r.label} w={r.w} lv={l()} now={p.now} />}</For>
+            <For each={rows()}>{(r) => <LimitBar label={r.label} w={r.w} lv={l()} now={p.now} hot={r.hot} />}</For>
           </div>
         </Show>
       )}

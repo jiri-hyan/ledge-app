@@ -64,7 +64,7 @@ pub(crate) fn maybe_refresh(opening: bool) {
     let (want, accounts) = {
         let c = core();
         let cfg = c.cfg.read();
-        let visible = crate::layout::page_has(&cfg.layout, &c.mode.lock(), "calendar") && (opening || c.drawer.view() == View::Full);
+        let visible = crate::layout::page_has_calendar(&cfg.layout, &c.mode.lock()) && (opening || c.drawer.view() == View::Full);
         if !visible || c.dead() {
             return;
         }

@@ -30,7 +30,7 @@ Lepidlo: `claude/bridge.rs` (`/mcp` před ostatními cestami, vlastní strop tě
 (`mod mcp`, `mcp_main`, `serve(…, mcp::host::endpoint())`, příkazy), `main.rs` (`--mcp` před Tauri),
 `config/*` (`Config.mcp`), `commands/onboarding.rs` (`scan_apps`/`scan_repos` `pub(crate)`),
 `src/Settings.tsx` (`config-changed` → `adoptExternal`), `src/settings/ctx.ts` (`adoptBase`),
-`settings/labels.ts` (`mcp.enabled`), `settings/panels/Claude.tsx`, `i18n/load.ts`, `settings.test.mjs`.
+`settings/labels.ts` (`mcp.enabled`), `settings/panels/Claude.tsx`, `i18n/dicts.ts`, `settings.test.mjs`.
 
 ## Toky
 

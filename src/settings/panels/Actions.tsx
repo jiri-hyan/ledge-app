@@ -12,7 +12,6 @@ import ActionEditor, { kindLabel } from "../../actions/ActionEditor";
 import { actionsApi, runAction } from "../../actions/api";
 import { cleanAction, moveItem, slugId } from "../../actions/model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../../actions/ui";
-import ScriptsSettings from "../../actions/ScriptsSettings";
 import { say } from "../../ui/toast";
 import { t } from "../../i18n";
 import { afterSave, base, hit, offerUndo } from "../ctx";
@@ -76,7 +75,7 @@ export default function ActionsPanel(p: PanelProps) {
       <Section
         id="actions"
         title={t("actions.panel.title", "Akce a odkazy")}
-        desc={t("actions.panel.intro", "Weby, složky, soubory, aplikace a příkazy na jedno kliknutí — karta Rychlé akce, karta Odkazy (weby, složky a soubory) a paleta (Ctrl+K nebo 🔍).")}
+        desc={t("actions.panel.intro", "Weby, složky, soubory, aplikace a příkazy na jedno kliknutí — karta Odkazy a akce, karta Odkazy (weby, složky a soubory) a paleta (Ctrl+K nebo 🔍).")}
         aside={
           <Show when={!editing()}>
             <span id="f-actions.add" class="act-add" classList={{ hit: lit("actions.add") }}>
@@ -135,7 +134,6 @@ export default function ActionsPanel(p: PanelProps) {
           )}
         </Show>
       </Section>
-      <ScriptsSettings />
     </>
   );
 }

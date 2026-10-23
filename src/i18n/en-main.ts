@@ -27,4 +27,6 @@ registerDict("en", {
   "format.agoMin": "{n} min ago",
   "format.agoH": "{n} h ago",
   "ui.error.generic": "Something went wrong.",
+  "ui.error.technical": "Something went wrong — details are in the log.",
+  "ui.confirm.cancel": "Cancel",
 });

@@ -1,6 +1,8 @@
 // Čistá logika lístků na plochu (bez DOM a Tauri, testy `model.test.mjs`): přidání bodu / textu na
 // konec těla poznámky, barvy podle průhledností (text vždy čitelný), porovnání cest a stav připnutí
 // ze snapshotu šuplíku (`Snapshot.pins`, Rust `pins::win::view`).
+import { normPath, samePath } from "../util/path.ts";
+import { SUGGEST_MAX_CHARS, looksTimed, toLocalValue, type Suggest } from "../notes/suggest.ts";
 
 /** Průhlednost textu nejníž sem (%) — stejně jako Rust `pins::TEXT_MIN`. */
 export const TEXT_MIN = 50;
@@ -64,9 +66,8 @@ export function pinColors(bg: number, text: number) {
   };
 }
 
-/** Cesta pro porovnání (jako Rust `pins::same_note`): malá písmena, zpětná lomítka. */
-export const normPath = (p: string) => p.trim().replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
-export const samePath = (a: string, b: string) => normPath(a) === normPath(b);
+// Porovnání cest (jako Rust `pins::same_note`) je sdílené v `util/path.ts`; odsud se jen re-exportuje.
+export { normPath, samePath };
 
 export type PinRef = { path: string; through: boolean };
 export type PinsLike = { open: PinRef[]; key: string } | undefined | null;
@@ -112,4 +113,18 @@ export function caretFromText(body: string, nodeText: string, offset: number): n
     start += line.length + 1;
   }
   return null;
+}
+
+/**
+ * Text, na který se po přidání bodu zeptat jádra (`note_suggest_remind`), nebo null: jen bod, který vypadá časově
+ * („zítra v 10 zavolat X“), a jen poznámka BEZ připomínky (`remindMs`). Bez volání, dokud nikdo bod nepřidá.
+ */
+export function remindAskText(addedText: string, remindMs: number | null | undefined): string | null {
+  const t = flat(addedText);
+  return remindMs == null && looksTimed(t) ? t.slice(0, SUGGEST_MAX_CHARS) : null;
+}
+
+/** Chip „⏰ Připomenout …?“ ukázat jen s použitelným návrhem a dokud poznámka nemá připomínku. */
+export function pinSuggestVisible(s: Suggest | null, remindMs: number | null | undefined): Suggest | null {
+  return s && remindMs == null && toLocalValue(s.iso) ? s : null;
 }

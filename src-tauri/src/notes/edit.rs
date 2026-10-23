@@ -84,16 +84,16 @@ fn mtime_ms(p: &Path) -> i64 {
 /// Ověřená poznámka: (kanonická cesta, kanonický kořen).
 fn resolve(root: &Path, path: &Path) -> Result<(PathBuf, PathBuf), String> {
     let real = check_note_path(root, path)?;
-    let real_root = root.canonicalize().map_err(|e| e.to_string())?;
+    let real_root = root.canonicalize().map_err(|e| crate::errors::io(tr("Složku poznámek nejde otevřít", "Can't open the notes folder"), &e))?;
     Ok((real, real_root))
 }
 
 fn read_bytes(real: &Path) -> Result<Vec<u8>, String> {
-    let meta = std::fs::metadata(real).map_err(|e| e.to_string())?;
+    let meta = std::fs::metadata(real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))?;
     if meta.len() > MAX_NOTE_BYTES {
         return Err(tr("Poznámka je větší než 1 MB — otevři ji v editoru.", "The note is larger than 1 MB — open it in an editor.").into());
     }
-    std::fs::read(real).map_err(|e| e.to_string())
+    std::fs::read(real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))
 }
 
 /// Složka poznámky je obecná (kořen nebo `_obecne`) — bez projektu stačí klíč vynechat.
@@ -340,8 +340,8 @@ pub fn edit_draft_save(root: &Path, d: Option<&EditDraft>) -> Result<(), String>
     let dir = draft_dir(root);
     match d {
         Some(d) => {
-            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-            write_atomic(&dir.join(EDIT_DRAFT), serde_json::to_string(d).map_err(|e| e.to_string())?.as_bytes())
+            std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(tr("Koncept úprav nejde uložit", "Can't save the edit draft"), &e))?;
+            write_atomic(&dir.join(EDIT_DRAFT), serde_json::to_string(d).map_err(|e| crate::errors::json(tr("Koncept úprav nejde uložit", "Can't save the edit draft"), &e))?.as_bytes())
         }
         None => {
             let _ = std::fs::remove_file(dir.join(EDIT_DRAFT));

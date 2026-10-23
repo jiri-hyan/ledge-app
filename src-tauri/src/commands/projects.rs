@@ -174,10 +174,10 @@ pub(crate) fn kill_port_holder(port: u16, pid: u32) -> Result<(), String> {
         return Err(tr("Tenhle server spustil Ledge — zastav ho tlačítkem Stop.", "Ledge started this server — use Stop.").into());
     }
     unsafe {
-        let h = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|e| trf!("Proces nejde ukončit: {e}", "Can't stop the process: {e}"))?;
+        let h = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|e| crate::errors::any(tr("Proces nejde ukončit", "Can't stop the process"), &e))?;
         let res = TerminateProcess(h, 1);
         let _ = CloseHandle(h);
-        res.map_err(|e| trf!("Proces nejde ukončit: {e}", "Can't stop the process: {e}"))?;
+        res.map_err(|e| crate::errors::any(tr("Proces nejde ukončit", "Can't stop the process"), &e))?;
     }
     mark_dirty();
     Ok(())
@@ -221,7 +221,7 @@ pub(crate) fn open_dir(dir: &Path, target: &str) -> Result<(), String> {
         "folder" => std::process::Command::new("explorer").arg(dir).spawn(),
         _ => return Err(tr("Neznámý cíl.", "Unknown target.").into()),
     };
-    res.map(|_| ()).map_err(|e| e.to_string())?;
+    res.map(|_| ()).map_err(|e| crate::errors::spawn(tr("Složku nejde otevřít", "Can't open the folder"), &e))?;
     c.send_ui(UiCmd::Hide);
     Ok(())
 }
@@ -249,9 +249,9 @@ fn pull_message(res: Result<Captured, RunError>) -> Result<String, String> {
     let last = |s: &str| s.lines().rfind(|l| !l.trim().is_empty()).unwrap_or("").to_string();
     match res {
         Ok(out) if out.success => Ok(last(&out.stdout)),
-        Ok(out) => Err(trf!("git pull selhal: {}", "git pull failed: {}", last(&out.stderr))),
+        Ok(out) => Err(crate::errors::git(tr("Git pull selhal", "git pull failed"), out.code, &out.stderr)),
         Err(RunError::Timeout) => Err(trf!("git pull nedoběhl do {} min — přerušeno.", "git pull didn't finish within {} min — stopped.", PULL_TIMEOUT.as_secs() / 60)),
-        Err(RunError::Spawn(e)) => Err(trf!("git nejde spustit: {e}", "can't run git: {e}")),
+        Err(RunError::Spawn(e)) => Err(crate::errors::spawn_text(tr("Git nejde spustit", "Can't run git"), &e)),
     }
 }
 
@@ -271,7 +271,7 @@ pub(crate) fn clone_project(id: String) -> Result<String, String> {
     if !cloning::clonable(&p, path_ok, c.index.lock().clones(&remote)) {
         return Err(trf!("{} se klonovat nedá (už je na disku, nebo je klonů víc).", "{} can't be cloned (it's already on disk, or there are several clones).", p.name));
     }
-    let root = c.cfg.read().roots.first().cloned().ok_or_else(|| tr("Config nemá `roots` — není kam klonovat.", "The config has no `roots` — nowhere to clone to."))?;
+    let root = c.cfg.read().roots.first().cloned().ok_or_else(|| tr("Nastavení nemá `roots` — není kam klonovat.", "The settings have no `roots` — nowhere to clone to."))?;
     let root = PathBuf::from(root);
     if !root.is_dir() {
         return Err(trf!("Kořen projektů {} neexistuje.", "Projects root {} doesn't exist.", root.display()));
@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn pull_message_reports_last_line_and_errors() {
-        let out = |success: bool, stdout: &str, stderr: &str| Ok(Captured { success, stdout: stdout.into(), stderr: stderr.into() });
+        let out = |success: bool, stdout: &str, stderr: &str| Ok(Captured { success, code: Some(i32::from(!success)), stdout: stdout.into(), stderr: stderr.into() });
         type Case = (Result<Captured, RunError>, Result<&'static str, &'static str>);
         let cases: [Case; 5] = [
             (out(true, "Updating a..b
@@ -312,9 +312,9 @@ Fast-forward
             (out(true, "", ""), Ok("")),
             (out(false, "", "hint: x
 fatal: Not possible to fast-forward, aborting.
-"), Err("git pull selhal: fatal: Not possible to fast-forward, aborting.")),
+"), Err("Git pull selhal: větev se rozešla se vzdálenou. Rychlé posunutí nejde — sluč ji ručně.")),
             (Err(RunError::Timeout), Err("git pull nedoběhl do 2 min — přerušeno.")),
-            (Err(RunError::Spawn("nenalezeno".into())), Err("git nejde spustit: nenalezeno")),
+            (Err(RunError::Spawn("nenalezeno (os error 2)".into())), Err("Git nejde spustit: program nejde spustit. Zkontroluj, že je nainstalovaný a cesta k němu je správná.")),
         ];
         for (res, want) in cases {
             assert_eq!(pull_message(res), want.map(String::from).map_err(String::from));

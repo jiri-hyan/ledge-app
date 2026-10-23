@@ -62,7 +62,7 @@ export function shownPosition(tl: MediaTimeline, now: number, playing: boolean, 
 }
 
 /** Čas „1:42“, od hodiny „1:02:05“; záporné / neplatné = 0:00. */
-export function fmtTime(ms: number): string {
+export function fmtDuration(ms: number): string {
   const s = Math.floor((Number.isFinite(ms) ? Math.max(0, ms) : 0) / 1000);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);

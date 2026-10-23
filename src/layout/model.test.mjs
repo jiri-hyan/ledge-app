@@ -10,6 +10,7 @@ import {
   removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, shownCards, tilesOf,
   visibleProjects, withLayout, BODY, CARD_SLOTS, movePart, moveToNewPage, orderParts, partsOf, setParts, slotsOf,
 } from "./model.ts";
+import { fullLayout } from "./fullLayout.mjs";
 
 const ids = (l, page) => pageOf(l, page).cards.map((c) => c.id);
 
@@ -20,10 +21,15 @@ test("zrcadlo Rustu: karty a části jako v layout.rs", () => {
   const block = src.slice(src.indexOf("pub const PARTS"), src.indexOf("];", src.indexOf("pub const PARTS")));
   const parts = [...block.matchAll(/\("([A-Za-z]+)", "([a-z]+)"\)/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(parts, Object.entries(PARTS));
-  // výchozí velikosti = výchozí rozložení v Rustu (Práce: Běží xl, Claude a Repa m)
+  // výchozí rozložení = fixture, kterou čte i `layout::tests::default_is_clean_start` (zrcadlo Rustu)
   const d = defaultLayout();
-  assert.deepEqual(d.pages[0].cards.map((c) => `${c.id}:${c.size}`), ["projects:xl", "actions:xl", "shelf:xl", "running:xl", "claude:m", "repos:m", "notes:xl"]);
-  assert.deepEqual(d.pages[1].cards.map((c) => `${c.id}:${c.size}`), ["projects:xl", "clock:s", "timer:s", "weather:s", "calendar:s", "media:m", "links:m", "actions:xl", "shelf:xl", "notes:xl"]);
+  const fx = JSON.parse(readFileSync(new URL("../../src-tauri/src/fixtures/layout-default.json", import.meta.url), "utf8"));
+  assert.deepEqual(d.pages.map((p) => [p.id, p.cards.map((c) => `${c.id}:${c.size}`)]), fx.pages.map((p) => [p.id, p.cards.map((c) => `${c.id}:${c.size}`)]));
+  assert.deepEqual(d.pages[0].cards.map((c) => c.id), ["projects", "notes"], "čistý začátek: Práce jen Projekty + Poznámky");
+  assert.deepEqual(d.pages[1].cards.map((c) => c.id), ["clock", "media", "notes", "links"]);
+  const none = ["calendar", "mail", "github", "system", "weather", "actions", "today"];
+  assert.ok(d.pages.every((p) => p.cards.every((c) => !none.includes(c.id))), "karty bez zdroje a duplicitní akce jen v katalogu");
+  assert.deepEqual(d.upgrades, fx.upgrades);
   assert.deepEqual(d.upgrades, [UP_PERSONAL_PROJECTS], "výchozí = jednorázové úpravy už hotové");
   const up = src.match(/pub const UP_PERSONAL_PROJECTS: &str = "([A-Za-z]+)"/)[1];
   assert.equal(up, UP_PERSONAL_PROJECTS);
@@ -48,7 +54,7 @@ test("normalizace: obranné čtení", () => {
 });
 
 test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku", () => {
-  const d = defaultLayout();
+  const d = fullLayout();
   const before = JSON.stringify(d);
   assert.deepEqual(ids(moveCard(d, "prace", 4, 0), "prace").slice(0, 2), ["claude", "projects"]);
   assert.deepEqual(ids(moveCard(d, "prace", 0, 99), "prace"), ids(d, "prace"), "mimo rozsah = beze změny");
@@ -83,10 +89,10 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
 });
 
 test("katalog: co na záložce není a kde to je", () => {
-  const d = defaultLayout();
-  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail"]);
+  const d = fullLayout();
+  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today"]);
   // GitHub, Systém a Pošta jsou v katalogu, ale na žádné záložce (výchozí rozložení se nemění)
-  assert.deepEqual(catalog(d, "prace").filter((x) => ["github", "system", "mail"].includes(x.id)).map((x) => x.on), [[], [], []]);
+  assert.deepEqual(catalog(d, "prace").filter((x) => ["github", "system", "mail", "today"].includes(x.id)).map((x) => x.on), [[], [], [], []]);
   assert.deepEqual(catalog(d, "osobni").find((x) => x.id === "mail").on, []);
   assert.deepEqual(catalog(d, "prace").find((x) => x.id === "weather").on, ["osobni"]);
   const hidden = removeCard(removeCard(d, "prace", "notes").layout, "osobni", "notes").layout;
@@ -96,7 +102,7 @@ test("katalog: co na záložce není a kde to je", () => {
 });
 
 test("záložky: přidat, id, přejmenovat, smazat + Vrátit, pořadí, limity", () => {
-  const d = defaultLayout();
+  const d = fullLayout();
   const a = addPage(d, "Hry a hudba", "🎮");
   assert.equal(a.id, "hry-a-hudba");
   assert.deepEqual(pageOf(a.layout, a.id), { id: "hry-a-hudba", name: "Hry a hudba", icon: "🎮", cards: [] });
@@ -128,8 +134,8 @@ test("záložky: přidat, id, přejmenovat, smazat + Vrátit, pořadí, limity",
 });
 
 test("co stránka ukáže: karty bez dat se schovají samy", () => {
-  const f = (over = {}) => ({ procs: 0, notesEnabled: true, actions: 0, scriptOut: false, shelf: false, media: false, ...over });
-  const d = defaultLayout();
+  const f = (over = {}) => ({ procs: 0, notesEnabled: true, actions: 0, scriptOut: false, shelf: false, media: false, today: false, ...over });
+  const d = fullLayout();
   const custom = { id: "hry", name: "Hry", cards: [{ id: "actions", size: "xl" }, { id: "media", size: "m" }] };
   const cases = [
     [pageOf(d, "prace"), f(), ["projects", "claude", "repos", "notes"]],
@@ -138,16 +144,19 @@ test("co stránka ukáže: karty bez dat se schovají samy", () => {
     [pageOf(d, "osobni"), f(), ["projects", "clock", "timer", "weather", "calendar", "links", "actions", "notes"]],
     [pageOf(d, "osobni"), f({ media: true }), ["projects", "clock", "timer", "weather", "calendar", "media", "links", "actions", "notes"]],
     [custom, f(), ["actions"]],
+    // karta Dnes bez řádků se nekreslí, s řádkem ano
+    [{ id: "x", name: "X", cards: [{ id: "today", size: "m" }, { id: "clock", size: "s" }] }, f(), ["clock"]],
+    [{ id: "x", name: "X", cards: [{ id: "today", size: "m" }, { id: "clock", size: "s" }] }, f({ today: true }), ["today", "clock"]],
   ];
   for (const [p, facts, want] of cases) assert.deepEqual(shownCards(p, facts).map((c) => c.id), want, `${p.id} ${JSON.stringify(facts)}`);
 });
 
 test("withLayout mění jen jedno pole", () => {
   const cfg = { drawer: { width: 900 }, projects: [{ id: "a" }] };
-  const out = withLayout(cfg, defaultLayout());
+  const out = withLayout(cfg, fullLayout());
   assert.equal(out.projects, cfg.projects);
   assert.equal(cfg.layout, undefined);
-  assert.deepEqual(out.layout, defaultLayout());
+  assert.deepEqual(out.layout, fullLayout());
 });
 
 test("tažení v mřížce: nejbližší střed; Alt+šipky", () => {
@@ -204,7 +213,7 @@ test("výška karty: normalizace, nastavení, kruh ↕, rychlé volby", () => {
   const raw = { pages: [{ id: "a", name: "A", cards: [{ id: "claude", size: "m", h: 3 }, { id: "repos", size: "m", h: 9 }, { id: "notes", size: "xl", h: "2" }] }] };
   const l = normalizeLayout(raw);
   assert.deepEqual(l.pages[0].cards, [{ id: "claude", size: "m", h: 3 }, { id: "repos", size: "m" }, { id: "notes", size: "xl" }], "jen 1–4, číslo");
-  const d = defaultLayout();
+  const d = fullLayout();
   const before = JSON.stringify(d);
   const set = setHeight(d, "prace", "claude", 2);
   assert.equal(pageOf(set, "prace").cards.find((c) => c.id === "claude").h, 2);
@@ -226,7 +235,7 @@ test("zástupci (karta Projekty): volby dlaždic, skryté projekty, výchozí = 
     ["nesmysl", { size: "huge", label: "ano", hidden: ["a", 3, "a", ""] }, { size: "tile", label: true, git: true, hidden: ["a"] }],
   ];
   for (const [name, raw, want] of cases) assert.deepEqual(normalizeTiles(raw), want, name);
-  const d = defaultLayout();
+  const d = fullLayout();
   const s = setTiles(d, "osobni", { size: "large" });
   assert.deepEqual(tilesOf(pageOf(s, "osobni").cards[0]), { ...DEFAULT_TILES, size: "large" });
   assert.equal(pageOf(s, "prace").cards[0].tiles, undefined, "jiná záložka beze změny");
@@ -289,7 +298,7 @@ test("pořadí částí karty: normalizace, doplnění, výchozí pořadí se ne
 });
 
 test("přesun části: movePart / setParts, výchozí pořadí pole smaže, ostatní karty nedotčené", () => {
-  const l = defaultLayout();
+  const l = fullLayout();
   const card = (x, page = "prace") => pageOf(x, page).cards.find((c) => c.id === "claude");
   const a = movePart(l, "prace", "claude", 0, 2);
   assert.deepEqual(card(a).parts, [BODY, "claudeCosts", "claudeLimits"]);
@@ -309,7 +318,7 @@ test("přesun části: movePart / setParts, výchozí pořadí pole smaže, osta
 });
 
 test("karta přetažená na „+“: nová záložka s kartou, jméno se přejmenuje potom", () => {
-  const l = defaultLayout();
+  const l = fullLayout();
   const r = moveToNewPage(l, "prace", "claude", "Nová záložka");
   assert.ok(r, "vznikla");
   assert.deepEqual(pageOf(r.layout, r.id).cards.map((c) => c.id), ["claude"]);

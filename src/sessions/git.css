@@ -21,8 +21,4 @@
 .sess-git-diff { display: flex; flex-direction: column; gap: var(--s1); padding: 0 0 var(--s1) calc(2ch + var(--s2)); min-width: 0; }
 .sess-git-msg { width: 100%; box-sizing: border-box; resize: vertical; min-height: 56px; font: var(--fs-body) var(--sans); color: var(--t1); background: var(--well-2); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 10px; }
 .sess-git-msg:focus { outline: none; border-color: var(--focus); }
-.sess-git-confirm { display: flex; flex-direction: column; gap: var(--s2); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 10px; }
-.sess-git-confirm.sess-git-warn { border-color: color-mix(in srgb, var(--red) 40%, transparent); }
-.sess-git-ctext { font: var(--fs-xs) var(--sans); color: var(--t1); overflow-wrap: anywhere; }
-.sess-git-danger { color: var(--on-light); background: var(--red); border-color: transparent; }
 .sess-git-err { margin: 0; max-height: 160px; overflow: auto; font: var(--fs-xs) var(--mono); color: var(--red); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }

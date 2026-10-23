@@ -2,32 +2,28 @@
 // vzhledů zavřeného Ledge, pozice a velikost proužku; v Pokročilé tvar, linka, krytí a celé „Co proužek
 // ukazuje“), Po najetí (`AppearanceHover.tsx`: 3 dlaždice `drawer.hover`), Otevřený (`AppearanceOpen.tsx`:
 // galerie stylů, monitor ve skutečném poměru, šířka a hustota; v Pokročilé barvy, rozložení, vlastní šířka,
-// písmo, rohy, pozadí) a Pohyb (`AppearanceMotion.tsx`: 7 animací s ukázkou + rychlost). Pod kroky jazyk.
+// písmo, rohy, pozadí) a Pohyb (`AppearanceMotion.tsx`: 7 animací s ukázkou + rychlost).
 // Každý krok je hlavně galerie; žádný přepínač nemá víc než 4 volby. Skok z hledání (`hit`) přepne krok
 // a rozbalí jeho Pokročilé (`appearanceModel.ts` `stepOf`/`isAdvanced`).
 // Každá změna se hned náhledově aplikuje na celý šuplík (`applyAppearance`); odchod bez uložení vrátí
 // uložený vzhled. Ukládá JEN společná lišta Nastavení (Uložit / Zahodit / Vrátit) → Rust pošle `appearance`
 // a překreslí proužek. Pozadí (`drawer.glass`), šířka (`drawer.width`), animace a celý proužek se nastavují
 // JEN tady — panel Chování má jen chování. Kotvy hledání `f-<id>` = klíče z `labels.ts`.
-// Jazyk rozhraní (`ui.lang`) je tu taky: patří k tomu, jak UI vypadá. Přepne se po Uložit (`ctx.loadBase` → `setLang`).
+// Jazyk rozhraní (`ui.lang`) tu už není — je v panelu Začínáme úplně nahoře (přepne se po Uložit, `ctx.loadBase` → `setLang`).
 import { For, Match, Switch, createEffect, createSignal, on, onCleanup } from "solid-js";
 import type { PanelProps } from "../types";
 import type { Appearance } from "../../types";
-import { t, type Lang } from "../../i18n";
+import { t } from "../../i18n";
 import { DEFAULT_APPEARANCE, normalizeAppearance } from "../../theme/appearance";
 import { applyAppearance, savedAppearance } from "../../theme/apply";
 import { hit } from "../ctx";
-import { fieldHint, fieldLabel } from "../labels";
 import { STEPS, isAdvanced, stepOf, type StepId } from "../appearanceModel";
 import AppearanceClosed from "./AppearanceClosed";
 import AppearanceHover from "./AppearanceHover";
 import AppearanceOpen from "./AppearanceOpen";
 import AppearanceMotion from "./AppearanceMotion";
-import { Seg, peek, withThemeDraft, type Ap } from "./apUi";
+import { peek, withThemeDraft, type Ap } from "./apUi";
 import "./appearance.css";
-
-/** Názvy jazyků vždy v jejich vlastním jazyce (ať se k češtině vrátí i ten, kdo anglicky neumí). */
-const LANGS: [Lang, string][] = [["cs", "Čeština"], ["en", "English"]];
 
 const STEP_LABEL: Record<StepId, () => string> = {
   closed: () => t("appearance.step.closed", "Zavřený"),
@@ -85,8 +81,6 @@ export default function AppearancePanel(p: PanelProps) {
   };
   const adv = (s: StepId) => !!advOpen()[s];
   const setAdv = (s: StepId) => (v: boolean) => setAdvOpen((o) => ({ ...o, [s]: v }));
-  const uiLang = (): Lang => (p.cfg.ui?.lang === "en" ? "en" : "cs");
-  const setUiLang = (v: Lang) => (p.cfg.ui ? p.setCfg("ui", "lang", v) : p.setCfg("ui", { lang: v }));
   const key = (e: KeyboardEvent, i: number) => {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!d) return;
@@ -116,13 +110,6 @@ export default function AppearancePanel(p: PanelProps) {
         <Match when={lastStep() === "open"}><AppearanceOpen ap={ap} dirty={dirty()} adv={adv("open")} setAdv={setAdv("open")} /></Match>
         <Match when={lastStep() === "motion"}><AppearanceMotion ap={ap} reduced={reduced} /></Match>
       </Switch>
-
-      <div class="card ap-lang" id="f-ui.lang" classList={{ hit: hit() === "ui.lang" }}>
-        <div class="opt">
-          <span>{fieldLabel("ui.lang")}<small>{fieldHint("ui.lang")}</small></span>
-          <Seg<Lang> label={fieldLabel("ui.lang")} value={uiLang()} set={setUiLang} options={LANGS} />
-        </div>
-      </div>
     </div>
   );
 }

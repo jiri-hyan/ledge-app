@@ -1,6 +1,5 @@
 /* Karta Přihrádka (`ShelfCard.tsx`): řádky souborů s ikonou ze shellu, tah ven. Jen tokeny ze styles.css. */
 .shelf-card:not(.wide) { margin-bottom: var(--gap-section); }
-.shelf-card h4 .warn { color: var(--amber); }
 .shelf-list { max-height: calc(260px * var(--fz)); overflow-y: auto; }
 .shelf-row { cursor: grab; }
 .shelf-row:active { cursor: grabbing; }

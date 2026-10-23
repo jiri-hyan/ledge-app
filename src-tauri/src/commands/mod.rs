@@ -10,6 +10,7 @@ pub(crate) mod config;
 pub(crate) mod integrations;
 pub(crate) mod costs;
 pub(crate) mod drawer;
+pub(crate) mod geo;
 pub(crate) mod limits;
 pub(crate) mod mcp;
 pub(crate) mod media;

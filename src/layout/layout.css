@@ -8,6 +8,12 @@
 .deck-item { grid-column: span var(--span, 2); min-width: 0; position: relative; display: flex; flex-direction: column; }
 /* karta vyplní buňku; vlastní odsazení dolů (dřív nad mřížkou) tu nahrazuje mezera mřížky */
 .deck > .deck-item > * { flex: 1; margin-bottom: 0; }
+/* podržení hlavičky (`cardDrag.ts` `pend`): po krátké prodlevě (klik nic neukáže) naroste proužek nahoře na kartě
+   za dobu podržení `--hold-ms`; jen transform / opacity, jen po dobu podržení, v klidu nic */
+.deck-item[data-hold]::after { content: ""; position: absolute; left: var(--r-md); right: var(--r-md); top: 0; height: 2px; border-radius: 1px; background: var(--accent); transform-origin: left; pointer-events: none; animation: lay-hold var(--hold-ms) linear both; }
+@keyframes lay-hold { 0%, 25% { opacity: 0; transform: scaleX(0); } 26% { opacity: 1; transform: scaleX(0.02); } 100% { opacity: 1; transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .deck-item[data-hold]::after { display: none; } }
+html[data-motion="none"] .deck-item[data-hold]::after { display: none; }
 /* pevná výška (`h` řádků `--deck-row`): obsah scrolluje uvnitř karty, ne celý šuplík */
 .deck-item[data-h] { height: calc(var(--h, 2) * var(--deck-row) + (var(--h, 2) - 1) * var(--dg)); }
 .deck-item[data-h] > :not(.lay-tools, .lay-rs, .lay-target) { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -39,10 +45,8 @@
 /* ---------- režim úprav ---------- */
 .deck.editing .deck-item > :not(.lay-tools, .lay-rs) { pointer-events: none; user-select: none; }
 /* klidné zvýraznění bez pohybu (dřív rozvlnění — šéfovi se karty „kynklaly“, 18. 10.) */
-.deck.editing .deck-item { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line-2)); outline-offset: 2px; border-radius: var(--r-xl); }
+.deck.editing .deck-item { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line-2)); outline-offset: 2px; border-radius: var(--r-xl); cursor: grab; touch-action: none; /* kartu chytíš kdekoli na jejím prázdném místě (obsah má v úpravách pointer-events: none), nebo za ⠿ */ }
 .deck.editing .deck-item:hover { outline-style: solid; outline-color: var(--accent); }
-/* kartu chytíš kdekoli na jejím prázdném místě (obsah má v úpravách pointer-events: none), nebo za ⠿ */
-.deck.editing .deck-item { cursor: grab; touch-action: none; }
 .deck.dragging, .deck.dragging .deck-item { cursor: grabbing; user-select: none; }
 /* tažená karta = mezera velikosti karty na místě dopadu (živý náhled pořadí, CSS `order`): obsah schovaný,
    zůstane přerušovaný obrys s jemnou výplní; skutečnou kartu nese „duch“ pod kurzorem */

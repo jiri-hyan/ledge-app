@@ -180,7 +180,7 @@ pub(crate) fn parse(text: &str) -> Result<J, String> {
     if t.trim().is_empty() {
         return Ok(J::Obj(vec![]));
     }
-    let v: J = serde_json::from_str(t).map_err(|e| trf!("settings.json není platný JSON: {e}", "settings.json isn't valid JSON: {e}"))?;
+    let v: J = serde_json::from_str(t).map_err(|e| crate::errors::json(crate::i18n::tr("settings.json Clauda", "Claude's settings.json"), &e))?;
     match v {
         J::Obj(_) => Ok(v),
         _ => Err(crate::i18n::tr("settings.json není JSON objekt.", "settings.json isn't a JSON object.").into()),
@@ -348,7 +348,7 @@ pub(crate) fn read(path: &Path) -> Result<String, String> {
     match std::fs::read_to_string(path) {
         Ok(t) => Ok(t),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
-        Err(e) => Err(format!("{}: {e}", path.display())),
+        Err(e) => Err(crate::errors::io(&trf!("{} nejde přečíst", "Can't read {}", path.display()), &e)),
     }
 }
 
@@ -396,16 +396,16 @@ pub fn apply(path: &Path, f: impl FnOnce(&str) -> Result<(String, bool), String>
         return Ok(false);
     }
     let dir = path.parent().ok_or_else(|| crate::i18n::tr("settings.json nemá složku", "settings.json has no folder"))?;
-    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", dir.display()), &e))?;
     let backup = dir.join(BACKUP);
     if path.exists() && !backup.exists() {
-        std::fs::copy(path, &backup).map_err(|e| trf!("záloha {}: {e}", "backup {}: {e}", backup.display()))?;
+        std::fs::copy(path, &backup).map_err(|e| crate::errors::io(&trf!("Zálohu {} nejde vytvořit", "Can't create the backup {}", backup.display()), &e))?;
     }
     let tmp = dir.join("settings.json.ledge-tmp");
-    std::fs::write(&tmp, new.as_bytes()).map_err(|e| e.to_string())?;
+    std::fs::write(&tmp, new.as_bytes()).map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))?;
     std::fs::rename(&tmp, path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
-        trf!("zápis {}: {e}", "writing {}: {e}", path.display())
+        crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e)
     })?;
     Ok(true)
 }

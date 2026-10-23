@@ -12,7 +12,7 @@ crate — parser, opakování i pásma jsou vlastní (chrono z existujících z�
 | `ics.rs` | rozbalení řádků (na bajtech), parametry, escapování, VEVENT, VTIMEZONE, `X-WR-CALNAME`; filtr `keep` zahodí nepotřebné události hned; z vlastností schůzky / URL / místa / popisu jen odkaz Připojit (popis se nedrží) | `parse`, `Event`, `Dt`, `VTimezone`, `TzPart`, `parse_dt`, `parse_duration` |
 | `expand.rs` | RRULE v místním čase události: FREQ D/W/M/Y, INTERVAL, COUNT, UNTIL, BYDAY (i `2MO`/`-1FR`), BYMONTHDAY, BYMONTH, BYSETPOS, WKST | `parse_rule`, `occurrences`, `month_days`, `Rule`, `Until` |
 | `tz.rs` | pásma: VTIMEZONE z feedu → vestavěná tabulka IANA + Windows názvů (EU/US letní čas, pevné posuny) → neznámé = místní + `guess` | `Zone`, `Zones`, `Tz`, `builtin`, `LocalTz`, `SystemLocal` |
-| `view.rs` | výběr karty: Dnes (bez skončených) / Zítra / první další den, řazení, strop řádků, čas další změny; `Item.join` | `pick`, `Day`, `Item`, `Picked` |
+| `view.rs` | `any_ongoing` (probíhá teď časovaná událost? pro klid pulsu GitHubu, `live::meeting_now`); výběr karty: Dnes (bez skončených) / Zítra / první další den, řazení, strop řádků, čas další změny; `Item.join` | `pick`, `Day`, `Item`, `Picked` |
 | `conf.rs` | config `personal.calendars` (`source`, `account`, `remindMin`, `remindToast`), adresa jako tajemství (webcal→https, jen https, doména, otisk), validace podle zdroje | `CalendarFeed`, `normalize_url`, `domain`, `key`, `validate`, `DEFAULT_REMIND_MIN` |
 | `source.rs` | **zdroj jako abstrakce**: druhy, okno, sdílený typ událostí, klíč stavu, cíl načtení, dispatch, kontrakt adaptéru účtů | `SourceKind`, `Event` (= `Occ`), `Window`, `Adapter`, `adapter`, `Target`, `key`, `targets`, `fetch`, `finish`, `unavailable` |
 | `outlook.rs` | zdroj `outlook-local`: detekce bez spuštění, tenká vrstva IDispatch, okno přes `Restrict`, převod položek (čistý) | `installed`, `running`, `events`, `RawItem`, `to_occ`, `naive_from_ole`, `restrict_filter`, `missing`, `closed` |
@@ -30,7 +30,7 @@ Napojení (jednořádkové): `threads/ui.rs` (otevření šuplíku), `threads/em
 barva), `attention.rs` (`Event::Meeting`), `toast.rs` (`toast_xml_actions`), `commands/calendar.rs`
 (`calendar_test`, `calendar_join`, `calendar_outlook_probe`, `calendar_outlook_load`), `lib.rs` (registrace).
 Kalendáře účtů bez řádku v `personal.calendars`: `live::view` přidá za ně zdroje z `accounts::calsync::infos`
-(`CalInfo.account`; čip v kartě vede do Nastavení → Účty; bez připomínky). Řádek `graph`/`google` má přednost.
+(`CalInfo.account`; čip v kartě vede do Nastavení → Osobní → Kalendáře → Pokročilé; bez připomínky). Řádek `graph`/`google` má přednost.
 
 ### Zdroje (`source.rs`)
 
@@ -45,7 +45,7 @@ Kalendáře účtů bez řádku v `personal.calendars`: `live::view` přidá za 
 s rozbalenými opakováními, `Event` = `Occ` (UTC ms, `all_day`, `title`, `location`, `join` — odkaz jde
 vytáhnout `meeting::find` / `offer`). Chyba = lidská věta bez tokenu. Id zdroje = `source::key` (otisk
 `druh:účet`), název = `CalendarFeed.name` (prázdný → `"Outlook"`/doména), barva = `CalendarFeed.color`.
-Zapojení = jedna větev v `source::adapter` + dlaždice v `CalendarSettings.tsx` `SOURCES` (účty vedou do Nastavení → Účty).
+Zapojení = jedna větev v `source::adapter` + dlaždice v `CalendarSettings.tsx` `SOURCES` (jen ICS a Outlook v PC; účty se přihlašují v Pokročilé pod kalendáři).
 
 ### Outlook v PC (`outlook.rs`)
 

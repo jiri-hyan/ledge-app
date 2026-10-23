@@ -13,7 +13,6 @@ import AppearancePanel from "./panels/Appearance";
 import ProjectsActionsPanel from "./panels/ProjectsActions";
 import ClaudePanel from "./panels/Claude";
 import PersonalPanel from "./panels/Personal";
-import AccountsPanel from "./panels/Accounts";
 import NotesPanel from "./panels/Notes";
 import BehaviorPanel from "./panels/Behavior";
 import AppPanel from "./panels/AppPanel";
@@ -27,7 +26,6 @@ const COMPONENTS: Record<string, Component<PanelProps>> = {
   akce: ProjectsActionsPanel,
   claude: ClaudePanel,
   osobni: PersonalPanel,
-  ucty: AccountsPanel,
   poznamky: NotesPanel,
   chovani: BehaviorPanel,
   aplikace: AppPanel,

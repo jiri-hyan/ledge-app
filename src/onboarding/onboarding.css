@@ -94,9 +94,17 @@
 .ob-lang b, .ob-theme b { display: block; font-size: var(--fs-body); }
 .ob-lang small, .ob-theme small { color: var(--t3); font-size: var(--fs-sm); }
 
-/* volba způsobu nastavení a připojení Clauda */
-.ob-ways { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); }
-.ob-ways .ob-lang:disabled { opacity: 0.6; }
+/* krok Claude: volby jedním klikem + rozbalovací Podrobnosti s ručním připojením */
+.ob-opt { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.ob-opt + .ob-opt { border-top: 1px solid var(--line); padding-top: var(--s3); }
+.ob-opt-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ob-opt-txt b { font-size: var(--fs-body); }
+.ob-opt-txt small { color: var(--t3); font-size: var(--fs-sm); line-height: 1.45; }
+.ob-opt .btn { flex-shrink: 0; }
+.ob-details { border-top: 1px solid var(--line); padding-top: var(--s3); }
+.ob-details summary { cursor: pointer; color: var(--t2); font-size: var(--fs-sm); user-select: none; }
+.ob-details[open] summary { margin-bottom: var(--s3); }
+.ob-details .ob-conn { margin-top: var(--s3); }
 .ob-conn { display: flex; flex-direction: column; gap: var(--s2); }
 .ob-conn + .ob-conn { border-top: 1px solid var(--line); padding-top: var(--s3); }
 .ob-conn h5 { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; }

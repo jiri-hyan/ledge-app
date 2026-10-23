@@ -41,6 +41,6 @@ pub fn set_text(s: &str) -> Result<(), String> {
             Ok(())
         })();
         let _ = CloseClipboard();
-        res.map_err(|e| trf!("Do schránky to nejde zapsat: {e}", "Can't write to the clipboard: {e}"))
+        res.map_err(|e| crate::errors::any(tr("Do schránky to nejde zapsat", "Can't write to the clipboard"), &e))
     }
 }

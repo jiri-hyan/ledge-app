@@ -2,7 +2,7 @@
 // volby navíc z `children` (karta Projekty: dlaždice, popisek, git, které projekty), „Skrýt kartu“
 // (odebere ji z této záložky do katalogu), „Skrýt sekci: …“ (části karty — limity, útrata, Git,
 // subagenti v kartě Claude; hlasitost; baterie), „Vzhled karty…“ (vlna 8 P: akcent, pozadí, hlavička,
-// hustota, varianta — panel `layout/CardLook.tsx` pod mřížkou) a „Upravit šuplík…“ (režim úprav). Ukládá jen pole
+// hustota, varianta — panel `layout/CardLook.tsx`, stav `layout/lookState.ts` pod mřížkou) a „Upravit šuplík…“ (režim úprav). Ukládá jen pole
 // `layout` (`layout/edit.ts` `saveLayout`: `get_config` → změna → `save_config`); kartu překreslí nový
 // snapshot. Po skrytí lišta „… skryta · Vrátit“ na pár sekund (`HiddenNotice`, vykresluje `MainPage`) —
 // žádný modal. Seznam se kreslí přes `Portal` s pevnou pozicí u tlačítka: karta s omezenou výškou
@@ -12,18 +12,16 @@
 // volba bez viditelného efektu se ohlásí v liště (`sizeOutcome` → „Karta je v řadě sama…“) a vybere se
 // nejbližší možná — nikdy tiché nic. Každá změna velikosti / výšky / stropu má „Vrátit“; v režimu úprav jde
 // do draftu (`tweak`). „Řádků“ = strop karet Claude, Repa, Běží. Pozice seznamu z `ui/place.ts`.
-import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { Portal } from "solid-js/web";
+import { createSignal, For, Show, type JSX } from "solid-js";
 import { t } from "../i18n";
 import { change, editing, offerUndo, saveLayout } from "../layout/edit";
 import { QUICK_HEIGHTS, QUICK_LIMITS, removeCard, restoreCard, setHeight, setLimit, setPartHidden, setSize, type CardHeight, type CardId, type CardSize, type Layout, type PartKey } from "../layout/model";
 import { fitSize, usableSizes, type SizeOutcome } from "../layout/size";
 import { colsNow } from "../layout/cols";
 import { cardName, partName, sizeName, sizeNoteText, tx } from "../layout/text";
-import { placePopup } from "../ui/place";
-import { openCardLook } from "../layout/CardLook";
+import { createMenu, PopCap, PopItem, PopMenu, PopSep } from "../ui/Popover";
+import { openCardLook } from "../layout/lookState";
 import type { CardLook } from "../layout/look";
-import "./cardmenu.css";
 
 const UNDO_MS = 6000;
 const [hidden, setHidden] = createSignal<{ text: string; undo: (l: Layout) => Layout } | null>(null);
@@ -55,20 +53,18 @@ function tweak(text: string, f: (l: Layout) => { layout: Layout; undo: (l: Layou
   void hide(text, f, cfgError);
 }
 
-type Pos = { x: number; y: number; maxH: number };
-
 /** Vlastní volba karty v ⋯ (text už přeložený). */
 export type CardMenuItem = { label: string; run: () => void; disabled?: boolean };
 
 /** Řádek rychlé volby v menu: popisek + až 4 tlačítka (víc voleb = jinde, ne segment). */
 export function MenuChoice<T>(p: { label: string; items: readonly { v: T; text: string; title?: string }[]; value: T; onPick: (v: T) => void }) {
   return (
-    <span class="card-menu-choice" role="group" aria-label={p.label}>
-      <span class="card-menu-cap">{p.label}</span>
-      <span class="card-menu-seg">
+    <span class="pop-choice" role="group" aria-label={p.label}>
+      <PopCap>{p.label}</PopCap>
+      <span class="pop-seg">
         <For each={p.items}>
           {(it) => (
-            <button role="menuitemradio" aria-checked={it.v === p.value} classList={{ on: it.v === p.value }} title={it.title} onClick={() => it.v !== p.value && p.onPick(it.v)}>
+            <button role="menuitemradio" aria-checked={it.v === p.value} classList={{ "pop-on": it.v === p.value }} title={it.title} onClick={() => it.v !== p.value && p.onPick(it.v)}>
               {it.text}
             </button>
           )}
@@ -97,41 +93,14 @@ export default function CardMenu(p: {
   children?: JSX.Element;
   extra?: CardMenuItem[];
 }) {
-  const [pos, setPos] = createSignal<Pos | null>(null);
-  const open = () => pos() !== null;
-  let root: HTMLSpanElement | undefined;
-  let list: HTMLSpanElement | undefined;
-  const outside = (e: PointerEvent) => {
-    const n = e.target as Node;
-    if (!root?.contains(n) && !list?.contains(n)) close();
-  };
-  /** posun mřížky / karty pod pevným menu = zavřít (ne posun seznamu projektů v menu) */
-  const scrolled = (e: Event) => {
-    if (!list?.contains(e.target as Node)) close();
-  };
-  const close = () => {
-    setPos(null);
-    document.removeEventListener("pointerdown", outside, true);
-    document.removeEventListener("scroll", scrolled, true);
-  };
+  const menu = createMenu();
+  const open = () => menu.open();
+  const close = () => menu.close();
   const [cols, setCols] = createSignal(4);
-  /** umístění přes `ui/place.ts`: pod ⋯ zarovnané vpravo, u spodního okraje nad něj, vždy celé v okně */
-  const place = () => {
-    if (!root || !list) return;
-    const r = root.getBoundingClientRect();
-    const at = placePopup({ left: r.left, top: r.top, right: r.right, bottom: r.bottom }, { w: list.offsetWidth, h: list.scrollHeight }, { w: window.innerWidth, h: window.innerHeight }, { align: "end" });
-    setPos({ x: at.x, y: at.y, maxH: at.maxH });
+  const toggle = (e: MouseEvent) => {
+    if (!open()) setCols(colsNow());
+    menu.toggle(e);
   };
-  const toggle = () => {
-    if (open() || !root) return close();
-    setCols(colsNow());
-    const r = root.getBoundingClientRect();
-    setPos({ x: Math.max(0, r.right - 220), y: r.bottom + 4, maxH: window.innerHeight });
-    queueMicrotask(place);
-    document.addEventListener("pointerdown", outside, true);
-    document.addEventListener("scroll", scrolled, true);
-  };
-  onCleanup(close);
   const hideCard = () => {
     close();
     tweak(t("cards.hide.doneCard", "Karta „{name}“ skryta", { name: cardName(p.card) }), (l) => {
@@ -141,7 +110,7 @@ export default function CardMenu(p: {
   };
   const hidePart = (k: PartKey) => {
     close();
-    tweak(t("cards.hide.doneSection", "Sekce „{name}“ skryta", { name: partName(k) }), (l) => ({ layout: setPartHidden(l, k, true), undo: (x) => setPartHidden(x, k, false) }), p.cfgError);
+    tweak(t("cards.hide.doneSection", "Část „{name}“ skryta", { name: partName(k) }), (l) => ({ layout: setPartHidden(l, k, true), undo: (x) => setPartHidden(x, k, false) }), p.cfgError);
   };
   // jen velikosti, které při dnešním počtu sloupců vypadají jinak (ve 2 sloupcích S a celá šířka)
   const sizeItems = () => usableSizes(cols()).map((s) => ({ v: s, text: s.toUpperCase(), title: sizeName(s) }));
@@ -175,35 +144,33 @@ export default function CardMenu(p: {
     tweak(text, (l) => ({ layout: setLimit(l, p.page, p.card, n), undo: (x) => setLimit(x, p.page, p.card, prev) }), p.cfgError);
   };
   return (
-    <span class="card-menu" classList={{ open: open() }} ref={root} data-cmenu>
+    <span class="card-menu" classList={{ open: open() }} data-cmenu>
       <button class="card-menu-btn" aria-haspopup="menu" aria-expanded={open()} title={t("cards.hide.more", "Další volby")} aria-label={t("cards.hide.more", "Další volby")} onClick={toggle}>⋯</button>
-      <Show when={pos()}>
+      <Show when={menu.at()}>
         {(at) => (
-          <Portal mount={root?.closest(".shell") ?? document.body}>
-            <span class="card-menu-list" role="menu" ref={list} style={{ position: "fixed", left: `${at().x}px`, top: `${at().y}px`, "max-height": `${at().maxH}px`, "overflow-y": "auto" }}>
-              <For each={p.extra ?? []}>
-                {(x) => <button role="menuitem" disabled={x.disabled} onClick={() => { close(); x.run(); }}>{x.label}</button>}
-              </For>
-              <Show when={(p.extra ?? []).length > 0}><span class="card-menu-sep" /></Show>
-              <Show when={p.size}>
-                {(sz) => <MenuChoice label={t("cards.menu.size", "Velikost")} items={sizeItems()} value={fitSize(sz(), cols())} onPick={pickSize} />}
-              </Show>
-              <MenuChoice label={t("cards.menu.height", "Výška")} items={heightItems()} value={quickH()} onPick={(v) => pickHeight(v ?? undefined)} />
-              <Show when={p.limit !== undefined}>
-                <MenuChoice label={t("cards.menu.limit", "Řádků")} items={limitItems()} value={p.limit !== undefined && QUICK_LIMITS.includes(p.limit) ? p.limit : -1} onPick={pickLimit} />
-              </Show>
-              {p.children}
-              <span class="card-menu-sep" />
-              <button role="menuitem" onClick={() => { close(); openCardLook(p.page, p.card, p.look, p.cfgError); }}>{t("cards.cardlook.menu", "Vzhled karty…")}</button>
-              <button role="menuitem" onClick={hideCard}>{t("cards.hide.card", "Skrýt kartu")}</button>
-              <For each={p.parts ?? []}>
-                {(k) => <button role="menuitem" onClick={() => hidePart(k)}>{t("cards.hide.part", "Skrýt sekci: {name}", { name: partName(k) })}</button>}
-              </For>
-              <Show when={p.onEdit}>
-                <button role="menuitem" onClick={() => { close(); p.onEdit?.(); }}>{t("cards.layout.editMenu", "Upravit šuplík…")}</button>
-              </Show>
-            </span>
-          </Portal>
+          <PopMenu anchor={at().anchor} keyboard={at().keyboard} trigger={menu.trigger()} onClose={close} align="end" label={t("cards.hide.more", "Další volby")}>
+            <For each={p.extra ?? []}>
+              {(x) => <PopItem disabled={x.disabled} onClick={() => { close(); x.run(); }}>{x.label}</PopItem>}
+            </For>
+            <Show when={(p.extra ?? []).length > 0}><PopSep /></Show>
+            <Show when={p.size}>
+              {(sz) => <MenuChoice label={t("cards.menu.size", "Velikost")} items={sizeItems()} value={fitSize(sz(), cols())} onPick={pickSize} />}
+            </Show>
+            <MenuChoice label={t("cards.menu.height", "Výška")} items={heightItems()} value={quickH()} onPick={(v) => pickHeight(v ?? undefined)} />
+            <Show when={p.limit !== undefined}>
+              <MenuChoice label={t("cards.menu.limit", "Řádků")} items={limitItems()} value={p.limit !== undefined && QUICK_LIMITS.includes(p.limit) ? p.limit : -1} onPick={pickLimit} />
+            </Show>
+            {p.children}
+            <PopSep />
+            <PopItem onClick={() => { close(); openCardLook(p.page, p.card, p.look, p.cfgError); }}>{t("cards.cardlook.menu", "Vzhled karty…")}</PopItem>
+            <PopItem onClick={hideCard}>{t("cards.hide.card", "Skrýt kartu")}</PopItem>
+            <For each={p.parts ?? []}>
+              {(k) => <PopItem onClick={() => hidePart(k)}>{t("cards.hide.part", "Skrýt část: {name}", { name: partName(k) })}</PopItem>}
+            </For>
+            <Show when={p.onEdit}>
+              <PopItem onClick={() => { close(); p.onEdit?.(); }}>{t("cards.layout.editMenu", "Upravit šuplík…")}</PopItem>
+            </Show>
+          </PopMenu>
         )}
       </Show>
     </span>

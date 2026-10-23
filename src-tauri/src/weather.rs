@@ -3,6 +3,8 @@
 //! Žádný poll: stahuje se jen při otevření šuplíku na Osobní, když jsou data starší než 30 min
 //! (nebo se změnilo místo). Síť volá jen Rust — CSP šuplíku pouští jen IPC. Místo je vždy z configu,
 //! nikdy z polohy podle IP. Parsování a mapování kódů jsou čisté funkce (testy na uloženém vzorku).
+//! Hledání města pro Nastavení (`geocoding-api.open-meteo.com`, také bez klíče) je dole: volá se jen
+//! na výslovné psaní do pole Město, nikdy v klidu.
 
 use crate::i18n::tr;
 use serde::Serialize;
@@ -155,12 +157,94 @@ pub fn status(place_set: bool, has_data: bool, error: bool, loading: bool, old: 
 pub async fn fetch(lat: f64, lon: f64) -> Result<Weather, String> {
     let client = reqwest::Client::builder().timeout(TIMEOUT).build().map_err(|e| trf!("HTTP klient: {e}", "HTTP client: {e}"))?;
     let net = |e: reqwest::Error| {
-        if e.is_timeout() { tr("Open-Meteo neodpověděl do 5 s", "Open-Meteo didn't answer within 5 s").to_string() } else { trf!("Open-Meteo nedostupné: {e}", "Open-Meteo unavailable: {e}") }
+        if e.is_timeout() { tr("Open-Meteo neodpověděl do 5 s", "Open-Meteo didn't answer within 5 s").to_string() } else { crate::errors::net(tr("Open-Meteo nedostupné", "Open-Meteo unavailable"), &e) }
     };
     let resp = client.get(url(lat, lon)).send().await.map_err(net)?;
     let status = resp.status();
     let text = resp.text().await.map_err(net)?;
     parse(&text).map_err(|e| if status.is_success() { e } else { format!("{e} (HTTP {})", status.as_u16()) })
+}
+
+// ---------- hledání města (Nastavení → Osobní → Počasí) ----------
+
+pub const GEO_API: &str = "https://geocoding-api.open-meteo.com/v1/search";
+/// Nejvýš tolik návrhů v našeptávači.
+pub const GEO_COUNT: usize = 5;
+/// Kratší dotaz se neposílá (jedno písmeno vrátí náhodná místa).
+pub const GEO_MIN_CHARS: usize = 2;
+const GEO_MAX_CHARS: usize = 80;
+
+/// Jeden návrh města: název, kraj / region, země a souřadnice (4 desetinná místa jako u počasí).
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Place {
+    pub name: String,
+    pub region: Option<String>,
+    pub country: Option<String>,
+    pub lat: f64,
+    pub lon: f64,
+}
+
+/// Dotaz z pole Město: oříznutý, jen když má aspoň `GEO_MIN_CHARS` znaků (po ořezu mezer); delší než 80 znaků se zkrátí.
+pub fn clean_query(q: &str) -> Option<String> {
+    let q = q.trim();
+    (q.chars().count() >= GEO_MIN_CHARS).then(|| q.chars().take(GEO_MAX_CHARS).collect())
+}
+
+/// Procentové kódování složky URL (RFC 3986 nechráněné znaky zůstanou, vše ostatní po bajtech UTF-8).
+fn encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+/// URL dotazu na města; jazyk názvů podle jazyka UI.
+pub fn geo_url(query: &str) -> String {
+    let lang = tr("cs", "en");
+    format!("{GEO_API}?name={}&count={GEO_COUNT}&language={lang}&format=json", encode(query))
+}
+
+/// Odpověď geocodingu → návrhy. Bez `results` (nic nenalezeno) = prázdný seznam; chybová odpověď → Err s důvodem;
+/// záznam bez názvu nebo souřadnic v platném rozsahu se přeskočí.
+pub fn parse_places(text: &str) -> Result<Vec<Place>, String> {
+    let v: Value = serde_json::from_str(text).map_err(|e| trf!("Hledání města: nečitelná odpověď ({e})", "City search: unreadable answer ({e})"))?;
+    if v.get("error").and_then(Value::as_bool) == Some(true) {
+        let reason = v.get("reason").and_then(Value::as_str).unwrap_or(tr("bez důvodu", "no reason given"));
+        return Err(format!("Open-Meteo: {reason}"));
+    }
+    let text_of = |r: &Value, k: &str| r.get(k).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+    let round = |x: f64| (x * 1e4).round() / 1e4;
+    let list = v.get("results").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
+    Ok(list
+        .iter()
+        .filter_map(|r| {
+            let (lat, lon) = (r.get("latitude")?.as_f64()?, r.get("longitude")?.as_f64()?);
+            if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
+                return None;
+            }
+            Some(Place { name: text_of(r, "name")?, region: text_of(r, "admin1"), country: text_of(r, "country"), lat: round(lat), lon: round(lon) })
+        })
+        .take(GEO_COUNT)
+        .collect())
+}
+
+/// Hledání města (async, timeout 5 s). Volá se jen na psaní v Nastavení; krátký dotaz nic nestahuje.
+pub async fn search_places(query: &str) -> Result<Vec<Place>, String> {
+    let Some(q) = clean_query(query) else { return Ok(Vec::new()) };
+    let client = reqwest::Client::builder().timeout(TIMEOUT).build().map_err(|e| trf!("HTTP klient: {e}", "HTTP client: {e}"))?;
+    let net = |e: reqwest::Error| {
+        if e.is_timeout() { tr("Hledání města neodpovědělo do 5 s", "City search didn't answer within 5 s").to_string() } else { crate::errors::net(tr("Hledání města nejde", "City search unavailable"), &e) }
+    };
+    let resp = client.get(geo_url(&q)).send().await.map_err(net)?;
+    let status = resp.status();
+    let text = resp.text().await.map_err(net)?;
+    parse_places(&text).map_err(|e| if status.is_success() { e } else { format!("{e} (HTTP {})", status.as_u16()) })
 }
 
 #[cfg(test)]
@@ -221,6 +305,45 @@ mod tests {
         let w = parse(r#"{"current":{"temperature_2m":10,"weather_code":0}}"#).unwrap();
         assert!(w.is_day);
         assert_eq!(w.icon, "☀️");
+    }
+
+    const GEO: &str = include_str!("fixtures/open-meteo-geocoding.json");
+
+    #[test]
+    fn geocoding_sample_to_places() {
+        let p = parse_places(GEO).unwrap();
+        assert_eq!(p.len(), 3, "záznam bez souřadnic se přeskočí");
+        assert_eq!(p[0], Place { name: "Praha".into(), region: Some("Hlavní město Praha".into()), country: Some("Česko".into()), lat: 50.088, lon: 14.4208 });
+        assert_eq!((p[1].name.as_str(), p[1].region.as_deref(), p[1].country.as_deref()), ("Praha", Some("Texas"), Some("Spojené státy americké")));
+        // chybí kraj i země → None, ne prázdný text
+        assert_eq!((p[2].region.clone(), p[2].country.clone()), (None, None));
+        assert_eq!((p[2].lat, p[2].lon), (-16.5, -179.9999));
+    }
+
+    #[test]
+    fn geocoding_empty_error_garbage() {
+        assert_eq!(parse_places(r#"{"generationtime_ms":0.4}"#).unwrap(), vec![]);
+        assert_eq!(parse_places(r#"{"results":[]}"#).unwrap(), vec![]);
+        assert!(parse_places(r#"{"error":true,"reason":"Parameter count must be between 1 and 100."}"#).unwrap_err().contains("count must be"));
+        assert!(parse_places("<html>502</html>").unwrap_err().contains("nečitelná"));
+        // souřadnice mimo rozsah se nepřevezmou
+        assert_eq!(parse_places(r#"{"results":[{"name":"X","latitude":91.0,"longitude":10.0}]}"#).unwrap(), vec![]);
+        // víc než GEO_COUNT návrhů se ořízne
+        let many = format!(r#"{{"results":[{}]}}"#, (0..9).map(|i| format!(r#"{{"name":"M{i}","latitude":1.0,"longitude":2.0}}"#)).collect::<Vec<_>>().join(","));
+        assert_eq!(parse_places(&many).unwrap().len(), GEO_COUNT);
+    }
+
+    #[test]
+    fn geocoding_query_and_url() {
+        for (raw, want) in [("", None), (" a ", None), ("  ", None), ("Pr", Some("Pr")), ("  Plzeň  ", Some("Plzeň"))] {
+            assert_eq!(clean_query(raw).as_deref(), want, "{raw:?}");
+        }
+        assert_eq!(clean_query(&"ž".repeat(200)).unwrap().chars().count(), 80);
+        assert_eq!(encode("Plzeň & co"), "Plze%C5%88%20%26%20co");
+        assert_eq!(encode("a-b_c.d~e"), "a-b_c.d~e");
+        let u = geo_url("Český Těšín");
+        assert!(u.starts_with("https://geocoding-api.open-meteo.com/v1/search?name=%C4%8Cesk%C3%BD%20T%C4%9B%C5%A1%C3%ADn&count=5&language=cs"), "{u}");
+        crate::i18n::with_lang(crate::uiconf::Lang::En, || assert!(geo_url("Brno").contains("language=en")));
     }
 
     #[test]

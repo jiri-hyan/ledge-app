@@ -2,17 +2,7 @@
 import { t } from "../i18n";
 import type { FoundApp, FoundRepo } from "../types";
 
-export type StepId = "welcome" | "assist" | "projects" | "apps" | "claude" | "links" | "look" | "done";
-export const STEPS: { id: StepId; key: string; cs: string }[] = [
-  { id: "welcome", key: "onboarding.step.welcome", cs: "Vítej" },
-  { id: "assist", key: "onboarding.step.assist", cs: "S Claudem" },
-  { id: "projects", key: "onboarding.step.projects", cs: "Projekty" },
-  { id: "apps", key: "onboarding.step.apps", cs: "Aplikace" },
-  { id: "claude", key: "onboarding.step.claude", cs: "Claude Code" },
-  { id: "links", key: "onboarding.step.links", cs: "Odkazy" },
-  { id: "look", key: "onboarding.step.look", cs: "Vzhled" },
-  { id: "done", key: "onboarding.step.done", cs: "Hotovo" },
-];
+export { STEPS, estimateMinutes, visibleSteps, doneRows, type StepId } from "./plan";
 
 /** Repo jde přidat: má návrh projektu a v Ledge ještě není. */
 export const importable = (r: FoundRepo) => !!r.project && !r.already;

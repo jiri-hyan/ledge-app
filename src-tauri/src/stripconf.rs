@@ -54,7 +54,9 @@ impl Default for StripConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            items: vec![StripItem::Mode, StripItem::Clock, StripItem::Running, StripItem::Claude, StripItem::Waiting, StripItem::Repos],
+            // čistý začátek: hodiny, režim a „Claude čeká“ (ta se ukáže jen když Claude opravdu čeká); Běží, Claude
+            // a Repa si uživatel přidá v Nastavení → Proužek
+            items: vec![StripItem::Clock, StripItem::Mode, StripItem::Waiting],
             opacity: 0.82,
             monitor: "primary".into(),
             custom: String::new(),

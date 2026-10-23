@@ -109,7 +109,7 @@ pub fn apply(plan: &Plan) -> Result<(), String> {
     if let Some(m) = plan.moves.iter().find(|m| m.to.exists()) {
         return Err(trf!("Na cílovém místě už je soubor „{}“.", "A file “{}” already exists at the destination.", m.to.file_name().unwrap_or_default().to_string_lossy()));
     }
-    let io = |e: std::io::Error| e.to_string();
+    let io = |e: std::io::Error| crate::errors::io(tr("Poznámku nejde přesunout", "Can't move the note"), &e);
     let mut copied: Vec<&Path> = Vec::new();
     let mut moved: Vec<&Mv> = Vec::new();
     let res = (|| -> Result<(), String> {
@@ -143,7 +143,7 @@ pub fn apply(plan: &Plan) -> Result<(), String> {
 /// Odkazy z těla poznámky `path` a množina odkazů, které používají jiné poznámky téže složky.
 fn refs_and_shared(path: &Path) -> Result<(Vec<String>, HashSet<String>), String> {
     let dir = path.parent().ok_or_else(|| tr("Poznámka bez složky.", "Note without a folder."))?;
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(path).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))?;
     let refs = refs_of(split(&String::from_utf8_lossy(&bytes)).1);
     let mut shared = HashSet::new();
     if let Ok(rd) = std::fs::read_dir(dir) {

@@ -47,7 +47,7 @@ export default function ScriptsSettings() {
         <PathPick path="scripts.dir" kind="folder" nullable label={t("settings.f.scripts.dir", "Složka skriptů")} placeholder={list()?.dir || "%USERPROFILE%\\Ledge\\scripts"} />
       </Row>
       <Row id="scripts.inActions" dim={c.cfg.scripts?.enabled === false}>
-        <Toggle path="scripts.inActions" label={t("settings.f.scripts.inActions", "Skripty i v kartě Rychlé akce")} />
+        <Toggle path="scripts.inActions" label={t("settings.f.scripts.inActions", "Skripty i v kartě Odkazy a akce")} />
       </Row>
       <Show when={list()}>
         {(l) => (

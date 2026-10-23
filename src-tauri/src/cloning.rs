@@ -92,19 +92,14 @@ pub fn run(remote: &str, target: &Path) -> Result<(), String> {
     let res = crate::gitinfo::capture(&mut cmd, None, true, Instant::now() + TIMEOUT);
     let err = match res {
         Ok(out) if out.success && target.join(".git").exists() => return Ok(()),
-        Ok(out) => trf!("{prog} selhal: {}", "{prog} failed: {}", last_line(&out.stderr)),
+        Ok(out) => crate::errors::git(&trf!("{prog} selhal", "{prog} failed"), out.code, &out.stderr),
         Err(crate::gitinfo::RunError::Timeout) => trf!("Klonování nestihlo {} min.", "Cloning didn't finish within {} min.", TIMEOUT.as_secs() / 60),
-        Err(crate::gitinfo::RunError::Spawn(e)) if prog == "gh" => trf!("GitHub CLI (gh) nejde spustit: {e}", "can't run GitHub CLI (gh): {e}"),
-        Err(crate::gitinfo::RunError::Spawn(e)) => trf!("git nejde spustit: {e}", "can't run git: {e}"),
+        Err(crate::gitinfo::RunError::Spawn(e)) if prog == "gh" => crate::errors::spawn_text(crate::i18n::tr("GitHub CLI (gh) nejde spustit", "Can't run GitHub CLI (gh)"), &e),
+        Err(crate::gitinfo::RunError::Spawn(e)) => crate::errors::spawn_text(crate::i18n::tr("Git nejde spustit", "Can't run git"), &e),
     };
     // rozpracovaný klon tohohle pokusu (složka předtím neexistovala) — jinak by další pokus kolidoval
     let _ = std::fs::remove_dir_all(target);
     Err(err)
-}
-
-/// Poslední neprázdný řádek výstupu (hláška gitu/gh), nebo „bez výstupu“.
-pub fn last_line(s: &str) -> String {
-    s.lines().rev().map(str::trim).find(|l| !l.is_empty()).unwrap_or(crate::i18n::tr("bez výstupu", "no output")).to_string()
 }
 
 #[cfg(test)]
@@ -186,11 +181,5 @@ mod tests {
         assert!(Busy::claim("test-busy").is_none() && is_busy("test-busy"));
         drop(a);
         assert!(!is_busy("test-busy") && Busy::claim("test-busy").is_some());
-    }
-
-    #[test]
-    fn last_line_picks_message() {
-        assert_eq!(last_line("Cloning…\n\nfatal: repository not found\n  "), "fatal: repository not found");
-        assert_eq!(last_line(""), "bez výstupu");
     }
 }

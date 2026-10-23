@@ -3,11 +3,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaultLayout, moveCard, removeCard, setSize } from "./model.ts";
+import { fullLayout } from "./fullLayout.mjs";
 import { MAX_UNDO, popUndo, pushUndo, resetLayout } from "./history.ts";
 
 test("případ 10: Zpět po každé změně (velikost, přesun, odebrání), nejen po odebrání", () => {
   // dřív: Vrátit jen po odebrání karty / smazání záložky / přesunu na záložku, a jen 6 s
-  const a = defaultLayout();
+  const a = fullLayout();
   const b = setSize(a, "prace", "claude", "s");
   const c = moveCard(b, "prace", 4, 0);
   const d = removeCard(c, "prace", "repos").layout;
@@ -30,7 +31,7 @@ test("případ 10: Zpět po každé změně (velikost, přesun, odebrání), nej
 });
 
 test("případ 11: Obnovit výchozí = výchozí rozložení, jednorázové úpravy se nespustí znovu", () => {
-  const custom = removeCard(defaultLayout(), "osobni", "projects").layout;
+  const custom = removeCard(fullLayout(), "osobni", "projects").layout;
   custom.upgrades = ["personalProjects", "budouciUprava"];
   const r = resetLayout(custom);
   assert.deepEqual(r.pages, defaultLayout().pages);

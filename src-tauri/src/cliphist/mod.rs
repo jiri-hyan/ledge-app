@@ -260,7 +260,7 @@ pub fn save_pins_to(file: &Path, pins: &[Pin]) -> Result<(), String> {
         let _ = std::fs::create_dir_all(dir);
     }
     let tmp = file.with_extension("json.tmp");
-    std::fs::write(&tmp, serialize_pins(pins)).and_then(|_| std::fs::rename(&tmp, file)).map_err(|e| trf!("Připnuté ze schránky nejde uložit: {e}", "Can't save the pinned clipboard items: {e}"))
+    std::fs::write(&tmp, serialize_pins(pins)).and_then(|_| std::fs::rename(&tmp, file)).map_err(|e| crate::errors::io(tr("Připnuté ze schránky nejde uložit", "Can't save the pinned clipboard items"), &e))
 }
 
 // ---------- stav za běhu ----------

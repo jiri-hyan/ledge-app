@@ -20,8 +20,11 @@ import { archiveNote, completeNote, deleteNote, reopenNote } from "../notes/life
 import { lifeActions, type LifeAction } from "../notes/lifeactions";
 import { actionText } from "../notes/lifelabels";
 import { IconX } from "../icons";
+import { debounce } from "../util/time";
+import { PopCap, PopItem, PopMenu, PopSep } from "../ui/Popover";
 import { IconEdit, IconLock, IconMore, IconPin, IconPlus, IconThrough } from "./icons";
-import { appendLine, caretFromText, pinColors, pointLine, SAVE_DELAY, TEXT_MIN, type SaveState } from "./model";
+import { appendLine, caretFromText, pinColors, pinSuggestVisible, pointLine, remindAskText, SAVE_DELAY, TEXT_MIN, type SaveState } from "./model";
+import { SUGGEST_DELAY, toLocalValue, type Suggest } from "../notes/suggest";
 
 /** Štítek zápisu v patičce — jen to, co se opravdu děje (žádné „uloženo“ dřív, než se uložilo). */
 function saveLabel(st: SaveState): string {
@@ -44,6 +47,10 @@ export default function PinApp() {
   const [adding, setAdding] = createSignal(false);
   const [addText, setAddText] = createSignal("");
   const [menu, setMenu] = createSignal(false);
+  /** návrh připomínky z právě přidaného bodu („zítra v 10 zavolat X“) — jen po přidání, nic se neptá v klidu */
+  const [sug, setSug] = createSignal<Suggest | null>(null);
+  let sugSeq = 0;
+  let menuBtn: HTMLButtonElement | undefined;
   /** po Splnit / Archivovat / Smazat: lišta „Zpět“, lístek se po ní sám zavře */
   const [after, setAfter] = createSignal(false);
   /** nápověda před prvním průchozím režimem (s čerstvým stavem zkratky) */
@@ -55,7 +62,6 @@ export default function PinApp() {
   /** běžící zápisy — událost `pin-note` z vlastního zápisu přijde dřív než odpověď */
   let saving = 0;
   let pendingHash: string | null = null;
-  let editTimer: number | undefined;
   /** stav zápisu pro štítek v patičce: čeká na uložení / ukládá se / uloženo */
   const [saveState, setSaveState] = createSignal<SaveState>("idle");
   let savedTimer: number | undefined;
@@ -221,8 +227,7 @@ export default function PinApp() {
     return caretFromText(trimBody(n.body), node.textContent ?? "", r.startOffset);
   }
   async function flush(): Promise<boolean> {
-    clearTimeout(editTimer);
-    editTimer = undefined;
+    autosave.cancel();
     if (!dirty()) return true;
     try {
       if ((await write(text())) === "saved") {
@@ -237,10 +242,10 @@ export default function PinApp() {
     return false;
   }
   /** Automatické uložení: po chvíli ticha při psaní (a vždy při odepnutí, Hotovo, ztrátě fokusu). */
+  const autosave = debounce(() => void flush(), SAVE_DELAY);
   const schedule = () => {
-    clearTimeout(editTimer);
     setSaveState("pending");
-    editTimer = window.setTimeout(() => void flush(), SAVE_DELAY);
+    autosave();
   };
   async function finishEdit() {
     if (await flush()) setEditing(false);
@@ -272,8 +277,47 @@ export default function PinApp() {
   async function submitAdd() {
     const line = pointLine(editing() ? text() : note()?.body ?? "", addText());
     if (!line) return setAdding(false);
-    if (await add(line)) setAddText("");
+    const typed = addText();
+    if (await add(line)) {
+      setAddText("");
+      askRemind(typed);
+    }
     addInput?.focus();
+  }
+
+  /** Po přidání bodu s časem: jedno zeptání jádra (po `SUGGEST_DELAY` ticha, další bod předchozí zeptání zahodí). */
+  const askRemind = debounce((typed: string) => {
+    const ask = remindAskText(typed, note()?.remindMs);
+    const id = ++sugSeq;
+    if (!ask) return void setSug(null);
+    api.noteSuggestRemind(ask).then(
+      (r) => id === sugSeq && setSug(r ?? null),
+      () => id === sugSeq && setSug(null),
+    );
+  }, SUGGEST_DELAY);
+
+  /** Klik na chip: připomínka poznámky přes stejný zápis jako editor (`note_save` s `remind`). */
+  async function acceptRemind(s: Suggest) {
+    const v = toLocalValue(s.iso);
+    setSug(null);
+    if (!v || !(await flush())) return;
+    try {
+      for (let i = 0; i < 2; i++) {
+        const n = note();
+        if (!n) return;
+        const r = await busy(() => api.noteSave({ path: n.path, expectedHash: n.hash, body: n.body, project: n.project ?? "", kind: n.kind, remind: v, images: [] }));
+        if (r?.outcome === "saved") {
+          setNote(r.note);
+          markSaved();
+          say(t("notes.pin.remindSet", "Připomínka nastavena: {when}", { when: s.label }));
+          return;
+        }
+        await load();
+      }
+      say(t("notes.pin.retry", "Poznámka se právě měnila jinde — zkus to znovu."), true);
+    } catch (e) {
+      sayError(e);
+    }
   }
 
   // ---------- schránka: obrázek (Win+Shift+S → Ctrl+V) i text ----------
@@ -330,7 +374,7 @@ export default function PinApp() {
     const n = note();
     if (!n || a === "unarchive") return;
     if (a === "delete") {
-      clearTimeout(editTimer);
+      autosave.cancel();
     } else if (!(await settle())) {
       return say(t("notes.pin.unpinBlocked", "Odepnutí počká — rozepsaný text se nepodařilo uložit (viz upozornění v lístku)."), true);
     }
@@ -362,7 +406,6 @@ export default function PinApp() {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (hint()) setHint(null);
-      else if (menu()) setMenu(false);
       else if (adding()) setAdding(false);
       else if (editing()) void finishEdit();
     };
@@ -375,7 +418,7 @@ export default function PinApp() {
       window.removeEventListener("keydown", key);
       window.removeEventListener("blur", blur);
       document.removeEventListener("paste", paste);
-      clearTimeout(editTimer);
+      autosave.cancel();
       clearTimeout(savedTimer);
     });
     void api.pinInit().then(
@@ -409,7 +452,7 @@ export default function PinApp() {
         <Show when={p()?.locked}><span class="pin-state" title={t("notes.pin.lockedTitle", "Zamčeno na místě")}><IconLock /></span></Show>
         <Show when={!through()}>
           <button class="pin-ic" classList={{ on: !!p()?.onTop }} aria-pressed={!!p()?.onTop} title={p()?.onTop ? t("notes.pin.onTopOn", "Vždy navrchu — klik: normální okno") : t("notes.pin.onTopOff", "Normální okno — klik: vždy navrchu")} onClick={() => patch({ onTop: !p()?.onTop })}><IconPin /></button>
-          <button class="pin-ic" aria-haspopup="menu" aria-expanded={menu()} title={t("notes.pin.more", "Volby lístku")} onClick={() => setMenu(!menu())}><IconMore /></button>
+          <button class="pin-ic" ref={menuBtn} aria-haspopup="menu" aria-expanded={menu()} title={t("notes.pin.more", "Volby lístku")} onClick={() => setMenu(!menu())}><IconMore /></button>
           <button class="pin-ic" title={t("notes.pin.unpin", "Odepnout z plochy (poznámka zůstane v Ledge)")} onClick={unpin}><IconX /></button>
         </Show>
       </div>
@@ -464,6 +507,16 @@ export default function PinApp() {
           </Show>
         </div>
 
+        <Show when={!through() && !gone() ? pinSuggestVisible(sug(), note()?.remindMs) : null}>
+          {(g) => (
+            <div class="pin-sug">
+              <button class="pin-sug-go" title={t("notes.suggest.title", "Nastaví připomínku podle času v textu")} onClick={() => void acceptRemind(g())}>
+                ⏰ {t("notes.suggest.ask", "Připomenout {when}?", { when: g().label })}
+              </button>
+              <button class="pin-sug-x" aria-label={t("notes.suggest.dismiss", "Nenabízet")} title={t("notes.suggest.dismiss", "Nenabízet")} onClick={() => setSug(null)}><IconX /></button>
+            </div>
+          )}
+        </Show>
         <Show when={!through() && note() && !gone()}>
           <Show when={adding()} fallback={
             <div class="pin-foot">
@@ -497,16 +550,10 @@ export default function PinApp() {
 
       <Show when={menu() && !through() && p()}>
         {(pr) => (
-          <div class="pin-menu" role="menu">
-            <button role="menuitemcheckbox" aria-checked={pr().onTop} classList={{ on: pr().onTop }} onClick={() => patch({ onTop: !pr().onTop })}>
-              <span class="box" />{t("notes.pin.onTop", "Vždy navrchu")}
-            </button>
-            <button role="menuitemcheckbox" aria-checked={pr().locked} classList={{ on: pr().locked }} onClick={() => patch({ locked: !pr().locked })}>
-              <span class="box" />{t("notes.pin.lock", "Zamknout na místě")}
-            </button>
-            <button role="menuitemcheckbox" aria-checked={false} onClick={wantThrough}>
-              <span class="box" />{t("notes.pin.through", "Průchozí — myš projde na stránku pod lístkem")}
-            </button>
+          <PopMenu fill anchor={{ left: 0, top: 0, right: 0, bottom: 0 }} trigger={menuBtn} onClose={() => setMenu(false)} label={t("notes.pin.more", "Volby lístku")}>
+            <PopItem checked={pr().onTop} onClick={() => patch({ onTop: !pr().onTop })}>{t("notes.pin.onTop", "Vždy navrchu")}</PopItem>
+            <PopItem checked={pr().locked} onClick={() => patch({ locked: !pr().locked })}>{t("notes.pin.lock", "Zamknout na místě")}</PopItem>
+            <PopItem checked={false} onClick={wantThrough}>{t("notes.pin.through", "Průchozí — myš projde na stránku pod lístkem")}</PopItem>
             <label class="pin-range">
               <span>{t("notes.pin.bg", "Pozadí")} <b>{look()?.bg ?? pr().bg} %</b></span>
               <input type="range" min="0" max="100" step="5" value={pr().bg} onInput={(e) => setLook({ bg: +e.currentTarget.value, text: look()?.text ?? pr().text })} onChange={(e) => patch({ bg: +e.currentTarget.value }).then(() => setLook(null))} />
@@ -515,33 +562,33 @@ export default function PinApp() {
               <span>{t("notes.pin.text", "Text")} <b>{look()?.text ?? pr().text} %</b></span>
               <input type="range" min={TEXT_MIN} max="100" step="5" value={pr().text} onInput={(e) => setLook({ bg: look()?.bg ?? pr().bg, text: +e.currentTarget.value })} onChange={(e) => patch({ text: +e.currentTarget.value }).then(() => setLook(null))} />
             </label>
-            <button role="menuitem" onClick={() => startEdit()}>{t("notes.pin.editText", "Upravit text")}</button>
-            <button role="menuitem" onClick={() => { setMenu(false); void patch({ collapsed: true }); }}>{t("notes.pin.collapse", "Sbalit na lištu (dvojklik na lištu)")}</button>
-            <button role="menuitem" onClick={() => { setMenu(false); const n = note(); if (n) void settle().then((ok) => ok && api.pinEditInLedge(n.path).catch(sayError)); }}>{t("notes.pin.editInLedge", "Upravit v Ledge")}</button>
-            <button role="menuitem" onClick={() => { setMenu(false); const n = note(); if (n) api.noteOpen(n.path).catch(sayError); }}>{t("notes.pin.openExternal", "Otevřít v externím editoru")}</button>
-            <button role="menuitem" onClick={unpin}>{t("notes.pin.unpinLong", "Odepnout z plochy (poznámka zůstane)")}</button>
-            <span class="pin-sep" />
+            <PopItem onClick={() => startEdit()}>{t("notes.pin.editText", "Upravit text")}</PopItem>
+            <PopItem onClick={() => { setMenu(false); void patch({ collapsed: true }); }}>{t("notes.pin.collapse", "Sbalit na lištu (dvojklik na lištu)")}</PopItem>
+            <PopItem onClick={() => { setMenu(false); const n = note(); if (n) void settle().then((ok) => ok && api.pinEditInLedge(n.path).catch(sayError)); }}>{t("notes.pin.editInLedge", "Upravit v Ledge")}</PopItem>
+            <PopItem onClick={() => { setMenu(false); const n = note(); if (n) api.noteOpen(n.path).catch(sayError); }}>{t("notes.pin.openExternal", "Otevřít v externím editoru")}</PopItem>
+            <PopItem onClick={unpin}>{t("notes.pin.unpinLong", "Odepnout z plochy (poznámka zůstane)")}</PopItem>
+            <PopSep />
             <Show when={note()}>
               {(n) => (
                 <>
-                  <span class="pin-cap">{t("notes.export.title", "Export")}</span>
+                  <PopCap>{t("notes.export.title", "Export")}</PopCap>
                   <For each={exportItems(n().path, () => (editing() ? text() : n().body))}>
-                    {(it) => <button role="menuitem" onClick={() => { setMenu(false); void settle().then((ok) => ok && it.run()); }}>{it.label}</button>}
+                    {(it) => <PopItem onClick={() => { setMenu(false); void settle().then((ok) => ok && it.run()); }}>{it.label}</PopItem>}
                   </For>
-                  <span class="pin-sep" />
+                  <PopSep />
                 </>
               )}
             </Show>
             <For each={lifeActions(!!note()?.done, false)}>
-              {(a) => <button role="menuitem" classList={{ danger: a === "delete" }} onClick={() => void life(a)}>{actionText(a)}</button>}
+              {(a) => <PopItem danger={a === "delete"} onClick={() => void life(a)}>{actionText(a)}</PopItem>}
             </For>
-          </div>
+          </PopMenu>
         )}
       </Show>
 
       <Show when={!through() && hint()}>
         {(h) => (
-          <div class="pin-menu pin-hint" role="dialog">
+          <div class="pop pop-fill pin-hint" role="dialog">
             <b>{t("notes.pin.hintTitle", "Průchozí režim")}</b>
             <p>{t("notes.pin.hintText", "Myš půjde lístkem na stránku pod ním — lístek zůstane vidět, jen ho nepůjde ovládat myší.")}</p>
             <Show when={h().key && h().keyOk} fallback={<p class="warn">{t("notes.pin.hintNoKey", "Zkratka pro vypnutí teď nefunguje (vypnutá nebo obsazená jinou aplikací). Vypneš ho v Ledge: Ctrl+K → „Lístky: vypnout průchozí režim“.")}</p>}>

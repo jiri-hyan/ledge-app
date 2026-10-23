@@ -30,7 +30,7 @@ const monthsGen = () => [
 
 export const pad2 = (n: number) => String(n).padStart(2, "0");
 /** „7:05“ → „07:05“ (24 h). */
-export const fmtTime = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+export const fmtClock = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 /** „pátek 16. října“ / „Friday, October 16“ */
 export const fmtDate = (d: Date) => t("format.date", "{dow} {d}. {month}", { dow: dayNames()[d.getDay()], d: d.getDate(), month: monthsGen()[d.getMonth()] });
 export const num = (v: number, digits = 0) => v.toLocaleString(locale(), { maximumFractionDigits: digits });

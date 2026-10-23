@@ -3,37 +3,34 @@
 // výšky obsahu (`report`) a fokus (jen výslovný klik → `focusDrawer`, odchod → `releaseFocus`). Malé
 // pohledy (peek, náhled po najetí `compact` / `island`) kreslí `hover/SmallView.tsx` stejným morfem.
 // Vzhled (motiv, animace) aplikuje `theme/apply.ts` (`initAppearance` v onMount).
-// Karty jsou v `cards/`, hlavní stránka v `MainPage.tsx`, poznámky v `notes/`.
-// anglické slovníky (registerDict) dřív než cokoli, co volá t()
+// Karty jsou v `cards/`, hlavní stránka v `MainPage.tsx`, poznámky v `notes/`. Nastavení, průvodce, paleta, Poznámky a
+// panel „Nová verze“ jsou líné chunky (`lazyViews.tsx`), přednačtené v klidu po prvním otevření šuplíku.
+// loader anglických slovníků (líný chunk, jen pro jazyk ≠ cs) dřív než cokoli, co volá setLang()
 import "./i18n/load";
 import { createSignal, Show, onMount, onCleanup, createEffect, on as onChange } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { api, on, type Snapshot, type View, type ViewMsg, type NoteView } from "./api";
 import { IconShield } from "./icons";
 import NoteEditor from "./notes/NoteEditor";
-import NotesPage from "./notes/NotesPage";
 import { returnTo, setEditPath, setNotePreset, setPageProject, setReturnTo, type NotePreset } from "./notes/store";
 import "./notes/notes.css";
 import { OVERLAP, spring, collapsedClip, bandClip, FULL_CLIP, measure, motionNow, preHide, revealContent, concealContent } from "./motion";
 import { closePlan, openPlan, type Geo, type Plan } from "./theme/openAnim";
 import { initAppearance } from "./theme/apply";
-import Settings from "./Settings";
 import { holdWide, wantWidth } from "./settings/widen";
 import MainPage from "./MainPage";
 import Head from "./cards/Head";
-import UpdatePanel from "./cards/UpdatePanel";
 import SmallView from "./hover/SmallView";
 import { isHoverView, smallWidth } from "./hover/model";
 import { asPage, typing, type Page } from "./nav";
 import { EMPTY_SNAPSHOT } from "./snapshot";
 import { Toast } from "./ui/toast";
 import UndoBar from "./notes/UndoBar";
-import Palette from "./palette/Palette";
 import { gotoSettingsPanel } from "./palette/goto";
-import Wizard from "./onboarding/Wizard";
 import { checkFirstRun, wizardOpen } from "./onboarding/state";
 import { beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, escEdit, resumeEdit, setCatalogOpen, setEditPage } from "./layout/edit";
 import { normalizeLayout } from "./layout/model";
+import { NotesPage, Palette, Settings, UpdatePanel, Wizard, preloadViews } from "./lazyViews";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
@@ -259,6 +256,8 @@ export default function App() {
   }, { defer: true }));
   // průvodce prvním spuštěním: config se čte při prvním otevření; dokud běží, šuplík otevírá na něm
   createEffect(() => view() === "full" && void checkFirstRun());
+  // líné pohledy (Nastavení, paleta…) se přednačtou až po prvním zobrazení šuplíku, v klidu
+  createEffect(() => view() === "full" && preloadViews());
   createEffect(() => view() === "full" && wizardOpen() && setPage("welcome"));
   // z poznámky zpět na šuplík (Zpět, uložení, Esc) → opener jako před `focusDrawer`
   createEffect(onChange(page, (pg, prev) => prev && typing(prev) && !typing(pg) && view() !== "hidden" && api.releaseFocus(), { defer: true }));

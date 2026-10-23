@@ -7,13 +7,14 @@ import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { api, type EditPreview, type GitFileView, type GitView, type SessionView } from "../api";
 import { t, tp } from "../i18n";
 import { say } from "../ui/toast";
+import { Confirm } from "../ui/Confirm";
 import DiffPreview from "./DiffPreview";
 import { badge, canPush, commitReady, defaultPicked, diffModes, hiddenFiles, messageKey, togglePicked } from "./git";
 import "./git.css";
 
-type Confirm = { kind: "push" } | { kind: "discard"; path: string; text: string } | { kind: "remove"; text: string };
+type Ask = { kind: "push" } | { kind: "discard"; path: string; text: string } | { kind: "remove"; text: string };
 type Diff = { path: string; staged: boolean; pv: EditPreview | null };
-const confirmText = (c: Confirm, v: GitView) => (c.kind === "push" ? v.pushText : c.text);
+const confirmText = (c: Ask, v: GitView) => (c.kind === "push" ? v.pushText : c.text);
 
 export default function GitPanel(p: { id: string; status: SessionView["status"] }) {
   /** undefined = načítá se, null = cwd není v gitu */
@@ -26,7 +27,7 @@ export default function GitPanel(p: { id: string; status: SessionView["status"] 
   /** null = formulář commitu zavřený */
   const [msg, setMsg] = createSignal<string | null>(null);
   const [picked, setPicked] = createSignal<string[]>([]);
-  const [confirm, setConfirm] = createSignal<Confirm | null>(null);
+  const [confirm, setConfirm] = createSignal<Ask | null>(null);
   const [took, setTook] = createSignal(false);
   let box: HTMLTextAreaElement | undefined;
 
@@ -108,7 +109,7 @@ export default function GitPanel(p: { id: string; status: SessionView["status"] 
     else if (k === "send") sendCommit();
   }
 
-  function doConfirm(c: Confirm) {
+  function doConfirm(c: Ask) {
     setConfirm(null);
     if (c.kind === "push") void run(() => api.sessionGitPush(p.id), t("sessions.git.pushed", "Pushnuto"));
     else if (c.kind === "discard") void run(() => api.sessionGitDiscard(p.id, c.path), t("sessions.git.discarded", "Změny zahozené"), () => diff()?.path === c.path && setDiff(null));
@@ -202,15 +203,15 @@ export default function GitPanel(p: { id: string; status: SessionView["status"] 
 
                 <Show when={confirm()}>
                   {(c) => (
-                    <div class="sess-git-confirm" classList={{ "sess-git-warn": c().kind !== "push" }}>
-                      <div class="sess-git-ctext">{confirmText(c(), v())}</div>
-                      <div class="sess-git-line">
-                        <button class="mini" onClick={() => setConfirm(null)}>{t("sessions.git.cancel", "Zrušit")}</button>
-                        <button class="mini" classList={{ "sess-git-danger": c().kind !== "push" }} disabled={busy()} onClick={() => doConfirm(c())}>
-                          {c().kind === "push" ? t("sessions.git.pushDo", "Pushnout") : c().kind === "discard" ? t("sessions.git.discardDo", "Zahodit změny") : t("sessions.git.removeDo", "Odstranit worktree")}
-                        </button>
-                      </div>
-                    </div>
+                    <Confirm
+                      when
+                      text={confirmText(c(), v()) ?? ""}
+                      yes={c().kind === "push" ? t("sessions.git.pushDo", "Pushnout") : c().kind === "discard" ? t("sessions.git.discardDo", "Zahodit změny") : t("sessions.git.removeDo", "Odstranit worktree")}
+                      danger={c().kind !== "push"}
+                      busy={busy()}
+                      onYes={() => doConfirm(c())}
+                      onNo={() => setConfirm(null)}
+                    />
                   )}
                 </Show>
 

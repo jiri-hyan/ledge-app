@@ -29,7 +29,7 @@ export default function WeatherCard(p: { s: Snapshot; now: number; onSettings: (
       <h4><span class="ic" style="background:var(--blue)" />{t("cards.weather.title", "Počasí")} <span class="n">{w().label}</span>{p.menu}</h4>
       <Show when={w().data} fallback={
         <Show when={w().status !== "unset"} fallback={
-          <div class="empty">{t("cards.weather.unset", "Nastav místo v Nastavení (zeměpisná šířka a délka). Bez něj se nic nestahuje.")} <button class="mini" onClick={() => { p.onSettings(); gotoSettingsPanel("f-personal.weather"); }}>{t("cards.weather.setPlace", "Nastavit místo…")}</button></div>
+          <div class="empty">{t("cards.weather.unset", "Vyber město v Nastavení → Osobní. Bez něj se nic nestahuje.")} <button class="mini" onClick={() => { p.onSettings(); gotoSettingsPanel("f-personal.weather"); }}>{t("cards.weather.setPlace", "Nastavit místo…")}</button></div>
         }>
           <Show when={w().status === "unavailable"} fallback={<div class="empty">{w().loading ? t("cards.weather.loading", "Načítám počasí…") : t("cards.weather.notYet", "Počasí zatím nenačteno — stáhne se při otevření.")}</div>}>
             <div class="empty">{t("cards.weather.unavailable", "Počasí je nedostupné.")}</div>

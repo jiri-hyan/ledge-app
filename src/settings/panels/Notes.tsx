@@ -7,6 +7,7 @@ import { t } from "../../i18n";
 import { KindIcon } from "../../notes/kinds";
 import { say, sayError } from "../../ui/toast";
 import { base, offerUndo, useSettings } from "../ctx";
+import { Advanced } from "../fields/Advanced";
 import { Color, PathPick, Slider, Text, Toggle } from "../fields/controls";
 import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
 import { SortList } from "../fields/SortList";
@@ -21,7 +22,7 @@ const SYNC_TEXT: Record<string, [string, string]> = {
   ok: ["settings.notes.sync.st.ok", "V pořádku"],
   syncing: ["settings.notes.sync.st.syncing", "Synchronizuji…"],
   offline: ["settings.notes.sync.st.offline", "Bez připojení"],
-  neprihlaseno: ["settings.notes.sync.st.auth", "Nepřihlášeno ke gitu (gh auth setup-git)"],
+  neprihlaseno: ["settings.notes.sync.st.auth", "Nepřihlášeno ke GitHubu — postup je v Pokročilé"],
   konflikt: ["settings.notes.sync.st.conflict", "Konflikt — vyřeš v repu poznámek"],
   chyba: ["settings.notes.sync.st.error", "Chyba"],
 };
@@ -131,12 +132,6 @@ export default function NotesPanel(_p: PanelProps) {
         <Section title={t("settings.notes.sync", "Synchronizace mezi počítači")}>
           <Row id="notes.sync.enabled"><Toggle path="notes.sync.enabled" label={t("settings.f.notes.sync.enabled", "Synchronizace mezi počítači")} /></Row>
           <Show when={n().sync.enabled}>
-            <Row id="notes.sync.remote" stack>
-              <Text path="notes.sync.remote" label={t("settings.f.notes.sync.remote", "Repo pro poznámky")} placeholder={t("settings.notes.sync.remote.ph", "https://github.com/ty/poznamky.git")} mono grow />
-            </Row>
-            <Row id="notes.sync.intervalMin">
-              <Slider path="notes.sync.intervalMin" min={1} max={120} label={t("settings.f.notes.sync.intervalMin", "Jak často synchronizovat")} fmt={(v) => t("settings.notes.sync.every", "každých {v} min", { v })} />
-            </Row>
             <Row
               id="notes.sync.now"
               label={t("settings.notes.sync.now", "Synchronizovat teď")}
@@ -152,6 +147,14 @@ export default function NotesPanel(_p: PanelProps) {
                 <button class="mini" disabled={syncing() || syncDirty()} onClick={syncNow}>{syncing() ? t("settings.notes.sync.running", "Synchronizuji…") : t("settings.notes.sync.now", "Synchronizovat teď")}</button>
               </span>
             </Row>
+            <Advanced id="poznamky" inline hint={t("settings.notes.adv.hint", "Repo pro poznámky, přihlášení ke gitu a interval")}>
+              <Row id="notes.sync.remote" stack>
+                <Text path="notes.sync.remote" label={t("settings.f.notes.sync.remote", "Repo pro poznámky")} placeholder={t("settings.notes.sync.remote.ph", "https://github.com/ty/poznamky.git")} mono grow />
+              </Row>
+              <Row id="notes.sync.intervalMin">
+                <Slider path="notes.sync.intervalMin" min={1} max={120} label={t("settings.f.notes.sync.intervalMin", "Jak často synchronizovat")} fmt={(v) => t("settings.notes.sync.every", "každých {v} min", { v })} />
+              </Row>
+            </Advanced>
           </Show>
         </Section>
       </Show>

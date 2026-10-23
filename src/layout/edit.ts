@@ -52,7 +52,7 @@ type Src = { layout: unknown; mode: string; cfgError: string | null };
 /** ✎ / paleta / ⋯ → úpravy (s chybou configu ne — uložení by přepsalo uživatelův soubor výchozím). */
 export function beginEdit(s: Src, openCatalog = false) {
   if (s.cfgError) {
-    say(t("cards.layout.cfgError", "Config má chybu — šuplík teď upravíš jen v Nastavení."), true);
+    say(t("cards.layout.cfgError", "Nastavení obsahuje chybu — šuplík teď upravíš jen v Nastavení."), true);
     return;
   }
   if (editing()) {
@@ -178,7 +178,7 @@ export async function finishEdit() {
 /** Jedna změna rozložení mimo režim úprav (⋯ na kartě): uloží jen pole `layout`. */
 export async function saveLayout(f: (l: Layout) => Layout, cfgError: string | null): Promise<boolean> {
   if (cfgError) {
-    say(t("cards.hide.cfgError", "Config má chybu — karty teď skryješ jen v Nastavení."), true);
+    say(t("cards.hide.cfgError", "Nastavení obsahuje chybu — karty teď skryješ jen v Nastavení."), true);
     return false;
   }
   try {

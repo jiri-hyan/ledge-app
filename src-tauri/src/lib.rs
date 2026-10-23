@@ -46,6 +46,7 @@ mod ctl;
 mod drawer;
 mod drawerfit;
 mod edge;
+mod errors;
 mod focusreturn;
 mod gamemode;
 mod gitinfo;
@@ -102,6 +103,7 @@ mod threads;
 mod tilelook;
 mod timer;
 mod toast;
+mod tray;
 mod uiconf;
 mod update;
 mod usage;
@@ -249,6 +251,10 @@ pub fn run() {
             }));
 
             sync_hotkeys();
+            // ikona v oznamovací oblasti: důkaz, že Ledge běží, a cesta k ukončení (`tray.rs`)
+            tray::init(app.handle());
+            // nový uživatel: šuplík se jednou otevře sám s Vítej (bez fokusu, ne ve hře) — `onboarding/first_run.rs`
+            onboarding::first_run::schedule();
             if cfg.claude.enabled
                 && let Err(e) = claude::serve(cfg.claude.port, claude, ctl::status_extra(), ctl::ctl_handler(), mcp::host::endpoint())
             {
@@ -400,6 +406,7 @@ pub fn run() {
             commands::media::volume_set,
             commands::media::volume_mute,
             commands::calendar::calendar_test,
+            commands::geo::geo_search,
             commands::integrations::system_view,
             commands::integrations::system_taskmgr,
             commands::integrations::github_view,

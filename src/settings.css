@@ -55,7 +55,7 @@
 .st-phead p { margin-top: 4px; max-width: 70ch; color: var(--t2); font-size: var(--fs-ui); }
 .st-phead-act { margin-left: auto; display: flex; align-items: center; gap: var(--s2); flex-shrink: 0; }
 
-.st-sec { margin-bottom: var(--s3); padding: 2px var(--s4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-xl); }
+.st-sec { margin-bottom: var(--s3); padding: 2px var(--s4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-xl); container-type: inline-size; }
 .st-sec-head { display: flex; align-items: center; gap: var(--s2); padding-top: var(--s3); }
 .st-sec h3 { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; }
 .st-sec-aside { margin-left: auto; }
@@ -74,7 +74,6 @@
 .st-lbl small { display: block; margin-top: 2px; color: var(--t3); font-size: var(--fs-sm); line-height: 1.4; }
 .st-ctl { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s2); margin-left: auto; min-width: 0; max-width: 100%; }
 .st-row.stack .st-ctl { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin-left: 0; }
-.st-sec { container-type: inline-size; }
 @container (max-width: 520px) {
   .st-ctl { margin-left: 0; justify-content: flex-start; }
   .opt > :last-child:not(:first-child) { margin-left: 0; }
@@ -88,6 +87,24 @@
 .st-empty { padding: var(--s3) 0; color: var(--t3); font-size: var(--fs-ui); }
 .st-note { color: var(--t3); font-size: var(--fs-sm); }
 .st-info { margin-bottom: var(--s3); padding: 8px 12px; color: var(--t2); font-size: var(--fs-sm); background: color-mix(in srgb, var(--blue) 10%, transparent); border: 1px solid color-mix(in srgb, var(--blue) 26%, transparent); border-radius: var(--r-md); }
+
+/* Štítek „Platí hned“ u voleb, které se neukládají lištou (`fields/Row.tsx` `LiveBadge`) */
+.st-live { align-self: flex-start; padding: 2px 8px; color: var(--green); font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; background: color-mix(in srgb, var(--green) 12%, transparent); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent); border-radius: var(--r-pill); }
+.st-row:not(.stack) .st-live { align-self: center; }
+
+/* Sbalitelné „Pokročilé“ (`fields/Advanced.tsx`): vlastní karta pod sekcemi panelu, nebo `inline` uvnitř sekce */
+.st-adv { margin-bottom: var(--s3); padding: 2px var(--s4); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-xl); }
+.st-adv.inline { margin: var(--s2) 0 0; padding: 0; background: none; border: 0; border-top: 1px solid var(--line-soft); border-radius: 0; }
+.st-adv > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--s2); padding: 12px 0; list-style: none; cursor: pointer; }
+.st-adv > summary::-webkit-details-marker { display: none; }
+.st-adv > summary::before { content: "▸"; color: var(--t3); }
+.st-adv[open] > summary::before { content: "▾"; }
+.st-adv > summary b { color: var(--t2); font-size: var(--fs-ui); font-weight: 600; }
+.st-adv > summary small { color: var(--t3); font-size: var(--fs-sm); }
+.st-adv-body { padding-bottom: var(--s2); }
+/* sekce uvnitř „Pokročilé“ jsou plošné, ne karta v kartě */
+.st-adv-body > .st-sec { padding-left: 0; padding-right: 0; background: none; border: 0; border-radius: 0; margin-bottom: 0; }
+.st-adv-body > .st-sec + .st-sec { border-top: 1px solid var(--line-soft); }
 
 /* ---------- ovládací prvky ---------- */
 .st input[type="text"], .st input[type="number"], .st select { transition: border-color var(--fast), box-shadow var(--fast); }
@@ -138,7 +155,6 @@
 .st kbd { padding: 1px 6px; color: var(--t1); font: 600 var(--fs-sm) var(--mono); background: var(--card-2); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: var(--r-xs); }
 @keyframes st-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--violet) 12%, transparent); } }
 
-.mini.danger { color: var(--on-light); background: var(--red); border-color: transparent; }
 .st .link { color: var(--blue); font-weight: 600; font-size: var(--fs-ui); text-decoration: underline; text-underline-offset: 2px; }
 .st input[type="checkbox"] { accent-color: var(--violet); margin-top: 3px; }
 
@@ -174,6 +190,13 @@
 .st-actions small { color: var(--t3); }
 .st-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3) var(--s5); }
 .st-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+/* pole Město s našeptávačem (`panels/CityPicker.tsx`) */
+.st-city { display: flex; flex-direction: column; gap: var(--s2); }
+.st-city .st-text { width: 100%; }
+.st-city-err { color: var(--red); font-size: var(--fs-sm); }
+.st-city-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 4px; list-style: none; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-md); }
+.st-city-list button { width: 100%; padding: 6px 10px; color: var(--t1); font-size: var(--fs-ui); text-align: left; border-radius: calc(var(--r-md) - 3px); }
+.st-city-list button:hover, .st-city-list button:focus-visible { background: var(--card-3); }
 .st-pickers { display: flex; gap: 4px; }
 .st-icons { display: flex; flex-wrap: wrap; gap: 4px; }
 .st-icons button { display: grid; place-items: center; width: 32px; height: 32px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm); transition: background var(--fast), border-color var(--fast); }
@@ -197,10 +220,6 @@
 .st-dot.warn { background: var(--amber); }
 .st-dot.bad { background: var(--red); }
 
-.st-confirm { display: flex; align-items: center; gap: var(--s3); margin: 6px 0; padding: 10px 12px; background: var(--pop); border: 1px solid var(--line-2); border-radius: var(--r-lg); animation: st-in var(--dur-2) var(--ease); }
-.st-confirm.danger { border-color: color-mix(in srgb, var(--red) 40%, transparent); }
-.st-confirm small { display: block; margin-top: 2px; color: var(--t2); font-size: var(--fs-sm); }
-.st-confirm-btns { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
 
 .st-cands { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3) 0; }
 .st-cand-list :focus-visible { outline-offset: -2px; }
@@ -257,8 +276,10 @@
 .st-tips { list-style: none; margin: 0; padding: 4px 0 var(--s3); display: grid; gap: 2px; }
 .st-tips li { display: flex; align-items: center; gap: var(--s3); padding: 8px 0; }
 .st-tips li + li { border-top: 1px solid var(--line-soft); }
-.st-tips kbd { min-width: 52px; text-align: center; flex-shrink: 0; }
+.st-tips kbd { min-width: 52px; text-align: center; flex-shrink: 0; white-space: nowrap; }
 .st-tips .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .st-tips strong { color: var(--t1); font-weight: 600; }
 .st-tips small { color: var(--t3); font-size: var(--fs-sm); }
+.st-tips .st-kbd-mouse { opacity: 0.7; }
+.st-keys-group { margin: var(--s3) 0 0; font-size: var(--fs-sm); font-weight: 600; color: var(--t3); }
 .act-add { display: inline-flex; border-radius: var(--r-md); }

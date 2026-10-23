@@ -9,6 +9,7 @@
 //! - nic se nespouští s viditelnou konzolí (CREATE_NO_WINDOW);
 //! - chybějící exe/složka = srozumitelná chyba, ne pád.
 
+use crate::i18n::tr;
 use crate::ports;
 use parking_lot::Mutex;
 use regex::Regex;
@@ -79,7 +80,7 @@ impl Job {
         let mut child = cmd
             .creation_flags(flags | CREATE_SUSPENDED.0)
             .spawn()
-            .map_err(|e| trf!("Nepodařilo se spustit: {e}", "Couldn't start: {e}"))?;
+            .map_err(|e| e.to_string())?;
         let res = self.assign(&child).map_err(|e| format!("Job Object: {e}")).and_then(|()| resume_threads(child.id()));
         if let Err(e) = res {
             let _ = child.kill();
@@ -409,8 +410,8 @@ impl ProcMan {
         if let Some(p) = port {
             cmd.env("PORT", p.to_string());
         }
-        let job = Job::new()?;
-        let mut child = job.spawn(&mut cmd, CREATE_NO_WINDOW)?;
+        let job = Job::new().map_err(|e| crate::errors::any(tr("Server nejde spustit", "Can't start the server"), &e))?;
+        let mut child = job.spawn(&mut cmd, CREATE_NO_WINDOW).map_err(|e| crate::errors::spawn_text(tr("Server nejde spustit", "Can't start the server"), &e))?;
         let pid = child.id();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -578,7 +579,7 @@ impl ProcMan {
                     (me.notify)(ProcEvent::Changed);
                 }
             })
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| crate::errors::io(tr("Server nejde spustit", "Can't start the server"), &e))?;
         Ok(LaunchOutcome::Started)
     }
 
@@ -633,7 +634,7 @@ impl ProcMan {
                 let mut child = match cmd.spawn() {
                     Ok(c) => c,
                     Err(e) => {
-                        me.fail(&id, generation, trf!("Spuštění selhalo: {e}", "Launch failed: {e}"));
+                        me.fail(&id, generation, crate::errors::spawn(tr("Spuštění selhalo", "Launch failed"), &e));
                         return;
                     }
                 };
@@ -659,7 +660,7 @@ impl ProcMan {
                 drop(g);
                 (me.notify)(ProcEvent::Changed);
             })
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| crate::errors::io(tr("Server nejde spustit", "Can't start the server"), &e))?;
         Ok(LaunchOutcome::Started)
     }
 }

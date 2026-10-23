@@ -6,7 +6,7 @@ import { api, type ImportPreview } from "../../api";
 import { t } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
 import { dirty, offerUndo, snapshotDraft, useSettings } from "../ctx";
-import { Confirm } from "../fields/Confirm";
+import { Confirm } from "../../ui/Confirm";
 import { Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
 
@@ -27,7 +27,7 @@ const SECTION_NAMES: Record<string, readonly [string, string]> = {
   autostart: ["settings.section.autostart", "Spouštění po startu Windows"],
   update: ["settings.section.update", "Aktualizace"],
   appearance: ["settings.section.appearance", "Vzhled a animace"],
-  actions: ["settings.section.actions", "Rychlé akce"],
+  actions: ["settings.section.actions", "Odkazy a akce"],
   questions: ["settings.section.questions", "Otázky Clauda"],
   onboarding: ["settings.section.onboarding", "Průvodce"],
   ui: ["settings.section.ui", "Jazyk"],
@@ -180,11 +180,17 @@ export default function BackupPanel(_p: PanelProps) {
       <Section title={t("settings.f.backup.reset", "Obnovit výchozí")}>
         <ResetBox />
       </Section>
-      <Section>
-        <Row id="backup.file">
-          <button class="mini" onClick={() => api.openConfigFile()?.catch(sayError)}>{t("settings.backup.file.btn", "Otevřít config.json")}</button>
-        </Row>
-      </Section>
     </>
+  );
+}
+
+/** Pro pokročilé: ruční úprava souboru s nastavením (v „Pokročilé“ panelu `AppPanel.tsx`). */
+export function BackupAdvanced() {
+  return (
+    <Section>
+      <Row id="backup.file">
+        <button class="mini" onClick={() => api.openConfigFile()?.catch(sayError)}>{t("settings.backup.file.btn", "Otevřít config.json")}</button>
+      </Row>
+    </Section>
   );
 }

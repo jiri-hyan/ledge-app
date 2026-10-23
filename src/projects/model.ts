@@ -1,9 +1,10 @@
 // Zástupci projektů — čistá logika „co se spustí a odkud“ (vlna 9 Z): stav místa (`Place` z jádra), text
 // tooltipu a panelu Upravit…, živé / selhané procesy, výběr složky z víc klonů a zápis `path` / `run` do
 // configu. Bez DOM a bez IPC (test `model.test.mjs`); komponenty jsou `ProjectPanel.tsx`, `RunningPill.tsx`.
-import type { FolderCandidate, Place, ProcView, ProjectView } from "../types.ts";
+import type { FolderCandidate, Place, ProcView, ProjectView, SessionView } from "../types.ts";
 import { t, tp } from "../i18n.ts";
 import { ago } from "../format.ts";
+import { samePath } from "../util/path.ts";
 
 export const LIVE_PHASES = ["ready", "running", "starting", "preparing"];
 export const isLive = (phase: string | undefined) => !!phase && LIVE_PHASES.includes(phase);
@@ -40,7 +41,7 @@ export function tileTip(pr: ProjectView, proc?: ProcView | null): string {
   lines.push(t("cards.proj.tip.where", "Složka: {dir}", { dir: whereOf(pr, proc) }));
   const port = proc?.port ?? pr.port;
   if (pr.kind === "dev" && port) lines.push(t("cards.proj.tip.port", "Port: {port}", { port }));
-  if (proc && isLive(proc.phase)) lines.push(t("cards.proj.tip.live", "Běží — ■ v akcích dlaždice zastaví"));
+  if (proc && isLive(proc.phase)) lines.push(t("cards.proj.tip.live", "Běží — ■ v akcích zástupce zastaví"));
   else if (proc?.phase === "failed") lines.push(t("cards.proj.tip.failed", "Nenaběhl: {msg}", { msg: proc.message ?? "" }));
   return lines.join("\n");
 }
@@ -89,8 +90,8 @@ export function freshest(items: FolderCandidate[]): string | null {
   return items.length > 1 && items[0]?.lastCommit != null ? items[0].path : null;
 }
 
-export const samePath = (a: string, b: string) => norm(a) === norm(b);
-const norm = (p: string) => p.replace(/[\\/]+$/, "").replace(/\//g, "\\").toLowerCase();
+// Porovnání cest je sdílené v `util/path.ts`; odsud se jen re-exportuje.
+export { samePath };
 
 /** „poslední commit před 3 h“ / „bez commitu“ (unix s z jádra). */
 export function commitText(lastCommit: number | null, now: number): string {
@@ -124,3 +125,40 @@ export function failInfo(proc: ProcView | undefined | null): { message: string; 
   const tail = proc.tail?.length ? proc.tail : proc.lastLine ? [proc.lastLine] : [];
   return { message: proc.message ?? t("cards.proj.fail.unknown", "Server se nespustil."), tail };
 }
+
+/** Zdraví projektu na zástupci: neuložené změny, nepushnuté commity a „Claude tu pracuje“ (jen ze snapshotu). */
+export interface TileHealth {
+  dirty: number;
+  ahead: number;
+  claude: boolean;
+}
+
+/** Odznaky zástupce z `projects[].git` a `sessions[]`; vše v pořádku (nic k ukázání) = null. Session s `projectId`
+ *  projektu a stavem `working` (ukončená se nepočítá). */
+export function tileHealth(pr: Pick<ProjectView, "id" | "git">, sessions: readonly Pick<SessionView, "projectId" | "status" | "ended">[]): TileHealth | null {
+  const dirty = Math.max(0, pr.git?.dirty ?? 0);
+  const ahead = Math.max(0, pr.git?.ahead ?? 0);
+  const claude = sessions.some((x) => x.projectId === pr.id && x.status === "working" && !x.ended);
+  return dirty > 0 || ahead > 0 || claude ? { dirty, ahead, claude } : null;
+}
+
+/** Odstín jediné tečky (kompaktní vzhled, malé dlaždice): Claude pracuje > neuložené změny > nepushnuté. */
+export const healthTone = (h: TileHealth): "claude" | "dirty" | "ahead" => (h.claude ? "claude" : h.dirty > 0 ? "dirty" : "ahead");
+
+/** Věta do náhledu po najetí / popisu zástupce: „Claude tu pracuje · 3 neuložené změny · 2 nepushnuté commity“. */
+export function healthText(h: TileHealth): string {
+  const parts: string[] = [];
+  if (h.claude) parts.push(t("cards.proj.health.claude", "Claude tu pracuje"));
+  if (h.dirty > 0) parts.push(tp("cards.proj.health.dirty", h.dirty, ["{n} neuložená změna", "{n} neuložené změny", "{n} neuložených změn"]));
+  if (h.ahead > 0) parts.push(tp("cards.proj.health.ahead", h.ahead, ["{n} nepushnutý commit", "{n} nepushnuté commity", "{n} nepushnutých commitů"]));
+  return parts.join(" · ");
+}
+
+/** Kolik poznámek projektu panel ukáže (zbytek jako „+N“). */
+export const PROJECT_NOTES = 3;
+
+/** Dotaz `note_query` pro panel projektu: nehotové poznámky tohoto projektu, nejvýš `PROJECT_NOTES` (jedno volání při otevření). */
+export const projectNotesQuery = (id: string) => ({ project: id, limit: PROJECT_NOTES, includeDone: false });
+
+/** Kolik poznámek se do panelu nevešlo (`total` z `note_query` bez stropu); záporné / chybějící = 0. */
+export const notesHidden = (total: number | null | undefined, shown: number): number => Math.max(0, (total ?? 0) - shown);

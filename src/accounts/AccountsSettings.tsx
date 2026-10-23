@@ -1,4 +1,4 @@
-// Nastavení → Účty: přidat účet (dlaždice Microsoft / Google), stav (přihlášen jako…, co Ledge smí
+// Nastavení → Osobní → Kalendáře → Pokročilé (skládá `settings/panels/Personal.tsx`): přidat účet (dlaždice Microsoft / Google), stav (přihlášen jako…, co Ledge smí
 // číst), Odhlásit a průvodce vlastní registrací aplikace (Client ID). Ledge nemá vlastní ověřenou
 // registraci — výchozí Client ID je prázdné a panel řekne proč. Přihlášení samo běží v systémovém
 // prohlížeči; refresh token a client secret jdou rovnou do Správce pověření Windows (Rust), do configu
@@ -6,9 +6,9 @@
 import { createSignal, For, onMount, Show, type JSX } from "solid-js";
 import { t } from "../i18n";
 import { hit, useSettings } from "../settings/ctx";
-import { Confirm } from "../settings/fields/Confirm";
+import { Confirm } from "../ui/Confirm";
 import { Text, Toggle } from "../settings/fields/controls";
-import { Row, Section } from "../settings/fields/Row";
+import { LiveBadge, Row, Section } from "../settings/fields/Row";
 import { fieldHint, fieldLabel } from "../settings/labels";
 import { say, sayError } from "../ui/toast";
 import { accountsApi, type AccountView, type GoogleCalendar } from "./api";
@@ -148,6 +148,7 @@ function Provider(p: { id: ProviderId; view?: AccountView; open: boolean; onChan
                   <button class="mini" onClick={() => void accountsApi.cancel(p.id)}>{t("settings.accounts.cancel", "Zrušit")}</button>
                 </>
               }>
+                <LiveBadge />
                 <button class="mini ok" disabled={!ready()} onClick={() => void connect()} title={ready() ? "" : t("settings.accounts.needId", "Nejdřív vyplň údaje z registrace aplikace (průvodce níž).")}>
                   {p.view?.expired ? t("settings.accounts.reconnect", "Přihlásit znovu v prohlížeči") : t("settings.accounts.connect", "Přihlásit v prohlížeči")}
                 </button>
@@ -194,6 +195,7 @@ function Provider(p: { id: ProviderId; view?: AccountView; open: boolean; onChan
             </Row>
           </Show>
           <div class="acc-bar">
+            <LiveBadge />
             <button class="mini" onClick={() => setAsk(true)}>{t("settings.accounts.signOut", "Odhlásit")}</button>
           </div>
           <Confirm

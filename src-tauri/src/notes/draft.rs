@@ -3,6 +3,7 @@
 //! Závisí na `write_atomic`, `decode_png`, `b64_encode` (`mod.rs`).
 
 use super::{MAX_IMAGE, MAX_IMAGES, PNG_SIG, b64_encode, decode_png, write_atomic};
+use crate::i18n::tr;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -36,8 +37,8 @@ pub(crate) fn draft_dir(root: &Path) -> PathBuf {
 /// Text, projekt a připomínka (volá se s debounce při psaní — malé, bez obrázků).
 pub fn draft_save_meta(root: &Path, meta: &DraftMeta) -> Result<(), String> {
     let dir = draft_dir(root);
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    write_atomic(&dir.join("draft.json"), serde_json::to_string(meta).map_err(|e| e.to_string())?.as_bytes())
+    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(tr("Koncept nejde uložit", "Can't save the draft"), &e))?;
+    write_atomic(&dir.join("draft.json"), serde_json::to_string(meta).map_err(|e| crate::errors::json(tr("Koncept nejde uložit", "Can't save the draft"), &e))?.as_bytes())
 }
 
 /// Obrázky konceptu (jen když se změnily): validace jako u poznámky, staré `N.png` pryč.
@@ -50,7 +51,7 @@ pub fn draft_save_images(root: &Path, images: &[String]) -> Result<(), String> {
     if pngs.is_empty() && !dir.exists() {
         return Ok(()); // nic k uložení ani k úklidu — složku kvůli tomu nezakládat
     }
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(tr("Obrázky konceptu nejdou uložit", "Can't save the draft images"), &e))?;
     for (i, png) in pngs.iter().enumerate() {
         write_atomic(&dir.join(format!("{}.png", i + 1)), png)?;
     }
@@ -59,7 +60,7 @@ pub fn draft_save_images(root: &Path, images: &[String]) -> Result<(), String> {
         if !p.exists() {
             break;
         }
-        std::fs::remove_file(&p).map_err(|e| e.to_string())?;
+        std::fs::remove_file(&p).map_err(|e| crate::errors::io(tr("Obrázky konceptu nejdou uložit", "Can't save the draft images"), &e))?;
     }
     Ok(())
 }
@@ -87,7 +88,7 @@ pub fn draft_clear(root: &Path) -> Result<(), String> {
         let name = e.file_name().to_string_lossy().into_owned();
         let ours = name == "draft.json" || (name.ends_with(".png") && name[..name.len() - 4].parse::<usize>().is_ok()) || name.ends_with(".tmp");
         if ours {
-            std::fs::remove_file(e.path()).map_err(|e| e.to_string())?;
+            std::fs::remove_file(e.path()).map_err(|e| crate::errors::io(tr("Koncept nejde smazat", "Can't delete the draft"), &e))?;
         }
     }
     let _ = std::fs::remove_dir(&dir); // jen když je prázdná

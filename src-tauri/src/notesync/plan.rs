@@ -56,7 +56,6 @@ pub fn plan_init(root: &RootState, remote: Option<RemoteState>) -> Option<InitPl
 /// Chybový výstup gitu u síťové operace → offline / nepřihlášeno / jiná chyba.
 pub fn classify(stderr: &str) -> Outcome {
     let s = stderr.to_lowercase();
-    let msg = short_err(stderr);
     const AUTH: [&str; 13] = [
         "authentication failed",
         "could not read username",
@@ -88,11 +87,14 @@ pub fn classify(stderr: &str) -> Outcome {
         "no route to host",
     ];
     if AUTH.iter().any(|p| s.contains(p)) {
-        Outcome::Neprihlaseno(format!("{msg} — {}", auth_hint()))
+        {
+        crate::errors::detail("synchronizace poznámek", &short_err(stderr));
+        Outcome::Neprihlaseno(format!("{} — {}", crate::i18n::tr("Přihlášení k repozitáři selhalo", "Signing in to the repository failed"), auth_hint()))
+    }
     } else if NET.iter().any(|p| s.contains(p)) {
-        Outcome::Offline(msg)
+        Outcome::Offline(crate::errors::git("", None, stderr))
     } else {
-        Outcome::Chyba(if msg.is_empty() { crate::i18n::tr("git selhal bez hlášky", "git failed without a message").into() } else { msg })
+        Outcome::Chyba(crate::errors::git("", None, stderr))
     }
 }
 

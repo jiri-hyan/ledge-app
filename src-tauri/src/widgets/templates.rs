@@ -79,7 +79,7 @@ pub fn views(dir: &Path) -> Vec<TemplateView> {
 /// Zkopíruje šablonu `file` do `dir` (založí ji). Existující soubor nepřepíše.
 pub fn install(dir: &Path, file: &str) -> Result<PathBuf, String> {
     let t = ALL.iter().find(|t| t.file == file).ok_or_else(|| tr("Neznámý příklad.", "Unknown example."))?;
-    std::fs::create_dir_all(dir).map_err(|e| trf!("Složku {} nejde založit: {e}", "Can't create the folder {}: {e}", dir.display()))?;
+    std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", dir.display()), &e))?;
     let path = dir.join(t.file);
     let mut bytes: Vec<u8> = Vec::new();
     if kind_of(t.file) == Some(Kind::Powershell) {
@@ -89,9 +89,9 @@ pub fn install(dir: &Path, file: &str) -> Result<PathBuf, String> {
     use std::io::Write;
     let mut f = std::fs::OpenOptions::new().write(true).create_new(true).open(&path).map_err(|e| match e.kind() {
         std::io::ErrorKind::AlreadyExists => trf!("{} už ve složce je — nepřepisuju ho.", "{} is already in the folder — not overwriting it.", t.file),
-        _ => trf!("{} nejde uložit: {e}", "Can't save {}: {e}", t.file),
+        _ => crate::errors::io(&trf!("{} nejde uložit", "Can't save {}", t.file), &e),
     })?;
-    f.write_all(&bytes).map_err(|e| e.to_string())?;
+    f.write_all(&bytes).map_err(|e| crate::errors::io(&trf!("{} nejde uložit", "Can't save {}", t.file), &e))?;
     Ok(path)
 }
 

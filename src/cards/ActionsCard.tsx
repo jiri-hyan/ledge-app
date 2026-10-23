@@ -47,7 +47,7 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
       <div class="card act-card" classList={{ wide: !!p.wide }} data-anim data-view={p.view ?? "tiles"} data-edit={editing() ? "" : undefined}>
         <h4>
           <span class="ic" style="background:var(--teal)" />
-          {t("actions.card.title", "Rychlé akce")}
+          {t("actions.card.title", "Odkazy a akce")}
           <span class="n">{ids().length || ""}</span>
           <button class="mini" onClick={edit}>{t("actions.card.edit", "Upravit")}</button>
           {p.menu}

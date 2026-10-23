@@ -20,7 +20,7 @@ nevznikne, dokud UI neukáže záložku Osobní, a skrytá karta odběry zruší
 | `src/media/Player.tsx` | stavebnice: `useCover` (jedna data URL na kartu), `Cover`, `Progress` (lišta: klik/tah/šipky = `{seek}`, jen s `canSeek`; drží cíl do nové timeline), `TimeText`, `Controls` (+ náhodně/opakovat jen když je zdroj hlásí), `Equalizer` (ozdoba) — tik na celé sekundy jen při přehrávání s otevřeným šuplíkem | |
 | `src/media/VariantPicker.tsx` | ikonka v rohu karty → nabídka s miniaturami (`Thumb`), uložení `media.variant` (`get_config` → `save_config`), „Vrátit“, okamžitý vzhled do snapshotu (`shownVariant`) | `VariantPicker` `Thumb` `saveVariant` |
 | `src/media/MediaSettings.tsx` | Nastavení → Osobní → Přehrávač: vzhled s náhledy, čas v proužku, ekvalizér (společná lišta Uložit/Vrátit) | |
-| `src/media/timeline.ts` · `src/media/shown.ts` | čistá logika (`positionAt`, `shownPosition`, `fmtTime`, `seekTarget`, `seekKey`, `nextTickIn`, `variantOf`, `nextRepeat`) — test `timeline.test.mjs`; `drawerShown` (události `view`/`closing` + `visibilitychange`) | |
+| `src/media/timeline.ts` · `src/media/shown.ts` | čistá logika (`positionAt`, `shownPosition`, `fmtDuration`, `seekTarget`, `seekKey`, `nextTickIn`, `variantOf`, `nextRepeat`) — test `timeline.test.mjs`; `drawerShown` (události `view`/`closing` + `visibilitychange`) | |
 | `src/media/Battery.tsx` | řádek baterie pod hodinami v `cards/ClockCard.tsx` | `Battery` |
 | `src/media/model.ts` | čistá logika: `remaining` (sekundy → h/min), `batteryLow`, `volumeLevel` (ikona), `throttle` (posuvník) — test `model.test.mjs` | |
 | `src/media/media.css` · `src/i18n/en-media.ts` | styly (prefix `med-`) · angličtina `cards.media.*`, `cards.sound.*`, `cards.battery.*` | |

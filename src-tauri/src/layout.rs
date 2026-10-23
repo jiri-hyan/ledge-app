@@ -27,10 +27,10 @@ use serde_json::Value;
 pub const WORK: &str = "prace";
 pub const PERSONAL: &str = "osobni";
 /// Karty, které jde dát na záložku (zrcadlo `CARD_IDS` v `src/layout/model.ts`).
-pub const CARDS: [&str; 16] = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail"];
-/// Karty, které nejsou ve výchozím rozložení: uživatel je přidá z katalogu (GitHub a Systém — nové
-/// funkce, které nemají měnit dnešní šuplík; Pošta — potřebuje přihlášený účet Microsoft).
-/// `Sections::default()` je má vypnuté.
+pub const CARDS: [&str; 17] = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today"];
+/// Karty, které potřebují zdroj nebo jsou nové funkce (GitHub, Systém, Pošta — přihlášený účet Microsoft):
+/// uživatel je přidá z katalogu a MCP je jako „opt-in“ hlásí Claudovi. Ve výchozím rozložení nejsou
+/// (kromě nich ani Kalendář, Počasí, Claude, Repa… — viz [`clean_default`]); `Sections::default()` je má vypnuté.
 pub const OPT_IN: [&str; 3] = ["github", "system", "mail"];
 /// Dynamická karta: id s prefixem (dnes jen widgety ze skriptů `widget:<soubor>`, `widgets/`).
 /// Validace hlídá jen tvar — soubor nemusí existovat (karta pak ukáže, že chybí). Katalog je nabízí
@@ -175,11 +175,41 @@ pub struct LayoutConfig {
     pub upgrades: Vec<String>,
 }
 
+/// Výchozí rozložení NOVÉHO configu: čistý začátek bez přeplněných záložek. Práce = Projekty + Poznámky
+/// (Claude a Repa přidá průvodce podle detekce, [`with_detected`]), Osobní = Čas, Právě hraje, Poznámky,
+/// Odkazy. Karty bez zdroje (Kalendář, Pošta, GitHub, Počasí bez místa) a duplicitní Rychlé akce tu nejsou —
+/// jsou v katalogu. Existující config se tím nemění: soubor bez `layout` se převádí z [`from_legacy`]
+/// (původní tvar), soubor s `layout` se bere tak, jak je. Zrcadlo `defaultLayout` v `src/layout/model.ts`
+/// (fixture `fixtures/layout-default.json` hlídají oba testy).
+pub fn clean_default() -> LayoutConfig {
+    let mut personal = row(&["clock", "media"]);
+    personal.extend(row(&["notes", "links"]));
+    LayoutConfig {
+        pages: vec![
+            LayoutPage { id: WORK.into(), cards: row(&["projects"]).into_iter().chain(row(&["notes"])).collect(), ..Default::default() },
+            LayoutPage { id: PERSONAL.into(), cards: personal, ..Default::default() },
+        ],
+        hidden_parts: Vec::new(),
+        // značka „Projekty na Osobní“ už proběhla (karta tam schválně není) — upgrade ji nevrací
+        upgrades: vec![UP_PERSONAL_PROJECTS.into()],
+    }
+}
+
+/// Průvodce: k čistému rozložení přidá na Práci karty podle toho, co našel — `claude` (Claude Code je
+/// nainstalovaný) a `repos` (přidal git projekty). Karty jdou před Poznámky, v jedné řadě
+/// ([`row_sizes`]); už přítomná karta se nepřidá podruhé, ostatní se nemění. Čistá funkce.
+pub fn with_detected(l: &mut LayoutConfig, claude: bool, repos: bool) {
+    let Some(work) = l.pages.iter_mut().find(|p| p.id == WORK) else { return };
+    let want: Vec<&str> = [("claude", claude), ("repos", repos)].into_iter().filter(|(id, on)| *on && !work.cards.iter().any(|c| c.id == *id)).map(|(id, _)| id).collect();
+    let at = work.cards.iter().position(|c| c.id == "notes").unwrap_or(work.cards.len());
+    for (i, c) in row(&want).into_iter().enumerate() {
+        work.cards.insert(at + i, c);
+    }
+}
+
 impl Default for LayoutConfig {
     fn default() -> Self {
-        let mut l = from_legacy(&Value::Null);
-        apply_upgrades(&mut l);
-        l
+        clean_default()
     }
 }
 
@@ -283,24 +313,52 @@ pub fn placed(l: &LayoutConfig, id: &str) -> bool {
 /// Odvozené pole z `layout`: `drawer.sections` (karta = je na nějaké záložce; část = karta je a část
 /// není skrytá) a `modes.personalEnabled` (vždy zapnuto — záložky řídí `layout`). Idempotentní.
 pub fn derive(cfg: &mut Config) {
-    let l = &cfg.layout;
-    let Ok(mut v) = serde_json::to_value(&cfg.drawer.sections) else { return };
+    cfg.drawer.sections = derived_sections(&cfg.layout, &cfg.drawer.sections);
+    cfg.modes.personal_enabled = true;
+}
+
+/// Je pole `drawer.sections` (camelCase klíč) podle rozložení zapnuté? `None` = klíč není karta ani část karty.
+fn section_on(l: &LayoutConfig, key: &str) -> Option<bool> {
+    // karta Dnes čte kalendář z paměti: i bez karty Kalendář musí být jeho zdroj zapnutý (jinak by `view` hlásil „off“)
+    if key == "calendar" {
+        return Some(placed(l, "calendar") || placed(l, "today"));
+    }
+    if CARDS.contains(&key) {
+        Some(placed(l, key))
+    } else {
+        PARTS.iter().find(|(p, _)| *p == key).map(|(_, parent)| placed(l, parent) && !l.hidden_parts.iter().any(|h| h == key))
+    }
+}
+
+/// `drawer.sections` odvozené z rozložení `l` (z `base` se berou jen pole, která `l` nezná). Čistá funkce.
+pub fn derived_sections(l: &LayoutConfig, base: &crate::config::Sections) -> crate::config::Sections {
+    let Ok(mut v) = serde_json::to_value(base) else { return base.clone() };
     if let Some(m) = v.as_object_mut() {
         for (k, val) in m.iter_mut() {
-            let on = if CARDS.contains(&k.as_str()) {
-                placed(l, k)
-            } else if let Some((_, parent)) = PARTS.iter().find(|(p, _)| p == k) {
-                placed(l, parent) && !l.hidden_parts.iter().any(|h| h == k)
-            } else {
-                continue;
-            };
-            *val = Value::Bool(on);
+            if let Some(on) = section_on(l, k) {
+                *val = Value::Bool(on);
+            }
         }
     }
-    if let Ok(s) = serde_json::from_value(v) {
-        cfg.drawer.sections = s;
+    serde_json::from_value(v).unwrap_or_else(|_| base.clone())
+}
+
+/// Hodnota pole `Sections` (snake_case, jak ho píše makro `sections!`) ve výchozím rozložení. Bez serde —
+/// `Sections::default()` ji volá, a `serde(default)` by se jinak zacyklil. Pole mimo karty a části = `true`.
+pub fn section_in_default(field: &str) -> bool {
+    let mut key = String::new();
+    let mut up = false;
+    for ch in field.chars() {
+        if ch == '_' {
+            up = true;
+        } else if up {
+            key.extend(ch.to_uppercase());
+            up = false;
+        } else {
+            key.push(ch);
+        }
     }
-    cfg.modes.personal_enabled = true;
+    section_on(&clean_default(), &key).unwrap_or(true)
 }
 
 /// Záložka pro režim `mode` (id); neznámé id (smazaná záložka) = první.
@@ -316,6 +374,11 @@ pub fn page_id(l: &LayoutConfig, mode: &str) -> String {
 /// Je karta na záložce, která je teď vidět? (počasí a kalendář stahují jen tehdy)
 pub fn page_has(l: &LayoutConfig, mode: &str, card: &str) -> bool {
     page(l, mode).is_some_and(|p| p.cards.iter().any(|c| c.id == card))
+}
+
+/// Je na právě viditelné záložce karta, která čte kalendář (Kalendář, nebo Dnes — ta ukazuje další schůzku)?
+pub fn page_has_calendar(l: &LayoutConfig, mode: &str) -> bool {
+    page_has(l, mode, "calendar") || page_has(l, mode, "today")
 }
 
 /// Název záložky pro proužek (ikona + název; vestavěná bez názvu podle jazyka).
@@ -417,27 +480,82 @@ mod tests {
     }
     use CardSize::*;
 
+    /// Původní výchozí rozložení (před čistým startem) — tak se dál převádí starý config bez `layout`.
+    fn old_default() -> LayoutConfig {
+        let mut l = from_legacy(&json!({}));
+        apply_upgrades(&mut l);
+        l
+    }
+
+    fn fixture_shape(page: &Value) -> Vec<(String, CardSize)> {
+        page["cards"].as_array().unwrap().iter().map(|c| (c["id"].as_str().unwrap().to_string(), serde_json::from_value(c["size"].clone()).unwrap())).collect()
+    }
+
     #[test]
-    fn default_is_todays_drawer() {
+    fn default_is_clean_start() {
         let d = LayoutConfig::default();
-        let mut legacy = from_legacy(&json!({}));
-        apply_upgrades(&mut legacy);
-        assert_eq!(d, legacy);
+        assert_eq!(d, clean_default());
         assert_eq!(d.upgrades, [UP_PERSONAL_PROJECTS]);
         assert_eq!(d.pages.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), [WORK, PERSONAL]);
         let s = |v: &[(&str, CardSize)]| v.iter().map(|(a, b)| (a.to_string(), *b)).collect::<Vec<_>>();
-        assert_eq!(shape(&d, WORK), s(&[("projects", Xl), ("actions", Xl), ("shelf", Xl), ("running", Xl), ("claude", M), ("repos", M), ("notes", Xl)]));
-        assert_eq!(
-            shape(&d, PERSONAL),
-            s(&[("projects", Xl), ("clock", S), ("timer", S), ("weather", S), ("calendar", S), ("media", M), ("links", M), ("actions", Xl), ("shelf", Xl), ("notes", Xl)])
-        );
+        assert_eq!(shape(&d, WORK), s(&[("projects", Xl), ("notes", Xl)]));
+        assert_eq!(shape(&d, PERSONAL), s(&[("clock", M), ("media", M), ("notes", M), ("links", M)]));
         assert!(d.pages.iter().flat_map(|p| &p.cards).all(|c| c.h.is_none() && c.tiles.is_none() && c.look.is_none()), "výška podle obsahu, výchozí dlaždice i vzhled");
         assert!(d.hidden_parts.is_empty());
         assert!(validate(&d).is_ok());
-        // každá karta kromě opt-in (GitHub, Systém, Pošta) je ve výchozím rozložení; ty jsou jen v katalogu
-        for c in CARDS {
-            assert_eq!(placed(&d, c), !OPT_IN.contains(&c), "{c}");
+        // karty bez zdroje (kalendář, pošta, GitHub, počasí bez místa) ani duplicitní akce ve výchozím rozložení nejsou
+        for c in ["calendar", "mail", "github", "system", "weather", "actions", "running", "repos", "claude", "shelf", "timer"] {
+            assert!(!placed(&d, c), "{c} je jen v katalogu / přidá ho průvodce");
         }
+        // zrcadlo `defaultLayout` v TS: stejný tvar ve fixture (druhá půlka testu je v `model.test.mjs`)
+        let fx: Value = serde_json::from_str(include_str!("fixtures/layout-default.json")).unwrap();
+        assert_eq!(fixture_shape(&fx["pages"][0]), shape(&d, WORK));
+        assert_eq!(fixture_shape(&fx["pages"][1]), shape(&d, PERSONAL));
+        assert_eq!(fx["upgrades"], json!(d.upgrades));
+    }
+
+    #[test]
+    fn old_default_is_kept_for_files_without_layout() {
+        // starý config bez `layout` se převádí z původního tvaru (7 karet na Práci, 10 na Osobní) — beze změny
+        let old = old_default();
+        let mut cfg = Config::default();
+        upgrade_loaded(&json!({}), &mut cfg);
+        assert_eq!(cfg.layout, old);
+        assert_eq!(ids(&old, WORK), ["projects", "actions", "shelf", "running", "claude", "repos", "notes"]);
+        assert_eq!(ids(&old, PERSONAL).len(), 10);
+        // soubor s vlastním `layout` se nemění ani o kartu
+        let mut mine = Config::default();
+        let raw = json!({"layout": serde_json::to_value(&old).unwrap()});
+        mine.layout = serde_json::from_value(raw["layout"].clone()).unwrap();
+        upgrade_loaded(&raw, &mut mine);
+        assert_eq!(mine.layout, old);
+    }
+
+    #[test]
+    fn with_detected_table() {
+        // (popis, claude, repos, Práce po průvodci)
+        type Case = (&'static str, bool, bool, Vec<(&'static str, CardSize)>);
+        let cases: [Case; 4] = [
+            ("nic nenalezeno", false, false, vec![("projects", Xl), ("notes", Xl)]),
+            ("jen Claude", true, false, vec![("projects", Xl), ("claude", Xl), ("notes", Xl)]),
+            ("jen repa", false, true, vec![("projects", Xl), ("repos", Xl), ("notes", Xl)]),
+            ("obojí v jedné řadě", true, true, vec![("projects", Xl), ("claude", M), ("repos", M), ("notes", Xl)]),
+        ];
+        for (name, claude, repos, want) in cases {
+            let mut l = LayoutConfig::default();
+            with_detected(&mut l, claude, repos);
+            let want: Vec<(String, CardSize)> = want.into_iter().map(|(a, b)| (a.to_string(), b)).collect();
+            assert_eq!(shape(&l, WORK), want, "{name}");
+            assert_eq!(shape(&l, PERSONAL), shape(&LayoutConfig::default(), PERSONAL), "{name}: Osobní se nemění");
+            assert!(validate(&l).is_ok(), "{name}");
+            let before = l.clone();
+            with_detected(&mut l, claude, repos);
+            assert_eq!(l, before, "{name}: podruhé beze změny");
+        }
+        // záložka Práce smazaná → nic nespadne
+        let mut l = LayoutConfig { pages: vec![], ..Default::default() };
+        with_detected(&mut l, true, true);
+        assert!(l.pages.is_empty());
     }
 
     #[test]
@@ -533,6 +651,11 @@ mod tests {
         let cases: Vec<Case> = vec![
             ("výchozí", Box::new(|_| {}), vec![("weather", true), ("claudeCosts", true), ("nowPlaying", true), ("battery", true)]),
             ("bez počasí", Box::new(without("weather")), vec![("weather", false), ("calendar", true)]),
+            ("bez kalendáře = zdroj vypnutý", Box::new(without("calendar")), vec![("calendar", false)]),
+            ("karta Dnes drží zdroj kalendáře zapnutý", Box::new(|l: &mut LayoutConfig| {
+                l.pages.iter_mut().for_each(|p| p.cards.retain(|c| c.id != "calendar"));
+                l.pages[1].cards.push(card("today", M));
+            }), vec![("calendar", true)]),
             ("akce jen z jedné záložky pryč", Box::new(|l: &mut LayoutConfig| l.pages[0].cards.retain(|c| c.id != "actions")), vec![("actions", true)]),
             ("bez Clauda = i jeho části", Box::new(without("claude")), vec![("claude", false), ("claudeCosts", false), ("claudeLimits", false)]),
             ("skrytá útrata", Box::new(|l: &mut LayoutConfig| l.hidden_parts = vec!["claudeCosts".into()]), vec![("claude", true), ("claudeCosts", false), ("claudeGit", true)]),
@@ -546,6 +669,7 @@ mod tests {
         for (name, f, want) in cases {
             let mut cfg = Config::default();
             cfg.modes.personal_enabled = false;
+            cfg.layout = old_default(); // plné rozložení: ať je co odebírat
             f(&mut cfg.layout);
             derive(&mut cfg);
             let v = serde_json::to_value(&cfg.drawer.sections).unwrap();
@@ -587,20 +711,20 @@ mod tests {
             ("dlouhý název", Box::new(|l| l.pages[0].name = "x".repeat(33)), Some("layout.pages.0.name")),
             ("emoji ikona", Box::new(|l| l.pages[0].icon = "🎮".into()), None),
             ("ikona text", Box::new(|l| l.pages[0].icon = "hry hry".into()), Some("layout.pages.0.icon")),
-            ("neznámá karta", Box::new(|l| l.pages[0].cards.push(card("pocasi", S))), Some("layout.pages.0.cards.7.id")),
+            ("neznámá karta", Box::new(|l| l.pages[0].cards.push(card("pocasi", S))), Some("layout.pages.0.cards.2.id")),
             ("widget ze skriptu", Box::new(|l| l.pages[0].cards.push(card("widget:kurz-cnb.ps1", M))), None),
             ("widget na dvou záložkách", Box::new(|l| {
                 l.pages[0].cards.push(card("widget:kurz-cnb.ps1", M));
                 l.pages[1].cards.push(card("widget:kurz-cnb.ps1", S));
             }), None),
-            ("widget s cestou", Box::new(|l| l.pages[0].cards.push(card(r"widget:..\x.ps1", M))), Some("layout.pages.0.cards.7.id")),
-            ("widget bez souboru", Box::new(|l| l.pages[0].cards.push(card("widget:", M))), Some("layout.pages.0.cards.7.id")),
+            ("widget s cestou", Box::new(|l| l.pages[0].cards.push(card(r"widget:..\x.ps1", M))), Some("layout.pages.0.cards.2.id")),
+            ("widget bez souboru", Box::new(|l| l.pages[0].cards.push(card("widget:", M))), Some("layout.pages.0.cards.2.id")),
             ("widget dvakrát", Box::new(|l| {
                 l.pages[0].cards.push(card("widget:a.ps1", M));
                 l.pages[0].cards.push(card("widget:a.ps1", S));
-            }), Some("layout.pages.0.cards.8.id")),
-            ("karta dvakrát", Box::new(|l| l.pages[0].cards.push(card("claude", S))), Some("layout.pages.0.cards.7.id")),
-            ("stejná karta na dvou záložkách", Box::new(|l| l.pages[1].cards.push(card("claude", L))), None),
+            }), Some("layout.pages.0.cards.3.id")),
+            ("karta dvakrát", Box::new(|l| l.pages[0].cards.push(card("projects", S))), Some("layout.pages.0.cards.2.id")),
+            ("stejná karta na dvou záložkách", Box::new(|l| l.pages[1].cards.push(card("projects", L))), None),
             ("neznámá část", Box::new(|l| l.hidden_parts = vec!["git".into()]), Some("layout.hiddenParts.0")),
             ("výška 4", Box::new(|l| l.pages[0].cards[1].h = Some(4)), None),
             ("výška 0", Box::new(|l| l.pages[0].cards[1].h = Some(0)), Some("layout.pages.0.cards.1.h")),
@@ -765,9 +889,9 @@ mod tests {
         let l = LayoutConfig::default();
         assert_eq!(page_id(&l, PERSONAL), PERSONAL);
         assert_eq!(page_id(&l, "smazana"), WORK);
-        assert!(page_has(&l, PERSONAL, "weather"));
-        assert!(!page_has(&l, WORK, "weather"));
-        assert!(!page_has(&l, "smazana", "weather"), "neznámá = první záložka (Práce)");
+        assert!(page_has(&l, PERSONAL, "clock"));
+        assert!(!page_has(&l, WORK, "clock"));
+        assert!(!page_has(&l, "smazana", "clock"), "neznámá = první záložka (Práce)");
         let p = LayoutPage { id: "hry".into(), name: " Hry ".into(), icon: "🎮".into(), ..Default::default() };
         assert_eq!(title(&p), "🎮 Hry");
         assert!(!title(&l.pages[0]).is_empty());

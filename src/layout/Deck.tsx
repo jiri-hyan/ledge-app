@@ -19,7 +19,7 @@
 // Vzhled karty (vlna 8 P, `look.ts`): `data-cl-bg` / `data-cl-head` / `data-cl-dens` / `data-cl-accent` a
 // Části karet (kolo 13): `PartsCtx.Provider` dává obalům `PartSlot` v kartách pořadí, skrytí a lištu pro tah
 // (`partDrag.ts`, stejný motor jako karty: duch, mezera, FLIP, zóna Skrýt); klávesy na úchytu části ve `partKey`.
-// `--accent` na `.deck-item` (živý náhled z panelu `CardLook.tsx`); karta bez vzhledu = žádný atribut.
+// `--accent` na `.deck-item` (živý náhled z panelu `CardLook.tsx` (stav `lookState.ts`)); karta bez vzhledu = žádný atribut.
 import { batch, createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { t, tp } from "../i18n";
 import { change, dropTab, editPage, offerUndo, setCatalogOpen, setEditPage, setRenameAsk } from "./edit";
@@ -38,7 +38,7 @@ import { partKeyAction } from "./parts";
 import { cardName, pageName, sizeName, sizeNoteText, slotName } from "./text";
 import { cardLookAttrs } from "./look";
 import type { PartKey } from "./model";
-import { lookFor } from "./CardLook";
+import { lookFor } from "./lookState";
 import "./layout.css";
 import "./dnd.css";
 
@@ -83,7 +83,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
     key: (e, card, k) => partKey(e, card, k),
     show: (k) => {
       change((l) => setPartHidden(l, k as PartKey, false));
-      offerUndo(t("cards.layout.partShown", "Sekce „{name}“ je zase vidět", { name: slotName(k) }), () => change((l) => setPartHidden(l, k as PartKey, true)));
+      offerUndo(t("cards.layout.partShown", "Část „{name}“ je zase vidět", { name: slotName(k) }), () => change((l) => setPartHidden(l, k as PartKey, true)));
     },
   };
   onCleanup(() => {
@@ -236,11 +236,11 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
     const page = p.page.id;
     if (a.kind === "move") {
       change((l) => movePart(l, page, d.card, a.from, a.to));
-      offerUndo(t("cards.layout.partMoved", "Sekce „{name}“ přesunuta", { name: slotName(d.key) }), () => change((l) => movePart(l, page, d.card, a.to, a.from)));
+      offerUndo(t("cards.layout.partMoved", "Část „{name}“ přesunuta", { name: slotName(d.key) }), () => change((l) => movePart(l, page, d.card, a.to, a.from)));
     } else if (a.kind === "hide" && d.key !== BODY) {
       const k = d.key as PartKey;
       change((l) => setPartHidden(l, k, true));
-      offerUndo(t("cards.hide.doneSection", "Sekce „{name}“ skryta", { name: slotName(k) }), () => change((l) => setPartHidden(l, k, false)));
+      offerUndo(t("cards.hide.doneSection", "Část „{name}“ skryta", { name: slotName(k) }), () => change((l) => setPartHidden(l, k, false)));
     }
   }
 
@@ -324,7 +324,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   /** štítek u kurzoru: kam se karta pustí, když to není obyčejné místo v mřížce */
   const flyLabel = () => {
     const pdr = pd.drag();
-    if (pdr && pd.zoneOn()) return { text: t("cards.layout.zonePartTip", "Skrýt sekci „{name}“ · jde vrátit", { name: slotName(pdr.key) }), blocked: false };
+    if (pdr && pd.zoneOn()) return { text: t("cards.layout.zonePartTip", "Skrýt část „{name}“ · jde vrátit", { name: slotName(pdr.key) }), blocked: false };
     const d = drag();
     if (!d) return null;
     const tab = dropTab();
@@ -443,7 +443,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
       </Show>
       <Show when={dragging() || pd.hideable()}>
         <div class="lay-zone" classList={{ on: cd.zoneOn() || pd.zoneOn() }} ref={zoneEl} aria-hidden="true">
-          <Show when={dragging()} fallback={<><b>×</b> {t("cards.layout.zonePart", "Skrýt sekci")} <small>{t("cards.layout.zonePart.hint", "jde vrátit")}</small></>}>
+          <Show when={dragging()} fallback={<><b>×</b> {t("cards.layout.zonePart", "Skrýt část")} <small>{t("cards.layout.zonePart.hint", "jde vrátit")}</small></>}>
             <b>×</b> {t("cards.layout.zone", "Skrýt kartu")} <small>{t("cards.layout.zone.hint", "do katalogu · jde vrátit")}</small>
           </Show>
         </div>

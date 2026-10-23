@@ -2,7 +2,7 @@
 //! `Outcome` (`net_fail`, `local_fail`), nastavení repa (`setup_repo`) a commit všeho (`commit_all`).
 //! Závisí na `gitinfo::run_env`.
 
-use super::{ATTRIBUTES, IGNORE, LOCAL_DEADLINE, NET_DEADLINE, Outcome, classify, ensure_lines, short_err};
+use super::{ATTRIBUTES, IGNORE, LOCAL_DEADLINE, NET_DEADLINE, Outcome, classify, ensure_lines};
 use crate::gitinfo;
 use std::path::Path;
 use std::time::Instant;
@@ -10,6 +10,8 @@ use std::time::Instant;
 pub(super) enum Fail {
     Timeout,
     Git(String),
+    /// git se nepodařilo spustit (text chyby systému)
+    Spawn(String),
 }
 
 fn env_for(remote: &str) -> Vec<(&'static str, &'static str)> {
@@ -32,7 +34,7 @@ pub(super) fn git(dir: &Path, remote: &str, args: &[&str], net: bool) -> Result<
     let deadline = Instant::now() + if net { NET_DEADLINE } else { LOCAL_DEADLINE };
     match gitinfo::run_env(dir, args, &env_for(remote), deadline) {
         Err(gitinfo::RunError::Timeout) => Err(Fail::Timeout),
-        Err(gitinfo::RunError::Spawn(e)) => Err(Fail::Git(format!("fatal: git nejde spustit ({e})"))),
+        Err(gitinfo::RunError::Spawn(e)) => Err(Fail::Spawn(e)),
         Ok(o) if o.success => Ok(o.stdout),
         Ok(o) => Err(Fail::Git(if o.stderr.trim().is_empty() { o.stdout } else { o.stderr })),
     }
@@ -43,13 +45,15 @@ pub(super) fn net_fail(f: Fail) -> Outcome {
     match f {
         Fail::Timeout => Outcome::Offline(trf!("git nestihl odpovědět do {} s", "git didn't answer within {} s", NET_DEADLINE.as_secs())),
         Fail::Git(e) => classify(&e),
+        Fail::Spawn(e) => Outcome::Chyba(crate::errors::spawn_text(crate::i18n::tr("Git nejde spustit", "Can't run git"), &e)),
     }
 }
 
 pub(super) fn local_fail(what: &str, f: Fail) -> Outcome {
     match f {
         Fail::Timeout => Outcome::Chyba(trf!("{what}: git nestihl doběhnout", "{what}: git didn't finish in time")),
-        Fail::Git(e) => Outcome::Chyba(format!("{what}: {}", short_err(&e))),
+        Fail::Git(e) => Outcome::Chyba(crate::errors::git(what, None, &e)),
+        Fail::Spawn(e) => Outcome::Chyba(crate::errors::spawn_text(what, &e)),
     }
 }
 
@@ -62,11 +66,11 @@ pub(super) fn setup_repo(dir: &Path, remote: &str, pc: &str) -> Result<(), Outco
     let gi = dir.join(".gitignore");
     let existing = std::fs::read_to_string(&gi).unwrap_or_default();
     if let Some(text) = ensure_lines(&existing, &IGNORE) {
-        std::fs::write(&gi, text).map_err(|e| Outcome::Chyba(trf!("Zápis .gitignore: {e}", "Writing .gitignore: {e}")))?;
+        std::fs::write(&gi, text).map_err(|e| Outcome::Chyba(crate::errors::io(crate::i18n::tr("Soubor .gitignore nejde zapsat", "Can't write .gitignore"), &e)))?;
     }
     let ga = dir.join(".gitattributes");
     if !ga.exists() {
-        std::fs::write(&ga, ATTRIBUTES).map_err(|e| Outcome::Chyba(trf!("Zápis .gitattributes: {e}", "Writing .gitattributes: {e}")))?;
+        std::fs::write(&ga, ATTRIBUTES).map_err(|e| Outcome::Chyba(crate::errors::io(crate::i18n::tr("Soubor .gitattributes nejde zapsat", "Can't write .gitattributes"), &e)))?;
     }
     let name = format!("Ledge ({pc})");
     let email = format!("ledge@{}.local", pc.to_lowercase());

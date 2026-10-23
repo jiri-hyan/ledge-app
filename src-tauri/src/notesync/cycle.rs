@@ -30,7 +30,7 @@ pub(super) fn cycle(ctx: &Ctx) -> Outcome {
     if let Some(text) = ensure_lines(&gi, &IGNORE)
         && let Err(e) = std::fs::write(root.join(".gitignore"), text)
     {
-        return Outcome::Chyba(trf!("Zápis .gitignore: {e}", "Writing .gitignore: {e}"));
+        return Outcome::Chyba(crate::errors::io(crate::i18n::tr("Soubor .gitignore nejde zapsat", "Can't write .gitignore"), &e));
     }
     if let Err(o) = commit_all(root, remote, &commit_message(ctx.pc, &ctx.now)) {
         return o;

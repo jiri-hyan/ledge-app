@@ -108,7 +108,7 @@ export function ProjectEditor(p: { i: number; notes?: string[] }) {
           </div>
         </div>
         <div class="st-sub wide">
-          {L(t("settings.proj.links", "Odkazy v rychlých akcích"), t("settings.proj.links.hint", "Staging, produkce, dokumentace… (jen http/https)"))}
+          {L(t("settings.proj.links", "Odkazy v kartě Odkazy a akce"), t("settings.proj.links.hint", "Staging, produkce, dokumentace… (jen http/https)"))}
           <For each={pr().links ?? []}>
             {(_l, j) => (
               <div class="st-inline">

@@ -3,11 +3,10 @@
 // ✎ režim úprav šuplíku (`layout/edit.ts`) a nástroje (paleta 🔍, poznámka, nastavení, zavřít). Čte jen snapshot; navigaci dělá skořápka (App) přes callbacky.
 import { Show } from "solid-js";
 import { api, type Snapshot } from "../api";
-import { IconBack, IconNote, IconSettings, IconX } from "../icons";
+import { IconBack, IconNote, IconSearch, IconSettings, IconX } from "../icons";
 import { editPath } from "../notes/store";
-import { fmtDate, fmtTime } from "../format";
+import { fmtDate, fmtClock } from "../format";
 import type { Page } from "../nav";
-import { IconSearch } from "../palette/Palette";
 import { t, tp } from "../i18n";
 import { rich } from "../ui/rich";
 import { bubble } from "../pkgctx/BubbleNotice";
@@ -19,7 +18,7 @@ import "./head.css";
 
 export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: () => void; onSettings: () => void; onBack: () => void; onUpdate: () => void; onPalette?: () => void }) {
   const d = () => new Date(p.now);
-  const hhmm = () => fmtTime(d());
+  const hhmm = () => fmtClock(d());
   const date = () => fmtDate(d());
   const failed = () => p.s.procs.filter((x) => x.phase === "failed").length;
   const working = () => p.s.sessions.filter((x) => x.state === "working").length;

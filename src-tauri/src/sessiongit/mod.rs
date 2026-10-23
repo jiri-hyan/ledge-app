@@ -73,7 +73,7 @@ fn write(dir: &Path, args: &[&str], input: Option<&str>, wait: Duration, what: &
             Err(if why.is_empty() { trf!("{what} selhal.", "{what} failed.") } else { trf!("{what} selhal:\n{why}", "{what} failed:\n{why}") })
         }
         Err(RunError::Timeout) => Err(trf!("{what} nedoběhl do {} s — přerušeno.", "{what} didn't finish within {} s — stopped.", wait.as_secs())),
-        Err(RunError::Spawn(e)) => Err(trf!("git nejde spustit: {e}", "can't run git: {e}")),
+        Err(RunError::Spawn(e)) => Err(crate::errors::spawn_text(tr("Git nejde spustit", "Can't run git"), &e)),
     }
 }
 
@@ -125,9 +125,9 @@ pub fn read_repo(cwd: &Path, w: Waits) -> Result<Option<Repo>, String> {
     let out = git(&dir, &plan::STATUS, &plan::ENV_READ, None, w.read);
     let mut st = match out {
         Ok(o) if o.success => parse::status_z(&o.stdout),
-        Ok(o) => return Err(trf!("git status selhal: {}", "git status failed: {}", plan::tail(&o.stderr, 3))),
+        Ok(o) => return Err(crate::errors::git(tr("Git status selhal", "git status failed"), o.code, &o.stderr)),
         Err(RunError::Timeout) => return Err(tr("git status nedoběhl včas.", "git status didn't finish in time.").into()),
-        Err(RunError::Spawn(e)) => return Err(trf!("git nejde spustit: {e}", "can't run git: {e}")),
+        Err(RunError::Spawn(e)) => return Err(crate::errors::spawn_text(tr("Git nejde spustit", "Can't run git"), &e)),
     };
     if !st.initial
         && let Some(n) = read(&dir, &plan::NUMSTAT, w.read)

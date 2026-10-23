@@ -1,6 +1,7 @@
 // Krátké hlášky dole v šuplíku: `say` / `sayError` odkudkoli, vykresluje je `<Toast />` ve skořápce App.
 import { createSignal, Show } from "solid-js";
 import { t } from "../i18n";
+import { humanError } from "./errortext";
 
 const [toast, setToast] = createSignal<{ text: string; err: boolean } | null>(null);
 let toastTimer: number | undefined;
@@ -11,10 +12,10 @@ export function say(text: string, err = false) {
   toastTimer = window.setTimeout(() => setToast(null), err ? 4200 : 2400);
 }
 
-/** Text chyby pro člověka: chyby jádra jsou už česky (string), `Error` bez prefixu „Error:“. */
+/** Text chyby pro člověka: chyby jádra jsou už lidské věty (string), `Error` bez prefixu „Error:“;
+ * surová technická chyba (`os error`, stacktrace, JSON) se nahradí obecnou větou (`errortext.ts`). */
 export function errorText(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e ?? "");
-  return msg.trim() || t("ui.error.generic", "Něco se nepovedlo.");
+  return humanError(e, t("ui.error.generic", "Něco se nepovedlo."), t("ui.error.technical", "Něco se nepovedlo — podrobnosti jsou v logu."));
 }
 
 export const sayError = (e: unknown) => say(errorText(e), true);

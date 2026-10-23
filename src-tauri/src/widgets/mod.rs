@@ -140,7 +140,7 @@ fn hash_rest(f: &mut std::fs::File, head: &[u8], max: u64) -> Result<Option<Stri
     let mut total = head.len() as u64;
     let mut buf = [0u8; 16 * 1024];
     loop {
-        let n = f.read(&mut buf).map_err(|e| e.to_string())?;
+        let n = f.read(&mut buf).map_err(|e| crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e))?;
         if n == 0 {
             break;
         }
@@ -168,7 +168,7 @@ pub fn load_one(path: &Path, kind: Kind, size: u64) -> Result<Option<Loaded>, St
         if md.len() > MAX_SIDECAR {
             return Ok(Some((Err(tr("hlavička .exe.ledge je větší než 16 KB", "the .exe.ledge header is larger than 16 KB").into()), String::new(), String::new())));
         }
-        let text = std::fs::read(&side).map_err(|e| e.to_string())?;
+        let text = std::fs::read(&side).map_err(|e| crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e))?;
         let text = smeta::header_text(&text, false);
         let parsed = match meta::parse(&text, smeta::Lang::Python) {
             Ok(None) => return Ok(None),
@@ -178,7 +178,7 @@ pub fn load_one(path: &Path, kind: Kind, size: u64) -> Result<Option<Loaded>, St
         if size > MAX_EXE {
             return Ok(Some((Err(too_big("64 MB")), String::new(), preview(&text))));
         }
-        let mut f = std::fs::File::open(path).map_err(|e| e.to_string())?;
+        let mut f = std::fs::File::open(path).map_err(|e| crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e))?;
         let Some(exe) = hash_rest(&mut f, &[], MAX_EXE)? else { return Ok(Some((Err(too_big("64 MB")), String::new(), preview(&text)))) };
         let mut h = sha2::Sha256::new();
         h.update(exe.as_bytes());
@@ -186,9 +186,9 @@ pub fn load_one(path: &Path, kind: Kind, size: u64) -> Result<Option<Loaded>, St
         h.update(text.as_bytes());
         return Ok(Some((parsed, crate::scripts::run::sha256_hex(h), preview(&text))));
     };
-    let mut f = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut f = std::fs::File::open(path).map_err(|e| crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e))?;
     let mut head = Vec::with_capacity(smeta::HEADER_BYTES);
-    (&mut f).take(smeta::HEADER_BYTES as u64).read_to_end(&mut head).map_err(|e| e.to_string())?;
+    (&mut f).take(smeta::HEADER_BYTES as u64).read_to_end(&mut head).map_err(|e| crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e))?;
     let text = smeta::header_text(&head, size > head.len() as u64);
     let parsed = match meta::parse(&text, lang) {
         Ok(None) => return Ok(None),

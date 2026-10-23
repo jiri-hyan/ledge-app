@@ -6,7 +6,7 @@ import { createSignal, For, onMount, Show } from "solid-js";
 import { ago } from "../format";
 import { t } from "../i18n";
 import { PathPick, Toggle } from "../settings/fields/controls";
-import { Row, Section } from "../settings/fields/Row";
+import { LiveBadge, Row, Section } from "../settings/fields/Row";
 import { say, sayError } from "../ui/toast";
 import type { WidgetTemplate, WidgetView } from "../types";
 import { widgetsApi } from "./api";
@@ -105,6 +105,7 @@ export default function WidgetsSettings() {
                         </div>
                       </div>
                       <Show when={w.status === "consent"}>
+                        <LiveBadge />
                         <button class="mini ok" onClick={() => setAsk(ask() === w.id ? null : w.id)}>{t("settings.widgets.review", "Zkontrolovat a povolit")}</button>
                       </Show>
                       <Show when={w.status !== "consent" && w.status !== "problem" && w.status !== "off"}>

@@ -28,7 +28,7 @@ pub(crate) fn relaunch_outside(confirmed: Vec<String>) -> Result<InstallOutcome,
     if running.iter().any(|n| !confirmed.contains(n)) {
         return Ok(InstallOutcome::Confirm { running });
     }
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = std::env::current_exe().map_err(|e| crate::errors::io(tr("Restart nejde provést", "Can't restart"), &e))?;
     let target = pkgctx::relaunch_target(&exe, pkgctx::twin_of(&exe), |p| p.is_file());
     let dir = target.parent().map(|p| p.to_path_buf()).unwrap_or_default();
     let args = format!("{} {}", pkgctx::AFTER_PID, std::process::id());
@@ -37,7 +37,10 @@ pub(crate) fn relaunch_outside(confirmed: Vec<String>) -> Result<InstallOutcome,
         Err(e) => {
             log(&format!("relaunch: Plánovač úloh selhal ({e}), zkouším Explorer"));
             release_single_instance();
-            outside::run_explorer(&target).map_err(|x| trf!("Restart mimo balíček selhal: {e}; Explorer: {x}. Spusť Ledge z nabídky Start.", "Restarting outside the package failed: {e}; Explorer: {x}. Start Ledge from the Start menu."))?;
+            outside::run_explorer(&target).map_err(|x| {
+                log(&format!("relaunch: Explorer selhal ({x})"));
+                tr("Restart mimo balíček se nepovedl. Spusť Ledge z nabídky Start.", "Restarting outside the package failed. Start Ledge from the Start menu.").to_string()
+            })?;
             "Explorer"
         }
     };

@@ -52,6 +52,11 @@ fn ymd(d: NaiveDate) -> String {
     format!("{:04}-{:02}-{:02}", d.year(), d.month(), d.day())
 }
 
+/// Probíhá teď nějaká časovaná (ne celodenní) událost? Nulová událost „trvá“ minutu jako v `pick`.
+pub fn any_ongoing<'a>(occs: impl IntoIterator<Item = &'a Occ>, now: i64) -> bool {
+    occs.into_iter().any(|o| !o.all_day && o.start <= now && now < eff_end(o))
+}
+
 pub fn pick(occs: &[(usize, &Occ)], now: i64, local: &dyn LocalTz, max_rows: usize) -> Picked {
     let now_n = naive(now);
     let today = (now_n + Duration::seconds(local.offset_utc(now_n) as i64)).date();
@@ -135,6 +140,29 @@ mod tests {
     fn timed(title: &str, start: i64, end: i64) -> Occ {
         Occ { start, end, title: title.into(), ..Occ::default() }
     }
+    #[test]
+    fn any_ongoing_table() {
+        let t = |s: i64, e: i64| timed("x", s, e);
+        let ad = allday("Svátek", 15, 16);
+        let now = utc(15, 10, 0);
+        type Case<'a> = (&'a str, Vec<Occ>, bool);
+        let cases: Vec<Case> = vec![
+            ("nic", vec![], false),
+            ("probíhá", vec![t(now - 1000, now + 1000)], true),
+            ("začíná přesně teď", vec![t(now, now + 60_000)], true),
+            ("končí přesně teď", vec![t(now - 60_000, now)], false),
+            ("ještě nezačala", vec![t(now + 1, now + 120_000)], false),
+            ("už skončila", vec![t(now - 120_000, now - 1)], false),
+            ("celodenní se nepočítá", vec![ad.clone()], false),
+            ("nulová trvá minutu", vec![t(now - 30_000, now - 30_000)], true),
+            ("nulová po minutě ne", vec![t(now - 60_000, now - 60_000)], false),
+            ("celodenní + probíhající", vec![ad, t(now - 1, now + 1)], true),
+        ];
+        for (name, occs, want) in cases {
+            assert_eq!(any_ongoing(&occs, now), want, "{name}");
+        }
+    }
+
     fn allday(title: &str, from: u32, to: u32) -> Occ {
         Occ { start: utc(from, 0, 0), end: utc(to, 0, 0), all_day: true, title: title.into(), ..Occ::default() }
     }

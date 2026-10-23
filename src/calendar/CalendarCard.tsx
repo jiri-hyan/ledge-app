@@ -28,7 +28,7 @@ function openAccountSettings(onSettings: () => void, account: "microsoft" | "goo
 /** Zapne / vypne jeden kalendář (uloží jen to pole). S chybou configu neukládá — přepsal by se. */
 async function setEnabled(i: number, on: boolean, name: string, cfgError: string | null) {
   if (cfgError) {
-    say(t("cards.calendar.cfgError", "Config má chybu — kalendář teď vypneš jen v Nastavení."), true);
+    say(t("cards.calendar.cfgError", "Nastavení obsahuje chybu — kalendář teď vypneš jen v Nastavení."), true);
     return;
   }
   try {
@@ -160,7 +160,7 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
                 class="cal-chip"
                 classList={{ "cal-chip-off": !c.enabled, "cal-chip-bad": !!c.error }}
                 title={c.account
-                  ? t("cards.calendar.chipAccount", "{name} ({domain}) — účet nastavíš v Nastavení → Účty", { name: c.name, domain: c.domain })
+                  ? t("cards.calendar.chipAccount", "{name} ({domain}) — účet nastavíš v Nastavení → Osobní → Kalendáře → Pokročilé", { name: c.name, domain: c.domain })
                   : c.enabled
                   ? c.domain
                     ? t("cards.calendar.chipOff", "{name} ({domain}) — kliknutím vypneš", { name: c.name, domain: c.domain })

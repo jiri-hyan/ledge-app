@@ -11,7 +11,7 @@ import { IconBell, IconFolder, IconGithub, IconLink, IconNote, IconTerminal } fr
 import { logoSrc } from "../logos";
 import type { NotePreset } from "../notes/store";
 import { say, sayError } from "../ui/toast";
-import { failInfo, isLive, placeOf, tileTip } from "../projects/model";
+import { failInfo, healthText, healthTone, isLive, placeOf, tileHealth, tileTip } from "../projects/model";
 import { startProject, stopProject, tipEnter, tipLeave } from "../projects/state";
 import { t } from "../i18n";
 import { BgTileButton } from "../sessions/BgLaunch";
@@ -71,6 +71,8 @@ export default function ProjectTile(p: {
   const port = () => (proc()?.phase === "ready" ? proc()?.port : undefined);
   const look = () => lookOf("project", p.pr.id, p.pr.look);
   const label = () => p.tiles.label && !look()?.hideLabel;
+  /** odznaky zdraví (neuložené změny, nepushnuté commity, Claude pracuje) — jen ze snapshotu */
+  const health = createMemo(() => tileHealth(p.pr, p.s.sessions), null, { equals: (a, b) => a?.dirty === b?.dirty && a?.ahead === b?.ahead && a?.claude === b?.claude });
   const hit = () => (p.editing ? p.onLook() : startProject(pr(), proc()));
   /** běžící projekt: prstenec kolem loga (i kolem ikony s vlastním vzhledem) */
   const ring = () => <Show when={proc()}>{(pc) => <span class={`ring ${pc().phase}`} />}</Show>;
@@ -92,7 +94,7 @@ export default function ProjectTile(p: {
       <button
         class="proj-hit"
         onClick={hit}
-        aria-description={tileTip(pr(), proc())}
+        aria-description={[tileTip(pr(), proc()), health() ? healthText(health()!) : ""].filter(Boolean).join("\n")}
         aria-label={p.editing ? t("cards.tile.editOf", "Upravit vzhled: {name}", { name: pr().name }) : t("cards.projects.launch", "Spustit {name}", { name: pr().name })}
       >
         <Show when={look() && !isPlain(look()) ? look() : null} fallback={
@@ -132,6 +134,16 @@ export default function ProjectTile(p: {
           </div>
         </Show>
       </button>
+      {/* malé odznaky v rohu (nejsou klikací; věta je v náhledu po najetí `TileTip`); kde je git řádek pod názvem, dirty a ahead nezdvojuje */}
+      <Show when={health()}>
+        {(h) => (
+          <span class="proj-hl" data-tone={healthTone(h())} data-br={p.tiles.git ? "" : undefined} aria-hidden="true">
+            <Show when={h().claude}><i class="proj-hl-c" /></Show>
+            <Show when={h().dirty > 0}><i class="proj-hl-g proj-hl-d" /></Show>
+            <Show when={h().ahead > 0}><i class="proj-hl-g proj-hl-a" /></Show>
+          </span>
+        )}
+      </Show>
       {/* akce uvnitř dlaždice dole (překryjí jen její text), ikony s popiskem v title */}
       <Show when={!p.editing}>
         <div class="acts" role="toolbar" aria-label={t("cards.projects.actions", "Akce pro {name}", { name: pr().name })}>

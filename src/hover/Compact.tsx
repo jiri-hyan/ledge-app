@@ -7,7 +7,7 @@ import { For, Show } from "solid-js";
 import { api, type SessionView, type Snapshot } from "../api";
 import { Approval } from "../cards/Peek";
 import { Controls, Cover, useCover } from "../media/Player";
-import { ago, fmtTime, uptime } from "../format";
+import { ago, fmtClock, uptime } from "../format";
 import { pctText, level, winState } from "../limits/model";
 import { t } from "../i18n";
 import { compactPlan } from "./model";
@@ -106,7 +106,7 @@ export default function Compact(p: { s: Snapshot; now: number; expandMs: number 
         <div class="hov-empty" data-anim>{t("cards.hover.calm", "Nic se neděje.")}</div>
       </Show>
       <div class="hov-foot" data-anim>
-        <span class="hov-clock">{fmtTime(new Date(p.now))}</span>
+        <span class="hov-clock">{fmtClock(new Date(p.now))}</span>
         <Limit5h s={p.s} now={p.now} />
         <button class="hov-more" onClick={() => void api.expandDrawer()}>{t("cards.hover.more", "▾ celý šuplík")}</button>
       </div>

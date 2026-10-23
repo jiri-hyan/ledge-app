@@ -35,12 +35,12 @@ export const favErrText = (e: FavError): string =>
 /** Uloží seznam oblíbených do configu. Rozbitý config (v paměti výchozí hodnoty) neukládá — přepsal by uživatelův. */
 export async function saveFavorites(list: Favorite[], cfgError: string | null): Promise<boolean> {
   if (cfgError) {
-    say(t("cards.media.cfgError", "Config má chybu — vzhled teď změníš jen v Nastavení."), true);
+    say(t("cards.media.cfgError", "Nastavení obsahuje chybu — vzhled teď změníš jen v Nastavení."), true);
     return false;
   }
   try {
     const cfg = await api.getConfig();
-    if (!cfg) throw new Error(t("cards.media.noConfig", "Config se nepodařilo načíst."));
+    if (!cfg) throw new Error(t("cards.media.noConfig", "Nastavení se nepodařilo načíst."));
     await api.saveConfig({ ...cfg, media: { ...(cfg.media ?? {}), favorites: list } });
     return true;
   } catch (e) {

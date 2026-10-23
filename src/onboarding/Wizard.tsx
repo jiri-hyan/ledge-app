@@ -1,15 +1,15 @@
 // Průvodce prvním spuštěním — stránka šuplíku `welcome` (vkládá ji App, když `wizardOpen()`).
 // Hlavička s postupem, tělo kroku s plynulým přechodem (bez animace při prefers-reduced-motion),
 // patička Zpět / Přeskočit krok / Uložit a pokračovat. Každý krok se ukládá hned (`applyStep`).
-import { createEffect, createMemo, For, Match, on, onMount, Show, Switch } from "solid-js";
+import { createEffect, For, Match, on, onMount, Show, Switch } from "solid-js";
 import { t } from "../i18n";
-import { STEPS, reducedMotion, type StepId } from "./logic";
+import { reducedMotion, type StepId } from "./logic";
 import { closeWizard } from "./state";
-import { applyStep, finish, pending, prefetch, setWiz, wiz } from "./store";
+import { applyStep, finish, pending, prefetch, setWiz, steps, wiz } from "./store";
 import ProjectsStep from "./steps/Projects";
-import { AssistStep } from "./steps/Assist";
 import AppsStep from "./steps/Apps";
-import { ClaudeStep, LinksStep } from "./steps/Extras";
+import { ClaudeStep } from "./steps/Claude";
+import { LinksStep } from "./steps/Extras";
 import { DoneStep, LookStep, WelcomeStep } from "./steps/Basics";
 import "./onboarding.css";
 
@@ -17,8 +17,7 @@ export default function Wizard(p: { onExit: () => void }) {
   onMount(() => {
     if (wiz.reposState === "idle") void prefetch();
   });
-  // Vzhled jen když config sekci `appearance` s motivy má (jinak by výběr nic neuložil)
-  const steps = createMemo(() => STEPS.filter((s) => s.id !== "look" || wiz.themesState !== "ready" || wiz.themes.length > 0));
+  // `steps()` (store.ts): Vzhled jen s motivy v configu, Claude jen s nainstalovaným Claude Code
   const idx = () => Math.min(wiz.step, steps().length - 1);
   const cur = (): StepId => steps()[idx()].id;
   const last = () => idx() === steps().length - 1;
@@ -77,7 +76,7 @@ export default function Wizard(p: { onExit: () => void }) {
             )}
           </For>
         </ol>
-        <button class="mini" disabled={wiz.busy} onClick={() => void exit()}>
+        <button class="mini" disabled={wiz.busy} title={last() ? undefined : t("onboarding.skipAllHint", "Průvodce jde kdykoli spustit znovu: Nastavení → Začínáme.")} onClick={() => void exit()}>
           {last() ? t("onboarding.close", "Zavřít") : t("onboarding.skipAll", "Přeskočit průvodce")}
         </button>
       </header>
@@ -87,12 +86,11 @@ export default function Wizard(p: { onExit: () => void }) {
       <div class="ob-body" ref={body}>
         <Switch>
           <Match when={cur() === "welcome"}><WelcomeStep /></Match>
-          <Match when={cur() === "assist"}><AssistStep /></Match>
           <Match when={cur() === "projects"}><ProjectsStep /></Match>
           <Match when={cur() === "apps"}><AppsStep /></Match>
-          <Match when={cur() === "claude"}><ClaudeStep /></Match>
           <Match when={cur() === "links"}><LinksStep /></Match>
           <Match when={cur() === "look"}><LookStep /></Match>
+          <Match when={cur() === "claude"}><ClaudeStep /></Match>
           <Match when={cur() === "done"}><DoneStep /></Match>
         </Switch>
       </div>

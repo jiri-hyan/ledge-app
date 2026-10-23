@@ -39,7 +39,7 @@ Výchozí Client ID je prázdné — Ledge žádné nevymýšlí a bez tvého ni
 - Trvalé přihlášení (refresh token) je jen ve **Správci pověření Windows** (Ovládací panely →
   Správce pověření → Pověření systému Windows → Obecná pověření → `Ledge/accounts/microsoft` nebo
   `Ledge/accounts/google`). V configu je jen Client ID. Do logu ani do chybových hlášek se token nedostane.
-- **Odhlásit** (Nastavení → Účty) smaže přihlášení ze Správce pověření. U Googlu ho Ledge i odvolá.
+- **Odhlásit** (Nastavení → Osobní → Kalendáře → Pokročilé) smaže přihlášení ze Správce pověření. U Googlu ho Ledge i odvolá.
   Microsoft odvolání pro veřejné aplikace nenabízí — přístup můžeš odebrat ručně: osobní účet na
   account.microsoft.com → Soukromí → Aplikace a služby; pracovní účet na myapps.microsoft.com.
 
@@ -78,7 +78,7 @@ Když to nejde:
    `https://www.googleapis.com/auth/calendar.readonly`.
 4. **Audience → Test users → Add users →** přidej svůj Gmail (bez toho Google přihlášení odmítne).
 5. **Clients → Create client →** Application type **Desktop app** → Create. Zkopíruj **Client ID**
-   a **Client secret** a vlož je v Ledge do Nastavení → Účty → Google. (U desktopové aplikace secret
+   a **Client secret** a vlož je v Ledge do Nastavení → Osobní → Kalendáře → Pokročilé → Google. (U desktopové aplikace secret
    tajný není — Google to tak sám popisuje —, Ledge ho i tak ukládá jen do Správce pověření.) Adresu
    přesměrování nezadáváš: desktopový klient bere `http://127.0.0.1:<port>` automaticky.
 6. V Ledge klikni **Přihlásit v prohlížeči**. Google ukáže **„Google tuto aplikaci neověřil“** —
@@ -87,7 +87,7 @@ Když to nejde:
 7. **Ať přihlášení nevyprší za 7 dní:** v **Audience → Publishing status** klikni **Publish app**
    („In production“). Ověření podávat nemusíš (aplikace je jen pro tebe, limit 100 uživatelů platí dál),
    varování při přihlášení zůstane, ale refresh token už po týdnu nepropadne.
-8. Které kalendáře se ukážou: Nastavení → Účty → Google → **Vybrat kalendáře…** (nic = jen hlavní).
+8. Které kalendáře se ukážou: Nastavení → Osobní → Kalendáře → Pokročilé → Google → **Vybrat kalendáře…** (nic = jen hlavní).
 
 ## Soukromí v kostce
 

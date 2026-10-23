@@ -27,6 +27,7 @@
 //! pak registr nechá být (nic nezapíše ani nesmaže). Nastavení to ukáže u přepínače a nabídne
 //! „Restartovat mimo“; instance mimo bublinu pak Run zapíše při startu.
 
+use crate::i18n::tr;
 use std::path::{Path, PathBuf};
 
 use winreg::enums::HKEY_CURRENT_USER;
@@ -209,19 +210,19 @@ pub fn apply(enabled: bool) -> Result<(), String> {
             return Ok(());
         }
     }
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe = std::env::current_exe().map_err(|e| crate::errors::io(tr("Spuštění s Windows nejde nastavit", "Can't set up start with Windows"), &e))?;
     let installed = installed_exe();
     let (run, _) = RegKey::predef(HKEY_CURRENT_USER)
         .create_subkey(RUN)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::io(tr("Spuštění s Windows nejde nastavit", "Can't set up start with Windows"), &e))?;
     let current: Option<String> = run.get_value(NAME).ok();
     match decide(&exe, installed.as_deref(), current.as_deref(), enabled) {
         Action::Keep => {}
-        Action::Write(want) => run.set_value(NAME, &want).map_err(|e| e.to_string())?,
+        Action::Write(want) => run.set_value(NAME, &want).map_err(|e| crate::errors::io(tr("Spuštění s Windows nejde nastavit", "Can't set up start with Windows"), &e))?,
         Action::Delete => match run.delete_value(NAME) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e.to_string()),
+            Err(e) => return Err(crate::errors::io(tr("Spuštění s Windows nejde vypnout", "Can't turn off start with Windows"), &e)),
         },
     }
     let legacy: Option<String> = run.get_value(LEGACY_NAME).ok();
@@ -229,7 +230,7 @@ pub fn apply(enabled: bool) -> Result<(), String> {
         match run.delete_value(LEGACY_NAME) {
             Ok(()) => crate::log(&format!("autostart: smazána stará hodnota Run {LEGACY_NAME} = {}", legacy.unwrap_or_default())),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(format!("stará hodnota Run {LEGACY_NAME}: {e}")),
+            Err(e) => return Err(crate::errors::io(tr("Starou položku spuštění s Windows nejde odstranit", "Can't remove the old start-with-Windows entry"), &e)),
         }
     }
     Ok(())

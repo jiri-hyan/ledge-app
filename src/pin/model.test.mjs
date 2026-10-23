@@ -1,7 +1,7 @@
 // Lístky na plochu — čistá logika (`model.ts`): přidání bodu / textu, barvy, připnutí ze snapshotu.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anyThrough, appendLine, caretFromText, isPinned, isTaskLine, pinColors, pointLine, samePath, taskLine, TEXT_MIN } from "./model.ts";
+import { anyThrough, appendLine, caretFromText, isPinned, isTaskLine, pinColors, pinSuggestVisible, pointLine, remindAskText, samePath, taskLine, TEXT_MIN } from "./model.ts";
 
 test("taskLine: bod checklistu z textu", () => {
   const cases = [
@@ -86,4 +86,23 @@ test("caretFromText: dvojklik do vykresleného textu → pozice v těle", () => 
     ["   ", 1, null],
   ];
   for (const [node, off, want] of cases) assert.equal(caretFromText(body, node, off), want, JSON.stringify([node, off]));
+});
+
+test("připomínka z přidaného bodu: ptát se jen na časový text a jen u poznámky bez připomínky", () => {
+  const cases = [
+    ["zítra v 10 zavolat X", null, "zítra v 10 zavolat X"],
+    ["  zítra   v 10\n zavolat ", undefined, "zítra v 10 zavolat"],
+    ["koupit mléko", null, null],
+    ["do 25. 10. odevzdat", null, "do 25. 10. odevzdat"],
+    ["zítra v 10 zavolat X", 1_800_000_000_000, null],
+    ["ab", null, null],
+    ["", null, null],
+  ];
+  for (const [text, remindMs, want] of cases) assert.equal(remindAskText(text, remindMs), want, JSON.stringify(text));
+  assert.equal(remindAskText("zítra ".repeat(10_000), null).length, 20_000);
+  const sg = { label: "zítra 10:00", iso: "2026-10-24T10:00:00+02:00" };
+  assert.equal(pinSuggestVisible(sg, null), sg);
+  assert.equal(pinSuggestVisible(sg, 5), null, "poznámka už připomínku má");
+  assert.equal(pinSuggestVisible({ label: "x", iso: "nesmysl" }, null), null, "nepoužitelné ISO");
+  assert.equal(pinSuggestVisible(null, null), null);
 });

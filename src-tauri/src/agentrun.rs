@@ -100,7 +100,7 @@ pub fn run(args: &[String], cwd: Option<&Path>, wait: Duration, cap: usize) -> R
     if let Some(d) = cwd {
         cmd.current_dir(d);
     }
-    let mut child = cmd.spawn().map_err(|e| trf!("Claude Code nejde spustit: {e}", "Can't start Claude Code: {e}"))?;
+    let mut child = cmd.spawn().map_err(|e| crate::errors::spawn(tr("Claude Code nejde spustit", "Can't start Claude Code"), &e))?;
     let (out, err) = (Arc::new(Mutex::new(Tail::default())), Arc::new(Mutex::new(Tail::default())));
     let (tx, rx) = mpsc::channel();
     if let Some(o) = child.stdout.take() {
@@ -120,7 +120,7 @@ pub fn run(args: &[String], cwd: Option<&Path>, wait: Duration, cap: usize) -> R
                 return Err(trf!("Claude Code neodpověděl do {s} s.", "Claude Code didn't answer within {s} s."));
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-            Err(e) => return Err(e.to_string()),
+            Err(e) => return Err(crate::errors::io(tr("Claude Code nejde dočkat", "Can't wait for Claude Code"), &e)),
         }
     };
     let end = Instant::now() + DRAIN;
@@ -145,7 +145,7 @@ pub fn attach(cwd: &str, id: &str) -> Result<(), String> {
         return Ok(());
     }
     match agentview::attach_command(false, &dir, id).ok_or_else(bad)? {
-        Launch::Cmd(raw) => Command::new("cmd").raw_arg(raw).creation_flags(NO_WINDOW).spawn().map(|_| ()).map_err(|e| e.to_string()),
+        Launch::Cmd(raw) => Command::new("cmd").raw_arg(raw).creation_flags(NO_WINDOW).spawn().map(|_| ()).map_err(|e| crate::errors::spawn(tr("Terminál nejde otevřít", "Can't open a terminal"), &e)),
         Launch::Wt(_) => Err(bad()),
     }
 }

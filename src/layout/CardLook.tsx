@@ -3,55 +3,27 @@
 // obsah — plovoucí panel by se ořízl); karta nad ním je živý náhled (`lookFor` → `Deck` atributy
 // `data-cl-*`). Hotovo / klik mimo = uložit (v režimu úprav do draftu), Esc = zahodit, Vrátit, Obnovit
 // podle stylu. Obecné pro každou kartu (i nové karty jiných modulů) — řeší to `.deck-item`, ne karta.
+// Panel (UI) — stav a `openCardLook` / `lookFor` jsou v malém `lookState.ts` (eager); tenhle soubor se načítá líně.
 // Jediný panel vzhledu karty (kolo 13): u karty Právě hraje v něm je i výběr varianty přehrávače
 // (`media.variant`, miniatury z `media/VariantPicker.tsx`; ukládá se hned jako ikonka v rohu karty a
 // Nastavení → Osobní — jeden zdroj v configu), u karet se zástupci (Projekty, Akce) výběr dlaždice, jejíž
 // vzhled (`tilelook/*`) se má upravit. Ikonka v rohu přehrávače a pravý klik na dlaždici jsou zkratky.
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { For, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../i18n";
 import { MenuChoice } from "../cards/CardMenu";
 import type { Snapshot } from "../api";
 import { Thumb, saveVariant, shownVariant, variantHint, variantName } from "../media/VariantPicker";
 import { VARIANTS } from "../media/timeline";
 import { openLook } from "../tilelook/state";
-import { change, editing, saveLayout } from "./edit";
+import { closeCardLook, draft, setDraft, target, type Target } from "./lookState";
 import {
-  ACCENT_NAMES, accentCss, BG_NAMES, BGS, CARD_ACCENTS, DENSITIES, DENSITY_NAMES, normalizeCardLook, patchCardLook, setCardLook, VIEW_CARDS, VIEW_NAMES, VIEWS,
+  ACCENT_NAMES, accentCss, BG_NAMES, BGS, CARD_ACCENTS, DENSITIES, DENSITY_NAMES, patchCardLook, VIEW_CARDS, VIEW_NAMES, VIEWS,
   type CardLook,
 } from "./look";
 import { cardName, tx } from "./text";
 import type { CardId } from "./model";
 import "../tilelook/tilelook.css";
 import "../media/media.css";
-
-type Target = { page: string; card: string; initial: CardLook | undefined; cfgError: string | null };
-const [target, setTarget] = createSignal<Target | null>(null);
-const [draft, setDraft] = createSignal<CardLook | undefined>(undefined);
-
-/** Vzhled, který má karta kreslit: rozpracovaný (živý náhled), jinak uložený. */
-export const lookFor = (page: string, card: string, saved: CardLook | undefined): CardLook | undefined => {
-  const tg = target();
-  return tg && tg.page === page && tg.card === card ? draft() : saved;
-};
-
-/** ⋯ → „Vzhled karty…“. */
-export function openCardLook(page: string, card: string, initial: CardLook | undefined, cfgError: string | null) {
-  const cur = target();
-  if (cur) void closeCardLook(true);
-  const init = normalizeCardLook(initial, card);
-  setTarget({ page, card, initial: init, cfgError });
-  setDraft(init);
-}
-
-export async function closeCardLook(save: boolean) {
-  const tg = target();
-  const l = draft();
-  setTarget(null);
-  setDraft(undefined);
-  if (!save || !tg || JSON.stringify(l ?? null) === JSON.stringify(tg.initial ?? null)) return;
-  if (editing()) change((x) => setCardLook(x, tg.page, tg.card, l));
-  else await saveLayout((x) => setCardLook(x, tg.page, tg.card, l), tg.cfgError);
-}
 
 /** Panel pod mřížkou (MainPage), jen pro kartu na zobrazené záložce. */
 export default function CardLookPanel(p: { page: string; s?: Snapshot }) {
@@ -180,12 +152,12 @@ function TileLooks(p: { s: Snapshot; card: string }) {
   return (
     <Show when={items().length}>
       <div class="tl-ed-row">
-        <span class="tl-ed-cap">{t("cards.cardlook.tiles", "Dlaždice")}</span>
-        <select aria-label={t("cards.cardlook.tilesAria", "Upravit vzhled dlaždice")} onChange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ""; void open(v); }}>
-          <option value="">{t("cards.cardlook.tilesPick", "Upravit vzhled dlaždice…")}</option>
+        <span class="tl-ed-cap">{t("cards.cardlook.tiles", "Zástupci")}</span>
+        <select aria-label={t("cards.cardlook.tilesAria", "Upravit vzhled zástupce")} onChange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ""; void open(v); }}>
+          <option value="">{t("cards.cardlook.tilesPick", "Upravit vzhled zástupce…")}</option>
           <For each={items()}>{(x) => <option value={x.id}>{x.name}</option>}</For>
         </select>
-        <small class="tl-ed-note">{t("cards.cardlook.tilesHint", "Zkratka: pravý klik na dlaždici → Upravit vzhled.")}</small>
+        <small class="tl-ed-note">{t("cards.cardlook.tilesHint", "Zkratka: pravý klik na zástupce → Upravit vzhled.")}</small>
       </div>
     </Show>
   );

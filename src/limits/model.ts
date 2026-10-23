@@ -48,3 +48,16 @@ export function otherDay(ms: number, now: number): boolean {
   const b = new Date(now);
   return a.getFullYear() !== b.getFullYear() || a.getMonth() !== b.getMonth() || a.getDate() !== b.getDate();
 }
+
+/** Od jaké spotřeby 5h okna se při práci Clauda zvýrazní čas resetu. */
+export const HINT_FROM_PCT = 80;
+
+/**
+ * Čas resetu k zvýraznění (ms), nebo null: 5h okno má čerstvý vzorek, je od `HINT_FROM_PCT` a zbývá do resetu,
+ * a aspoň jedna session právě pracuje (jinak limit nikoho nebrzdí). Čistá funkce nad snapshotem — žádný časovač.
+ */
+export function resetHint(w: LimitWindow | null | undefined, at: number | null | undefined, now: number, staleMs: number, working: boolean): number | null {
+  if (!working || !w || w.resetsAt == null) return null;
+  const st = winState(w, at, now, staleMs);
+  return st.kind === "fresh" && st.pct >= HINT_FROM_PCT ? w.resetsAt : null;
+}

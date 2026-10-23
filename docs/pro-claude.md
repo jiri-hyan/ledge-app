@@ -164,7 +164,7 @@ Windows) nainstalovat a nastavit na míru.
    GitHub API (`releases/latest`), **ověř SHA256** proti `SHA256SUMS.txt` / prvnímu řádku poznámek vydání.
    Nesedí-li, neinstaluj.
 3. **Tichá instalace** `Ledge_..._x64-setup.exe /S` do `%LOCALAPPDATA%\Ledge` (bez správce).
-4. **Zapnutí MCP smí jen člověk:** první průchod -> krok „S Claudem“ -> „Nastavit s Claudem“, nebo Nastavení ->
+4. **Zapnutí MCP smí jen člověk:** průvodce -> krok „Claude“ -> „Připojit“, nebo Nastavení ->
    Claude (MCP). Pak připoj: `claude mcp add --scope user ledge -- "%LOCALAPPDATA%\Ledge\ledge.exe" --mcp`
    (Claude Desktop: JSON výše do `claude_desktop_config.json`).
 5. **Rozhovor:** `ledge_status` -> `apps_discover` -> max 3-4 otázky (aplikace, weby, druh práce, styl) ->

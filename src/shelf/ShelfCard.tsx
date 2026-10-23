@@ -1,12 +1,13 @@
 // Karta „Přihrádka“: soubory přetažené na proužek (jen odkazy — cesty, nic se nekopíruje). Řádek:
 // ikona ze shellu, název, složka, „chybí“; akce Cesta / @ (zmínka pro Claude Code) do schránky,
-// Otevřít, Ve složce, ✕. Hlavička: kopírovat vše (oba formáty), vyprázdnit (druhým klikem). Řádek
+// Otevřít, Ve složce, ✕. Hlavička: kopírovat vše (oba formáty), vyprázdnit (s potvrzením `ui/Confirm`). Řádek
 // jde táhnout ven (Průzkumník, terminál s Claude) — tah spustí jádro (`shelf/dragout.rs`), nic se
 // neposílá samo. Data si karta bere sama (`shelf_list`) při otevření šuplíku a po události `shelf`.
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { on } from "../api";
 import type { ViewMsg } from "../types";
 import { say, sayError } from "../ui/toast";
+import { Confirm } from "../ui/Confirm";
 import { t, tp } from "../i18n";
 import { shelfApi } from "./api";
 import { cardVisible, carriesFiles, isDrag, type ClipFormat, type ShelfItem, type ShelfList } from "./model";
@@ -114,11 +115,6 @@ export default function ShelfCard(p: { wide?: boolean; menu?: JSX.Element }) {
   const [confirm, setConfirm] = createSignal(false);
   const items = () => list()?.items ?? [];
   const clear = async () => {
-    if (!confirm()) {
-      setConfirm(true);
-      setTimeout(() => setConfirm(false), 4000);
-      return;
-    }
     setConfirm(false);
     await shelfApi.clear().catch(sayError);
   };
@@ -131,9 +127,18 @@ export default function ShelfCard(p: { wide?: boolean; menu?: JSX.Element }) {
           <span class="n">{items().length}</span>
           <button class="mini" title={t("cards.shelf.copyAllTip", "Všechny cesty do schránky, každá na řádek")} onClick={() => copy([], "plain")}>{t("cards.shelf.copyAll", "Kopírovat vše")}</button>
           <button class="mini" title={t("cards.shelf.copyAllClaudeTip", "Všechny jako zmínky pro Claude Code na jednom řádku")} onClick={() => copy([], "claude")}>{t("cards.shelf.copyAllClaude", "@ vše")}</button>
-          <button class="mini" classList={{ warn: confirm() }} onClick={clear}>{confirm() ? t("cards.shelf.clearConfirm", "Opravdu vyprázdnit?") : t("cards.shelf.clear", "Vyprázdnit")}</button>
+          <button class="mini" onClick={() => setConfirm(true)}>{t("cards.shelf.clear", "Vyprázdnit")}</button>
           {p.menu}
         </h4>
+        <Confirm
+          when={confirm()}
+          text={t("cards.shelf.clearConfirm", "Vyprázdnit přihrádku?")}
+          detail={t("cards.shelf.clearDetail", "Odebere všechny odkazy z přihrádky. Soubory na disku zůstanou.")}
+          yes={t("cards.shelf.clear", "Vyprázdnit")}
+          danger
+          onYes={() => void clear()}
+          onNo={() => setConfirm(false)}
+        />
         <div class="shelf-list">
           <For each={items()}>{(it) => <Row it={it} />}</For>
         </div>

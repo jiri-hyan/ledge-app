@@ -130,7 +130,7 @@ export default function ActionEditor(p: {
       <div class="act-field">
         <label>{t("actions.edit.label", "Popisek")}</label>
         <div class="ctl">
-          <input type="text" value={d.label} placeholder={labelFrom(d.target) || t("actions.edit.labelPh", "Jak se dlaždice jmenuje")} onInput={(e) => setD("label", e.currentTarget.value)} />
+          <input type="text" value={d.label} placeholder={labelFrom(d.target) || t("actions.edit.labelPh", "Jak se zástupce jmenuje")} onInput={(e) => setD("label", e.currentTarget.value)} />
           <ErrLine f="label" />
         </div>
       </div>

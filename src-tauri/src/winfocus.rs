@@ -167,7 +167,7 @@ pub fn launch(cwd: &str, id: &str) -> Result<(), String> {
         return Ok(());
     }
     match crate::sessions::resume_command(false, cwd, id).ok_or_else(bad)? {
-        Launch::Cmd(raw) => std::process::Command::new("cmd").raw_arg(raw).creation_flags(NO_WINDOW).spawn().map(|_| ()).map_err(|e| e.to_string()),
+        Launch::Cmd(raw) => std::process::Command::new("cmd").raw_arg(raw).creation_flags(NO_WINDOW).spawn().map(|_| ()).map_err(|e| crate::errors::spawn(crate::i18n::tr("Terminál nejde otevřít", "Can't open a terminal"), &e)),
         Launch::Wt(_) => Err(bad()),
     }
 }

@@ -6,6 +6,7 @@ registerDict("en", {
   // okno lístku
   "notes.pin.gone": "The note is gone — it was deleted or moved.",
   "notes.pin.retry": "The note was just being changed elsewhere — try again.",
+  "notes.pin.remindSet": "Reminder set: {when}",
   "notes.pin.reloaded": "The note changed in the meantime — I loaded the new version.",
   "notes.pin.copied": "Saved as a new note — you'll find it in the Notes card.",
   "notes.pin.imageSaved": "Image saved to the note.",

@@ -10,7 +10,7 @@ test("případ 8: ⋯ na kartě v režimu úprav mění draft, ne config (jinak 
   const menu = src("../cards/CardMenu.tsx");
   assert.ok(menu.includes("if (editing())") && menu.includes("change((l) => f(l).layout)"), "tweak: v úpravách do draftu");
   for (const f of ["setSize", "setHeight", "setLimit"]) assert.ok(!new RegExp(`saveLayout[(][^)]*${f}`).test(menu), `${f} jde přes tweak, ne saveLayout`);
-  assert.ok(menu.includes("placePopup"), "pozice seznamu ze sdíleného ui/place.ts");
+  assert.ok(menu.includes("PopMenu"), "seznam je společné menu ui/Popover.tsx (pozice ze sdíleného ui/place.ts)");
 });
 
 test("případ 6 + 9: tah karty je pointer (ne HTML5), náhled bez přeskládání DOM, Esc zruší jen tah, velikost živě", () => {

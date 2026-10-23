@@ -9,6 +9,7 @@
 .lim-fill.lim-bad { background: var(--red); }
 .lim-pct { text-align: right; color: var(--t1); }
 .lim-when { color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lim-when.lim-hot { color: var(--amber); font-weight: 600; }
 .lim-row.lim-old .lim-fill { opacity: 0.45; }
 .lim-row.lim-old .lim-pct { color: var(--t3); }
 .lim-empty { font: var(--fs-xs) var(--mono); color: var(--t3); padding: var(--s1) 0 var(--s2); }

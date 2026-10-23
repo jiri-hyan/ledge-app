@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { defaultLayout, setSize } from "./model.ts";
+import { setSize } from "./model.ts";
+import { fullLayout } from "./fullLayout.mjs";
 import { pushUndo, popUndo } from "./history.ts";
 import { discards, escAction, isDirty, showResume } from "./keep.ts";
 
@@ -15,7 +16,7 @@ test("skrytí, blur ani znovuotevření draft nezahodí; zahodí ho jen Zrušit 
 });
 
 test("draft i historie Zpět po „zavření“ zůstanou (stav se při hide nemění, Zpět dál funguje)", () => {
-  const a = defaultLayout();
+  const a = fullLayout();
   const b = setSize(a, "prace", "claude", "s");
   const st = pushUndo([], a, b);
   // „hide“ = žádná operace nad stavem; po znovuotevření je to pořád ono
@@ -24,7 +25,7 @@ test("draft i historie Zpět po „zavření“ zůstanou (stav se při hide nem
 });
 
 test("připomínka po znovuotevření jen s opravdu neuloženými změnami", () => {
-  const a = defaultLayout();
+  const a = fullLayout();
   const b = setSize(a, "prace", "claude", "s");
   assert.equal(showResume("reopen", a, b), true);
   assert.equal(showResume("reopen", a, a), false, "bez změn není co připomínat");
@@ -33,7 +34,7 @@ test("připomínka po znovuotevření jen s opravdu neuloženými změnami", () 
 });
 
 test("Esc mimo tah: se změnami se zeptá, beze změn zruší", () => {
-  const a = defaultLayout();
+  const a = fullLayout();
   assert.equal(escAction(a, setSize(a, "prace", "claude", "s")), "ask");
   assert.equal(escAction(a, a), "cancel");
 });

@@ -1,6 +1,8 @@
 // Nastavení → Osobní → Kalendáře: přidání = výběr zdroje dlaždicí („Odkaz ICS“ — vložit odkaz a Přidat,
-// jedno zkušební stažení; „Outlook v tomto PC“ — klasický Outlook přes COM, bez přihlášení; další zdroje
-// jako účty Microsoft/Google se přidají jako další dlaždice v `SOURCES`). U každého kalendáře barva, název,
+// jedno zkušební stažení, s návodem, kde odkaz vzít — PRVNÍ a při prázdném seznamu rovnou rozbalená volba;
+// „Outlook v tomto PC“ — klasický Outlook přes COM, bez přihlášení). Přihlášení účtem Microsoft/Google
+// (vlastní registrace aplikace) je až v „Pokročilé“ pod kalendáři (`accounts/AccountsSettings.tsx`, skládá
+// ho `settings/panels/Personal.tsx`). U každého kalendáře barva, název,
 // zapnutí, „Otestovat“ / „Změnit odkaz“ (ICS) nebo „Načíst z Outlooku“, připomínka schůzky (minuty předem
 // + oznámení s tlačítkem Připojit) a Odebrat s Vrátit. Kotva `f-personal.calendars` je `Section`
 // v `settings/panels/Personal.tsx`. Adresa se ukazuje jen jako doména (je to tajemství); chyby lidskou řečí.
@@ -18,7 +20,7 @@ const MAX_CALENDARS = 8;
 
 type Feed = { name: string; url: string; color: string | null; enabled: boolean; source?: string; remindMin?: number; remindToast?: boolean };
 type Msg = { text: string; err: boolean };
-type Pick = "ics" | "outlook-local" | "microsoft" | "google" | null;
+type Pick = "ics" | "outlook-local" | null;
 
 function problemText(p: UrlProblem): string {
   switch (p) {
@@ -57,12 +59,10 @@ function Help() {
   );
 }
 
-/** Dlaždice zdrojů v pořadí; účty Microsoft/Google se přihlašují a zapínají v Nastavení → Účty (dlaždice tam vede). */
+/** Dlaždice zdrojů v pořadí; účty Microsoft/Google (přihlášení) jsou v Pokročilé pod kalendáři. */
 const SOURCES = () => [
   { id: "ics" as const, icon: "🔗", title: t("settings.calendar.src.ics", "Odkaz ICS"), desc: t("settings.calendar.src.icsDesc", "Google nebo Outlook na webu — tajný odkaz, bez přihlášení") },
   { id: "outlook-local" as const, icon: "🖥", title: t("settings.calendar.src.outlook", "Outlook v tomto PC"), desc: t("settings.calendar.src.outlookDesc", "klasický Outlook nainstalovaný tady — bez přihlášení, bez internetu") },
-  { id: "microsoft" as const, icon: "Ⓜ", title: t("settings.calendar.src.microsoft", "Účet Microsoft"), desc: t("settings.calendar.src.microsoftDesc", "Outlook a Microsoft 365 — přihlášení v Nastavení → Účty") },
-  { id: "google" as const, icon: "Ⓖ", title: t("settings.calendar.src.google", "Účet Google"), desc: t("settings.calendar.src.googleDesc", "Kalendář Google — přihlášení v Nastavení → Účty") },
 ];
 
 /** Připomínka schůzky u kalendáře `i`: minuty předem + oznámení Windows s Připojit. */
@@ -99,7 +99,8 @@ export default function CalendarSettings() {
   const c = useSettings();
   const list = (): Feed[] => c.cfg.personal?.calendars ?? [];
   const at = (i: number, f: string) => `personal.calendars.${i}.${f}`;
-  const [pick, setPick] = createSignal<Pick>(null);
+  // bez kalendáře rovnou rozbalený Odkaz ICS (první a nejjednodušší cesta)
+  const [pick, setPick] = createSignal<Pick>(list().length === 0 ? "ics" : null);
   const [url, setUrl] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [msg, setMsg] = createSignal<Msg | null>(null);
@@ -291,6 +292,7 @@ export default function CalendarSettings() {
             />
             <button class="mini ok" disabled={busy() || !url().trim()} onClick={add}>{busy() ? t("settings.calendar.adding", "Načítám…") : t("settings.calendar.add", "Přidat")}</button>
           </div>
+          <p class="cal-src-note">{t("settings.calendar.icsHow", "Google: Nastavení kalendáře → Integrovat kalendář → Tajná adresa ve formátu iCal. Outlook na webu: Nastavení → Kalendář → Sdílené kalendáře → Publikovat kalendář → odkaz ICS.")}</p>
           <Help />
         </Show>
         <Show when={pick() === "outlook-local"}>
@@ -319,14 +321,10 @@ export default function CalendarSettings() {
           </div>
         </Show>
       </Show>
-      <Show when={pick() === "microsoft" || pick() === "google"}>
-        <div class="cal-src-info">
-          <span>{t("settings.calendar.account.what", "Kalendář účtu se do karty přidá sám, když se v Nastavení → Účty přihlásíš a necháš zapnutý „Kalendář v kartě Kalendář“.")}</span>
-          <button class="mini ok" onClick={() => gotoSettingsPanel(pick() === "google" ? "f-accounts.google" : "f-accounts.microsoft")}>
-            {t("settings.calendar.account.open", "Otevřít Účty")}
-          </button>
-        </div>
-      </Show>
+      <div class="cal-src-info">
+        <span>{t("settings.calendar.account.what", "Pracovní účet Microsoft nebo Google s přihlášením místo odkazu najdeš níže v Pokročilé.")}</span>
+        <button class="mini" onClick={() => gotoSettingsPanel("f-accounts.microsoft")}>{t("settings.calendar.account.open", "Ukázat")}</button>
+      </div>
       <Show when={msg()}>{(m) => <div class="cal-set-msg" classList={{ "cal-set-err": m().err }} role={m().err ? "alert" : undefined}>{m().text}</div>}</Show>
     </div>
   );

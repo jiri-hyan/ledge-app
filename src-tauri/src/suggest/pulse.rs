@@ -59,9 +59,10 @@ impl Dedup {
     }
 }
 
-/// Která událost se ukáže (nejdůležitější podle `Event::rank`), nebo žádná: puls vypnutý / nic nového.
-pub(crate) fn decide(events: &[(String, Event)], pulse_on: bool) -> Option<Event> {
-    if !pulse_on {
+/// Která událost se ukáže (nejdůležitější podle `Event::rank`), nebo žádná: puls vypnutý / nic nového / právě
+/// probíhá schůzka (klid; událost se nezapamatuje k pozdějšímu pulsu, chip v návrzích zůstává).
+pub(crate) fn decide(events: &[(String, Event)], pulse_on: bool, in_meeting: bool) -> Option<Event> {
+    if !pulse_on || in_meeting {
         return None;
     }
     events.iter().map(|(_, e)| *e).min_by_key(|e| e.rank())
@@ -78,13 +79,13 @@ static WATCH: Mutex<Watch> = Mutex::new(Watch { seen: None, dedup: None });
 /// `gh` odhlášené) se paměť pozorování nemění — po návratu dat se porovnává s posledním, co jsme viděli.
 pub(super) fn on_refreshed() {
     let c = crate::state::core();
-    let (pulse_on, gh) = {
+    let now_ms = crate::state::now_ms();
+    let (pulse_on, gh, in_meeting) = {
         let g = c.cfg.read();
-        (g.suggest.github_pulse, g.github.clone())
+        (g.suggest.github_pulse, g.github.clone(), crate::calendar::live::meeting_now(&g, now_ms))
     };
     let Some((review, mine, at)) = crate::github::cached_prs(&gh) else { return };
     let now = GhSeen::of(&super::refs(&review, &mine, at));
-    let now_ms = crate::state::now_ms();
     let events: Vec<(String, Event)> = {
         let mut w = WATCH.lock();
         let evs = transitions(w.seen.as_ref(), &now);
@@ -92,7 +93,7 @@ pub(super) fn on_refreshed() {
         let dedup = w.dedup.get_or_insert_with(Dedup::default);
         evs.into_iter().filter(|(k, e)| dedup.allow(k, *e, now_ms)).collect()
     };
-    if let Some(ev) = decide(&events, pulse_on) {
+    if let Some(ev) = decide(&events, pulse_on, in_meeting) {
         // bez toastu (druhý parametr): GitHub nemá vlastní oznámení Windows
         attention::signal(ev.color(), false);
         crate::state::mark_dirty();
@@ -154,16 +155,19 @@ mod tests {
     fn decide_table() {
         let ci = ("a/b#1".to_string(), Event::GithubCi);
         let rev = ("a/b#2".to_string(), Event::GithubReview);
-        type Case<'a> = (&'a str, Vec<(String, Event)>, bool, Option<Event>);
+        type Case<'a> = (&'a str, Vec<(String, Event)>, bool, bool, Option<Event>);
         let cases: Vec<Case> = vec![
-            ("nic nového", vec![], true, None),
-            ("vypnuto", vec![ci.clone()], false, None),
-            ("jen CI", vec![ci.clone()], true, Some(Event::GithubCi)),
-            ("jen revize", vec![rev.clone()], true, Some(Event::GithubReview)),
-            ("CI má přednost před revizí", vec![rev.clone(), ci.clone()], true, Some(Event::GithubCi)),
+            ("nic nového", vec![], true, false, None),
+            ("vypnuto", vec![ci.clone()], false, false, None),
+            ("jen CI", vec![ci.clone()], true, false, Some(Event::GithubCi)),
+            ("jen revize", vec![rev.clone()], true, false, Some(Event::GithubReview)),
+            ("CI má přednost před revizí", vec![rev.clone(), ci.clone()], true, false, Some(Event::GithubCi)),
+            ("během schůzky klid (CI)", vec![ci.clone()], true, true, None),
+            ("během schůzky klid (revize)", vec![rev.clone()], true, true, None),
+            ("během schůzky bez nové události nic", vec![], true, true, None),
         ];
-        for (name, evs, on, want) in cases {
-            assert_eq!(decide(&evs, on), want, "{name}");
+        for (name, evs, on, meeting, want) in cases {
+            assert_eq!(decide(&evs, on, meeting), want, "{name}");
         }
     }
 

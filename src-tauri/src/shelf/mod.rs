@@ -196,7 +196,7 @@ fn save_to(file: &Path, items: &[Item]) -> Result<(), String> {
         let _ = std::fs::create_dir_all(dir);
     }
     let tmp = file.with_extension("json.tmp");
-    std::fs::write(&tmp, serialize(items)).and_then(|_| std::fs::rename(&tmp, file)).map_err(|e| trf!("Přihrádku nejde uložit: {e}", "Can't save the shelf: {e}"))
+    std::fs::write(&tmp, serialize(items)).and_then(|_| std::fs::rename(&tmp, file)).map_err(|e| crate::errors::io(tr("Přihrádku nejde uložit", "Can't save the shelf"), &e))
 }
 
 /// Práce se seznamem (načte se líně při prvním použití). `f` vrací `true` = změna → uložit + událost.

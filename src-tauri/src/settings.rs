@@ -19,6 +19,9 @@ pub(crate) fn apply_config(mut new: Config) {
     let c = core();
     let old = c.cfg.read().clone();
     crate::i18n::set_lang(new.ui.lang);
+    if old.ui.lang != new.ui.lang {
+        crate::tray::relabel();
+    }
     *c.cfg.write() = new.clone();
     *c.cfg_error.lock() = notes_root_error(&new);
     if old.roots != new.roots || old.projects != new.projects {

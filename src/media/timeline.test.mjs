@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/media/timeline.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fmtTime, fraction, live, nextRepeat, nextTickIn, nextVariant, positionAt, seekKey, seekTarget, shownPosition, variantOf, VARIANTS } from "./timeline.ts";
+import { fmtDuration, fraction, live, nextRepeat, nextTickIn, nextVariant, positionAt, seekKey, seekTarget, shownPosition, variantOf, VARIANTS } from "./timeline.ts";
 
 const NOW = 1_760_000_000_000;
 const tl = (positionMs, durationMs, updatedMs, rate = 1) => ({ positionMs, durationMs, updatedMs, rate, canSeek: true });
@@ -47,7 +47,7 @@ test("čas m:ss a h:mm:ss", () => {
     [-5, "0:00"],
     [Number.NaN, "0:00"],
   ];
-  for (const [ms, want] of cases) assert.equal(fmtTime(ms), want, String(ms));
+  for (const [ms, want] of cases) assert.equal(fmtDuration(ms), want, String(ms));
 });
 
 test("lišta: podíl, klik na pozici, klávesy", () => {

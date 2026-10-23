@@ -3,7 +3,7 @@
 import { createSignal, Show } from "solid-js";
 import { api, type UpdateView } from "../api";
 import { IconShield } from "../icons";
-import { fmtTime } from "../format";
+import { fmtClock } from "../format";
 import { say, sayError } from "../ui/toast";
 import { t, tp } from "../i18n";
 import { bubble } from "../pkgctx/BubbleNotice";
@@ -14,7 +14,7 @@ export default function UpdatePanel(p: { u: UpdateView & { state: "dostupna" }; 
   const [busy, setBusy] = createSignal(false);
   const published = () => {
     const d = new Date(p.u.publikovano);
-    return Number.isNaN(d.getTime()) ? "" : t("cards.update.date", "{d}. {m}. {time}", { d: d.getDate(), m: d.getMonth() + 1, time: fmtTime(d) });
+    return Number.isNaN(d.getTime()) ? "" : t("cards.update.date", "{d}. {m}. {time}", { d: d.getDate(), m: d.getMonth() + 1, time: fmtClock(d) });
   };
   async function install(confirmed: string[]) {
     setBusy(true);

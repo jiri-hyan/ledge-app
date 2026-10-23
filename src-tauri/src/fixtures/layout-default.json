@@ -1,0 +1,8 @@
+{
+  "_": "Výchozí rozložení nového configu — hlídá ho layout.rs (default_is_clean_start) i src/layout/model.test.mjs (zrcadlo defaultLayout)",
+  "pages": [
+    { "id": "prace", "cards": [{ "id": "projects", "size": "xl" }, { "id": "notes", "size": "xl" }] },
+    { "id": "osobni", "cards": [{ "id": "clock", "size": "m" }, { "id": "media", "size": "m" }, { "id": "notes", "size": "m" }, { "id": "links", "size": "m" }] }
+  ],
+  "upgrades": ["personalProjects"]
+}

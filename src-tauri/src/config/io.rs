@@ -1,6 +1,7 @@
 //! Umístění configu, načtení, atomické uložení a generované JSON schéma.
 
 use super::{Config, validate};
+use crate::i18n::tr;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -42,11 +43,11 @@ pub fn load(path: &Path) -> Result<Option<Config>, String> {
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(trf!("Nejde přečíst {}: {e}", "Can't read {}: {e}", path.display())),
+        Err(e) => return Err(crate::errors::io(&trf!("Nejde přečíst {}", "Can't read {}", path.display()), &e)),
     };
     let text = text.trim_start_matches('\u{feff}');
-    let raw: serde_json::Value = serde_json::from_str(text).map_err(|e| format!("config.json: {e}"))?;
-    let mut cfg = Config::deserialize(&raw).map_err(|e| format!("config.json: {e}"))?;
+    let raw: serde_json::Value = serde_json::from_str(text).map_err(|e| crate::errors::json(tr("Nastavení (config.json)", "Settings (config.json)"), &e))?;
+    let mut cfg = Config::deserialize(&raw).map_err(|e| crate::errors::json(tr("Nastavení (config.json)", "Settings (config.json)"), &e))?;
     crate::onboarding::upgrade_loaded(&raw, &mut cfg);
     // dřívější `drawer.animationMs` → `appearance.motion` (jedno místo pro pohyb)
     crate::appearance::motion::upgrade_loaded(&raw, &mut cfg);
@@ -70,12 +71,12 @@ pub fn save(path: &Path, cfg: &Config) -> Result<(), String> {
     static SAVING: parking_lot::Mutex<u64> = parking_lot::Mutex::new(0);
     validate(cfg)?;
     if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", dir.display()), &e))?;
     }
     // odvozená pole (`drawer.sections`) v souboru vždy odpovídají `layout` (i pro starší Ledge)
     let mut cfg = cfg.clone();
     crate::layout::derive(&mut cfg);
-    let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    let text = serde_json::to_string_pretty(&cfg).map_err(|e| crate::errors::json(tr("Nastavení nejde uložit", "Can't save the settings"), &e))?;
     let mut n = SAVING.lock();
     *n += 1;
     crate::configio::keep_unreadable(path)?;
@@ -84,7 +85,7 @@ pub fn save(path: &Path, cfg: &Config) -> Result<(), String> {
     if res.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
-    res.map_err(|e| trf!("{} nejde zapsat: {e}", "can't write {}: {e}", path.display()))
+    res.map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))
 }
 
 pub fn write_schema(dir: &Path) {

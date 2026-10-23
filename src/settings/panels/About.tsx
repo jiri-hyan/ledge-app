@@ -29,7 +29,6 @@ export default function AboutPanel(_p: PanelProps) {
   const [info] = createResource(() => api.appInfo());
   const u = () => c.s.update;
   const st = () => updateState(u());
-  const repoUrl = () => (/^[\w.-]+\/[\w.-]+$/.test(c.cfg.update.repo ?? "") ? `https://github.com/${c.cfg.update.repo}` : null);
   return (
     <>
       <Section title={t("settings.about.title", "O aplikaci")}>
@@ -50,13 +49,26 @@ export default function AboutPanel(_p: PanelProps) {
           <Row id="update.intervalH">
             <Slider path="update.intervalH" min={1} max={48} label={t("settings.f.update.intervalH", "Jak často kontrolovat")} fmt={(v) => t("settings.about.every", "každých {v} h", { v })} />
           </Row>
-          <Row id="update.repo">
-            <span class="st-inline">
-              <Text path="update.repo" label={t("settings.f.update.repo", "Repo s vydáními")} placeholder="owner/name" mono />
-              <Show when={repoUrl()}>{(url) => <button class="mini" onClick={() => open(api.openUrl(url()))}>{t("settings.about.openRepo", "Otevřít na GitHubu")}</button>}</Show>
-            </span>
-          </Row>
         </Show>
+      </Section>
+    </>
+  );
+}
+
+/** Technické volby aplikace (v „Pokročilé“ panelu `AppPanel.tsx`): repo s vydáními, soubory a log. */
+export function AboutAdvanced() {
+  const c = useSettings();
+  const [info] = createResource(() => api.appInfo());
+  const repoUrl = () => (/^[\w.-]+\/[\w.-]+$/.test(c.cfg.update.repo ?? "") ? `https://github.com/${c.cfg.update.repo}` : null);
+  return (
+    <>
+      <Section title={t("settings.about.updates", "Aktualizace")}>
+        <Row id="update.repo" dim={!c.cfg.update.check}>
+          <span class="st-inline">
+            <Text path="update.repo" label={t("settings.f.update.repo", "Repo s vydáními")} placeholder="owner/name" mono />
+            <Show when={repoUrl()}>{(url) => <button class="mini" onClick={() => open(api.openUrl(url()))}>{t("settings.about.openRepo", "Otevřít na GitHubu")}</button>}</Show>
+          </span>
+        </Row>
       </Section>
       <Section title={t("settings.about.files", "Soubory")}>
         <Row id="about.files" stack>

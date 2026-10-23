@@ -6,6 +6,7 @@
    Design styl (vlna 6, `theme/looks.ts`) mění plochy přes proměnné `--m-*` (materiál), `--h-*` (nadpisy
    karet), `--deck-*`/`--l-pad`/`--span-*` (rozložení) a `--sans`/`--display` (písmo); pravidla níž je
    čtou s výchozí hodnotou = dnešní vzhled. Ozdoby jednotlivých stylů: blok „Styly“ na konci. */
+@import "./ui/toast.css";
 :root {
   /* škály vzhledu (1 = výchozí): písmo, hustota mezer, zaoblení, krytí pozadí, rychlost animací */
   --fz: 1;
@@ -99,7 +100,7 @@
   --s5: calc(22px * var(--dens));
   --gap-section: calc(14px * var(--dens));
   --pad-card: calc(14px * var(--dens)) calc(15px * var(--dens));
-  --fs-2xs: calc(10.5px * var(--fz));
+  --fs-2xs: calc(11px * var(--fz)); /* nejmenší písmo v aplikaci: 11 px (ne menší) */
   --fs-xs: calc(11px * var(--fz));
   --fs-sm: calc(11.5px * var(--fz));
   --fs-md: calc(12px * var(--fz));
@@ -174,6 +175,7 @@ html[data-glass="on"] .shell {
 .mini:disabled { opacity: 0.55; transform: none; }
 .mini.ok { color: var(--on-light); background: var(--t1); border-color: transparent; }
 .mini.ok:hover { background: var(--pri-hover); }
+.mini.danger { color: var(--on-light); background: var(--red); border-color: transparent; }
 select, input[type="number"], input[type="text"] { font: var(--fs-ui) var(--sans); color: var(--t1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 8px; }
 input[type="number"] { width: 66px; }
 input[type="text"] { width: 260px; }
@@ -198,9 +200,6 @@ input[type="text"] { width: 260px; }
 .card-menu-btn { width: 22px; height: 18px; border-radius: var(--r-sm); color: var(--t3); font-size: var(--fs-md); line-height: 1; opacity: 0; transition: opacity var(--fast), background var(--fast), color var(--fast); }
 .card:hover .card-menu-btn, .card-menu.open .card-menu-btn, .card-menu-btn:focus-visible { opacity: 1; }
 .card-menu-btn:hover { background: var(--card-2); color: var(--t1); }
-.card-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 150px; background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: var(--shadow-toast); padding: var(--s1); animation: drop var(--dur-2) var(--ease); }
-.card-menu-list button { text-align: left; font-size: var(--fs-sm); color: var(--t1); padding: 6px 10px; border-radius: var(--r-sm); white-space: nowrap; }
-.card-menu-list button:hover { background: var(--card-2); }
 /* po skrytí karty: „Karta … skryta · Vrátit“ (pár sekund, místo hlášky) */
 .card-undo { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: var(--raised); border: 1px solid var(--line-2); padding: 6px 8px 6px 14px; border-radius: var(--r-md); font-size: var(--fs-ui); box-shadow: var(--shadow-toast); animation: rise var(--dur-4) var(--spring); z-index: 49; white-space: nowrap; }
 /* hlavní stránka bez jediné viditelné karty (MainPage) */
@@ -234,8 +233,6 @@ input[type="text"] { width: 260px; }
 .tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 3px; }
 
 /* ---------- hláška ---------- */
-.toast { position: fixed; left: 50%; bottom: var(--s4); transform: translateX(-50%); background: var(--raised); border: 1px solid var(--line-2); padding: var(--s2) 14px; border-radius: var(--r-md); font-size: var(--fs-ui); max-width: 80%; box-shadow: var(--shadow-toast); animation: rise var(--dur-4) var(--spring); z-index: 50; }
-.toast.err { color: var(--red); }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 10px); } }
 @keyframes drop { from { opacity: 0; transform: translateY(-8px); } }
 
@@ -302,3 +299,20 @@ html[data-look-shift] .shell, html[data-look-shift] .shell * {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 html[data-motion="none"] *, html[data-motion="none"] *::before, html[data-motion="none"] *::after { animation: none !important; transition: none !important; }
+
+/* Systémový vysoký kontrast (`prefers-contrast: more`): okraje ovládacích prvků a panelů v barvě textu, silnější fokus.
+   Jen okraje a obrys — vzhled motivu zůstává. */
+@media (prefers-contrast: more) {
+  .card, .btn, .mini, .seg, .pill, .card-undo, input, textarea, select { border-color: color-mix(in srgb, var(--t1) 60%, transparent); }
+  .seg button.on { box-shadow: inset 0 0 0 1px var(--t1); }
+  :focus-visible { outline-width: 3px; }
+}
+
+/* Windows „Kontrastní motivy“ (`forced-colors: active`): systémové barvy, viditelné okraje, výběr a fokus bez spoléhání
+   na pozadí a stíny, které prohlížeč odstraní. */
+@media (forced-colors: active) {
+  :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+  .card, .btn, .mini, .seg, .pill, .card-undo, input, textarea, select { border: 1px solid CanvasText; }
+  .seg button.on { background: Highlight; color: HighlightText; }
+  button:disabled { color: GrayText; }
+}

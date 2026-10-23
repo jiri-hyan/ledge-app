@@ -181,13 +181,13 @@ pub fn capture(cmd: &mut Command, label: &str, timeout_s: u32, show: bool) -> Re
             label,
             timeout_s
         )),
-        Err(RunError::Spawn(e)) => Err(trf!("{} nejde spustit: {e}", "can't run {}: {e}", label)),
+        Err(RunError::Spawn(e)) => Err(crate::errors::spawn_text(&trf!("{} nejde spustit", "Can't run {}", label), &e)),
     }
 }
 
 /// Spustí `cmd` v novém viditelném okně konzole (výslovný klik člověka).
 pub fn spawn_console(cmd: &mut Command, label: &str) -> Result<Outcome, String> {
-    cmd.creation_flags(CREATE_NEW_CONSOLE).spawn().map_err(|e| trf!("Terminál nejde otevřít: {e}", "Can't open a terminal: {e}"))?;
+    cmd.creation_flags(CREATE_NEW_CONSOLE).spawn().map_err(|e| crate::errors::spawn(tr("Terminál nejde otevřít", "Can't open a terminal"), &e))?;
     Ok(Outcome { message: trf!("{} — běží v terminálu", "{} — running in a terminal", label), output: None, hide: true })
 }
 
@@ -205,7 +205,7 @@ pub fn run_exe(a: &Action, exe: &Path) -> Result<Outcome, String> {
         .current_dir(dir)
         .creation_flags(DETACHED_PROCESS | CREATE_NO_WINDOW)
         .spawn()
-        .map_err(|e| trf!("{} nejde spustit: {e}", "can't run {}: {e}", a.label))?;
+        .map_err(|e| crate::errors::spawn(&trf!("{} nejde spustit", "Can't run {}", a.label), &e))?;
     Ok(Outcome { message: trf!("{} — spuštěno", "{} — started", a.label), output: None, hide: true })
 }
 
@@ -273,12 +273,12 @@ impl Consents {
             let Some(old) = set.iter().find(|f| **f != fp).cloned() else { break };
             set.remove(&old);
         }
-        let text = serde_json::to_string_pretty(&set.iter().collect::<Vec<_>>()).map_err(|e| e.to_string())?;
+        let text = serde_json::to_string_pretty(&set.iter().collect::<Vec<_>>()).map_err(|e| crate::errors::json(tr("Souhlas nejde uložit", "Can't save the consent"), &e))?;
         if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| trf!("Souhlas nejde uložit: {e}", "Can't save the consent: {e}"))?;
+            std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(tr("Souhlas nejde uložit", "Can't save the consent"), &e))?;
         }
         let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &path)).map_err(|e| trf!("Souhlas nejde uložit: {e}", "Can't save the consent: {e}"))
+        std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &path)).map_err(|e| crate::errors::io(tr("Souhlas nejde uložit", "Can't save the consent"), &e))
     }
 }
 

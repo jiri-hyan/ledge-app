@@ -4,14 +4,14 @@
 import { registerDict } from "../i18n";
 
 registerDict("en", {
-  "settings.nav.ucty": "Accounts",
   "settings.section.accounts": "Accounts (Client ID — sign-ins aren't backed up)",
-  "settings.nav.ucty.kw": "account accounts microsoft outlook office 365 google gmail sign in sign out oauth calendar mail email client id app registration azure",
+  "settings.accounts.adv": "Advanced: connect a Microsoft / Google account",
+  "settings.accounts.adv.hint": "Sign-in with your own app registration — only when an ICS link isn't enough",
 
   // karta Pošta
   "cards.mail.title": "Mail",
   "cards.mail.unreadTitle": "Unread in the Inbox",
-  "cards.mail.off": "Mail is turned off in Settings → Accounts.",
+  "cards.mail.off": "Mail is turned off in Settings → Personal → Calendars → Advanced.",
   "cards.mail.unset": "Sign in to your Microsoft (Outlook) account to see your unread count and the latest subjects here. Ledge reads only message headers and sends nothing anywhere.",
   "cards.mail.connect": "Set up account…",
   "cards.mail.unavailable": "Couldn't load your mail.",
@@ -28,14 +28,13 @@ registerDict("en", {
   "cards.mail.day": "{m}/{d}",
   "cards.layout.card.mail": "Mail",
   "cards.layout.desc.mail": "Unread count and latest subjects from Outlook (Microsoft account)",
-  "cards.calendar.chipAccount": "{name} ({domain}) — set up the account in Settings → Accounts",
+  "cards.calendar.chipAccount": "{name} ({domain}) — set up the account in Settings → Personal → Calendars → Advanced",
 
   // proužek
   "settings.strip.item.mail": "Mail — unread (Microsoft account)",
   "settings.strip.sample.mail": "✉ 3",
 
   // Nastavení → Účty
-  "settings.accounts.desc": "Microsoft (Outlook) and Google: calendar in the Calendar card, mail in the Mail card. Read-only, only while the card is visible, nothing is sent anywhere.",
   "settings.accounts.add": "Add account",
   "settings.accounts.addDesc": "Pick an account. Integrations are off until you sign in — without signing in Ledge sends nothing to Microsoft or Google.",
   "settings.accounts.why": "Ledge is an open-source app without its own verified registration at Microsoft or Google, so you create one yourself (free, step by step in the guide). Your Client ID is yours alone; the sign-in stays in Windows Credential Manager.",

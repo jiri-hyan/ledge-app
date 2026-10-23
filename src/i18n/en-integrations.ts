@@ -7,7 +7,7 @@ registerDict("en", {
   // karta GitHub
   "cards.github.title": "GitHub",
   "cards.github.loading": "Loading from GitHub…",
-  "cards.github.cfgError": "The config has an error — you can only turn GitHub on in Settings now.",
+  "cards.github.cfgError": "The settings contain an error — you can only turn GitHub on in Settings now.",
   "cards.github.copied": "Copied: gh auth login",
   "cards.github.ci.success": "Checks passed",
   "cards.github.ci.failure": "Checks failed",

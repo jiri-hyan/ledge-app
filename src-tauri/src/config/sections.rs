@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 /// stahování/odběry, a starší Ledge; ruční změna se přepíše. Starý config bez `layout` se z něj převede.
 /// Nová karta / část = řádek v `sections!` níže + `layout::CARDS` / `PARTS` (+ zrcadla v `src/cards/sections.ts`
 /// `SECTION_KEYS` a `src/layout/model.ts`).
-/// Výchozí hodnota je `true`; karta, která ve výchozím rozložení není (katalog ji jen nabídne,
-/// `layout::OPT_IN`), je `false` — musí sedět s `layout::derive` nad výchozím rozložením.
+/// Výchozí hodnota = `layout::section_in_default`, tj. podle výchozího rozložení (`layout::clean_default`):
+/// karta, která v něm není (katalog ji jen nabídne), je `false`.
 macro_rules! sections {
     ($($(#[$doc:meta])* $field:ident,)*) => {
         #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -20,9 +20,9 @@ macro_rules! sections {
 
         impl Default for Sections {
             fn default() -> Self {
-                // karty mimo výchozí rozložení (`layout::OPT_IN`) jsou vypnuté — odvozené pole musí sedět
-                // s výchozím `layout` (jinak by se `Config::default()` lišil od načteného)
-                Self { $($field: !crate::layout::OPT_IN.contains(&stringify!($field)),)* }
+                // odvozené pole musí sedět s výchozím `layout` (jinak by se `Config::default()` lišil od
+                // načteného): karta mimo čisté výchozí rozložení (`layout::clean_default`) je vypnutá
+                Self { $($field: crate::layout::section_in_default(stringify!($field)),)* }
             }
         }
 

@@ -94,7 +94,7 @@ pub(crate) fn pin_drag(window: WebviewWindow) -> Result<(), String> {
     if win::prefs_of(&label).is_some_and(|p| p.locked || p.through) {
         return Ok(());
     }
-    window.start_dragging().map_err(|e| e.to_string())
+    window.start_dragging().map_err(|e| crate::errors::any(crate::i18n::tr("Lístek nejde přesunout", "Can't move the sticky"), &e))
 }
 
 /// Okno lístku: „Upravit v Ledge“ = otevře poznámku v editoru šuplíku. Cesta se ověří jako u
@@ -108,7 +108,7 @@ pub(crate) fn pin_edit_in_ledge(window: WebviewWindow, path: String) -> Result<(
     notes::check_note_path(&root, Path::new(&path))?;
     let c = core();
     c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
-    c.app.emit_to(drawer::LABEL, "edit-note", path).map_err(|e| e.to_string())
+    c.app.emit_to(drawer::LABEL, "edit-note", path).map_err(|e| crate::errors::any(crate::i18n::tr("Poznámku nejde otevřít v Ledge", "Can't open the note in Ledge"), &e))
 }
 
 /// Okno lístku: ✕ = odepnout (poznámka zůstane v kartě Poznámky).

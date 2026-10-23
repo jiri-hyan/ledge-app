@@ -8,7 +8,7 @@ import { api, type Snapshot } from "../api";
 import { DecideButtons, pendingWhere } from "../cards/Peek";
 import { IconShield } from "../icons";
 import { Controls, Cover, useCover } from "../media/Player";
-import { fmtDate, fmtTime, num, uptime, ago } from "../format";
+import { fmtDate, fmtClock, num, uptime, ago } from "../format";
 import { elapsedMs, fmtDuration, leftMs } from "../timer/model";
 import { timerDo } from "../timer/TimerCard";
 import { say } from "../ui/toast";
@@ -139,7 +139,7 @@ export default function Island(p: { s: Snapshot; now: number; expandMs: number }
           )}
         </Match>
         <Match when={ev().kind === "idle"}>
-          <span class="isl-time">{fmtTime(new Date(p.now))}</span>
+          <span class="isl-time">{fmtClock(new Date(p.now))}</span>
           <span class="isl-tx">
             <span class="isl-sub">{fmtDate(new Date(p.now))}</span>
             <Show when={freshWeather(p.s.personal.weather, p.now)}>

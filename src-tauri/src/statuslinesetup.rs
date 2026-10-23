@@ -140,7 +140,7 @@ pub fn render_stored(s: &Stored) -> String {
 }
 
 pub fn parse_stored(text: &str) -> Result<Stored, String> {
-    let v: J = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
+    let v: J = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| crate::errors::json(crate::i18n::tr("Uložená původní hodnota stavového řádku", "The saved original status line"), &e))?;
     match (v.get("had"), v.get("value")) {
         (Some(J::Bool(true)), Some(x)) => Ok(Stored { value: Some(x.clone()) }),
         (Some(J::Bool(false)), _) => Ok(Stored { value: None }),
@@ -167,9 +167,9 @@ pub fn store_path() -> PathBuf {
 /// Uložený původní `statusLine`: soubor chybí = `Ok(None)`, rozbitý = chyba (nehádat).
 pub fn load_stored(path: &Path) -> Result<Option<Stored>, String> {
     match std::fs::read_to_string(path) {
-        Ok(t) => parse_stored(&t).map(Some).map_err(|e| format!("{}: {e}", path.display())),
+        Ok(t) => parse_stored(&t).map(Some).map_err(|e| crate::errors::prefixed(&path.display().to_string(), &e)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(format!("{}: {e}", path.display())),
+        Err(e) => Err(crate::errors::io(&path.display().to_string(), &e)),
     }
 }
 
@@ -216,7 +216,7 @@ pub fn install_at(settings: &Path, store: &Path, ours: &str) -> Result<bool, Str
     hooksetup::apply(settings, |t| {
         let m = merge(t, ours)?;
         if let Some(s) = &m.store {
-            write_atomic(store, render_stored(s).as_bytes()).map_err(|e| format!("{}: {e}", store.display()))?;
+            write_atomic(store, render_stored(s).as_bytes()).map_err(|e| crate::errors::io(&store.display().to_string(), &e))?;
         }
         Ok((m.text, m.changed))
     })

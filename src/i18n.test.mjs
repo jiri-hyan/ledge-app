@@ -3,14 +3,14 @@
 // a ověří, že (a) každý klíč z t()/tp() a datových párů {key, cs} má anglický záznam, (b) jeden klíč
 // nemá dvě různé české výchozí hodnoty, (c) proměnné `{x}` a tučné `<b>` v en sedí s češtinou,
 // (d) v přeložených souborech nezbyl natvrdo český text (mimo `PENDING` a `ALLOW_CZECH`).
-// Navíc: žádné t() při importu modulu, žádné osiřelé en klíče, všechny slovníky načtené v `i18n/load.ts`.
+// Navíc: žádné t() při importu modulu, žádné osiřelé en klíče, všechny slovníky načtené v `i18n/dicts.ts` (líně).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEY, areaKey, boldCount, scanSource, varsOf } from "./i18nScan.ts";
-import { plural, pluralForm, registerDict, setLang, t, tp } from "./i18n.ts";
+import { lang, loadDict, plural, pluralForm, registerDict, setDictLoader, setLang, t, tp } from "./i18n.ts";
 import { ago, fmtDate, num } from "./format.ts";
 
 // Soubory (nebo složky `x/`), kde natvrdo česky psané texty ještě zůstaly — kontrola d je přeskočí,
@@ -25,7 +25,7 @@ const PENDING = [
 const ALLOW_CZECH = [
   { file: "onboarding/steps/Basics.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },
   { file: "onboarding/steps/Basics.tsx", text: "Ahoj! Nastavíme si Ledge.", why: "ukázka češtiny u volby jazyka" },
-  { file: "settings/panels/Appearance.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },
+  { file: "settings/panels/Start.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },
   { file: "settings/panels/Personal.tsx", text: "Plzeň", why: "název města v nabídce polohy počasí (vlastní jméno, ukládá se do configu)" },
 ];
 
@@ -51,6 +51,8 @@ const DYNAMIC = [
   { file: "palette/items.ts", key: "pn.kw[0]", why: "klíčová slova panelů z settings/registry.ts — " + PAIRS },
   { file: "palette/winsettings.ts", key: "p.name[0]", why: "stránky Nastavení Windows WIN_PAGES — " + PAIRS },
   { file: "palette/Palette.tsx", key: "...SECTION_LABEL[r().item.section]", why: PAIRS },
+  { file: "ui/shortcuts.ts", key: "s.key", why: "tabulka SHORTCUTS — " + PAIRS },
+  { file: "ui/shortcuts.ts", key: "g.key", why: "skupiny SHORTCUT_GROUPS — " + PAIRS },
   { file: "settings/catalog.ts", key: "p.key", why: "název panelu (`own()` a registry.ts) — " + PAIRS },
   { file: "settings/catalog.ts", key: "p.kw[0]", why: "klíčová slova panelu — " + PAIRS },
   { file: "settings/labels.ts", key: "`settings.f.${id}`", why: TABLE },
@@ -267,23 +269,71 @@ test("žádné osiřelé anglické klíče", () => {
   assert.deepEqual(orphan, [], "klíč už v kódu není — smaž ho ze slovníku (nebo je překlep)");
 });
 
-/** Slovníky načítané líně se svými daty (samostatný chunk) → importuje je jen ten modul, nikdy `load.ts`. */
+/** Slovníky načítané líně se svými daty (samostatný chunk) → importuje je jen ten modul, nikdy `dicts.ts`. */
 const LAZY_DICTS = [{ dict: "i18n/en-emoji.ts", by: "palette/emojidata.ts", why: "jména emoji jen s tabulkou (dynamický import v palette/emoji.ts)" }];
 
-test("všechny slovníky se načtou dřív než UI (i18n/load.ts v App.tsx)", () => {
-  const load = readFileSync(join(SRC, "i18n", "load.ts"), "utf8");
+test("všechny slovníky jsou v i18n/dicts.ts a load.ts je registruje jako líný loader (první import App.tsx)", () => {
+  const load = readFileSync(join(SRC, "i18n", "dicts.ts"), "utf8");
   const imported = new Set([...load.matchAll(/^import "(.+)";$/gm)].map((m) => rel(join(SRC, "i18n", m[1] + ".ts"))));
   const lazy = new Set(LAZY_DICTS.map((x) => x.dict));
-  assert.deepEqual([...DICT_FILES].filter((f) => !imported.has(f) && !lazy.has(f)).sort(), [], "slovník chybí v src/i18n/load.ts");
+  assert.deepEqual([...DICT_FILES].filter((f) => !imported.has(f) && !lazy.has(f)).sort(), [], "slovník chybí v src/i18n/dicts.ts");
   for (const x of LAZY_DICTS) {
-    assert.ok(DICT_FILES.has(x.dict) && !imported.has(x.dict), `${x.dict}: líný slovník nesmí být v load.ts`);
+    assert.ok(DICT_FILES.has(x.dict) && !imported.has(x.dict), `${x.dict}: líný slovník nesmí být v dicts.ts`);
     const name = x.dict.split("/").pop();
     assert.ok(readFileSync(join(SRC, x.by), "utf8").includes(`import "../i18n/${name}";`), `${x.by} musí importovat ${x.dict}`);
     const stem = name.replace(/\.ts$/, "");
     const others = FILES.filter((f) => f.file !== x.by && f.file !== x.dict && readFileSync(join(SRC, f.file), "utf8").includes(`/${stem}`)).map((f) => f.file);
     assert.deepEqual(others, [], `${x.dict} importuje jen ${x.by} (${x.why})`);
   }
+  assert.ok(readFileSync(join(SRC, "i18n", "load.ts"), "utf8").includes('setDictLoader(() => import("./dicts"));'), "load.ts musí registrovat líný import dicts");
   const app = readFileSync(join(SRC, "App.tsx"), "utf8");
   assert.match(app, /^import "\.\/i18n\/load";$/m);
   assert.ok(app.indexOf('import "./i18n/load";') < app.indexOf("import {"), "load musí být první import App.tsx");
+});
+
+test("setLang s líným slovníkem: čeština hned, jiný jazyk až po načtení, poslední volání vyhrává", async () => {
+  let loads = 0;
+  let release;
+  setDictLoader(() => (loads++, new Promise((r) => (release = r))));
+  try {
+    setLang("cs");
+    assert.equal(loads, 0, "čeština nenačítá nic");
+    await loadDict("cs");
+    assert.equal(loads, 0);
+    setLang("en");
+    assert.equal(lang(), "cs", "do načtení slovníku zůstává čeština");
+    setLang("cs"); // uživatel to rozmyslel — pozdní odpověď loaderu nesmí přepsat
+    release();
+    await loadDict("en");
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(lang(), "cs");
+    setLang("en");
+    assert.equal(lang(), "en", "slovník už je načtený → synchronně");
+    assert.equal(loads, 1, "chunk se stahuje jednou");
+  } finally {
+    setDictLoader(null);
+    setLang("cs");
+  }
+});
+
+test("loadDict: selhání loaderu nezablokuje další pokus a setLang spadne na češtinu z kódu", async () => {
+  let n = 0;
+  setDictLoader(() => (++n === 1 ? Promise.reject(new Error("síť")) : Promise.resolve()));
+  try {
+    await assert.rejects(loadDict("en"));
+    await loadDict("en");
+    assert.equal(n, 2);
+  } finally {
+    setDictLoader(null);
+  }
+  let m = 0;
+  setDictLoader(() => (++m, Promise.reject(new Error("síť"))));
+  try {
+    setLang("en");
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(lang(), "en", "i při chybě se jazyk přepne (chybějící klíč = čeština)");
+  } finally {
+    setDictLoader(null);
+    setLang("cs");
+  }
 });

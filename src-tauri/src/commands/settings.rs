@@ -19,7 +19,10 @@ use tauri_plugin_opener::OpenerExt;
 pub(crate) fn check_config(cfg: serde_json::Value) -> Option<FieldError> {
     match serde_json::from_value::<Config>(cfg) {
         Ok(c) => config::validate_field(&c).err(),
-        Err(e) => Some(FieldError { field: None, message: trf!("Nastavení má neplatný tvar: {e}", "The settings have an invalid shape: {e}") }),
+        Err(e) => {
+            crate::errors::detail("check_config", &e);
+            Some(FieldError { field: None, message: tr("Nastavení má neplatný tvar — podrobnosti jsou v logu.", "The settings have an invalid shape — details are in the log.").into() })
+        }
     }
 }
 
@@ -138,5 +141,5 @@ pub(crate) fn open_app_file(which: String) -> Result<(), String> {
     if !path.exists() {
         return Err(trf!("{} zatím neexistuje.", "{} doesn't exist yet.", path.display()));
     }
-    core().app.opener().open_path(path.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())
+    core().app.opener().open_path(path.to_string_lossy(), None::<&str>).map_err(|e| crate::errors::any(tr("Soubor nejde otevřít", "Can't open the file"), &e))
 }

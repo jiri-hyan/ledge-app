@@ -88,7 +88,7 @@ fn merge_into(src: &Path, dst: &Path, pc: &str, skip: &Prints) -> Result<Prints,
         let from = rel_path(src, &c.from);
         let to = rel_path(dst, &c.to);
         if let Some(parent) = to.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| trf!("Složka {}: {e}", "Folder {}: {e}", parent.display()))?;
+            std::fs::create_dir_all(parent).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", parent.display()), &e))?;
         }
         let res = if c.rewrite.is_empty() {
             std::fs::copy(&from, &to).map(|_| ())
@@ -103,7 +103,7 @@ fn merge_into(src: &Path, dst: &Path, pc: &str, skip: &Prints) -> Result<Prints,
                 Err(e) => std::fs::write(&to, e.into_bytes()),
             })
         };
-        res.map_err(|e| format!("Kopie {} → {}: {e}", from.display(), to.display()))?;
+        res.map_err(|e| crate::errors::io(&trf!("Kopie {} → {} se nepovedla", "Copying {} → {} failed", from.display(), to.display()), &e))?;
     }
     Ok(prints)
 }
@@ -114,7 +114,7 @@ fn stamp(now: &DateTime<FixedOffset>) -> String {
 
 impl Syncer {
     pub(super) fn fresh(&mut self, ctx: &Ctx) -> Result<(), Outcome> {
-        std::fs::create_dir_all(ctx.root).map_err(|e| Outcome::Chyba(trf!("Složka {}: {e}", "Folder {}: {e}", ctx.root.display())))?;
+        std::fs::create_dir_all(ctx.root).map_err(|e| Outcome::Chyba(crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", ctx.root.display()), &e)))?;
         git(ctx.root, ctx.remote, &["init", "-q", "-b", "main"], false).map_err(|f| local_fail("git init", f))?;
         setup_repo(ctx.root, ctx.remote, ctx.pc)?;
         commit_all(ctx.root, ctx.remote, &commit_message(ctx.pc, &ctx.now))?;
@@ -128,7 +128,7 @@ impl Syncer {
         let root = ctx.root;
         let parent = root.parent().ok_or_else(|| Outcome::Chyba(crate::i18n::tr("Kořen poznámek nemá nadřazenou složku.", "The notes folder has no parent folder.").into()))?;
         let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "notes".into());
-        std::fs::create_dir_all(parent).map_err(|e| Outcome::Chyba(trf!("Složka {}: {e}", "Folder {}: {e}", parent.display())))?;
+        std::fs::create_dir_all(parent).map_err(|e| Outcome::Chyba(crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", parent.display()), &e)))?;
         // zbytky dřívějšího nedokončeného pokusu (náš vlastní dočasný klon — data jsou v kořeni / na remote)
         let clone_prefix = format!("{name}.sync-clone-");
         if let Ok(rd) = std::fs::read_dir(parent) {
@@ -157,7 +157,7 @@ impl Syncer {
         }
         let backup = parent.join(format!("{name}.pred-sync-{}", stamp(&ctx.now)));
         if root.exists() {
-            std::fs::rename(root, &backup).map_err(|e| fail(Outcome::Chyba(trf!("Nejde odsunout {} (otevřený soubor?): {e}", "Can't move {} aside (an open file?): {e}", root.display()))))?;
+            std::fs::rename(root, &backup).map_err(|e| fail(Outcome::Chyba(crate::errors::io(&trf!("Nejde odsunout {}", "Can't move {} aside", root.display()), &e))))?;
         }
         // watcher mohl mezi dvěma přejmenováními založit prázdný kořen znovu → smazat jen prázdný
         let swap = std::fs::rename(&tmp, root).or_else(|_| std::fs::remove_dir(root).and_then(|_| std::fs::rename(&tmp, root)));
@@ -166,7 +166,7 @@ impl Syncer {
                 let _ = std::fs::remove_dir(root);
                 let _ = std::fs::rename(&backup, root);
             }
-            return Err(fail(Outcome::Chyba(trf!("Nejde prohodit složky poznámek: {e}", "Can't swap the notes folders: {e}"))));
+            return Err(fail(Outcome::Chyba(crate::errors::io(crate::i18n::tr("Nejde prohodit složky poznámek", "Can't swap the notes folders"), &e))));
         }
         // co mezitím přibylo ve staré složce (zápis během klonování) — stejné se přeskočí
         if backup.exists() {

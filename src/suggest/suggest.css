@@ -6,6 +6,8 @@
 .sg-ico svg { width: 15px; height: 15px; }
 .sg-chip[data-kind="ghCi"] .sg-ico { color: var(--red); }
 .sg-chip[data-kind="reminder"] .sg-ico { color: var(--amber); }
+.sg-chip[data-kind="meeting"] .sg-ico { color: var(--blue); }
+.sg-chip[data-kind="meetingNote"] .sg-ico { color: var(--blue); }
 .sg-chip[data-kind="ghReview"] .sg-ico { color: var(--violet); }
 .sg-chip[data-kind="dev"] .sg-ico { color: var(--green); }
 .sg-chip[data-kind="clip"] .sg-ico { color: var(--accent); }

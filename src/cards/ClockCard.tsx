@@ -1,7 +1,7 @@
 // Osobní: velké hodiny s ISO týdnem (tik `now` dodává skořápka, jen při otevřeném šuplíku) a pod nimi
 // baterie, jen na stroji s baterií (`media/Battery.tsx`).
 import { Show, type JSX } from "solid-js";
-import { fmtDate, fmtTime, isoWeek, pad2 } from "../format";
+import { fmtDate, fmtClock, isoWeek, pad2 } from "../format";
 import { t } from "../i18n";
 import type { BatteryView } from "../api";
 import Battery from "../media/Battery";
@@ -16,7 +16,7 @@ export default function ClockCard(p: { now: number; battery?: BatteryView | null
       {/* hodiny a baterie jsou části karty: pořadí a skrytí v úpravách (`layout/PartSlot.tsx`); baterie je skrytá i bez baterie */}
       <PartsBox card="clock">
         <PartSlot card="clock" k="body">
-          <div class="big-time">{fmtTime(d())}<span class="sec">{pad2(d().getSeconds())}</span></div>
+          <div class="big-time">{fmtClock(d())}<span class="sec">{pad2(d().getSeconds())}</span></div>
           <div class="big-date">{t("cards.clock.date", "{date} {year}", { date: fmtDate(d()), year: d().getFullYear() })}</div>
         </PartSlot>
         <Show when={p.battery || p.hideBattery}>

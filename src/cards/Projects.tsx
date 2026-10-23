@@ -11,6 +11,7 @@
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import type { ProjectView, Snapshot } from "../api";
 import type { NotePreset } from "../notes/store";
+import type { NotesNav } from "../nav";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
 import { DEFAULT_TILES, pageOf, setTiles, tilesOf, visibleProjects, type Layout, type TileOpts } from "../layout/model";
@@ -25,7 +26,7 @@ import { openTileMenu, type MenuItem } from "../tilelook/TileMenu";
 import { isPlain } from "../tilelook/model";
 import { logoSrc } from "../logos";
 import ProjectPanel, { FailBox } from "../projects/ProjectPanel";
-import { failInfo, isLive, placeOf } from "../projects/model";
+import { failInfo, isLive, placeOf, tileHealth } from "../projects/model";
 import { changeFolder, closeProjectPanel, openProjectPanel, projectPanel, restartProject, startProject, stopProject, tip, tipLeave } from "../projects/state";
 import TileTip from "../projects/TileTip";
 import Popover, { boxOf } from "../ui/Popover";
@@ -63,6 +64,8 @@ export default function Projects(p: {
   /** záložka, na které karta je (složky a volby jsou její) */
   page: string;
   onNote: (preset: NotePreset) => void;
+  /** otevření poznámky z panelu projektu (volitelné — bez něj panel poznámky neukáže) */
+  nav?: NotesNav;
   onSettings: () => void;
   tiles?: TileOpts;
   view?: CardView;
@@ -229,7 +232,7 @@ export default function Projects(p: {
         <For each={entries()} fallback={
           <Show when={p.s.projects.length} fallback={
             <div class="empty proj-empty" data-anim>
-              {t("cards.projects.emptyShort", "Zatím žádné projekty — dlaždice spustí server, otevře složku nebo aplikaci.")}
+              {t("cards.projects.emptyShort", "Zatím žádné projekty — zástupce spustí server, otevře složku nebo aplikaci.")}
               <button class="mini ok" onClick={addProject}>{t("cards.projects.add", "Přidat projekt")}</button>
             </div>
           }>
@@ -285,7 +288,7 @@ export default function Projects(p: {
                 onFocus={wantKeys}
                 onChange={(ev) => applyTiles((x) => renameFolder(x, f().id, ev.currentTarget.value))}
               />
-              <Show when={editing()}><small>{t("cards.folder.dragOut", "Táhni dlaždici ven = vyjmout")}</small></Show>
+              <Show when={editing()}><small>{t("cards.folder.dragOut", "Táhni zástupce ven = vyjmout")}</small></Show>
               <span class="grow" />
               <button class="mini" onClick={() => removeOne(f())}>{t("cards.folder.removeShort", "Zrušit složku")}</button>
               <button class="mini" aria-label={t("cards.folder.close", "Zavřít složku")} title={t("cards.folder.close", "Zavřít složku")} onClick={() => setOpen(null)}>×</button>
@@ -303,7 +306,7 @@ export default function Projects(p: {
       <Show when={projectPanel() && byId(projectPanel()!.id) && list().some((x) => x.id === projectPanel()!.id) ? projectPanel()!.id : null} keyed>
         {(id) => (
           <Popover anchor={() => tileBox(id)} label={byId(id)?.name ?? id}>
-            <ProjectPanel s={p.s} pr={byId(id)!} onSettings={p.onSettings} />
+            <ProjectPanel s={p.s} pr={byId(id)!} onSettings={p.onSettings} nav={p.nav} onNote={p.onNote} />
           </Popover>
         )}
       </Show>
@@ -318,7 +321,7 @@ export default function Projects(p: {
       <Show when={tip() && byId(tip()!.id) && !projectPanel() && !lookTarget() ? tip() : null} keyed>
         {(tp) => (
           <Popover anchor={() => tileBox(tp.id) ?? boxOf(tp.el)} label={byId(tp.id)!.name} passive>
-            <TileTip pr={byId(tp.id)!} proc={p.s.procs.find((x) => x.id === tp.id)} />
+            <TileTip pr={byId(tp.id)!} proc={p.s.procs.find((x) => x.id === tp.id)} health={tileHealth(byId(tp.id)!, p.s.sessions)} />
           </Popover>
         )}
       </Show>

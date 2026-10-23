@@ -5,6 +5,7 @@
 import { createEffect, createSignal, on } from "solid-js";
 import { api } from "../api";
 import { t } from "../i18n";
+import "./mdtask.css";
 
 export default function Markdown(p: { body: string; images: { src: string; data: string }[]; onToggle: (line: number, checked: boolean) => void }) {
   const [html, setHtml] = createSignal("");

@@ -91,7 +91,7 @@ pub(crate) fn open_url(url: String) -> Result<(), String> {
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return Err(crate::i18n::tr("Jen http(s) odkazy.", "Only http(s) links.").into());
     }
-    core().app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+    core().app.opener().open_url(url, None::<&str>).map_err(|e| crate::errors::any(crate::i18n::tr("Odkaz nejde otevřít", "Can't open the link"), &e))
 }
 
 /// Fokus odešel do vyskakovacího okna vlastněného šuplíkem (kalendář `datetime-local`, `<select>`)?
@@ -146,7 +146,7 @@ pub(crate) fn open_link(index: usize, target: String) -> Result<(), String> {
         }
         personal::LinkTarget::Invalid(why) => return Err(format!("{}: {why}", link.name)),
     }
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| crate::errors::any(&link.name, &e))?;
     c.send_ui(UiCmd::Hide);
     Ok(())
 }

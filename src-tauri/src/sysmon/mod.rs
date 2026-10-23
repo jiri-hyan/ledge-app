@@ -177,5 +177,5 @@ pub fn strip_now() -> Vec<Segment> {
 /// Otevře Správce úloh (klik na CPU / paměť v kartě). `taskmgr` si okno vytvoří sám; Ledge žádné nové nemá.
 pub fn open_task_manager() -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
-    crate::state::core().app.opener().open_path("taskmgr.exe", None::<&str>).map_err(|e| e.to_string())
+    crate::state::core().app.opener().open_path("taskmgr.exe", None::<&str>).map_err(|e| crate::errors::any(crate::i18n::tr("Správce úloh nejde otevřít", "Can't open Task Manager"), &e))
 }

@@ -47,7 +47,7 @@ fn net_error(e: &reqwest::Error) -> String {
     } else if e.is_connect() {
         tr("GitHub je nedostupný (offline?)", "GitHub is unreachable (offline?)").into()
     } else {
-        trf!("síť: {e}", "network: {e}")
+        crate::errors::net(tr("Chyba sítě", "Network error"), e)
     }
 }
 
@@ -97,16 +97,16 @@ pub fn download(url: &str, dest: &Path) -> Result<(), String> {
             if resp.content_length().is_some_and(|n| n > MAX_SETUP_BYTES) {
                 return Err(tr("instalátor je podezřele velký — nestahuji", "the installer is suspiciously large — not downloading").into());
             }
-            let mut f = std::fs::File::create(dest).map_err(|e| format!("{}: {e}", dest.display()))?;
+            let mut f = std::fs::File::create(dest).map_err(|e| crate::errors::io(&dest.display().to_string(), &e))?;
             let mut total = 0u64;
             while let Some(chunk) = resp.chunk().await.map_err(|e| net_error(&e))? {
                 total += chunk.len() as u64;
                 if total > MAX_SETUP_BYTES {
                     return Err(tr("instalátor je podezřele velký — přerušeno", "the installer is suspiciously large — stopped").into());
                 }
-                f.write_all(&chunk).map_err(|e| format!("{}: {e}", dest.display()))?;
+                f.write_all(&chunk).map_err(|e| crate::errors::io(&dest.display().to_string(), &e))?;
             }
-            f.sync_all().map_err(|e| e.to_string())
+            f.sync_all().map_err(|e| crate::errors::io(&dest.display().to_string(), &e))
         })
     });
     if res.is_err() {

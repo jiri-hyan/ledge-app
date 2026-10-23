@@ -213,7 +213,7 @@ impl Syncer {
     pub fn sync(&mut self, ctx: &Ctx) -> Outcome {
         self.notes.clear();
         if let Err(e) = std::fs::create_dir_all(ctx.root) {
-            return Outcome::Chyba(trf!("Složka {}: {e}", "Folder {}: {e}", ctx.root.display()));
+            return Outcome::Chyba(crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", ctx.root.display()), &e));
         }
         let key = (ctx.root.to_path_buf(), ctx.remote.to_string());
         let mut swapped = None;

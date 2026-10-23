@@ -42,7 +42,7 @@ agenty: [agents/actions.md](../agents/actions.md) → „Rychlé akce“. Cituj 
 | `src/palette/compact.ts` | kompaktní paleta (`palette.compact`): co ukázat pod polem podle režimu a dotazu, šipky (rozbalit ↓ / sbalit ↑) | `shown`, `visible`, `arrow`, `Shown`, `Fold` |
 | `src-tauri/src/paletteconf.rs` | sekce configu `palette` → `Snapshot.palette_compact` (`paletteCompact`) | `PaletteConfig` |
 | `src/palette/timer.ts` | příkazy časovače: „Časovač N min“ z předvoleb, pauza / pokračovat / +5 min / zrušit podle stavu, stopky; přes `timer/TimerCard.timerDo` | `timerItems` |
-| `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems`, `PItem`, `Nav` · `Palette`, `IconSearch` · `gotoSettingsPanel`, `settingsTarget` |
+| `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems`, `PItem`, `Nav` · `Palette` (líný chunk, `lazyViews.tsx`; lupa `IconSearch` je v `icons.tsx`) · `gotoSettingsPanel`, `settingsTarget` |
 | `src/types/actions.ts` | typy + `Snapshot.actions`/`scripts`/`paletteWinSettings` | `ActionCfg`, `ActionView`, `ScriptView`, `ScriptsListing`, `ActionOutcome` |
 
 Lepidlo: `config/*` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.actions`),
@@ -50,7 +50,7 @@ Lepidlo: `config/*` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.ac
 `MainPage.tsx` (karta), `Head.tsx` (🔍), `App.tsx` (signál palety, `Ctrl+K`, `palNav`). Skripty:
 `config/*` (`Config.scripts` + `scripts::validate`), `snapshot.rs` (`scripts`, `palette_win_settings`),
 `settings.rs` (změna `scripts` → `refresh_async`), `threads/ui.rs` (otevření šuplíku s `inActions` →
-`refresh_async`), `i18n.ts` (`tIn`), `i18n/load.ts` (`en-winsettings`, `en-quick`; `en-emoji` ne — líně s tabulkou).
+`refresh_async`), `i18n.ts` (`tIn`), `i18n/dicts.ts` (`en-winsettings`, `en-quick`; `en-emoji` ne — líně s tabulkou).
 
 Widgety ze skriptů (spouštěné samy, karta / proužek) mají vlastní mapu [widgets.md](widgets.md); sdílí
 `scripts::meta::fields`, `scripts::run::{interp, plan}` a pro klik `run` souhlasy skriptů (`CONSENTS`).

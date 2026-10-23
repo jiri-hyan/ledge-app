@@ -33,6 +33,8 @@ export interface OnboardingPatch {
   links?: { label: string; url: string }[];
   theme?: string;
   done?: boolean;
+  /** detekce průvodce: Claude Code je nainstalovaný (s `done` přidá na Práci kartu Claude) */
+  claude?: boolean;
 }
 export interface OnboardingApplied {
   added: string[];

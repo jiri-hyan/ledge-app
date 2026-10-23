@@ -155,7 +155,7 @@ pub(crate) fn note_open(path: String) -> Result<(), String> {
     // otevírá se ověřená kanonická cesta (ne řetězec z UI), bez prefixu \\?\, který shell neumí
     let real = notes::strip_verbatim(&notes::check_note_path(&root, Path::new(&path))?);
     let c = core();
-    c.app.opener().open_path(real.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())?;
+    c.app.opener().open_path(real.to_string_lossy(), None::<&str>).map_err(|e| crate::errors::any(tr("Poznámku nejde otevřít", "Can't open the note"), &e))?;
     c.send_ui(UiCmd::Hide);
     Ok(())
 }
@@ -248,7 +248,7 @@ pub(crate) fn note_open_with(path: String, app: String) -> Result<(), String> {
         .args(args)
         .creation_flags(DETACHED_PROCESS | CREATE_NO_WINDOW)
         .spawn()
-        .map_err(|e| trf!("{name} nejde spustit: {e}", "Can't start {name}: {e}"))?;
+        .map_err(|e| crate::errors::spawn(&trf!("{name} nejde spustit", "Can't start {name}"), &e))?;
     core().send_ui(UiCmd::Hide);
     Ok(())
 }

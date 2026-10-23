@@ -21,8 +21,7 @@ const PANEL_FILES = {
   vzhled: ["panels/Appearance.tsx", "panels/AppearanceClosed.tsx", "panels/AppearanceHover.tsx", "panels/AppearanceOpen.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceThemes.tsx", "panels/AppearancePages.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
   akce: ["panels/ProjectsActions.tsx", "panels/Projects.tsx", "panels/ProjectEditor.tsx", "panels/Actions.tsx", "../actions/ScriptsSettings.tsx", "panels/LegacyLinks.tsx", "../widgets/WidgetsSettings.tsx"],
   claude: ["panels/Claude.tsx", "panels/Questions.tsx", "../mcp/McpSettings.tsx"],
-  osobni: ["panels/Personal.tsx", "../media/MediaSettings.tsx", "../suggest/SuggestSettings.tsx", "../cliphist/ClipSettings.tsx", "../calendar/CalendarSettings.tsx", "../integrations/IntegrationsSettings.tsx"],
-  ucty: ["panels/Accounts.tsx", "../accounts/AccountsSettings.tsx"],
+  osobni: ["panels/Personal.tsx", "../media/MediaSettings.tsx", "../suggest/SuggestSettings.tsx", "../cliphist/ClipSettings.tsx", "../calendar/CalendarSettings.tsx", "../integrations/IntegrationsSettings.tsx", "../accounts/AccountsSettings.tsx"],
   poznamky: ["panels/Notes.tsx"],
   chovani: ["panels/Behavior.tsx", "panels/Hotkeys.tsx", "../pkgctx/BubbleNotice.tsx"],
   aplikace: ["panels/AppPanel.tsx", "panels/Backup.tsx", "panels/About.tsx"],
@@ -167,6 +166,7 @@ test("staré id panelů (před vlnou 6) vedou na nové; neznámé nikam", () => 
     ["suplik", "suplik"],
     ["vzhled", "vzhled"],
     ["osobni", "osobni"],
+    ["ucty", "osobni"],
     ["poznamky", "poznamky"],
     ["neco", null],
     ["f-neznamo", null],
@@ -211,8 +211,11 @@ test("hledání najde i staré názvy panelů a voleb (bez diakritiky)", () => {
   for (const it of items.filter((x) => x.anchor)) assert.ok(!/\b[a-z]+\.[a-z]+[A-Z]\w*/.test(it.label) && !/keepWarm|barWindows/.test(it.label), `název ${it.anchor}: ${it.label}`);
 });
 
-test("jazyk rozhraní: volba ve Vzhledu, hledání ji najde česky i anglicky", () => {
-  assert.equal(fields()["ui.lang"].panel, "vzhled");
+test("jazyk rozhraní: volba úplně nahoře v Začínáme (ne ve Vzhledu), hledání ji najde česky i anglicky", () => {
+  assert.equal(fields()["ui.lang"].panel, "zaciname");
+  assert.ok(!src["panels/Appearance.tsx"].includes("ui.lang\"") && !src["panels/Appearance.tsx"].includes("setUiLang"), "Vzhled jazyk nenastavuje");
+  const start = src["panels/Start.tsx"];
+  assert.ok(start.indexOf('id="ui.lang"') > 0 && start.indexOf('id="ui.lang"') < start.indexOf('id="onboarding.wizard"'), "jazyk je první řádek Začínáme");
   const line = read("labels.ts").split("\n").find((l) => l.includes('"ui.lang"'));
   for (const w of ["jazyk", "language"]) assert.ok(line.includes(w), `kw obsahuje ${w}`);
   assert.ok(/settings\.f\.ui\.lang\.kw": "[^"]*language/.test(read("en.ts")), "anglická klíčová slova");
@@ -242,7 +245,9 @@ test("chyba pole → panel (nejdelší prefix vyhrává)", () => {
     ["autostart", "chovani"],
     ["update.repo", "aplikace"],
     ["onboarding.done", "zaciname"],
-    ["ui.lang", "vzhled"],
+    ["ui.lang", "zaciname"],
+    ["accounts.microsoft.clientId", "osobni"],
+    ["accounts.google.calendars", "osobni"],
     ["neznamo.pole", null],
     ["", null],
     [null, null],

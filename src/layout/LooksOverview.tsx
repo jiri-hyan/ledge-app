@@ -30,7 +30,7 @@ export default function LooksOverview() {
     });
   }
   return (
-    <Show when={cards().length + tiles().length} fallback={<p class="st-empty">{t("settings.looks.none", "Nic upraveného — vzhled změníš v šuplíku: ⋯ na kartě → Vzhled karty…, pravý klik na dlaždici → Upravit vzhled…")}</p>}>
+    <Show when={cards().length + tiles().length} fallback={<p class="st-empty">{t("settings.looks.none", "Nic upraveného — vzhled změníš v šuplíku: ⋯ na kartě → Vzhled karty…, pravý klik na zástupce → Upravit vzhled…")}</p>}>
       <For each={cards()}>
         {(x) => (
           <div class="st-row">
@@ -47,14 +47,14 @@ export default function LooksOverview() {
           <div class="st-row">
             <div class="st-lbl">
               <span class="st-name">{x.name}</span>
-              <small>{x.kind === "project" ? t("settings.looks.project", "Zástupce projektu") : t("settings.looks.action", "Dlaždice akce / odkazu")}</small>
+              <small>{x.kind === "project" ? t("settings.looks.project", "Zástupce projektu") : t("settings.looks.action", "Zástupce akce / odkazu")}</small>
             </div>
             <div class="st-ctl"><button class="mini" onClick={() => resetTile(x)}>{t("settings.looks.reset", "Obnovit")}</button></div>
           </div>
         )}
       </For>
       <div class="st-row">
-        <div class="st-lbl"><small>{t("settings.looks.allHint", "Karty zase podle design stylu, dlaždice s automatickou ikonou. Složky zůstanou.")}</small></div>
+        <div class="st-lbl"><small>{t("settings.looks.allHint", "Karty zase podle design stylu, zástupci s automatickou ikonou. Složky zůstanou.")}</small></div>
         <div class="st-ctl"><button class="mini" onClick={resetAll}>{t("settings.looks.resetAll", "Obnovit vše")}</button></div>
       </div>
     </Show>

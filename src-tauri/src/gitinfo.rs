@@ -81,6 +81,8 @@ fn git_cmd(dir: &Path, args: &[&str]) -> Command {
 #[derive(Debug)]
 pub struct Captured {
     pub success: bool,
+    /// návratový kód procesu (`None` = ukončen signálem / neznámý)
+    pub code: Option<i32>,
     pub stdout: String,
     /// prázdné, když volající stderr nechtěl
     pub stderr: String,
@@ -208,6 +210,7 @@ pub fn capture_tail(cmd: &mut Command, input: Option<&str>, stderr: bool, deadli
     };
     Ok(Captured {
         success: status.success(),
+        code: status.code(),
         stdout: String::from_utf8_lossy(&buf).into_owned(),
         stderr: String::from_utf8_lossy(&err_buf).into_owned(),
     })

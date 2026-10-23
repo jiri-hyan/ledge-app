@@ -6,7 +6,7 @@ import { api, type MediaAction, type MediaRepeat, type MediaTimeline, type Media
 import { sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { drawerShown } from "./shown";
-import { fmtTime, fraction, live, nextRepeat, nextTickIn, seekKey, seekTarget, shownPosition } from "./timeline";
+import { fmtDuration, fraction, live, nextRepeat, nextTickIn, seekKey, seekTarget, shownPosition } from "./timeline";
 
 const svg = { viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true } as const;
 const stroke = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 1.9, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": true } as const;
@@ -82,7 +82,7 @@ export function Progress(p: { m: MediaView; tl: MediaTimeline; times?: boolean; 
     setSeek({ ms, at: Date.now() });
     control({ seek: ms });
   };
-  const label = () => t("cards.media.position", "{pos} z {len}", { pos: fmtTime(shown()), len: fmtTime(p.tl.durationMs) });
+  const label = () => t("cards.media.position", "{pos} z {len}", { pos: fmtDuration(shown()), len: fmtDuration(p.tl.durationMs) });
   return (
     <div class="med-prog" classList={{ "med-prog-thin": p.thin }}>
       <div
@@ -123,8 +123,8 @@ export function Progress(p: { m: MediaView; tl: MediaTimeline; times?: boolean; 
       </div>
       <Show when={p.times}>
         <div class="med-times">
-          <span>{fmtTime(shown())}</span>
-          <span>{fmtTime(p.tl.durationMs)}</span>
+          <span>{fmtDuration(shown())}</span>
+          <span>{fmtDuration(p.tl.durationMs)}</span>
         </div>
       </Show>
     </div>
@@ -134,7 +134,7 @@ export function Progress(p: { m: MediaView; tl: MediaTimeline; times?: boolean; 
 /** Jen čas „1:42“ (vzhled Jen v proužku) — tiká stejně jako lišta. */
 export function TimeText(p: { m: MediaView; tl: MediaTimeline }) {
   const pos = usePosition(() => p.m, () => p.tl, () => null);
-  return <span class="med-clock">{fmtTime(pos())}</span>;
+  return <span class="med-clock">{fmtDuration(pos())}</span>;
 }
 
 function ModeButton(p: { on: boolean; label: string; badge?: string; onClick: () => void; children: JSX.Element }) {

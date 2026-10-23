@@ -30,7 +30,6 @@ export const ANCHOR_STEP: Record<string, StepId | null> = {
   "drawer.width": "open",
   "drawer.glass": "open",
   "appearance.motion": "motion",
-  "ui.lang": null,
 };
 
 /** Kotvy schované v rozbalovacím „Pokročilé“ svého kroku (skok na ně ho rozbalí). */

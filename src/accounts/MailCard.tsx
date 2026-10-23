@@ -3,7 +3,7 @@
 // kartou, nejvýš 1× za 2 minuty; karta jen kreslí. Klik na zprávu / „Otevřít Outlook“ = Outlook na webu.
 import { For, Show, type JSX } from "solid-js";
 import { api, type MailItem, type Snapshot } from "../api";
-import { ago, fmtTime } from "../format";
+import { ago, fmtClock } from "../format";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
 import { sayError } from "../ui/toast";
@@ -22,7 +22,7 @@ function when(ms: number, now: number): string {
   if (!ms) return "";
   const d = new Date(ms);
   const n = new Date(now);
-  return d.toDateString() === n.toDateString() ? fmtTime(d) : t("cards.mail.day", "{d}. {m}.", { d: d.getDate(), m: d.getMonth() + 1 });
+  return d.toDateString() === n.toDateString() ? fmtClock(d) : t("cards.mail.day", "{d}. {m}.", { d: d.getDate(), m: d.getMonth() + 1 });
 }
 
 function Row(p: { it: MailItem; now: number; web: string }) {
@@ -53,7 +53,7 @@ export default function MailCard(p: { s: Snapshot; now: number; onSettings: () =
       <Show when={status() !== "unset" && status() !== "off"} fallback={
         <div class="empty mail-empty">
           {status() === "off"
-            ? t("cards.mail.off", "Pošta je v Nastavení → Účty vypnutá.")
+            ? t("cards.mail.off", "Pošta je v Nastavení → Osobní → Kalendáře → Pokročilé vypnutá.")
             : t("cards.mail.unset", "Přihlas účet Microsoft (Outlook) a uvidíš tu počet nepřečtených a nejnovější předměty. Ledge čte jen hlavičky zpráv a nic nikam neposílá.")}
           <button class="mini ok" onClick={() => openAccountsSettings(p.onSettings)}>{t("cards.mail.connect", "Nastavit účet…")}</button>
         </div>

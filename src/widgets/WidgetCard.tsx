@@ -16,7 +16,7 @@ import "./widgets.css";
 /** Zapne / vypne položku proužku `id` (jedno pole configu, jako ⋯ Skrýt kartu). */
 export async function toggleStrip(id: string, on: boolean, cfgError: string | null): Promise<void> {
   if (cfgError) {
-    say(t("cards.widget.cfgError", "Config má chybu — proužek teď upravíš jen v Nastavení."), true);
+    say(t("cards.widget.cfgError", "Nastavení obsahuje chybu — proužek teď upravíš jen v Nastavení."), true);
     return;
   }
   try {

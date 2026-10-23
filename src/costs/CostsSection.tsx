@@ -83,7 +83,7 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
       <div class="cost">
         <button class="cost-head" onClick={toggle} aria-expanded={open()}>
           <span class="cost-chev" classList={{ on: open() }}>›</span>
-          <span class="cost-title">{t("sessions.costs.title", "Útrata Claude (odhad)")}</span>
+          <span class="cost-title" title={t("sessions.costs.tip", "Odhad podle ceníku API — při předplatném ji neplatíš.")}>{t("sessions.costs.title", "Hodnota v cenách API")}</span>
           <Show when={!open() && today()}>
             <span class="cost-peek">{t("sessions.costs.todayShort", "dnes {v}", { v: usd(today()!.total.cost) })}</span>
           </Show>

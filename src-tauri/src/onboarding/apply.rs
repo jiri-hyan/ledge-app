@@ -5,6 +5,7 @@
 
 use crate::actions::{MAX_ACTIONS, MAX_LABEL};
 use crate::config::{Config, Project, validate};
+use crate::i18n::tr;
 use crate::onboarding::repos::{norm, slug};
 use crate::uiconf::Lang;
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,8 @@ pub struct Patch {
     pub links: Vec<NewLink>,
     pub theme: Option<String>,
     pub done: Option<bool>,
+    /// Detekce průvodce: Claude Code je nainstalovaný. Spolu s `done` (první dokončení) přidá na Práci kartu Claude.
+    pub claude: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -86,9 +89,14 @@ pub fn apply(cfg: &Config, patch: &Patch) -> Result<(Config, Applied), String> {
         }
     }
     if let Some(d) = patch.done {
+        // první dokončení průvodce (config byl čerstvý): čisté rozložení dostane karty podle detekce — Claude,
+        // když ho našel, a Repa, když jsou mezi projekty git složky. Opakované spuštění průvodce rozložení nemění.
+        if d && !cfg.onboarding.done {
+            crate::layout::with_detected(&mut c.layout, patch.claude, c.projects.iter().any(|p| p.path.is_some()));
+        }
         c.onboarding.done = d;
     }
-    let mut v = serde_json::to_value(&c).map_err(|e| e.to_string())?;
+    let mut v = serde_json::to_value(&c).map_err(|e| crate::errors::json(tr("Výběr nejde uložit", "Can't save the selection"), &e))?;
     if !patch.links.is_empty() {
         add_links(&mut v, &patch.links, &mut out)?;
     }
@@ -100,12 +108,12 @@ pub fn apply(cfg: &Config, patch: &Patch) -> Result<(Config, Applied), String> {
             None => out.theme_saved = Some(false),
         }
     }
-    let next = Config::deserialize(&v).map_err(|e| trf!("Výběr nejde uložit: {e}", "Can't save the selection: {e}"))?;
+    let next = Config::deserialize(&v).map_err(|e| crate::errors::json(tr("Výběr nejde uložit", "Can't save the selection"), &e))?;
     validate(&next)?;
     if let Some(theme) = &patch.theme
         && out.theme_saved.is_none()
     {
-        let back = serde_json::to_value(&next).map_err(|e| e.to_string())?;
+        let back = serde_json::to_value(&next).map_err(|e| crate::errors::json(tr("Výběr nejde uložit", "Can't save the selection"), &e))?;
         out.theme_saved = Some(back.pointer("/appearance/theme") == Some(&json!(theme)));
     }
     Ok((next, out))
@@ -257,5 +265,36 @@ mod tests {
             assert_eq!(out.theme_saved, Some(false));
         }
         assert_eq!(unique_id(&["a".into(), "a-2".into()], "a"), "a-3");
+    }
+
+    #[test]
+    fn finishing_adds_cards_by_detection() {
+        use crate::layout::{WORK, placed};
+        let fresh = crate::onboarding::fresh_config();
+        let work_ids = |c: &Config| c.layout.pages.iter().find(|p| p.id == WORK).unwrap().cards.iter().map(|k| k.id.clone()).collect::<Vec<_>>();
+        let git = dev("Web", r"C:\r\web", None);
+        let app = Project { path: None, exe: Some(r"C:\Apps\a.exe".into()), kind: crate::config::ProjectKind::App, ..dev("Aplikace", r"C:\x", None) };
+        // (popis, Claude nalezen, projekty, Práce po dokončení)
+        let cases: Vec<(&str, bool, Vec<Project>, Vec<&str>)> = vec![
+            ("nic nenalezeno", false, vec![], vec!["projects", "notes"]),
+            ("jen Claude", true, vec![], vec!["projects", "claude", "notes"]),
+            ("jen git projekt", false, vec![git.clone()], vec!["projects", "repos", "notes"]),
+            ("aplikace nejsou repo", false, vec![app], vec!["projects", "notes"]),
+            ("Claude i repo", true, vec![git], vec!["projects", "claude", "repos", "notes"]),
+        ];
+        for (name, claude, projects, want) in cases {
+            let (next, _) = apply(&fresh, &Patch { done: Some(true), claude, projects, ..Default::default() }).unwrap();
+            assert_eq!(work_ids(&next), want, "{name}");
+            assert!(next.onboarding.done, "{name}");
+            assert_eq!(placed(&next.layout, "claude"), claude, "{name}");
+        }
+        // hotový průvodce spuštěný znovu rozložení nemění
+        let mut again = crate::onboarding::fresh_config();
+        again.onboarding.done = true;
+        let (next, _) = apply(&again, &Patch { done: Some(true), claude: true, ..Default::default() }).unwrap();
+        assert_eq!(next.layout, again.layout, "hotový průvodce znovu: rozložení se nemění");
+        // krok bez `done` (průběžné ukládání) rozložení nemění ani s detekcí
+        let (next, _) = apply(&fresh, &Patch { claude: true, ..Default::default() }).unwrap();
+        assert_eq!(next.layout, fresh.layout);
     }
 }

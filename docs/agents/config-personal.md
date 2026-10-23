@@ -34,7 +34,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     jen po kliku „Načíst z Outlooku“ (COM ho spustí na pozadí). Text pozvánky (odkaz Teams) čte jen když
     Outlook volajícímu věří (`Application.IsTrusted`) — jinak by vyskočila bezpečnostní výzva Outlooku.
     Nový Outlook COM nemá → odkaz ICS. `"graph"` / `"google"` + `account` = účty Microsoft / Google
-    (`calendar/graph.rs`, `google.rs` přes `source::adapter`; přihlášení v Nastavení → Účty). Bez řádku tady
+    (`calendar/graph.rs`, `google.rs` přes `source::adapter`; přihlášení v Nastavení → Osobní → Kalendáře → Pokročilé). Bez řádku tady
     dá kalendář účtu do karty přepínač `accounts.*.calendar` (bez připomínky); je-li zapnutý řádek téhož
     účtu tady, vede ho tenhle (připomínka, Připojit) a přepínač účtu se nezdvojí.
   - **Připojit:** z vlastností schůzky (`X-MICROSOFT-SKYPETEAMSMEETINGURL`, `X-GOOGLE-CONFERENCE`,
@@ -46,7 +46,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     tebe“ a „hotovo“), blikne a pulsne; `remindToast: true` (výchozí `false`) navíc pošle toast Windows
     s tlačítkem Připojit. Budík jen na čas připomínky, nic se kvůli ní nestahuje (data z posledního
     načtení / cache). Ve fullscreen hře / herním režimu nic, toast ani při „nerušit“ nebo otevřeném šuplíku.
-- **Účty Microsoft a Google (OAuth)** — sekce `accounts` (Nastavení → Účty; kód `src-tauri/src/accounts/`,
+- **Účty Microsoft a Google (OAuth)** — sekce `accounts` (Nastavení → Osobní → Kalendáře → Pokročilé; kód `src-tauri/src/accounts/`,
   mapa `docs/codemap/accounts.md`, návod pro uživatele `docs/ucty.md`). Výchozí = nic nepřihlášeno, žádná síť.
   ```json
   "accounts": {

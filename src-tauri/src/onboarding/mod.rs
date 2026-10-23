@@ -12,11 +12,12 @@ pub mod apply;
 pub mod apps;
 pub mod claude;
 pub mod dialog;
+pub mod first_run;
 pub mod repos;
 pub mod store;
 pub mod themes;
 
-use crate::config::{Config, NotesSyncConfig, UpdateConfig, valid_notes_remote};
+use crate::config::{Config, NotesSyncConfig, StripConfig, StripItem, UpdateConfig, valid_notes_remote};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -48,6 +49,17 @@ pub fn upgrade_loaded(raw: &Value, cfg: &mut Config) {
     legacy_notes_sync(raw.pointer("/notes/sync"), &mut cfg.notes.sync, origin);
     missing_kinds_in_lang(raw, cfg);
     legacy_update_repo(&mut cfg.update);
+    legacy_strip_items(raw, &mut cfg.strip);
+}
+
+/// Proužek, který dřív bez `strip.items` ukazoval šest položek. Nový výchozí je menší
+/// ([`StripConfig::default`]), ale existující soubor bez `items` se nesmí změnit — dostane původních šest.
+/// Čistá funkce (jen v paměti).
+pub fn legacy_strip_items(raw: &Value, strip: &mut StripConfig) {
+    if raw.pointer("/strip/items").is_none() {
+        use StripItem::*;
+        strip.items = vec![Mode, Clock, Running, Claude, Waiting, Repos];
+    }
 }
 
 /// Repo, ze kterého se dřív stahovaly aktualizace. Vydání jsou teď ve veřejném repu (výchozí `update.repo`).
@@ -113,6 +125,31 @@ mod tests {
         let path = dir.path().join("config.json");
         config::save(&path, &cfg).unwrap();
         assert_eq!(config::load(&path).unwrap().unwrap(), cfg);
+    }
+
+    #[test]
+    fn existing_file_keeps_old_strip_and_layout() {
+        // starý soubor bez `strip.items` / `layout` = původních šest položek a plné rozložení (ne čistý start)
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        for text in ["{}", r#"{"autostart":false}"#, r#"{"strip":{"enabled":true}}"#] {
+            std::fs::write(&path, text).unwrap();
+            let cfg = config::load(&path).unwrap().unwrap();
+            assert_eq!(cfg.strip.items, [StripItem::Mode, StripItem::Clock, StripItem::Running, StripItem::Claude, StripItem::Waiting, StripItem::Repos], "{text}");
+            let work: Vec<&str> = cfg.layout.pages[0].cards.iter().map(|c| c.id.as_str()).collect();
+            assert_eq!(work, ["projects", "actions", "shelf", "running", "claude", "repos", "notes"], "{text}");
+            assert_eq!(cfg.layout.pages[1].cards.len(), 10, "{text}");
+            assert!(cfg.drawer.sections.claude && cfg.drawer.sections.weather && cfg.drawer.sections.actions, "{text}: sections odvozené z plného rozložení");
+        }
+        // vlastní položky proužku a vlastní rozložení se nemění
+        std::fs::write(&path, r#"{"strip":{"items":["clock"]},"layout":{"pages":[{"id":"prace","name":"","cards":[{"id":"notes","size":"xl"}]}]}}"#).unwrap();
+        let cfg = config::load(&path).unwrap().unwrap();
+        assert_eq!(cfg.strip.items, [StripItem::Clock]);
+        assert_eq!(cfg.layout.pages.len(), 1);
+        // čistý config zůstává čistý
+        let fresh = fresh_config();
+        assert_eq!(fresh.strip.items, [StripItem::Clock, StripItem::Mode, StripItem::Waiting]);
+        assert_eq!(fresh.layout.pages[0].cards.len(), 2);
     }
 
     #[test]

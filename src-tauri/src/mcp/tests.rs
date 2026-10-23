@@ -371,9 +371,9 @@ fn layout_tools_use_editor_validation() {
     assert_eq!(host.saves.load(Ordering::SeqCst), 0, "preview nic neukládá");
     let good = json!({ "layout": { "pages": [{ "id": "prace", "name": "", "cards": [{ "id": "projects", "size": "xl" }, { "id": "claude", "size": "m", "h": 2 }] }], "hiddenParts": [] } });
     let bad = json!({ "layout": { "pages": [{ "id": "prace", "name": "", "cards": [{ "id": "kocka", "size": "m" }] }] } });
-    roundtrip("layout_apply", good.clone(), bad, |c| c.layout.pages.len() == 1 && !c.drawer.sections.weather);
+    roundtrip("layout_apply", good.clone(), bad, |c| c.layout.pages.len() == 1 && !c.drawer.sections.clock);
     let (_, text) = call(&srv, &host, "layout_preview", good);
-    assert!(text.contains("projects XL") && text.contains("weather"), "souhrn ukáže karty i co zmizí: {text}");
+    assert!(text.contains("projects XL") && text.contains("clock"), "souhrn ukáže karty i co zmizí: {text}");
     // překlep v poli karty = chyba, ne tiché ignorování
     assert!(call(&srv, &host, "layout_preview", json!({ "layout": { "pages": [{ "id": "prace", "cards": [{ "id": "claude", "sise": "m" }] }] } })).1.contains("sise"));
     // bez `upgrades` se převezmou (jednorázové úpravy se nepustí znovu)

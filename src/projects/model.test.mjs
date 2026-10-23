@@ -4,7 +4,7 @@
 //   node --experimental-strip-types --test src/projects/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tipState, clickOf, commitText, failInfo, freshest, isLive, liveProcs, placeOf, placeProblem, preselect, samePath, tileTip, whatOf, whereOf, withProjectFields } from "./model.ts";
+import { tipState, clickOf, commitText, failInfo, freshest, healthText, healthTone, isLive, liveProcs, placeOf, placeProblem, preselect, samePath, tileHealth, tileTip, PROJECT_NOTES, notesHidden, projectNotesQuery, whatOf, whereOf, withProjectFields } from "./model.ts";
 
 const NOW = 1_792_250_979_530;
 const pr = (o = {}) => ({ id: "orbit", name: "Orbit", kind: "dev", accent: "#2563eb", monogram: "O", logoKey: null, path: "C:\\Work\\orbit-v2", pathOk: true, clonable: false, cloning: false, github: null, links: [], git: null, run: "npm run dev:staging", port: 5210, remote: "acme/orbit", app: null, place: { kind: "ok" }, ...o });
@@ -37,7 +37,7 @@ test("co a odkud: tooltip ukáže příkaz, složku a port; běžící proces v�
   assert.equal(tileTip(pr()), "Klik spustí: npm run dev:staging\nSložka: C:\\Work\\orbit-v2\nPort: 5210");
   assert.equal(
     tileTip(pr(), pc("ready", { cwd: "C:\\Work\\orbit", port: 5211 })),
-    "Klik spustí: npm run dev:staging\nSložka: C:\\Work\\orbit\nPort: 5211\nBěží — ■ v akcích dlaždice zastaví",
+    "Klik spustí: npm run dev:staging\nSložka: C:\\Work\\orbit\nPort: 5211\nBěží — ■ v akcích zástupce zastaví",
   );
   assert.match(tileTip(pr(), pc("failed", { message: "Server nenaběhl do 90 s." })), /Nenaběhl: Server nenaběhl do 90 s\.$/);
   assert.match(tileTip(pr({ run: null })), /^Chybí příkaz ke spuštění/);
@@ -107,4 +107,32 @@ test("náhled po najetí: stav jako pilulka (běží s portem, startuje, nenabě
     ["neběží", pr(), null, { tone: "n", text: "neběží", detail: null }],
   ];
   for (const [name, p, proc, want] of cases) assert.deepEqual(tipState(p, proc), want, name);
+});
+
+test("zdraví zástupce: dirty / ahead z gitu, Claude jen při pracující session téhož projektu", () => {
+  const git = (dirty, ahead) => ({ branch: "main", dirty, ahead, behind: 0 });
+  const sess = (projectId, status, over = {}) => ({ projectId, status, ended: false, ...over });
+  const cases = [
+    ["čistý bez session", pr({ git: git(0, 0) }), [], null],
+    ["bez gitu", pr({ git: null }), [], null],
+    ["neuložené", pr({ git: git(3, 0) }), [], { dirty: 3, ahead: 0, claude: false }],
+    ["nepushnuté", pr({ git: git(0, 2) }), [], { dirty: 0, ahead: 2, claude: false }],
+    ["oboje", pr({ git: git(1, 1) }), [], { dirty: 1, ahead: 1, claude: false }],
+    ["Claude pracuje", pr({ git: git(0, 0) }), [sess("orbit", "working")], { dirty: 0, ahead: 0, claude: true }],
+    ["cizí projekt", pr(), [sess("jiny", "working")], null],
+    ["čeká / nečinná / ukončená", pr(), [sess("orbit", "waiting"), sess("orbit", "idle"), sess("orbit", "working", { ended: true })], null],
+    ["bez projectId", pr(), [sess(null, "working")], null],
+  ];
+  for (const [name, p, sessions, want] of cases) assert.deepEqual(tileHealth(p, sessions), want, name);
+  assert.deepEqual(["claude", "dirty", "ahead", "dirty"], [{ dirty: 1, ahead: 1, claude: true }, { dirty: 1, ahead: 1, claude: false }, { dirty: 0, ahead: 4, claude: false }, { dirty: 2, ahead: 0, claude: false }].map(healthTone));
+  assert.equal(healthText({ dirty: 1, ahead: 0, claude: false }), "1 neuložená změna");
+  assert.equal(healthText({ dirty: 3, ahead: 2, claude: true }), "Claude tu pracuje · 3 neuložené změny · 2 nepushnuté commity");
+  assert.equal(healthText({ dirty: 5, ahead: 1, claude: false }), "5 neuložených změn · 1 nepushnutý commit");
+});
+
+test("poznámky projektu v panelu: dotaz s filtrem projektu a stropem 3, zbytek jako +N", () => {
+  assert.equal(PROJECT_NOTES, 3);
+  assert.deepEqual(projectNotesQuery("orbit"), { project: "orbit", limit: 3, includeDone: false });
+  const cases = [[0, 0, 0], [2, 2, 0], [3, 3, 0], [7, 3, 4], [undefined, 0, 0], [null, 2, 0], [1, 3, 0]];
+  for (const [total, shown, want] of cases) assert.equal(notesHidden(total, shown), want, `${total}/${shown}`);
 });

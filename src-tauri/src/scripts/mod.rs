@@ -127,9 +127,10 @@ pub type Loaded = (Result<Meta, String>, String);
 /// `Ok(None)` = soubor nemá `@ledge.` (pomocný modul).
 pub fn load_one(path: &Path, lang: Lang, size: u64) -> Result<Option<Loaded>, String> {
     use sha2::Digest;
-    let mut f = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let read_err = |e: std::io::Error| crate::errors::io(&trf!("{} nejde přečíst", "Can't read {}", path.display()), &e);
+    let mut f = std::fs::File::open(path).map_err(read_err)?;
     let mut head = Vec::with_capacity(meta::HEADER_BYTES);
-    (&mut f).take(meta::HEADER_BYTES as u64).read_to_end(&mut head).map_err(|e| e.to_string())?;
+    (&mut f).take(meta::HEADER_BYTES as u64).read_to_end(&mut head).map_err(read_err)?;
     let parsed = match meta::parse(&meta::header_text(&head, size > head.len() as u64), lang) {
         Ok(None) => return Ok(None),
         Ok(Some(m)) => Ok(m),
@@ -143,7 +144,7 @@ pub fn load_one(path: &Path, lang: Lang, size: u64) -> Result<Option<Loaded>, St
     let mut buf = [0u8; 16 * 1024];
     let mut total = head.len() as u64;
     loop {
-        let n = f.read(&mut buf).map_err(|e| e.to_string())?;
+        let n = f.read(&mut buf).map_err(read_err)?;
         if n == 0 {
             break;
         }

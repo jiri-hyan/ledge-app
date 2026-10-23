@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { addToFolder, arrange, dropOnTile, folderIdFor, folderOf, normalizeFolders, removeFolder, renameFolder, takeOut } from "./folders.ts";
-import { defaultLayout, normalizeTiles, pageOf, setTiles, tilesOf } from "./model.ts";
+import { normalizeTiles, pageOf, setTiles, tilesOf } from "./model.ts";
+import { fullLayout } from "./fullLayout.mjs";
 
 const base = { size: "tile", label: true, git: true, hidden: [] };
 const P = ["a", "b", "c", "d", "e"].map((id) => ({ id }));
@@ -70,7 +71,7 @@ test("normalizace: špatná id, duplicity, projekt ve dvou složkách, prázdné
 test("rozložení: složky jdou do `tiles` a zpět; bez složek se pole nepíše", () => {
   assert.ok(!("folders" in normalizeTiles(base)));
   const t = dropOnTile(tilesOf(undefined), "b", "a").tiles;
-  const l = setTiles(defaultLayout(), "osobni", { folders: t.folders });
+  const l = setTiles(fullLayout(), "osobni", { folders: t.folders });
   assert.deepEqual(tilesOf(pageOf(l, "osobni").cards[0]).folders, [{ id: "slozka", name: "", items: ["a", "b"] }]);
   const back = setTiles(l, "osobni", { folders: [] });
   assert.equal(pageOf(back, "osobni").cards[0].tiles, undefined, "bez složek a s výchozími volbami = pole `tiles` pryč");

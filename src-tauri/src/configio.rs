@@ -93,8 +93,8 @@ pub fn read_import(path: &Path) -> Result<Config, String> {
 /// Náhled importu proti aktuálnímu configu.
 pub fn preview(current: &Config, path: &Path) -> Result<ImportPreview, String> {
     let imported = read_import(path)?;
-    let cur = serde_json::to_value(current).map_err(|e| e.to_string())?;
-    let cfg = serde_json::to_value(&imported).map_err(|e| e.to_string())?;
+    let cur = serde_json::to_value(current).map_err(|e| crate::errors::json(tr("Náhled importu", "Import preview"), &e))?;
+    let cfg = serde_json::to_value(&imported).map_err(|e| crate::errors::json(tr("Náhled importu", "Import preview"), &e))?;
     let sections = section_diff(&cur, &cfg);
     Ok(ImportPreview { cfg, sections })
 }
@@ -121,11 +121,9 @@ pub fn keep_unreadable(path: &Path) -> Result<Option<std::path::PathBuf>, String
         .map(|i| path.with_file_name(if i == 1 { format!("{name}.broken-{secs}") } else { format!("{name}.broken-{secs}-{i}") }))
         .find(|p| !p.exists())
         .expect("nekonečná řada");
-    std::fs::copy(path, &bak).map_err(|e| trf!(
-            "{} nejde načíst ani zazálohovat ({e}) — nepřepisuji ho, oprav ho ručně.",
-            "{} can't be read or backed up ({e}) — not overwriting it, fix it by hand.",
-            path.display()
-        ))?;
+    std::fs::copy(path, &bak).map_err(|e| {
+        crate::errors::io(&trf!("{} nejde zazálohovat, nepřepisuji ho", "{} can't be backed up, not overwriting it", path.display()), &e)
+    })?;
     Ok(Some(bak))
 }
 
@@ -182,7 +180,7 @@ mod tests {
         let p = preview(&Config::default(), &old).unwrap();
         assert_eq!(p.cfg["autostart"], json!(false));
         assert!(p.sections.iter().any(|s| s.key == "autostart" && s.changed));
-        assert!(p.sections.iter().any(|s| s.key == "drawer" && !s.changed));
+        assert!(p.sections.iter().any(|s| s.key == "hotkeys" && !s.changed));
     }
 
     /// Rozbitý config na disku (v paměti jsou výchozí hodnoty) + uložení z Nastavení / průvodce =

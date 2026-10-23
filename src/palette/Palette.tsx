@@ -10,7 +10,7 @@
 // `cliphist`; Enter = položka zpět do schránky (jádro, vlastní zápis), Ctrl+P připnout, Ctrl+Del smazat.
 import { createEffect, createMemo, createSignal, For, Index, on, onCleanup, onMount, Show } from "solid-js";
 import { api, on as onEvent, type NoteView, type Snapshot } from "../api";
-import { IconFolder, IconLink, IconNote, IconSettings, IconShield, IconTerminal } from "../icons";
+import { IconFolder, IconLink, IconNote, IconSearch, IconSettings, IconShield, IconTerminal } from "../icons";
 import { ActionIcon, ConfirmAction, answerConfirm, confirmPending } from "../actions/ui";
 import { buildItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
 import { bumpUsage, cleanUsage, pushRecent, rank, segments, type Ranked, type Usage } from "./search";
@@ -25,13 +25,6 @@ import type { ScriptView } from "../types";
 import { lang, t } from "../i18n";
 import { say, sayError } from "../ui/toast";
 import "./palette.css";
-
-export const IconSearch = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="7" />
-    <path d="m20 20-3.5-3.5" />
-  </svg>
-);
 
 const GLYPH: Record<Section, () => any> = { action: IconLink, project: IconFolder, note: IconNote, claude: IconTerminal, settings: IconSettings, app: IconShield, script: IconTerminal, windows: IconSettings, calc: IconSearch, convert: IconSearch, emoji: IconNote, clip: IconNote };
 const RECENT_KEY = "ledge.palette.recent";

@@ -4,7 +4,7 @@ import { registerDict } from "../i18n";
 
 registerDict("en", {
   // karta
-  "cards.widget.cfgError": "The config has an error — you can change the strip only in Settings now.",
+  "cards.widget.cfgError": "The settings contain an error — you can change the strip only in Settings now.",
   "cards.widget.consent.again": "Allow again and run",
   "cards.widget.consent.allow": "Allow and run",
   "cards.widget.consent.done": "Allowed — the widget is starting.",

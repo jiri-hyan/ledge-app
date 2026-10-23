@@ -1,37 +1,6 @@
-// Načte všechny anglické slovníky (registerDict) — import v `App.tsx` dřív, než se UI vykreslí.
-// Nový slovník = nový import tady; `src/i18n.test.mjs` hlídá, že žádný nechybí.
-import "./en-main";
-import "./en-cards";
-import "./en-sessions";
-import "./en-sessiongit";
-import "./en-notes";
-import "../pin/en";
-import "./en-palette";
-import "./en-actions";
-import "./en-winsettings";
-import "./en-quick";
-import "./en-questions";
-import "./en-limits";
-import "./en-timer";
-import "./en-costs";
-import "./en-shelf";
-import "./en-cliphist";
-import "./en-media";
-import "./en-suggest";
-import "./en-calendar";
-import "./en-integrations";
-import "../accounts/en";
-import "./en-agentview";
-import "./en-pkgctx";
-import "./en-layout";
-import "../tilelook/en";
-import "../projects/en";
-import "../strip/en";
-import "./en-hover";
-import "./en-widgets";
-import "../settings/en";
-import "../settings/panels/en";
-import "../settings/panels/en-look";
-import "../settings/previews/en";
-import "../onboarding/en";
-import "../mcp/en";
+// Líné načtení anglických slovníků: registruje v `i18n.ts` loader, který při prvním `setLang("en")` (nebo
+// `loadDict("en")` z lazy palety) stáhne chunk `dicts.ts`. První import `App.tsx` — dřív než cokoli volá `setLang`.
+// Čeština je zdroj pravdy v kódu, takže se při jazyce cs nenačítá žádný slovník (paměť WebView2).
+import { setDictLoader } from "../i18n";
+
+setDictLoader(() => import("./dicts"));

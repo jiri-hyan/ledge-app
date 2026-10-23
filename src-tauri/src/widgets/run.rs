@@ -73,7 +73,7 @@ pub fn fail_text(f: &Fail) -> String {
         Fail::TooBig => tr("Skript vypsal víc než 256 KB — zkrať výstup.", "The script printed more than 256 KB — shorten the output.").into(),
         Fail::Exit(t) if t.is_empty() => tr("Skript skončil chybou.", "The script ended with an error.").into(),
         Fail::Exit(t) => trf!("Skript skončil chybou: {}", "The script ended with an error: {}", t.lines().last().unwrap_or("")),
-        Fail::Spawn(e) => trf!("Skript nejde spustit: {e}", "Can't run the script: {e}"),
+        Fail::Spawn(e) => crate::errors::spawn_text(tr("Skript nejde spustit", "Can't run the script"), e),
     }
 }
 

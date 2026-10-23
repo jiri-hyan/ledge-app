@@ -1,0 +1,39 @@
+// Všechny anglické slovníky (registerDict) v JEDNOM chunku — načte se až při přepnutí na jazyk jiný než čeština
+// (`i18n.ts` `loadDict` přes `load.ts`); při češtině se nenačítá nic (čeština je přímo v `t()`).
+// Nový slovník = nový import tady; `src/i18n.test.mjs` hlídá, že žádný nechybí.
+import "./en-main";
+import "./en-keys";
+import "./en-cards";
+import "./en-sessions";
+import "./en-sessiongit";
+import "./en-notes";
+import "../pin/en";
+import "./en-palette";
+import "./en-actions";
+import "./en-winsettings";
+import "./en-quick";
+import "./en-questions";
+import "./en-limits";
+import "./en-timer";
+import "./en-costs";
+import "./en-shelf";
+import "./en-cliphist";
+import "./en-media";
+import "./en-suggest";
+import "./en-calendar";
+import "./en-integrations";
+import "../accounts/en";
+import "./en-agentview";
+import "./en-pkgctx";
+import "./en-layout";
+import "../tilelook/en";
+import "../projects/en";
+import "../strip/en";
+import "./en-hover";
+import "./en-widgets";
+import "../settings/en";
+import "../settings/panels/en";
+import "../settings/panels/en-look";
+import "../settings/previews/en";
+import "../onboarding/en";
+import "../mcp/en";

@@ -40,7 +40,7 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-tab svg { width: 13px; height: 13px; color: var(--k); }
 .note-tab:hover { background: var(--card-2); color: var(--t1); }
 .note-tab.on { background: color-mix(in srgb, var(--k) 16%, transparent); border-color: color-mix(in srgb, var(--k) 35%, transparent); color: var(--t1); }
-.note-tab .cnt { font: 600 calc(10.5px * var(--fz)) var(--mono); color: var(--t3); }
+.note-tab .cnt { font: 600 var(--fs-2xs) var(--mono); color: var(--t3); }
 .note-tab.on .cnt { color: var(--t2); }
 .kind-badge { display: grid; flex-shrink: 0; }
 .kind-badge svg { width: 15px; height: 15px; }
@@ -82,7 +82,7 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .pick-btn.open .pick-caret { transform: rotate(-135deg) translate(-1px, -2px); }
 /* panel v toku lišty: zabere vlastní řádek pod ní (šuplík naroste, nic se neořízne) */
 .pick-pop { flex: 1 0 100%; order: 50; background: var(--pop); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 10px; box-shadow: var(--shadow-pop); animation: drop var(--dur-2) var(--ease) both; }
-.pp-logo { width: 22px; height: 22px; border-radius: var(--r-sm); display: grid; place-items: center; flex-shrink: 0; font: 650 calc(10px * var(--fz)) var(--display); color: var(--white); box-shadow: var(--ring-logo); }
+.pp-logo { width: 22px; height: 22px; border-radius: var(--r-sm); display: grid; place-items: center; flex-shrink: 0; font: 650 var(--fs-2xs) var(--display); color: var(--white); box-shadow: var(--ring-logo); }
 .pp-logo img { width: 15px; height: 15px; object-fit: contain; }
 .pp-logo.has-img { background: var(--logo-plate) !important; }
 .pick-pop .pp-q { width: 100%; margin-bottom: 6px; }
@@ -97,7 +97,7 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .rp-cal { width: 238px; flex-shrink: 0; }
 .rp-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: calc(12.5px * var(--fz)); margin-bottom: 6px; }
 .rp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.rp-dow { font: 600 calc(10px * var(--fz)) var(--sans); color: var(--t3); text-align: center; padding: 2px 0 4px; text-transform: uppercase; }
+.rp-dow { font: 600 var(--fs-2xs) var(--sans); color: var(--t3); text-align: center; padding: 2px 0 4px; text-transform: uppercase; }
 .rp-day { height: 28px; border-radius: 7px; font-size: calc(12px * var(--fz)); font-variant-numeric: tabular-nums; color: var(--t1); transition: background var(--dur-1); }
 .rp-day:hover { background: var(--card-2); }
 .rp-day.out { color: var(--t3); }
@@ -117,7 +117,7 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .pp-list::-webkit-scrollbar-thumb, .rp-slots::-webkit-scrollbar-thumb, .notes-list::-webkit-scrollbar-thumb, .note-preview::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 3px; }
 
 /* ---------- náhled Markdownu ---------- */
-.md { font: calc(13.5px * var(--fz))/1.55 var(--sans); color: var(--t1); user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
+.md { --md-check-line: var(--line-2); --md-check-ink: var(--on-light); font: calc(13.5px * var(--fz))/1.55 var(--sans); color: var(--t1); user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
 .md > * + * { margin-top: 8px; }
 .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { font-family: var(--display); font-weight: 650; line-height: 1.25; }
 .md h1 { font-size: calc(19px * var(--fz)); }
@@ -129,12 +129,8 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .md ul, .md ol { padding-left: 20px; }
 .md li { margin: 2px 0; }
 .md li > ul, .md li > ol { margin-top: 2px; }
-.md li[data-task] { list-style: none; margin-left: -20px; display: flex; flex-wrap: wrap; gap: 0 8px; align-items: flex-start; }
-.md li[data-task] > ul, .md li[data-task] > ol { flex-basis: 100%; padding-left: 43px; }
-.md-check { width: 15px; height: 15px; margin-top: 3px; border-radius: 4px; border: 1.5px solid var(--line-2); flex-shrink: 0; position: relative; cursor: pointer; transition: background var(--dur-1), border-color var(--dur-1); }
 .md-check:hover { border-color: var(--t2); }
 .md-check.on { background: var(--green); border-color: transparent; }
-.md-check.on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--on-light); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .md li[data-task]:has(.md-check.on) > span:last-child { color: var(--t3); text-decoration: line-through; }
 .md-link { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .md blockquote { border-left: 3px solid var(--line-2); padding-left: 10px; color: var(--t2); }
@@ -153,10 +149,6 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-row:hover .note-act, .note-act:focus-visible, .note-act.on { opacity: 1; }
 .note-act:hover, .note-act.on { color: var(--t1); background: var(--card-2); }
 .note-act svg { width: 15px; height: 15px; }
-.note-act-list button { display: flex; align-items: center; gap: 8px; }
-.note-act-list button svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--t3); }
-.note-act-list button.danger { color: var(--red); }
-.note-act-list button.danger svg { color: inherit; }
 .note-archive-title { font-size: var(--fs-ui); }
 /* tlačítka akcí v liště editoru (Splnit · Archivovat · Smazat) */
 .note-life-del:hover { color: var(--red); }

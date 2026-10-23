@@ -1,0 +1,4 @@
+/* Hláška (ui/toast.tsx) — společný vzhled pro šuplík i okno lístku (`pin/pin.css` nastaví proměnné --toast-* v :root,
+   styly šuplíku tam nejsou). Načítá ho `@import` ve styles.css a v pin.css. */
+.toast { position: var(--toast-pos, fixed); left: var(--toast-l, 50%); right: var(--toast-r, auto); bottom: var(--toast-b, var(--s4)); transform: var(--toast-tf, translateX(-50%)); background: var(--toast-bg, var(--raised)); color: var(--toast-fg, inherit); border: var(--toast-bd, 1px solid var(--line-2)); padding: var(--toast-pad, var(--s2) 14px); border-radius: var(--toast-rad, var(--r-md)); font-size: var(--toast-fs, var(--fs-ui)); max-width: var(--toast-max, 80%); text-shadow: none; box-shadow: var(--shadow-toast); animation: rise var(--dur-4) var(--spring); z-index: var(--toast-z, 50); }
+.toast.err { color: var(--toast-err-fg, var(--red)); background: var(--toast-err-bg, var(--toast-bg, var(--raised))); }

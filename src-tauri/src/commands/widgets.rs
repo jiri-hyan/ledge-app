@@ -46,7 +46,7 @@ fn open_in_editor(path: &Path) -> Result<(), String> {
     if r.0 as isize > 32 {
         return Ok(());
     }
-    std::process::Command::new("notepad.exe").arg(path).spawn().map(|_| ()).map_err(|e| trf!("Editor nejde otevřít: {e}", "Can't open an editor: {e}"))
+    std::process::Command::new("notepad.exe").arg(path).spawn().map(|_| ()).map_err(|e| crate::errors::spawn(tr("Editor nejde otevřít", "Can't open an editor"), &e))
 }
 
 #[tauri::command(async)]
@@ -65,8 +65,8 @@ pub(crate) fn widgets_open_dir() -> Result<String, String> {
     let c = core();
     let cfg = c.cfg.read().widgets.clone();
     let dir = widgets::resolve_dir(&cfg)?;
-    std::fs::create_dir_all(&dir).map_err(|e| trf!("Složku {} nejde založit: {e}", "Can't create the folder {}: {e}", dir.display()))?;
-    c.app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", dir.display()), &e))?;
+    c.app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| crate::errors::any(tr("Složku nejde otevřít", "Can't open the folder"), &e))?;
     Ok(dir.display().to_string())
 }
 
@@ -125,7 +125,7 @@ pub(crate) fn widget_click(id: String, index: usize, label: String) -> Result<Op
     let c = core();
     let item = live::item(&id, index, &label).ok_or_else(|| tr("Widget se mezitím obnovil — klikni znovu.", "The widget refreshed meanwhile — click again."))?;
     if let Some(url) = item.url.as_deref().filter(|u| widgets::output::url_ok(u)) {
-        c.app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())?;
+        c.app.opener().open_url(url, None::<&str>).map_err(|e| crate::errors::any(tr("Odkaz nejde otevřít", "Can't open the link"), &e))?;
         c.send_ui(UiCmd::Hide);
         return Ok(None);
     }
@@ -137,8 +137,8 @@ pub(crate) fn widget_click(id: String, index: usize, label: String) -> Result<Op
         }
         Some(Act::Open { path }) => {
             match personal::classify_fs(&path) {
-                LinkTarget::Folder(p) | LinkTarget::File(p) => c.app.opener().open_path(p.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())?,
-                LinkTarget::Web(u) => c.app.opener().open_url(u, None::<&str>).map_err(|e| e.to_string())?,
+                LinkTarget::Folder(p) | LinkTarget::File(p) => c.app.opener().open_path(p.to_string_lossy(), None::<&str>).map_err(|e| crate::errors::any(tr("Odkaz nejde otevřít", "Can't open the link"), &e))?,
+                LinkTarget::Web(u) => c.app.opener().open_url(u, None::<&str>).map_err(|e| crate::errors::any(tr("Odkaz nejde otevřít", "Can't open the link"), &e))?,
                 LinkTarget::App(_) => return Err(tr("Widget nesmí spouštět programy — jen otevřít složku nebo dokument.", "A widget may not launch programs — only open a folder or a document.").into()),
                 LinkTarget::Invalid(why) => return Err(format!("{path}: {why}")),
             }

@@ -35,7 +35,7 @@ pub type Mcp = Arc<dyn Fn(&crate::mcp::HttpReq) -> crate::mcp::HttpResp + Send +
 
 /// Spustí server. `extra` obslouží /status rozšířený o stav Ledge, `ctl` příkazy `/ctl/…`, `mcp` cestu `/mcp`.
 pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sync>, ctl: Ctl, mcp: Mcp) -> Result<(), String> {
-    let server = tiny_http::Server::http(("127.0.0.1", port)).map_err(|e| format!("Port {port}: {e}"))?;
+    let server = tiny_http::Server::http(("127.0.0.1", port)).map_err(|e| crate::errors::any(&trf!("Port {port}", "Port {port}"), &e))?;
     std::thread::Builder::new()
         .name("claude-bridge".into())
         .spawn(move || {
@@ -115,7 +115,7 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
                 });
             }
         })
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::io(crate::i18n::tr("Most pro Claude nejde spustit", "Can't start the Claude bridge"), &e))?;
     Ok(())
 }
 

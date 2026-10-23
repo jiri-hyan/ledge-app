@@ -9,6 +9,7 @@ import { createContext, createSignal, useContext } from "solid-js";
 import { createStore, reconcile, unwrap } from "solid-js/store";
 import { setLang } from "../i18n";
 import type { FieldError, Snapshot } from "../types";
+import { debounce } from "../util/time";
 import { getPath, pathKeys } from "./model";
 
 const [cfg, setCfgRaw] = createStore<any>({});
@@ -21,7 +22,7 @@ const [active, setActive] = createSignal("zaciname");
 /** rozpracovaná verze se liší od uložené (počítá shell po každé změně, s debounce) */
 const [dirty, setDirty] = createSignal(false);
 const [undoMsg, setUndoMsg] = createSignal<{ text: string; restore: () => void } | null>(null);
-let undoTimer: number | undefined;
+const hideUndo = debounce(() => setUndoMsg(null), 8000);
 
 export { cfg, base, rev, dirty, setDirty, fieldError, setFieldError, hit, setHit, active, setActive, undoMsg };
 
@@ -86,13 +87,12 @@ export async function runAfterSave(): Promise<unknown[]> {
 
 /** Lišta „Vrátit“ (smazání, obnova výchozích…) na 8 s. */
 export function offerUndo(text: string, restore: () => void) {
-  clearTimeout(undoTimer);
   setUndoMsg({ text, restore });
-  undoTimer = window.setTimeout(() => setUndoMsg(null), 8000);
+  hideUndo();
 }
 export function runUndo() {
   const u = undoMsg();
-  clearTimeout(undoTimer);
+  hideUndo.cancel();
   setUndoMsg(null);
   u?.restore();
 }

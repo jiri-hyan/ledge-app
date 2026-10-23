@@ -66,7 +66,7 @@ export default function LookEditor(p: { auto: AutoIcon; editing: boolean }) {
         <TileIcon look={look()} auto={p.auto} size="44px" />
         <div class="tl-ed-title">
           <b>{look().hideLabel ? tg().name : tileLabel(tg().name, look())}</b>
-          <small>{t("cards.tile.editTitle", "Vzhled dlaždice — změny vidíš hned")}</small>
+          <small>{t("cards.tile.editTitle", "Vzhled zástupce — změny vidíš hned")}</small>
         </div>
       </div>
 

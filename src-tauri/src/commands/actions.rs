@@ -21,10 +21,10 @@ pub(crate) fn run_action(id: String, target: String, confirmed: Option<String>) 
     if actions::needs_confirm(&a, consented) && confirmed.as_deref() != Some(actions::confirm_text(&a).as_str()) {
         return Err(trf!("{}: akce se mezitím změnila nebo nebyla potvrzena — zkus to znovu.", "{}: the action changed meanwhile or wasn't confirmed — try again.", a.label));
     }
-    let launch = actionrun::resolve(&a, actionrun::check_fs(&a)).map_err(|e| format!("{}: {e}", a.label))?;
+    let launch = actionrun::resolve(&a, actionrun::check_fs(&a)).map_err(|e| crate::errors::prefixed(&a.label, &e))?;
     let opener = c.app.opener();
     let opened = |r: Result<(), tauri_plugin_opener::Error>| {
-        r.map(|_| Outcome { message: trf!("{} — otevřeno", "{} — opened", a.label), output: None, hide: true }).map_err(|e| format!("{}: {e}", a.label))
+        r.map(|_| Outcome { message: trf!("{} — otevřeno", "{} — opened", a.label), output: None, hide: true }).map_err(|e| crate::errors::any(&a.label, &e))
     };
     let res = match launch {
         Launch::Url(u) => opened(opener.open_url(u, None::<&str>)),

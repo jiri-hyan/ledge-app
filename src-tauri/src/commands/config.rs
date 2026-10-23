@@ -27,5 +27,5 @@ pub(crate) fn open_config_file() -> Result<(), String> {
         .creation_flags(0x0800_0000)
         .spawn()
         .map(|_| ())
-        .map_err(|e| e.to_string())
+        .map_err(|e| crate::errors::spawn(crate::i18n::tr("Nastavení nejde otevřít", "Can't open the settings"), &e))
 }

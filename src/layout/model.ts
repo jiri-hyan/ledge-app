@@ -12,7 +12,7 @@ import { normalizeCardLook, type CardLook } from "./look.ts";
 import { normalizeFolders, type TileFolder } from "./folders.ts";
 
 
-export const CARD_IDS = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail"] as const;
+export const CARD_IDS = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today"] as const;
 export type BuiltinCardId = (typeof CARD_IDS)[number];
 /** Dynamická karta: widget ze skriptu (`widget:<soubor>`). */
 export type DynCardId = `widget:${string}`;
@@ -79,12 +79,12 @@ const PARTS_ONLY: readonly CardId[] = ["media"];
 export type Text = readonly [string, string];
 /** Název, jednořádkový popis a výchozí velikost karty (katalog, Nastavení, potvrzení „… odebrána“). */
 export const CARD_INFO: Record<BuiltinCardId, { name: Text; desc: Text; size: CardSize }> = {
-  projects: { name: ["cards.layout.card.projects", "Projekty"], desc: ["cards.layout.desc.projects", "Dlaždice projektů — spustit, zastavit, otevřít"], size: "xl" },
+  projects: { name: ["cards.layout.card.projects", "Projekty"], desc: ["cards.layout.desc.projects", "Zástupci projektů — spustit, zastavit, otevřít"], size: "xl" },
   running: { name: ["cards.layout.card.running", "Běží"], desc: ["cards.layout.desc.running", "Servery spuštěné z Ledge; bez nich se neukáže"], size: "xl" },
   claude: { name: ["cards.layout.card.claude", "Claude"], desc: ["cards.layout.desc.claude", "Session, subagenti, schvalování, limity a útrata"], size: "m" },
   repos: { name: ["cards.layout.card.repos", "Repa"], desc: ["cards.layout.desc.repos", "Neuložená a nepushnutá práce, repa pozadu"], size: "m" },
   notes: { name: ["cards.layout.card.notes", "Poznámky"], desc: ["cards.layout.desc.notes", "Poslední poznámky a připomínky na dnes"], size: "xl" },
-  actions: { name: ["cards.layout.card.actions", "Rychlé akce"], desc: ["cards.layout.desc.actions", "Weby, složky, aplikace a příkazy na jedno kliknutí"], size: "xl" },
+  actions: { name: ["cards.layout.card.actions", "Odkazy a akce"], desc: ["cards.layout.desc.actions", "Weby, složky, aplikace a příkazy na jedno kliknutí"], size: "xl" },
   shelf: { name: ["cards.layout.card.shelf", "Přihrádka"], desc: ["cards.layout.desc.shelf", "Soubory přetažené na proužek; prázdná se neukáže"], size: "xl" },
   clock: { name: ["cards.layout.card.clock", "Čas"], desc: ["cards.layout.desc.clock", "Velké hodiny s týdnem, na notebooku i baterie"], size: "s" },
   timer: { name: ["cards.layout.card.timer", "Časovač"], desc: ["cards.layout.desc.timer", "Odpočet a stopky"], size: "s" },
@@ -96,10 +96,12 @@ export const CARD_INFO: Record<BuiltinCardId, { name: Text; desc: Text; size: Ca
   system: { name: ["cards.layout.card.system", "Systém"], desc: ["cards.layout.desc.system", "CPU, paměť, disky a síť s malými grafy; měří jen když je vidět"], size: "m" },
   // výchozí nepřidaná (Rust `layout::OPT_IN`) — potřebuje přihlášený účet Microsoft
   mail: { name: ["cards.layout.card.mail", "Pošta"], desc: ["cards.layout.desc.mail", "Nepřečtené a nejnovější předměty z Outlooku (účet Microsoft)"], size: "m" },
+  // jen z katalogu (výchozí rozložení ji nemá); bez dat se nekreslí (`Facts.today`)
+  today: { name: ["cards.layout.card.today", "Dnes"], desc: ["cards.layout.desc.today", "Další schůzka, připomínky na dnes, PR k revizi a reset limitu Claude — jen to, co dnes něco znamená"], size: "m" },
 };
 export const PART_INFO: Record<PartKey, Text> = {
   claudeLimits: ["cards.layout.part.claudeLimits", "Limity 5h / týden"],
-  claudeCosts: ["cards.layout.part.claudeCosts", "Útrata (odhad)"],
+  claudeCosts: ["cards.layout.part.claudeCosts", "Hodnota v cenách API"],
   claudeGit: ["cards.layout.part.claudeGit", "Git panel"],
   claudeSubagents: ["cards.layout.part.claudeSubagents", "Subagenti"],
   nowPlaying: ["cards.layout.part.nowPlaying", "Skladba"],
@@ -119,16 +121,14 @@ const isTileSize = (x: unknown): x is TileSize => typeof x === "string" && (TILE
 export const defaultSize = (id: CardId): CardSize => (isBuiltin(id) ? CARD_INFO[id].size : "m");
 const card = (id: CardId, size: CardSize = defaultSize(id)): LayoutCard => ({ id, size });
 
-/** Výchozí rozložení = dnešní Práce + Osobní (zrcadlo `layout::from_legacy(Null)`; test hlídá tvar). */
+/** Výchozí rozložení NOVÉHO configu = čistý začátek (zrcadlo `layout::clean_default`; oba testy čtou
+ *  `src-tauri/src/fixtures/layout-default.json`): Práce = Projekty + Poznámky (Claude a Repa přidá průvodce
+ *  podle detekce), Osobní = Čas, Právě hraje, Poznámky, Odkazy. Karty bez zdroje jsou jen v katalogu. */
 export function defaultLayout(): Layout {
   return {
     pages: [
-      { id: WORK, name: "", cards: [card("projects"), card("actions"), card("shelf"), card("running"), card("claude"), card("repos"), card("notes")] },
-      {
-        id: PERSONAL,
-        name: "",
-        cards: [card("projects"), card("clock"), card("timer"), card("weather"), card("calendar"), card("media"), card("links"), card("actions"), card("shelf"), card("notes")],
-      },
+      { id: WORK, name: "", cards: [card("projects", "xl"), card("notes", "xl")] },
+      { id: PERSONAL, name: "", cards: [card("clock", "m"), card("media", "m"), card("notes", "m"), card("links", "m")] },
     ],
     hiddenParts: [],
     upgrades: [UP_PERSONAL_PROJECTS],
@@ -469,6 +469,8 @@ export type Facts = {
   shelf: boolean;
   /** karta Právě hraje má co ukázat (skladbu nebo hlasitost) */
   media: boolean;
+  /** karta Dnes má aspoň jeden řádek (`cards/today.ts` `todayRows`) */
+  today: boolean;
 };
 
 /** Karty záložky, které teď něco ukážou, v pořadí záložky. Prázdné akce zvou k přidání mimo Práci. */
@@ -484,6 +486,8 @@ export function shownCards(p: LayoutPage, f: Facts): LayoutCard[] {
         return f.shelf;
       case "media":
         return f.media;
+      case "today":
+        return f.today;
       case "notes":
         return f.notesEnabled;
       default:

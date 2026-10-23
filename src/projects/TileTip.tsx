@@ -4,11 +4,11 @@
 import { onCleanup, onMount, Show } from "solid-js";
 import type { ProcView, ProjectView } from "../api";
 import { t } from "../i18n";
-import { tipState, whatOf, whereOf } from "./model";
+import { healthText, tipState, whatOf, whereOf, type TileHealth } from "./model";
 import { tipLeave } from "./state";
 import "./projpanel.css";
 
-export default function TileTip(p: { pr: ProjectView; proc: ProcView | undefined }) {
+export default function TileTip(p: { pr: ProjectView; proc: ProcView | undefined; health?: TileHealth | null }) {
   const st = () => tipState(p.pr, p.proc);
   // dlaždici může nový snapshot překreslit (pointerleave starého prvku pak nepřijde) — náhled zmizí, jakmile
   // kurzor není nad dlaždicí tohohle projektu; posluchač jen po dobu náhledu
@@ -26,6 +26,7 @@ export default function TileTip(p: { pr: ProjectView; proc: ProcView | undefined
       </div>
       <div class="pz-tip-row"><span>{p.pr.kind === "dev" ? t("cards.proj.edit.what", "Spustí") : t("cards.proj.edit.app", "Otevře")}</span><code>{whatOf(p.pr) ?? "—"}</code></div>
       <div class="pz-tip-row"><span>{t("cards.proj.edit.where", "Ze složky")}</span><code>{whereOf(p.pr, p.proc)}</code></div>
+      <Show when={p.health}>{(h) => <div class="pz-tip-health">{healthText(h())}</div>}</Show>
       <Show when={st().detail}>{(d) => <div class="pz-tip-err">{d()}</div>}</Show>
       <div class="pz-tip-hint">{t("cards.proj.tip.menu", "Pravý klik nebo ⋯ = všechny volby")}</div>
     </div>

@@ -11,7 +11,7 @@ import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 
 async function pickStyle(id: string, name: string, cfgError: string | null) {
-  if (cfgError) return say(t("palette.style.cfgError", "Config má chybu — styl změníš v Nastavení."), true);
+  if (cfgError) return say(t("palette.style.cfgError", "Nastavení obsahuje chybu — styl změníš v Nastavení."), true);
   try {
     const cfg = await api.getConfig();
     if (!cfg) return;

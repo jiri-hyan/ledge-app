@@ -23,6 +23,7 @@ import TimerCard from "./timer/TimerCard";
 import WeatherCard from "./cards/WeatherCard";
 import CalendarCard from "./calendar/CalendarCard";
 import MailCard from "./accounts/MailCard";
+import TodayCard, { useTodayRows } from "./cards/TodayCard";
 import LinksCard from "./cards/LinksCard";
 import MediaCard, { PersonalLive } from "./media/MediaCard";
 import ActionsCard from "./cards/ActionsCard";
@@ -34,7 +35,7 @@ import CardMenu, { HiddenNotice } from "./cards/CardMenu";
 import TileOptions from "./cards/TileOptions";
 import Tour from "./layout/Tour";
 import HoldTip from "./layout/HoldTip";
-import CardLookPanel, { closeCardLook, lookFor } from "./layout/CardLook";
+import { closeCardLook, lookFor, target as cardLookTarget } from "./layout/lookState";
 import { viewOf } from "./layout/look";
 import TileMenu from "./tilelook/TileMenu";
 import { closeLook } from "./tilelook/state";
@@ -43,7 +44,7 @@ import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
 import { isLink, visibleGroups } from "./actions/model";
 import { lastResult } from "./actions/api";
 import Deck from "./layout/Deck";
-import Catalog from "./layout/Catalog";
+import { CardLookPanel, Catalog } from "./lazyViews";
 import EditBar from "./layout/EditBar";
 import { beginEdit, catalogOpen, draft, editing, editPage, saveLayout, setCatalogOpen } from "./layout/edit";
 import { LIMIT_CARDS, limitOf, normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type CardSize, type PartKey } from "./layout/model";
@@ -62,6 +63,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const kind = () => pageKind(page().id);
   const on = (k: Parameters<typeof sectionOn>[1]) => sectionOn(p.s.sections, k);
   const facts = () => ({
+    today: todayRows().length > 0,
     procs: p.s.procs.length,
     notesEnabled: p.s.notesEnabled,
     // odkazy (akce, které jen otevírají) ukazuje na záložce s kartou Odkazy jen ona
@@ -106,13 +108,15 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   ];
   const inbox = () => p.s.pending.length + p.s.questions.length > 0;
   const has = (id: CardId) => pageHas(page(), id);
+  // karta Dnes se nekreslí bez řádků (schůzka, připomínky, PR, limit) — počítá se jen na záložce, kde je
+  const todayRows = useTodayRows(() => p.s, () => p.now, () => has("today"));
   // názvy umístěných widgetů pro katalog a „karta odebrána“
   createEffect(() => rememberWidgets(p.s.widgets));
 
   const card = (id: CardId): JSX.Element => {
     switch (id) {
       case "projects":
-        return <Projects s={p.s} page={page().id} view={view("projects")} onNote={p.onNote} onSettings={p.onSettings} tiles={tiles()} menu={menu("projects")} onShowAll={() => void saveLayout((l) => setTiles(l, page().id, { hidden: [] }), p.s.cfgError)} />;
+        return <Projects s={p.s} page={page().id} view={view("projects")} onNote={p.onNote} nav={p.nav} onSettings={p.onSettings} tiles={tiles()} menu={menu("projects")} onShowAll={() => void saveLayout((l) => setTiles(l, page().id, { hidden: [] }), p.s.cfgError)} />;
       case "running":
         return <Running s={p.s} now={p.now} menu={menu("running")} page={page().id} limit={limitOf(cardOf("running"))} />;
       case "claude":
@@ -136,6 +140,8 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         return <CalendarCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("calendar")} />;
       case "links":
         return <LinksCard s={p.s} mode={page().id} onSettings={p.onSettings} menu={menu("links")} />;
+      case "today":
+        return <TodayCard s={p.s} now={p.now} nav={p.nav} menu={menu("today")} />;
       case "mail":
         return <MailCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("mail")} />;
       case "media":
@@ -160,7 +166,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       {/* kontextové návrhy (max 3 chipy) — jen z reálných událostí, `src/suggest/` */}
       <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
       <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} begin={() => edit()} />
-      <CardLookPanel page={page().id} s={p.s} />
+      <Show when={cardLookTarget()?.page === page().id}><CardLookPanel page={page().id} s={p.s} /></Show>
       <TileMenu />
       <Show when={editing() && catalogOpen()}><Catalog layout={layout()} /></Show>
       <Show when={!editing() && page().cards.length === 0}>

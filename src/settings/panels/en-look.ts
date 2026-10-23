@@ -100,7 +100,7 @@ registerDict("en", {
   "palette.style.item": "Style: {name}",
   "palette.style.current": "current",
   "palette.style.done": "Style {name} applied.",
-  "palette.style.cfgError": "The config has an error — change the style in Settings.",
+  "palette.style.cfgError": "The settings contain an error — change the style in Settings.",
   // vzhled záložek a vlastní motivy (kolo 13)
   "appearance.pages.title": "Tab looks",
   "appearance.pages.hint": "Every tab can have its own style, theme and accent — it applies as soon as you switch to it. The strip, width and animations stay shared.",

@@ -240,7 +240,7 @@ pub(crate) fn write_atomic(path: &Path, data: &[u8]) -> Result<(), String> {
     use std::io::Write;
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(0);
-    let err = |e: std::io::Error| trf!("Zápis {}: {e}", "Writing {}: {e}", path.display());
+    let err = |e: std::io::Error| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e);
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(format!(".{}-{}.tmp", std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed)));
     let tmp = PathBuf::from(tmp);

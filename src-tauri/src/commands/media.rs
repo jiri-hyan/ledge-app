@@ -56,5 +56,5 @@ pub(crate) fn media_favorite_open(index: usize, uri: String) -> Result<(), Strin
     if mediaconf::source_of(&fav.uri).is_none() {
         return Err(crate::i18n::tr("Tenhle odkaz Ledge neotevře.", "Ledge won't open this link.").into());
     }
-    c.app.opener().open_url(fav.uri, None::<&str>).map_err(|e| e.to_string())
+    c.app.opener().open_url(fav.uri, None::<&str>).map_err(|e| crate::errors::any(crate::i18n::tr("Odkaz nejde otevřít", "Can't open the link"), &e))
 }

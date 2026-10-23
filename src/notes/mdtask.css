@@ -1,0 +1,7 @@
+/* Úkoly v náhledu poznámky (`.md`, HTML z Rust `md::to_html`) — rozložení společné pro šuplík (`notes.css`) i okno
+   lístku (`pin/pin.css`, bez styles.css): odsazení a barvy si každé okno nastaví proměnnými --md-* v `.md`.
+   Načítá ho `notes/Markdown.tsx`. */
+.md li[data-task] { list-style: none; margin-left: calc(-1 * var(--md-task-in, 20px)); display: flex; flex-wrap: wrap; gap: 0 var(--md-task-gap, 8px); align-items: flex-start; }
+.md li[data-task] > ul, .md li[data-task] > ol { flex-basis: 100%; padding-left: var(--md-task-nest, 43px); }
+.md-check { width: 15px; height: 15px; margin-top: 3px; border-radius: 4px; border: 1.5px solid var(--md-check-line); flex-shrink: 0; position: relative; cursor: pointer; transition: background var(--dur-1), border-color var(--dur-1); }
+.md-check.on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--md-check-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }

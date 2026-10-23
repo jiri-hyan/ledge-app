@@ -41,7 +41,7 @@ async function open(url: string) {
 /** Jedním klikem zapnout GitHub (uloží jen `github.enabled`); s chybou v configu neukládá — přepsal by se. */
 async function enable(cfgError: string | null) {
   if (cfgError) {
-    say(t("cards.github.cfgError", "Config má chybu — GitHub teď zapneš jen v Nastavení."), true);
+    say(t("cards.github.cfgError", "Nastavení obsahuje chybu — GitHub teď zapneš jen v Nastavení."), true);
     return;
   }
   try {

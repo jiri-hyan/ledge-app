@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/suggest/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLIP_FRESH_MS, DEV_FRESH_MS, DISMISS_MS, GH_FRESH_MS, MAX_CHIPS, clipUrl, devUrl, dismiss, hostOf, isDismissed, isKnown, knownLinks, normUrl, pick, sameSuggestions } from "./model.ts";
+import { CLIP_FRESH_MS, DEV_FRESH_MS, DISMISS_MS, GH_FRESH_MS, MAX_CHIPS, MEET_LEAD_MS, MEET_NOTE_MS, clipUrl, currentMeetings, meetingNoteText, trackMeetings, devUrl, dismiss, hostOf, isDismissed, isKnown, knownLinks, normUrl, pick, sameSuggestions } from "./model.ts";
 
 const NOW = 1_800_000_000_000;
 const ON = { clipboard: true, devServer: true, github: true, reminders: true, githubPulse: true };
@@ -10,6 +10,8 @@ const pr = (n, repo = "a/b") => ({ repo, number: n, title: `PR ${n}`, url: `http
 const base = () => ({
   on: { ...ON },
   reminders: [],
+  notes: true,
+  meetings: [],
   github: { review: [], failing: [], fetchedMs: NOW - 1000 },
   procs: [],
   projects: [{ id: "web", name: "Web" }],
@@ -199,4 +201,73 @@ test("shoda chipů: tik času je nepřekreslí, změna obsahu ano", () => {
   assert.ok(!sameSuggestions(a, pick(input, dismiss(new Map(), a[0].key, NOW), NOW)), "zavřený chip");
   assert.ok(!sameSuggestions(a, []), "jiný počet");
   assert.ok(sameSuggestions([], []));
+});
+
+const MIN = 60_000;
+const meet = (title, start, end, over = {}) => ({ title, start, end, join: { url: "https://teams.microsoft.com/l/meetup-join/x", provider: "teams" }, ...over });
+
+test("schůzka: Připojit 10 min předem do konce, poznámka do 15 min po konci", () => {
+  const m = meet("Standup", NOW + 30 * MIN, NOW + 60 * MIN);
+  const at = (now, input = {}) => pick({ ...base(), meetings: [m], ...input }, new Map(), now);
+  const start = NOW + 30 * MIN;
+  const end = NOW + 60 * MIN;
+  const cases = [
+    ["dlouho předem", start - MEET_LEAD_MS - 1, []],
+    ["10 min předem", start - MEET_LEAD_MS, ["meeting"]],
+    ["těsně před začátkem", start - 1, ["meeting"]],
+    ["probíhá", start + 5 * MIN, ["meeting"]],
+    ["poslední milisekunda", end - 1, ["meeting"]],
+    ["právě skončila", end, ["meetingNote"]],
+    ["14 min po konci", end + 14 * MIN, ["meetingNote"]],
+    ["přesně 15 min po konci", end + MEET_NOTE_MS, ["meetingNote"]],
+    ["po 15 min nic", end + MEET_NOTE_MS + 1, []],
+  ];
+  for (const [name, now, want] of cases) assert.deepEqual(kinds(at(now)), want, name);
+  const j = at(start)[0];
+  assert.deepEqual([j.title, j.url, j.provider, j.start], ["Standup", m.join.url, "teams", start]);
+  assert.equal(at(end)[0].start, start, "poznámka zná začátek (titulek)");
+});
+
+test("schůzka: vypnuté připomínky, vypnuté poznámky, zavření a pořadí", () => {
+  const m = meet("Review", NOW, NOW + 30 * MIN);
+  const input = { ...base(), meetings: [m] };
+  assert.deepEqual(kinds(pick({ ...input, on: { ...ON, reminders: false } }, new Map(), NOW)), []);
+  assert.deepEqual(kinds(pick({ ...input, notes: false }, new Map(), NOW + 31 * MIN)), [], "bez poznámek žádný chip ze schůzky");
+  const [c] = pick(input, new Map(), NOW);
+  assert.deepEqual(kinds(pick(input, dismiss(new Map(), c.key, NOW), NOW + 1)), [], "zavřená");
+  const [n] = pick(input, new Map(), NOW + 31 * MIN);
+  assert.notEqual(n.key, c.key, "poznámka má vlastní klíč (zavření Připojit ji nezavře)");
+  assert.deepEqual(kinds(pick(input, dismiss(new Map(), c.key, NOW), NOW + 31 * MIN)), ["meetingNote"]);
+  // pořadí: připomínka · schůzka · CI
+  const all = pick({ ...input, reminders: [{ path: "p", title: "t", remindMs: 1 }], github: { review: [], failing: [pr(2)], fetchedMs: NOW } }, new Map(), NOW);
+  assert.deepEqual(kinds(all), ["reminder", "meeting", "ghCi"]);
+  // víc schůzek najednou: nejdřívější + zbytek v `more`
+  const two = pick({ ...base(), meetings: [meet("B", NOW + 2 * MIN, NOW + 40 * MIN), meet("A", NOW, NOW + 20 * MIN)] }, new Map(), NOW);
+  assert.deepEqual([two[0].title, two[0].more], ["A", 1]);
+});
+
+test("paměť schůzek: pamatuje do 15 min po konci a pak zapomene; skončená z kalendáře nezmizí", () => {
+  const m = meet("Call", NOW + 10 * MIN, NOW + 40 * MIN);
+  let mem = trackMeetings(new Map(), [m], NOW);
+  assert.equal(mem.size, 1);
+  mem = trackMeetings(mem, [], NOW + 41 * MIN); // kalendář ji už nevrací
+  assert.equal(mem.size, 1);
+  assert.deepEqual(kinds(pick({ ...base(), meetings: [...mem.values()] }, new Map(), NOW + 41 * MIN)), ["meetingNote"]);
+  assert.equal(trackMeetings(mem, [], NOW + 40 * MIN + MEET_NOTE_MS + 1).size, 0);
+  assert.equal(trackMeetings(mem, [m], NOW + 41 * MIN).size, 1, "stejná schůzka se nezdvojí");
+});
+
+test("dnešní schůzky z kalendáře: jen s odkazem, bez celodenních a bez jiných dnů", () => {
+  const it = (title, over = {}) => ({ title, start: 1, end: 2, allDay: false, join: { url: "https://meet.google.com/abc-defg-hij", provider: "meet" }, ...over });
+  const cal = { days: [{ kind: "today", items: [it("A"), it("bez", { join: null }), it("celý den", { allDay: true }), it("starý", { join: undefined })] }, { kind: "tomorrow", items: [it("Zítra")] }] };
+  assert.deepEqual(currentMeetings(cal).map((x) => x.title), ["A"]);
+  assert.deepEqual(currentMeetings(undefined), []);
+  assert.deepEqual(currentMeetings({ days: [{ kind: "tomorrow", items: [it("Zítra")] }] }), []);
+});
+
+test("poznámka ze schůzky: první řádek „{název} — {datum}“", () => {
+  const start = new Date(2026, 9, 5, 14, 30).getTime();
+  assert.equal(meetingNoteText({ title: "Standup", start }), "Standup — 5. 10. 2026\n\n");
+  assert.equal(meetingNoteText({ title: "  ", start }), "— — 5. 10. 2026\n\n");
+  assert.equal(meetingNoteText({ title: "Plán Q4", start: new Date(2026, 0, 31, 23, 59).getTime() }).split("\n")[0], "Plán Q4 — 31. 1. 2026");
 });

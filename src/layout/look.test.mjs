@@ -9,7 +9,8 @@ import { readFileSync } from "node:fs";
 import {
   accentCss, BGS, CARD_ACCENTS, cardLookAttrs, customizedCards, DENSITIES, normalizeCardLook, patchCardLook, resetCardLooks, setCardLook, VIEW_CARDS, VIEWS, viewOf,
 } from "./look.ts";
-import { clone, defaultLayout, normalizeLayout, pageOf, sameLayout } from "./model.ts";
+import { clone, normalizeLayout, pageOf, sameLayout } from "./model.ts";
+import { fullLayout } from "./fullLayout.mjs";
 
 test("karta bez vzhledu = žádné atributy ani proměnné", () => {
   for (const raw of [undefined, null, {}, { bg: "style" }, { accent: "pink" }, { view: "list" }, { hideHead: false }]) {
@@ -45,7 +46,7 @@ test("varianty zobrazení: Projekty, Repa, Poznámky, Akce; výchozí = dnešní
 test("patch a změna v rozložení; Obnovit podle stylu; přehled a Obnovit vše", () => {
   assert.deepEqual(patchCardLook(undefined, "notes", { bg: "solid", density: "style" }), { bg: "solid" });
   assert.equal(patchCardLook({ bg: "solid" }, "notes", { bg: "style" }), undefined);
-  const d = defaultLayout();
+  const d = fullLayout();
   const l = setCardLook(setCardLook(d, "prace", "claude", { accent: "red" }), "osobni", "clock", { bg: "clear" });
   assert.deepEqual(pageOf(l, "prace").cards.find((c) => c.id === "claude").look, { accent: "red" });
   assert.equal(pageOf(d, "prace").cards.find((c) => c.id === "claude").look, undefined, "vstup netknutý");

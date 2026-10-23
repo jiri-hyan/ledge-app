@@ -242,7 +242,7 @@ pub fn create(root: &Path, note: &NewNote, now: &DateTime<FixedOffset>) -> Resul
     if !inside(root, &dir) {
         return Err(tr("Neplatný projekt.", "Invalid project.").into());
     }
-    std::fs::create_dir_all(&dir).map_err(|e| trf!("Složka {}: {e}", "Folder {}: {e}", dir.display()))?;
+    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", dir.display()), &e))?;
 
     let base = unique_base(&dir, &format!("{}-{}", now.format("%Y-%m-%d-%H%M%S"), slug(text)));
 
@@ -325,7 +325,7 @@ pub fn set_done(root: &Path, path: &Path, done: bool) -> Result<(), String> {
     let real = check_note_path(root, path)?;
     let lock = path_lock(&real);
     let _g = lock.lock();
-    let bytes = std::fs::read(&real).map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(&real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))?;
     write_atomic(&real, with_done(&String::from_utf8_lossy(&bytes), done).as_bytes())
 }
 

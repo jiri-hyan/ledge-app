@@ -201,7 +201,7 @@ export default function LayoutEditor() {
       <Section
         id="layout.looks"
         title={t("settings.f.layout.looks", "Upravené karty a zástupci")}
-        desc={t("settings.looks.desc", "Karty a dlaždice s vlastním vzhledem. Měníš ho v šuplíku: ⋯ na kartě → Vzhled karty…, pravý klik na dlaždici → Upravit vzhled… (v režimu úprav stačí klik).")}
+        desc={t("settings.looks.desc", "Karty a zástupci s vlastním vzhledem. Měníš ho v šuplíku: ⋯ na kartě → Vzhled karty…, pravý klik na zástupce → Upravit vzhled… (v režimu úprav stačí klik).")}
       >
         <LooksOverview />
       </Section>

@@ -1,7 +1,7 @@
 // Překlady UI: `t(klíč, čeština, proměnné)`. Čeština je zdroj pravdy přímo v kódu (čitelné bez
 // slovníku), angličtina přijde jako slovník `en` podle klíčů. Proměnné `{jmeno}` v textu.
 // Slovníky: `src/i18n/en-*.ts`, `src/settings/en.ts` + `panels/en.ts`, `src/onboarding/en.ts`; načítá je
-// `src/i18n/load.ts` (první import v App).
+// `src/i18n/dicts.ts`, načítané líně (`i18n/load.ts` registruje loader, první import v App; `pin/main.tsx` vlastní).
 // Množná čísla: `tp(klíč, n, čeština)` — en klíče `klíč.one` / `klíč.other`. Hlídá `src/i18n.test.mjs`.
 import { createSignal } from "solid-js";
 
@@ -9,7 +9,36 @@ export type Lang = "cs" | "en";
 
 const [lang, setLangSignal] = createSignal<Lang>("cs");
 export { lang };
-export const setLang = (l: Lang) => setLangSignal(l);
+
+/** Loader anglických slovníků (dynamický import); bez něj (testy, kde se slovníky importují napřímo) je `setLang` synchronní. */
+let loader: (() => Promise<unknown>) | null = null;
+let loading: Promise<void> | null = null;
+let loaded = false;
+export const setDictLoader = (fn: (() => Promise<unknown>) | null) => {
+  loader = fn;
+  loading = null;
+  loaded = false;
+};
+/** Počká na slovník jazyka (cs = nic, jinak jednou stáhne chunk se slovníky). */
+export function loadDict(l: Lang): Promise<void> {
+  if (l === "cs" || !loader || loaded) return Promise.resolve();
+  return (loading ??= loader().then(
+    () => void (loaded = true),
+    (e) => {
+      loading = null; // další pokus smí zkusit znovu
+      throw e;
+    },
+  ));
+}
+
+let wanted: Lang = "cs";
+/** Přepne jazyk; jiný než čeština nejdřív počká na slovník (jinak by se krátce ukázala čeština), poslední volání vyhrává. */
+export function setLang(l: Lang) {
+  wanted = l;
+  if (l === "cs" || !loader || loaded) return setLangSignal(l);
+  const apply = () => void (wanted === l && setLangSignal(l)); // při chybě načtení platí aspoň čeština z kódu
+  void loadDict(l).then(apply, apply);
+}
 
 /** Locale pro `toLocaleString` a spol. */
 export const localeOf = (l: Lang) => (l === "en" ? "en-US" : "cs-CZ");

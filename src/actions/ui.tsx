@@ -7,6 +7,7 @@ import type { ActionView } from "../types";
 import { actionIconSrc, lastResult, setLastResult } from "./api";
 import { t } from "../i18n";
 import { useTone } from "../ui/iconTone";
+import { Confirm } from "../ui/Confirm";
 import TileIcon from "../tilelook/TileIcon";
 import { isPlain } from "../tilelook/model";
 import { lookOf } from "../tilelook/state";
@@ -52,15 +53,19 @@ export function ConfirmAction(p: { where: string }) {
   return (
     <Show when={pending()?.where === p.where ? pending() : null}>
       {(x) => (
-        <div class="act-confirm" role="alertdialog" aria-label={t("actions.confirm.aria", "Potvrzení akce")}>
-          <div class="grow">
-            <div class="name">{t("actions.confirm.title", "Spustit „{label}“?", { label: x().a.label })}</div>
-            <div class="code" title={x().a.confirmText}>{x().a.confirmText}</div>
-            <Show when={x().a.confirmNote}>{(n) => <div class="act-confirm-note">{n()}</div>}</Show>
-          </div>
-          <button class="mini" onClick={() => answerConfirm(false)}>{t("actions.confirm.cancel", "Zrušit")}</button>
-          <button class="mini ok" onClick={() => answerConfirm(true)}>{t("actions.confirm.run", "Spustit")}</button>
-        </div>
+        <Confirm
+          when
+          text={t("actions.confirm.title", "Spustit „{label}“?", { label: x().a.label })}
+          detail={
+            <span class="act-confirm-detail">
+              <span class="code" title={x().a.confirmText}>{x().a.confirmText}</span>
+              <Show when={x().a.confirmNote}>{(n) => <span class="act-confirm-note">{n()}</span>}</Show>
+            </span>
+          }
+          yes={t("actions.confirm.run", "Spustit")}
+          onYes={() => answerConfirm(true)}
+          onNo={() => answerConfirm(false)}
+        />
       )}
     </Show>
   );

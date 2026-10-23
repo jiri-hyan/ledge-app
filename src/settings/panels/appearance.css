@@ -5,7 +5,7 @@
 /* přepínač v kartě se smí zalomit (nikdy nepřeteče kartu); víc než 4 volby = galerie, ne přepínač */
 .ap .seg { flex-wrap: wrap; max-width: 100%; }
 .ap .ap-top { grid-column: 1 / -1; gap: var(--s3); }
-.ap .ap-lang, .ap .ap-wide { grid-column: 1 / -1; }
+.ap .ap-wide { grid-column: 1 / -1; }
 .ap-bar { display: flex; gap: var(--s2); align-items: center; justify-content: flex-end; }
 .ap-state { margin-right: auto; font-size: var(--fs-md); color: var(--t3); }
 .ap-state.warn { color: var(--amber); }
@@ -67,7 +67,7 @@
   background: radial-gradient(80px 40px at 8% 0%, color-mix(in srgb, var(--accent) calc(var(--glow-1) * var(--m-glow, 1)), transparent), transparent 70%), var(--tint-solid);
   box-shadow: var(--m-shell-ring, 0 0 0 0 transparent), inset 0 -1px 0 var(--shell-edge); }
 .ap-mini[data-layout="float"] .ap-mdrawer { margin: 5px 0 6px; border-radius: calc(10px * var(--rr)); }
-.ap-mt { font: 600 calc(10px * var(--fz)) var(--display); line-height: 1; }
+.ap-mt { font: 600 var(--fs-2xs) var(--display); line-height: 1; }
 .ap-mgrid { --mc: 3; display: grid; grid-template-columns: repeat(var(--mc), minmax(0, 1fr)); gap: 3px; }
 .ap-mcard { display: flex; flex-direction: column; gap: 2px; min-height: 18px; padding: 3px; border-radius: calc(4px * var(--rr));
   background: var(--m-card-bg, var(--card)); border: var(--m-card-bd, 1px solid var(--line)); box-shadow: var(--m-card-sh, none); }

@@ -266,12 +266,12 @@ pub fn image_dir() -> PathBuf {
 /// SVG beze změny (≤ 512 KB). Čte disk a COM — volat mimo UI vlákno.
 pub fn import_image(dir: &Path, src: &Path) -> Result<String, String> {
     let bad = || tr("Tenhle soubor nejde použít jako obrázek (png, jpg, ico, webp, bmp, gif nebo svg).", "This file can't be used as an image (png, jpg, ico, webp, bmp, gif or svg).").to_string();
-    let meta = std::fs::metadata(src).map_err(|e| trf!("Soubor nejde přečíst: {e}", "Can't read the file: {e}"))?;
+    let meta = std::fs::metadata(src).map_err(|e| crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e))?;
     let svg = src.extension().is_some_and(|e| e.eq_ignore_ascii_case("svg"));
     if !meta.is_file() || meta.len() > if svg { MAX_SVG } else { MAX_IMAGE } {
         return Err(tr("Obrázek je moc velký (fotka nejvýš 12 MB, SVG 512 KB).", "The image is too large (photo at most 12 MB, SVG 512 KB).").into());
     }
-    let bytes = std::fs::read(src).map_err(|e| trf!("Soubor nejde přečíst: {e}", "Can't read the file: {e}"))?;
+    let bytes = std::fs::read(src).map_err(|e| crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e))?;
     let (ext, out) = if svg {
         let text = std::str::from_utf8(&bytes).map_err(|_| bad())?;
         if !text.contains("<svg") {
@@ -282,10 +282,10 @@ pub fn import_image(dir: &Path, src: &Path) -> Result<String, String> {
         ("png", crate::iconimg::to_png(&bytes).ok_or_else(bad)?)
     };
     let key = format!("{:016x}", crate::icons::fnv1a(&out));
-    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(tr("Obrázek nejde uložit", "Can't save the image"), &e))?;
     let path = dir.join(format!("{key}.{ext}"));
     if !path.exists() {
-        std::fs::write(&path, &out).map_err(|e| e.to_string())?;
+        std::fs::write(&path, &out).map_err(|e| crate::errors::io(tr("Obrázek nejde uložit", "Can't save the image"), &e))?;
     }
     Ok(key)
 }

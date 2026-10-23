@@ -77,6 +77,7 @@ const FIELD_PANELS: [string, string][] = [
   ["gameMode", "chovani"],
   ["modes", "osobni"],
   ["personal", "osobni"],
+  ["accounts", "osobni"],
   ["timer", "osobni"],
   ["media", "osobni"],
   ["clipboard", "osobni"],
@@ -88,7 +89,7 @@ const FIELD_PANELS: [string, string][] = [
   ["update", "aplikace"],
   ["appearance", "vzhled"],
   ["onboarding", "zaciname"],
-  ["ui", "vzhled"],
+  ["ui", "zaciname"],
 ];
 
 /** Kam vede skok odjinud (`palette/goto.ts` `gotoSettingsPanel`): id panelu (i staré id před vlnou 6 přes

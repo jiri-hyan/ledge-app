@@ -77,7 +77,7 @@ pub(crate) fn shelf_copy(paths: Vec<String>, format: Format) -> Result<usize, St
 pub(crate) fn shelf_open(path: String) -> Result<(), String> {
     let p = existing(&path)?;
     let c = core();
-    c.app.opener().open_path(&p, None::<&str>).map_err(|e| format!("{p}: {e}"))?;
+    c.app.opener().open_path(&p, None::<&str>).map_err(|e| crate::errors::any(&p, &e))?;
     c.send_ui(UiCmd::Hide);
     Ok(())
 }
@@ -87,7 +87,7 @@ pub(crate) fn shelf_open(path: String) -> Result<(), String> {
 pub(crate) fn shelf_reveal(path: String) -> Result<(), String> {
     let p = existing(&path)?;
     let c = core();
-    c.app.opener().reveal_item_in_dir(&p).map_err(|e| format!("{p}: {e}"))?;
+    c.app.opener().reveal_item_in_dir(&p).map_err(|e| crate::errors::any(&p, &e))?;
     c.send_ui(UiCmd::Hide);
     Ok(())
 }

@@ -9,6 +9,7 @@ import { fromMs } from "./remind";
 import { DEFAULT_KIND } from "./kinds";
 import { planOther, planSame, trimBody } from "./editdraft";
 import { samePath } from "../pin/model";
+import { debounce } from "../util/time";
 import { t } from "../i18n";
 
 // ---------- nová poznámka ----------
@@ -19,7 +20,6 @@ export const [projTouched, setProjTouched] = createSignal(false);
 export const [draftRemind, setDraftRemind] = createSignal("");
 export const [draftKind, setDraftKind] = createSignal(DEFAULT_KIND);
 
-let draftTimer: number | undefined;
 export const draftMeta = () => ({ text: draft(), project: draftProj(), projectTouched: projTouched(), remind: draftRemind(), kind: draftKind() === DEFAULT_KIND ? "" : draftKind() });
 export const b64Of = (urls: string[]) => urls.map((u) => u.slice(u.indexOf(",") + 1));
 
@@ -30,27 +30,17 @@ function persistDraft() {
   (empty ? api.noteDraftClear() : api.noteDraftSave(m)).catch(() => {});
 }
 
-export function scheduleDraft() {
-  clearTimeout(draftTimer);
-  draftTimer = window.setTimeout(() => {
-    draftTimer = undefined;
-    persistDraft();
-  }, 500);
-}
+const draftSave = debounce(persistDraft, 500);
+export const scheduleDraft = () => draftSave();
 
 /** Zapsat hned, pokud čeká debounce (zavření stránky do 500 ms od psaní). */
 export function flushDraft() {
-  if (draftTimer !== undefined) {
-    clearTimeout(draftTimer);
-    draftTimer = undefined;
-    persistDraft();
-  }
+  draftSave.flush();
   flushEdit();
 }
 
 export function resetDraft() {
-  clearTimeout(draftTimer);
-  draftTimer = undefined;
+  draftSave.cancel();
   setDraft("");
   setDraftImgs([]);
   setDraftProj("");
@@ -130,29 +120,17 @@ function diskEdit(): EditDraft | null {
   return s ? { path: s.base.path, hash: s.hash, text: s.text, project: s.project, kind: s.kind, remind: s.remind } : null;
 }
 
-let editTimer: number | undefined;
 function persistEdit() {
   const d = diskEdit();
   if (!edBase() && !d) return;
   api.noteEditDraftSave(d).catch(() => {});
 }
-export function scheduleEdit() {
-  clearTimeout(editTimer);
-  editTimer = window.setTimeout(() => {
-    editTimer = undefined;
-    persistEdit();
-  }, 500);
-}
-function flushEdit() {
-  if (editTimer === undefined) return;
-  clearTimeout(editTimer);
-  editTimer = undefined;
-  persistEdit();
-}
+const editSave = debounce(persistEdit, 500);
+export const scheduleEdit = () => editSave();
+const flushEdit = () => editSave.flush();
 
 export function resetEdit() {
-  clearTimeout(editTimer);
-  editTimer = undefined;
+  editSave.cancel();
   setEdStale(false);
   setEdBase(null);
   setOrig(null);

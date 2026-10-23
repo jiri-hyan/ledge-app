@@ -100,3 +100,17 @@ input.proj-fname { width: 170px; padding: 3px 8px; font-size: var(--fs-ui); font
 .projects[data-view="compact"] .proj { padding: 6px 2px; gap: 0; }
 .projects[data-view="compact"] .nm, .projects[data-view="compact"] .br { display: none; }
 .projects[data-view="compact"] .logo { font-size: calc(12px * var(--fz)); }
+
+/* zdraví projektu na zástupci: malé tečky v rohu (neuložené změny, nepushnuté commity, Claude tu pracuje) */
+.proj-hl { position: absolute; top: 7px; right: 8px; display: flex; gap: 3px; pointer-events: none; }
+.proj-hl i { width: 6px; height: 6px; border-radius: 50%; background: var(--t3); }
+.proj-hl .proj-hl-c { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent); }
+.proj-hl .proj-hl-d { background: var(--amber); }
+.proj-hl .proj-hl-a { background: var(--blue); }
+/* git řádek pod názvem už dirty a ahead píše */
+.proj-hl[data-br] .proj-hl-g { display: none; }
+/* malé dlaždice a kompaktní vzhled: jediná tečka podle důležitosti */
+.projects[data-tiles="small"] .proj-hl i, .projects[data-view="compact"] .proj-hl i { display: none; }
+.projects[data-tiles="small"] .proj-hl::after, .projects[data-view="compact"] .proj-hl::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+.projects[data-tiles="small"] .proj-hl[data-tone="claude"]::after, .projects[data-view="compact"] .proj-hl[data-tone="claude"]::after { background: var(--accent); }
+.projects[data-tiles="small"] .proj-hl[data-tone="dirty"]::after, .projects[data-view="compact"] .proj-hl[data-tone="dirty"]::after { background: var(--amber); }

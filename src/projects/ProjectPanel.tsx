@@ -8,11 +8,13 @@ import { createEffect, createResource, createSignal, For, onCleanup, onMount, Sh
 import { api, type ProcView, type ProjectView, type Snapshot } from "../api";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
-import { commitText, failInfo, freshest, isLive, placeOf, placeProblem, preselect, samePath, whatOf, whereOf } from "./model";
+import { commitText, failInfo, freshest, isLive, notesHidden, placeOf, placeProblem, preselect, projectNotesQuery, samePath, whatOf, whereOf } from "./model";
+import type { NotesNav } from "../nav";
+import { setPageProject, type NotePreset } from "../notes/store";
 import { changeFolder, closeProjectPanel, launch, openProjectPanel, projectPanel, restartProject, saveProjectFields, stopProject, wantKeys } from "./state";
 import "./projpanel.css";
 
-export default function ProjectPanel(p: { s: Snapshot; pr: ProjectView; onSettings: () => void }) {
+export default function ProjectPanel(p: { s: Snapshot; pr: ProjectView; onSettings: () => void; nav?: NotesNav; onNote?: (preset: NotePreset) => void }) {
   let box!: HTMLDivElement;
   const proc = () => p.s.procs.find((x) => x.id === p.pr.id);
   const mode = () => projectPanel()?.mode ?? "edit";
@@ -20,7 +22,7 @@ export default function ProjectPanel(p: { s: Snapshot; pr: ProjectView; onSettin
   onMount(() => {
     const down = (e: PointerEvent) => {
       const el = e.target as HTMLElement | null;
-      if (!el || box.contains(el) || el.closest("[data-tl-tile], .tl-menu")) return;
+      if (!el || box.contains(el) || el.closest("[data-tl-tile], .pop")) return;
       closeProjectPanel();
     };
     const key = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), closeProjectPanel());
@@ -39,14 +41,14 @@ export default function ProjectPanel(p: { s: Snapshot; pr: ProjectView; onSettin
         <span class="grow" />
         <button class="mini" aria-label={t("cards.proj.panel.close", "Zavřít")} title={t("cards.proj.panel.close", "Zavřít")} onClick={closeProjectPanel}>×</button>
       </div>
-      <Show when={mode() === "choose"} fallback={<Edit s={p.s} pr={p.pr} proc={proc()} onSettings={p.onSettings} />}>
+      <Show when={mode() === "choose"} fallback={<Edit s={p.s} pr={p.pr} proc={proc()} onSettings={p.onSettings} nav={p.nav} onNote={p.onNote} />}>
         <Choose pr={p.pr} now={Date.now()} />
       </Show>
     </div>
   );
 }
 
-function Edit(p: { s: Snapshot; pr: ProjectView; proc: ProcView | undefined; onSettings: () => void }) {
+function Edit(p: { s: Snapshot; pr: ProjectView; proc: ProcView | undefined; onSettings: () => void; nav?: NotesNav; onNote?: (preset: NotePreset) => void }) {
   let input: HTMLInputElement | undefined;
   const [run, setRun] = createSignal(p.pr.run ?? "");
   // jiný projekt / uložená změna zvenku → pole podle configu (rozepsané se nepřepíše)
@@ -81,7 +83,7 @@ function Edit(p: { s: Snapshot; pr: ProjectView; proc: ProcView | undefined; onS
             spellcheck={false}
             value={run()}
             placeholder={t("cards.proj.edit.runPh", "např. npm run dev")}
-            aria-label={t("cards.proj.edit.runAria", "Příkaz, který dlaždice spustí")}
+            aria-label={t("cards.proj.edit.runAria", "Příkaz, který zástupce spustí")}
             onFocus={wantKeys}
             onInput={(e) => setRun(e.currentTarget.value)}
             onKeyDown={(e) => {
@@ -125,6 +127,9 @@ function Edit(p: { s: Snapshot; pr: ProjectView; proc: ProcView | undefined; onS
       <Show when={failInfo(p.proc)} fallback={<Show when={p.proc}>{(pc) => <LogView id={pc().id} open={projectPanel()?.focus === "log"} />}</Show>}>
         <FailBox s={p.s} pr={p.pr} proc={p.proc!} inPanel />
       </Show>
+      <Show when={p.s.notesEnabled && p.nav && p.onNote}>
+        <ProjectNotes pr={p.pr} nav={p.nav!} onNote={p.onNote!} />
+      </Show>
       <div class="pz-row pz-btns pz-foot">
         <Show when={live()} fallback={
           <button class="mini ok" disabled={!!problem() && placeOf(p.pr).kind !== "choose"} onClick={() => (placeOf(p.pr).kind === "choose" ? openProjectPanel(p.pr.id, "choose") : void launch(p.pr))}>▶ {t("cards.proj.run", "Spustit")}</button>
@@ -137,6 +142,34 @@ function Edit(p: { s: Snapshot; pr: ProjectView; proc: ProcView | undefined; onS
         <button class="mini" onClick={() => { closeProjectPanel(); p.onSettings(); gotoSettingsPanel("f-projects.add"); }}>{t("cards.proj.edit.settings", "Vše v Nastavení")}</button>
       </div>
     </>
+  );
+}
+
+/** Až 3 otevřené poznámky projektu (jedno `note_query` při otevření panelu) a „Nová poznámka k projektu“. */
+function ProjectNotes(p: { pr: ProjectView; nav: NotesNav; onNote: (preset: NotePreset) => void }) {
+  const [data] = createResource(() => p.pr.id, (id) => api.noteQuery(projectNotesQuery(id)));
+  const list = () => data()?.notes ?? [];
+  const more = () => notesHidden(data()?.total, list().length);
+  return (
+    <div class="pz-notes">
+      <div class="pz-row">
+        <span class="pz-cap">{t("cards.proj.notes.title", "Poznámky")}</span>
+        <Show when={list().length === 0 && !data.loading}><span class="pz-note">{t("cards.proj.notes.none", "Žádná otevřená poznámka.")}</span></Show>
+      </div>
+      <For each={list()}>
+        {(n) => (
+          <button class="pz-nrow" title={n.title} onClick={() => { closeProjectPanel(); p.nav.onOpen(n); }}>
+            <span class="pz-ntitle">{n.title || t("cards.suggest.imageOnly", "(jen obrázek)")}</span>
+            <Show when={n.remind}><span class="pz-nbell" aria-hidden="true">⏰</span></Show>
+          </button>
+        )}
+      </For>
+      <div class="pz-row pz-btns">
+        <span class="pz-cap" />
+        <button class="mini" onClick={() => { closeProjectPanel(); p.onNote({ project: p.pr.id, remind: false }); }}>{t("cards.proj.notes.new", "Nová poznámka k projektu")}</button>
+        <Show when={more() > 0}><button class="mini" onClick={() => { closeProjectPanel(); p.nav.onAll(); setPageProject(p.pr.id); }}>{t("cards.proj.notes.more", "+{n} dalších", { n: more() })}</button></Show>
+      </div>
+    </div>
   );
 }
 

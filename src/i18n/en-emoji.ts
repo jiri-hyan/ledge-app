@@ -1,6 +1,6 @@
 // Angličtina jmen emoji palety (podle Unicode CLDR) — klíče z tabulky `src/palette/emojidata.ts`.
 // Načítá se **líně** spolu s tabulkou (import v `emojidata.ts`, samostatný chunk při prvním `:` dotazu),
-// proto není v `i18n/load.ts` (`src/i18n.test.mjs` → LAZY_DICTS). Import s příponou `.ts` — kvůli node testům.
+// proto není v `i18n/dicts.ts` (`src/i18n.test.mjs` → LAZY_DICTS). Import s příponou `.ts` — kvůli node testům.
 import { registerDict } from "../i18n.ts";
 
 registerDict("en", {

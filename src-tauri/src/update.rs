@@ -266,15 +266,15 @@ fn gh(args: &[&str], timeout: Duration) -> Result<String, String> {
         Ok(o) if o.success => Ok(o.stdout),
         Ok(o) => Err(gh_error(&o.stderr)),
         Err(RunError::Timeout) => Err(trf!("gh neodpověděl do {} s (offline?)", "gh didn't answer within {} s (offline?)", timeout.as_secs())),
-        Err(RunError::Spawn(e)) => Err(trf!("gh nejde spustit: {e}", "can't run gh: {e}")),
+        Err(RunError::Spawn(e)) => Err(crate::errors::spawn_text(crate::i18n::tr("GitHub CLI (gh) nejde spustit", "Can't run GitHub CLI (gh)"), &e)),
     }
 }
 
 fn sha256_file(path: &Path) -> Result<String, String> {
     use sha2::{Digest, Sha256};
-    let mut f = std::fs::File::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut f = std::fs::File::open(path).map_err(|e| crate::errors::io(&path.display().to_string(), &e))?;
     let mut h = Sha256::new();
-    std::io::copy(&mut f, &mut h).map_err(|e| format!("{}: {e}", path.display()))?;
+    std::io::copy(&mut f, &mut h).map_err(|e| crate::errors::io(&path.display().to_string(), &e))?;
     Ok(format!("{:x}", h.finalize()))
 }
 
@@ -290,7 +290,7 @@ fn fetch_release(repo: &str) -> Result<String, String> {
 
 fn download_and_verify(rel: &Release, repo: &str) -> Result<PathBuf, String> {
     let dir = std::env::temp_dir().join("ledge-update").join(&rel.tag);
-    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))?;
     let file = dir.join(&rel.asset);
     let _ = std::fs::remove_file(&file);
     let url = rel.download_url.as_deref().filter(|u| updatenet::download_ok(u, repo, &rel.tag, &rel.asset));
@@ -341,7 +341,10 @@ fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
     if crate::pkgctx::current().is_some() {
         let dir = setup.parent().unwrap_or(Path::new(""));
         return crate::outside::run_task(crate::outside::TASK_UPDATE, setup, OUTSIDE_ARGS, dir, crate::outside::After::Keep)
-            .map_err(|e| trf!("Instalátor nejde spustit mimo balíček ({e}). Spusť ho ručně z Průzkumníka: {}", "Can't run the installer outside the package ({e}). Run it yourself from Explorer: {}", setup.display()));
+            .map_err(|e| {
+                let why = crate::errors::any(crate::i18n::tr("Instalátor nejde spustit mimo balíček", "Can't run the installer outside the package"), &e);
+                trf!("{why} Spusť ho ručně z Průzkumníka: {}", "{why} Run it yourself from Explorer: {}", setup.display())
+            });
     }
     let line = installer_command(setup, exe)?;
     let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
@@ -357,7 +360,7 @@ fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
             .spawn()
     };
     let base = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP;
-    spawn(base | CREATE_BREAKAWAY_FROM_JOB).or_else(|_| spawn(base)).map(|_| ()).map_err(|e| trf!("Instalátor nejde spustit: {e}", "Can't run the installer: {e}"))
+    spawn(base | CREATE_BREAKAWAY_FROM_JOB).or_else(|_| spawn(base)).map(|_| ()).map_err(|e| crate::errors::spawn(crate::i18n::tr("Instalátor nejde spustit", "Can't run the installer"), &e))
 }
 
 // ---------- stav a vlákno ----------

@@ -1,0 +1,8 @@
+/* Karta Dnes (TodayCard.tsx). Jen tokeny ze styles.css; řádky využívají `.row`, `.name`, `.sub`, `.pill`. */
+.td-row { padding: 6px 0; }
+.td-click { width: 100%; text-align: left; border-radius: var(--r-sm); color: inherit; }
+.td-click:hover .name { color: var(--t0); }
+.td-time { font: var(--fs-xs) var(--mono); color: var(--t2); min-width: 3.2em; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.td-now { color: var(--green); }
+.td-late { color: var(--amber); }
+.td-more { padding: 2px 0 0 calc(3.2em + 10px); }

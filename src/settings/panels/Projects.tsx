@@ -7,7 +7,7 @@ import { t } from "../../i18n";
 import { logoSrc } from "../../logos";
 import { say, sayError } from "../../ui/toast";
 import { base, fieldError, offerUndo, useSettings } from "../ctx";
-import { Confirm } from "../fields/Confirm";
+import { Confirm } from "../../ui/Confirm";
 import { Toggle } from "../fields/controls";
 import { PanelHead, Row, Section } from "../fields/Row";
 import { fieldLabel } from "../labels";
@@ -174,7 +174,7 @@ export default function ProjectsPanel(p: PanelProps) {
 
   return (
     <>
-      <PanelHead id="projects.add" title={t("settings.nav.akce", "Projekty, akce a odkazy")} desc={t("settings.proj.desc", "Všechno, co se otevírá jedním klikem: projekty (dev server nebo aplikace), rychlé akce a odkazy na weby, složky a soubory.")}>
+      <PanelHead id="projects.add" title={t("settings.nav.akce", "Projekty, odkazy a akce")} desc={t("settings.proj.desc", "Všechno, co se otevírá jedním klikem: projekty (dev server nebo aplikace), rychlé akce a odkazy na weby, složky a soubory.")}>
         <button class="mini" disabled={busy()} onClick={() => setCands(!cands())} aria-expanded={cands()}>{t("settings.proj.fromRepos", "Z naklonovaných rep")}</button>
         <button class="mini ok" disabled={busy()} onClick={fromFolder}>+ {t("settings.proj.fromFolder", "Přidat projekt ze složky…")}</button>
       </PanelHead>

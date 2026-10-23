@@ -1,0 +1,8 @@
+/* Potvrzení nevratné akce (ui/Confirm.tsx): inline panel v místě akce. */
+.ui-confirm { display: flex; align-items: center; gap: var(--s3); margin: 6px 0; padding: 10px 12px; background: var(--pop); border: 1px solid var(--line-2); border-radius: var(--r-lg); animation: drop var(--dur-2) var(--ease); }
+.ui-confirm.danger { border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.ui-confirm-text { flex: 1; min-width: 0; }
+.ui-confirm small { display: block; margin-top: 2px; color: var(--t2); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.ui-confirm-btns { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
+@media (prefers-contrast: more) { .ui-confirm { border-color: color-mix(in srgb, var(--t1) 60%, transparent); } }
+@media (forced-colors: active) { .ui-confirm { border: 1px solid CanvasText; } }

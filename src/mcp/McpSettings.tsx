@@ -4,7 +4,8 @@
 // výměna klíče s potvrzením. Klíč se nikdy neukazuje sám od sebe.
 import { createSignal, onMount, Show } from "solid-js";
 import { t } from "../i18n";
-import { Confirm } from "../settings/fields/Confirm";
+import { Confirm } from "../ui/Confirm";
+import { Advanced } from "../settings/fields/Advanced";
 import { Row, Section } from "../settings/fields/Row";
 import { useSettings } from "../settings/ctx";
 import { fieldLabel } from "../settings/labels";
@@ -60,9 +61,9 @@ export function McpSettings() {
   return (
     <Section
       title={t("settings.mcp.title", "Claude (MCP)")}
-      desc={t("settings.mcp.desc", "Claude Code nebo Claude Desktop může Ledge nastavit za tebe: přidá aplikace, weby a rychlé akce, které používáš, upraví záložky, karty a vzhled. Smí jen číst a měnit nastavení Ledge — nic nespouští a nic neposílá ven (jen tento počítač). Každou změnu vrátíš.")}
+      desc={t("settings.mcp.desc", "Claude Code nebo Claude Desktop může Ledge nastavit za tebe: přidá aplikace, weby, odkazy a akce, které používáš, upraví záložky, karty a vzhled. Smí jen číst a měnit nastavení Ledge — nic nespouští a nic neposílá ven (jen tento počítač). Každou změnu vrátíš.")}
     >
-      <Row id="mcp.enabled">
+      <Row id="mcp.enabled" live>
         <button
           class="st-switch"
           classList={{ on: !!st()?.enabled }}
@@ -85,6 +86,7 @@ export function McpSettings() {
                 <button class="mini ok" onClick={() => void copy(s().cliCommand)}>{t("settings.mcp.copy", "Kopírovat")}</button>
               </div>
             </Row>
+            <Advanced id="claude.mcp" inline hint={t("settings.mcp.adv.hint", "Claude Desktop, záloha přes http, výměna klíče")}>
             <Row id="mcp.desktop" label={t("settings.mcp.desktop", "Připojit Claude Desktop")} hint={t("settings.mcp.desktop.hint", "Úryvek do claude_desktop_config.json (sekce mcpServers), pak Claude Desktop restartuj.")}>
               <button class="mini" onClick={() => void copy(s().desktopConfig)}>{t("settings.mcp.copy", "Kopírovat")}</button>
             </Row>
@@ -104,7 +106,7 @@ export function McpSettings() {
               <Confirm
                 when={ask()}
                 text={t("settings.mcp.rotate.ask", "Vyměnit klíč MCP?")}
-                detail={t("settings.mcp.rotate.detail", "Starý klíč přestane platit hned. Připojení přes příkaz (stdio) si nový vezme samo po restartu klienta; http zálohu musíš přidat znovu.")}
+                detail={t("settings.mcp.rotate.detail", "Starý klíč přestane platit hned. Připojení přes příkaz si nový klíč vezme samo po restartu klienta; zálohu přes http musíš přidat znovu.")}
                 yes={t("settings.mcp.rotate.yes", "Vyměnit")}
                 onYes={() => {
                   setAsk(false);
@@ -114,6 +116,7 @@ export function McpSettings() {
                 onNo={() => setAsk(false)}
               />
             </Row>
+            </Advanced>
           </>
         )}
       </Show>

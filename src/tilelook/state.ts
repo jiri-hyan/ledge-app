@@ -25,7 +25,7 @@ export const lookOf = (kind: LookKind, id: string, saved: TileLook | undefined):
 /** Otevřít panel „Upravit vzhled…“ (jen výslovný klik). Jiný otevřený se nejdřív uloží. */
 export function openLook(tg: Omit<LookTarget, "initial"> & { initial: TileLook | undefined }, cfgError: string | null) {
   if (cfgError) {
-    say(t("cards.tile.cfgError", "Config má chybu — vzhled teď změníš jen v Nastavení."), true);
+    say(t("cards.tile.cfgError", "Nastavení obsahuje chybu — vzhled teď změníš jen v Nastavení."), true);
     return;
   }
   const cur = target();
@@ -86,7 +86,7 @@ export function lookImageSrc(key: string): string | undefined {
 /** Výběr obrázku (systémový dialog) → klíč v cache; zrušení = null. */
 export async function pickLookImage(): Promise<string | null> {
   try {
-    const path = await api.pickPath("image", t("cards.tile.pickImage", "Obrázek pro dlaždici"));
+    const path = await api.pickPath("image", t("cards.tile.pickImage", "Obrázek pro zástupce"));
     if (!path) return null;
     return (await api.lookImageAdd(path)) ?? null;
   } catch (e) {

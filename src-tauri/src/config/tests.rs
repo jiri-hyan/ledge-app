@@ -135,15 +135,19 @@ fn sections_defaults_all_on() {
     let d = serde_json::to_value(Sections::default()).unwrap();
     let obj = d.as_object().unwrap();
     assert_eq!(obj.len(), Sections::FIELDS.len());
-    assert!(obj.iter().all(|(k, v)| v == &serde_json::Value::Bool(!crate::layout::OPT_IN.contains(&k.as_str()))), "{d}");
+    // výchozí = podle čistého výchozího rozložení: jen karty, které v něm jsou
+    let on: Vec<&str> = obj.iter().filter(|(_, v)| **v == serde_json::Value::Bool(true)).map(|(k, _)| k.as_str()).collect();
+    assert_eq!(on, ["battery", "clock", "favorites", "links", "notes", "nowPlaying", "projects", "sound"], "{d}");
+    assert_eq!(Sections::default(), crate::layout::derived_sections(&crate::layout::LayoutConfig::default(), &Sections::default()));
     // (JSON drawer.sections, pole → očekávaná hodnota)
     let cases: &[(&str, &[(&str, bool)])] = &[
-        // starý config jen se 4 poli: nová pole zapnutá
-        (r#"{"projects":true,"running":false,"claude":true,"notes":true}"#, &[("running", false), ("repos", true), ("weather", true), ("claudeCosts", true)]),
-        // úplně prázdné a chybějící sekce = vše zapnuté
-        ("{}", &[("projects", true), ("shelf", true), ("claudeSubagents", true)]),
+        // jen 4 pole: uvedená platí, ostatní podle výchozího rozložení (starý config s `layout` / bez něj
+        // se stejně odvozuje z rozložení při načtení — `layout::derive`)
+        (r#"{"projects":true,"running":false,"claude":true,"notes":true}"#, &[("running", false), ("claude", true), ("repos", false), ("weather", false), ("claudeCosts", false), ("clock", true)]),
+        // úplně prázdné a chybějící sekce = výchozí rozložení
+        ("{}", &[("projects", true), ("shelf", false), ("claudeSubagents", false), ("links", true)]),
         // nová pole se čtou camelCase
-        (r#"{"repos":false,"claudeLimits":false,"claudeGit":false}"#, &[("repos", false), ("claudeLimits", false), ("claudeGit", false), ("claude", true)]),
+        (r#"{"repos":true,"claudeLimits":true,"claudeGit":false}"#, &[("repos", true), ("claudeLimits", true), ("claudeGit", false), ("claude", false)]),
         // neznámý klíč (pole přidané novější verzí) neshodí načtení
         (r#"{"nowPlaying":false,"clock":false}"#, &[("clock", false), ("links", true)]),
     ];

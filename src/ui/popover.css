@@ -2,3 +2,38 @@
    vyšší než okno. Vzhled dodá obsah (panel Vzhled…, Upravit…, náhled dlaždice). */
 .ui-pop { position: fixed; z-index: 58; width: min(440px, calc(100vw - 16px)); overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
 .ui-pop-passive { z-index: 59; width: max-content; max-width: min(340px, calc(100vw - 16px)); pointer-events: none; }
+
+/* ---------- Menu (Popover.tsx `PopMenu`): jedna rodina `.pop-*` pro všechna menu ----------
+   Pozice z `placePopup` (pevná, překlopí se u okraje), obsah se posouvá uvnitř. `.pop-fill` = panel uvnitř okna
+   (lístek na ploše, `--pop-top` = výška jeho lišty); okno lístku si tokeny níž definuje v `pin.css`. */
+.pop { position: fixed; z-index: 60; color: var(--t1); text-shadow: none; display: flex; flex-direction: column; min-width: 160px; padding: var(--s1); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: var(--shadow-toast); overflow-y: auto; overscroll-behavior: contain; animation: drop var(--dur-2) var(--ease); }
+.pop-fill { position: absolute; inset: var(--pop-top, 0) 0 0 0; z-index: 5; min-width: 0; border: 0; border-radius: 0; box-shadow: none; animation: none; }
+.pop-item { display: flex; align-items: center; gap: var(--s2); text-align: left; font-size: var(--fs-sm); color: var(--t1); padding: 6px 10px; border-radius: var(--r-sm); white-space: nowrap; }
+.pop-item:hover:not(:disabled), .pop-item:focus-visible { background: var(--card-2); }
+.pop-item:disabled { opacity: 0.45; }
+.pop-item svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--t3); }
+.pop-on { background: var(--card-2); color: var(--t0); font-weight: 600; }
+.pop-more { margin-top: 2px; color: var(--t3); justify-content: center; }
+.pop-undo { margin-top: 2px; color: var(--accent); justify-content: center; }
+.pop-danger, .pop-danger svg { color: var(--red); }
+.pop-check { position: relative; padding-left: 26px; }
+.pop-check::before { content: ""; position: absolute; left: 9px; top: 50%; width: 10px; height: 10px; margin-top: -6px; border: 1px solid var(--line-2); border-radius: 3px; }
+.pop-checked::before { content: "✓"; display: grid; place-items: center; font-size: var(--fs-2xs); line-height: 1; font-weight: 700; color: var(--accent); border-color: var(--accent); }
+.pop-sep { height: 1px; margin: 4px 2px; background: var(--line); }
+.pop-cap { font-size: var(--fs-xs); font-weight: 600; color: var(--t3); padding: 4px 6px 0; }
+.pop-scroll { display: flex; flex-direction: column; max-height: 168px; overflow-y: auto; overscroll-behavior: contain; }
+.pop-choice { display: flex; flex-direction: column; gap: 3px; padding: 4px 6px 6px; }
+.pop-choice > .pop-cap { padding: 0; }
+.pop-seg { display: flex; gap: 2px; padding: 2px; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.pop-seg button { flex: 1; text-align: center; padding: 3px 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--t2); border-radius: calc(var(--r-sm) - 2px); white-space: nowrap; }
+.pop-seg button.pop-on { background: var(--card-3); color: var(--t1); box-shadow: inset 0 0 0 1px var(--line-2); }
+
+@media (prefers-contrast: more) {
+  .pop, .ui-pop, .pop-seg { border-color: color-mix(in srgb, var(--t1) 60%, transparent); }
+}
+@media (forced-colors: active) {
+  .pop, .ui-pop, .pop-seg { border: 1px solid CanvasText; }
+  .pop-on, .pop-seg button.pop-on, .pop-item:hover:not(:disabled), .pop-item:focus-visible { background: Highlight; color: HighlightText; }
+  .pop-checked::before { border-color: CanvasText; color: CanvasText; }
+  .pop-item:disabled { color: GrayText; }
+}

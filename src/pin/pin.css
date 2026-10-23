@@ -1,6 +1,7 @@
 /* Okno lístku na plochu (`pin.html`): průhledné okno, karta s vlastní lištou. Barvy z průhledností
    (`model.ts` `pinColors` → `--pin-bg`, `--pin-bar`, `--pin-fg`, `--pin-shadow`). Vlastní styly —
    lístek nenačítá styly šuplíku. */
+@import "../ui/toast.css";
 :root {
   color-scheme: dark;
   --pin-accent: #7ab8ff;
@@ -8,6 +9,44 @@
   --pin-line: rgba(255, 255, 255, 0.14);
   --pin-well: rgba(255, 255, 255, 0.08);
   font: 13px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* tokeny společného menu (`.pop-*`) v podobě lístku */
+  --raised: rgba(20, 22, 28, 0.97);
+  --line: var(--pin-line);
+  --line-2: rgba(255, 255, 255, 0.3);
+  --well: var(--pin-well);
+  --card-2: var(--pin-well);
+  --card-3: rgba(255, 255, 255, 0.16);
+  --t0: #fff;
+  --t1: #f4f5f8;
+  --t2: rgba(244, 245, 248, 0.8);
+  --t3: rgba(244, 245, 248, 0.6);
+  --red: #ff8a8a;
+  --accent: var(--pin-green);
+  --r-sm: 6px;
+  --r-md: 8px;
+  --s1: 4px;
+  --s2: 8px;
+  --fs-xs: 11px;
+  --fs-2xs: 10px;
+  --fs-sm: 13px;
+  --shadow-toast: none;
+  --pop-top: 28px;
+  /* hláška (`ui/toast.css`) uvnitř lístku: nad patičkou, přes šířku okna */
+  --toast-pos: absolute;
+  --toast-l: 6px;
+  --toast-r: 6px;
+  --toast-b: 38px;
+  --toast-tf: none;
+  --toast-bg: rgba(20, 22, 28, 0.95);
+  --toast-fg: #f4f5f8;
+  --toast-bd: 0;
+  --toast-pad: 5px 8px;
+  --toast-rad: 6px;
+  --toast-fs: 12px;
+  --toast-max: none;
+  --toast-z: 6;
+  --toast-err-bg: rgba(120, 30, 30, 0.95);
+  --toast-err-fg: #f4f5f8;
 }
 * { box-sizing: border-box; margin: 0; }
 html, body, #root { height: 100%; background: transparent; overflow: hidden; }
@@ -105,9 +144,13 @@ button, input, textarea { font: inherit; color: inherit; }
 /* po Splnit / Archivovat / Smazat: lišta „Zpět“ přes spodek lístku, obsah se nedá ovládat */
 .pin-undo { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 6px 10px; border: 1px solid var(--pin-line); border-radius: 8px; background: rgba(16, 18, 24, 0.97); text-shadow: none; }
 .pin.after .pin-body, .pin.after .pin-foot { pointer-events: none; opacity: 0.45; }
-.pin-sep { height: 1px; margin: 4px 0; background: var(--pin-line); }
-.pin-menu button.danger { color: #ff8a8a; }
 /* stav automatického uložení (Rozepsáno… / Ukládám… / Uloženo) */
+.pin-sug { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; padding: 0 8px 6px; }
+.pin-sug-go { height: 24px; padding: 0 10px; border-radius: 12px; font-size: 12px; color: inherit; background: rgba(255, 255, 255, 0.08); border: 1px dashed rgba(255, 255, 255, 0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pin-sug-go:hover { background: rgba(255, 255, 255, 0.16); }
+.pin-sug-x { width: 22px; height: 22px; flex-shrink: 0; border-radius: 4px; display: grid; place-items: center; opacity: 0.65; }
+.pin-sug-x:hover { opacity: 1; background: rgba(255, 255, 255, 0.12); }
+.pin-sug-x svg { width: 12px; height: 12px; }
 .pin-save { margin-left: auto; align-self: center; font-size: 11px; opacity: 0.65; white-space: nowrap; }
 .pin-save.ok { opacity: 0.9; color: var(--pin-accent); }
 
@@ -124,36 +167,8 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 .pin-gone { margin-top: 0; }
 
-/* ⋯ volby a nápověda: přes tělo lístku, u malého lístku se posouvá */
-.pin-menu {
-  position: absolute;
-  inset: 28px 0 0 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px;
-  background: rgba(20, 22, 28, 0.97);
-  color: #f4f5f8;
-  text-shadow: none;
-  z-index: 5;
-}
-.pin-menu > button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 26px;
-  padding: 3px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-.pin-menu > button:hover { background: var(--pin-well); }
-.pin-menu .box { flex: 0 0 14px; height: 14px; border-radius: 4px; border: 1.5px solid rgba(255, 255, 255, 0.4); }
-.pin-menu [role="menuitem"] { padding-left: 30px; }
-.pin-menu button.on .box { background: var(--pin-green); border-color: transparent; }
+/* ⋯ volby a nápověda: panel přes tělo lístku. Menu je společné (`ui/popover.css` `.pop-*`, importuje ho
+   `ui/Popover.tsx`); lístek nenačítá styly šuplíku, tak mu tokeny menu dá tady (viz :root). */
 .pin-range { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px; }
 .pin-range span { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.85; }
 .pin-range input { width: 100%; accent-color: var(--pin-accent); }
@@ -186,7 +201,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .pin.collapsed .pin-through { bottom: 6px; right: 70px; }
 
 /* Markdown (HTML z Rustu `md::to_html`) — jako v šuplíku, tokeny lístku */
-.md { overflow-wrap: anywhere; user-select: text; }
+.md { --md-task-in: 18px; --md-task-gap: 7px; --md-task-nest: 40px; --md-check-line: rgba(255, 255, 255, 0.55); --md-check-ink: #0b1220; overflow-wrap: anywhere; user-select: text; }
 .md > * + * { margin-top: 6px; }
 .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { font-weight: 650; line-height: 1.25; font-size: 14px; }
 .md h1 { font-size: 16px; }
@@ -196,12 +211,8 @@ button, input, textarea { font: inherit; color: inherit; }
 .md ul, .md ol { padding-left: 18px; }
 .md li { margin: 2px 0; }
 .md li > ul, .md li > ol { margin-top: 2px; }
-.md li[data-task] { list-style: none; margin-left: -18px; display: flex; flex-wrap: wrap; gap: 0 7px; align-items: flex-start; }
-.md li[data-task] > ul, .md li[data-task] > ol { flex-basis: 100%; padding-left: 40px; }
-.md-check { width: 15px; height: 15px; margin-top: 3px; border-radius: 4px; border: 1.5px solid rgba(255, 255, 255, 0.55); flex-shrink: 0; position: relative; cursor: pointer; }
 .md-check:hover { border-color: #fff; }
 .md-check.on { background: var(--pin-green); border-color: transparent; }
-.md-check.on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #0b1220; border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .md li[data-task]:has(.md-check.on) > span:last-child { opacity: 0.55; text-decoration: line-through; }
 .md-link { color: var(--pin-accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .md blockquote { border-left: 3px solid var(--pin-line); padding-left: 8px; opacity: 0.85; }
@@ -209,18 +220,3 @@ button, input, textarea { font: inherit; color: inherit; }
 .md img { max-width: 100%; border-radius: 6px; border: 1px solid var(--pin-line); display: block; }
 .md-alt { opacity: 0.6; font-style: italic; }
 
-.toast {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: 38px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: rgba(20, 22, 28, 0.95);
-  color: #f4f5f8;
-  font-size: 12px;
-  text-shadow: none;
-  z-index: 6;
-}
-.toast.err { background: rgba(120, 30, 30, 0.95); }
-.pin-cap { padding: 4px 8px 0; font-size: 11px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em; }

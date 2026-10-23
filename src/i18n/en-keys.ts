@@ -1,0 +1,30 @@
+// Angličtina pro klávesy a gesta (`ui/shortcuts.ts`, `ui.keys.*`) a jejich zobrazení v Nastavení / paletě.
+import { registerDict } from "../i18n";
+
+registerDict("en", {
+  "ui.keys.group.drawer": "Drawer",
+  "ui.keys.group.cards": "Cards and menus",
+  "ui.keys.group.notes": "Notes and pinned notes",
+  "ui.keys.group.settings": "Settings",
+  "ui.keys.hover": "Moving the mouse to the top edge of the screen opens the drawer; moving away closes it.",
+  "ui.keys.palette": "Command palette: projects, actions, notes, settings, calculations and conversions. Type “?” to find this help.",
+  "ui.keys.esc": "Closes the palette; otherwise cancels drawer editing, goes back to the main page and finally closes the drawer.",
+  "ui.keys.tabs": "Switches to a tab by its position (not while typing in a field).",
+  "ui.keys.hold": "Hold a card header for 0.4 s and drag: turns on editing and moves the card. Release earlier and nothing happens.",
+  "ui.keys.rename": "Double-click a tab in edit mode to rename it.",
+  "ui.keys.handle": "Double-click a card's bottom handle (in edit mode) to fit its height to the content.",
+  "ui.keys.tabMove": "On a tab in edit mode, moves it one place over.",
+  "ui.keys.undoEdit": "In edit mode, undoes the last layout change.",
+  "ui.keys.menu": "On a shortcut (project, action, link) opens its menu, same as a right-click.",
+  "ui.keys.menuNav": "In an open menu: move between items. Enter or Space runs one, Esc closes and returns to ⋯.",
+  "ui.keys.lists": "In note text, Enter continues a list, Tab and Shift+Tab indent an item.",
+  "ui.keys.noteSave": "Saves the note in the editor and in a pinned note.",
+  "ui.keys.pinBar": "Double-click a pinned note's bar to collapse it to the bar or expand it.",
+  "ui.keys.pinText": "Double-click the text of a pinned note to edit it.",
+  "ui.keys.find": "Search Settings; finds an option even without diacritics.",
+  "ui.keys.save": "Saves changes in Settings.",
+  "ui.keys.sortList": "In sortable lists, moves the selected item up or down.",
+  "ui.keys.title": "Keys and gestures",
+  "ui.keys.palette.cmd": "? Keys and gestures",
+  "ui.keys.palette.sub": "Every shortcut and gesture in one list (Settings → Getting started)",
+});

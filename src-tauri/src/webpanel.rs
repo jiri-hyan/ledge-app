@@ -180,7 +180,7 @@ pub fn open(app: &AppHandle, a: &Action, url: &str) -> Result<Outcome, String> {
     if c.dead() {
         return Err(trf!("{}: hra / herní režim — okno se teď neotevře.", "{}: game / game mode — the window won't open now.", a.label));
     }
-    let url = check_url(url).map_err(|e| format!("{}: {e}", a.label))?;
+    let url = check_url(url).map_err(|e| crate::errors::prefixed(&a.label, &e))?;
     let _one = OPENING.lock();
     let lbl = label(&a.id);
     if let Some(w) = app.get_webview_window(&lbl) {
@@ -222,7 +222,7 @@ pub fn open(app: &AppHandle, a: &Action, url: &str) -> Result<Outcome, String> {
             NewWindowResponse::Deny
         })
         .build()
-        .map_err(|e| format!("{}: {e}", a.label))?;
+        .map_err(|e| crate::errors::any(&a.label, &e))?;
     guard_frames(&w);
     let _ = w.set_position(PhysicalPosition::new(geom.x, geom.y));
     let _ = w.set_size(PhysicalSize::new(geom.w, geom.h));

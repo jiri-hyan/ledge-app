@@ -2,6 +2,7 @@
 // `labels.ts` vlevo, ovládání vpravo, chyba validace pod ním. `id` řádku = kotva hledání (`#f-<id>`)
 // a cesta pole pro chybu z Rustu.
 import { Show, type JSX } from "solid-js";
+import { t } from "../../i18n";
 import { hit, useSettings } from "../ctx";
 import { fieldHint, fieldLabel } from "../labels";
 
@@ -34,7 +35,13 @@ export function Section(p: { title?: string; desc?: string; id?: string; childre
   );
 }
 
-export function Row(p: { id: string; label?: string; hint?: string; stack?: boolean; nested?: boolean; dim?: boolean; children?: JSX.Element }) {
+/** Štítek „Platí hned“ vedle ovládání volby, která se NEukládá lištou Uložit (zapnutí MCP, zapojení hooků,
+ *  přihlášení účtu…) — jedna komponenta pro všechny; `Row live` ji dává před ovládací prvek. */
+export function LiveBadge() {
+  return <span class="st-live" title={t("settings.live.title", "Tahle volba se projeví hned — nečeká na tlačítko Uložit.")}>{t("settings.live", "Platí hned")}</span>;
+}
+
+export function Row(p: { id: string; label?: string; hint?: string; stack?: boolean; nested?: boolean; dim?: boolean; live?: boolean; children?: JSX.Element }) {
   const c = useSettings();
   const err = () => c.error(p.id, p.nested);
   const hint = () => p.hint ?? fieldHint(p.id);
@@ -44,7 +51,7 @@ export function Row(p: { id: string; label?: string; hint?: string; stack?: bool
         <span class="st-name">{p.label ?? fieldLabel(p.id)}</span>
         <Show when={hint()}><small>{hint()}</small></Show>
       </div>
-      <Show when={p.children}><div class="st-ctl">{p.children}</div></Show>
+      <Show when={p.children}><div class="st-ctl"><Show when={p.live}><LiveBadge /></Show>{p.children}</div></Show>
       <Show when={err()}><div class="st-err" role="alert">{err()}</div></Show>
     </div>
   );

@@ -65,8 +65,8 @@ pub(crate) fn scripts_open_dir() -> Result<String, String> {
     let c = core();
     let cfg = c.cfg.read().scripts.clone();
     let dir = scripts::resolve_dir(&cfg)?;
-    std::fs::create_dir_all(&dir).map_err(|e| trf!("Složku {} nejde založit: {e}", "Can't create the folder {}: {e}", dir.display()))?;
-    c.app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", dir.display()), &e))?;
+    c.app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| crate::errors::any(tr("Složku nejde otevřít", "Can't open the folder"), &e))?;
     scripts::refresh_async();
     Ok(dir.display().to_string())
 }
@@ -76,9 +76,9 @@ pub(crate) fn scripts_open_dir() -> Result<String, String> {
 pub(crate) fn win_settings_open(target: String) -> Result<(), String> {
     let c = core();
     match winsettings::parse(&target)? {
-        WinTarget::Settings(uri) => c.app.opener().open_url(uri, None::<&str>).map_err(|e| e.to_string())?,
+        WinTarget::Settings(uri) => c.app.opener().open_url(uri, None::<&str>).map_err(|e| crate::errors::any(tr("Nastavení Windows nejde otevřít", "Can't open Windows Settings"), &e))?,
         WinTarget::Control(name) => {
-            std::process::Command::new(winsettings::control_exe()).args(["/name", &name]).spawn().map_err(|e| trf!("Ovládací panel nejde otevřít: {e}", "Can't open the Control Panel: {e}"))?;
+            std::process::Command::new(winsettings::control_exe()).args(["/name", &name]).spawn().map_err(|e| crate::errors::spawn(tr("Ovládací panel nejde otevřít", "Can't open the Control Panel"), &e))?;
         }
     }
     log(&format!("nastavení windows: {target}"));

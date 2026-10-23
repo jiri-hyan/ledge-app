@@ -87,7 +87,12 @@ export function createCardDrag(env: DragEnv) {
     const grab0 = { dx: x0 - r.left, dy: y0 - r.top };
     let last = { x: x0, y: y0 };
     let timer = 0;
+    // průběh podržení (CSS `layout.css` `[data-hold]`): proužek na kartě naroste za `HOLD_MS`; dřív pustíš = zmizí
+    const mark = hold ? (e.currentTarget as HTMLElement) : null;
+    mark?.style.setProperty("--hold-ms", `${HOLD_MS}ms`);
+    mark?.setAttribute("data-hold", "");
     const stop = () => {
+      mark?.removeAttribute("data-hold");
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
       window.removeEventListener("pointercancel", stop);

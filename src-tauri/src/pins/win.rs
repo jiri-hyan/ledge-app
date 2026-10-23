@@ -215,7 +215,7 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
         .additional_browser_args(crate::drawer::BROWSER_ARGS)
         .disable_drag_drop_handler()
         .build()
-        .map_err(|e| trf!("Lístek se neotevřel: {e}", "The sticky didn't open: {e}"))?;
+        .map_err(|e| crate::errors::any(crate::i18n::tr("Lístek se neotevřel", "The sticky didn't open"), &e))?;
     let _ = w.set_position(PhysicalPosition::new(place.x, place.y));
     let _ = w.set_size(PhysicalSize::new(place.w, place.h));
     apply(&w, &pin.prefs);

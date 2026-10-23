@@ -23,7 +23,7 @@ zapnutí i přímo z palety). Cituj symbolem, ne číslem řádku.
 Lepidlo: `config/*` (`Config.clipboard` + `cliphist::validate`), `settings.rs` (změna `clipboard` →
 `cliphist::sync`), `lib.rs` (start `cliphist::sync`, `generate_handler!`), `Cargo.toml` (feature
 `Win32_System_RemoteDesktop`), `settings/labels.ts` (`clipboard.*`), `panels/Personal.tsx` (`<ClipSettings />`),
-`settings/settings.test.mjs` (panel `suplik` vykresluje i `ClipSettings.tsx`), `i18n/load.ts`.
+`settings/settings.test.mjs` (panel `suplik` vykresluje i `ClipSettings.tsx`), `i18n/dicts.ts`.
 
 ## Toky
 

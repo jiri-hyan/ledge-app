@@ -114,7 +114,8 @@ export default function Settings(p: { update: UpdateView; s: Snapshot }) {
   function jump(e: FieldError | null) {
     const target = panelForField(e?.field);
     if (target) setActive(target);
-    reveal(null, main);
+    // pole s chybou může být v „Pokročilé“ — `hit` ho rozbalí; bez vlastního řádku zůstane první .st-err
+    reveal(e?.field ?? null, main);
   }
 
   async function save(force = false) {

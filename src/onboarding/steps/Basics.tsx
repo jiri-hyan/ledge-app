@@ -2,8 +2,8 @@
 // sekce Vzhled) a Hotovo (souhrn uloženého + jak šuplík otevřít podle `drawer.trigger`).
 import { For, Show } from "solid-js";
 import { t } from "../../i18n";
-import { STEPS } from "../logic";
-import { chooseLang, setWiz, wiz } from "../store";
+import { doneRows, estimateMinutes } from "../logic";
+import { chooseLang, setWiz, steps, wiz } from "../store";
 import { THEMES, type ThemeId } from "../../theme/themes";
 import { savedAppearance, scopeStyle } from "../../theme/apply";
 
@@ -18,7 +18,7 @@ export function WelcomeStep() {
   return (
     <div class="ob-hero">
       <div>
-        <span class="ob-kicker">{t("onboarding.welcome.kicker", "Asi 2 minuty")}</span>
+        <span class="ob-kicker">{t("onboarding.welcome.kicker", "Asi {n} min", { n: estimateMinutes(steps()) })}</span>
         <h2>{t("onboarding.welcome.title", "Vítej v Ledge")}</h2>
         <p>
           {t(
@@ -27,7 +27,7 @@ export function WelcomeStep() {
           )}
         </p>
         <ol class="ob-plan">
-          <For each={STEPS.slice(1, -1)}>{(s) => <li>{t(s.key, s.cs)}</li>}</For>
+          <For each={steps().slice(1, -1)}>{(s) => <li>{t(s.key, s.cs)}</li>}</For>
         </ol>
       </div>
       <div class="ob-langs" role="radiogroup" aria-label={t("onboarding.welcome.lang", "Jazyk")}>
@@ -87,46 +87,42 @@ function openTip(trigger: string): string {
   }
 }
 
+/** Jméno motivu pro souhrn: z `THEMES` (stejně jako v Nastavení → Vzhled), jinak popisek z nabídky Rustu; neznámé = `null`. */
+function themeName(v: string | null): string | null {
+  if (!v) return null;
+  const id = () => themeOf(v) as ThemeId; // (zápis `THEMES[id()]` jako v LookStep — vědomý dynamický klíč v i18n.test.mjs)
+  if (themeOf(v)) return t(THEMES[id()].key, THEMES[id()].cs);
+  return wiz.themes.find((o) => o.value === v)?.label || null;
+}
+
 export function DoneStep() {
-  const s = () => wiz.sum;
-  const linksWhere = () => t("onboarding.done.inActions", "v kartě Odkazy");
+  const rows = () => doneRows(wiz.sum, wiz.hooks?.state === "full", themeName(wiz.sum.theme));
   return (
     <div class="ob-center">
       <div class="ob-lead">
         <h3>{t("onboarding.done.title", "Hotovo — Ledge je tvůj")}</h3>
-        <p>{openTip(wiz.trigger)}</p>
+        <p>{rows().length ? openTip(wiz.trigger) : t("onboarding.done.nothing", "Hotovo — Ledge najdeš u horního okraje obrazovky.")}</p>
       </div>
-      <div class="ob-summary">
-        <div class="ob-sum">
-          <b>{s().projects.length}</b>
-          <span>{t("onboarding.done.projects", "projektů a aplikací přidáno")}</span>
-          <Show when={s().projects.length}>
-            <small>{s().projects.slice(0, 6).join(", ") + (s().projects.length > 6 ? "…" : "")}</small>
-          </Show>
+      <Show when={rows().length}>
+        <div class="ob-summary">
+          <For each={rows()}>
+            {(r) => (
+              <div class="ob-sum">
+                <b>{r.kind === "projects" || r.kind === "links" ? r.n : "✓"}</b>
+                <span>
+                  {r.kind === "projects" && t("onboarding.done.projects", "projektů a aplikací přidáno")}
+                  {r.kind === "links" && t("onboarding.done.links", "odkazů")}
+                  {r.kind === "theme" && t("onboarding.done.theme", "motiv {v}", { v: r.name })}
+                  {r.kind === "hooks" && t("onboarding.done.hooks", "hooky Claude Code")}
+                </span>
+                <Show when={r.kind === "projects" ? r.names : r.kind === "links" ? t("onboarding.done.inActions", "v kartě Odkazy") : ""}>{(small) => <small>{small()}</small>}</Show>
+              </div>
+            )}
+          </For>
         </div>
-        <div class="ob-sum">
-          <b>{s().links}</b>
-          <span>{t("onboarding.done.links", "odkazů")}</span>
-          <Show when={s().links}>
-            <small>{linksWhere()}</small>
-          </Show>
-        </div>
-        <div class="ob-sum">
-          <b>{s().hooks || wiz.hooks?.state === "full" ? "✓" : "—"}</b>
-          <span>{t("onboarding.done.hooks", "hooky Claude Code")}</span>
-        </div>
-        <Show when={s().theme}>
-          <div class="ob-sum">
-            <b>{s().themeSaved === false ? "—" : "✓"}</b>
-            <span>{t("onboarding.done.theme", "motiv {v}", { v: s().theme ?? "" })}</span>
-            <Show when={s().themeSaved === false}>
-              <small>{t("onboarding.done.themeLater", "tahle verze motivy ještě neumí")}</small>
-            </Show>
-          </div>
-        </Show>
-      </div>
+      </Show>
       <ul class="ob-bullets">
-        <li>{t("onboarding.done.tipBrowser", "V prohlížeči nebo maximalizovaném okně přitlač myš k hornímu okraji — šuplík vyjede i přes ně.")}</li>
+        <li>{t("onboarding.done.tipTray", "Ikonka Ledge v oznamovací oblasti (vedle hodin) šuplík otevře a Ledge tam i ukončíš.")}</li>
         <li>{t("onboarding.done.tipLayout", "Uprav si šuplík — ✎ v hlavičce: přetáhni karty, změň jejich velikost, přidej je z katalogu nebo si založ vlastní záložku.")}</li>
         <li>{t("onboarding.done.tipAgain", "Průvodce kdykoli znovu: Nastavení → Začínáme. Všechno ostatní najdeš tamtéž.")}</li>
       </ul>
