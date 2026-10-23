@@ -14,6 +14,8 @@ quiet while a fullscreen game is running.
 - **Projects.** One tile per project: a click starts its dev server (`npm run dev`, port handling, log) or
   launches its app. Logos are detected from the project itself (favicon, web manifest, app icon). Running
   servers have their own card with Open / Stop; projects missing on this PC can be cloned with one click.
+  Notices about uncommitted or unpushed work can be muted per repo or marked as read; shortcuts and folders
+  can be imported from a Launcher catalog.
 - **Claude Code sessions.** Every Claude Code session on the PC — desktop app and CLI, with subagents —
   with its state: waiting for you, working, idle, unfinished work. A click switches to that window (or
   resumes a finished session in a terminal).
@@ -26,9 +28,15 @@ quiet while a fullscreen game is running.
 - **Quick actions and command palette.** Tiles for websites, folders, files, apps and commands, all
   searchable with `Ctrl+K`. Commands and apps with arguments always ask before running until you grant
   consent in Settings.
-- **Personal tab.** Clock, weather (Open-Meteo) and your links, separate from work.
-- **Looks.** Six themes (dark, midnight, graphite, nord, light, high contrast), accent colour, density,
-  font size, corner radius, translucency, motion style and speed, strip style and position.
+- **Your own layout.** Cards on your own tabs in S/M/L/XL sizes with adjustable height; hold a card header (or
+  click ✎) to enter edit mode — drag cards, even between tabs, resize by the edge, Undo (Ctrl+Z). Projects,
+  Repos and Notes also have a Bento view (one large tile with smaller ones around it).
+- **Personal tab.** Clock, weather (Open-Meteo), media player (volume, microphone mute, audio output picker,
+  optional album-cover tint) and your links, separate from work.
+- **Looks.** 13 ready-made design styles (Classic, Glass, Terminal, Paper, Neon, Brutal, Pastel, Aurora, Mono,
+  Retro, Fluent, OLED, Warm), 16 colour themes plus your own, accent colour, density, font size, corner
+  radius, translucency, 9 opening animations (including a Dynamic Island–style liquid capsule) and their speed,
+  strip style and position.
 - **Setup guide.** On first run a short guide finds your repos, picks apps from the Start menu, connects
   Claude Code hooks, and sets language and theme. Nothing is pre-filled with anyone else's data.
 - **Czech and English** UI, switchable in Settings → Look and animations.

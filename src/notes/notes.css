@@ -154,3 +154,26 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-life-del:hover { color: var(--red); }
 .note-name { font-size: calc(13px * var(--fz)); font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note-pinsave svg { width: 14px; height: 14px; }
+
+/* Bento režim karty Poznámky (kolo 18): velká poslední / připnutá poznámka + dlaždice akcí */
+/* úzká karta: akce spadnou pod náhled */
+.note-bento { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s2); margin-bottom: var(--s2); }
+.note-bento-hero { cursor: pointer; text-align: left; color: inherit; font: inherit; min-width: 0; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--well); padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); transition: border-color var(--fast), background var(--fast); }
+.note-bento-hero:hover { border-color: var(--blue); background: var(--well-2); }
+.note-bento-head { display: flex; flex-direction: column; gap: 2px; }
+.note-bento-tag { font-size: var(--fs-2xs); font-weight: 600; text-transform: uppercase; color: var(--blue); }
+.note-bento-title { font-size: var(--fs-ui); font-weight: 700; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-bento-sub { font-size: var(--fs-xs); color: var(--t3); }
+.note-bento-preview { font: var(--fs-xs) var(--mono); color: var(--t2); max-height: 80px; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+.note-bento-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-bento-task { color: var(--blue); }
+.note-bento-muted { color: var(--t3); font-style: italic; }
+.note-bento-empty { color: var(--t3); font-style: italic; font-size: var(--fs-xs); }
+.note-bento-acts { display: flex; flex-direction: column; gap: 6px; }
+.note-bento-btn { width: 100%; justify-content: center; }
+.note-bento-templates { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.note-bento-tmpl { font-size: var(--fs-2xs); padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-bento-tools { display: flex; gap: 4px; }
+.note-bento-tool { flex: 1; font-size: var(--fs-2xs); justify-content: center; }
+.note-list[data-view="bento"] { display: flex; flex-direction: column; gap: 2px; }
+.note-act-copy:hover { color: var(--blue); }

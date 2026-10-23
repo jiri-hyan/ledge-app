@@ -13,7 +13,8 @@ import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { canBgLaunch, openBgLaunch } from "../sessions/BgLaunch";
 import { timerItems } from "./timer";
-import { normalizeLayout, pageOf } from "../layout/model";
+import { normalizeLayout, pageOf, placed } from "../layout/model";
+import { pasteToShelf } from "../shelf/ShelfCard";
 import { pageName } from "../layout/text";
 import { placeOf } from "../projects/model";
 import { restartProject, startProject, stopAll } from "../projects/state";
@@ -136,6 +137,8 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
   lay.pages.forEach((pg, i) => {
     if (pg.id !== cur) add({ id: `tab:${pg.id}`, section: "app", order: 6, title: t("palette.app.tab", "Přejít na záložku {name}", { name: pageName(pg) }), keywords: `zalozka tab prepnout ${i + 1} ${pg.id}`, run: () => api.setMode(pg.id) });
   });
+  if (placed(lay, "shelf"))
+    add({ id: "app:shelfPaste", section: "app", order: 6, title: t("palette.app.shelfPaste", "Vložit schránku do přihrádky"), keywords: "prihradka shelf vlozit paste schranka obrazek soubor text", run: () => void pasteToShelf() });
   add({ id: "app:editDrawer", section: "app", order: 6, title: t("palette.app.editDrawer", "Upravit šuplík (karty a záložky)"), keywords: "upravit rozlozeni karty zalozky presunout pridat odebrat velikost katalog edit layout", run: () => nav.onEditDrawer() });
   for (const x of timerItems(s)) add(x);
   for (const x of styleItems(s)) add(x);

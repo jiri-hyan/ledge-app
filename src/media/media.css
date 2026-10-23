@@ -4,6 +4,9 @@
    `med-eq-live` (hraje + otevřený šuplík); omezení pohybu ho vypne globálně (styles.css). */
 
 /* ---------- karta s průběhem (výchozí) ---------- */
+/* podbarvení barvou obalu (`media.tint`, `tint.ts`) — jen se zapnutou volbou a obalem */
+.med-card.med-tinted { background: color-mix(in srgb, var(--media-tint) 16%, var(--card)); transition: background var(--dur-3) var(--ease); }
+.med-tinted .med-range { accent-color: var(--media-tint); }
 .med-now { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 2px 0; }
 .med-cover { width: 44px; height: 44px; border-radius: var(--r-sm); flex-shrink: 0; overflow: hidden; display: grid; place-items: center; background: var(--card-2); color: var(--t3); }
 .med-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -126,6 +129,9 @@
 .med-vol { display: flex; align-items: center; gap: var(--s2); margin-top: 10px; min-width: 0; }
 h4 + .med-vol { margin-top: 0; }
 .med-range { flex: 1; min-width: 0; accent-color: var(--accent); cursor: pointer; }
+.med-outs { display: flex; margin-top: 4px; min-width: 0; }
+.med-out { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; font-size: var(--fs-xs); color: var(--t2); }
+.med-out-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .med-pct { font: var(--fs-xs) var(--mono); color: var(--t3); min-width: 4.2ch; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ---------- baterie (karta Čas) ---------- */

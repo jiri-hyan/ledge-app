@@ -81,6 +81,7 @@ mod projectdetect;
 mod rawpush;
 mod refresh;
 mod resolve;
+mod runguard;
 mod screen;
 mod scripts;
 mod sessiongit;
@@ -337,6 +338,8 @@ pub fn run() {
             commands::settings::logo_preview,
             commands::settings::app_info,
             commands::settings::open_app_file,
+            commands::settings::launcher_catalog_read,
+            commands::settings::launcher_import_check,
             commands::pkgctx::pkg_context,
             commands::pkgctx::relaunch_outside,
             commands::notes::note_create,
@@ -351,6 +354,7 @@ pub fn run() {
             commands::notes::note_search,
             commands::notes::note_suggest_remind,
             commands::notes::note_read,
+            commands::notes::note_copy_text,
             commands::notes::note_save,
             commands::notes::note_toggle_task,
             commands::noteslife::note_archive,
@@ -405,6 +409,8 @@ pub fn run() {
             commands::media::media_favorite_open,
             commands::media::volume_set,
             commands::media::volume_mute,
+            commands::media::volume_mic_mute,
+            commands::media::volume_set_device,
             commands::calendar::calendar_test,
             commands::geo::geo_search,
             commands::integrations::system_view,
@@ -429,6 +435,9 @@ pub fn run() {
             commands::shelf::shelf_remove,
             commands::shelf::shelf_clear,
             commands::shelf::shelf_drag_out,
+            commands::shelf::shelf_paste,
+            commands::shelf::shelf_copy_content,
+            commands::shelf::shelf_resize_image,
             commands::cliphist::clip_list,
             commands::cliphist::clip_paste,
             commands::cliphist::clip_pin,

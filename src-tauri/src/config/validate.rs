@@ -15,6 +15,9 @@ pub fn validate(cfg: &Config) -> Result<(), String> {
 /// Validace configu: první chyba i s cestou k poli (Nastavení ji ukáže u pole).
 pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     let mut seen = std::collections::HashSet::new();
+    if cfg.git_alerts.read.len() > 64 || !cfg.git_alerts.read.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return Err(fe("gitAlerts.read", tr("Otisk „Přečteno“ má nečekaný tvar — smaž ho.", "The “Mark as read” fingerprint has an unexpected form — delete it.")));
+    }
     for (i, p) in cfg.projects.iter().enumerate() {
         let at = |f: &str| format!("projects.{i}.{f}");
         if p.id.trim().is_empty() {

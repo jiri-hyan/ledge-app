@@ -33,6 +33,7 @@ registerDict("en", {
   "palette.app.hooked": "Hooks connected.",
   "palette.app.tab": "Go to tab {name}",
   "palette.app.editDrawer": "Edit the drawer (cards and tabs)",
+  "palette.app.shelfPaste": "Paste the clipboard to the shelf",
   "palette.app.close": "Close drawer",
   "palette.app.gameMode": "Turn on game mode (Ledge disappears)",
   "palette.placeholder": "Search actions, projects, notes, sessions, settings…",

@@ -165,6 +165,9 @@
 .st-sort.dragging .st-sort-item.lifted { z-index: 2; transition: none; }
 .st-sort-item.lifted .st-item { background: var(--raised); box-shadow: var(--shadow-pop); }
 .st-item { display: flex; align-items: center; gap: var(--s2); min-height: 42px; padding: 6px 8px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.st-list { display: flex; flex-direction: column; gap: var(--s2); }
+.st-import-cmds { margin: 4px 0 0; padding-left: 18px; max-height: 220px; overflow-y: auto; }
+.st-import-cmds code { font: var(--fs-xs) var(--mono); overflow-wrap: anywhere; }
 .st-item .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-item small { margin-left: 6px; color: var(--t3); font-size: var(--fs-sm); }
 .st-item.dim .grow, .st-item.dim .st-logo { opacity: 0.5; }

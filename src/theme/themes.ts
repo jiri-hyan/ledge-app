@@ -292,6 +292,40 @@ export const THEMES: Record<ThemeId, ThemeDef> = {
       "ring-logo": "inset 0 0 0 1px rgba(255, 176, 0, 0.3)",
     },
   },
+  // kolo 18: čistá černá pro OLED a teplé espresso
+  oled: {
+    id: "oled", key: "appearance.theme.oled", cs: "OLED", light: false,
+    vars: {
+      ...DARK_LAYERS, ...STATUS,
+      bg: "0 0 0", pop: "rgba(7, 8, 12, 0.99)", raised: "#0d0f15",
+      card: "#07080c", "card-2": "#0f1118", "card-3": "#171a24",
+      well: "rgba(255, 255, 255, 0.03)", "well-2": "rgba(255, 255, 255, 0.05)",
+      line: "rgba(255, 255, 255, 0.08)", "line-2": "rgba(255, 255, 255, 0.16)", "line-soft": "rgba(255, 255, 255, 0.04)",
+      thumb: "rgba(255, 255, 255, 0.2)", "shell-edge": "rgba(255, 255, 255, 0.12)", "shell-side": "rgba(255, 255, 255, 0.06)",
+      spot: "rgba(255, 255, 255, 0.05)", "pill-n": "rgba(255, 255, 255, 0.08)", "switch-off": "rgba(255, 255, 255, 0.16)",
+      t0: "#ffffff", t1: "#f8fafc", t2: "#94a3b8", t3: "#8290a4",
+      accent: "#38bdf8", "accent-2": "#8b5cf6", focus: "#38bdf8", "glow-1": "0%", "glow-2": "0%",
+      "ring-logo": "inset 0 0 0 1px rgba(255, 255, 255, 0.12)",
+    },
+  },
+  warm: {
+    id: "warm", key: "appearance.theme.warm", cs: "Teplý", light: false,
+    vars: {
+      ...DARK_LAYERS, ...STATUS,
+      bg: "20 17 15", pop: "rgba(31, 26, 23, 0.98)", raised: "#26201c",
+      card: "#1f1a17", "card-2": "#29231f", "card-3": "#352e29",
+      well: "rgba(0, 0, 0, 0.28)", "well-2": "rgba(0, 0, 0, 0.4)",
+      line: "rgba(245, 235, 230, 0.08)", "line-2": "rgba(245, 235, 230, 0.15)", "line-soft": "rgba(245, 235, 230, 0.05)",
+      thumb: "rgba(245, 235, 230, 0.2)", "shell-edge": "rgba(245, 235, 230, 0.1)", "shell-side": "rgba(245, 235, 230, 0.06)",
+      spot: "rgba(245, 235, 230, 0.06)", "pill-n": "rgba(245, 235, 230, 0.08)", "switch-off": "rgba(245, 235, 230, 0.16)",
+      t0: "#ffffff", t1: "#f5ebe6", t2: "#c4b5ab", t3: "#a8988c",
+      green: "#4ade80", amber: "#fbbf24", red: "#f87171", blue: "#60a5fa", violet: "#a78bfa", teal: "#2dd4bf",
+      "amber-ink": "#fde7a7", "red-ink": "#fecaca",
+      "on-light": "#1f1a17", "pri-hover": "#ffffff",
+      accent: "#f59e0b", "accent-2": "#f97316", focus: "#f59e0b", "glow-1": "14%", "glow-2": "10%",
+      "ring-logo": "inset 0 0 0 1px rgba(245, 235, 230, 0.12)",
+    },
+  },
 };
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];

@@ -34,7 +34,7 @@ pub mod rules;
 mod testkit;
 
 pub use bridge::{Ctl, Mcp, serve};
-pub use questions::{Ask, Reply};
+pub use questions::{Ask, QuestionLog, Reply};
 
 use crate::config::EnforceCommit;
 use crate::subagents::Subagents;
@@ -136,6 +136,8 @@ struct Inner {
     track: HashMap<String, Track>,
     /// otázky Clauda (`questions.rs`); `None` sender = jen ukázaná (`questionHoldS` 0)
     asks: Vec<questions::Held>,
+    /// deník posledních otázek Clauda (`questions.rs`, jen paměť)
+    question_log: Vec<questions::QuestionLog>,
     /// plány z `PreToolUse`, které Ledge pustil do Claude (`planhook.rs`, deduplikace)
     released: Vec<planhook::Released>,
 }
@@ -187,7 +189,7 @@ pub const MAX_APPROVAL: Duration = Duration::from_secs(550);
 impl Claude {
     pub fn new(on_change: OnChange, timeout: Duration) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(Inner { next_id: 1, pending: vec![], sessions: HashMap::new(), track: HashMap::new(), asks: vec![], released: vec![] })),
+            inner: Arc::new(Mutex::new(Inner { next_id: 1, pending: vec![], sessions: HashMap::new(), track: HashMap::new(), asks: vec![], question_log: vec![], released: vec![] })),
             on_change,
             timeout: Arc::new(Mutex::new(timeout.min(MAX_APPROVAL))),
             question_hold: Arc::new(Mutex::new(Duration::from_secs(questions::MAX_HOLD_S))),

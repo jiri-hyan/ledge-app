@@ -20,6 +20,8 @@ export interface MediaLook {
   variant: MediaVariant;
   stripTime: MediaStripTime;
   equalizer: boolean;
+  /** podbarvit kartu barvou obalu (chybí = ne) */
+  tint?: boolean;
   /** oblíbené (Rust `mediaconf::Favorite`); prázdné se neposílá */
   favorites?: import("./favorites").Favorite[];
 }

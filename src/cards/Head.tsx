@@ -1,5 +1,6 @@
 // Hlavička šuplíku: hodiny (nebo Zpět + název stránky), stavové chipy, nová verze, záložky (`layout/Tabs.tsx`),
 // pilulka „N běží“ (klik = seznam serverů se Stop / Restart / Otevřít / Log — `projects/RunningPill.tsx`),
+// chip „N neuloženo“ (klik = Přečteno / Ztišit u repa — `cards/DirtyPill.tsx`),
 // ✎ režim úprav šuplíku (`layout/edit.ts`) a nástroje (paleta 🔍, poznámka, nastavení, zavřít). Čte jen snapshot; navigaci dělá skořápka (App) přes callbacky.
 import { Show } from "solid-js";
 import { api, type Snapshot } from "../api";
@@ -14,6 +15,7 @@ import { gotoSettingsPanel } from "../palette/goto";
 import Tabs from "../layout/Tabs";
 import { beginEdit, editing, finishEdit } from "../layout/edit";
 import RunningPill from "../projects/RunningPill";
+import DirtyPill from "./DirtyPill";
 import "./head.css";
 
 export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: () => void; onSettings: () => void; onBack: () => void; onUpdate: () => void; onPalette?: () => void }) {
@@ -22,8 +24,6 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
   const date = () => fmtDate(d());
   const failed = () => p.s.procs.filter((x) => x.phase === "failed").length;
   const working = () => p.s.sessions.filter((x) => x.state === "working").length;
-  const dirty = () => p.s.projects.filter((x) => (x.git?.dirty ?? 0) > 0).length;
-  const unpushed = () => p.s.projects.filter((x) => (x.git?.ahead ?? 0) > 0).length;
   const unfinished = () => p.s.sessions.filter((x) => x.uncommitted.length > 0 || x.unpushed > 0);
   // jen „dostupná“ — nelze_overit (gh chybí, offline) hlavička neukazuje, to patří do Nastavení
   const avail = () => (p.page === "main" && p.s.update.state === "dostupna" ? p.s.update : null);
@@ -49,9 +49,7 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
           <Show when={unfinished().length > 0}>
             <span class="chip amber" title={unfinished().map((x) => x.title ?? x.project ?? x.cwd).join("\n")}><span class="d" />{rich(tp("cards.head.unfinished", unfinished().length, "<b>{n}</b> session nedokončily"))}</span>
           </Show>
-          <Show when={dirty() + unpushed() > 0}>
-            <span class="chip amber"><span class="d" />{rich(t("cards.head.dirty", "<b>{n}</b> neuloženo", { n: dirty() }))}{unpushed() ? t("cards.head.unpushed", " · {n} nepushnuto", { n: unpushed() }) : ""}</span>
-          </Show>
+          <DirtyPill s={p.s} />
           <Show when={bubble()}>
             {(b) => (
               <button class="chip dim" title={t("cards.pkg.chipTitle", "Ledge běží uvnitř aplikace {app} (balíček MSIX): nastavení, data a spouštění po startu jdou do její izolované kopie. Klik = Nastavení → Restartovat mimo.", { app: b().app })} onClick={() => { p.onSettings(); gotoSettingsPanel("f-autostart"); }}>

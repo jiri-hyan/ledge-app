@@ -1,4 +1,4 @@
-// Výběr animace otevírání v panelu Vzhled: 9 stylů jako malé živé ukázky (výřez nahoře + malý šuplík).
+// Výběr animace otevírání v panelu Vzhled: 10 stylů jako malé živé ukázky (výřez nahoře + malý šuplík).
 // Klik = vybrat a jednou přehrát tentýž plán, jaký použije šuplík (`theme/openAnim.ts` `openPlan`) —
 // v klidu se nic nehýbe. Pod tím rychlost; při systémovém „omezit pohyb“ upozornění (Ledge pak
 // nepřehrává nic, ani vysunutí okna v Rustu).
@@ -20,6 +20,7 @@ const NAME: Record<MotionStyle, Pair> = {
   notch: ["appearance.motion.notch", "Z výřezu"],
   drop: ["appearance.motion.drop", "Pád"],
   unfold: ["appearance.motion.unfold", "Rozvinutí"],
+  liquid: ["appearance.motion.liquid", "Tekutá kapsle"],
   none: ["appearance.motion.none", "Žádná"],
 };
 const DESC: Record<MotionStyle, Pair> = {
@@ -31,6 +32,7 @@ const DESC: Record<MotionStyle, Pair> = {
   notch: ["appearance.motion.notchDesc", "rozbalí se z proužku"],
   drop: ["appearance.motion.dropDesc", "spadne a jednou se odrazí"],
   unfold: ["appearance.motion.unfoldDesc", "rozvine se, karty naskakují po jedné"],
+  liquid: ["appearance.motion.liquidDesc", "pružně se roztáhne ze středu jako Dynamic Island"],
   none: ["appearance.motion.noneDesc", "okamžitě"],
 };
 /** tvary malé ukázky (výřez 44×8 px nahoře, šuplík s rádiusem 10 px) */

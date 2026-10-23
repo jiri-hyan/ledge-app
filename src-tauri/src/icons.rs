@@ -477,6 +477,7 @@ mod tests {
             logo: None,
             links: vec![],
             look: None,
+            mute_dirty: false,
         };
         assert_eq!(exe_policy(&p), ExeIcon::First);
         p.exe = Some("node_modules/electron/dist/electron.exe".into());

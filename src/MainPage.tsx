@@ -8,7 +8,7 @@
 // Vlna 8 P: vzhled karty (⋯ → „Vzhled karty…“, panel `layout/CardLook.tsx` pod mřížkou, varianty zobrazení
 // karet `viewOf`) a vzhled zástupců (pravý klik → `tilelook/TileMenu.tsx`).
 // Dynamické karty (widgety ze skriptů `widget:<soubor>`) kreslí `widgets/WidgetCard.tsx` z `Snapshot.widgets`.
-import { createEffect, createMemo, on as onChange, onCleanup, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, on as onChange, onCleanup, onMount, Show, type JSX } from "solid-js";
 import type { Snapshot } from "./api";
 import type { NotesNav } from "./nav";
 import ClaudeSessions, { ClaudeInbox } from "./ClaudeSessions";
@@ -37,7 +37,8 @@ import Tour from "./layout/Tour";
 import HoldTip from "./layout/HoldTip";
 import { closeCardLook, lookFor, target as cardLookTarget } from "./layout/lookState";
 import { viewOf } from "./layout/look";
-import TileMenu from "./tilelook/TileMenu";
+import TileMenu, { openTileMenu } from "./tilelook/TileMenu";
+import { gotoSettingsPanel } from "./palette/goto";
 import { closeLook } from "./tilelook/state";
 import { setActivePage } from "./theme/apply";
 import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
@@ -87,6 +88,22 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   // vzhled záložky (`appearance.pages`, `theme/pages.ts`): platí, dokud je hlavní stránka vidět
   createEffect(() => setActivePage(page().id));
   onCleanup(() => setActivePage(""));
+  // pravý klik na prázdné místo šuplíku (mimo karty a ovládací prvky) = menu Upravit rozložení / Přidat kartu /
+  // Vzhled / Nastavení; posluchač jen na událost, v klidu nic neběží
+  onMount(() => {
+    const onContext = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (!el?.closest(".deck, .content") || el.closest(".card, button, a, input, textarea, select, .proj")) return;
+      openTileMenu(e, [
+        { text: t("cards.deck.menuEdit", "Upravit rozložení"), run: () => edit() },
+        { text: t("cards.deck.menuAdd", "Přidat kartu…"), run: () => edit(true) },
+        { text: t("cards.deck.menuLook", "Vzhled a design styly…"), run: () => { p.onSettings(); gotoSettingsPanel("f-appearance.style"); } },
+        { text: t("cards.deck.menuSettings", "Nastavení"), run: () => p.onSettings() },
+      ]);
+    };
+    window.addEventListener("contextmenu", onContext);
+    onCleanup(() => window.removeEventListener("contextmenu", onContext));
+  });
   // jiná záložka / konec úprav: otevřené panely vzhledu se uloží a zavřou
   createEffect(onChange([() => page().id, editing], () => {
     void closeLook(true, editing());

@@ -155,6 +155,10 @@ pub struct MediaConfig {
     /// Ozdoba ekvalizéru u vzhledu `strip` (znak v proužku, animace v šuplíku). Jen dekorace — neukazuje
     /// skutečný zvuk. Výchozí true.
     pub equalizer: bool,
+    /// Karta se jemně podbarví převládající barvou obalu alba (počítá se v UI jednou na obal, jen když je
+    /// karta vidět). Výchozí false = vzhled jako dřív (kolo 18).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub tint: bool,
     /// Oblíbené playlisty a stanice (dlaždice v kartě Právě hraje, nejvýš 24). Klik otevře odkaz
     /// v Spotify / prohlížeči; Ledge nic nepřehrává sám. Výchozí prázdné (do souboru se nepíše).
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -163,7 +167,7 @@ pub struct MediaConfig {
 
 impl Default for MediaConfig {
     fn default() -> Self {
-        Self { variant: Variant::Card, strip_time: StripTime::Auto, equalizer: true, favorites: Vec::new() }
+        Self { variant: Variant::Card, strip_time: StripTime::Auto, equalizer: true, tint: false, favorites: Vec::new() }
     }
 }
 
@@ -245,7 +249,7 @@ mod tests {
         v
     }
     fn cfg(variant: Variant, strip_time: StripTime, equalizer: bool) -> MediaConfig {
-        MediaConfig { variant, strip_time, equalizer, favorites: Vec::new() }
+        MediaConfig { variant, strip_time, equalizer, tint: false, favorites: Vec::new() }
     }
 
     #[test]
@@ -253,7 +257,10 @@ mod tests {
         // starý config bez `media` = karta s průběhem, čas v proužku jen u „Jen v proužku“, ozdoba zapnutá
         let c: crate::config::Config = serde_json::from_str("{}").unwrap();
         assert_eq!(c.media, MediaConfig::default());
-        assert_eq!((c.media.variant, c.media.strip_time, c.media.equalizer), (Variant::Card, StripTime::Auto, true));
+        assert_eq!((c.media.variant, c.media.strip_time, c.media.equalizer, c.media.tint), (Variant::Card, StripTime::Auto, true, false));
+        let t: crate::config::Config = serde_json::from_str(r#"{"media":{"tint":true}}"#).unwrap();
+        assert!(t.media.tint);
+        assert!(serde_json::to_value(&c.media).unwrap().get("tint").is_none(), "vypnuté se nepíše");
         // skutečný tvar configu z vlny 5 (proužek s `media`, karta zapnutá): beze změny chování
         let old: crate::config::Config = serde_json::from_str(
             r#"{"strip":{"enabled":true,"items":["mode","clock","media"],"itemsRev":2},"drawer":{"sections":{"nowPlaying":true,"sound":true,"battery":true}},"modes":{"personalEnabled":true},"personal":{"links":[]}}"#,

@@ -104,6 +104,8 @@ pub enum CardDensity {
 pub enum CardView {
     List,
     Tiles,
+    /// velká dlaždice + menší kolem (kolo 18; kreslí ji Projekty, Repa a Poznámky)
+    Bento,
     Compact,
 }
 

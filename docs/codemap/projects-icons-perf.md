@@ -89,7 +89,8 @@ seřazeno SVG > větší rastr do 128 px > deklarované; protáhlé obrázky = n
 - `resolve::tests` — `clones`, `owner_repo_raw`, worktree jako druhý klon, řazení kandidátů (deterministicky), `place_of`,
   `last_commit` nad dočasným repem; `bench_remote_regex` (`#[ignore]`).
 - `procman::tests` — `fail_tail`, `tail`/`cwd`/`cmd` u pádu, událost `Failed` s id a zprávou.
-- `src/projects/model.test.mjs` — klik podle místa, tooltip, předvolba výběru, zápis `path`/`run`, `failInfo`.
+- `src/projects/model.test.mjs` — klik podle místa, tooltip, předvolba výběru, zápis `path`/`run`/`muteDirty`, `failInfo`.
+- `src/projects/dirty.test.mjs` — souhrn neuložené práce bez ztišených rep (`muteDirty`), podpis pro „Přečteno“.
 
 ## Výkon — co zbývá (neopraveno, s odhadem)
 

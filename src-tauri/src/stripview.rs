@@ -128,7 +128,7 @@ pub(crate) fn refresh_strip() {
                 let git = c.git.lock();
                 let mut dirty = 0;
                 let mut unpushed = 0;
-                for p in cfg.projects.iter().filter(|p| p.enabled) {
+                for p in cfg.projects.iter().filter(|p| cfg.git_alerts.enabled && p.enabled && !p.mute_dirty) {
                     if let Some((_, Some(g))) = git.get(&p.id) {
                         if g.dirty > 0 {
                             dirty += 1;
@@ -262,7 +262,7 @@ fn look_facts(
         .collect();
     done.sort_by_key(|s| std::cmp::Reverse(s.updated_at));
     let (mut repos, git) = (0, c.git.lock());
-    for p in cfg.projects.iter().filter(|p| p.enabled) {
+    for p in cfg.projects.iter().filter(|p| cfg.git_alerts.enabled && p.enabled && !p.mute_dirty) {
         if let Some((_, Some(g))) = git.get(&p.id)
             && (g.dirty > 0 || g.ahead > 0)
         {

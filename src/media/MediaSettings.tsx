@@ -1,5 +1,5 @@
 // Nastavení → Osobní → Přehrávač: vzhled karty Právě hraje s náhledy (`media.variant`), čas skladby
-// v proužku (`media.stripTime`) a ozdoba ekvalizéru (`media.equalizer`). Mění se jen návrh Nastavení —
+// v proužku (`media.stripTime`), ozdoba ekvalizéru (`media.equalizer`) a podbarvení obalem (`media.tint`). Mění se jen návrh Nastavení —
 // uloží (a vrátí) ho společná lišta Uložit / Zahodit / Vrátit. Pod tím oblíbené playlisty a stanice
 // (`FavoritesSettings.tsx`). Totéž pole `media.variant` mění i panel
 // „Vzhled karty…“ na kartě (`layout/CardLook.tsx`) a ikonka v jejím rohu — jeden zdroj v configu.
@@ -45,6 +45,7 @@ export default function MediaSettings() {
       <Show when={current() === "strip"}>
         <Row id="media.equalizer"><Toggle path="media.equalizer" label={fieldLabel("media.equalizer")} /></Row>
       </Show>
+      <Row id="media.tint"><Toggle path="media.tint" label={fieldLabel("media.tint")} /></Row>
       <FavoritesSettings id="media.favorites" />
     </>
   );

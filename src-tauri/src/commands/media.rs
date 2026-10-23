@@ -58,3 +58,15 @@ pub(crate) fn media_favorite_open(index: usize, uri: String) -> Result<(), Strin
     }
     c.app.opener().open_url(fav.uri, None::<&str>).map_err(|e| crate::errors::any(crate::i18n::tr("Odkaz nejde otevřít", "Can't open the link"), &e))
 }
+
+/// Ztlumit / zapnout výchozí mikrofon (výslovný klik v kartě Zvuk). Vrací nový stav.
+#[tauri::command(async)]
+pub(crate) fn volume_mic_mute() -> Result<bool, String> {
+    volume::mic_mute_toggle()
+}
+
+/// Přepnout výchozí výstup na zařízení ze seznamu `VolumeView.devices` (výslovný klik).
+#[tauri::command(async)]
+pub(crate) fn volume_set_device(id: String) -> Result<(), String> {
+    volume::set_default_output(&id)
+}

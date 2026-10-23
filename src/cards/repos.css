@@ -5,3 +5,13 @@
 .repo-list[data-view="compact"] > * { padding-block: 3px; }
 .repo-list[data-view="compact"] > * > .grow { display: flex; align-items: center; gap: var(--s2); }
 .repo-list[data-view="compact"] > * > .grow > :not(:first-child) { margin-top: 0; flex-wrap: nowrap; overflow: hidden; }
+
+/* varianta Bento (kolo 18): dlaždice, první (nejvíc neuložené práce nahoře) přes 2 sloupce */
+.repo-list[data-view="bento"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s2); }
+.repo-list[data-view="bento"] > * { align-items: flex-start; padding: var(--s2); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--well); min-width: 0; }
+.repo-list[data-view="bento"]:has(> :nth-child(2)) > :first-child {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--amber) 14%, var(--well)), var(--well));
+  border-color: color-mix(in srgb, var(--amber) 40%, var(--line));
+}
+.repo-list[data-view="bento"]:has(> :nth-child(2)) > :first-child .name { font-size: calc(14.5px * var(--fz)); font-weight: 700; }

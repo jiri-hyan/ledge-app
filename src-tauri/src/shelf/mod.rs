@@ -9,6 +9,8 @@
 pub mod clip;
 pub mod dragout;
 pub mod drop;
+pub mod drops;
+pub mod paste;
 
 use crate::i18n::tr;
 use crate::strip::{Rgba, Segment, StripModel};
@@ -202,6 +204,7 @@ fn save_to(file: &Path, items: &[Item]) -> Result<(), String> {
 /// Práce se seznamem (načte se líně při prvním použití). `f` vrací `true` = změna → uložit + událost.
 fn with<R>(f: impl FnOnce(&mut Vec<Item>) -> (R, bool)) -> Result<R, String> {
     let mut g = STORE.lock();
+    let first = g.is_none();
     let s = g.get_or_insert_with(|| {
         let file = crate::config::config_dir().join(FILE);
         let items = load_from(&file);
@@ -210,7 +213,16 @@ fn with<R>(f: impl FnOnce(&mut Vec<Item>) -> (R, bool)) -> Result<R, String> {
     let (r, changed) = f(&mut s.items);
     if changed {
         save_to(&s.file, &s.items)?;
+    }
+    if changed || first {
+        // vlastní soubory ze schránky, na které už nic neodkazuje (odebrání, Vyprázdnit, zbytky z minula)
+        let refs: Vec<String> = s.items.iter().map(|i| i.path.clone()).collect();
         drop(g);
+        drops::sweep(&refs);
+    } else {
+        drop(g);
+    }
+    if changed {
         notify();
     }
     Ok(r)

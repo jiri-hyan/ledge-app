@@ -40,7 +40,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   = barvy motivu, nebo `#rrggbb`), `bg` (`tint` jemný tón akcentu | `solid` plné | `clear` průhledné),
   `hideHead` (bez hlavičky, ⋯ zůstane při najetí), `density` (`compact` | `airy`), `view` jen u karet
   `projects` (výchozí `tiles`), `repos` a `notes` (výchozí `list`), `actions` (výchozí `tiles`): `list` |
-  `tiles` | `compact`. V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu).
+  `tiles` | `compact`, u `projects` / `repos` / `notes` i `bento` (kolo 18: velká dlaždice + menší kolem — u Projektů
+  dva první, běžící dopředu; u Poznámek připnutá / nejnovější poznámka + dlaždice Nová .md, šablony, Uložit HTML).
+  V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu).
   `limit` (volitelné, jen karty `claude`, `repos`, `running`; 0–50, `0` = bez stropu, chybí = 4) = kolik řádků
   karta ukáže, zbytek pod „Zobrazit další (k)“ ↔ „Méně“; session, které čekají na tebe, se nikdy neschovají
   (⋯ karty → Řádků 3/4/6/Vše, nebo Nastavení → Šuplík a karty).

@@ -12,64 +12,38 @@ use super::{Host, schema};
 use crate::i18n::tr;
 use crate::actions::Action;
 use crate::config::{Config, Project, ProjectKind};
-use regex::Regex;
 use serde_json::{Map, Value, json};
 use std::path::Path;
-use std::sync::LazyLock;
 
-/// Skript balíčkovače: `npm run dev`, `pnpm dev`, `yarn start`, `bun run build`, `npm start`.
-static PM_SCRIPT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(npm|pnpm|yarn|bun)( run)? [a-z0-9][a-z0-9:._-]{0,63}$").unwrap());
-
-/// (příkaz, argumenty), které Ledge sám navrhne pro složku (průvodce `repos::suggest` + `projectdetect`).
+/// (příkaz, argumenty), které Ledge sám navrhne pro složku — sdílená pojistka `runguard`.
 pub fn detected_runs(dir: &Path) -> Vec<(String, Vec<String>)> {
-    let mut out = Vec::new();
-    if !dir.is_dir() {
-        return out;
-    }
-    let name = dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let facts = crate::onboarding::repos::facts(dir);
-    if let (_, _, Some(p)) = crate::onboarding::repos::suggest(&facts, &name, &dir.to_string_lossy(), None) {
-        out.push((p.run.unwrap_or_default(), p.args));
-    }
-    if let Ok(d) = crate::projectdetect::detect(dir, &[]) {
-        out.push((d.run.unwrap_or_default(), Vec::new()));
-    }
-    out
+    crate::runguard::detected_runs(dir)
 }
 
-/// Smí MCP dát zástupci tenhle příkaz a argumenty? Kontroluje jen to, co se proti `old` změnilo.
+/// Smí MCP dát zástupci tenhle příkaz a argumenty? Kontroluje jen to, co se proti `old` změnilo
+/// (pravidla jsou `runguard::check`, tady jen věty pro MCP).
 pub fn check_cmd(old: Option<&Project>, new: &Project, host: &dyn Host) -> Result<(), String> {
+    use crate::runguard::{Issue, check};
     let run_changed = old.map(|o| o.run != new.run).unwrap_or(new.run.is_some());
     let args_changed = old.map(|o| o.args != new.args).unwrap_or(!new.args.is_empty());
-    if let Some(exe) = new.exe.as_deref()
-        && old.map(|o| o.exe.as_deref() != Some(exe)).unwrap_or(true)
-        && (!exe.trim().to_ascii_lowercase().ends_with(".exe") || exe.contains(['"', '\0', '\n']))
-    {
-        return Err(trf!("exe „{exe}“: čekám cestu k souboru .exe.", "exe “{exe}”: expected a path to an .exe file."));
-    }
-    if !run_changed && !args_changed {
-        return Ok(());
-    }
-    let found = new.path.as_deref().map(|p| host.detected_runs(Path::new(p))).unwrap_or_default();
-    if run_changed && let Some(run) = new.run.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
-        let ok = PM_SCRIPT.is_match(&run.to_ascii_lowercase()) || found.iter().any(|(r, _)| r == run);
-        if !ok {
-            let known: Vec<&str> = found.iter().map(|(r, _)| r.as_str()).filter(|r| !r.is_empty()).collect();
+    let exe_changed = old.map(|o| o.exe != new.exe).unwrap_or(true);
+    let found = || new.path.as_deref().map(|p| host.detected_runs(Path::new(p))).unwrap_or_default();
+    match check(new.exe.as_deref(), exe_changed, new.run.as_deref(), run_changed, &new.args, args_changed, found) {
+        Ok(()) => Ok(()),
+        Err(Issue::Exe(exe)) => Err(trf!("exe „{exe}“: čekám cestu k souboru .exe.", "exe “{exe}”: expected a path to an .exe file.")),
+        Err(Issue::Run { run, known }) => {
             let hint = if known.is_empty() { String::new() } else { trf!(" Ve složce jsem našel: {}.", " Found in the folder: {}.", known.join(", ")) };
-            return Err(trf!(
+            Err(trf!(
                 "Příkaz „{run}“ zástupci přes MCP dát nejde: zástupce se spouští bez potvrzení, proto jen skript balíčkovače (npm/pnpm/yarn/bun run <skript>) nebo příkaz, který Ledge sám najde ve složce projektu.{hint} Jiný příkaz přidej jako rychlou akci typu command (actions_add) — ta se před prvním spuštěním zeptá.",
                 "The command “{run}” can't be given to a shortcut over MCP: shortcuts start without confirmation, so only a package-manager script (npm/pnpm/yarn/bun run <script>) or a command Ledge finds in the project folder itself is allowed.{hint} Add any other command as a quick action of kind command (actions_add) — it asks before its first run."
-            ));
+            ))
         }
-    }
-    if args_changed && !new.args.is_empty() && !found.iter().any(|(_, a)| *a == new.args) {
-        return Err(tr(
+        Err(Issue::Args) => Err(tr(
             "Argumenty zástupci přes MCP dát nejde (spouští se bez potvrzení). Aplikaci s argumenty přidej jako rychlou akci typu app (actions_add) — ta se před prvním spuštěním zeptá.",
-            "Arguments can't be given to a shortcut over MCP (it starts without confirmation). Add an app with arguments as a quick action of kind app (actions_add) — it asks before its first run."
+            "Arguments can't be given to a shortcut over MCP (it starts without confirmation). Add an app with arguments as a quick action of kind app (actions_add) — it asks before its first run.",
         )
-        .into());
+        .into()),
     }
-    Ok(())
 }
 
 fn ids_of<'a>(it: impl Iterator<Item = &'a str>) -> String {
@@ -266,7 +240,7 @@ mod tests {
             ("npx something", false),
             // „npm run“ bez skriptu jen vypíše skripty (projde jako skript „run“) — neškodné
         ] {
-            assert_eq!(PM_SCRIPT.is_match(run), ok, "{run}");
+            assert_eq!(crate::runguard::run_ok(run, &[]), ok, "{run}");
         }
     }
 

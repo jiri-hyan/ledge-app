@@ -23,6 +23,8 @@ param(
 # 'Continue': git/gh píšou průběh na stderr, PowerShell 5.1 by to pod 'Stop' bral jako chybu —
 # návratové kódy se kontrolují výslovně ($LASTEXITCODE) a chyby končí `exit 1`
 $ErrorActionPreference = 'Continue'
+# výstup gitu / gh je UTF-8 už od začátku (hlášky denylistu s diakritikou); skript sám zůstává UTF-8 s BOM kvůli PS 5.1
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $root = Split-Path -Parent $PSScriptRoot
 # build nesmí dusit ostatní práci na stroji — potomci (pnpm, cargo, rustc) prioritu zdědí
 (Get-Process -Id $PID).PriorityClass = 'BelowNormal'

@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  accentCss, BGS, CARD_ACCENTS, cardLookAttrs, customizedCards, DENSITIES, normalizeCardLook, patchCardLook, resetCardLooks, setCardLook, VIEW_CARDS, VIEWS, viewOf,
+  accentCss, BGS, CARD_ACCENTS, cardLookAttrs, customizedCards, DENSITIES, normalizeCardLook, patchCardLook, resetCardLooks, setCardLook, VIEW_CARDS, VIEWS, viewOf, viewsOf,
 } from "./look.ts";
 import { clone, normalizeLayout, pageOf, sameLayout } from "./model.ts";
 import { fullLayout } from "./fullLayout.mjs";
@@ -74,4 +74,12 @@ test("zrcadlo Rustu: akcenty karty jako tilelook.rs", () => {
   const src = readFileSync(new URL("../../src-tauri/src/tilelook.rs", import.meta.url), "utf8");
   const block = src.slice(src.indexOf("pub const CARD_ACCENTS"), src.indexOf("];", src.indexOf("pub const CARD_ACCENTS")));
   assert.deepEqual(block.match(/"([a-z]+)"/g).map((s) => s.slice(1, -1)), [...CARD_ACCENTS]);
+});
+
+test("Bento jen u karet, které ho kreslí", () => {
+  assert.deepEqual(viewsOf("notes"), ["list", "tiles", "bento", "compact"]);
+  assert.deepEqual(viewsOf("actions"), ["list", "tiles", "compact"]);
+  assert.deepEqual(viewsOf("clock"), []);
+  assert.deepEqual(normalizeCardLook({ view: "bento" }, "repos"), { view: "bento" });
+  assert.equal(normalizeCardLook({ view: "bento" }, "actions"), undefined, "akce bento nekreslí");
 });

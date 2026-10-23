@@ -64,6 +64,16 @@ async function copy(paths: string[], format: ClipFormat) {
 
 const run = (f: () => Promise<unknown>) => () => f().catch(sayError);
 
+/** Vložit ze schránky (tlačítko v hlavičce karty, paleta `Ctrl+K`). */
+export async function pasteToShelf() {
+  try {
+    const n = (await shelfApi.paste()) ?? 0;
+    say(tp("cards.shelf.pasted", n, ["{n} položka vložena ze schránky", "{n} položky vloženy ze schránky", "{n} položek vloženo ze schránky"]));
+  } catch (e) {
+    sayError(e);
+  }
+}
+
 function Row(p: { it: ShelfItem }) {
   let start: { x: number; y: number } | null = null;
   const down = (e: PointerEvent) => {
@@ -97,6 +107,12 @@ function Row(p: { it: ShelfItem }) {
       </div>
       <Show when={p.it.missing}><span class="pill r">{t("cards.shelf.missing", "chybí")}</span></Show>
       <span class="r">
+        <Show when={p.it.extra === "text"}>
+          <button class="mini" disabled={p.it.missing} title={t("cards.shelf.copyContentTip", "Zkopírovat textový obsah souboru do schránky")} onClick={run(async () => { await shelfApi.copyContent(p.it.path); say(t("cards.shelf.contentCopied", "Obsah souboru je ve schránce")); })}>{t("cards.shelf.copyContent", "Obsah")}</button>
+        </Show>
+        <Show when={p.it.extra === "image"}>
+          <button class="mini" disabled={p.it.missing} title={t("cards.shelf.resizeTip", "Zmenšená kopie: PNG, delší strana nejvýš 1024 px (originál zůstane)")} onClick={run(async () => { await shelfApi.resize(p.it.path); say(t("cards.shelf.resized", "Zmenšená kopie je v přihrádce")); })}>{t("cards.shelf.resize", "Zmenšit")}</button>
+        </Show>
         <button class="mini" title={t("cards.shelf.copyPathTip", "Kopírovat cestu do schránky")} onClick={() => copy([p.it.path], "plain")}>{t("cards.shelf.copyPath", "Cesta")}</button>
         <button class="mini" title={t("cards.shelf.copyClaudeTip", "Kopírovat jako zmínku pro Claude Code (@cesta)")} onClick={() => copy([p.it.path], "claude")}>@</button>
         <button class="mini" disabled={p.it.missing} onClick={run(() => shelfApi.open(p.it.path))}>{t("cards.shelf.open", "Otevřít")}</button>
@@ -125,6 +141,7 @@ export default function ShelfCard(p: { wide?: boolean; menu?: JSX.Element }) {
           <span class="ic" style="background:var(--teal)" />
           {t("cards.shelf.title", "Přihrádka")}
           <span class="n">{items().length}</span>
+          <button class="mini" title={t("cards.shelf.pasteTip", "Vložit soubory, obrázek nebo text ze schránky")} onClick={() => void pasteToShelf()}>{t("cards.shelf.paste", "Vložit")}</button>
           <button class="mini" title={t("cards.shelf.copyAllTip", "Všechny cesty do schránky, každá na řádek")} onClick={() => copy([], "plain")}>{t("cards.shelf.copyAll", "Kopírovat vše")}</button>
           <button class="mini" title={t("cards.shelf.copyAllClaudeTip", "Všechny jako zmínky pro Claude Code na jednom řádku")} onClick={() => copy([], "claude")}>{t("cards.shelf.copyAllClaude", "@ vše")}</button>
           <button class="mini" onClick={() => setConfirm(true)}>{t("cards.shelf.clear", "Vyprázdnit")}</button>

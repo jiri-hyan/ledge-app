@@ -8,6 +8,7 @@ import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
 import type { CardView } from "../layout/look";
 import ShowMore, { useCap } from "../layout/ShowMore";
+import { saveProjectFields } from "../projects/state";
 import "./repos.css";
 
 /** Repa s neuloženou / nepushnutou prací a ta, co zaostávají za remote. */
@@ -57,6 +58,15 @@ export default function Repos(p: { s: Snapshot; view?: CardView; menu?: JSX.Elem
               <Show when={pr.git!.behind > 0 && pr.git!.dirty === 0}>
                 <button class="mini" disabled={busy() === pr.id} aria-busy={busy() === pr.id} title="git pull --ff-only" onClick={() => pull(pr)}>{busy() === pr.id ? "…" : t("cards.repos.pull", "Pull")}</button>
               </Show>
+              <button
+                class="mini"
+                classList={{ on: !!pr.muteDirty }}
+                aria-pressed={!!pr.muteDirty}
+                title={pr.muteDirty ? t("cards.repos.unmuteTitle", "Znovu upozorňovat v proužku a v hlavičce") : t("cards.repos.muteTitle", "Nezobrazovat v proužku a v hlavičce šuplíku (dlaždice stav ukáže dál)")}
+                onClick={() => void saveProjectFields(pr.id, { muteDirty: !pr.muteDirty })}
+              >
+                {pr.muteDirty ? t("cards.repos.muted", "Ztišeno") : t("cards.repos.mute", "Ztišit")}
+              </button>
               <button class="mini" title={t("cards.repos.terminal", "Terminál")} aria-label={t("cards.repos.terminalIn", "Terminál v {name}", { name: pr.name })} onClick={() => api.openIn(pr.id, "terminal")}>›_</button>
             </span>
           </div>

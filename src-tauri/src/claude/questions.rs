@@ -56,6 +56,35 @@ pub struct Ask {
     pub answerable: bool,
 }
 
+/// Záznam o otázce Clauda v deníku (posledních `MAX_LOG` událostí pro diagnostiku v Nastavení).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionLog {
+    pub id: u64,
+    pub at: u64,
+    pub session_id: String,
+    pub title: String,
+    /// `holding` · `shown` · `answered` · `released` · `expired` · `turnEnded` · `skipped`
+    pub outcome: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+const MAX_LOG: usize = 20;
+
+fn push_log(g: &mut Inner, entry: QuestionLog) {
+    if let Some(existing) = g.question_log.iter_mut().find(|x| x.id != 0 && x.id == entry.id) {
+        existing.at = entry.at;
+        existing.outcome = entry.outcome;
+        if entry.detail.is_some() {
+            existing.detail = entry.detail;
+        }
+        return;
+    }
+    g.question_log.insert(0, entry);
+    g.question_log.truncate(MAX_LOG);
+}
+
 /// Odpověď z UI na jednu otázku (pořadí jako `Ask.questions`): vybrané možnosti + vlastní text.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -169,13 +198,30 @@ fn wait_on(sessions: &mut std::collections::HashMap<String, Session>, sid: &str,
 pub(super) fn on_event(g: &mut Inner, ev: &str, sid: &str, tool: &str, now: u64) {
     let turn_over = matches!(ev, "UserPromptSubmit" | "Stop" | "SessionEnd");
     let answered_there = ev == "PostToolUse" && tool == TOOL;
+    let mut ended_ids = Vec::new();
     g.asks.retain(|(a, tx)| {
         let gone = a.session_id == sid && (turn_over || (answered_there && tx.is_none()));
-        if gone && let Some(tx) = tx {
-            let _ = tx.send(Outcome::Release);
+        if gone {
+            if let Some(tx) = tx {
+                let _ = tx.send(Outcome::Release);
+            }
+            ended_ids.push((a.id, a.session_id.clone(), a.questions.first().map(name).unwrap_or_default(), if answered_there { "answered" } else { "turnEnded" }, end_detail(ev)));
         }
         !gone && (tx.is_some() || a.expires_at > now)
     });
+    for (id, s_id, title, out, detail) in ended_ids {
+        push_log(g, QuestionLog { id, at: now, session_id: s_id, title, outcome: out.into(), detail: Some(detail.into()) });
+    }
+}
+
+/// Lidská věta, proč otázka skončila mimo Ledge (do deníku v Nastavení, ne do logu).
+fn end_detail(ev: &str) -> &'static str {
+    match ev {
+        "PostToolUse" => crate::i18n::tr("odpověď padla v Claude Code", "answered in Claude Code"),
+        "UserPromptSubmit" => crate::i18n::tr("nový pokyn v Claude Code", "new prompt in Claude Code"),
+        "SessionEnd" => crate::i18n::tr("session skončila", "the session ended"),
+        _ => crate::i18n::tr("Claude ukončil tah", "Claude ended the turn"),
+    }
 }
 
 impl Claude {
@@ -186,6 +232,10 @@ impl Claude {
     pub fn questions(&self) -> Vec<Ask> {
         let now = now_ms();
         self.inner.lock().asks.iter().filter(|(a, _)| a.expires_at > now).map(|(a, _)| a.clone()).collect()
+    }
+
+    pub fn question_log(&self) -> Vec<QuestionLog> {
+        self.inner.lock().question_log.clone()
     }
 
     /// Čeká na šéfa: schválení nebo otázka (peek, jantarový proužek).
@@ -201,8 +251,16 @@ impl Claude {
             return None;
         }
         let sid = s(body, "session_id");
-        let input = body.get("tool_input")?;
-        let questions = parse(input)?;
+        let Some(input) = body.get("tool_input") else {
+            let mut g = self.inner.lock();
+            push_log(&mut g, QuestionLog { id: 0, at: now_ms(), session_id: sid, title: TOOL.into(), outcome: "skipped".into(), detail: Some(crate::i18n::tr("hook neposlal otázku", "the hook sent no question").into()) });
+            return None;
+        };
+        let Some(questions) = parse(input) else {
+            let mut g = self.inner.lock();
+            push_log(&mut g, QuestionLog { id: 0, at: now_ms(), session_id: sid, title: TOOL.into(), outcome: "skipped".into(), detail: Some(crate::i18n::tr("otázku Ledge neumí ukázat (víc než 4 otázky, víc než 8 možností nebo stejné možnosti) — odpověz v Claude Code", "Ledge can't show this question (more than 4 questions, more than 8 options or duplicates) — answer in Claude Code").into()) });
+            return None;
+        };
         if sid.is_empty() {
             return None;
         }
@@ -216,8 +274,18 @@ impl Claude {
             let now = now_ms();
             let cwd = s(body, "cwd");
             let expires_at = now + if answerable { hold.as_millis() as u64 } else { SHOW_ONLY_MS };
+            let first_title = questions.first().map(name).unwrap_or_else(|| TOOL.into());
+            let q_count = questions.len();
             wait_on(&mut g.sessions, &sid, &cwd, now);
-            g.asks.push((Ask { id, session_id: sid, cwd, questions, created_at: now, expires_at, answerable }, answerable.then_some(tx)));
+            g.asks.push((Ask { id, session_id: sid.clone(), cwd, questions, created_at: now, expires_at, answerable }, answerable.then_some(tx)));
+            push_log(&mut g, QuestionLog {
+                id,
+                at: now,
+                session_id: sid,
+                title: first_title,
+                outcome: if answerable { "holding" } else { "shown" }.into(),
+                detail: Some(trf!("otázek: {q_count}", "questions: {q_count}")),
+            });
             id
         };
         (self.on_change)();
@@ -230,6 +298,7 @@ impl Claude {
                 // termín: uklidit pod zámkem; odpověď, která to stihla těsně před ním, platí
                 let mut g = self.inner.lock();
                 g.asks.retain(|(a, _)| a.id != id);
+                push_log(&mut g, QuestionLog { id, at: now_ms(), session_id: String::new(), title: String::new(), outcome: "expired".into(), detail: None });
                 drop(g);
                 (self.on_change)();
                 rx.try_recv().ok()
@@ -250,10 +319,12 @@ impl Claude {
         if let Some(tx) = tx {
             let _ = tx.send(Outcome::Answer(map));
         }
+        let now = now_ms();
         if let Some(sess) = g.sessions.get_mut(&a.session_id) {
             sess.state = SessionState::Working;
-            sess.updated_at = now_ms();
+            sess.updated_at = now;
         }
+        push_log(&mut g, QuestionLog { id: a.id, at: now, session_id: a.session_id, title: a.questions.first().map(name).unwrap_or_default(), outcome: "answered".into(), detail: None });
         drop(g);
         (self.on_change)();
         Ok(())
@@ -263,9 +334,11 @@ impl Claude {
     pub fn release_question(&self, id: u64) -> bool {
         let mut g = self.inner.lock();
         let Some(i) = g.asks.iter().position(|(a, _)| a.id == id) else { return false };
-        if let (_, Some(tx)) = g.asks.remove(i) {
+        let (a, tx) = g.asks.remove(i);
+        if let Some(tx) = tx {
             let _ = tx.send(Outcome::Release);
         }
+        push_log(&mut g, QuestionLog { id: a.id, at: now_ms(), session_id: a.session_id, title: a.questions.first().map(name).unwrap_or_default(), outcome: "released".into(), detail: None });
         drop(g);
         (self.on_change)();
         true
@@ -407,6 +480,41 @@ mod tests {
     /// spojeným „, “ — přesně tvar, který Claude Code 2.1.x čeká (`answers`: otázka → řetězec,
     /// „multi-select answers are comma-separated“; pole by si sám spojil stejně). Víc otázek v jednom
     /// volání, „Jiné…“ víceřádkové a s unicode.
+    /// Deník otázek (zadání týden 43, bod 7a): každá otázka jeden řádek, nejnovější nahoře, stav se
+    /// přepisuje podle id (čeká → odpovězeno / předáno / konec tahu), nečitelné se zapíšou jako přeskočené.
+    #[test]
+    fn question_log_records_outcomes() {
+        let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1));
+        c.set_question_hold(5);
+        let c2 = c.clone();
+        let h = std::thread::spawn(move || c2.handle_question(&ask_body("s")));
+        let a = wait_for_ask(&c);
+        assert_eq!(c.question_log()[0].outcome, "holding");
+        c.answer_question(a.id, &[reply(&["B"], None)]).unwrap();
+        h.join().unwrap();
+        let log = c.question_log();
+        assert_eq!((log.len(), log[0].id, log[0].outcome.as_str(), log[0].title.as_str()), (1, a.id, "answered", "Hlava"), "titulek = štítek otázky");
+        // konec tahu
+        let c2 = c.clone();
+        let h = std::thread::spawn(move || c2.handle_question(&ask_body("s")));
+        let b = wait_for_ask(&c);
+        c.handle_event(&json!({"hook_event_name": "Stop", "session_id": "s"}));
+        h.join().unwrap();
+        let log = c.question_log();
+        assert_eq!((log.len(), log[0].id, log[0].outcome.as_str()), (2, b.id, "turnEnded"));
+        // nečitelná otázka = přeskočeno (id 0, neslučuje se)
+        let bad = json!({"tool_name": TOOL, "session_id": "s", "tool_input": {"questions": []}});
+        assert_eq!(c.handle_question(&bad), None);
+        assert_eq!(c.handle_question(&bad), None);
+        let log = c.question_log();
+        assert_eq!((log.len(), log[0].outcome.as_str(), log[1].outcome.as_str()), (4, "skipped", "skipped"));
+        // strop deníku
+        for _ in 0..30 {
+            c.handle_question(&bad);
+        }
+        assert_eq!(c.question_log().len(), MAX_LOG);
+    }
+
     #[test]
     fn multi_select_sends_every_checked_option() {
         let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1));

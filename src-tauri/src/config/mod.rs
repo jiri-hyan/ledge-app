@@ -54,6 +54,10 @@ pub struct Config {
     /// Vzhled: motiv, akcent, hustota, písmo, animace, proužek (`appearance.rs`). Pořadí karet je v `layout`.
     pub appearance: crate::appearance::AppearanceConfig,
     pub projects: Vec<Project>,
+    /// Upozornění na neuloženou / nepushnutou práci v repech (chip v hlavičce, proužek): vypínač a „Přečteno“.
+    /// Chybí = upozorňovat jako dřív. Ztišení jednoho repa je `projects[].muteDirty`.
+    #[serde(skip_serializing_if = "GitAlerts::is_default")]
+    pub git_alerts: GitAlerts,
     /// Rychlé akce (web, soubor, složka, aplikace, příkaz) — karta „Rychlé akce“ a paleta (`actions.rs`).
     pub actions: Vec<crate::actions::Action>,
     /// Jazyk rozhraní (`ui.lang`).
@@ -108,6 +112,7 @@ impl Default for Config {
             update: UpdateConfig::default(),
             appearance: Default::default(),
             projects: Vec::new(),
+            git_alerts: GitAlerts::default(),
             actions: Vec::new(),
             ui: Default::default(),
             onboarding: Default::default(),

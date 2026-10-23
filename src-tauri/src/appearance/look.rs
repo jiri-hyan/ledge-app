@@ -48,6 +48,10 @@ pub enum Material {
     Soft,
     /// čárkované rámečky bez výplně (terminál)
     Frame,
+    /// akryl / Mica s 1px horním odleskem (Fluent; kolo 18)
+    Acrylic,
+    /// teplé tónované plochy s měkkým stínem (Teplý; kolo 18)
+    Tinted,
 }
 
 /// Rozložení hlavní stránky (sloupce, mezery, okraje).
@@ -69,6 +73,8 @@ pub enum Layout {
     Mosaic,
     /// velké měkké dlaždice ve 3 sloupcích
     Tiles,
+    /// čistý 4sloupcový panel bez okrajů (Fluent; kolo 18)
+    Panel,
 }
 
 /// Předvolba šířky šuplíku.

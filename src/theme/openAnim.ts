@@ -7,6 +7,7 @@
 //  - rozplynutí: jen průhlednost a jemné zvětšení;
 //  - pád: celý šuplík spadne shora, jednou se jemně odrazí a usadí (jen posun a průhlednost);
 //  - rozvinutí: tvar se rozvine shora dolů bez překmitu a karty naskakují jedna po druhé (`Plan.reveal`);
+//  - tekutá kapsle: pružné roztažení ze středu horní hrany s jemným přestřelem (Dynamic Island);
 //  - žádná (i systémové „omezit pohyb“): `null` = okamžitě.
 // Stejný plán přehrává náhled v Nastavení (`settings/panels/AppearanceMotion.tsx`) na malém šuplíku.
 import type { MotionStyle } from "../types.ts";
@@ -106,6 +107,23 @@ export function openPlan(style: MotionStyle, speed: number, g: Geo, fromVisible 
       reveal: { step: UNFOLD_STEP_MS, blur: false },
     };
   }
+  if (style === "liquid") {
+    // Dynamic Island (kolo 18): kapsle ze středu horní hrany se pružně roztáhne, jemně
+    // přestřelí a usadí — jen transform + opacity
+    return {
+      frames: [
+        { opacity: 0.6, transform: "scale(0.42, 0.28)", transformOrigin: "50% 0", offset: 0 },
+        { opacity: 1, transform: "scale(1.04, 1.03)", transformOrigin: "50% 0", offset: 0.72, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" },
+        { opacity: 1, transform: "scale(0.99, 0.995)", transformOrigin: "50% 0", offset: 0.88, easing: "ease-out" },
+        { opacity: 1, transform: "scale(1, 1)", transformOrigin: "50% 0", offset: 1 },
+      ],
+      duration: ms(480, speed),
+      easing: "linear",
+      delay: 0,
+      start: { transform: "scale(0.42, 0.28)", opacity: "0.6" },
+      breath: false,
+    };
+  }
   // fade
   return {
     frames: [
@@ -151,6 +169,18 @@ export function closePlan(style: MotionStyle, speed: number, g: Geo): Plan | nul
       frames: [{ transform: "translateY(0%)", opacity: 1 }, { transform: "translateY(-40%)", opacity: 0 }],
       duration: cap(ms(240, speed)),
       easing: "cubic-bezier(0.5, 0, 0.9, 0.5)",
+    };
+  }
+  if (style === "liquid") {
+    return {
+      ...base,
+      frames: [
+        { opacity: 1, transform: "scale(1, 1)", transformOrigin: "50% 0", offset: 0 },
+        { opacity: 0.9, transform: "scale(1.02, 0.96)", transformOrigin: "50% 0", offset: 0.2, easing: "ease-in" },
+        { opacity: 0, transform: "scale(0.42, 0.28)", transformOrigin: "50% 0", offset: 1, easing: "cubic-bezier(0.4, 0, 0.8, 0.2)" },
+      ],
+      duration: cap(ms(220, speed)),
+      easing: "linear",
     };
   }
   if (style === "fade") {

@@ -11,7 +11,7 @@ import { IconBell, IconFolder, IconGithub, IconLink, IconNote, IconTerminal } fr
 import { logoSrc } from "../logos";
 import type { NotePreset } from "../notes/store";
 import { say, sayError } from "../ui/toast";
-import { failInfo, healthText, healthTone, isLive, placeOf, tileHealth, tileTip } from "../projects/model";
+import { actsPress, failInfo, healthText, healthTone, isLive, placeOf, tileHealth, tileTip } from "../projects/model";
 import { startProject, stopProject, tipEnter, tipLeave } from "../projects/state";
 import { t } from "../i18n";
 import { BgTileButton } from "../sessions/BgLaunch";
@@ -146,7 +146,8 @@ export default function ProjectTile(p: {
       </Show>
       {/* akce uvnitř dlaždice dole (překryjí jen její text), ikony s popiskem v title */}
       <Show when={!p.editing}>
-        <div class="acts" role="toolbar" aria-label={t("cards.projects.actions", "Akce pro {name}", { name: pr().name })}>
+        {/* stisk na tlačítku akce nezačne tah dlaždice ani ji nespustí; prázdné místo lišty táhne dál (`actsPress`) */}
+        <div class="acts" role="toolbar" aria-label={t("cards.projects.actions", "Akce pro {name}", { name: pr().name })} onPointerDown={(e) => actsPress(e.target as Element) === "button" && e.stopPropagation()}>
           <Show when={live()} fallback={
             <Show when={pr().kind === "dev" || pr().pathOk}>
               <button title={t("cards.proj.run", "Spustit")} aria-label={t("cards.projects.launch", "Spustit {name}", { name: pr().name })} onClick={() => startProject(pr(), proc())}>▶</button>
@@ -175,7 +176,23 @@ export default function ProjectTile(p: {
           <Show when={pr().github}>{(u) => <button title="GitHub" aria-label={t("cards.projects.onGithub", "{name} na GitHubu", { name: pr().name })} onClick={() => api.openUrl(u())}><IconGithub /></button>}</Show>
           <For each={pr().links}>{(l) => <button title={`${l.label} · ${l.url}`} aria-label={l.label} onClick={() => api.openUrl(l.url)}><IconLink /></button>}</For>
           </span>
-          <button title={t("cards.proj.more", "Upravit, změnit složku nebo příkaz, vzhled…")} aria-label={t("cards.proj.moreOf", "Další volby: {name}", { name: pr().name })} aria-haspopup="menu" onClick={(e) => p.onMenu(e)}>⋯</button>
+          <button
+            class="proj-more"
+            title={t("cards.proj.more", "Upravit, změnit složku nebo příkaz, vzhled…")}
+            aria-label={t("cards.proj.moreOf", "Další volby: {name}", { name: pr().name })}
+            aria-haspopup="menu"
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.stopPropagation();
+              e.preventDefault();
+              p.onMenu(e);
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              // myš otevřela menu už na pointerdown; klik bez počtu = klávesnice (Enter / Mezerník)
+              if (e.detail === 0) p.onMenu(e);
+            }}
+          >⋯</button>
         </div>
       </Show>
     </div>

@@ -38,6 +38,9 @@ pub(crate) struct ProjectView {
     /// vzhled dlaždice (`tilelook::TileLook`); chybí = automaticky
     #[serde(skip_serializing_if = "Option::is_none")]
     look: Option<crate::tilelook::TileLook>,
+    /// ztišené upozornění na neuloženou / nepushnutou práci v proužku a v hlavičce šuplíku
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    mute_dirty: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -56,6 +59,11 @@ pub(crate) struct Snapshot {
     pending: Vec<claude::Pending>,
     /// otázky Clauda (AskUserQuestion) čekající na odpověď v Ledge / jen ukázané
     questions: Vec<claude::Ask>,
+    /// deník posledních otázek Clauda (diagnostika v Nastavení → Claude → Otázky; jen paměť)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    question_log: Vec<claude::QuestionLog>,
+    /// upozornění na neuloženou práci: vypínač a otisk „Přečteno“ (`config.gitAlerts`)
+    git_alerts: crate::config::GitAlerts,
     /// všechny Claude session na PC (`sessions.rs`), seřazené pro kartu
     sessions: Vec<sessions::Row>,
     /// hooky Ledge v `~/.claude/settings.json`
@@ -194,6 +202,7 @@ pub(crate) fn snapshot() -> Snapshot {
             app: p.exe.clone().or_else(|| p.app_name.clone()),
             place,
             look: p.look.clone(),
+            mute_dirty: p.mute_dirty,
         });
     }
     let sessions = {
@@ -233,6 +242,8 @@ pub(crate) fn snapshot() -> Snapshot {
         procs: c.procs.snapshot(),
         pending: c.claude.pending(),
         questions: c.claude.questions(),
+        question_log: c.claude.question_log(),
+        git_alerts: cfg.git_alerts.clone(),
         sessions,
         hooks: hooksetup::status_cached(cfg.claude.port),
         limits: crate::limitslive::view(),

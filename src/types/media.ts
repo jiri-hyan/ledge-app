@@ -25,6 +25,10 @@ export interface VolumeView {
   muted: boolean;
   /** název zařízení; "" = nevíme */
   device: string;
+  /** výchozí mikrofon ztlumený; null / chybí = žádný mikrofon (nebo starší jádro) */
+  micMuted?: boolean | null;
+  /** aktivní výstupy pro přepínač (`active` = výchozí); chybí = starší jádro */
+  devices?: { id: string; name: string; active: boolean }[];
 }
 
 /** Baterie (Rust `battery::BatteryView`); jen stroj s baterií. */

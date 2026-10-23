@@ -16,4 +16,10 @@ export const shelfApi = {
   remove: (path: string) => call<boolean>("shelf_remove", { path }),
   clear: () => call("shelf_clear"),
   dragOut: (paths: string[]) => call("shelf_drag_out", { paths }),
+  /** ze schránky: soubory jako odkazy, obrázek / text jako nový soubor v `shelf-drops`; vrací počet */
+  paste: () => call<number>("shelf_paste"),
+  /** text souboru z přihrádky (≤ 256 kB, UTF-8) do schránky */
+  copyContent: (path: string) => call("shelf_copy_content", { path }),
+  /** zmenšená kopie obrázku (PNG, delší strana ≤ 1024 px) do přihrádky; vrací její cestu */
+  resize: (path: string) => call<string>("shelf_resize_image", { path, maxPx: 1024 }),
 };

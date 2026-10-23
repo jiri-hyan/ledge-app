@@ -31,7 +31,7 @@ export const DENSITY = { compact: 0.78, normal: 1, comfy: 1.22 } as const;
 export const RADIUS = { sharp: 0.35, normal: 1, round: 1.4 } as const;
 export const STRIP_SIZE = { small: 0.85, normal: 1, large: 1.2 } as const;
 /** Styly animací v pořadí panelu (zrcadlo `MotionStyle` v appearance.rs). */
-export const MOTION_STYLES: MotionStyle[] = ["spring", "smooth", "snappy", "bounce", "fade", "notch", "drop", "unfold", "none"];
+export const MOTION_STYLES: MotionStyle[] = ["spring", "smooth", "snappy", "bounce", "fade", "notch", "drop", "unfold", "liquid", "none"];
 export const STRIP_STYLES: StripStyle[] = ["pill", "line", "dot", "term", "tag", "glow", "block", "drop"];
 const keysOf = <T extends string>(o: Record<T, unknown>) => Object.keys(o) as T[];
 
@@ -109,6 +109,7 @@ const CSS_EASE: Record<Exclude<MotionStyle, "none">, { spring: string; ease: str
   notch: { spring: "cubic-bezier(0.3, 1.35, 0.5, 1)", ease: "cubic-bezier(0.2, 0.9, 0.25, 1.05)" },
   drop: { spring: "cubic-bezier(0.34, 1.6, 0.64, 1)", ease: "cubic-bezier(0.2, 0.9, 0.25, 1.05)" },
   unfold: { spring: "cubic-bezier(0.25, 0.8, 0.3, 1)", ease: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
+  liquid: { spring: "cubic-bezier(0.32, 1.65, 0.54, 1)", ease: "cubic-bezier(0.18, 0.92, 0.24, 1.06)" },
 };
 
 export type WidenMotion = { shrinkMs: number; fadeMs: number; restoreMs: number; easing: string };

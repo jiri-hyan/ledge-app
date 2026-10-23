@@ -18,6 +18,9 @@ pub(crate) struct ShelfItemView {
     /// soubor / složka na disku není (smazaný, přejmenovaný, odpojený disk) — nemaže se sám
     missing: bool,
     added_ms: u64,
+    /// akce navíc podle přípony: `text` (Obsah) · `image` (Zmenšit) · chybí
+    #[serde(skip_serializing_if = "Option::is_none")]
+    extra: Option<shelf::paste::Extra>,
 }
 
 #[derive(Serialize)]
@@ -37,7 +40,7 @@ pub(crate) fn shelf_list() -> ShelfList {
         .into_iter()
         .map(|i| {
             let (name, dir) = shelf::split(&i.path);
-            ShelfItemView { missing: !Path::new(&i.path).exists(), path: i.path, name, dir, added_ms: i.added_ms }
+            ShelfItemView { missing: !Path::new(&i.path).exists(), extra: shelf::paste::extra_of(&i.path), path: i.path, name, dir, added_ms: i.added_ms }
         })
         .collect();
     ShelfList { enabled, items }
@@ -100,6 +103,32 @@ pub(crate) fn shelf_remove(path: String) -> Result<bool, String> {
 #[tauri::command(async)]
 pub(crate) fn shelf_clear() -> Result<(), String> {
     shelf::clear()
+}
+
+/// Vložit ze schránky (soubory jako odkazy; obrázek / text jako nový soubor v `shelf-drops`). Vrací počet.
+#[tauri::command(async)]
+pub(crate) fn shelf_paste() -> Result<usize, String> {
+    if !core().cfg.read().shelf.enabled {
+        return Err(tr("Přihrádka je vypnutá (Nastavení → Šuplík a karty).", "The shelf is turned off (Settings → Drawer and cards).").into());
+    }
+    shelf::paste::paste_clipboard()
+}
+
+/// Textový obsah souboru z přihrádky (do 256 kB, UTF-8) do schránky Windows. Jen položky přihrádky.
+#[tauri::command(async)]
+pub(crate) fn shelf_copy_content(path: String) -> Result<(), String> {
+    let p = existing(&path)?;
+    let text = shelf::paste::text_of(Path::new(&p), 256 * 1024)?;
+    shelf::clip::set_text(&text)
+}
+
+/// Zmenšená kopie obrázku z přihrádky (delší strana ≤ `max_px`, výchozí 1024) jako PNG do `shelf-drops`
+/// a do přihrádky; originál zůstane. Vrací cestu kopie.
+#[tauri::command(async)]
+pub(crate) fn shelf_resize_image(path: String, max_px: Option<u32>) -> Result<String, String> {
+    let p = existing(&path)?;
+    let out = shelf::paste::resized_copy(Path::new(&p), max_px.unwrap_or(1024).clamp(16, 4096))?;
+    Ok(out.to_string_lossy().into_owned())
 }
 
 /// Tah položek ven (UI ho zavolá, když se s drženým tlačítkem pohne za práh).

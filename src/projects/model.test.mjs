@@ -4,7 +4,7 @@
 //   node --experimental-strip-types --test src/projects/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tipState, clickOf, commitText, failInfo, freshest, healthText, healthTone, isLive, liveProcs, placeOf, placeProblem, preselect, samePath, tileHealth, tileTip, PROJECT_NOTES, notesHidden, projectNotesQuery, whatOf, whereOf, withProjectFields } from "./model.ts";
+import { tipState, clickOf, commitText, failInfo, freshest, healthText, healthTone, isLive, liveProcs, placeOf, placeProblem, preselect, samePath, tileHealth, tileTip, PROJECT_NOTES, notesHidden, projectNotesQuery, whatOf, whereOf, withProjectFields, liveFirst, actsPress } from "./model.ts";
 
 const NOW = 1_792_250_979_530;
 const pr = (o = {}) => ({ id: "orbit", name: "Orbit", kind: "dev", accent: "#2563eb", monogram: "O", logoKey: null, path: "C:\\Work\\orbit-v2", pathOk: true, clonable: false, cloning: false, github: null, links: [], git: null, run: "npm run dev:staging", port: 5210, remote: "acme/orbit", app: null, place: { kind: "ok" }, ...o });
@@ -81,6 +81,9 @@ test("zápis do configu: jen path / run toho projektu, prázdné = smazat klíč
   const b = withProjectFields(a, "orbit", { path: null, run: " pnpm dev " });
   assert.deepEqual(b.projects[0], { id: "orbit", name: "Orbit", remote: "acme/orbit", run: "pnpm dev" });
   assert.deepEqual(withProjectFields(b, "orbit", { run: "" }).projects[0], { id: "orbit", name: "Orbit", remote: "acme/orbit" });
+  const c = withProjectFields(cfg, "orbit", { muteDirty: true });
+  assert.equal(c.projects[0].muteDirty, true);
+  assert.equal("muteDirty" in withProjectFields(c, "orbit", { muteDirty: false }).projects[0], false, "false = smazat klíč");
   assert.equal(withProjectFields(cfg, "neni", { path: "C:\\x" }), cfg);
   assert.deepEqual(withProjectFields({}, "orbit", { path: "C:\\x" }), {});
 });
@@ -135,4 +138,19 @@ test("poznámky projektu v panelu: dotaz s filtrem projektu a stropem 3, zbytek 
   assert.deepEqual(projectNotesQuery("orbit"), { project: "orbit", limit: 3, includeDone: false });
   const cases = [[0, 0, 0], [2, 2, 0], [3, 3, 0], [7, 3, 4], [undefined, 0, 0], [null, 2, 0], [1, 3, 0]];
   for (const [total, shown, want] of cases) assert.equal(notesHidden(total, shown), want, `${total}/${shown}`);
+});
+
+test("Bento: běžící zástupci dopředu, složky a ostatní v pořadí", () => {
+  const e = (id, kind = "project") => (kind === "project" ? { kind, p: { id } } : { kind, f: { id } });
+  const live = (id) => id === "c" || id === "e";
+  const got = liveFirst([e("a"), e("F", "folder"), e("c"), e("d"), e("e")], live).map((x) => x.p?.id ?? x.f.id);
+  assert.deepEqual(got, ["c", "e", "a", "F", "d"]);
+  assert.deepEqual(liveFirst([], live), []);
+});
+
+test("gesto v liště akcí: tlačítko si stisk nechá, prázdné místo dál táhne dlaždici", () => {
+  const el = (inButton) => ({ closest: (sel) => (sel === "button" && inButton ? {} : null) });
+  assert.equal(actsPress(el(true)), "button");
+  assert.equal(actsPress(el(false)), "tile");
+  assert.equal(actsPress(null), "tile");
 });

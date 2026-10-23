@@ -16,6 +16,28 @@ import { isPinned, newPin, togglePin } from "./pins";
 import { completeNote, unarchiveNote } from "./lifecycle";
 import { IconCheck, IconUnarchive } from "./lifeicons";
 import RowMenu from "./RowMenu";
+import { say, sayError } from "../ui/toast";
+import { bentoLines, heroOf, TEMPLATES } from "./bento";
+import { tx } from "../layout/text";
+import { exportNote } from "./exportActions";
+
+function IconCopy() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M4 2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6zM2 5a1 1 0 0 0-1 1v8a2 2 0 0 0 2 2h6a1 1 0 0 0 1-1v-1H3a2 2 0 0 1-2-2V6a1 1 0 0 0-1-1H2z"/>
+    </svg>
+  );
+}
+
+/** Text poznámky do schránky — přes jádro (šuplík nemá fokus, `navigator.clipboard` by selhal). */
+async function copyNote(path: string) {
+  try {
+    await api.noteCopyText(path);
+    say(t("notes.row.copied", "Zkopírováno do schránky"));
+  } catch (e) {
+    sayError(e);
+  }
+}
 
 /** Kolik řádků má karta (stejně jako `notes::CARD_ROWS`). */
 const CARD_ROWS = 8;
@@ -41,6 +63,9 @@ export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: 
       </Show>
       <Show when={p.archived}>
         <button class="note-act" title={t("notes.life.actUnarchive", "Vrátit z archivu")} aria-label={t("notes.life.actUnarchive", "Vrátit z archivu")} onClick={() => void unarchiveNote(n())}><IconUnarchive /></button>
+      </Show>
+      <Show when={!p.archived}>
+        <button class="note-act note-act-copy" title={t("notes.row.copy", "Kopírovat text")} aria-label={t("notes.row.copy", "Kopírovat text")} onClick={() => void copyNote(n().path)}><IconCopy /></button>
       </Show>
       <Show when={!p.archived}>
         <button class="note-pin" classList={{ on: isPinned(p.s.pins, n().path) }} aria-pressed={isPinned(p.s.pins, n().path)} title={isPinned(p.s.pins, n().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.rowPin", "Připnout na plochu — lístek přes ostatní okna")} onClick={() => togglePin(n().path)}><IconPin /></button>
@@ -118,6 +143,24 @@ export function NotesCard(p: {
   const moreCount = () => (p.personal ? p.s.personal.notesMore : cur() === "all" ? p.s.notesMore : Math.max(0, (picked.latest?.total ?? 0) - items().length));
   const open = () => (p.personal ? items().filter((n) => !n.done).length : tabs().find((tb) => tb.id === cur())?.count ?? 0);
   const newKind = () => (cur() === "all" ? undefined : cur());
+
+  // varianta Bento (`bento.ts`): velká připnutá / nejnovější poznámka + dlaždice akcí
+  const bento = () => p.view === "bento" && items().length > 0;
+  const hero = () => heroOf(items(), p.s.pins);
+  const [heroDetail] = createResource(
+    () => (bento() && hero() ? { path: hero()!.path, rev: p.s.notesRev } : null),
+    (k) => api.noteRead(k.path).catch(() => null),
+  );
+  async function fromTemplate(kind: string, text: string) {
+    try {
+      const path = await api.noteCreate({ text, kind, project: null, remind: null, images: [] });
+      const detail = path ? await api.noteRead(path).catch(() => null) : null;
+      if (detail) p.onOpen(detail);
+    } catch (e) {
+      sayError(e);
+    }
+  }
+
   return (
     <div class="card wide" data-anim>
       <h4>
@@ -135,6 +178,36 @@ export function NotesCard(p: {
           <button class="mini ok" onClick={() => p.onNew(newKind())}>{t("notes.card.add", "Přidat poznámku")}</button>
           <button class="mini" onClick={() => newPin()} title={t("notes.pin.newTitle", "Nový lístek na plochu — poznámka přes ostatní okna (QA, checklist)")}>{t("notes.card.addPin", "Nový lístek na plochu")}</button>
         </div>
+      </Show>
+      <Show when={bento() ? hero() : null}>
+        {(h) => (
+          <div class="note-bento">
+            <button class="note-bento-hero" onClick={() => p.onOpen(h())}>
+              <span class="note-bento-head">
+                <span class="note-bento-tag">{isPinned(p.s.pins, h().path) ? t("notes.bento.pinned", "Připnutá na ploše") : t("notes.bento.latest", "Nejnovější")}</span>
+                <span class="note-bento-title">{h().title || t("notes.imageOnly", "(jen obrázek)")}</span>
+                <span class="note-bento-sub">{projName(p.s, h().project)} · {ago(h().createdMs, p.now)}</span>
+              </span>
+              <span class="note-bento-preview">
+                <Show when={bentoLines(heroDetail()?.body).length} fallback={<span class="note-bento-muted">{t("notes.bento.emptyBody", "(bez textu)")}</span>}>
+                  <For each={bentoLines(heroDetail()?.body)}>{(l) => <span class="note-bento-line" classList={{ "note-bento-task": l.task }}>{l.text}</span>}</For>
+                </Show>
+              </span>
+            </button>
+            <div class="note-bento-acts">
+              <button class="mini ok note-bento-btn" onClick={() => p.onNew(newKind())}>+ {t("notes.bento.newMd", "Nová .md")}</button>
+              <div class="note-bento-templates" role="group" aria-label={t("notes.bento.templates", "Nová ze šablony")}>
+                <For each={TEMPLATES}>
+                  {(x) => <button class="mini note-bento-tmpl" title={t("notes.bento.templates", "Nová ze šablony")} onClick={() => void fromTemplate(x.kind, tx(x.body))}>{tx(x.name)}</button>}
+                </For>
+              </div>
+              <div class="note-bento-tools">
+                <button class="mini note-bento-tool" onClick={() => void exportNote(h().path, "html")} title={t("notes.bento.htmlTitle", "Uložit jako HTML — v prohlížeči pak Tisk nebo Uložit jako PDF")}>{t("notes.bento.html", "Uložit HTML…")}</button>
+                <button class="mini note-bento-tool" onClick={() => void openExternal(h().path)} title={t("notes.bento.openTitle", "Otevřít v aplikaci pro .md")}>{t("notes.bento.open", "Otevřít")}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </Show>
       <div class="note-list" data-view={p.view ?? "list"}>
         <For each={items()}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>

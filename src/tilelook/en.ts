@@ -33,6 +33,7 @@ registerDict("en", {
   "cards.cardlook.reset": "Reset to style",
   "cards.cardlook.title": "Card look: {name}",
   "cards.cardlook.view": "View",
+  "cards.cardlook.view.bento": "Bento",
   "cards.cardlook.view.compact": "Compact",
   "cards.cardlook.view.list": "List",
   "cards.cardlook.view.tiles": "Tiles",

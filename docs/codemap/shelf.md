@@ -13,10 +13,12 @@ zmínka pro Claude Code), otevřít, ukázat ve složce, odebrat, vyprázdnit, p
 | `src-tauri/src/shelf/drop.rs` | cíl přetažení: líně vzniklé vlákno `shelf-drop` (OLE STA), neviditelné vrstvené okno (krytí 1/255) s `IDropTarget` (+ `IDropTargetHelper` pro náhled tahu), jen `CF_HDROP`; heuristika „je to OLE tah“ | `set_armed` `ole_drag_likely` `pick_effect` `Target` `run` `OVER` |
 | `src-tauri/src/shelf/dragout.rs` | tah ven: na hlavním vlákně `SHCreateDataObject` (absolutní PIDL) + `SHDoDragDrop` s výchozím zdrojem shellu | `start` `drag` |
 | `src-tauri/src/shelf/clip.rs` | text do schránky (`CF_UNICODETEXT`, opakované `OpenClipboard`) | `set_text` |
-| `src-tauri/src/commands/shelf.rs` | Tauri příkazy; pracují jen s cestami, které v přihrádce jsou (`contains`) | `shelf_list` `shelf_icon` `shelf_copy` `shelf_open` `shelf_reveal` `shelf_remove` `shelf_clear` `shelf_drag_out` |
+| `src-tauri/src/shelf/paste.rs` | Vložit ze schránky: `CF_HDROP` = odkazy (síťové cesty `is_remote` ne), `PNG` / `CF_DIB` / text = nový soubor přes `drops::save`; filtr historie schránky (`cliphist::filter::pre_verdict` + `looks_secret`); WIC → PNG se stropem `MAX_PIXELS` (100 MP); zmenšená kopie; text souboru pro „Obsah“ (jen soubor s textovou příponou); akce navíc podle přípony `extra_of` (jediná pravda, UI ji dostane v `shelf_list`) | `paste_clipboard` `resized_copy` `text_of` `image_to_png` `dib_to_bmp` `extra_of` `Extra` `is_remote` `MAX_IMAGE_BYTES` `MAX_TEXT_UNITS` `MAX_PIXELS` |
+| `src-tauri/src/shelf/drops.rs` | vlastní soubory `%LOCALAPPDATA%\Ledge\shelf-drops`: `create_new` pod volným jménem, strop složky 256 MB, úklid neodkazovaných souborů (po každé změně seznamu a při prvním načtení; čerstvé < 60 s nechá) | `save` `sweep` `sweep_plan` `names` `fits` `drops_dir` `MAX_DIR_BYTES` `FRESH_S` |
+| `src-tauri/src/commands/shelf.rs` | Tauri příkazy; pracují jen s cestami, které v přihrádce jsou (`contains`) | `shelf_list` `shelf_icon` `shelf_copy` `shelf_open` `shelf_reveal` `shelf_remove` `shelf_clear` `shelf_drag_out` `shelf_paste` `shelf_copy_content` `shelf_resize_image` |
 | `threads/hover.rs` | `shelf::Arm::step` každý tik → `drop::set_armed`; při aktivní zóně neotevírá šuplík; mrtvý Ledge = `set_armed(None)` | |
 | `strip.rs` | `StripModel.shelf` (`Hint`), před kreslením `shelf::overlay` na kopii modelu | |
-| `src/shelf/ShelfCard.tsx` · `api.ts` · `model.ts` · `shelf.css` | karta (Práce i Osobní, jen neprázdná), most k jádru, čistá logika (`isDrag`, `cardVisible`, `carriesFiles`), styly `shelf-*` | `ShelfCard` `shelfApi` `DRAG_PX` |
+| `src/shelf/ShelfCard.tsx` · `api.ts` · `model.ts` · `shelf.css` | karta (Práce i Osobní, jen neprázdná; Vložit v hlavičce, u textu Obsah, u obrázku Zmenšit), most k jádru, čistá logika (`isDrag`, `cardVisible`, `carriesFiles`; akce navíc `extra` posílá jádro), styly `shelf-*`; paleta „Vložit schránku do přihrádky“ (`palette/items.ts`, jen s kartou v rozložení) | `ShelfCard` `pasteToShelf` `shelfApi` `DRAG_PX` |
 | `src/i18n/en-shelf.ts` | angličtina `cards.shelf.*` | |
 
 ## Toky
@@ -39,7 +41,9 @@ zmínka pro Claude Code), otevřít, ukázat ve složce, odebrat, vyprázdnit, p
 ## Invarianty a pasti
 
 - **Nikdy `DROPEFFECT_MOVE`** (dovnitř `pick_effect`, ven `COPY | LINK`): zdroj by po „přesunu“ soubor smazal.
-- Ukládají se jen cesty; chybějící soubor se označí „chybí“, nikdy se sám neodebere.
+- Ukládají se jen cesty; chybějící soubor se označí „chybí“, nikdy se sám neodebere. Výjimka: obrázek / text
+  ze schránky a zmenšená kopie nemají cestu → Ledge je uloží jako nový soubor do `shelf-drops` (nikdy vedle
+  originálu, nikdy přes existující soubor). Po odebrání / Vyprázdnit je úklid smaže (jen tyhle vlastní soubory, nikdy cesty z Průzkumníka).
 - Do Claude session se nic neposílá samo (žádné SendInput / fokus) — jen schránka a tah člověkem.
 - **Click-through proužek** drop nedostane → zvláštní okno, viditelné JEN během tahu. Zóna se aktivuje jen
   vjezdem s drženým tlačítkem (klik na taby prohlížeče pod proužkem ne) a jen při OLE kurzoru (posun okna,

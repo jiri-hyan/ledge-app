@@ -62,6 +62,15 @@ Typické úpravy:
   `shape` `rounded` (výchozí) | `circle` | `square` | `glass`, `label` ≤ 40 znaků. Mění se v šuplíku: pravý
   klik na dlaždici / ⋯ v akcích dlaždice → „Upravit vzhled…“ (v režimu úprav stačí klik); přehled a
   „Obnovit vše“ v Nastavení → Šuplík a karty → Upravené karty a zástupci.
+- **Ztišit git upozornění u projektu** (`"muteDirty": true`; chybí / `false` = upozorňovat jako dřív, `false`
+  se nepíše): repo se nepočítá do chipu „N neuloženo · M nepushnuto“ v hlavičce šuplíku ani do proužku
+  (`stripview.rs`); dlaždice (odznaky zdraví) a karta Repa stav ukazují dál. Mění se klikem: chip v hlavičce
+  → „Ztišit u tohoto repa“, tlačítko Ztišit v kartě Repa, Nastavení → projekt → přepínač. „Přečteno“ v témže
+  menu jen zhasne zvýraznění, dokud se počty nezmění (otisk `gitAlerts.read`, přežije restart).
+- **Vypnout upozornění na neuloženou práci úplně** (`"gitAlerts": { "enabled": false }`; chybí = zapnuto jako dřív,
+  výchozí se nepíše): chip v hlavičce i počty v proužku zmizí, dlaždice a karta Repa stav ukazují dál. `read` = krátký
+  otisk stavu označeného „Přečteno“ (a–z 0–9, ≤ 64 znaků; zapisuje ho šuplík, ručně ne). Nastavení → Projekty →
+  „Upozorňovat na neuloženou práci v repech“ a pod ním seznam ztišených rep s Odztišit.
 - **Co a odkud se spouští** (`src/projects/`, `resolve::place_of`): tooltip dlaždice = příkaz, složka, port;
   ⋯ / pravý klik → **Upravit…** (příkaz jde přepsat přímo, Enter uloží `run`), **Změnit složku…** (dialog
   Windows → `path`), Stop / Restart. `path` v configu vyhrává — **neexistující `path` = chyba na dlaždici**,

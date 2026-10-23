@@ -44,6 +44,8 @@ export interface ProjectView {
   place?: Place;
   /** vlastní vzhled dlaždice (`tilelook.rs`); chybí = automaticky */
   look?: TileLook;
+  /** ztišené upozornění na neuloženou / nepushnutou práci v proužku a v hlavičce šuplíku */
+  muteDirty?: boolean;
 }
 
 /** Odkud projekt poběží: jasné · `path` neexistuje · víc složek s repem (vybrat) · nic na disku. */

@@ -14,7 +14,7 @@
 
 pub mod apps;
 pub mod filter;
-mod win;
+pub(crate) mod win;
 #[cfg(test)]
 mod tests;
 

@@ -62,6 +62,15 @@ pub(crate) fn note_read(path: String) -> Result<notes::edit::NoteDetail, String>
     notes::edit::read(&notes_root().ok_or_else(off)?, Path::new(&path))
 }
 
+/// Text poznámky (tělo bez frontmatteru; prázdné = nadpis) do schránky Windows — „Kopírovat text“ u řádku.
+/// Přes jádro, ne `navigator.clipboard`: šuplík nemá fokus a WebView bez fokusu zápis odmítne.
+#[tauri::command(async)]
+pub(crate) fn note_copy_text(path: String) -> Result<(), String> {
+    let d = notes::edit::read(&notes_root().ok_or_else(off)?, Path::new(&path))?;
+    let text = if d.body.trim().is_empty() { d.view.title.clone() } else { d.body };
+    crate::shelf::clip::set_text(&text)
+}
+
 /// Uloží úpravu (`copy` = jako novou poznámku vedle původní). Jiný obsah na disku → `changed`.
 #[tauri::command(async)]
 pub(crate) fn note_save(note: notes::edit::SaveNote, copy: bool) -> Result<notes::edit::SaveOutcome, String> {

@@ -17,7 +17,7 @@ import { VARIANTS } from "../media/timeline";
 import { openLook } from "../tilelook/state";
 import { closeCardLook, draft, setDraft, target, type Target } from "./lookState";
 import {
-  ACCENT_NAMES, accentCss, BG_NAMES, BGS, CARD_ACCENTS, DENSITIES, DENSITY_NAMES, patchCardLook, VIEW_CARDS, VIEW_NAMES, VIEWS,
+  ACCENT_NAMES, accentCss, BG_NAMES, BGS, CARD_ACCENTS, DENSITIES, DENSITY_NAMES, patchCardLook, VIEW_CARDS, VIEW_NAMES, viewsOf,
   type CardLook,
 } from "./look";
 import { cardName, tx } from "./text";
@@ -88,7 +88,7 @@ function Panel(p: { tg: Target; s?: Snapshot }) {
         {(def) => (
           <MenuChoice
             label={t("cards.cardlook.view", "Zobrazení")}
-            items={VIEWS.map((v) => ({ v, text: tx(VIEW_NAMES[v]) }))}
+            items={viewsOf(p.tg.card).map((v) => ({ v, text: tx(VIEW_NAMES[v]) }))}
             value={look().view ?? def()}
             onPick={(v) => patch({ view: v === def() ? undefined : v })}
           />

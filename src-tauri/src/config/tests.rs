@@ -62,6 +62,7 @@ fn roundtrip_and_atomic_save() {
         logo: None,
         links: vec![],
         look: None,
+        mute_dirty: false,
     });
     save(&path, &cfg).unwrap();
     let names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
@@ -94,6 +95,7 @@ fn rejects_duplicate_ids_and_bad_accent() {
         logo: None,
         links: vec![],
         look: None,
+        mute_dirty: false,
     };
     cfg.projects = vec![p.clone(), p.clone()];
     assert!(validate(&cfg).unwrap_err().contains("dvakrát"));
@@ -424,4 +426,33 @@ fn note_kinds_validation() {
 #[test]
 fn schema_mentions_projects() {
     assert!(schema_json().contains("projects"));
+}
+
+#[test]
+fn project_mute_dirty_old_config_and_roundtrip() {
+    // starý tvar projektu (před kolem 18) bez `muteDirty` = upozorňovat jako dřív
+    let old = r#"{"projects":[{"id":"orbit","name":"Orbit","kind":"dev","remote":"acme/orbit","run":"npm run dev"}]}"#;
+    let cfg: Config = serde_json::from_str(old).unwrap();
+    assert!(!cfg.projects[0].mute_dirty);
+    let back = serde_json::to_value(&cfg.projects[0]).unwrap();
+    assert!(back.get("muteDirty").is_none(), "false se nepíše: {back}");
+    let cfg: Config = serde_json::from_str(&old.replace(r#""run":"npm run dev""#, r#""run":"npm run dev","muteDirty":true"#)).unwrap();
+    assert!(cfg.projects[0].mute_dirty);
+    assert_eq!(serde_json::to_value(&cfg.projects[0]).unwrap()["muteDirty"], true);
+}
+
+#[test]
+fn git_alerts_old_config_and_validation() {
+    // starý config bez `gitAlerts` = upozorňovat, nic přečteného; výchozí se nepíše
+    let cfg: Config = serde_json::from_str(r#"{"projects":[]}"#).unwrap();
+    assert_eq!(cfg.git_alerts, GitAlerts { enabled: true, read: String::new() });
+    assert!(serde_json::to_value(&cfg).unwrap().get("gitAlerts").is_none());
+    let cfg: Config = serde_json::from_str(r#"{"gitAlerts":{"enabled":false,"read":"k3x9a1"}}"#).unwrap();
+    assert!(!cfg.git_alerts.enabled && cfg.git_alerts.read == "k3x9a1");
+    assert!(validate(&cfg).is_ok());
+    let mut bad = cfg.clone();
+    bad.git_alerts.read = "a".repeat(65);
+    assert!(validate(&bad).is_err());
+    bad.git_alerts.read = "ne platny".into();
+    assert!(validate(&bad).is_err());
 }

@@ -65,6 +65,33 @@ pub struct Project {
     /// Vzhled dlaždice (ikona, barva, tvar, popisek — `tilelook.rs`). Chybí = automaticky (logo, `accent`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub look: Option<crate::tilelook::TileLook>,
+    /// Ztišit upozornění na neuloženou / nepushnutou práci v proužku a v hlavičce šuplíku (dlaždice i karta
+    /// Repa stav dál ukazují). Chybí = upozorňovat (chování před kolem 18).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mute_dirty: bool,
+}
+
+/// `gitAlerts`: upozorňovat na neuloženou práci v repech (výchozí ano) a otisk stavu, který člověk označil
+/// „Přečteno“ (`read`, krátký hash z UI `projects/dirty.ts` — zvýraznění zhasne, dokud se počty nezmění; přežije
+/// restart).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct GitAlerts {
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub read: String,
+}
+
+impl Default for GitAlerts {
+    fn default() -> Self {
+        Self { enabled: true, read: String::new() }
+    }
+}
+
+impl GitAlerts {
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 fn yes() -> bool {

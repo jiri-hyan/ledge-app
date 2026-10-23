@@ -94,6 +94,25 @@ export const STYLES: readonly StyleDef[] = [
     desc: ["appearance.style.retro.desc", "Jantarová na hnědočerné jako starý monitor: strojové písmo, tvrdé stíny a pixelová linka."],
     parts: { theme: "retro", density: "normal", fontScale: 1, radius: "sharp", opacity: 1, strip: "block", stripSize: "normal", font: "mono", material: "hard", layout: "mosaic", width: "medium", blur: false },
   },
+  // kolo 18 — další volby v galerii, nic z dosavadních se nemění
+  {
+    id: "fluent",
+    name: ["appearance.style.fluent", "Fluent"],
+    desc: ["appearance.style.fluent.desc", "Jako Windows 11: jemné průsvitné vrstvy s akrylem, tenký horní odlesk a čistý panel ve 4 sloupcích."],
+    parts: { theme: "dark", density: "normal", fontScale: 1, radius: "normal", opacity: 0.88, strip: "pill", stripSize: "normal", font: "system", material: "acrylic", layout: "panel", width: "medium", blur: true },
+  },
+  {
+    id: "oled",
+    name: ["appearance.style.oled", "OLED"],
+    desc: ["appearance.style.oled.desc", "Čistá černá bez stínů a rozmazání, ostré akcenty a nejvyšší kontrast pro OLED displeje."],
+    parts: { theme: "oled", density: "normal", fontScale: 1, radius: "normal", opacity: 1, strip: "line", stripSize: "normal", font: "system", material: "solid", layout: "classic", width: "custom", blur: false },
+  },
+  {
+    id: "warm",
+    name: ["appearance.style.warm", "Teplý"],
+    desc: ["appearance.style.warm.desc", "Teplé espresso a jantarové tóny, oblé rohy a měkké teplé stíny."],
+    parts: { theme: "warm", density: "normal", fontScale: 1, radius: "round", opacity: 0.95, strip: "pill", stripSize: "normal", font: "system", material: "tinted", layout: "mosaic", width: "medium", blur: false },
+  },
 ];
 
 export const STYLE_IDS = STYLES.map((s) => s.id);
@@ -189,6 +208,22 @@ export const MATERIALS: Record<Material, Look> = {
       "m-h-color": "var(--accent)", "m-h-prefix": '">"', "m-pill-r": "0px",
     },
   },
+  acrylic: {
+    name: ["appearance.material.acrylic", "Akryl"],
+    vars: {
+      ...SOLID, "m-glow": "1.1", "m-shell-ring": "inset 0 1px 0 rgba(255, 255, 255, 0.16)",
+      "m-card-bg": "color-mix(in srgb, var(--card) 60%, transparent)", "m-card-bd": "1px solid color-mix(in srgb, var(--line) 80%, transparent)",
+      "m-card-sh": "inset 0 1px 0 rgba(255, 255, 255, 0.12)", "m-h-color": "var(--t2)", "m-pill-r": "var(--r-md)",
+    },
+  },
+  tinted: {
+    name: ["appearance.material.tinted", "Tónované"],
+    vars: {
+      ...SOLID, "m-glow": "0.4", "m-sig": "0.8",
+      "m-card-bg": "var(--card)", "m-card-bd": "1px solid var(--line)",
+      "m-card-sh": "0 4px 14px -4px rgba(0, 0, 0, 0.25)", "m-h-color": "var(--t2)", "m-pill-r": "var(--r-lg)",
+    },
+  },
 };
 
 // ---------- rozložení hlavní stránky ----------
@@ -204,6 +239,7 @@ export const LAYOUTS: Record<LayoutId, LayoutDef> = {
   panorama: { name: ["appearance.layout.panorama", "Panoráma"], cols: 4, vars: { "deck-gap": "var(--s3)", "deck-pad": "6px", "l-pad": PAD } },
   mosaic: { name: ["appearance.layout.mosaic", "Mozaika"], cols: 3, vars: { "deck-gap": "var(--s4)", "deck-pad": "0 6px 6px 0", "l-pad": PAD } },
   tiles: { name: ["appearance.layout.tiles", "Dlaždice"], cols: 3, vars: { "deck-gap": "var(--s4)", "deck-pad": "10px", "l-pad": PAD } },
+  panel: { name: ["appearance.layout.panel", "Panel"], cols: 4, vars: { "deck-gap": "var(--s3)", "deck-pad": "0px", "l-pad": PAD } },
 };
 
 /** Šířka předvolby v px (zrcadlo `WidthPreset::px` v look.rs); null = vlastní (`drawer.width`) / celá šířka. */

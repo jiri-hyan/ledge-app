@@ -30,7 +30,7 @@ pub struct AppearanceConfig {
     /// do nich zapíše, „Obnovit styl“ je vrátí). Neznámé jméno frontend bere jako `classic`.
     pub style: String,
     /// Barevný motiv: `dark` (výchozí), `midnight`, `graphite`, `nord`, `light`, `contrast`, barvy stylů
-    /// (`terminal`, `paper`, `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`).
+    /// (`terminal`, `paper`, `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`, `oled`, `warm`).
     pub theme: Theme,
     /// Barva akcentu `#rrggbb` (podpisová linka, záře, fokus). Prázdné = výchozí fialovo-modrá Ledge.
     pub accent: String,
@@ -123,12 +123,16 @@ pub enum Theme {
     Mono,
     /// jantarová na hnědočerné, jako starý monitor (styl Retro)
     Retro,
+    /// čistá černá, nulový šum, ostré akcenty (styl OLED)
+    Oled,
+    /// teplé espresso a jantarové tóny (styl Teplý)
+    Warm,
 }
 
 #[cfg(test)]
 impl Theme {
     /// Všechny motivy (testy kontrastu a zrcadel TS).
-    pub const ALL: [Theme; 14] = [
+    pub const ALL: [Theme; 16] = [
         Theme::Dark,
         Theme::Midnight,
         Theme::Graphite,
@@ -143,6 +147,8 @@ impl Theme {
         Theme::Aurora,
         Theme::Mono,
         Theme::Retro,
+        Theme::Oled,
+        Theme::Warm,
     ];
 }
 
@@ -183,7 +189,7 @@ pub struct MotionLook {
     /// `spring` = pružina s překmitem (výchozí), `smooth` = plynule bez překmitu, `snappy` = svižně,
     /// `bounce` = dopadne a odskočí, `fade` = rozplynutí, `notch` = rozbalení z proužku (nejdřív do
     /// šířky, pak dolů), `drop` = pád s jemným doskokem, `unfold` = rozvinutí shora dolů s postupným
-    /// naskakováním karet, `none` = bez animací (okamžitě). Systémové „omezit pohyb“ se chová jako `none`
+    /// naskakováním karet, `liquid` = pružné rozvinutí ze středu horní hrany (Dynamic Island), `none` = bez animací (okamžitě). Systémové „omezit pohyb“ se chová jako `none`
     /// (frontend i vysunutí okna v Rustu, `motion::anim_ms_now`).
     pub style: MotionStyle,
     /// Rychlost animací (násobek, 0.5–2; 2 = dvakrát rychleji).
@@ -208,6 +214,8 @@ pub enum MotionStyle {
     Notch,
     Drop,
     Unfold,
+    /// elastické rozvinutí ze středu horní hrany jako Dynamic Island (kolo 18)
+    Liquid,
     None,
 }
 
@@ -406,10 +414,10 @@ mod tests {
         for bad in ["", "Neon", "neon styl", "x1"] {
             assert!(ok(|a| a.style = bad.into()).is_err(), "{bad:?}");
         }
-        for t in ["\"paper\"", "\"neon\"", "\"brutal\"", "\"pastel\""] {
+        for t in ["\"paper\"", "\"neon\"", "\"brutal\"", "\"pastel\"", "\"oled\"", "\"warm\""] {
             assert!(serde_json::from_str::<Theme>(t).is_ok(), "{t}");
         }
-        for m in ["\"bounce\"", "\"fade\"", "\"notch\"", "\"drop\"", "\"unfold\""] {
+        for m in ["\"bounce\"", "\"fade\"", "\"notch\"", "\"drop\"", "\"unfold\"", "\"liquid\""] {
             assert!(serde_json::from_str::<MotionStyle>(m).is_ok(), "{m}");
         }
         for s in ["\"tag\"", "\"glow\"", "\"block\"", "\"drop\""] {

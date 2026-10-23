@@ -6,7 +6,7 @@
 
 export type CardBg = "tint" | "solid" | "clear";
 export type CardDensity = "compact" | "airy";
-export type CardView = "list" | "tiles" | "compact";
+export type CardView = "list" | "tiles" | "bento" | "compact";
 export type CardLook = { accent?: string; bg?: CardBg; hideHead?: boolean; density?: CardDensity; view?: CardView };
 export type Text = readonly [string, string];
 
@@ -35,14 +35,19 @@ export const DENSITY_NAMES: Record<(typeof DENSITIES)[number], Text> = {
   compact: ["cards.cardlook.dens.compact", "Kompaktní"],
   airy: ["cards.cardlook.dens.airy", "Vzdušná"],
 };
-export const VIEWS = ["list", "tiles", "compact"] as const;
+export const VIEWS = ["list", "tiles", "bento", "compact"] as const;
 export const VIEW_NAMES: Record<CardView, Text> = {
   list: ["cards.cardlook.view.list", "Seznam"],
   tiles: ["cards.cardlook.view.tiles", "Dlaždice"],
+  bento: ["cards.cardlook.view.bento", "Bento"],
   compact: ["cards.cardlook.view.compact", "Kompaktní"],
 };
 /** Karty s variantou zobrazení a jejich výchozí (= dnešní) varianta. */
 export const VIEW_CARDS: Readonly<Record<string, CardView>> = { projects: "tiles", repos: "list", notes: "list", actions: "tiles" };
+/** Bento (kolo 18: velká dlaždice + menší kolem) mají jen karty, které ho opravdu kreslí. */
+const BENTO_CARDS = new Set(["projects", "repos", "notes"]);
+/** Varianty, které karta nabízí (prázdné = karta bez variant). */
+export const viewsOf = (cardId: string): readonly CardView[] => (cardId in VIEW_CARDS ? VIEWS.filter((v) => v !== "bento" || BENTO_CARDS.has(cardId)) : []);
 
 const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0-9a-fA-F]{6}$/.test(s);
 const oneOf = <T extends string>(list: readonly T[], x: unknown): x is T => typeof x === "string" && (list as readonly string[]).includes(x);
@@ -57,7 +62,7 @@ export function normalizeCardLook(raw: unknown, cardId: string): CardLook | unde
   if (r.hideHead === true) out.hideHead = true;
   if (oneOf(["compact", "airy"] as const, r.density)) out.density = r.density;
   const def = VIEW_CARDS[cardId];
-  if (def && oneOf(VIEWS, r.view) && r.view !== def) out.view = r.view;
+  if (def && oneOf(viewsOf(cardId), r.view) && r.view !== def) out.view = r.view;
   return Object.keys(out).length ? out : undefined;
 }
 

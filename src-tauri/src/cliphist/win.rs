@@ -146,7 +146,7 @@ unsafe fn on_update(hwnd: HWND) {
 }
 
 /// Formáty na schránce (schránka otevřená): id, jméno registrovaných, DWORD u `DWORD_FORMATS`.
-unsafe fn formats() -> Vec<Fmt> {
+pub(crate) unsafe fn formats() -> Vec<Fmt> {
     unsafe {
         let mut out = Vec::new();
         let mut f = 0;
@@ -213,7 +213,7 @@ unsafe fn read_text() -> Option<String> {
 }
 
 /// Exe procesu, kterému patří okno vlastníka schránky (`None` = bez vlastníka / nejde zjistit).
-unsafe fn owner_exe() -> Option<String> {
+pub(crate) unsafe fn owner_exe() -> Option<String> {
     unsafe {
         let owner = GetClipboardOwner().ok().filter(|h| !h.0.is_null())?;
         let mut pid = 0u32;

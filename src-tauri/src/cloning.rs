@@ -128,6 +128,7 @@ mod tests {
             logo: None,
             links: vec![],
             look: None,
+            mute_dirty: false,
         }
     }
 

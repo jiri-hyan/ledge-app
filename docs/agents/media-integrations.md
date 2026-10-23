@@ -14,6 +14,11 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   karty — config `media` (viz Konfigurace).
 - **Hlasitost** (`drawer.sections.sound`) — výchozí výstup (Core Audio): posuvník 0–100 (při tahu nejvýš
   ~20 změn/s), ztlumit, název zařízení v tooltipu; změna klávesou / mixérem se ukáže hned (callback).
+  **Mikrofon** — tlačítko ztlumí / zapne výchozí vstup (jen když je mikrofon; stav z callbacku, i ztlumení zvenku).
+  **Výstup** — s víc aktivními výstupy menu se seznamem; přepíná se jen na zařízení, které Ledge sám nabídl.
+  Přepnutí používá **nedokumentované COM rozhraní Windows `IPolicyConfig`** (stejně jako běžné přepínače zvuku);
+  když selže (jiná verze Windows), Ledge otevře Nastavení zvuku Windows a řekne to větou. Mikrofon i výstup jdou
+  ovládat jen se zapnutou kartou (`drawer.sections.sound` + záložka Osobní, `volume::allowed`).
 - **Baterie** (`drawer.sections.battery`) — pod hodinami v kartě Čas: procenta, nabíjí se / v síti / na baterii,
   zbývající čas jen když ho Windows odhadne. Stroj bez baterie (desktop) neukazuje nic a nic neodebírá.
 - **Výkon:** nic nepolluje. Odběry vzniknou až při prvním zobrazení záložky Osobní (Tauri `personal_live`;

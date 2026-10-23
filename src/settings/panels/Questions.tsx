@@ -2,8 +2,9 @@
 // (`claude.questionHoldS`, 0 = jen ukázat), jak dlouho čekat a stav hooku PreToolUse(AskUserQuestion)
 // s tlačítkem doplnit / zapojit (Rust `hooksetup.rs`, příkaz `hooks_install`). Volba jde do draftu a
 // uloží ji společná lišta (Uložit); zapojení hooku je akce (zápis do ~/.claude), ne volba configu.
-import { createSignal, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import { api, type Snapshot } from "../../api";
+import { fmtClock } from "../../format";
 import { t } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
 import { useSettings } from "../ctx";
@@ -14,6 +15,17 @@ import { fieldLabel } from "../labels";
 const DEFAULT_HOLD = 540;
 const MAX_HOLD = 550;
 const MIN_HOLD = 30;
+
+/** Jak otázka v deníku skončila (Rust `QuestionLog.outcome`). */
+const OUTCOME: Record<string, () => string> = {
+  answered: () => t("questions.log.answered", "Odpovězeno"),
+  holding: () => t("questions.log.holding", "Čeká v Ledge"),
+  shown: () => t("questions.log.shown", "Jen ukázáno"),
+  released: () => t("questions.log.released", "Předáno do Claude"),
+  expired: () => t("questions.log.expired", "Vypršelo"),
+  turnEnded: () => t("questions.log.turnEnded", "Konec tahu"),
+};
+const outcomeName = (o: string) => OUTCOME[o]?.() ?? t("questions.log.skipped", "Přeskočeno");
 
 export default function QuestionsSection(p: { s: Snapshot }) {
   const c = useSettings();
@@ -84,6 +96,24 @@ export default function QuestionsSection(p: { s: Snapshot }) {
       </Show>
       <Show when={!p.s.claudeEnabled}>
         <p class="st-note">{t("questions.panel.bridgeOff", "Most pro Claude je vypnutý — Ledge otázky neuvidí.")}</p>
+      </Show>
+      <Show when={p.s.questionLog?.length}>
+        <Row id="claude.questionLog" stack label={t("questions.panel.log", "Deník posledních otázek")} hint={t("questions.panel.logHint", "Posledních 20 otázek Clauda od spuštění Ledge — jestli k tobě došly a jak skončily")}>
+          <div class="st-list">
+            <For each={p.s.questionLog ?? []}>
+              {(item) => (
+                <div class="st-item">
+                  <span class="mono">{fmtClock(new Date(item.at))}</span>
+                  <span class="grow">
+                    <strong>{item.title || t("questions.log.untitled", "Otázka Clauda")}</strong>
+                    <Show when={item.detail}>{(d) => <small> · {d()}</small>}</Show>
+                  </span>
+                  <span class="st-tag">{outcomeName(item.outcome)}</span>
+                </div>
+              )}
+            </For>
+          </div>
+        </Row>
       </Show>
     </Section>
   );

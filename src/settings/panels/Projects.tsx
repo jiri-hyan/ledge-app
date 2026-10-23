@@ -15,6 +15,7 @@ import { SortList } from "../fields/SortList";
 import { inRoots, moveItem, norm } from "../model";
 import type { PanelProps } from "../types";
 import { ProjectEditor, ProjectLogo } from "./ProjectEditor";
+import { commandLines, commandsOf, importLauncherCatalog, withVerdicts } from "../launcherImport";
 
 /** Pole, na kterých závisí logo — dokud se nezmění proti uloženému, platí logo z dlaždice. */
 const LOGO_FIELDS = ["path", "remote", "subdir", "logo", "exe", "appName", "kind"];
@@ -159,6 +160,39 @@ export default function ProjectsPanel(p: PanelProps) {
       sayError(e);
     }
   }
+  /** Launcher → Ledge (zadání týden 43 bod 4): zástupci z `catalog.json`. Příkazy projdou pojistkou v jádře
+   *  (`launcher_import_check`); co neprojde, je vypnuté. Před převzetím potvrzení se seznamem příkazů; pak jde vše
+   *  do návrhu (Uložit / Vrátit). Ledge z katalogu nic nespouští. */
+  const [pendingImport, setPendingImport] = createSignal<{ cfg: any; lines: ReturnType<typeof commandLines>; added: number; skipped: number } | null>(null);
+  async function importCatalog() {
+    setBusy(true);
+    try {
+      const got = await api.pickPath("json", t("settings.proj.importPick", "Vyber catalog.json z Launcheru"));
+      if (!got) return;
+      const raw = await api.launcherCatalog(got);
+      const res = importLauncherCatalog(raw, c.cfg);
+      if (!res.added.length) return say(t("settings.proj.importNone", "Nic nového — všechno z katalogu už v projektech je (nebo nemá příkaz)."));
+      const verdicts = (await api.launcherImportCheck(commandsOf(res.nextCfg, res.addedIds))) ?? [];
+      const next = withVerdicts(res.nextCfg, res.addedIds, verdicts);
+      setPendingImport({ cfg: next, lines: commandLines(next, res.addedIds, verdicts), added: res.added.length, skipped: res.skipped.length });
+    } catch (e) {
+      sayError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function applyImport() {
+    const imp = pendingImport();
+    setPendingImport(null);
+    if (!imp) return;
+    const before = { projects: structuredClone(c.cfg.projects ?? []), layout: structuredClone(c.cfg.layout) };
+    c.set("projects", imp.cfg.projects);
+    if (imp.cfg.layout) c.set("layout", imp.cfg.layout);
+    offerUndo(t("settings.proj.imported", "Z katalogu přidáno {n} (přeskočeno {m}) — ulož lištou dole", { n: imp.added, m: imp.skipped }), () => {
+      c.set("projects", before.projects);
+      if (before.layout !== undefined) c.set("layout", before.layout);
+    });
+  }
   function remove(i: number) {
     setAsk(null);
     setOpen(null);
@@ -175,9 +209,29 @@ export default function ProjectsPanel(p: PanelProps) {
   return (
     <>
       <PanelHead id="projects.add" title={t("settings.nav.akce", "Projekty, odkazy a akce")} desc={t("settings.proj.desc", "Všechno, co se otevírá jedním klikem: projekty (dev server nebo aplikace), rychlé akce a odkazy na weby, složky a soubory.")}>
+        <button class="mini" disabled={busy()} onClick={importCatalog} title={t("settings.proj.importTitle", "Zástupce a složky z katalogu Launcheru (catalog.json)")}>{t("settings.proj.importCatalog", "Z Launcheru…")}</button>
         <button class="mini" disabled={busy()} onClick={() => setCands(!cands())} aria-expanded={cands()}>{t("settings.proj.fromRepos", "Z naklonovaných rep")}</button>
         <button class="mini ok" disabled={busy()} onClick={fromFolder}>+ {t("settings.proj.fromFolder", "Přidat projekt ze složky…")}</button>
       </PanelHead>
+      <Confirm
+        when={!!pendingImport()}
+        text={t("settings.proj.importAsk", "Převzít {n} zástupců z Launcheru? Klik na zástupce pak spustí tyto příkazy:", { n: pendingImport()?.added ?? 0 })}
+        detail={
+          <ul class="st-import-cmds">
+            <For each={pendingImport()?.lines ?? []}>
+              {(l) => (
+                <li>
+                  <b>{l.name}</b>: <code>{l.command}</code>
+                  <Show when={l.problem}>{(why) => <em> — {t("settings.proj.importOff", "importuji vypnutý: {why}", { why: why() })}</em>}</Show>
+                </li>
+              )}
+            </For>
+          </ul>
+        }
+        yes={t("settings.proj.importYes", "Převzít")}
+        onYes={applyImport}
+        onNo={() => setPendingImport(null)}
+      />
       <Show when={cands()}>
         <Section title={t("settings.proj.cands", "Naklonovaná repa, která ještě nejsou v projektech")}>
           <Candidates onPick={(x) => addFrom(x.path)} onClose={() => setCands(false)} />
@@ -220,8 +274,35 @@ export default function ProjectsPanel(p: PanelProps) {
         </Row>
       </Section>
       <Section>
+        <GitAlerts />
         <Roots />
       </Section>
+    </>
+  );
+}
+
+/** Upozornění na neuloženou / nepushnutou práci (`gitAlerts.enabled`, výchozí ano) a ztišená repa s Odztišit
+ *  (`projects[].muteDirty`). Mění draft — uloží společná lišta. */
+function GitAlerts() {
+  const c = useSettings();
+  const muted = () => (Array.isArray(c.cfg.projects) ? c.cfg.projects : []).map((p: any, i: number) => ({ p, i })).filter((x: any) => x.p?.muteDirty);
+  return (
+    <>
+      <Row id="gitAlerts.enabled"><Toggle path="gitAlerts.enabled" label={fieldLabel("gitAlerts.enabled")} /></Row>
+      <Show when={muted().length}>
+        <Row id="gitAlerts.muted" stack label={t("settings.proj.mutedList", "Ztišená repa")} hint={t("settings.proj.mutedHint", "U těchhle se neuložená práce nepočítá do hlavičky ani proužku.")}>
+          <div class="st-list">
+            <For each={muted()}>
+              {(x) => (
+                <div class="st-item">
+                  <span class="grow">{x.p.name ?? x.p.id}</span>
+                  <button class="mini" onClick={() => c.set(`projects.${x.i}.muteDirty`, false)}>{t("settings.proj.unmute", "Odztišit")}</button>
+                </div>
+              )}
+            </For>
+          </div>
+        </Row>
+      </Show>
     </>
   );
 }

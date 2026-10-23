@@ -290,6 +290,7 @@ fn base_project(name: &str, path: &str, remote: Option<&str>, kind: ProjectKind)
         logo: None,
         links: vec![],
         look: None,
+        mute_dirty: false,
     }
 }
 

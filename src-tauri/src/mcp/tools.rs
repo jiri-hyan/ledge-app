@@ -152,7 +152,7 @@ pub const TOOLS: &[Tool] = &[
         desc: "Read Ledge's current state: version, MCP on/off, counts of shortcuts (tiles), quick actions and tabs, design style and theme, strip style, UI language, drawer open, and how many changes undo_last can revert. Call this first." },
     Tool { name: "apps_discover", title: "Discover apps and projects", write: false,
         input: || json!({ "type": "object", "properties": { "repos": { "type": "boolean", "description": "Also scan the user's folders for git repositories and suggest project shortcuts (default true)." } }, "additionalProperties": false }),
-        desc: "List what the user has on this PC, read-only: Start menu apps (name and target .exe), Microsoft Store apps such as Notepad (source \"store\", with aumid instead of exe) and git repositories in the usual folders with a ready project suggestion (kind dev/app, run command, port). alreadyInLedge (only when true) marks what Ledge already shows. Use the results for tiles_add and actions_add. Can take a few seconds." },
+        desc: "List what the user has on this PC, read-only: Start menu apps (name and target .exe), Store apps such as Notepad (source \"store\", aumid instead of exe) and git repos in the usual folders with a project suggestion (kind, run, port). alreadyInLedge (only when true) = Ledge shows it already. For tiles_add and actions_add. Takes a few seconds." },
     Tool { name: "tiles_list", title: "List shortcuts", write: false, input: no_args,
         desc: "List the shortcuts (tiles) on the Projects card: id, name, kind (dev = local dev server with run command and port, app = desktop program), folder, look; and on which tabs the card is." },
     Tool { name: "tiles_add", title: "Add a shortcut", write: true,

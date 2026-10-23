@@ -1,5 +1,5 @@
 import type { ActionView, ScriptView } from "./actions";
-import type { Ask, HooksStatus, LimitsView, Pending, SessionView } from "./claude";
+import type { Ask, HooksStatus, LimitsView, Pending, QuestionLog, SessionView } from "./claude";
 import type { NoteKind, NoteView, NotesSyncView, PinsView } from "./notes";
 import type { PersonalView } from "./personal";
 import type { ProcView, ProjectView, View } from "./projects";
@@ -23,10 +23,14 @@ export interface Snapshot {
   layout: Layout;
   claudeEnabled: boolean;
   projects: ProjectView[];
+  /** upozornění na neuloženou práci (`config.gitAlerts`; chybí = starší jádro = zapnuto) */
+  gitAlerts?: { enabled: boolean; read?: string };
   procs: ProcView[];
   pending: Pending[];
   /** otázky Clauda (AskUserQuestion) — typ v bloku „questions“ na konci */
   questions: Ask[];
+  /** deník posledních otázek (prázdný = Rust pole vynechá) */
+  questionLog?: QuestionLog[];
   sessions: SessionView[];
   hooks: HooksStatus;
   notesEnabled: boolean;

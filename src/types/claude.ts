@@ -145,6 +145,17 @@ export interface Ask {
   /** false = `questionHoldS` 0 — odpovídá se v okně Claude */
   answerable: boolean;
 }
+/** Řádek deníku otázek (Rust `questions::QuestionLog`, posledních 20 od spuštění, jen paměť). */
+export interface QuestionLog {
+  id: number;
+  at: number;
+  sessionId: string;
+  /** štítek / text první otázky; "" = neznámá */
+  title: string;
+  outcome: "holding" | "shown" | "answered" | "released" | "expired" | "turnEnded" | "skipped";
+  /** lidská věta (přeložená v jádře) */
+  detail?: string | null;
+}
 /** Odpověď na jednu otázku: vybrané možnosti + vlastní text („Jiné…“). */
 export interface QuestionReply { labels: string[]; other: string | null }
 

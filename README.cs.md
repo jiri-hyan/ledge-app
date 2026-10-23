@@ -14,6 +14,8 @@ celou obrazovku se odmlčí.
 - **Projekty.** Dlaždice pro každý projekt: klik spustí dev server (`npm run dev`, port, log) nebo
   aplikaci. Logo si Ledge najde v projektu sám (favicon, web manifest, ikona aplikace). Běžící servery
   mají vlastní kartu s Otevřít / Zastavit; projekt, který na tomhle PC není, jde jedním klikem naklonovat.
+  Upozornění na neuloženou nebo nepushnutou práci jde u jednotlivých rep ztišit nebo označit jako přečtené;
+  zástupce a složky převezme z katalogu Launcheru.
 - **Session Claude Code.** Všechny session Claude Code na PC — desktopová appka i CLI, včetně subagentů —
   se stavem: čeká na tebe, pracuje, nečinná, nedokončená práce. Klik přepne do jejího okna (skončenou
   session obnoví v terminálu).
@@ -26,9 +28,15 @@ celou obrazovku se odmlčí.
 - **Rychlé akce a paleta příkazů.** Dlaždice pro weby, složky, soubory, aplikace a příkazy, všechno
   dohledatelné přes `Ctrl+K`. Příkazy a aplikace s argumenty se vždy zeptají, dokud jim v Nastavení
   nedáš souhlas.
-- **Záložka Osobní.** Hodiny, počasí (Open-Meteo) a tvoje odkazy, odděleně od práce.
-- **Vzhled.** Šest motivů (tmavý, půlnoc, grafit, nord, světlý, vysoký kontrast), barva akcentu, hustota,
-  velikost písma, zaoblení, průhlednost, styl a rychlost animací, styl a pozice proužku.
+- **Rozložení po svém.** Karty na vlastních záložkách ve velikostech S/M/L/XL s nastavitelnou výškou; podržením
+  hlavičky karty (nebo ✎) se otevře režim úprav — tah karet i mezi záložkami, změna velikosti za okraj, Zpět
+  (Ctrl+Z). Projekty, Repa a Poznámky umí i zobrazení Bento (velká dlaždice a menší kolem).
+- **Záložka Osobní.** Hodiny, počasí (Open-Meteo), přehrávač médií (hlasitost, ztlumení mikrofonu, výběr
+  zvukového výstupu, volitelně barva podle obalu alba) a tvoje odkazy, odděleně od práce.
+- **Vzhled.** 13 hotových design stylů (Klasický, Sklo, Terminál, Papír, Neon, Brutal, Pastel, Polární záře,
+  Mono, Retro, Fluent, OLED, Teplý), 16 barevných motivů a vlastní motivy, barva akcentu, hustota, velikost
+  písma, zaoblení, průhlednost, 9 animací otevírání (mimo jiné Tekutá kapsle ve stylu Dynamic Island) a jejich
+  rychlost, styl a pozice proužku.
 - **Průvodce.** Při prvním spuštění najde tvoje repa, nabídne aplikace ze Start menu, zapojí hooky
   Claude Code a nastaví jazyk a motiv. Nic není předvyplněné cizími daty.
 - **Čeština a angličtina**, přepínání v Nastavení → Vzhled a animace.

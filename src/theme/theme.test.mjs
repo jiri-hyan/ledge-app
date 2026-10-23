@@ -181,15 +181,18 @@ test("tabulka stylů je úplná a platná", () => {
   }
   // 6 schválených stylů + Klasický + 3 nové (kolo 13); sestava motiv + rozložení + materiál + písmo je u každého jiná,
   // každé rozložení je aspoň jednou použité
-  assert.deepEqual(STYLE_IDS, ["classic", "glass", "terminal", "paper", "neon", "brutal", "pastel", "aurora", "mono", "retro"]);
+  assert.deepEqual(STYLE_IDS, ["classic", "glass", "terminal", "paper", "neon", "brutal", "pastel", "aurora", "mono", "retro", "fluent", "oled", "warm"]);
   const combo = (s) => [s.parts.theme, s.parts.layout, s.parts.material, s.parts.font].join("|");
   assert.equal(new Set(STYLES.map(combo)).size, STYLES.length);
   assert.deepEqual([...new Set(STYLES.map((s) => s.parts.layout))].sort(), Object.keys(LAYOUTS).sort());
   // nový styl = vlastní motiv (barvy) a statická dekorace v CSS
-  for (const id of ["aurora", "mono", "retro"]) {
+  for (const id of ["aurora", "mono", "retro", "oled", "warm"]) {
     assert.equal(styleOf(id).parts.theme, id, `${id}: vlastní motiv`);
     assert.ok(css.includes(`html[data-style="${id}"]`), `${id}: blok v styles.css`);
   }
+  // Fluent (kolo 18) = tmavý motiv + akryl + vlastní rozložení Panel a blok dekorace
+  assert.deepEqual([styleOf("fluent").parts.material, styleOf("fluent").parts.layout, styleOf("fluent").parts.blur], ["acrylic", "panel", true]);
+  assert.ok(css.includes('html[data-style="fluent"]'), "fluent: blok v styles.css");
   assert.equal(styleOf("neexistuje").id, CLASSIC);
 });
 
@@ -291,6 +294,13 @@ test("plán otevření a zavření podle stylu animace", () => {
   assert.ok(unfold.reveal.step >= 20 && unfold.reveal.step <= 30 && unfold.reveal.blur === false, "odstup karet");
   assert.equal(unfold.breath, false);
   assert.equal(openPlan("notch", 1, g).reveal, undefined, "ostatní styly mají výchozí naskakování");
+  // tekutá kapsle (kolo 18): ze středu horní hrany, přestřel, jen transform + opacity; zavření zpět do kapsle
+  const liquid = openPlan("liquid", 1, g);
+  assert.equal(liquid.start.transform, "scale(0.42, 0.28)");
+  assert.equal(liquid.frames.at(-1).transform, "scale(1, 1)");
+  assert.ok(liquid.frames.some((f) => f.transform.includes("1.04")), "přestřel");
+  assert.ok(liquid.frames.every((f) => Object.keys(f).every((k) => ["transform", "transformOrigin", "opacity", "offset", "easing"].includes(k))), "žádný filtr ani clip");
+  assert.equal(closePlan("liquid", 1, g).frames.at(-1).transform, "scale(0.42, 0.28)");
   // dnešní stažení beze změny při rychlosti 1
   const c = closePlan("spring", 1, g);
   assert.deepEqual([c.duration, c.delay, c.frames.map((f) => f.clipPath)], [240, 40, ["F", "C"]]);

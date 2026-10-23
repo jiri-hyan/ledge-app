@@ -76,6 +76,9 @@ export function ProjectEditor(p: { i: number; notes?: string[] }) {
           <FieldErr path={at("path")} />
         </label>
         <label class="st-sub">{L(t("settings.proj.remote", "Git remote"), t("settings.proj.remote.hint", "https://…, git@… nebo owner/repo"))}<Text path={at("remote")} nullable mono label={t("settings.proj.remote", "Git remote")} placeholder="owner/repo" /><FieldErr path={at("remote")} /></label>
+        <div class="st-sub wide">
+          <span class="st-check"><Toggle path={at("muteDirty")} label={t("settings.proj.muteDirty", "Ztišit upozornění na neuložený git")} /> {t("settings.proj.muteDirty", "Ztišit upozornění na neuložený git")}<small> — {t("settings.proj.muteDirty.hint", "nezobrazovat v proužku a v hlavičce šuplíku")}</small></span>
+        </div>
         <label class="st-sub">{L(t("settings.proj.subdir", "Podsložka"), t("settings.proj.subdir.hint", "Kde se příkaz spouští, např. web"))}<Text path={at("subdir")} nullable mono label={t("settings.proj.subdir", "Podsložka")} placeholder="—" /></label>
 
         <Show when={pr().kind === "dev"}>

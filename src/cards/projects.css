@@ -17,7 +17,7 @@
   border: 1px solid color-mix(in srgb, var(--a) 22%, transparent);
   transition: transform var(--dur-3) var(--spring), border-color var(--dur-2), box-shadow var(--dur-3), background var(--dur-2); }
 .proj:hover { transform: perspective(520px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(-3px); border-color: color-mix(in srgb, var(--a) 55%, transparent); box-shadow: 0 12px 30px -10px color-mix(in srgb, var(--a) 60%, transparent); }
-.proj:active { transform: perspective(520px) rotateX(var(--rx)) rotateY(var(--ry)) scale(0.96); transition-duration: calc(0.08s / var(--speed)); }
+.proj:not(:has(.acts:hover)):active { transform: perspective(520px) rotateX(var(--rx)) rotateY(var(--ry)) scale(0.96); transition-duration: calc(0.08s / var(--speed)); }
 .proj.missing .proj-hit { opacity: 0.4; filter: grayscale(0.6); }
 .proj.live { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
 /* start selhal (vlna 9 Z): červený okraj + „nenaběhl“; víc složek s repem: „vyber složku“; ■ Stop v akcích */
@@ -59,6 +59,8 @@
 .proj:hover .acts, .proj:focus-within .acts { opacity: 1; pointer-events: auto; transform: none; }
 .acts:empty { display: none; }
 .acts button { height: 24px; min-width: 24px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-xs); color: var(--t2); }
+/* ⋯ s větší plochou — trefí se i v rychlosti, než lišta dojede (bod 2 zadání týden 43) */
+.acts .proj-more { min-width: 28px; padding: 0 6px; font-weight: 700; }
 .acts button:hover { background: var(--card-2); color: var(--t1); }
 .acts button:disabled { opacity: 0.55; cursor: progress; }
 .acts svg { width: 14px; height: 14px; }
@@ -114,3 +116,17 @@ input.proj-fname { width: 170px; padding: 3px 8px; font-size: var(--fs-ui); font
 .projects[data-tiles="small"] .proj-hl::after, .projects[data-view="compact"] .proj-hl::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
 .projects[data-tiles="small"] .proj-hl[data-tone="claude"]::after, .projects[data-view="compact"] .proj-hl[data-tone="claude"]::after { background: var(--accent); }
 .projects[data-tiles="small"] .proj-hl[data-tone="dirty"]::after, .projects[data-view="compact"] .proj-hl[data-tone="dirty"]::after { background: var(--amber); }
+
+/* varianta Bento (kolo 18): první dva zástupci (Bento je řadí běžící dopředu) jako velké
+   dlaždice přes 2 sloupce, jen když jsou aspoň 3 sloupce (`data-wide` z `fitColumns`); dense = řada bez děr */
+.projects[data-view="bento"][data-wide] { grid-auto-flow: row dense; }
+.projects[data-view="bento"][data-wide]:not([data-edit]) > .proj:is(:first-child, :nth-child(2)) {
+  grid-column: span 2;
+  padding: 16px 10px 14px;
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--a) 45%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--a) 18%, transparent), color-mix(in srgb, var(--a) 6%, transparent));
+  box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--a) 30%, transparent);
+  --logo: 64px;
+  --logo-img: 42px;
+}

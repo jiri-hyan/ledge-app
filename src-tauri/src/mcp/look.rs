@@ -137,7 +137,7 @@ pub struct Style {
 }
 
 #[rustfmt::skip]
-pub const STYLES: [Style; 10] = [
+pub const STYLES: [Style; 13] = [
     Style { id: "classic", theme: "dark", density: "normal", font_scale: 1.0, radius: "normal", opacity: 1.0, strip: "pill", strip_size: "normal", font: "system", material: "solid", layout: "classic", width: "custom", blur: false },
     Style { id: "glass", theme: "midnight", density: "normal", font_scale: 1.0, radius: "round", opacity: 0.82, strip: "pill", strip_size: "normal", font: "system", material: "glass", layout: "float", width: "medium", blur: false },
     Style { id: "terminal", theme: "terminal", density: "compact", font_scale: 1.0, radius: "sharp", opacity: 1.0, strip: "term", strip_size: "normal", font: "mono", material: "frame", layout: "band", width: "full", blur: false },
@@ -148,6 +148,9 @@ pub const STYLES: [Style; 10] = [
     Style { id: "aurora", theme: "aurora", density: "comfy", font_scale: 1.0, radius: "round", opacity: 0.9, strip: "pill", strip_size: "normal", font: "system", material: "glass", layout: "panorama", width: "wide", blur: false },
     Style { id: "mono", theme: "mono", density: "comfy", font_scale: 1.0, radius: "sharp", opacity: 1.0, strip: "line", strip_size: "small", font: "system", material: "solid", layout: "sheet", width: "medium", blur: false },
     Style { id: "retro", theme: "retro", density: "normal", font_scale: 1.0, radius: "sharp", opacity: 1.0, strip: "block", strip_size: "normal", font: "mono", material: "hard", layout: "mosaic", width: "medium", blur: false },
+    Style { id: "fluent", theme: "dark", density: "normal", font_scale: 1.0, radius: "normal", opacity: 0.88, strip: "pill", strip_size: "normal", font: "system", material: "acrylic", layout: "panel", width: "medium", blur: true },
+    Style { id: "oled", theme: "oled", density: "normal", font_scale: 1.0, radius: "normal", opacity: 1.0, strip: "line", strip_size: "normal", font: "system", material: "solid", layout: "classic", width: "custom", blur: false },
+    Style { id: "warm", theme: "warm", density: "normal", font_scale: 1.0, radius: "round", opacity: 0.95, strip: "pill", strip_size: "normal", font: "system", material: "tinted", layout: "mosaic", width: "medium", blur: false },
 ];
 
 pub fn appearance_get(cfg: &Config) -> Value {

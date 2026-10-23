@@ -69,6 +69,8 @@ export const api = {
   /** Čas v textu („zítra v 10“) → nabídka připomínky `{ label, iso }`, jinak null. */
   noteSuggestRemind: (text: string) => call<{ label: string; iso: string } | null>("note_suggest_remind", { text }),
   noteRead: (path: string) => call<NoteDetail>("note_read", { path }),
+  /** text poznámky do schránky (přes jádro — šuplík nemá fokus) */
+  noteCopyText: (path: string) => call("note_copy_text", { path }),
   noteSave: (note: SaveNote, copy = false) => call<SaveOutcome>("note_save", { note, copy }),
   noteArchive: (path: string, keepPin = false) => call<string>("note_archive", { path, keepPin }),
   noteUnarchive: (path: string) => call<string>("note_unarchive", { path }),
@@ -142,6 +144,10 @@ export const api = {
   mediaCover: (key: string) => call<string | null>("media_cover", { key }),
   volumeSet: (level: number) => call("volume_set", { level }),
   volumeMute: (muted: boolean) => call("volume_mute", { muted }),
+  /** ztlumit / zapnout výchozí mikrofon; vrací nový stav */
+  volumeMicMute: () => call<boolean>("volume_mic_mute"),
+  /** přepnout výchozí výstup na zařízení z `VolumeView.devices` */
+  volumeSetDevice: (id: string) => call("volume_set_device", { id }),
   /** Kalendář: jedno zkušební stažení odkazu ICS (nic se neukládá); chyba = lidská věta bez adresy. */
   calendarTest: (url: string) => call<CalendarTest>("calendar_test", { url }),
   /** Kalendář: Připojit ke schůzce — Rust otevře jen ověřený odkaz Teams/Meet/Zoom/Webex/Jitsi. */
@@ -158,6 +164,11 @@ export const api = {
   configImportPreview: (path: string) => call<ImportPreview>("config_import_preview", { path }),
   /** Nativní dialog nad šuplíkem; zrušení = null. */
   pickPath: (kind: PickKind, title?: string, start?: string) => call<string | null>("pick_path", { kind, title, start }),
+  /** katalog Launcheru (`catalog.json` vybraný v dialogu) jako JSON — import zástupců */
+  launcherCatalog: (path: string) => call<unknown>("launcher_catalog_read", { path }),
+  /** pojistka spouštění (`runguard`) pro zástupce z katalogu: `problem` = proč se importuje vypnutý */
+  launcherImportCheck: (items: { id: string; path?: string; run?: string; exe?: string; args?: string[] }[]) =>
+    call<{ id: string; problem: string | null }[]>("launcher_import_check", { items }),
   /** Vzhled zástupce: vybraný obrázek → zmenšený do cache → klíč (`tilelook.rs`); data URL podle klíče. */
   lookImageAdd: (path: string) => call<string>("look_image_add", { path }),
   lookImage: (key: string) => call<string | null>("look_image", { key }),

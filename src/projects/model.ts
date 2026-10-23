@@ -98,8 +98,9 @@ export function commitText(lastCommit: number | null, now: number): string {
   return lastCommit == null ? t("cards.proj.choose.noCommit", "datum commitu nejde zjistit") : t("cards.proj.choose.commit", "poslední commit {ago}", { ago: ago(lastCommit * 1000, now) });
 }
 
-/** Úprava projektu v configu: `path` (prázdné = smazat → dohledá se podle remote), `run` (oříznuté). */
-export type ProjectPatch = { path?: string | null; run?: string | null };
+/** Úprava projektu v configu: `path` (prázdné = smazat → dohledá se podle remote), `run` (oříznuté),
+ *  `muteDirty` (ztišit upozornění na neuložený git; false = smazat klíč = výchozí chování). */
+export type ProjectPatch = { path?: string | null; run?: string | null; muteDirty?: boolean | null };
 export function withProjectFields(cfg: any, id: string, patch: ProjectPatch): any {
   const projects = Array.isArray(cfg?.projects) ? cfg.projects : [];
   if (!projects.some((p: any) => p?.id === id)) return cfg;
@@ -113,6 +114,10 @@ export function withProjectFields(cfg: any, id: string, patch: ProjectPatch): an
         const v = patch[k]?.trim();
         if (v) out[k] = v;
         else delete out[k];
+      }
+      if ("muteDirty" in patch) {
+        if (patch.muteDirty) out.muteDirty = true;
+        else delete out.muteDirty;
       }
       return out;
     }),
@@ -162,3 +167,17 @@ export const projectNotesQuery = (id: string) => ({ project: id, limit: PROJECT_
 
 /** Kolik poznámek se do panelu nevešlo (`total` z `note_query` bez stropu); záporné / chybějící = 0. */
 export const notesHidden = (total: number | null | undefined, shown: number): number => Math.max(0, (total ?? 0) - shown);
+
+/** Varianta Bento karty Projekty: běžící zástupci dopředu (velké dlaždice jsou první dvě), jinak pořadí beze
+ *  změny; složky zůstanou, kde jsou. Stabilní — v režimu úprav se nepoužije (tah by skákal). */
+export function liveFirst<E extends { kind: string; p?: { id: string } }>(entries: readonly E[], live: (id: string) => boolean): E[] {
+  const on = (e: E) => e.kind === "project" && !!e.p && live(e.p.id);
+  return [...entries.filter(on), ...entries.filter((e) => !on(e))];
+}
+
+/** Stisk v liště akcí dlaždice (bod 2 zadání týden 43): na tlačítku akce patří tlačítku (dlaždice nezačne tah ani
+ *  spuštění), jinde v liště je to obyčejný stisk dlaždice (tah za prázdné místo funguje). Zavírání otevřených menu
+ *  (`PopMenu`, posluchač ve fázi capture na dokumentu) to nijak neovlivní. */
+export function actsPress(target: { closest(sel: string): unknown } | null): "button" | "tile" {
+  return target?.closest("button") ? "button" : "tile";
+}

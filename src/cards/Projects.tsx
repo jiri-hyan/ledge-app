@@ -26,7 +26,7 @@ import { openTileMenu, type MenuItem } from "../tilelook/TileMenu";
 import { isPlain } from "../tilelook/model";
 import { logoSrc } from "../logos";
 import ProjectPanel, { FailBox } from "../projects/ProjectPanel";
-import { failInfo, isLive, placeOf, tileHealth } from "../projects/model";
+import { failInfo, isLive, liveFirst, placeOf, tileHealth } from "../projects/model";
 import { changeFolder, closeProjectPanel, openProjectPanel, projectPanel, restartProject, startProject, stopProject, tip, tipLeave } from "../projects/state";
 import TileTip from "../projects/TileTip";
 import Popover, { boxOf } from "../ui/Popover";
@@ -55,7 +55,10 @@ function fitColumns(el: HTMLElement, key: () => string) {
     const cs = getComputedStyle(el);
     const min = parseFloat(cs.getPropertyValue("--tile-min")) || 118;
     const gap = parseFloat(cs.columnGap) || 0;
-    el.style.setProperty("--cols", String(tileColumns(w(), min, gap, n())));
+    const cols = tileColumns(w(), min, gap, n());
+    el.style.setProperty("--cols", String(cols));
+    // Bento potřebuje vědět, jestli se dvě velké dlaždice vejdou (CSS neumí porovnat proměnnou)
+    el.toggleAttribute("data-wide", cols >= 3);
   });
 }
 
@@ -75,7 +78,12 @@ export default function Projects(p: {
 }) {
   const tiles = () => p.tiles ?? DEFAULT_TILES;
   const list = () => visibleProjects(p.s.projects, tiles());
-  const entries = () => arrange(list(), tiles());
+  const view = () => p.view ?? "tiles";
+  /** Bento: běžící dopředu (velké dlaždice); v úpravách pořadí z configu */
+  const entries = () => {
+    const all = arrange(list(), tiles());
+    return view() === "bento" && !editing() ? liveFirst(all, (id) => isLive(p.s.procs.find((x) => x.id === id)?.phase)) : all;
+  };
   const [open, setOpen] = createSignal<string | null>(null);
   const [drag, setDrag] = createSignal<Drag | null>(null);
   const folder = (): { id: string; name: string; items: ProjectView[] } | null => {
@@ -228,7 +236,7 @@ export default function Projects(p: {
         <span class="n">{list().length || ""}</span>
         {p.menu}
       </h4>
-      <div class="projects proj-fit" ref={(el) => fitColumns(el, () => `${tiles().size}|${p.view ?? "tiles"}`)} data-tiles={tiles().size} data-view={p.view ?? "tiles"} data-edit={editing() ? "" : undefined}>
+      <div class="projects proj-fit" ref={(el) => fitColumns(el, () => `${tiles().size}|${view()}`)} data-tiles={tiles().size} data-view={view()} data-edit={editing() ? "" : undefined}>
         <For each={entries()} fallback={
           <Show when={p.s.projects.length} fallback={
             <div class="empty proj-empty" data-anim>

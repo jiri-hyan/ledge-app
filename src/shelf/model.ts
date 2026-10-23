@@ -8,6 +8,8 @@ export interface ShelfItem {
   /** soubor na disku není (smazaný, přejmenovaný, odpojený disk) — Ledge ho sám nemaže */
   missing: boolean;
   addedMs: number;
+  /** akce navíc podle přípony z jádra (`shelf::paste::extra_of`): Obsah u textu, Zmenšit u obrázku */
+  extra?: "text" | "image";
 }
 
 export interface ShelfList {

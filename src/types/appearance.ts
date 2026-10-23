@@ -1,15 +1,15 @@
 // --- appearance ---
 // Zrcadlo `AppearanceConfig` (src-tauri/src/appearance.rs) — `config.appearance`, událost `appearance`.
-export type ThemeId = "dark" | "midnight" | "graphite" | "nord" | "light" | "contrast" | "terminal" | "paper" | "neon" | "brutal" | "pastel" | "aurora" | "mono" | "retro";
-export type MotionStyle = "spring" | "smooth" | "snappy" | "bounce" | "fade" | "notch" | "drop" | "unfold" | "none";
+export type ThemeId = "dark" | "midnight" | "graphite" | "nord" | "light" | "contrast" | "terminal" | "paper" | "neon" | "brutal" | "pastel" | "aurora" | "mono" | "retro" | "oled" | "warm";
+export type MotionStyle = "spring" | "smooth" | "snappy" | "bounce" | "fade" | "notch" | "drop" | "unfold" | "liquid" | "none";
 export type StripPosition = "center" | "left" | "right";
 export type StripStyle = "pill" | "line" | "dot" | "term" | "tag" | "glow" | "block" | "drop";
 /** styl zavřeného Ledge (`strip.look`); seznam s názvy je `strip/looks.ts` */
 export type { StripLookId } from "../strip/looks";
 /** složky design stylu (vlna 6, `appearance/look.rs`); tabulka stylů je `theme/styles.ts` */
 export type FontLook = "system" | "mono" | "serif" | "grotesk";
-export type Material = "solid" | "glass" | "paper" | "glow" | "hard" | "soft" | "frame";
-export type LayoutId = "classic" | "float" | "band" | "sheet" | "panorama" | "mosaic" | "tiles";
+export type Material = "solid" | "glass" | "paper" | "glow" | "hard" | "soft" | "frame" | "acrylic" | "tinted";
+export type LayoutId = "classic" | "float" | "band" | "sheet" | "panorama" | "mosaic" | "tiles" | "panel";
 export type WidthPreset = "custom" | "narrow" | "medium" | "wide" | "full";
 export interface Appearance {
   /** design styl (`classic` = vzhled před vlnou 6); hodnoty stylu jsou v polích níž */

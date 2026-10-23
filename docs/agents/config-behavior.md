@@ -3,20 +3,20 @@
 Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsah je doslovný výřez původního AGENTS.md (odkazy typu „viz sekce …“ míří na sekce v souborech podle indexu).
 
 - **Vzhled** — sekce `appearance` (Nastavení → Vzhled; chybějící sekce = dnešní vzhled):
-  `theme` (`dark` výchozí, `midnight`, `graphite`, `nord`, `light`, `contrast`, `terminal`, `paper`, `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`), `accent` (`#rrggbb`,
+  `theme` (`dark` výchozí, `midnight`, `graphite`, `nord`, `light`, `contrast`, `terminal`, `paper`, `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`, `oled`, `warm`), `accent` (`#rrggbb`,
   prázdné = akcent motivu), `density` (`compact|normal|comfy`), `fontScale` 0.85–1.25, `radius`
   (`sharp|normal|round`), `glass.opacity` 0.25–1 (krytí pozadí; rozmazání je `drawer.glass: "acrylic"`),
-  `motion.style` (`spring|smooth|snappy|bounce|fade|notch|drop|unfold|none`) + `motion.speed` 0.5–2 (řídí i vysunutí šuplíku; starý
+  `motion.style` (`spring|smooth|snappy|bounce|fade|notch|drop|unfold|liquid|none`; `liquid` = tekutá kapsle ze středu jako Dynamic Island) + `motion.speed` 0.5–2 (řídí i vysunutí šuplíku; starý
   `drawer.animationMs` se při načtení převede: `0` → `none`, jiná délka → rychlost), `strip.style` (`pill|line|dot|term|tag|glow|block|drop`),
   `strip.size` (`small|normal|large`), `strip.color` (prázdné = přechod akcentu, `accent`, `#rrggbb`),
   `strip.position` (`center|left|right` — proužek i šuplík u horní hrany, myš otevírá tam). Pořadí a velikost karet je v `layout`
   (dřívější `appearance.cards` se převede). Šířka šuplíku zůstává `drawer.width`
   (za běhu nejvýš 95 % monitoru), krytí proužku `strip.opacity`. Změna se projeví bez restartu.
   **Design styly (vlna 6):** `style` (`classic` výchozí = vzhled před vlnou 6, `glass`, `terminal`, `paper`,
-  `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`) je jen jméno — výběr stylu v Nastavení / paletě (`Styl: Neon`) zapíše jeho
+  `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`, `fluent`, `oled`, `warm`) je jen jméno — výběr stylu v Nastavení / paletě (`Styl: Neon`) zapíše jeho
   hodnoty do polí výš a níž, ta jdou dál přebít (krok Otevřený → „Pokročilé“, „Obnovit styl“ je vrátí). Nová pole:
   `font` (`system|mono|serif|grotesk`, jen systémová písma Windows), `material`
-  (`solid|glass|paper|glow|hard|soft|frame`), `layout` (`classic|float|band|sheet|panorama|mosaic|tiles` —
+  (`solid|glass|paper|glow|hard|soft|frame|acrylic|tinted`), `layout` (`classic|float|band|sheet|panorama|mosaic|tiles|panel` —
   sloupce a mezery karet), `width` (`custom` = `drawer.width` | `narrow` 820 | `medium` 1080 | `wide` 1440 |
   `full` = celá šířka monitoru). Další motivy: `terminal`, `paper`, `neon`, `brutal`, `pastel`; animace navíc
   `bounce`, `fade`, `notch`; tvary proužku navíc `term`, `tag`, `glow`, `block`, `drop`. Systémové „omezit
@@ -91,7 +91,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   rozmazaný obal), `vinyl` (deska se točí jen při přehrávání), `strip` (jen v proužku — v šuplíku tenký ovladač,
   proužek ukáže skladbu i bez položky `media` v `strip.items`); `stripTime` = čas skladby v proužku po minutách
   („1/4 min“): `auto` (výchozí, jen u `strip`), `on`, `off`; `equalizer` (výchozí `true`, jen u `strip`) =
-  ozdoba ekvalizéru — jen dekorace, neukazuje skutečný zvuk. Starý config bez `media` = `card`, beze změny.
+  ozdoba ekvalizéru — jen dekorace, neukazuje skutečný zvuk; `tint` (výchozí `false`, `false` se nepíše) = karta
+  se jemně podbarví převládající barvou obalu alba (spočítá se v UI jednou na obal z 8×8 zmenšeniny).
+  Starý config bez `media` = `card`, beze změny.
   `favorites` = oblíbené playlisty a stanice jako dlaždice v kartě Právě hraje (část `favorites`, jde skrýt):
   `[{ "name": "Ráno", "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" }]`, nejvýš 24, název ≤ 60 znaků. `uri` =
   `spotify:playlist|album|artist|track|show|episode|user:<id>` nebo `http(s)://…` bez jména v adrese
