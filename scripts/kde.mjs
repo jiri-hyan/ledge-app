@@ -4,7 +4,8 @@
 //
 // Použití: node scripts/kde.mjs <symbol|slovo>
 //   1) definice v src/** a src-tauri/src/** (fn/struct/enum/const/static/mod/type/trait, function,
-//      interface/class/let/var, `X =`), max 15; bez přesné shody hledá jména, která slovo obsahují
+//      interface/class/let/var, `X =`, pole `pub x:` / `x?:`; camelCase klíč configu najde i snake_case
+//      pole v Rustu: `muteDirty` → `mute_dirty`), max 15; bez přesné shody hledá jména, která slovo obsahují
 //   2) docs/codemap/*.md a docs/agents/*.md, kde se slovo vyskytuje (soubor:řádek + první výskyt)
 import fs from 'node:fs'
 import path from 'node:path'
@@ -35,11 +36,16 @@ const rel = (p) => path.relative(root, p).split(path.sep).join('/')
 const cut = (s, n = 120) => { s = s.trim().replace(/\s+/g, ' '); return s.length > n ? s.slice(0, n - 1) + '…' : s }
 
 // Čistá funkce: řádky jednoho souboru → nálezy { tier, line, text }. tier 1 = definice, 2 = `X =`, 3 = částečná shoda.
+const snake = (w) => w.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())
+const escRe = (w) => w.replace(/\W/g, '') // hledá se identifikátor; cokoli jiného by se jen zahodilo
+
 export function findDefs(lines, word) {
   const low = word.toLowerCase()
+  const names = [...new Set([word, snake(word)])]
+  const fieldRe = new RegExp(String.raw`^\s*(?:pub(?:\([^)]*\))?\s+)?(?:` + names.map(escRe).join('|') + String.raw`)\??\s*:\s*(?:bool\b|boolean\b|string\b|number\b|str\b|[ui]\d+\b|f\d+\b|[ui]size\b|[A-Z]|&|\[|\()`)
   const hits = []
   lines.forEach((text, i) => {
-    if (!text.toLowerCase().includes(low)) return
+    if (!text.toLowerCase().includes(low) && !(names.length > 1 && text.includes(names[1]))) return
     let tier = 0
     for (const m of text.matchAll(DEF)) {
       if (m[1] === word) { tier = 1; break }
@@ -48,6 +54,7 @@ export function findDefs(lines, word) {
     if (tier !== 1) {
       const a = ASSIGN.exec(text)
       if (a && a[1] === word) tier = 2
+      else if (fieldRe.test(text)) tier = 2
     }
     if (tier) hits.push({ tier, line: i + 1, text })
   })

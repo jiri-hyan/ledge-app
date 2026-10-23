@@ -15,7 +15,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
 /// Rozpracovaný config z UI → první chyba i s polem (`None` = v pořádku). Nic nezapisuje.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn check_config(cfg: serde_json::Value) -> Option<FieldError> {
     match serde_json::from_value::<Config>(cfg) {
         Ok(c) => config::validate_field(&c).err(),

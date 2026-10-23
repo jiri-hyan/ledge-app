@@ -41,7 +41,7 @@ pub(crate) struct OutlookProbe {
 }
 
 /// Nastavení → Kalendáře → „Outlook v tomto PC“: je klasický Outlook? (nic nespouští)
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn calendar_outlook_probe() -> OutlookProbe {
     OutlookProbe { installed: outlook::installed(), running: outlook::running() }
 }

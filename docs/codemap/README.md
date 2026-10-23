@@ -37,8 +37,14 @@ MCP, instalace, pravidla) — čti jen potřebný soubor.
 node scripts/kde.mjs <symbol|slovo>   # definice (soubor:řádek) + které mapy / docs/agents ho zmiňují
 ```
 
-Mapy hlídá `scripts/codemap.test.mjs` (součást `test:ui`): soubory ve sloupci „soubor“ musí existovat
-(`x.rs` ≙ `x/mod.rs`, `x.ts` ≙ `x/index.ts`), identifikátory ve „klíčových symbolech“ musí být v kódu.
+Mapy hlídají testy v `test:ui` (`node scripts/codemap-lint.mjs` vypíše všechny nálezy najednou):
+- `scripts/codemap.test.mjs` — soubory ve sloupci „soubor“ musí existovat (`x.rs` ≙ `x/mod.rs`, `x.ts` ≙
+  `x/index.ts`), identifikátory ve „klíčových symbolech“ musí být v kódu (mapa nelže).
+- `scripts/codemap-coverage.test.mjs` — každý modul (první úroveň `src-tauri/src` a `src`) i každý produkční
+  zdroj (`.rs .ts .tsx .mjs`) musí být v některé mapě **jmenován** (holé `složka/*` na soubor nestačí;
+  zkrácený zápis `oauth.rs` platí jen v mapě, která modul jmenuje celou cestou). Nový soubor tedy bez řádku
+  v mapě neprojde. Výjimky s důvodem: `COVERAGE_ALLOW` v `scripts/codemap-coverage.mjs` (teď žádné).
+- `scripts/config-keys.test.mjs` — každý klíč `config.json` (z Rust struktur) musí být v `docs/agents/*.md`.
 
 ## Ověření
 

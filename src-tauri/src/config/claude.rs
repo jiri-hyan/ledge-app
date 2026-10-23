@@ -19,6 +19,11 @@ pub struct ClaudeConfig {
     /// Otázky Clauda (AskUserQuestion): jak dlouho (s) Ledge drží otázku a čeká na odpověď kliknutím;
     /// pak ji pustí do okna Claude. 0 = Ledge otázky jen ukazuje. Nejvýš 550 (hook má 600 s).
     pub question_hold_s: u64,
+    /// Pojistka otázek Clauda: když drženou otázku do tolika sekund nikdo v Ledge neviděl (šuplík
+    /// zavřený, hra přes celou obrazovku), Ledge ji pustí do okna Claude Code a zapíše do deníku.
+    /// 0 = vypnuto (drží celé `questionHoldS`), jinak 5–550.
+    #[serde(default = "default_question_unseen_s")]
+    pub question_unseen_s: u64,
     /// Připomínka resetu kvóty: když 5h nebo týdenní limit dosáhl 100 %, v čase resetu krátký peek
     /// a bliknutí proužku (ve fullscreen nic). Data ze stavového řádku Ledge (`limitslive.rs`).
     pub limits_reminder: bool,
@@ -33,8 +38,13 @@ pub struct ClaudeConfig {
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, limits_reminder: true, toast: false, costs: true }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true }
     }
+}
+
+/// Výchozí pojistka neviděné otázky (s).
+fn default_question_unseen_s() -> u64 {
+    crate::claude::unseen::DEFAULT_S
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
@@ -60,11 +70,14 @@ pub struct UpdateConfig {
     pub repo: String,
     /// Jak často kontrolovat (hodiny, 1–48).
     pub interval_h: u32,
+    /// Novou verzi hned po kontrole tiše stáhnout a ověřit (SHA256) na pozadí — v šuplíku pak stačí
+    /// „Restartovat a aktualizovat“. Platí jen se zapnutým `check`; nic se samo neinstaluje. Chybí = zapnuto.
+    pub prefetch: bool,
 }
 
 impl Default for UpdateConfig {
     fn default() -> Self {
-        Self { check: true, repo: "jiri-hyan/ledge-app".into(), interval_h: 6 }
+        Self { check: true, repo: "jiri-hyan/ledge-app".into(), interval_h: 6, prefetch: true }
     }
 }
 

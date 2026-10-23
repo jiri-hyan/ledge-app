@@ -56,7 +56,8 @@ pub fn snippet(orig: &str, words: &[String], before: usize, after: usize) -> Opt
     let at = f.text.find(w.as_str())?;
     let (from, to) = f.orig(at, at + w.len());
     let pre: Vec<usize> = orig[..from].char_indices().map(|(i, _)| i).collect();
-    let start = if pre.len() > before { pre[pre.len() - before] } else { 0 };
+    // `before == 0`: úryvek začíná přímo shodou (dřív by `pre[pre.len()]` spadlo)
+    let start = if before == 0 { from } else if pre.len() > before { pre[pre.len() - before] } else { 0 };
     let end = orig[to..].char_indices().nth(after).map_or(orig.len(), |(i, _)| to + i);
     let mut out: String = orig[start..end].split_whitespace().collect::<Vec<_>>().join(" ");
     if start > 0 {
@@ -169,6 +170,26 @@ mod tests {
         let (a, b) = f.orig(at, at + 5);
         assert_eq!(&o[a..b], "zítra");
         assert_eq!(f.orig(0, f.text.len()), (0, o.len()));
+    }
+
+    /// Skládání znaků (ß, İ, ligatury, kombinující akcenty) mění délky v bajtech — úryvek se z originálu
+    /// nikdy nesmí řezat uprostřed znaku.
+    #[test]
+    fn snippet_survives_exotic_unicode() {
+        let bits = ["a", "é", "e\u{301}", "ß", "İ", "ﬁ", "ǆ", "Σ", "ς", "ů", "🙂", " ", "\n", "x", "ŁÓDŹ", "ǅ", "\u{212a}", "\u{0}"];
+        let mut rng = crate::testrng::Rng(0xDEAD_BEEF_0BAD_F00D);
+        for i in 0..4000 {
+            let orig = rng.soup(&bits, 20);
+            let query = rng.soup(&bits, 3);
+            let ws = words(&query);
+            let r = std::panic::catch_unwind(|| {
+                let _ = matches(&fold_text(&orig), &ws);
+                for (before, after) in [(0, 0), (3, 3), (orig.len(), 5)] {
+                    let _ = snippet(&orig, &ws, before, after);
+                }
+            });
+            assert!(r.is_ok(), "panika v kole {i}: orig {orig:?} query {query:?}");
+        }
     }
 
     #[test]

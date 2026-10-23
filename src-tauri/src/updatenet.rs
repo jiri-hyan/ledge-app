@@ -3,6 +3,8 @@
 //! přesměrování na CDN GitHubu sleduje reqwest). Volá `update.rs`; `gh` zůstává zálohou (soukromé
 //! repo, vyčerpaný limit 60 dotazů/h). Ověření SHA256 dělá dál `update::verify` — tady se jen stahuje.
 //! Síť běží na runtime Tauri (`block_on`) ve vlastním vlákně, aby nezáleželo, odkud se volá.
+//! Vydání podle tagu (`/releases/tags/<tag>`, tentýž host) se čte jen na klik „Vrátit předchozí verzi“,
+//! když instalátor předchozí verze v cache není (`updcache::plan_rollback`).
 
 use crate::i18n::tr;
 use std::io::Write;
@@ -16,6 +18,11 @@ const MAX_SETUP_BYTES: u64 = 200 * 1024 * 1024;
 
 pub fn api_url(repo: &str) -> String {
     format!("https://api.github.com/repos/{repo}/releases/latest")
+}
+
+/// Vydání s daným tagem (tag je vždy `v<x.y.z>` z [`crate::update::Version`] — nic z venku).
+pub fn tag_url(repo: &str, tag: &str) -> String {
+    format!("https://api.github.com/repos/{repo}/releases/tags/{tag}")
 }
 
 /// HTTP stav API → lidský důvod. Čistá funkce.
@@ -66,7 +73,15 @@ fn run<T: Send>(f: impl FnOnce() -> Result<T, String> + Send) -> Result<T, Strin
 
 /// JSON nejnovějšího vydání (bez předběžných a konceptů — to zaručuje `/releases/latest`).
 pub fn latest(repo: &str) -> Result<String, String> {
-    let url = api_url(repo);
+    release_json(api_url(repo))
+}
+
+/// JSON vydání s tagem `tag` (návrat k předchozí verzi, jen na klik).
+pub fn by_tag(repo: &str, tag: &str) -> Result<String, String> {
+    release_json(tag_url(repo, tag))
+}
+
+fn release_json(url: String) -> Result<String, String> {
     run(|| {
         tauri::async_runtime::block_on(async {
             let resp = client(API_TIMEOUT)?
@@ -86,8 +101,12 @@ pub fn latest(repo: &str) -> Result<String, String> {
     })
 }
 
-/// Stáhne `url` do `dest` (přepíše). Při chybě nebo přetečení stropu soubor smaže.
-pub fn download(url: &str, dest: &Path) -> Result<(), String> {
+/// Průběh stahování: (staženo bajtů, celková velikost z `Content-Length`, když ji server řekl).
+pub type Progress<'a> = &'a (dyn Fn(u64, Option<u64>) + Sync);
+
+/// Stáhne `url` do `dest` (přepíše). Při chybě nebo přetečení stropu soubor smaže. `progress` dostává
+/// jen skutečně přijaté bajty (volá se po každém kusu — ředí ho volající, `updcache::progress_due`).
+pub fn download(url: &str, dest: &Path, progress: Progress) -> Result<(), String> {
     let res = run(|| {
         tauri::async_runtime::block_on(async {
             let mut resp = client(DOWNLOAD_TIMEOUT)?.get(url).send().await.map_err(|e| net_error(&e))?;
@@ -97,14 +116,17 @@ pub fn download(url: &str, dest: &Path) -> Result<(), String> {
             if resp.content_length().is_some_and(|n| n > MAX_SETUP_BYTES) {
                 return Err(tr("instalátor je podezřele velký — nestahuji", "the installer is suspiciously large — not downloading").into());
             }
+            let size = resp.content_length().filter(|n| *n > 0);
             let mut f = std::fs::File::create(dest).map_err(|e| crate::errors::io(&dest.display().to_string(), &e))?;
             let mut total = 0u64;
+            progress(0, size);
             while let Some(chunk) = resp.chunk().await.map_err(|e| net_error(&e))? {
                 total += chunk.len() as u64;
                 if total > MAX_SETUP_BYTES {
                     return Err(tr("instalátor je podezřele velký — přerušeno", "the installer is suspiciously large — stopped").into());
                 }
                 f.write_all(&chunk).map_err(|e| crate::errors::io(&dest.display().to_string(), &e))?;
+                progress(total, size);
             }
             f.sync_all().map_err(|e| crate::errors::io(&dest.display().to_string(), &e))
         })
@@ -122,6 +144,7 @@ mod tests {
     #[test]
     fn urls_and_errors() {
         assert_eq!(api_url("acme/ledge"), "https://api.github.com/repos/acme/ledge/releases/latest");
+        assert_eq!(tag_url("acme/ledge", "v0.2.13"), "https://api.github.com/repos/acme/ledge/releases/tags/v0.2.13");
         assert!(api_error(404, None).contains("soukromé"));
         assert!(api_error(403, Some("0")).contains("limit"));
         assert!(api_error(429, None).contains("limit"));

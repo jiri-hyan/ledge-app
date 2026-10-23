@@ -2,12 +2,14 @@
 // „Jiné…“ s vlastním textem, víc otázek po stránkách, „Odpovědět v Claude“ a zbývající čas. Odpověď →
 // příkaz `question_answer` (Rust `claude/questions.rs`), výběr je čistá logika v `model.ts`. Fokus se
 // bere jen po výslovném kliku do karty / na „Jiné…“ (pak klávesy 1–n, Enter, ←/→). Peek i karta Claude.
+// Viditelná karta potvrdí „zobrazeno“ (`seen.ts`) — bez toho ji pojistka jádra po `questionUnseenS` pustí do Claude.
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { api, inTauri, type Ask, type QuestionReply, type Snapshot } from "../api";
 import { t } from "../i18n";
 import { say, sayError } from "../ui/toast";
 import { answered, emptyDraft, instant, keyTarget, pick, remaining, toReply, toggleOther, type Draft } from "./model";
+import { useReportSeen } from "./seen";
 import "./questions.css";
 
 const lastSeg = (p: string) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
@@ -23,6 +25,9 @@ export default function QuestionCard(p: { ask: Ask; s: Snapshot; inSession?: boo
   const [armed, setArmed] = createSignal(false);
   const [now, setNow] = createSignal(Date.now());
   let otherBox: HTMLTextAreaElement | undefined;
+  let root: HTMLDivElement | undefined;
+  // pojistka `claude.questionUnseenS`: jádru říct, že karta je opravdu vidět (`seen.ts`)
+  useReportSeen(() => root, () => p.ask.id, () => p.ask.answerable);
 
   // jiná otázka ve stejné komponentě (nekeyed rodič) → začít znovu
   createEffect(on(() => p.ask.id, () => {
@@ -134,7 +139,7 @@ export default function QuestionCard(p: { ask: Ask; s: Snapshot; inSession?: boo
   }
 
   return (
-    <div class="qcard" classList={{ ro: !p.ask.answerable, "in-sess": !!p.inSession }} onPointerDown={(e) => !(e.target as HTMLElement).closest("button, textarea") && arm()}>
+    <div ref={root} class="qcard" classList={{ ro: !p.ask.answerable, "in-sess": !!p.inSession }} onPointerDown={(e) => !(e.target as HTMLElement).closest("button, textarea") && arm()}>
       <div class="q-head">
         <span class="q-ico" aria-hidden="true">?</span>
         <span class="q-who">

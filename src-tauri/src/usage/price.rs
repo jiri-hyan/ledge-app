@@ -171,6 +171,25 @@ mod tests {
         assert!(lookup("claude-opus-5-5").is_some() && lookup("claude-opus-5-5-x").is_none(), "jen přesná shoda");
     }
 
+    #[test]
+    fn hostile_model_ids_and_token_counts() {
+        // cizí / poškozené id z transcriptu: žádná panika na hranici vícebajtového znaku
+        for raw in ["", " ", "é", "-v", "-vé", "x-v1é", "anthropic.", "us.anthropic.é", "[", "@é", "é-12345678", "ě-v12", "-123456789", "claude\u{0}opus", "\u{130}-20261019", "-20261019"] {
+            let c = canonical(raw);
+            assert!(c.len() <= raw.len() * 3 + 3, "{raw:?} → {c:?}");
+            let _ = lookup(&c);
+            let _ = display(&c);
+        }
+        assert_eq!(canonical("-20261019"), "", "samotné datum se ořízne");
+        // obří počty tokenů: cena je konečné číslo (nebo žádná), ne NaN / inf
+        let max = Tokens { input: u64::MAX, output: u64::MAX, cw5: u64::MAX, cw1: u64::MAX, cr: u64::MAX };
+        for model in ["claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-1", "gpt-5"] {
+            for t in [0, TIER_LONG, TIER_FAST, TIER_US, TIER_LONG | TIER_FAST | TIER_US] {
+                assert!(cost(model, t, &max).is_none_or(|c| c.is_finite() && c >= 0.0), "{model} {t}");
+            }
+        }
+    }
+
     fn close(a: Option<f64>, b: f64) -> bool {
         a.is_some_and(|a| (a - b).abs() < 1e-9)
     }

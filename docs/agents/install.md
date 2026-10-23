@@ -18,7 +18,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   a kontrola, `-AlsoPrivate` = stejný instalátor i do vývojového repa (přechod pro Ledge ≤ 0.2.8, které
   hledaly aktualizace tam). CI (`.github/workflows/release.yml`) je jen ruční a do veřejného repa se
   nekopíruje.
-- **Aktualizace z appky** (`src-tauri/src/update.rs`, config `update: { check, repo, intervalH }`):
+- **Aktualizace z appky** (`src-tauri/src/update.rs` + `updater.rs`, config `update: { check, repo, intervalH, prefetch }`):
   60 s po startu a pak každých `intervalH` h se Ledge zeptá **veřejného GitHub API**
   `GET https://api.github.com/repos/<repo>/releases/latest` (`updatenet.rs`: bez tokenu, User-Agent
   `Ledge/<verze>`, termín 20 s) — **`gh` není potřeba**. Když API selže (soukromé repo → 404, limit
@@ -26,13 +26,35 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   (bez okna); obě odpovědi čte tatáž `update::evaluate`. Stavy ve `Snapshot.update`: `off` · `neovereno`
   · `aktualni` · `dostupna` · `nelze_overit {duvod}` (offline / repo nenalezeno / limit API, s chybou
   zálohy přes gh). Hlavička ukazuje **jen** `dostupna` (chip „Nová verze X“), zbytek Nastavení →
-  Záloha a aplikace → Aktualizace (+ „Zkontrolovat teď“). **Nikdy neinstaluje sám:** klik → poznámky → Instalovat → stažení
+  Záloha a aplikace → Aktualizace (+ „Zkontrolovat teď“). **Nikdy neinstaluje sám.** Stažení
   přes HTTPS jen z `https://github.com/<repo>/releases/download/<tag>/<asset>` (`updatenet::download_ok`,
-  strop 200 MB; záložně `gh release download`) do `%TEMP%\ledge-update\<tag>`, SHA256 se musí shodovat
-  s poznámkami (a s `digest` GitHubu) — jinak
-  nic nespustí → odpojený `cmd`: ~2 s pauza, `setup /S`, start nainstalovaného `ledge.exe`
-  (`autostart::install_target`); Ledge se ukončí. Běží-li spravované servery (s Ledge by umřely),
-  `update_install` vrátí jejich seznam a chce druhé potvrzení. Předběžné/nevalidní tagy se ignorují.
+  strop 200 MB; záložně `gh release download`) do cache `%LOCALAPPDATA%\Ledge\updates\<tag>\` (přes
+  `.part`), SHA256 se musí shodovat s poznámkami (a s `digest` GitHubu) — jinak se soubor smaže; vedle
+  něj `release.json` (SHA256, poznámky). Spuštění: SHA256 se z cache počítá znovu → odpojený `cmd`:
+  ~2 s pauza, `setup /S`, start nainstalovaného `ledge.exe` (`autostart::install_target`); Ledge se ukončí.
+  Běží-li spravované servery (s Ledge by umřely), `update_install` vrátí jejich seznam a chce druhé
+  potvrzení. Předběžné/nevalidní tagy se ignorují.
+  - **`update.prefetch`** (výchozí `true`, platí jen s `check: true`): hned po kontrole, která najde novější
+    vydání, se instalátor **tiše stáhne a ověří** (jednou na verzi; `Snapshot.update.fetch`: `idle` ·
+    `downloading {got, total}` — jen skutečné bajty, `total: null` = neurčitý průběh · `ready` · `failed
+    {duvod}`). Chip ukáže „Připraveno X“ a panel „Restartovat a aktualizovat“. Selhání se samo neopakuje
+    — „Zkusit znovu“ (`update_retry`). Žádná síť navíc: tytéž hosty a ověření jako dřív, jen dřív v čase.
+    `prefetch: false` = postaru, stáhne se až na klik „Stáhnout a nainstalovat“.
+  - **Úklid cache** (`updcache::plan_cleanup`, při startu a po stažení): zůstane instalátor běžící verze,
+    cíl návratu a nejnovější stažená novější verze; přerušené a starší pryč. Staré `%TEMP%\ledge-update` se smaže.
+  - **Co je nového:** `updates\seen.json` (`updseen.rs`) drží naposledy spuštěnou a předchozí verzi. Po
+    prvním spuštění nové verze, jejíž poznámky jsou v cache, ukáže hlavička jednorázový chip „Co je nového
+    v X“ (bez sítě, bez fokusu; „Rozumím“ = `update_notes_read`), trvale v Nastavení → Aktualizace.
+    Markdown poznámek se vykreslí jako text (`src/update/model.ts`, žádné HTML ani klikací odkazy z vydání).
+  - **Vrátit předchozí verzi** (Nastavení → Aktualizace, s potvrzením; `update_rollback`): ověřený
+    instalátor předchozí verze z cache, a když tam není (ruční instalace, první aktualizace touto cestou),
+    na klik `GET /repos/<repo>/releases/tags/v<předchozí>` + stažení se stejným ověřením. SHA256 každého
+    ověřeného instalátoru si Ledge pamatuje u verze v `seen.json` (`known`, mimo cache) — vydání přepsané
+    na GitHubu jiným instalátorem návrat odmítne. Návrat neběží, dokud se stahuje nová verze; úklid
+    nesmaže složku běžícího stažení a spouští jen `*-setup.exe` z manifestu (`update::safe_asset`). Downgrade umí
+    šablona NSIS Tauri v tichém režimu, dokud `bundle.windows.allowDowngrades` není `false` (výchozí `true`,
+    v `tauri.conf.json` nenastaveno — hlídá test `nsis_allows_silent_downgrade`). Po návratu na starší
+    verzi nic dalšího staršího nenabízí; zpět na novou vede běžná aktualizace (instalátor zůstal v cache).
 - **Lokální vydání:** `powershell -NoProfile -File scripts/release.ps1` → zkontroluje, že `version` v
   `src-tauri/tauri.conf.json` a `src-tauri/Cargo.toml` souhlasí, pustí `pnpm tauri build --bundles nsis`
   a vypíše cestu, velikost a SHA256 `Ledge_<verze>_x64-setup.exe` (`<target>\release\bundle\nsis\`).

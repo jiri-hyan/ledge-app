@@ -9,7 +9,7 @@ fn settings() -> Result<PathBuf, String> {
     crate::hooksetup::settings_path().ok_or_else(|| crate::i18n::tr("Nevím, kde je složka .claude.", "I don't know where the .claude folder is.").into())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn statusline_status() -> Result<StatusLineStatus, String> {
     Ok(statuslinesetup::status_at(&settings()?, &statuslinesetup::store_path()))
 }

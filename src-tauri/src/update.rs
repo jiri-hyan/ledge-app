@@ -11,13 +11,22 @@
 //! (`recv_timeout` do dalšího termínu) — v klidu nic nedělá. „Zkontrolovat teď“ pošle zprávu do
 //! téhož vlákna. Každé volání `gh` je bez okna a s termínem (`gitinfo::capture`, zabití stromu).
 //!
-//! **Nikdy sám neinstaluje.** Stav `dostupna` jen ukáže chip v hlavičce. Instalace až na klik
-//! ([`Updater::install`]): stažení přes HTTPS (záložně `gh release download`) do
-//! `%TEMP%\ledge-update\<tag>` → SHA256 souboru se
+//! **Nikdy sám neinstaluje.** Stav `dostupna` jen ukáže chip v hlavičce. S `update.prefetch` (výchozí
+//! zapnuto, platí jen se zapnutou kontrolou) se instalátor hned po kontrole **tiše stáhne** do cache
+//! (`updcache.rs`: `%LOCALAPPDATA%\Ledge\updates\<tag>`, jednou na verzi, průběh jen ze skutečných bajtů,
+//! selhání se samo neopakuje — „Zkusit znovu“ je klik) a UI pak nabídne „Restartovat a aktualizovat“.
+//! Instalace až na klik ([`Updater::install`]): instalátor z cache (SHA256 se před spuštěním počítá
+//! znovu), jinak stažení přes HTTPS (záložně `gh release download`) → SHA256 souboru se
 //! musí shodovat s řádkem v poznámkách (a s `digest`, který počítá GitHub, když ho vydání má) — bez
 //! shody se nic nespustí → odpojený `cmd` počká ~2 s, pustí tichý instalátor `/S` a pak nainstalovaný
 //! `ledge.exe`; volající (lib.rs) mezitím Ledge ukončí. Běžící dev servery (Job Object) by s Ledge
 //! umřely — proto `update_install` v lib.rs chce u nich druhé potvrzení.
+//!
+//! **Co je nového a návrat.** Poznámky k vydání se ukládají do manifestu v cache; po prvním spuštění nové
+//! verze je UI ukáže bez sítě (`updseen.rs`). „Vrátit předchozí verzi“ ([`Updater::rollback`]) spustí
+//! ověřený instalátor předchozí verze z cache; když tam není (ruční instalace), stáhne na klik vydání
+//! `v<předchozí>` z téhož repa se stejným ověřením. Šablona NSIS Tauri (`allowDowngrades`, výchozí `true`,
+//! v `tauri.conf.json` nezměněno — hlídá test) v tichém režimu starší verzi přes novější nainstaluje.
 //!
 //! **V bublině MSIX** (`pkgctx.rs`, Ledge spuštěný z Claude desktop) by `cmd` i instalátor zdědily
 //! kontext balíčku → instalace i Run by skončily jen v jeho soukromé kopii. Proto se tam instalátor
@@ -27,22 +36,22 @@
 //! Run. Starý Ledge se ukončí sám (jinak ho instalátor v tichém režimu zavře přes Restart Manager).
 //! Plánovač nedostupný → chyba s cestou k instalátoru (žádná instalace do bubliny).
 
-use crate::config::UpdateConfig;
 use crate::gitinfo::{self, RunError};
 use crate::updatenet;
-use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
+use crate::updcache;
+use serde::Deserialize;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::Arc;
-use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
+
+/// Stav a vlákno žijí v `updater.rs`; cesty `update::Updater` / `update::UpdateView` zůstávají.
+pub use crate::updater::{UpdateView, Updater};
 
 /// Verze běžící binárky (CI ji zapisuje do Cargo.toml jako `0.2.<run>`).
 pub const CURRENT: &str = env!("CARGO_PKG_VERSION");
 /// První kontrola po startu — ať start appky nesoupeří se síťí a `gh`.
-const FIRST_CHECK: Duration = Duration::from_secs(60);
+pub(crate) const FIRST_CHECK: Duration = Duration::from_secs(60);
 const VIEW_TIMEOUT: Duration = Duration::from_secs(20);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(300);
 fn auth_hint() -> &'static str {
@@ -143,8 +152,9 @@ fn is_hex64(s: &str) -> bool {
     s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// Bezpečné jméno souboru assetu (jde do `--pattern` a do cesty) a opravdu instalátor.
-fn safe_asset(name: &str) -> bool {
+/// Bezpečné jméno souboru assetu (jde do `--pattern` a do cesty) a opravdu instalátor. Platí i pro
+/// `release.json` v cache (`updcache::scan`) — nic jiného než `*-setup.exe` se nikdy nespustí.
+pub(crate) fn safe_asset(name: &str) -> bool {
     !name.is_empty()
         && name.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
         && name.to_ascii_lowercase().ends_with("-setup.exe")
@@ -164,40 +174,57 @@ pub fn notes_of(body: &str) -> String {
     body.lines().filter(|l| !l.trim_start().starts_with("SHA256")).collect::<Vec<_>>().join("\n").trim().to_string()
 }
 
+fn unreadable() -> String {
+    crate::i18n::tr("GitHub vrátil nečitelnou odpověď", "GitHub returned an unreadable answer").into()
+}
+
+/// Vydání → instalovatelné vydání (čistý tag, právě jeden bezpečně pojmenovaný instalátor a jeho SHA256
+/// v poznámkách), jinak lidský důvod.
+fn release_of(r: &GhRelease) -> Result<Release, String> {
+    let v = parse_version(&r.tag_name).ok_or_else(|| trf!("vydání má tag „{}“ (není vX.Y.Z) — nenabízím", "the release is tagged “{}” (not vX.Y.Z) — not offering it", r.tag_name))?;
+    let setups: Vec<&GhAsset> = r.assets.iter().filter(|a| a.name.to_ascii_lowercase().ends_with("-setup.exe")).collect();
+    let [asset] = setups.as_slice() else {
+        return Err(trf!("vydání {} nemá právě jeden instalátor *-setup.exe ({})", "release {} doesn't have exactly one *-setup.exe installer ({})", r.tag_name, setups.len()));
+    };
+    if !safe_asset(&asset.name) {
+        return Err(trf!("instalátor vydání {} má nečekané jméno „{}“", "the installer of release {} has an unexpected name “{}”", r.tag_name, asset.name));
+    }
+    let body = r.body.as_deref().unwrap_or("");
+    let Some(sha256) = sha_for(body, &asset.name) else {
+        return Err(trf!("vydání {} nemá v poznámkách SHA256 instalátoru — nejde ověřit", "release {} has no installer SHA256 in its notes — can't verify it", r.tag_name));
+    };
+    let digest = asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")).filter(|h| is_hex64(h)).map(str::to_ascii_lowercase);
+    Ok(Release {
+        tag: r.tag_name.trim().to_string(),
+        version: format!("{}.{}.{}", v.0, v.1, v.2),
+        notes: notes_of(body),
+        published: r.published_at.clone().unwrap_or_default(),
+        asset: asset.name.clone(),
+        sha256,
+        digest,
+        download_url: asset.browser_download_url.clone().or_else(|| asset.url.clone()),
+    })
+}
+
 /// JSON z `gh release view --json tagName,name,body,assets,publishedAt` → verdikt. Čistá funkce.
 pub fn evaluate(json: &str, current: &str) -> Verdict {
     let Ok(r) = serde_json::from_str::<GhRelease>(json) else {
-        return Verdict::Unverifiable(crate::i18n::tr("GitHub vrátil nečitelnou odpověď", "GitHub returned an unreadable answer").into());
+        return Verdict::Unverifiable(unreadable());
     };
     match newer(&r.tag_name, current) {
         None => Verdict::Unverifiable(trf!("nejnovější vydání má tag „{}“ (není vX.Y.Z) — nenabízím", "the latest release is tagged “{}” (not vX.Y.Z) — not offering it", r.tag_name)),
         Some(false) => Verdict::Current,
-        Some(true) => {
-            let setups: Vec<&GhAsset> = r.assets.iter().filter(|a| a.name.to_ascii_lowercase().ends_with("-setup.exe")).collect();
-            let [asset] = setups.as_slice() else {
-                return Verdict::Unverifiable(trf!("vydání {} nemá právě jeden instalátor *-setup.exe ({})", "release {} doesn't have exactly one *-setup.exe installer ({})", r.tag_name, setups.len()));
-            };
-            if !safe_asset(&asset.name) {
-                return Verdict::Unverifiable(trf!("instalátor vydání {} má nečekané jméno „{}“", "the installer of release {} has an unexpected name “{}”", r.tag_name, asset.name));
-            }
-            let body = r.body.as_deref().unwrap_or("");
-            let Some(sha256) = sha_for(body, &asset.name) else {
-                return Verdict::Unverifiable(trf!("vydání {} nemá v poznámkách SHA256 instalátoru — nejde ověřit", "release {} has no installer SHA256 in its notes — can't verify it", r.tag_name));
-            };
-            let digest = asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")).filter(|h| is_hex64(h)).map(str::to_ascii_lowercase);
-            let v = parse_version(&r.tag_name).expect("newer() už tag ověřil");
-            Verdict::Available(Release {
-                tag: r.tag_name.trim().to_string(),
-                version: format!("{}.{}.{}", v.0, v.1, v.2),
-                notes: notes_of(body),
-                published: r.published_at.clone().unwrap_or_default(),
-                asset: asset.name.clone(),
-                sha256,
-                digest,
-                download_url: asset.browser_download_url.clone().or_else(|| asset.url.clone()),
-            })
-        }
+        Some(true) => release_of(&r).map_or_else(Verdict::Unverifiable, Verdict::Available),
     }
+}
+
+/// JSON vydání podle tagu (návrat k předchozí verzi) → vydání; tag musí přesně sedět. Čistá funkce.
+pub fn evaluate_tag(json: &str, want: &str) -> Result<Release, String> {
+    let r = serde_json::from_str::<GhRelease>(json).map_err(|_| unreadable())?;
+    if r.tag_name.trim() != want {
+        return Err(trf!("GitHub vrátil vydání {} místo {want}", "GitHub returned release {} instead of {want}", r.tag_name));
+    }
+    release_of(&r)
 }
 
 /// Stažený soubor (`got` = SHA256 hex) proti vydání: poznámky vždy, `digest` GitHubu, když je.
@@ -279,7 +306,7 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 }
 
 /// Nejnovější vydání: veřejné API, při chybě `gh` (když je nainstalované). Obě chyby poctivě spolu.
-fn fetch_release(repo: &str) -> Result<String, String> {
+pub(crate) fn fetch_release(repo: &str) -> Result<String, String> {
     updatenet::latest(repo).or_else(|api| {
         if gh_exe().is_none() {
             return Err(api);
@@ -288,14 +315,27 @@ fn fetch_release(repo: &str) -> Result<String, String> {
     })
 }
 
-fn download_and_verify(rel: &Release, repo: &str) -> Result<PathBuf, String> {
-    let dir = std::env::temp_dir().join("ledge-update").join(&rel.tag);
+/// Vydání podle tagu: veřejné API, záložně `gh release view <tag>` (jen na klik „Vrátit“).
+pub(crate) fn fetch_release_tag(repo: &str, tag: &str) -> Result<String, String> {
+    updatenet::by_tag(repo, tag).or_else(|api| {
+        if gh_exe().is_none() {
+            return Err(api);
+        }
+        gh(&["release", "view", tag, "--repo", repo, "--json", "tagName,name,body,assets,publishedAt"], VIEW_TIMEOUT).map_err(|g| trf!("{api}; záloha přes gh: {g}", "{api}; fallback via gh: {g}"))
+    })
+}
+
+/// Stáhne instalátor vydání do `<root>/<tag>/` (přes `.part`), ověří SHA256 a zapíše manifest.
+pub(crate) fn download_and_verify(rel: &Release, repo: &str, root: &Path, progress: updatenet::Progress) -> Result<PathBuf, String> {
+    let dir = root.join(&rel.tag);
     std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))?;
     let file = dir.join(&rel.asset);
+    let part = dir.join(format!("{}.part", rel.asset));
+    let _ = std::fs::remove_file(dir.join(updcache::MANIFEST));
     let _ = std::fs::remove_file(&file);
     let url = rel.download_url.as_deref().filter(|u| updatenet::download_ok(u, repo, &rel.tag, &rel.asset));
     let https = match url {
-        Some(u) => updatenet::download(u, &file),
+        Some(u) => updatenet::download(u, &part, progress).and_then(|()| std::fs::rename(&part, &file).map_err(|e| crate::errors::io(&file.display().to_string(), &e))),
         None => Err(crate::i18n::tr("vydání neuvádí adresu instalátoru", "the release doesn't list the installer's address").into()),
     };
     if let Err(e) = https {
@@ -314,7 +354,21 @@ fn download_and_verify(rel: &Release, repo: &str) -> Result<PathBuf, String> {
         let _ = std::fs::remove_file(&file);
         return Err(e);
     }
+    updcache::write_manifest(&dir, &updcache::Manifest::of(rel))?;
     Ok(file)
+}
+
+/// Instalátor z cache znovu ověřený (SHA256 se počítá teď — soubor mohl kdokoli vyměnit). Neshoda →
+/// složka pryč a chyba.
+pub(crate) fn verified_cached(root: &Path, e: &updcache::Entry) -> Result<PathBuf, String> {
+    let (Some(m), Some(path)) = (e.manifest.as_ref(), updcache::installer(root, e)) else {
+        return Err(crate::i18n::tr("Instalátor v cache není celý.", "The cached installer is incomplete.").into());
+    };
+    let res = sha256_file(&path).and_then(|got| verify(&got, &m.release()));
+    if res.is_err() {
+        updcache::remove(root, std::slice::from_ref(&e.name));
+    }
+    res.map(|()| path)
 }
 
 /// Příkazová řádka pro `cmd.exe`: ~2 s počkat (Ledge se mezitím ukončí sám, ne přes kill instalátoru),
@@ -337,8 +391,10 @@ pub const OUTSIDE_ARGS: &str = "/S /R";
 /// Spustí instalaci odpojeně od Ledge: vlastní skupina procesů, skrytá konzole (CREATE_NO_WINDOW —
 /// ne DETACHED_PROCESS, s ním by si `ping` otevřel viditelné okno konzole) a mimo případný Job Object
 /// rodiče (CREATE_BREAKAWAY_FROM_JOB, když ho job nedovolí, tak bez něj).
-fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
+pub(crate) fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
     if crate::pkgctx::current().is_some() {
+        // cache v %LOCALAPPDATA% je v bublině virtualizovaná — mimo ni platí fyzická kopie
+        let setup = &crate::pkgctx::relaunch_target(setup, crate::pkgctx::twin_of(setup), |p| p.is_file());
         let dir = setup.parent().unwrap_or(Path::new(""));
         return crate::outside::run_task(crate::outside::TASK_UPDATE, setup, OUTSIDE_ARGS, dir, crate::outside::After::Keep)
             .map_err(|e| {
@@ -363,230 +419,9 @@ fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
     spawn(base | CREATE_BREAKAWAY_FROM_JOB).or_else(|_| spawn(base)).map(|_| ()).map_err(|e| crate::errors::spawn(crate::i18n::tr("Instalátor nejde spustit", "Can't run the installer"), &e))
 }
 
-// ---------- stav a vlákno ----------
-
-/// Stav pro UI (`Snapshot.update`).
-#[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(tag = "state", rename_all = "snake_case")]
-pub enum Status {
-    /// kontrola vypnutá v configu
-    Off,
-    /// zapnuto, první kontrola ještě neproběhla (60 s po startu)
-    Neovereno,
-    Aktualni,
-    Dostupna { verze: String, poznamky: String, publikovano: String },
-    /// offline / repo nenalezeno / limit API (a gh nepomohlo) / vydání nejde ověřit — poctivě s důvodem
-    NelzeOverit { duvod: String },
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateView {
-    #[serde(flatten)]
-    pub status: Status,
-    /// verze běžícího Ledge
-    pub current: &'static str,
-    pub repo: String,
-    /// kontrola právě běží
-    pub checking: bool,
-    /// unix ms poslední dokončené kontroly
-    pub checked_ms: Option<i64>,
-    /// stahuje / ověřuje / spouští instalátor
-    pub installing: bool,
-    pub install_error: Option<String>,
-}
-
-struct State {
-    status: Status,
-    repo: String,
-    checking: bool,
-    checked_ms: Option<i64>,
-    release: Option<Release>,
-    installing: bool,
-    install_error: Option<String>,
-}
-
-enum Msg {
-    Check,
-    Config(UpdateConfig),
-}
-
-type Notify = Arc<dyn Fn() + Send + Sync>;
-
-pub struct Updater {
-    tx: mpsc::Sender<Msg>,
-    st: Arc<Mutex<State>>,
-    notify: Notify,
-}
-
-fn idle_status(cfg: &UpdateConfig) -> Status {
-    if cfg.check { Status::Neovereno } else { Status::Off }
-}
-
-fn interval(cfg: &UpdateConfig) -> Duration {
-    Duration::from_secs(u64::from(cfg.interval_h.clamp(1, 48)) * 3600)
-}
-
-/// Kdy proběhne další automatická kontrola. `None` = vypnuto (vlákno spí, dokud nepřijde zpráva).
-/// Termín v minulosti (zapnuto po dlouhé pauze, změna repa) = hned. Čistá funkce.
-pub fn next_check(enabled: bool, start: Instant, last: Option<Instant>, every: Duration) -> Option<Instant> {
-    enabled.then(|| match last {
-        Some(l) => l + every,
-        None => start + FIRST_CHECK,
-    })
-}
-
-fn now_ms() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
-}
-
-impl Updater {
-    pub fn start(cfg: UpdateConfig, notify: Notify) -> Self {
-        let st = Arc::new(Mutex::new(State {
-            status: idle_status(&cfg),
-            repo: cfg.repo.clone(),
-            checking: false,
-            checked_ms: None,
-            release: None,
-            installing: false,
-            install_error: None,
-        }));
-        let (tx, rx) = mpsc::channel();
-        let (st2, n2) = (st.clone(), notify.clone());
-        std::thread::Builder::new().name("update".into()).spawn(move || worker(rx, st2, n2, cfg)).ok();
-        Self { tx, st, notify }
-    }
-
-    pub fn set_config(&self, cfg: UpdateConfig) {
-        {
-            let mut s = self.st.lock();
-            if s.repo != cfg.repo {
-                // jiné repo = dosavadní výsledek už neplatí
-                s.repo = cfg.repo.clone();
-                s.release = None;
-                s.checked_ms = None;
-                s.status = idle_status(&cfg);
-            } else if !cfg.check {
-                s.status = Status::Off;
-                s.release = None;
-            } else if s.status == Status::Off {
-                s.status = Status::Neovereno;
-            }
-        }
-        let _ = self.tx.send(Msg::Config(cfg));
-        (self.notify)();
-    }
-
-    /// Ruční kontrola (i s vypnutou automatickou) — výsledek přijde přes `notify`.
-    pub fn check_now(&self) {
-        let _ = self.tx.send(Msg::Check);
-    }
-
-    pub fn view(&self) -> UpdateView {
-        let s = self.st.lock();
-        UpdateView {
-            status: s.status.clone(),
-            current: CURRENT,
-            repo: s.repo.clone(),
-            checking: s.checking,
-            checked_ms: s.checked_ms,
-            installing: s.installing,
-            install_error: s.install_error.clone(),
-        }
-    }
-
-    /// Stáhne a ověří instalátor dostupné verze a odpojeně ho spustí (pak spustí `installed_exe`).
-    /// Při `Ok` musí volající Ledge ukončit. Blokuje (stažení) — volat mimo UI vlákno.
-    pub fn install(&self, installed_exe: &Path) -> Result<String, String> {
-        let (rel, repo) = {
-            let mut s = self.st.lock();
-            if s.installing {
-                return Err(crate::i18n::tr("Instalace už běží.", "Installation is already running.").into());
-            }
-            let rel = s.release.clone().ok_or_else(|| crate::i18n::tr("Není co instalovat — zkontroluj aktualizace znovu.", "Nothing to install — check for updates again."))?;
-            s.installing = true;
-            s.install_error = None;
-            (rel, s.repo.clone())
-        };
-        (self.notify)();
-        let res = download_and_verify(&rel, &repo).and_then(|setup| launch_installer(&setup, installed_exe).map(|()| setup));
-        if let Err(e) = &res {
-            let mut s = self.st.lock();
-            s.installing = false;
-            s.install_error = Some(e.clone());
-        }
-        (self.notify)();
-        res.map(|setup| trf!("{} → {} (spustí se {})", "{} → {} (then starts {})", rel.tag, setup.display(), installed_exe.display()))
-    }
-}
-
-fn worker(rx: mpsc::Receiver<Msg>, st: Arc<Mutex<State>>, notify: Notify, mut cfg: UpdateConfig) {
-    let start = Instant::now();
-    let mut last: Option<Instant> = None;
-    loop {
-        let due = next_check(cfg.check, start, last, interval(&cfg));
-        let msg = match due {
-            Some(t) => match rx.recv_timeout(t.saturating_duration_since(Instant::now())) {
-                Ok(m) => Some(m),
-                Err(RecvTimeoutError::Timeout) => None,
-                Err(RecvTimeoutError::Disconnected) => return,
-            },
-            None => match rx.recv() {
-                Ok(m) => Some(m),
-                Err(_) => return,
-            },
-        };
-        if let Some(Msg::Config(c)) = msg {
-            if c.repo != cfg.repo {
-                last = None;
-            }
-            cfg = c;
-            continue;
-        }
-        run_check(&cfg.repo, &st, &notify);
-        last = Some(Instant::now());
-        // „Zkontrolovat teď“ naklikané během kontroly = jedna kontrola; změny configu se nezahodí
-        while let Ok(m) = rx.try_recv() {
-            if let Msg::Config(c) = m {
-                if c.repo != cfg.repo {
-                    last = None;
-                }
-                cfg = c;
-            }
-        }
-    }
-}
-
-fn run_check(repo: &str, st: &Mutex<State>, notify: &Notify) {
-    st.lock().checking = true;
-    notify();
-    let res = fetch_release(repo);
-    let (status, release) = match res.map(|json| evaluate(&json, CURRENT)) {
-        Ok(Verdict::Current) => (Status::Aktualni, None),
-        Ok(Verdict::Available(r)) => (
-            Status::Dostupna { verze: r.version.clone(), poznamky: r.notes.clone(), publikovano: r.published.clone() },
-            Some(r),
-        ),
-        Ok(Verdict::Unverifiable(why)) | Err(why) => (Status::NelzeOverit { duvod: why }, None),
-    };
-    crate::log(&format!("update: {repo} → {status:?}").chars().take(300).collect::<String>());
-    {
-        let mut s = st.lock();
-        // repo se mezitím změnilo → výsledek patří starému, zahodit
-        if s.repo == repo {
-            s.status = status;
-            s.release = release;
-            s.checked_ms = Some(now_ms());
-        }
-        s.checking = false;
-    }
-    notify();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, validate};
 
     const FIXTURE: &str = include_str!("fixtures/gh-release-view.json");
     const API_FIXTURE: &str = include_str!("fixtures/github-api-release-latest.json");
@@ -677,6 +512,34 @@ mod tests {
         assert_eq!((r.sha256.as_str(), r.digest), (SHA_TEST, None));
     }
 
+    /// Návrat k předchozí verzi: vydání podle tagu projde stejným ověřením a tag musí přesně sedět.
+    #[test]
+    fn evaluate_tag_same_checks_and_exact_tag() {
+        let r = evaluate_tag(FIXTURE, "v0.2.14").unwrap();
+        assert_eq!((r.tag.as_str(), r.sha256.as_str()), ("v0.2.14", SHA_TEST));
+        assert_eq!(evaluate_tag(API_FIXTURE, "v0.2.14").unwrap().sha256, SHA_TEST);
+        #[rustfmt::skip]
+        let bad: Vec<(String, &str)> = vec![
+            (FIXTURE.to_string(), "v0.2.13"),                                        // jiné vydání, než o které jsme žádali
+            ("<html>".to_string(), "v0.2.14"),
+            (FIXTURE.replace("SHA256 (Ledge_0.2.14_x64-setup.exe)", "SHA256 (jiny-setup.exe)"), "v0.2.14"), // bez SHA
+            (FIXTURE.replace("\"tagName\":\"v0.2.14\"", "\"tagName\":\"v0.2.14-rc1\""), "v0.2.14-rc1"),
+        ];
+        for (json, tag) in bad {
+            assert!(evaluate_tag(&json, tag).is_err(), "{tag}");
+        }
+    }
+
+    /// Návrat = tichá instalace starší verze přes novější. Šablona NSIS Tauri to v `/S` dovolí jen s
+    /// `bundle.windows.allowDowngrades` ≠ false (výchozí true) — kdo ho vypne, rozbije „Vrátit“.
+    #[test]
+    fn nsis_allows_silent_downgrade() {
+        let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let v = &conf["bundle"]["windows"]["allowDowngrades"];
+        assert!(v.is_null() || v == &serde_json::Value::Bool(true), "allowDowngrades = {v}");
+        assert!(conf["bundle"]["targets"].as_array().unwrap().iter().any(|t| t == "nsis"));
+    }
+
     #[test]
     fn verify_needs_both_hashes_to_match() {
         let Verdict::Available(mut r) = evaluate(FIXTURE, "0.2.0") else { panic!() };
@@ -724,19 +587,6 @@ mod tests {
     }
 
     #[test]
-    fn schedule_first_after_60s_then_interval_never_when_off() {
-        let t0 = Instant::now();
-        let h6 = Duration::from_secs(6 * 3600);
-        assert_eq!(next_check(true, t0, None, h6), Some(t0 + FIRST_CHECK));
-        let l = t0 + Duration::from_secs(100);
-        assert_eq!(next_check(true, t0, Some(l), h6), Some(l + h6));
-        assert_eq!(next_check(false, t0, Some(l), h6), None);
-        assert_eq!(next_check(false, t0, None, h6), None);
-        let c = crate::config::UpdateConfig { interval_h: 0, ..Default::default() };
-        assert_eq!(interval(&c), Duration::from_secs(3600)); // nevalidní config nikdy nevede k busy loopu
-    }
-
-    #[test]
     fn installer_command_quotes_and_rejects() {
         let setup = Path::new(r"C:\Users\x y\AppData\Local\Temp\ledge-update\v0.2.14\Ledge_0.2.14_x64-setup.exe");
         let exe = Path::new(r"C:\Users\x y\AppData\Local\Ledge\ledge.exe");
@@ -747,43 +597,5 @@ mod tests {
         assert!(installer_command(Path::new(r#"C:\a"b\x-setup.exe"#), exe).is_err());
         assert!(installer_command(setup, Path::new(r"C:\%PATH%\ledge.exe")).is_err());
         assert!(installer_command(setup, Path::new("")).is_err());
-    }
-
-    #[test]
-    fn status_serializes_for_ui() {
-        let v = |status: Status| {
-            serde_json::to_value(UpdateView { status, current: "0.2.0", repo: "a/b".into(), checking: false, checked_ms: None, installing: false, install_error: None }).unwrap()
-        };
-        assert_eq!(v(Status::Off)["state"], "off");
-        assert_eq!(v(Status::Neovereno)["state"], "neovereno");
-        assert_eq!(v(Status::Aktualni)["state"], "aktualni");
-        let d = v(Status::Dostupna { verze: "0.2.14".into(), poznamky: "- x".into(), publikovano: "2026".into() });
-        assert_eq!((d["state"].as_str(), d["verze"].as_str(), d["current"].as_str()), (Some("dostupna"), Some("0.2.14"), Some("0.2.0")));
-        let n = v(Status::NelzeOverit { duvod: "offline".into() });
-        assert_eq!((n["state"].as_str(), n["duvod"].as_str()), (Some("nelze_overit"), Some("offline")));
-        assert!(n.get("checkedMs").is_some() && n.get("installError").is_some());
-    }
-
-    #[test]
-    fn config_defaults_old_config_and_validation() {
-        // starý config bez bloku update → zapnuto, repo jiri-hyan/ledge-app, 6 h
-        let cfg: Config = serde_json::from_str("{}").unwrap();
-        assert!(cfg.update.check);
-        assert_eq!(cfg.update.repo, "jiri-hyan/ledge-app");
-        assert_eq!(cfg.update.interval_h, 6);
-        let cfg: Config = serde_json::from_str(r#"{"update":{"intervalH":12}}"#).unwrap();
-        assert_eq!((cfg.update.check, cfg.update.interval_h), (true, 12));
-        assert!(crate::config::schema_json().contains("intervalH"));
-        let with = |j: &str| -> Result<(), String> { validate(&serde_json::from_str::<Config>(j).map_err(|e| e.to_string())?) };
-        assert!(with(r#"{"update":{"intervalH":1}}"#).is_ok());
-        assert!(with(r#"{"update":{"intervalH":48}}"#).is_ok());
-        assert!(with(r#"{"update":{"intervalH":0}}"#).unwrap_err().contains("1–48"));
-        assert!(with(r#"{"update":{"intervalH":49}}"#).is_err());
-        for bad in ["", "ledge", "a/b/c", "/ledge", "jiri-hyan/", "jiri hyan/ledge", "a/..", "https://github.com/jiri-hyan/ledge-app"] {
-            assert!(with(&format!(r#"{{"update":{{"repo":"{bad}"}}}}"#)).is_err(), "{bad}");
-        }
-        assert!(with(r#"{"update":{"repo":"Some_Org/repo.name-2"}}"#).is_ok());
-        // repo se validuje i s vypnutou kontrolou — chyba se neukáže až po zapnutí
-        assert!(with(r#"{"update":{"check":false,"repo":"x"}}"#).is_err());
     }
 }

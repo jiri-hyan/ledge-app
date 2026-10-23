@@ -21,11 +21,18 @@ pub const CARD_ROWS: usize = 8;
 /// ostatní — dohromady nejvýš `max` řádků. Druhá hodnota = kolik poznámek se nevešlo (zbytek
 /// přes `note_list`).
 pub fn card(notes: &[NoteView], today_end_ms: i64, max: usize) -> (Vec<NoteView>, usize) {
+    card_where(notes, |_| true, today_end_ms, max)
+}
+
+/// Jako [`card`] jen nad poznámkami, které projdou `keep` — bez kopie vyfiltrovaného seznamu
+/// (snapshot ji dělá při každém překreslení, a poznámek mohou být tisíce).
+pub fn card_where(notes: &[NoteView], keep: impl Fn(&NoteView) -> bool, today_end_ms: i64, max: usize) -> (Vec<NoteView>, usize) {
     let is_today = |n: &NoteView| !n.done && n.remind_ms.is_some_and(|r| r < today_end_ms);
-    let mut today: Vec<&NoteView> = notes.iter().filter(|n| is_today(n)).collect();
+    let mut today: Vec<&NoteView> = notes.iter().filter(|n| keep(n) && is_today(n)).collect();
     today.sort_by_key(|n| n.remind_ms);
-    let out: Vec<NoteView> = today.into_iter().chain(notes.iter().filter(|n| !is_today(n))).take(max).cloned().collect();
-    let more = notes.len() - out.len();
+    let out: Vec<NoteView> = today.into_iter().chain(notes.iter().filter(|n| keep(n) && !is_today(n))).take(max).cloned().collect();
+    let total = notes.iter().filter(|n| keep(n)).count();
+    let more = total - out.len();
     (out, more)
 }
 
@@ -123,6 +130,22 @@ mod tests {
         let many: Vec<NoteView> = (0..500).map(|i| nv("x", 1_000 - i, Some(10), false)).collect();
         let (c, more) = card(&many, 1_000, CARD_ROWS);
         assert_eq!((c.len(), more), (CARD_ROWS, 500 - CARD_ROWS));
+    }
+
+    #[test]
+    fn card_where_equals_card_over_prefiltered_copy() {
+        let mut notes: Vec<NoteView> = (0..40).map(|i| nv(&format!("n{i}"), 100 - i, (i % 3 == 0).then_some(500 + i), i % 7 == 0)).collect();
+        for (i, n) in notes.iter_mut().enumerate() {
+            n.project = (i % 4 == 0).then(|| "app".to_string());
+        }
+        for max in [0, 1, 3, 8, 100] {
+            let general: Vec<NoteView> = notes.iter().filter(|n| n.project.is_none()).cloned().collect();
+            assert_eq!(card_where(&notes, |n| n.project.is_none(), 1_000, max), card(&general, 1_000, max), "max {max}");
+            assert_eq!(card_where(&notes, |_| true, 1_000, max), card(&notes, 1_000, max), "vše, max {max}");
+        }
+        // nic neprojde → prázdná karta, nic „navíc“
+        assert_eq!(card_where(&notes, |_| false, 1_000, 8), (vec![], 0));
+        assert_eq!(card_where(&[], |_| true, 1_000, 8), (vec![], 0));
     }
 
     #[test]

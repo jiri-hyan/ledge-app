@@ -1,5 +1,6 @@
 // Sekce „Otázky Clauda“ v panelu Claude (dřív samostatný panel): odpovídat na AskUserQuestion z Ledge
-// (`claude.questionHoldS`, 0 = jen ukázat), jak dlouho čekat a stav hooku PreToolUse(AskUserQuestion)
+// (`claude.questionHoldS`, 0 = jen ukázat), jak dlouho čekat, pojistka neviděné otázky (`claude.questionUnseenS`,
+// 0 = vypnuto) a stav hooku PreToolUse(AskUserQuestion)
 // s tlačítkem doplnit / zapojit (Rust `hooksetup.rs`, příkaz `hooks_install`). Volba jde do draftu a
 // uloží ji společná lišta (Uložit); zapojení hooku je akce (zápis do ~/.claude), ne volba configu.
 import { createSignal, For, Show } from "solid-js";
@@ -15,6 +16,9 @@ import { fieldLabel } from "../labels";
 const DEFAULT_HOLD = 540;
 const MAX_HOLD = 550;
 const MIN_HOLD = 30;
+/** pojistka neviděné otázky (Rust `claude::unseen`: výchozí 20 s, 5–550, 0 = vypnuto) */
+const DEFAULT_UNSEEN = 20;
+const MIN_UNSEEN = 5;
 
 /** Jak otázka v deníku skončila (Rust `QuestionLog.outcome`). */
 const OUTCOME: Record<string, () => string> = {
@@ -24,6 +28,7 @@ const OUTCOME: Record<string, () => string> = {
   released: () => t("questions.log.released", "Předáno do Claude"),
   expired: () => t("questions.log.expired", "Vypršelo"),
   turnEnded: () => t("questions.log.turnEnded", "Konec tahu"),
+  releasedUnseen: () => t("questions.log.releasedUnseen", "Nikdo neviděl — předáno do Claude"),
 };
 const outcomeName = (o: string) => OUTCOME[o]?.() ?? t("questions.log.skipped", "Přeskočeno");
 
@@ -36,6 +41,8 @@ export default function QuestionsSection(p: { s: Snapshot }) {
   const hooks = () => p.s.hooks;
   const qMissing = () => hooks().state === "none" || hooks().missing.includes("PreToolUse");
   const setHold = (v: number) => c.set("claude.questionHoldS", v);
+  const unseen = (): number => c.cfg?.claude?.questionUnseenS ?? DEFAULT_UNSEEN;
+  const setUnseen = (v: number) => c.set("claude.questionUnseenS", v);
 
   async function install() {
     setAsk(false);
@@ -78,6 +85,27 @@ export default function QuestionsSection(p: { s: Snapshot }) {
             <span class="unit">s</span>
           </span>
         </Row>
+      </Show>
+      <Show when={on()}>
+        <Row id="claude.questionUnseenS" hint={unseen() > 0 ? t("questions.panel.unseenOn", "Když otázku do {n} s nikdo v Ledge neuvidí (šuplík zavřený, hra přes celou obrazovku), Claude se zeptá ve svém okně", { n: unseen() }) : t("questions.panel.unseenOff", "Ledge drží otázku celou dobu, i když ji nikdo nevidí")}>
+          <Toggle value={unseen() > 0} onChange={(v) => setUnseen(v ? DEFAULT_UNSEEN : 0)} label={fieldLabel("claude.questionUnseenS")} />
+        </Row>
+        <Show when={unseen() > 0}>
+          <Row id="claude.questionUnseen.wait" label={t("questions.panel.unseenWait", "Pustit neviděnou po")} hint={t("questions.panel.unseenWaitHint", "Sekundy od příchodu otázky ({min}–{max} s)", { min: MIN_UNSEEN, max: MAX_HOLD })}>
+            <span class="st-num">
+              <input
+                type="number"
+                min={MIN_UNSEEN}
+                max={MAX_HOLD}
+                style={{ width: "72px" }}
+                value={unseen()}
+                aria-label={t("questions.panel.unseenWait", "Pustit neviděnou po")}
+                onChange={(e) => setUnseen(Math.min(MAX_HOLD, Math.max(MIN_UNSEEN, Math.round(+e.currentTarget.value) || DEFAULT_UNSEEN)))}
+              />
+              <span class="unit">s</span>
+            </span>
+          </Row>
+        </Show>
       </Show>
       <Row id="claude.questionHook" label={t("questions.panel.hook", "Hook pro otázky")} hint={`${hookText()} ${t("questions.panel.newSessions", "Platí pro nově spuštěné session.")}`}>
         <Show when={qMissing() && hooks().state !== "error"}>

@@ -144,6 +144,57 @@ mod tests {
         assert_eq!(with_done("jen text\n", true), "---\ndone: true\n---\njen text\n");
     }
 
+    fn texts(seed: u64, count: usize, pieces: &[&str]) -> Vec<String> {
+        let mut rng = crate::testrng::Rng(seed);
+        (0..count).map(|_| rng.soup(pieces, 13)).collect()
+    }
+
+    #[test]
+    fn property_split_render_roundtrip_and_with_done_keeps_body() {
+        let pieces = ["---\n", "---", "a: 1\n", "kind: \"x y\"\n", "# c\n", "  - x\n", "\n", "\r\n", "é", "\u{feff}", "text ", "--- \n", ":\n", "\t", "done: true\n"];
+        for t in texts(0x9E37_79B9_7F4A_7C15, 4000, &pieces) {
+            let (front, body) = split(&t);
+            let bomless = t.trim_start_matches('\u{feff}');
+            match &front {
+                // bez CRLF se text složí zpět přesně (tělo je bajtově beze změny)
+                // (uzavírací `---` na posledním řádku bez konce řádku dostane při složení `\n`)
+                Some(f) if !t.contains('\r') => {
+                    let r = render(f, body);
+                    assert!(r == bomless || (body.is_empty() && r == format!("{bomless}\n")), "{t:?}");
+                }
+                Some(_) => assert!(bomless.ends_with(body), "{t:?}"),
+                None => assert_eq!(body, bomless, "bez hlavičky je tělo celý text: {t:?}"),
+            }
+            for done in [true, false] {
+                let out = with_done(&t, done);
+                let (f2, body2) = split(&out);
+                assert_eq!(body2, body, "with_done nesmí sáhnout na tělo: {t:?}");
+                assert_eq!(get(&f2.expect("hlavička"), "done").as_deref(), Some(if done { "true" } else { "false" }), "{t:?}");
+                assert_eq!(with_done(&out, done), out, "idempotence: {t:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn hostile_input_does_not_panic() {
+        let huge_line = "k: ".to_string() + &"é".repeat(1_000_000);
+        let cases = [String::new(), "---".into(), "---\n".into(), "\u{feff}".into(), "---\n---".into(), format!("---\n{huge_line}\n---\nx"), "\n\n\n".into(), "---\r".into(), "\0\0---\n".into()];
+        for t in &cases {
+            let (f, body) = split(t);
+            assert!(f.is_some() || body.len() <= t.len());
+            let _ = with_done(t, true);
+        }
+        let mut f: Vec<String> = vec![];
+        set(&mut f, "", "x"); // prázdný klíč se jen připojí, nespadne
+        unset(&mut f, "");
+        assert_eq!(get(&f, "kind"), None);
+        for v in ["", "\"", "''", "\"x'", "'", "\u{e9}\"\u{e9}"] {
+            let q = yaml_value(v);
+            assert!(!q.contains(['\n', '\r']), "{v:?}");
+            let _ = get(&[format!("k: {q}")], "k");
+        }
+    }
+
     #[test]
     fn frontmatter_needs_key_value_lines_and_close_within_30() {
         // tělo začínající oddělovačem není hlavička

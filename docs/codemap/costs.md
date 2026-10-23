@@ -9,7 +9,7 @@ dnech. Zdroj = lokální transcripty Claude Code `~/.claude/projects/<slug>/**/*
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `src-tauri/src/usage/parse.rs` | řádek JSONL → záznam (jen `type:"assistant"` s `message.usage`), předfiltr bajtů, klíč deduplikace, `cwd` z libovolného řádku | `parse_line`, `Rec`, `Tokens`, `maybe_usage`, `fnv`, `iso_ms`, `line_cwd` |
+| `src-tauri/src/usage/parse.rs` | řádek JSONL → záznam (součty tokenů nasycené, ne přetékající) (jen `type:"assistant"` s `message.usage`), předfiltr bajtů, klíč deduplikace, `cwd` z libovolného řádku | `parse_line`, `Rec`, `Tokens`, `maybe_usage`, `fnv`, `iso_ms`, `line_cwd` |
 | `src-tauri/src/usage/price.rs` | ceník USD / 1M tokenů jako data (datum ověření + zdroj), kanonické id modelu, pásma (Haiku 5.5 > 100k, fast, `inference_geo: us`), cena | `MODELS`, `VERIFIED`, `SOURCE`, `canonical`, `lookup`, `tier`, `cost`, `display`, `TIER_*`, `LONG_PROMPT` |
 | `src-tauri/src/usage/index.rs` | inkrementální index na disku: výpis souborů, čtení od offsetu, dedup, agregace den × cwd × model × pásmo, uložení | `Index`, `Index::update`, `Index::add`, `list_files`, `Found`, `Window`, `Stats`, `FileEntry`, `Key`, `Sum`, `load`, `save`, `encode_seen`, `decode_seen`, `VERSION` |
 | `src-tauri/src/usage/view.rs` | index → přehled (rozsahy, top projekty/modely + „ostatní“, dny) | `build`, `Summary`, `Range`, `Line`, `Day`, `Split`, `TOP`, `date_of` |

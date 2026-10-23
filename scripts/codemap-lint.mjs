@@ -1,6 +1,7 @@
 // Lint hniloby codemap: tabulky v docs/codemap/*.md tvrdí, které soubory a symboly existují. Když kód
 // uteče (přejmenování, přesun do podsložky), mapa lže a worker pak čte špatná místa — tohle to chytí.
 // Čisté funkce (bez I/O) + `loadTree` jako jediné I/O; test: scripts/codemap.test.mjs.
+// Pokrytí (každý modul má mapu) je v codemap-coverage.mjs, test: scripts/codemap-coverage.test.mjs.
 //   node scripts/codemap-lint.mjs      → vypíše nálezy (exit 1, je-li nějaký)
 //
 // Pravidla:
@@ -13,6 +14,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { coverageGaps } from './codemap-coverage.mjs'
 
 const SKIP_DIRS = new Set(['node_modules', 'target', 'target-agents', 'dist', '.git'])
 const CODE_ROOTS = ['src', 'src-tauri/src', 'scripts']
@@ -134,7 +136,7 @@ export function loadTree(root) {
   for (const f of code) {
     for (const w of fs.readFileSync(path.join(root, f), 'utf8').matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) words.add(w[0])
   }
-  return { entries: [...files, ...dirs], words }
+  return { entries: [...files, ...dirs], files, words }
 }
 
 /** Projde docs/codemap/*.md a vrátí nálezy [{ file, kind, value, line }]. */
@@ -149,10 +151,23 @@ export function lintCodemaps(root, opts = {}) {
   return found
 }
 
+/** Pokrytí: moduly kódu, které žádná mapa nejmenuje (+ zbytečné výjimky) → { missing, staleAllow }. */
+export function lintCoverage(root, allow) {
+  const { files } = loadTree(root)
+  const dir = path.join(root, 'docs', 'codemap')
+  const mds = fs.readdirSync(dir).filter((x) => x.endsWith('.md')).map((n) => fs.readFileSync(path.join(dir, n), 'utf8'))
+  return coverageGaps(files, mds, allow)
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const found = lintCodemaps(root)
   for (const f of found) console.log(`${f.file}:${f.line}  ${f.kind === 'file' ? 'soubor neexistuje' : 'symbol v kódu není'}: ${f.value}`)
-  console.log(found.length ? `CODEMAP: ${found.length} zastaralých položek` : 'CODEMAP: v pořádku')
-  process.exit(found.length ? 1 : 0)
+  const cov = lintCoverage(root)
+  for (const u of cov.missing) console.log(`bez mapy: ${u}  (jmenuj ho v docs/codemap/*.md, nebo výjimka v COVERAGE_ALLOW s důvodem)`)
+  for (const f of cov.unnamed) console.log(`soubor bez řádku v mapě: ${f}  (jmenuj ho výslovně v tabulce některé docs/codemap/*.md)`)
+  for (const u of cov.staleAllow) console.log(`zbytečná výjimka COVERAGE_ALLOW: ${u}`)
+  const bad = found.length + cov.missing.length + cov.unnamed.length + cov.staleAllow.length
+  console.log(bad ? `CODEMAP: ${found.length} zastaralých položek, ${cov.missing.length} modulů bez mapy, ${cov.unnamed.length} souborů bez řádku, ${cov.staleAllow.length} zbytečných výjimek` : 'CODEMAP: v pořádku')
+  process.exit(bad ? 1 : 0)
 }

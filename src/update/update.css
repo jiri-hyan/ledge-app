@@ -1,0 +1,15 @@
+/* Poznámky k vydání a průběh tichého stažení (panel „Nová verze“, „Co je nového“, Nastavení → Aktualizace). */
+.upd-md { max-height: 180px; overflow: auto; font-size: var(--fs-md); line-height: 1.5; color: var(--t2); }
+.upd-md h5 { margin: 6px 0 2px; font-size: var(--fs-md); color: var(--t1); }
+.upd-md p { margin: 0 0 4px; }
+.upd-md .upd-li { position: relative; padding-left: 14px; }
+.upd-md .upd-li::before { content: "•"; position: absolute; left: 2px; color: var(--t3); }
+.upd-md code { font-family: var(--mono); font-size: 0.95em; }
+.upd-md .upd-dim { color: var(--t3); }
+.upd-prog { position: relative; height: 4px; border-radius: 2px; background: var(--card-2); overflow: hidden; }
+.upd-prog > i { position: absolute; inset: 0 auto 0 0; background: var(--green); border-radius: 2px; transition: width var(--fast); }
+/* velikost neznámá: neurčitý pruh (animace jen během stahování — v klidu se nevykresluje) */
+.upd-prog.upd-indet > i { width: 30%; animation: upd-indet 1.2s ease-in-out infinite; }
+@keyframes upd-indet { from { left: -30%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .upd-prog.upd-indet > i { animation: none; width: 100%; opacity: 0.5; } }
+.upd-whatsnew { display: flex; flex-direction: column; gap: 6px; width: 100%; }

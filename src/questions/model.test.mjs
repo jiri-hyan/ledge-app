@@ -56,3 +56,16 @@ test("keyTarget: čísla možností, za posledním Jiné…, jinak nic", () => {
   assert.equal(keyTarget(m, "3"), "other");
   for (const k of ["4", "0", "a", "Enter"]) assert.equal(keyTarget(m, k), null);
 });
+
+test("„zobrazeno“ jen u držené otázky, otevřeného šuplíku a karty v záběru, jednou", async () => {
+  const { shouldReportSeen } = await import("./model.ts");
+  const base = { answerable: true, shown: true, inView: true, reported: false };
+  const cases = [
+    ["vše splněno", base, true],
+    ["jen ukázaná (odpovídá se v Claude)", { ...base, answerable: false }, false],
+    ["šuplík zavřený / WebView skryté", { ...base, shown: false }, false],
+    ["karta mimo záběr", { ...base, inView: false }, false],
+    ["už potvrzeno", { ...base, reported: true }, false],
+  ];
+  for (const [name, s, want] of cases) assert.equal(shouldReportSeen(s), want, name);
+});

@@ -28,7 +28,7 @@ pub(crate) fn next_wake(now_ms: i64, deadlines: impl IntoIterator<Item = Option<
 }
 
 /// Termíny pro `next_wake` ze stavu jádra (jen čtení paměti).
-fn deadlines(last_git: Instant) -> [Option<i64>; 11] {
+fn deadlines(last_git: Instant) -> [Option<i64>; 12] {
     let c = core();
     let now = now_ms();
     let in_ms = |left: Duration| now + left.as_millis() as i64 + 1;
@@ -43,8 +43,9 @@ fn deadlines(last_git: Instant) -> [Option<i64>; 11] {
     // časovač: konec odpočtu a změny minuty v proužku jen, když běží (`timer::next_deadline`);
     // kalendář jen s viditelnou kartou (`calendar::live::next_deadline`); čas skladby v proužku po minutách
     // jen když hraje a proužek ho ukazuje (`media::next_deadline_live`); připomínka schůzky jen na čas
-    // okna připomínky / začátku (`calendar::remind::next_deadline`, bez kalendáře s připomínkou nic)
-    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline(), crate::media::next_deadline_live(), crate::calendar::remind::next_deadline(), crate::accounts::calsync::next_deadline(), crate::accounts::mail::next_deadline()]
+    // okna připomínky / začátku (`calendar::remind::next_deadline`, bez kalendáře s připomínkou nic);
+    // opakovaný puls jen dokud čeká otázka Clauda se zavřeným šuplíkem (`attention::next_deadline`)
+    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline(), crate::media::next_deadline_live(), crate::calendar::remind::next_deadline(), crate::accounts::calsync::next_deadline(), crate::accounts::mail::next_deadline(), crate::attention::next_deadline()]
 }
 
 pub(crate) fn spawn_emit_thread() {
@@ -64,6 +65,8 @@ pub(crate) fn spawn_emit_thread() {
                     }
                 }
                 check_reminders();
+                // peek po konci hry + opakovaný puls čekající otázky Clauda (`attention.rs`)
+                crate::attention::catch_up();
                 crate::limitslive::tick(now_ms());
                 crate::timer::tick_live(now_ms());
                 crate::calendar::live::tick(now_ms());

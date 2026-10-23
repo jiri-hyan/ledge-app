@@ -44,7 +44,7 @@ kartou (pošta s položkou proužku 1× / 5 min), ve hře nic.
 | `AccountsSettings.tsx` | Nastavení → Osobní → Kalendáře → „Pokročilé: připojit účet Microsoft / Google“ (skládá `settings/panels/Personal.tsx`; panel Účty od kola 15 není): dlaždice, přihlášení, stav, co smí číst, Odhlásit, průvodci Azure / Google Cloud |
 | `MailCard.tsx` | karta Pošta (`openAccountsSettings`) |
 | `model.ts` (+ `model.test.mjs`) | Client ID (zrcadlo Rust), `grants`, výběr kalendářů, odznak |
-| `api.ts` · `en.ts` · `accounts.css` | příkazy · angličtina · třídy `mail-*`, `acc-*` |
+| `src/accounts/api.ts` · `en.ts` · `accounts.css` | příkazy · angličtina · třídy `mail-*`, `acc-*` |
 
 ## Testy
 

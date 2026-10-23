@@ -246,6 +246,44 @@ mod tests {
     }
 
     #[test]
+    fn hostile_limit_files_and_inputs() {
+        // soubor s limity i vstup stavového řádku jsou cizí JSON: špatné typy, obří a nekonečná čísla
+        let files = [
+            "", "   ", "\u{feff}", "[]", "null", "42", "\"x\"", "{", "{\"at\":1}", "{\"at\":\"zítra\",\"fiveHour\":{\"pct\":1}}",
+            "{\"at\":1e400,\"fiveHour\":{\"pct\":1}}", "{\"at\":1e19,\"fiveHour\":{\"pct\":1e308,\"resetsAt\":1e19}}",
+            "{\"at\":1,\"fiveHour\":{\"pct\":-1}}", "{\"at\":1,\"fiveHour\":{\"pct\":\"50\"}}", "{\"at\":1,\"fiveHour\":[1,2]}", "{\"at\":1,\"sevenDay\":null}",
+            "{\"at\":9223372036854775807,\"sevenDay\":{\"pct\":100,\"resetsAt\":9223372036854775807}}",
+        ];
+        for f in files {
+            if let Some(s) = from_file(f, Source::UsageLog) {
+                // co projde, s tím se dá dál počítat bez paniky (stáří, proužek, připomínka)
+                let _ = strip_text(&s, NOW, &|ms| ms.to_string());
+                let _ = top_fresh(&s, NOW);
+                let _ = should_write(Some(&s), &s);
+                let mut armed = Armed::new();
+                arm(&mut armed, &s, NOW);
+                let _ = (due(&mut armed, i64::MAX), next_reset(&armed));
+                let _ = to_file(&s);
+            }
+        }
+        let inputs = [
+            json!({}),
+            json!([]),
+            json!(null),
+            json!({"rate_limits": null}),
+            json!({"rate_limits": []}),
+            json!({"rate_limits": {"five_hour": {"used_percentage": "x"}}}),
+            json!({"rate_limits": {"five_hour": {"used_percentage": 1e308, "resets_at": -1}}}),
+            json!({"rate_limits": {"seven_day": {"used_percentage": 12.5, "resets_at": "x"}}}),
+        ];
+        for i in &inputs {
+            let _ = from_status_input(i, NOW);
+        }
+        assert_eq!(from_status_input(&inputs[7], NOW).and_then(|s| s.seven_day).map(|w| (w.pct, w.resets_at)), Some((12.5, None)), "neplatný reset = neznámý, procento zůstane");
+        assert!(from_status_input(&inputs[5], NOW).is_none(), "text místo čísla = okno není");
+    }
+
+    #[test]
     fn to_ms_table() {
         let cases = [
             (json!(1738425600), Some(1_738_425_600_000)),

@@ -22,6 +22,10 @@
 // první: makro `trf!` (texty podle jazyka) musí být definované před moduly, které ho používají
 #[macro_use]
 mod i18n;
+#[cfg(test)]
+mod hostile;
+#[cfg(test)]
+mod testrng;
 mod accounts;
 mod actionicons;
 mod actionrun;
@@ -110,6 +114,9 @@ mod update;
 mod usage;
 mod volume;
 mod updatenet;
+mod updater;
+mod updcache;
+mod updseen;
 mod weather;
 mod webpanel;
 mod widgets;
@@ -203,7 +210,8 @@ pub fn run() {
             let claude = Claude::new(Arc::new(on_claude_change), Duration::from_secs(cfg.claude.approval_timeout_s.max(5)));
             claude.set_enforce(cfg.claude.enforce_commit);
             claude.set_question_hold(cfg.claude.question_hold_s);
-            let updater = update::Updater::start(cfg.update.clone(), Arc::new(mark_dirty));
+            claude.set_question_unseen(cfg.claude.question_unseen_s);
+            let updater = update::Updater::start(cfg.update.clone(), actionrun::local_dir().join(updcache::DIR), Arc::new(mark_dirty));
             let core_arc = Arc::new(Core {
                 app: app.handle().clone(),
                 cfg: RwLock::new(cfg.clone()),
@@ -382,6 +390,9 @@ pub fn run() {
             commands::drawer::open_link,
             commands::update::update_check_now,
             commands::update::update_install,
+            commands::update::update_retry,
+            commands::update::update_notes_read,
+            commands::update::update_rollback,
             commands::sessions::session_open,
             commands::sessiongit::session_git,
             commands::sessiongit::session_git_diff,
@@ -396,6 +407,7 @@ pub fn run() {
             commands::sessions::hooks_remove,
             commands::sessions::question_answer,
             commands::sessions::question_release,
+            commands::sessions::question_seen,
             commands::agents::agent_action,
             commands::agents::agent_spawn,
             commands::limits::statusline_status,

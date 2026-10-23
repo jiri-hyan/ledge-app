@@ -24,7 +24,6 @@
 .chip.upd:hover { background: var(--card-2); }
 .chip.upd:active { transform: scale(0.96); }
 .upd-panel { margin-bottom: var(--gap-section); display: flex; flex-direction: column; gap: 10px; }
-.upd-notes { margin: 0; max-height: 180px; overflow: auto; white-space: pre-wrap; font: var(--fs-md)/1.5 var(--mono); color: var(--t2); }
 .upd-bar { display: flex; gap: var(--s2); align-items: center; justify-content: flex-end; }
 .upd-bar .msg { margin-right: auto; font-size: var(--fs-md); color: var(--t3); }
 .upd-bar .msg.warn { color: var(--amber); }

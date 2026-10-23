@@ -27,6 +27,8 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
   const unfinished = () => p.s.sessions.filter((x) => x.uncommitted.length > 0 || x.unpushed > 0);
   // jen „dostupná“ — nelze_overit (gh chybí, offline) hlavička neukazuje, to patří do Nastavení
   const avail = () => (p.page === "main" && p.s.update.state === "dostupna" ? p.s.update : null);
+  // jednorázově po první spuštění nové verze (poznámky z cache); zmizí po „Rozumím“ v panelu
+  const fresh = () => (p.page === "main" && p.s.update.whatsNew?.unread && !avail() ? p.s.update.whatsNew : null);
   return (
     <div class="head" data-anim>
       <Show when={p.page !== "main"} fallback={
@@ -61,7 +63,10 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
       </div>
       <div class="tools">
         <Show when={avail()}>
-          {(u) => <button class="chip green upd" onClick={p.onUpdate} title={t("cards.head.updateTitle", "Poznámky k vydání a instalace")}><span class="d" />{t("cards.head.newVersion", "Nová verze")} <b>{u().verze}</b></button>}
+          {(u) => <button class="chip green upd" onClick={p.onUpdate} title={t("cards.head.updateTitle", "Poznámky k vydání a instalace")}><span class="d" />{p.s.update.fetch.state === "ready" ? t("cards.head.readyVersion", "Připraveno") : t("cards.head.newVersion", "Nová verze")} <b>{u().verze}</b></button>}
+        </Show>
+        <Show when={fresh()}>
+          {(w) => <button class="chip dim upd" onClick={p.onUpdate} title={t("cards.head.whatsNewTitle", "Co se změnilo v této verzi")}>{t("cards.head.whatsNew", "Co je nového v")} <b>{w().verze}</b></button>}
         </Show>
         <Show when={p.page === "main"}>
           <Tabs s={p.s} />

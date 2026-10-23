@@ -43,3 +43,9 @@ export function remaining(expiresAt: number, now: number): string {
   if (s <= 0) return "";
   return s < 90 ? `${s} s` : `${Math.round(s / 60)} min`;
 }
+
+/** Poslat jádru „zobrazeno“ (`question_seen`, pojistka `claude.questionUnseenS`)? Jen držená otázka, šuplík
+ *  otevřený a WebView viditelné (`media/shown.ts`), karta aspoň částí v záběru a pro to id ještě ne. */
+export function shouldReportSeen(s: { answerable: boolean; shown: boolean; inView: boolean; reported: boolean }): boolean {
+  return s.answerable && s.shown && s.inView && !s.reported;
+}

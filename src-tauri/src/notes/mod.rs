@@ -33,6 +33,7 @@ pub mod export;
 mod frontmatter;
 pub mod lifecycle;
 pub mod openwith;
+pub mod pdf;
 pub mod md;
 mod md_list;
 mod recycle;
@@ -263,7 +264,13 @@ fn rename_retry(from: &Path, to: &Path) -> std::io::Result<()> {
     let mut attempt = 0;
     loop {
         match std::fs::rename(from, to) {
-            Err(e) if attempt < 10 && (e.kind() == std::io::ErrorKind::PermissionDenied || e.raw_os_error() == Some(32)) => {
+            // „neexistuje“ při existujícím tmp i složce = cíl se právě přepisuje jiným zápisem (přechodné)
+            Err(e)
+                if attempt < 10
+                    && (e.kind() == std::io::ErrorKind::PermissionDenied
+                        || e.raw_os_error() == Some(32)
+                        || (e.kind() == std::io::ErrorKind::NotFound && from.exists() && to.parent().is_some_and(Path::is_dir))) =>
+            {
                 attempt += 1;
                 std::thread::sleep(std::time::Duration::from_millis(25));
             }

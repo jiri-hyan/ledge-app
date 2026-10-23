@@ -93,8 +93,9 @@ pub fn parse_rule(s: &str) -> Result<Rule, String> {
             "BYDAY" => {
                 for x in v.split(',') {
                     let x = x.trim();
+                    // `get` místo `split_at`: vícebajtový znak uprostřed (cizí feed) nesmí shodit Ledge
                     let split = x.len().checked_sub(2).ok_or_else(|| format!("BYDAY {x}"))?;
-                    let (ord, day) = x.split_at(split);
+                    let (Some(ord), Some(day)) = (x.get(..split), x.get(split..)) else { return Err(format!("BYDAY {x}")) };
                     let ord = if ord.is_empty() { 0 } else { ord.trim_start_matches('+').parse::<i32>().map_err(|_| format!("BYDAY {x}"))? };
                     r.byday.push((ord, weekday(day).ok_or_else(|| format!("BYDAY {x}"))?));
                 }

@@ -202,7 +202,8 @@ export function NotesCard(p: {
                 </For>
               </div>
               <div class="note-bento-tools">
-                <button class="mini note-bento-tool" onClick={() => void exportNote(h().path, "html")} title={t("notes.bento.htmlTitle", "Uložit jako HTML — v prohlížeči pak Tisk nebo Uložit jako PDF")}>{t("notes.bento.html", "Uložit HTML…")}</button>
+                <button class="mini note-bento-tool" onClick={() => void exportNote(h().path, "html")} title={t("notes.bento.htmlTitle2", "Uložit jako samostatný HTML soubor s obrázky")}>{t("notes.bento.html", "Uložit HTML…")}</button>
+                <button class="mini note-bento-tool" onClick={() => void exportNote(h().path, "pdf")} title={t("notes.bento.pdfTitle", "Uložit jako PDF (A4) — bez prohlížeče a tiskárny")}>{t("notes.bento.pdf", "Uložit PDF…")}</button>
                 <button class="mini note-bento-tool" onClick={() => void openExternal(h().path)} title={t("notes.bento.openTitle", "Otevřít v aplikaci pro .md")}>{t("notes.bento.open", "Otevřít")}</button>
               </div>
             </div>

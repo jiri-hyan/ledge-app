@@ -9,7 +9,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 /// Balíček, ve kterém Ledge běží (nebo `package: null`), a kde fyzicky leží config z bubliny.
-#[tauri::command]
+#[tauri::command(async)]
 pub(crate) fn pkg_context() -> pkgctx::View {
     pkgctx::view()
 }

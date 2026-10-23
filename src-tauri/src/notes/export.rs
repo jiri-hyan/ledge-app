@@ -1,5 +1,6 @@
 //! Export poznámky (`note_export`): čisté funkce — Markdown bez frontmatteru s titulkem a samostatné
-//! HTML (vložené CSS, obrázky jako data URL, odkazy klikatelné). Dialog a zápis řeší příkaz.
+//! HTML (vložené CSS, obrázky jako data URL, odkazy klikatelné). PDF = totéž HTML vytištěné skrytým
+//! WebView2 (`pdf.rs`). Dialog a zápis řeší příkaz.
 //! Bezpečnost jako `md::to_html`: veškerý obsah je escapovaný, jediné nové značky jsou naše.
 
 use super::edit::NoteImage;
@@ -11,6 +12,8 @@ use super::store::slug;
 pub enum Format {
     Md,
     Html,
+    /// HTML z `export_html` vytištěné do PDF (`notes::pdf`)
+    Pdf,
 }
 
 impl Format {
@@ -18,6 +21,7 @@ impl Format {
         match s {
             "md" => Ok(Self::Md),
             "html" => Ok(Self::Html),
+            "pdf" => Ok(Self::Pdf),
             _ => Err(trf!("Neznámý formát exportu „{s}“.", "Unknown export format \"{s}\".")),
         }
     }
@@ -26,6 +30,16 @@ impl Format {
         match self {
             Self::Md => "md",
             Self::Html => "html",
+            Self::Pdf => "pdf",
+        }
+    }
+
+    /// Jméno filtru v dialogu „Uložit jako“.
+    pub fn filter(self) -> &'static str {
+        match self {
+            Self::Md => "Markdown",
+            Self::Html => "HTML",
+            Self::Pdf => "PDF",
         }
     }
 }
@@ -41,11 +55,11 @@ pub fn with_ext(path: &str, f: Format) -> String {
     if has { path.to_string() } else { format!("{path}.{}", f.ext()) }
 }
 
-/// Obsah souboru podle formátu (`images` se použijí jen v HTML).
+/// Obsah souboru podle formátu (`images` se použijí jen v HTML). U PDF je to HTML, které se vytiskne.
 pub fn render(f: Format, title: &str, body: &str, images: &[NoteImage]) -> String {
     match f {
         Format::Md => export_md(title, body),
-        Format::Html => export_html(title, body, images),
+        Format::Html | Format::Pdf => export_html(title, body, images),
     }
 }
 
@@ -159,7 +173,15 @@ mod tests {
     fn names_and_extensions() {
         assert_eq!(Format::parse("md"), Ok(Format::Md));
         assert_eq!(Format::parse("html").unwrap().ext(), "html");
-        assert!(Format::parse("pdf").is_err());
+        assert_eq!(Format::parse("pdf"), Ok(Format::Pdf));
+        assert!(Format::parse("docx").is_err() && Format::parse("PDF").is_err() && Format::parse("").is_err());
+        assert_eq!([Format::Md, Format::Html, Format::Pdf].map(Format::filter), ["Markdown", "HTML", "PDF"]);
+        assert_eq!(default_name("# Zápis ze schůzky", Format::Pdf), "zapis-ze-schuzky.pdf");
+        assert_eq!(with_ext("C:\\x\\a", Format::Pdf), "C:\\x\\a.pdf");
+        assert_eq!(with_ext("a.PDF", Format::Pdf), "a.PDF");
+        // PDF tiskne totéž samostatné HTML (obrázky vložené, nic externího)
+        assert_eq!(render(Format::Pdf, "T", "# T\n\nx", &[]), render(Format::Html, "T", "# T\n\nx", &[]));
+        assert!(render(Format::Pdf, "T", "x", &[]).starts_with("<!doctype html>"));
         assert_eq!(default_name("# Zavolat Řehořovi!\n", Format::Html), "zavolat-rehorovi.html");
         assert_eq!(default_name("", Format::Md), "poznamka.md");
         assert_eq!(with_ext("C:\\x\\a", Format::Md), "C:\\x\\a.md");

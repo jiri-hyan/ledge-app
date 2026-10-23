@@ -10,6 +10,11 @@
 //! Všechno je čistá logika (tabulkové testy) kromě `on_change`, které volá `refresh::on_claude_change`
 //! — žádné vlastní vlákno ani časovač: puls má termín (`PULSE_MS`, animuje ho vlákno `strip` jen po
 //! tu dobu), toast je jednorázové krátké vlákno (`toast.rs`).
+//!
+//! Otázka Clauda čeká a šuplík je zavřený (proužek je vidět): puls se opakuje po `REPULSE_MS`
+//! (`repulse_due`, termín pro vlákno `emit` z `next_repulse`) — jen dokud otázka čeká, v klidu nic.
+//! Přišla-li otázka / schválení za „mrtvého“ Ledge (hra přes celou obrazovku, herní režim), peek po
+//! návratu dožene `catch_up` (`revive_peek`, jednou při přechodu mrtvý → živý).
 
 use crate::claude::{Ask, Pending, Session, SessionState};
 use crate::i18n::tr;
@@ -20,6 +25,8 @@ use std::time::Instant;
 
 /// Délka pulsu proužku (dvě vlny).
 pub(crate) const PULSE_MS: u64 = 1200;
+/// Odstup opakovaného pulsu, dokud otázka Clauda čeká se zavřeným šuplíkem.
+pub(crate) const REPULSE_MS: u64 = 10_000;
 /// Stejná session + stejná událost nejvýš jednou za tuto dobu (puls i toast).
 pub(crate) const DEDUP_MS: u64 = 30_000;
 
@@ -218,6 +225,25 @@ pub(crate) fn toast_text(ev: Event, asks: bool, where_: &str) -> (String, String
     (title.to_string(), where_.to_string())
 }
 
+// ---------- otázka čeká: opakovaný puls, peek po hře ----------
+
+/// Zopakovat puls teď? Jen když čeká otázka Clauda, proužek je vidět (šuplík zavřený, Ledge živý) a od
+/// posledního pulsu (`last_ago`, ms; `None` = žádný) uběhlo `REPULSE_MS`.
+pub(crate) fn repulse_due(asking: bool, strip_shown: bool, last_ago: Option<u64>) -> bool {
+    asking && strip_shown && last_ago.is_none_or(|t| t >= REPULSE_MS)
+}
+
+/// Za kolik ms se má vlákno `emit` probudit kvůli dalšímu pulsu; `None` = nečeká se (žádný časovač).
+pub(crate) fn next_repulse(asking: bool, strip_shown: bool, last_ago: Option<u64>) -> Option<u64> {
+    (asking && strip_shown).then(|| REPULSE_MS.saturating_sub(last_ago.unwrap_or(REPULSE_MS)))
+}
+
+/// Dohnat peek po konci hry / herního režimu? Jen při přechodu mrtvý → živý, se zavřeným šuplíkem a
+/// něčím, co na člověka čeká (ruční zavření peeku za živého Ledge se nepřebije).
+pub(crate) fn revive_peek(was_dead: bool, dead: bool, hidden: bool, attention: bool) -> bool {
+    was_dead && !dead && hidden && attention
+}
+
 // ---------- napojení na jádro ----------
 
 struct Watch {
@@ -314,6 +340,49 @@ pub(crate) fn on_change() {
             crate::toast::show(&c.app.config().identifier, title, body);
         }
     }
+}
+
+/// Stav pro `catch_up`: byl Ledge při minulém průchodu mrtvý?
+static WAS_DEAD: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Kdy `catch_up` naposledy zopakoval puls čekající otázky.
+static LAST_REPULSE: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// (čeká otázka Clauda, proužek je vidět, ms od posledního pulsu) ze stavu jádra — jen paměť.
+fn asking_now() -> (bool, bool, Option<u64>) {
+    use crate::drawer::View;
+    let c = crate::state::core();
+    let asking = !c.claude.questions().is_empty();
+    // čekající otázka = jantarová linka, proužek je vidět i vypnutý (`stripview`: ambientní barva)
+    let shown = asking && c.drawer.view() == View::Hidden && !c.dead();
+    // poslední puls i poslední pokus o něj (bez animací se puls nenastaví — jinak by se `emit` točil)
+    let pulse = WATCH.lock().as_ref().and_then(|w| w.pulse).map(|(_, t)| t);
+    let ago = [pulse, *LAST_REPULSE.lock()].into_iter().flatten().map(|t| t.elapsed().as_millis() as u64).min();
+    (asking, shown, ago)
+}
+
+/// Vlákno `emit` (po každém probuzení): peek po hře (`revive_peek`) a opakovaný puls čekající otázky
+/// (`repulse_due`). Bez otázky a bez přechodu ze hry nic.
+pub(crate) fn catch_up() {
+    use crate::drawer::View;
+    use std::sync::atomic::Ordering;
+    let c = crate::state::core();
+    let dead = c.dead();
+    let was = WAS_DEAD.swap(dead, Ordering::Relaxed);
+    if revive_peek(was, dead, c.drawer.view() == View::Hidden, c.claude.attention()) {
+        c.send_ui(crate::state::UiCmd::Show(View::Peek, crate::drawer::Opener::Hover));
+    }
+    let (asking, shown, ago) = asking_now();
+    if repulse_due(asking, shown, ago) {
+        *LAST_REPULSE.lock() = Some(Instant::now());
+        // proužek si puls vyzvedne v `refresh_strip` na konci téhož průchodu `emit`
+        signal(Event::NeedsInput.color(), false);
+    }
+}
+
+/// Termín pro `next_wake` vlákna `emit` (ms epochy): další puls čekající otázky; jinak `None`.
+pub(crate) fn next_deadline() -> Option<i64> {
+    let (asking, shown, ago) = asking_now();
+    next_repulse(asking, shown, ago).map(|ms| crate::state::now_ms() + ms as i64 + 1)
 }
 
 /// Poslední část cesty (název složky) — když cwd neleží v žádném projektu.
@@ -435,6 +504,43 @@ mod tests {
         ];
         for (name, g, want) in cases {
             assert_eq!(react(g), want, "{name}");
+        }
+    }
+
+    #[test]
+    fn repulse_table() {
+        /// (popis, čeká otázka, proužek vidět, ms od pulsu, zopakovat teď, za kolik ms další)
+        type Case = (&'static str, bool, bool, Option<u64>, bool, Option<u64>);
+        let cases: &[Case] = &[
+            ("nic nečeká = nic", false, true, None, false, None),
+            ("šuplík otevřený / hra = proužek není vidět", true, false, None, false, None),
+            ("čeká, puls ještě nebyl", true, true, None, true, Some(0)),
+            ("čeká, puls před chvílí", true, true, Some(2_000), false, Some(REPULSE_MS - 2_000)),
+            ("čeká, puls před odstupem", true, true, Some(REPULSE_MS), true, Some(0)),
+            ("čeká, puls dávno", true, true, Some(10 * REPULSE_MS), true, Some(0)),
+        ];
+        for (name, asking, shown, ago, due, next) in cases {
+            assert_eq!(repulse_due(*asking, *shown, *ago), *due, "{name}");
+            assert_eq!(next_repulse(*asking, *shown, *ago), *next, "{name}");
+        }
+    }
+
+    /// Mezi opakovanými pulsy je klid (puls je kratší než odstup) — hlídá překladač.
+    const _: () = assert!(REPULSE_MS > PULSE_MS);
+
+    #[test]
+    fn revive_peek_table() {
+        // (byl mrtvý, je mrtvý, šuplík zavřený, něco čeká) → peek
+        let cases = [
+            ((true, false, true, true), true),
+            ((true, false, true, false), false),
+            ((true, false, false, true), false),
+            ((true, true, true, true), false),
+            ((false, false, true, true), false),
+            ((false, true, true, true), false),
+        ];
+        for ((was, dead, hidden, att), want) in cases {
+            assert_eq!(revive_peek(was, dead, hidden, att), want, "{was} {dead} {hidden} {att}");
         }
     }
 

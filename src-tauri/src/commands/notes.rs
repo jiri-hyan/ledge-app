@@ -170,8 +170,9 @@ pub(crate) fn note_open(path: String) -> Result<(), String> {
 }
 
 /// Exportuje poznámku do souboru: `format` = `md` (Markdown bez frontmatteru, s titulkem) | `html`
-/// (samostatný dokument s obrázky jako data URL). Dialog „Uložit jako“ (výchozí jméno = slug
-/// poznámky); zrušení = `None`, jinak vrací uloženou cestu. Poznámka se nemění.
+/// (samostatný dokument s obrázky jako data URL) | `pdf` (totéž HTML vytištěné skrytým WebView2,
+/// `notes::pdf`, termín 30 s). Dialog „Uložit jako“ (výchozí jméno = slug poznámky); zrušení = `None`,
+/// jinak vrací uloženou cestu. Poznámka se nemění. Chyba = lidská věta.
 #[tauri::command(async)]
 pub(crate) fn note_export(path: String, format: String) -> Result<Option<String>, String> {
     let root = notes_root().ok_or_else(off)?;
@@ -179,18 +180,18 @@ pub(crate) fn note_export(path: String, format: String) -> Result<Option<String>
     // `read` ověří cestu přes `check_note_path` (jen soubor v úložišti) a načte tělo i obrázky
     let note = notes::edit::read(&root, Path::new(&path))?;
     let c = core();
-    let filter = match fmt {
-        notes::export::Format::Md => "Markdown",
-        notes::export::Format::Html => "HTML",
-    };
-    let mut d = c.app.dialog().file().add_filter(filter, &[fmt.ext()]).set_file_name(notes::export::default_name(&note.body, fmt));
+    let mut d = c.app.dialog().file().add_filter(fmt.filter(), &[fmt.ext()]).set_file_name(notes::export::default_name(&note.body, fmt));
     if let Some(w) = c.app.get_webview_window(crate::drawer::LABEL) {
         d = d.set_parent(&w);
     }
     let Some(target) = d.blocking_save_file().and_then(|p| p.into_path().ok()) else { return Ok(None) };
     let target = std::path::PathBuf::from(notes::export::with_ext(&target.to_string_lossy(), fmt));
     let out = notes::export::render(fmt, &note.view.title, &note.body, &note.image_data);
-    notes::write_atomic(&target, out.as_bytes())?;
+    if fmt == notes::export::Format::Pdf {
+        notes::pdf::print(&c.app, &out, &target)?;
+    } else {
+        notes::write_atomic(&target, out.as_bytes())?;
+    }
     log(&format!("poznámka exportována: {}", target.display()));
     Ok(Some(target.to_string_lossy().into_owned()))
 }

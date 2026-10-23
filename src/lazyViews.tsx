@@ -1,5 +1,5 @@
 // Líně načítané pohledy mimo první obrazovku šuplíku (paměť WebView2 + velikost hlavního chunku): Nastavení
-// (s editorem rozložení a přehledem vzhledů), průvodce, paleta, stránka Poznámky, panel „Nová verze“, katalog karet
+// (s editorem rozložení a přehledem vzhledů), průvodce, paleta, stránka Poznámky, editor poznámky, panel „Nová verze“, katalog karet
 // a panel „Vzhled karty“. Každý je vlastní chunk i se svým CSS — Vite počká na styly dřív, než `import()` dokončí,
 // takže se nic nevykreslí bez nich. Fallback = nic (žádné blikání). `preloadViews` je přednačte v klidu po prvním
 // zobrazení šuplíku (`App.tsx`), aby první klik na Nastavení / Ctrl+K nebyl pomalý.
@@ -19,6 +19,7 @@ function view<P extends object>(load: () => Promise<{ default: Component<P> }>):
 export const Settings = view(() => import("./Settings"));
 export const Wizard = view(() => import("./onboarding/Wizard"));
 export const NotesPage = view(() => import("./notes/NotesPage"));
+export const NoteEditor = view(() => import("./notes/NoteEditor"));
 export const UpdatePanel = view(() => import("./cards/UpdatePanel"));
 export const Catalog = view(() => import("./layout/Catalog"));
 export const CardLookPanel = view(() => import("./layout/CardLook"));
@@ -33,6 +34,7 @@ const PRELOAD: (() => Promise<unknown>)[] = [
   () => import("./Settings"),
   () => import("./palette/Palette"),
   () => import("./notes/NotesPage"),
+  () => import("./notes/NoteEditor"),
   () => import("./cards/UpdatePanel"),
   () => import("./layout/Catalog"),
   () => import("./layout/CardLook"),

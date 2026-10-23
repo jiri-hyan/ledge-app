@@ -8,11 +8,12 @@ Formát souboru a pravidla pro agenty: [agents/notes.md](../agents/notes.md) →
 |---|---|---|
 | `src-tauri/src/notes/mod.rs` | kořen, čas, obrázky, společné I/O; re-exporty (`notes::…` platí pro vše níž) | `resolve_root` `parse_time` `iso` `end_of_day_ms` `decode_png` `b64_encode` `write_atomic` `path_lock` `DEFAULT_KIND` `GENERAL` |
 | `src-tauri/src/notes/frontmatter.rs` | frontmatter (čisté) | `split` `get` `set` `unset` `render` `with_done` `yaml_value` |
-| `src-tauri/src/notes/store.rs` | `NoteView`, jména a cesty, vytvoření, sken, `done` | `parse_note` `slug` `project_dir_name` `inside` `check_note_path` `NewNote` `valid_kind` `unique_base` `create` `scan` `set_done` |
-| `src-tauri/src/notes/reminders.rs` · `draft.rs` | karta a připomínky, stav peeku · koncept nové, předvyplnění projektu | `due_split` `card` `CARD_ROWS` `reminder_key` `load_peeked` · `Draft*` `draft_*` `preselect` |
+| `src-tauri/src/notes/store.rs` | `NoteView`, jména a cesty, vytvoření, sken, `done` | `parse_note` `slug` `project_dir_name` `inside` `check_note_path` `canonicalize_settled` `NewNote` `valid_kind` `unique_base` `create` `scan` `set_done` |
+| `src-tauri/src/notes/reminders.rs` · `draft.rs` | karta a připomínky, stav peeku · koncept nové, předvyplnění projektu | `due_split` `card` `card_where` `CARD_ROWS` `reminder_key` `load_peeked` · `Draft*` `draft_*` `preselect` |
 | `src-tauri/src/notes/md.rs` | Markdown → bezpečné HTML, úkoly, titulek karty (čisté funkce) | `to_html` `tasks` `toggle_line` `title` `plain` `image_refs` `relative_image` `esc` |
 | `src-tauri/src/notes/md_list.rs` | zásobník seznamů pro `to_html`: skutečné vnoření `<ul>`/`<ol>`, `start`, pokračovací řádky (čisté) | `Lists` `indent_width` |
-| `src-tauri/src/notes/export.rs` | export poznámky: md bez frontmatteru s titulkem, samostatné HTML s obrázky (čisté) | `Format` `export_md` `export_html` `render` `default_name` `with_ext` |
+| `src-tauri/src/notes/export.rs` | export poznámky: md bez frontmatteru s titulkem, samostatné HTML s obrázky, PDF = totéž HTML k tisku (čisté) | `Format` (`Md` `Html` `Pdf`, `filter`) `export_md` `export_html` `render` `default_name` `with_ext` |
+| `src-tauri/src/notes/pdf.rs` | PDF přes WebView2 `ICoreWebView2_7::PrintToPdf` (crate `webview2-com`, žádná nová závislost): jednorázové skryté okno `pdf-export-<n>` (`visible(false)`, `focused(false)`, `skip_taskbar`, bez capability, navigace jen `about:blank` + vlastní `file:`), A4, bez hlavičky/patičky, tisk do `<cíl>.ledge-tmp` → přejmenování, termín `TIMEOUT` 30 s, úklid `Cleanup`, chyby `Fail::message` | `print` `Fail` `label` `temp_html` `partial` `file_url` `nav_allowed` `TIMEOUT` `LABEL_PREFIX` |
 | `src-tauri/src/notes/openwith.rs` | „Otevřít v …“: aplikace registrované pro `.md` (`OpenWithProgids`), příkaz z registru → exe + argumenty, jméno do nabídky (čisté) | `MD_PROGIDS_KEY` `expand_env` `command_for` `display_name` |
 | `src-tauri/src/notes/when.rs` | čas v českém textu („zítra v 10“, „v pondělí“, „za 2 h“, „25. 10. v 14:00“, „večer“) → rozsah shody v originálu + čas; složený text bez diakritiky (`search::Folded`), vždy budoucnost, datum bez času = 9:00, ochrana proti verzím / %, telefonům / kapitolám; popisek chipu (`label`, cs + en) | `parse_when` `When` `label` `suggest` `Suggest` |
 | `src-tauri/src/notes/search.rs` | hledání v těle poznámek pro Ctrl+K: `fold_text` / `Folded` (bez diakritiky, 1 znak = 1 znak, mapa bajtů zpět), `words` `matches` `snippet`, `Index` (tělo bez obrázků, líně přestavěný při změně `rev`; hotové se nehledají) | `Index::{build, search}` `Hit` `fold_text` `Folded` `snippet` |
@@ -30,8 +31,8 @@ Formát souboru a pravidla pro agenty: [agents/notes.md](../agents/notes.md) →
 | `src/notes/RowMenu.tsx` · `UndoBar.tsx` | ⋯ řádku (společné menu `ui/Popover.tsx` `PopMenu`) · lišta Zpět (šuplík ve `App`, `pin` varianta v lístku) | `runAction` |
 | `src/notes/NoteEditor.tsx` | stránka „note“ (nová i úprava): název poznámky v hlavičce, konflikt (Načíst · Ponechat moje · kopie), lišta odložené úpravy, živá aktualizace při změně z lístku (`notesRev` → `runSync`), „Uložit a připnout“, náhled, klávesy Esc / Ctrl+Enter, chytré seznamy | |
 | `src/notes/lists.ts` · `listkeys.ts` | chytré seznamy v textarea (editor i lístek): čisté `onEnter` (pokračuje `1.` / `-` / `- [ ]`, prázdná položka seznam ukončí) a `onTab` (vnoření, číslování od `1.`) · napojení na klávesy | `onEnter` `onTab` `parseItem` · `listKey` |
-| `src/notes/NoteMenu.tsx` · `exportActions.ts` | ⋯ editoru (Export) · Markdown / HTML do souboru (`note_export`), kopie do schránky, Otevřít v … (`note_open_with_apps`, `note_open_with`) — sdílí lístek | `exportItems` `exportNote` `copyMarkdown` `openWith` |
-| `src/notes/NotesCard.tsx` | karta se záložkami, `NoteRow` (vč. Kopírovat text → `note_copy_text`), `Tabs`, `tabsOf`, `ReminderPeek`; varianta Bento (velká připnutá / nejnovější poznámka + dlaždice Nová .md, šablony, Uložit HTML, Otevřít) | `copyNote` |
+| `src/notes/NoteMenu.tsx` · `exportActions.ts` | ⋯ editoru (Export) · Markdown / HTML / PDF do souboru (`note_export`), kopie do schránky, Otevřít v … (`note_open_with_apps`, `note_open_with`) — sdílí lístek | `exportItems` `exportNote` `copyMarkdown` `openWith` |
+| `src/notes/NotesCard.tsx` | karta se záložkami, `NoteRow` (vč. Kopírovat text → `note_copy_text`), `Tabs`, `tabsOf`, `ReminderPeek`; varianta Bento (velká připnutá / nejnovější poznámka + dlaždice Nová .md, šablony, Uložit HTML, Uložit PDF, Otevřít) | `copyNote` |
 | `src/notes/bento.ts` | čistá logika Bento: která poznámka je velká, náhled těla, šablony (test `bento.test.mjs`) | `heroOf` `bentoLines` `TEMPLATES` |
 | `src/notes/NotesPage.tsx` | stránka „notes“ (záložky, projekt, „i hotové“, přepínač „Archiv“ → `note_query {archived}`) | `pageArchive` |
 | `src/notes/ProjectPicker.tsx` · `RemindPicker.tsx` · `kinds.tsx` | výběry (projekt, připomínka, kategorie pilulkami), ikony kategorií | |
@@ -41,7 +42,7 @@ Formát souboru a pravidla pro agenty: [agents/notes.md](../agents/notes.md) →
 | `src-tauri/src/pins/mod.rs` | lístky na plochu — čisté: stav lístku, soubor `note-pins.json`, label okna, geometrie (DPI, mimo obrazovku) | `Pin` `PinPrefs` `PinPatch` `PinsFile` `load` `save` `label_for` `key` `same_note` `place_new` `restore` `monitor_of` `Mon` `Place` `BAR_H` `TEXT_MIN` |
 | `src-tauri/src/pins/win.rs` | okna `note-<klíč>`: vznik bez fokusu, příznaky, geometrie z událostí, zpožděný zápis (`pins-save`), obnova po startu, fullscreen, otisk do okna | `open` `close` `set` `apply` `watch` `toggle_through_all` `sync_dead` `restore_all` `on_notes_changed` `view` `PinsView` `flush` `take_fresh` |
 | `src-tauri/src/commands/pins.rs` | příkazy: šuplík (`pin_toggle` `pin_new` `pin_through_all`), okno lístku podle volajícího labelu (`pin_init` `pin_set` `pin_drag` `pin_unpin` `pin_hint_seen`, `pin_edit_in_ledge` → šuplík `edit-note`) | `PinInit` `pin_label` |
-| `pin.html` · `src/pin/main.tsx` · `PinApp.tsx` · `pin.css` · `icons.tsx` · `en.ts` | okno lístku (vlastní vstup Vite, jen jeho kód a styly): lišta, ⋯ volby, + bod, úprava, schránka, průchozí s nápovědou | |
+| `pin.html` · `src/pin/main.tsx` · `PinApp.tsx` · `pin.css` · `src/pin/icons.tsx` · `en.ts` | okno lístku (vlastní vstup Vite, jen jeho kód a styly): lišta, ⋯ volby, + bod, úprava, schránka, průchozí s nápovědou | |
 | `src/pin/model.ts` | čisté: přidání bodu / textu (číslovaný seznam pokračuje číslem), kurzor z dvojkliku, barvy z průhledností, porovnání cest, připnutí ze snapshotu | `remindAskText` / `pinSuggestVisible` (po „+ bod“ s časem v textu chip „⏰ Připomenout zítra 10:00?“ přes `note_suggest_remind`, jedno zeptání po `SUGGEST_DELAY`, klik = `note_save` s `remind`; jen poznámka bez připomínky) · `appendLine` `taskLine` `pointLine` `caretFromText` `pinColors` `samePath` `isPinned` `anyThrough` |
 | `src/notes/pins.ts` | šuplík: připnout / odepnout, nový lístek, průchozí u všech, volby ⋯ karty | `togglePin` `newPin` `throughAll` `throughLabel` `pinMenuItems` |
 
@@ -76,6 +77,10 @@ Formát souboru a pravidla pro agenty: [agents/notes.md](../agents/notes.md) →
   šuplík vidí připnutí v `Snapshot.pins`.
 
 ## Invarianty a pasti
+- **PDF**: tiskne se jen v příkazu `note_export` (async, mimo hlavní vlákno; `with_webview` běží na hlavním) —
+  šuplík se nikdy nenaviguje pryč. Okno tisku se neukáže ani nevezme fokus a po tisku / chybě / termínu zmizí
+  spolu s dočasným HTML v `%TEMP%`. Rozbitý tisk nepřepíše starý soubor (`partial`). Starý WebView2 bez
+  `ICoreWebView2_7` = věta „aktualizuj WebView2 Runtime, nebo ulož HTML“. Tisk se v testech nespouští (GUI).
 - Zpětná kompatibilita (druhé PC se starším Ledge): nové klíče jen `kind`, `updated`; starý `with_done` je
   zachová. „Bez projektu“ ve složce projektu = `project: _obecne` (prázdná hodnota by spadla na složku).
 - Uložení nikdy nemění jméno/složku souboru; zápis `write_atomic`, read-modify-write pod `path_lock`.
@@ -103,7 +108,10 @@ Formát souboru a pravidla pro agenty: [agents/notes.md](../agents/notes.md) →
   neztratí), lokální stav (`.draft/`, `.state.json`) je v `IGNORE`; do cizího repa se necommituje (`Refuse`).
 
 ## Testy
-`cargo test notes` — `notes::{frontmatter,store,reminders,draft}::tests` + `notes::tests` (čas, base64, kořen;
+`cargo test notes` — `notes::export::tests` (formáty vč. `pdf`, jména, přípony, HTML vstup PDF), `notes::pdf::tests`
+(cesty, `file:` URL, zamčené okno tisku, věty chyb; samotný tisk jen naživo: editor poznámky → ⋯ → „Uložit jako
+PDF…“ → dialog → hláška „Uloženo do …“, PDF A4 s obrázky a zaškrtnutými úkoly, žádné okno ani ztráta fokusu),
+`notes::{frontmatter,store,reminders,draft}::tests` + `notes::tests` (čas, base64, kořen;
 pomůcky `notes/testkit.rs`), `notes::md::tests` (HTML tabulka, XSS, úkoly, titulky), `notes::edit::tests`
 (round-trip s neznámými klíči, detekce změny, kopie, úkol, obrázky mimo kořen, `query`, rozepsaná úprava);
 `config::tests::note_kinds_validation`; `notes::when::tests` (tabulka 60+ případů vč. negativních, rozsah v bajtech originálu, popisky cs / en), `notes::search::tests` (fold, mapa bajtů, úryvky, index nad dočasným kořenem); UI `src/notes/suggest.test.mjs`. Lístky: `cargo test pins` (label, volby a meze, soubor starý / rozbitý /

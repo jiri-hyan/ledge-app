@@ -18,19 +18,20 @@ pub struct Tokens {
 }
 
 impl Tokens {
+    /// Součty jsou nasycené: rozbitý řádek s `u64::MAX` nesmí shodit Ledge (debug) ani zalamovat do malého čísla.
     pub fn total(&self) -> u64 {
-        self.input + self.output + self.cw5 + self.cw1 + self.cr
+        [self.input, self.output, self.cw5, self.cw1, self.cr].into_iter().fold(0, u64::saturating_add)
     }
     /// Délka promptu jednoho požadavku (vstup + zápis + čtení cache) — pro cenové pásmo Haiku 5.5.
     pub fn prompt(&self) -> u64 {
-        self.input + self.cw5 + self.cw1 + self.cr
+        [self.input, self.cw5, self.cw1, self.cr].into_iter().fold(0, u64::saturating_add)
     }
     pub fn add(&mut self, o: &Tokens) {
-        self.input += o.input;
-        self.output += o.output;
-        self.cw5 += o.cw5;
-        self.cw1 += o.cw1;
-        self.cr += o.cr;
+        self.input = self.input.saturating_add(o.input);
+        self.output = self.output.saturating_add(o.output);
+        self.cw5 = self.cw5.saturating_add(o.cw5);
+        self.cw1 = self.cw1.saturating_add(o.cw1);
+        self.cr = self.cr.saturating_add(o.cr);
     }
 }
 
@@ -207,9 +208,76 @@ mod tests {
     }
 
     #[test]
+    fn hostile_lines_never_panic() {
+        let max = u64::MAX;
+        // obří čísla: součty se nasytí, nepřetečou
+        let huge = format!(r#"{{"input_tokens":{max},"output_tokens":{max},"cache_creation_input_tokens":{max},"cache_read_input_tokens":{max}}}"#);
+        let r = parse_line(line("r", "m", &huge).as_bytes()).expect("záznam");
+        assert_eq!(r.tokens.total(), max);
+        assert_eq!(r.tokens.prompt(), max);
+        let mut sum = Tokens::default();
+        sum.add(&r.tokens);
+        sum.add(&r.tokens);
+        assert_eq!(sum.input, max);
+        // záporné / desetinné / textové tokeny = řádek se zahodí, ne pád
+        let bad: [(&str, String); 11] = [
+            ("záporné", line("r", "m", r#"{"input_tokens":-5}"#)),
+            ("desetinné", line("r", "m", r#"{"input_tokens":1.5}"#)),
+            ("text", line("r", "m", r#"{"input_tokens":"5"}"#)),
+            ("přes u64", line("r", "m", r#"{"input_tokens":18446744073709551616}"#)),
+            ("usage pole", line("r", "m", "[1,2]")),
+            ("usage null", line("r", "m", "null")),
+            ("message pole", r#"{"type":"assistant","requestId":"r","timestamp":"2026-10-17T15:17:08Z","message":[1],"usage":1}"#.into()),
+            ("čas není čas", r#"{"type":"assistant","requestId":"r","timestamp":"včera","message":{"usage":{"output_tokens":5}}}"#.into()),
+            ("čas číslo", r#"{"type":"assistant","requestId":"r","timestamp":1760000000,"message":{"usage":{"output_tokens":5}}}"#.into()),
+            ("prázdný", String::new()),
+            ("jen mezery", "   \r\n".into()),
+        ];
+        for (name, l) in &bad {
+            assert_eq!(parse_line(l.as_bytes()), None, "{name}");
+        }
+        // ne-UTF-8 bajty uvnitř řádku nebo před ním: JSON je neplatný → None, ne pád
+        let mut raw = line("r", "m", r#"{"output_tokens":5}"#).into_bytes();
+        raw.splice(0..0, [0xff, 0xfe]);
+        assert_eq!(parse_line(&raw), None);
+        let mut raw = line("r", "m", r#"{"output_tokens":5}"#).into_bytes();
+        let at = raw.windows(4).position(|w| w == b"opus").unwrap();
+        raw[at] = 0xc3; // osiřelý začátek vícebajtové sekvence uvnitř řetězce
+        assert_eq!(parse_line(&raw), None);
+        // CRLF na konci neškodí (soubor upravený editorem)
+        let mut crlf = line("r", "m", r#"{"output_tokens":5}"#);
+        crlf.push_str("\r\n");
+        assert!(parse_line(crlf.as_bytes()).is_some());
+        // obří řádek (4 MB výsledek nástroje) s usage na konci se zpracuje
+        let big = format!(r#"{{"type":"assistant","requestId":"r","timestamp":"2026-10-17T15:17:08Z","note":"{}","message":{{"id":"m","usage":{{"output_tokens":7}}}}}}"#, "x".repeat(4_000_000));
+        assert_eq!(parse_line(big.as_bytes()).map(|r| r.tokens.output), Some(7));
+    }
+
+    #[test]
+    fn timestamps_with_offset_and_garbage() {
+        let cases: [(&str, Option<i64>); 7] = [
+            ("1970-01-01T00:00:00Z", Some(0)),
+            ("2026-10-17T15:17:08.995Z", Some(1_792_250_228_995)),
+            ("2026-10-17T17:17:08.995+02:00", Some(1_792_250_228_995)),
+            ("2026-10-17", None),
+            ("", None),
+            ("2026-13-45T99:99:99Z", None),
+            ("   2026-10-17T15:17:08Z", None),
+        ];
+        for (s, want) in cases {
+            assert_eq!(iso_ms(s), want, "{s:?}");
+        }
+    }
+
+    #[test]
     fn cwd_from_any_line() {
         assert_eq!(line_cwd(br#"{"type":"user","cwd":"C:\\a\\b","x":1}"#).as_deref(), Some("C:\\a\\b"));
         assert_eq!(line_cwd(br#"{"type":"user"}"#), None);
         assert_eq!(line_cwd(br#"{"cwd":""}"#), None);
+        // useknutý / rozbitý / ne-UTF-8 řetězec = None
+        assert_eq!(line_cwd(br#"{"cwd":"C:\\a"#), None);
+        assert_eq!(line_cwd(b"{\"cwd\":\"\xff\xfe\"}"), None);
+        assert_eq!(line_cwd(br#"{"cwd":"#), None);
+        assert_eq!(line_cwd(br#"{"cwd":123}"#), None);
     }
 }

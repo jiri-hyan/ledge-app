@@ -38,6 +38,19 @@ export type UpdateView = UpdateStatus & {
   checkedMs: number | null;
   installing: boolean;
   installError: string | null;
+  /** tiché stažení dostupné verze (Rust `updcache::Fetch`) */
+  fetch: UpdateFetch;
+  /** poznámky běžící verze z cache (bez sítě); `unread` = jednorázové upozornění v šuplíku */
+  whatsNew: { verze: string; poznamky: string; unread: boolean } | null;
+  /** „Vrátit předchozí verzi“; `local` = instalátor je v cache, jinak se na klik stáhne */
+  rollback: { verze: string; local: boolean } | null;
 };
+
+/** `total` = velikost z hlavičky; `null` → neurčitý průběh. */
+export type UpdateFetch =
+  | { state: "idle" }
+  | { state: "downloading"; got: number; total: number | null }
+  | { state: "ready" }
+  | { state: "failed"; duvod: string };
 
 export type InstallOutcome = { outcome: "confirm"; running: string[] } | { outcome: "started" };

@@ -162,6 +162,14 @@ tool_input vč. questions…,"answers":{"<text otázky>":"<label>"}}}}`. Vícev�
 (`questions::MULTI_SEP`, NEOVĚŘENO naživo), „Jiné“ = text uživatele (u vícevýběru na konec). Prázdná
 odpověď (= otázka v okně Claude jako dřív): „Odpovědět v Claude“ (`question_release`), termín, konec turnu
 (`UserPromptSubmit`/`Stop`/`SessionEnd`), nečitelný vstup, Ledge neběží. Session mezitím `waiting`.
+**Pojistka neviděné otázky** `claude.questionUnseenS` (výchozí 20 s, 5–550, `0` = vypnuto, Nastavení → Claude →
+Otázky Clauda): UI potvrdí „zobrazeno“ (`question_seen`), jen když je karta otázky opravdu vidět (šuplík otevřený,
+WebView viditelné, karta v záběru; jádro to bere jen při otevřeném šuplíku a mimo fullscreen hru). Bez potvrzení do
+N s Ledge otázku pustí (prázdná odpověď = Claude se zeptá ve svém okně), v Ledge zůstane jen ukázaná a deník
+(Nastavení → Claude → Deník posledních otázek) dostane „Nikdo neviděl — předáno do Claude“ (`releasedUnseen`).
+Platí, jen když je kratší než `questionHoldS`. **Restart Ledge za držení:** spojení hooku spadne → Claude Code to
+bere jako neblokující chybu hooku a zeptá se ve svém okně (jako „Ledge neběží“, naživo NEOVĚŘENO); nový Ledge o
+otázce neví (stav i deník jsou jen v paměti).
 `PermissionRequest` pro `AskUserQuestion` se **vždy hned pouští** (`Pass`) — nikdy povolovací karta s JSONem.
 `GET /status` vrací otázky v `questions`. Odpovídat přes API záměrně NEJDE (stejně jako schválení).
 

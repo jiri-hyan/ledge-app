@@ -456,3 +456,108 @@ fn git_alerts_old_config_and_validation() {
     bad.git_alerts.read = "ne platny".into();
     assert!(validate(&bad).is_err());
 }
+
+/// Rozbitý nebo ručně upravený config.json (špatné typy, `null`, obří čísla, prázdné řetězce, chybějící klíče)
+/// nesmí shodit start: `load` vrátí `Ok`/`Err` s větou, nikdy panika. Mutace skutečného (uloženého) configu.
+#[test]
+fn mutated_config_files_never_panic() {
+    use crate::testrng::Rng;
+    use serde_json::{Value, json};
+
+    fn paths(v: &Value, here: &mut Vec<String>, out: &mut Vec<Vec<String>>) {
+        out.push(here.clone());
+        match v {
+            Value::Object(m) => {
+                for (k, x) in m {
+                    here.push(k.clone());
+                    paths(x, here, out);
+                    here.pop();
+                }
+            }
+            Value::Array(a) => {
+                for (i, x) in a.iter().enumerate() {
+                    here.push(i.to_string());
+                    paths(x, here, out);
+                    here.pop();
+                }
+            }
+            _ => {}
+        }
+    }
+    fn at<'a>(v: &'a mut Value, path: &[String]) -> Option<&'a mut Value> {
+        let mut cur = v;
+        for p in path {
+            cur = match cur {
+                Value::Object(m) => m.get_mut(p)?,
+                Value::Array(a) => a.get_mut(p.parse::<usize>().ok()?)?,
+                _ => return None,
+            };
+        }
+        Some(cur)
+    }
+
+    // základ: výchozí config s jedním projektem (ať má co mutovat)
+    let mut base = Config::default();
+    base.projects.push(serde_json::from_value(json!({ "id": "app", "name": "Aplikace", "kind": "dev", "run": "npm run dev", "path": "C:/projekty/app" })).unwrap());
+    let base = serde_json::to_value(&base).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("config.json");
+    let long = "é".repeat(5000);
+    let nasty: Vec<Value> = vec![
+        Value::Null,
+        json!(true),
+        json!(-1),
+        json!(0),
+        json!(u64::MAX),
+        json!(1.0e308),
+        json!(""),
+        json!(long),
+        json!([]),
+        json!({}),
+        json!([null, 1, "x"]),
+        json!({ "": 1, "é": [] }),
+        json!("\u{0}"),
+        json!("C:\\"),
+    ];
+    std::fs::write(&file, base.to_string()).unwrap();
+    assert!(load(&file).is_ok(), "základ musí projít: {:?}", load(&file).err());
+    let mut rng = Rng(0x1234_5678_9ABC_DEF1);
+    let mut accepted = 0;
+    for i in 0..300 {
+        let mut v = base.clone();
+        for _ in 0..1 + rng.below(4) {
+            let mut all = Vec::new();
+            paths(&v, &mut Vec::new(), &mut all);
+            let path = all[rng.below(all.len())].clone();
+            let Some((last, parent)) = path.split_last() else { continue };
+            let new = nasty[rng.below(nasty.len())].clone();
+            match at(&mut v, parent) {
+                Some(Value::Object(m)) if rng.below(4) == 0 => {
+                    m.remove(last);
+                }
+                Some(Value::Object(m)) => {
+                    m.insert(last.clone(), new);
+                }
+                Some(Value::Array(a)) => {
+                    if let Some(slot) = last.parse::<usize>().ok().and_then(|k| a.get_mut(k)) {
+                        *slot = new;
+                    }
+                }
+                _ => {}
+            }
+        }
+        std::fs::write(&file, v.to_string()).unwrap();
+        let r = std::panic::catch_unwind(|| load(&file));
+        match r {
+            Ok(Ok(_)) => accepted += 1,
+            Ok(Err(e)) => assert!(!e.trim().is_empty(), "chyba bez věty, kolo {i}"),
+            Err(_) => panic!("panika při načtení configu, kolo {i}: {v}"),
+        }
+    }
+    assert!(accepted > 20, "mutace by měly občas projít (přijato {accepted} z 300)");
+    // ne-UTF-8 soubor a prázdný soubor: chyba / výchozí, ne panika
+    std::fs::write(&file, b"{\"projects\": \"\xff\xfe\"}").unwrap();
+    assert!(load(&file).is_err());
+    std::fs::write(&file, b"").unwrap();
+    assert!(load(&file).is_err());
+}

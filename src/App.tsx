@@ -11,7 +11,6 @@ import { createSignal, Show, onMount, onCleanup, createEffect, on as onChange } 
 import { createStore, reconcile } from "solid-js/store";
 import { api, on, type Snapshot, type View, type ViewMsg, type NoteView } from "./api";
 import { IconShield } from "./icons";
-import NoteEditor from "./notes/NoteEditor";
 import { returnTo, setEditPath, setNotePreset, setPageProject, setReturnTo, type NotePreset } from "./notes/store";
 import "./notes/notes.css";
 import { OVERLAP, spring, collapsedClip, bandClip, FULL_CLIP, measure, motionNow, preHide, revealContent, concealContent } from "./motion";
@@ -30,7 +29,7 @@ import { gotoSettingsPanel } from "./palette/goto";
 import { checkFirstRun, wizardOpen } from "./onboarding/state";
 import { beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, escEdit, resumeEdit, setCatalogOpen, setEditPage } from "./layout/edit";
 import { normalizeLayout } from "./layout/model";
-import { NotesPage, Palette, Settings, UpdatePanel, Wizard, preloadViews } from "./lazyViews";
+import { NoteEditor, NotesPage, Palette, Settings, UpdatePanel, Wizard, preloadViews } from "./lazyViews";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
@@ -180,9 +179,6 @@ export default function App() {
       initAppearance(),
     );
 
-    const tick = window.setInterval(() => view() !== "hidden" && setNow(Date.now()), 1000);
-    onCleanup(() => clearInterval(tick));
-
     // velikost obsahu → Rust nastaví okno (bez přesahu nad okrajem)
     const ro = new ResizeObserver(() => report());
     ro.observe(content);
@@ -239,6 +235,13 @@ export default function App() {
     const v = view();
     api.reportSize(v, smallWidth(v) ?? wantWidth(page()), Math.ceil(content.getBoundingClientRect().height) - OVERLAP);
   }
+  // hodiny v hlavičce: sekundový časovač existuje jen, dokud je šuplík vidět (zavřený = žádné buzení WebView)
+  createEffect(() => {
+    if (view() === "hidden") return;
+    setNow(Date.now());
+    const tick = window.setInterval(() => setNow(Date.now()), 1000);
+    onCleanup(() => clearInterval(tick));
+  });
   createEffect(onChange([view, page, holdWide], () => queueMicrotask(report)));
   createEffect(onChange(view, (v) => v === "hidden" && setPalette(null), { defer: true }));
   // zavřený šuplík rozpracované úpravy rozložení NEzahodí (draft i Zpět žijí v `edit.ts`); po znovuotevření
@@ -274,7 +277,7 @@ export default function App() {
             <Show when={s.cfgError}>
               <div class="banner" data-anim><IconShield /> <span>{s.cfgError}</span></div>
             </Show>
-            <Show when={updOpen() && page() === "main" && s.update.state === "dostupna" ? s.update : null}>
+            <Show when={updOpen() && page() === "main" && (s.update.state === "dostupna" || s.update.whatsNew?.unread) ? s.update : null}>
               {(u) => <UpdatePanel u={u()} onClose={() => setUpdOpen(false)} />}
             </Show>
             <Show when={page() === "main"}><MainPage s={s} now={now()} onNote={startNote} nav={notesNav} onSettings={() => setPage("settings")} /></Show>

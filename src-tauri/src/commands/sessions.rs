@@ -44,7 +44,16 @@ pub(crate) fn question_release(id: u64) -> bool {
     core().claude.release_question(id)
 }
 
+/// UI otázku opravdu ukázalo (karta v záběru, šuplík otevřený, WebView viditelné — `src/questions/seen.ts`).
+/// Jádro to vezme jen při otevřeném šuplíku a živém Ledge (`claude::unseen::seen_counts`), jinak `false`
+/// a UI to zkusí při další změně viditelnosti. Pojistka `claude.questionUnseenS` pak otázku nepustí.
 #[tauri::command]
+pub(crate) fn question_seen(id: u64) -> bool {
+    let c = core();
+    crate::claude::unseen::seen_counts(c.drawer.view() != crate::drawer::View::Hidden, c.dead()) && c.claude.question_seen(id)
+}
+
+#[tauri::command(async)]
 pub(crate) fn hooks_status() -> hooksetup::HooksStatus {
     hooksetup::status_cached(core().cfg.read().claude.port)
 }

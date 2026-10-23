@@ -158,13 +158,27 @@ pub(crate) fn inside(root: &Path, p: &Path) -> bool {
     !p.components().any(|c| matches!(c, Component::ParentDir)) && p.starts_with(root)
 }
 
+/// `canonicalize` s krátkým opakováním: atomický zápis jiného vlákna (`write_atomic`) soubor na pár ms
+/// přepisuje a Windows ho mezitím hlásí jako neexistující — poznámka by pak „nebyla poznámka Ledge“.
+/// Skutečně chybějící soubor ve skutečné složce selže po ~40 ms.
+fn canonicalize_settled(path: &Path) -> Option<PathBuf> {
+    for attempt in 0..5 {
+        match path.canonicalize() {
+            Ok(p) => return Some(p),
+            Err(_) if attempt < 4 && path.parent().is_some_and(Path::is_dir) => std::thread::sleep(std::time::Duration::from_millis(10)),
+            Err(_) => return None,
+        }
+    }
+    None
+}
+
 /// Cesta k existující poznámce pod kořenem (i po rozbalení symlinků), jinak chyba.
 pub fn check_note_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
     let bad = || trf!("Cesta {} není poznámka Ledge.", "Path {} isn't a Ledge note.", path.display());
     if !path.is_absolute() || !inside(root, path) || !path.extension().is_some_and(|e| e.eq_ignore_ascii_case("md")) {
         return Err(bad());
     }
-    let real = path.canonicalize().map_err(|_| bad())?;
+    let real = canonicalize_settled(path).ok_or_else(bad)?;
     let real_root = root.canonicalize().map_err(|_| bad())?;
     if !real.starts_with(&real_root) {
         return Err(bad());

@@ -10,6 +10,17 @@ mapy ho zmiňují). [`AGENTS.md`](AGENTS.md) je rozcestník k `docs/agents/*.md`
 API/MCP, instalace) — čti jen potřebný soubor, ne celý.
 Historie kol a backlog nejsou v repu (interní předávka mimo strom).
 
+## Kde začít podle úkolu
+
+| Úkol | Začni tady |
+|---|---|
+| Nová karta | `layout.rs` `CARDS` + `src/layout/model.ts` `CARD_IDS`/`CARD_INFO` + větev `MainPage.tsx` `card` — [layout.md](docs/codemap/layout.md) (Invarianty) |
+| Nový config klíč | struct v `src-tauri/src/config/*` (serde default + `JsonSchema`) → zrcadlo `src/types/*.ts` → zápis do `docs/agents/config*.md` (hlídá `scripts/config-keys.mjs`) → editor v Nastavení → test se starým configem — [core.md](docs/codemap/core.md) `config/*` |
+| Nový příkaz Tauri | `src-tauri/src/commands/<oblast>.rs` + `mod` v `commands/mod.rs` + `generate_handler!` v `lib.rs` + volání v `src/api.ts` (nebo `src/<oblast>/api.ts`) — [core.md](docs/codemap/core.md) |
+| Text / překlad | `t("klíč", "česky")` + angličtina v `src/i18n/en-<oblast>.ts` (nový slovník = import v `dicts.ts`); test `src/i18n.test.mjs` — [ui.md](docs/codemap/ui.md) (i18n) |
+| Panel nebo volba v Nastavení | `settings/registry.ts` (panel) · `catalog.ts` · `panels/*.tsx` · popisky `settings/labels.ts` + `settings/en.ts` — [settings.md](docs/codemap/settings.md) |
+| Nový modul / soubor | řádek v mapě své oblasti ([README](docs/codemap/README.md)); bez něj spadne `scripts/codemap-coverage.test.mjs` |
+
 ## Nepřekročitelná pravidla
 
 - Ledge **nekrade fokus** (jen výslovný klik) a při fullscreen hře je mrtvý.
@@ -31,9 +42,9 @@ Historie kol a backlog nejsou v repu (interní předávka mimo strom).
 
 ## Workeři a kola
 
-- Worker má větev `wN/<oblast>` (worktree `notch-wt/wN-<oblast>`); necommituje mimo ni a nepushuje.
+- Worker má větev `k<kolo>/<oblast>` (worktree `ledge-wt-<oblast>`); necommituje mimo ni a nepushuje.
 - Lead merguje non-ff: `merge: <popis> (kolo N)`. Worker na konci aktualizuje codemapu své oblasti
-  (`scripts/codemap.test.mjs` hlídá, že neodkazuje na neexistující soubory ani symboly).
+  (`scripts/codemap.test.mjs` hlídá, že neodkazuje na neexistující soubory ani symboly, `scripts/codemap-coverage.test.mjs`, že každý modul a zdroj má řádek; `node scripts/codemap-lint.mjs` vypíše obojí).
 - Sdílený `CARGO_TARGET_DIR=src-tauri/target-agents`. Orientace: `node scripts/kde.mjs <symbol>`.
 - Worktree past: `node_modules` je junction — před `git worktree remove` nejdřív
   `cmd //c rmdir <wt>\node_modules`, jinak se smaže i obsah cíle.

@@ -211,3 +211,75 @@ fn clip_table() {
         assert_eq!(clip(s, max), want, "{s}");
     }
 }
+
+use crate::testrng::Rng;
+
+/// Feed z internetu je cizí vstup: žádná kombinace (i s vícebajtovými znaky uprostřed hodnot) nesmí spadnout
+/// ani se točit věčně. Výsledek je `Ok`/`Err`, nic víc.
+#[test]
+fn hostile_feeds_never_panic_or_hang() {
+    let t0 = std::time::Instant::now();
+    let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+    let rule_bits = [
+        "FREQ=", "DAILY", "WEEKLY", "MONTHLY", "YEARLY", "SECONDLY", ";", "INTERVAL=", "0", "1", "99999999999", "-1", "COUNT=", "4294967295", "UNTIL=", "20261231T225959Z", "20261231", "BYDAY=", "MO", "-1FR", "5SU", "éM", "ěš", "M", "BYMONTHDAY=", "31", "-31", "32", "BYMONTH=", "13", "2", "BYSETPOS=", "-366", "WKST=", "SU", ",", "=", "ů",
+    ];
+    let value_bits = ["2026", "10", "19", "T", "090000", "Z", "-", "+", "P", "1D", "T1H", "15M", "9999999999999999999", "é", "ů", ":", ";", "\"", "\\", "/", " ", "00", "99", "0230", "20260230", "8"];
+    let names = ["DTSTART", "DTEND", "DURATION", "RRULE", "EXDATE", "RDATE", "SUMMARY", "LOCATION", "UID", "RECURRENCE-ID", "TZID", "BEGIN", "END", "X-ĚŠČ"];
+    let mut accepted = 0;
+    for i in 0..1500 {
+        let mut body = String::new();
+        for _ in 0..rng.below(3) {
+            body.push_str("BEGIN:VEVENT\nUID:a\n");
+            for _ in 0..rng.below(7) {
+                let name = rng.pick(&names);
+                let params = rng.pick(&["", ";TZID=Europe/Prague", ";TZID=\"Zvláštní ů\"", ";VALUE=DATE", ";TZID=", ";X=\"a:b\""]);
+                let value = match name {
+                    "RRULE" => rng.soup(&rule_bits, 8),
+                    "BEGIN" | "END" => rng.pick(&["VEVENT", "VTIMEZONE", "STANDARD", "DAYLIGHT", "VCALENDAR", ""]).to_string(),
+                    _ => rng.soup(&value_bits, 10),
+                };
+                body.push_str(&format!("{name}{params}:{value}\n"));
+            }
+            if rng.next().is_multiple_of(2) {
+                body.push_str("END:VEVENT\n");
+            }
+        }
+        if rng.next().is_multiple_of(4) {
+            body.push_str("BEGIN:VTIMEZONE\nTZID:Zvláštní\nBEGIN:STANDARD\n");
+            body.push_str(&format!("DTSTART:{}\nTZOFFSETFROM:{}\nTZOFFSETTO:{}\nRRULE:{}\nEND:STANDARD\nEND:VTIMEZONE\n", rng.soup(&value_bits, 6), rng.soup(&value_bits, 3), rng.soup(&value_bits, 3), rng.soup(&rule_bits, 8)));
+        }
+        let text = cal(&body);
+        let mut bytes = text.into_bytes();
+        // občas uříznout uprostřed (i vícebajtového znaku) nebo vložit nevalidní bajt
+        match rng.next() % 5 {
+            0 if !bytes.is_empty() => bytes.truncate(rng.below(bytes.len())),
+            1 if !bytes.is_empty() => {
+                let at = rng.below(bytes.len());
+                bytes.insert(at, 0xff);
+            }
+            _ => {}
+        }
+        let r = std::panic::catch_unwind(|| collect(&bytes, now(), &prague()).map(|p| p.occs.len()));
+        assert!(r.is_ok(), "panika v kole {i}: {}", String::from_utf8_lossy(&bytes));
+        accepted += usize::from(r.is_ok_and(|x| x.is_ok()));
+    }
+    assert!(accepted > 300, "test by nic neprověřil: přijato jen {accepted} feedů z 1500");
+    assert!(t0.elapsed() < std::time::Duration::from_secs(60), "zpracování zhrublo: {:?}", t0.elapsed());
+}
+
+/// Hodnoty s vícebajtovým znakem na hranici dvou bajtů (kde se `split_at` / `&s[..n]` láme).
+#[test]
+fn multibyte_values_do_not_break_parsers() {
+    use super::{expand, ics};
+    for rule in ["FREQ=WEEKLY;BYDAY=éM", "FREQ=WEEKLY;BYDAY=é", "FREQ=WEEKLY;BYDAY=ůů", "FREQ=DAILY;UNTIL=2026éé", "FREQ=DAILY;INTERVAL=é", "FREQ=MONTHLY;BYMONTHDAY=é"] {
+        assert!(expand::parse_rule(rule).is_err(), "{rule}");
+    }
+    for v in ["éé", "P1é", "-é", "+é1", "PTé", "é"] {
+        assert_eq!(ics::parse_duration(v), None, "{v}");
+        assert_eq!(ics::parse_offset(v), None, "{v}");
+    }
+    for v in ["éééé", "2026101é", "20261019Té0000", "ééééééé", "é0261019"] {
+        assert_eq!(ics::parse_dt(v, None, false), None, "{v}");
+        let _ = ics::parse_dt(v, None, true); // `VALUE=DATE` bere první osmici znaků — jen nesmí spadnout
+    }
+}

@@ -1,7 +1,8 @@
 //! Otázky Clauda (`AskUserQuestion`) v Ledge: hook `PreToolUse` s matcherem `AskUserQuestion` →
 //! `POST /question`. Ledge otázku ukáže jako chat (peek, karta Claude) a podrží požadavek, dokud šéf
 //! neodpoví (`answer_question`), nepustí ji do okna Claude (`release_question`), nevyprší
-//! `claude.questionHoldS` nebo neskončí turn. Odpověď = `permissionDecision: allow` + `updatedInput`
+//! `claude.questionHoldS`, neskončí turn nebo ji do `claude.questionUnseenS` nikdo neuvidí (pojistka
+//! `unseen.rs`: UI potvrdí `question_seen`, jinak se otázka pustí a v Ledge zůstane jen ukázaná). Odpověď = `permissionDecision: allow` + `updatedInput`
 //! (původní vstup beze změny + `answers`), jinak prázdné tělo = Claude se zeptá normálně.
 //! Čisté: `parse`, `build_answers`, `join_values`, `answer_body`. Mapa: `docs/codemap/sessions.md`.
 
@@ -15,7 +16,7 @@ pub const TOOL: &str = "AskUserQuestion";
 /// Nejdelší držení otázky: hook má timeout 600 s (`hooksetup::EVENTS`), 50 s rezerva.
 pub const MAX_HOLD_S: u64 = 550;
 /// Jak dlouho Ledge ukazuje otázku, kterou rovnou pustil do Claude (`questionHoldS` = 0).
-const SHOW_ONLY_MS: u64 = 10 * 60 * 1000;
+pub(super) const SHOW_ONLY_MS: u64 = 10 * 60 * 1000;
 const MAX_QUESTIONS: usize = 4;
 const MAX_OPTIONS: usize = 8;
 const MAX_OTHER_CHARS: usize = 4000;
@@ -54,6 +55,12 @@ pub struct Ask {
     pub expires_at: u64,
     /// false = `questionHoldS` 0 — Ledge jen ukazuje, odpovídá se v okně Claude
     pub answerable: bool,
+    /// kdy UI otázku poprvé opravdu ukázalo (`unseen::Claude::question_seen`); jen jádro
+    #[serde(skip)]
+    pub seen_at: Option<u64>,
+    /// pojistka ji pustila neviděnou do Claude (`unseen.rs`); v Ledge zůstala jen ukázaná
+    #[serde(skip)]
+    pub released_unseen: bool,
 }
 
 /// Záznam o otázce Clauda v deníku (posledních `MAX_LOG` událostí pro diagnostiku v Nastavení).
@@ -64,15 +71,15 @@ pub struct QuestionLog {
     pub at: u64,
     pub session_id: String,
     pub title: String,
-    /// `holding` · `shown` · `answered` · `released` · `expired` · `turnEnded` · `skipped`
+    /// `holding` · `shown` · `answered` · `released` · `releasedUnseen` · `expired` · `turnEnded` · `skipped`
     pub outcome: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
 }
 
-const MAX_LOG: usize = 20;
+pub(super) const MAX_LOG: usize = 20;
 
-fn push_log(g: &mut Inner, entry: QuestionLog) {
+pub(super) fn push_log(g: &mut Inner, entry: QuestionLog) {
     if let Some(existing) = g.question_log.iter_mut().find(|x| x.id != 0 && x.id == entry.id) {
         existing.at = entry.at;
         existing.outcome = entry.outcome;
@@ -145,7 +152,7 @@ pub fn join_values(vals: &[&str]) -> String {
     vals.join(MULTI_SEP)
 }
 
-fn name(q: &Question) -> String {
+pub(super) fn name(q: &Question) -> String {
     let t = if q.header.is_empty() { &q.question } else { &q.header };
     if t.chars().count() > 40 { t.chars().take(40).collect::<String>() + "…" } else { t.clone() }
 }
@@ -205,12 +212,18 @@ pub(super) fn on_event(g: &mut Inner, ev: &str, sid: &str, tool: &str, now: u64)
             if let Some(tx) = tx {
                 let _ = tx.send(Outcome::Release);
             }
-            ended_ids.push((a.id, a.session_id.clone(), a.questions.first().map(name).unwrap_or_default(), if answered_there { "answered" } else { "turnEnded" }, end_detail(ev)));
+            let out = if a.released_unseen { "releasedUnseen" } else if answered_there { "answered" } else { "turnEnded" };
+            ended_ids.push((a.id, a.session_id.clone(), a.questions.first().map(name).unwrap_or_default(), out, a.released_unseen, end_detail(ev)));
         }
         !gone && (tx.is_some() || a.expires_at > now)
     });
-    for (id, s_id, title, out, detail) in ended_ids {
-        push_log(g, QuestionLog { id, at: now, session_id: s_id, title, outcome: out.into(), detail: Some(detail.into()) });
+    for (id, s_id, title, out, unseen, detail) in ended_ids {
+        // puštěná pojistkou: v deníku zůstane „neviděno“, konec se jen připíše
+        let detail = match g.question_log.iter().find(|x| x.id == id).and_then(|x| x.detail.clone()) {
+            Some(prev) if unseen => format!("{prev} · {detail}"),
+            _ => detail.to_string(),
+        };
+        push_log(g, QuestionLog { id, at: now, session_id: s_id, title, outcome: out.into(), detail: Some(detail) });
     }
 }
 
@@ -262,9 +275,12 @@ impl Claude {
             return None;
         };
         if sid.is_empty() {
+            let mut g = self.inner.lock();
+            push_log(&mut g, QuestionLog { id: 0, at: now_ms(), session_id: sid, title: questions.first().map(name).unwrap_or_else(|| TOOL.into()), outcome: "skipped".into(), detail: Some(crate::i18n::tr("hook neposlal session_id — odpověz v Claude Code", "the hook sent no session_id — answer in Claude Code").into()) });
             return None;
         }
         let hold = *self.question_hold.lock();
+        let unseen = *self.question_unseen.lock();
         let answerable = !hold.is_zero();
         let (tx, rx) = mpsc::channel();
         let id = {
@@ -277,7 +293,7 @@ impl Claude {
             let first_title = questions.first().map(name).unwrap_or_else(|| TOOL.into());
             let q_count = questions.len();
             wait_on(&mut g.sessions, &sid, &cwd, now);
-            g.asks.push((Ask { id, session_id: sid.clone(), cwd, questions, created_at: now, expires_at, answerable }, answerable.then_some(tx)));
+            g.asks.push((Ask { id, session_id: sid.clone(), cwd, questions, created_at: now, expires_at, answerable, seen_at: None, released_unseen: false }, answerable.then_some(tx)));
             push_log(&mut g, QuestionLog {
                 id,
                 at: now,
@@ -292,16 +308,33 @@ impl Claude {
         if !answerable {
             return None;
         }
-        let out = match rx.recv_timeout(hold) {
-            Ok(o) => Some(o),
-            Err(_) => {
-                // termín: uklidit pod zámkem; odpověď, která to stihla těsně před ním, platí
-                let mut g = self.inner.lock();
-                g.asks.retain(|(a, _)| a.id != id);
-                push_log(&mut g, QuestionLog { id, at: now_ms(), session_id: String::new(), title: String::new(), outcome: "expired".into(), detail: None });
-                drop(g);
-                (self.on_change)();
-                rx.try_recv().ok()
+        // čekání po úsecích (`unseen::step`): pojistka neviděné otázky, pak termín držení — žádné
+        // vlákno navíc, čeká tohle vlákno hooku
+        let t0 = std::time::Instant::now();
+        let (hold_ms, unseen_ms) = (hold.as_millis() as u64, unseen.as_millis() as u64);
+        let out = loop {
+            // otázka už v seznamu není (odpověď / puštění) = zpráva čeká v kanálu → `Wait` ji vyzvedne
+            let seen = self.inner.lock().asks.iter().find(|(a, _)| a.id == id).is_none_or(|(a, _)| a.seen_at.is_some());
+            match super::unseen::step(t0.elapsed().as_millis() as u64, hold_ms, unseen_ms, seen) {
+                super::unseen::Step::Wait(ms) => match rx.recv_timeout(Duration::from_millis(ms.max(1))) {
+                    Ok(o) => break Some(o),
+                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break None,
+                },
+                super::unseen::Step::ReleaseUnseen => {
+                    if self.release_unseen(id, unseen_ms) {
+                        break rx.try_recv().ok();
+                    }
+                }
+                super::unseen::Step::Expire => {
+                    // termín: uklidit pod zámkem; odpověď, která to stihla těsně před ním, platí
+                    let mut g = self.inner.lock();
+                    g.asks.retain(|(a, _)| a.id != id);
+                    push_log(&mut g, QuestionLog { id, at: now_ms(), session_id: String::new(), title: String::new(), outcome: "expired".into(), detail: None });
+                    drop(g);
+                    (self.on_change)();
+                    break rx.try_recv().ok();
+                }
             }
         };
         match out {

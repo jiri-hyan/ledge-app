@@ -218,13 +218,11 @@ pub(crate) fn snapshot() -> Snapshot {
     let ((notes_card, notes_more), reminders, reminders_count, personal_notes) = if cfg.notes.enabled {
         let st = c.notes.lock();
         let eod = notes::end_of_day_ms(&notes::now_local());
-        let general: Vec<notes::NoteView> =
-            st.all.iter().filter(|n| n.project.is_none()).cloned().collect();
         (
             notes::card(&st.all, eod, notes::CARD_ROWS),
             st.due.iter().take(3).cloned().collect(),
             st.due.len(),
-            notes::card(&general, eod, notes::CARD_ROWS),
+            notes::card_where(&st.all, |n| n.project.is_none(), eod, notes::CARD_ROWS),
         )
     } else {
         ((Vec::new(), 0), Vec::new(), 0, (Vec::new(), 0))

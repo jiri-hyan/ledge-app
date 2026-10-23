@@ -36,17 +36,22 @@ pub fn parse_porcelain_v2(out: &str) -> GitInfo {
     g
 }
 
+/// Argumenty periodického `git status`: bez volitelných zámků (`--no-optional-locks`) — pozadí nesmí
+/// zabrat `index.lock` zrovna, když uživatel v repu commituje.
+const STATUS_ARGS: [&str; 5] = ["--no-optional-locks", "status", "--porcelain=v2", "--branch", "--untracked-files=normal"];
+/// Tvrdý strop jednoho `git status` na pozadí (síťový disk, zamčený repo): po něm se strom gitu zabije,
+/// vlákno nezůstane viset a příští kolo to zkusí znovu.
+const STATUS_TIMEOUT: Duration = Duration::from_secs(60);
+
 pub fn status(dir: &Path) -> Option<GitInfo> {
-    let out = Command::new("git")
-        .args(["status", "--porcelain=v2", "--branch", "--untracked-files=normal"])
-        .current_dir(dir)
-        .creation_flags(0x0800_0000)
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    Some(parse_porcelain_v2(&String::from_utf8_lossy(&out.stdout)))
+    status_until(dir, Instant::now() + STATUS_TIMEOUT)
+}
+
+fn status_until(dir: &Path, deadline: Instant) -> Option<GitInfo> {
+    let mut cmd = Command::new("git");
+    cmd.args(STATUS_ARGS).current_dir(dir).env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
+    let out = capture(&mut cmd, None, false, deadline).ok()?;
+    out.success.then(|| parse_porcelain_v2(&out.stdout))
 }
 
 /// `git <args>` v `dir` s tvrdým termínem (hook Claude Code čeká max. 5 s). Po termínu zabije celý
@@ -260,6 +265,42 @@ mod tests {
         // prošlý termín → Timeout bez spuštění
         let mut cmd = Command::new("git");
         assert_eq!(capture(&mut cmd, None, true, Instant::now()).unwrap_err(), RunError::Timeout);
+    }
+
+    #[test]
+    fn background_status_takes_no_optional_locks_and_respects_deadline() {
+        assert_eq!(STATUS_ARGS[0], "--no-optional-locks", "pozadí nesmí zabrat index.lock");
+        let dir = std::env::temp_dir().join(format!("ledge-gitinfo-status-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let soon = || Instant::now() + Duration::from_secs(20);
+        // není repo → None (ne panika, ne prázdný GitInfo)
+        assert_eq!(status_until(&dir, soon()), None);
+        // neexistující složka → None
+        assert_eq!(status_until(&dir.join("neni"), soon()), None);
+        // repo s jedním nesledovaným souborem
+        assert!(run(&dir, &["init", "-q", "-b", "hlavni"], soon()).is_some());
+        std::fs::write(dir.join("a.txt"), "x").unwrap();
+        let g = status_until(&dir, soon()).expect("repo");
+        assert_eq!((g.dirty, g.ahead, g.behind), (1, 0, 0));
+        // prošlý termín → git se nespustí
+        assert_eq!(status_until(&dir, Instant::now()), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn porcelain_v2_survives_garbage() {
+        let cases: [(&str, GitInfo); 6] = [
+            ("", GitInfo::default()),
+            ("\n\n\n", GitInfo::default()),
+            ("# branch.head (detached)\n", GitInfo::default()),
+            ("# branch.ab +x -y\n", GitInfo::default()),
+            ("# branch.ab +99999999999 -3\n", GitInfo { behind: 3, ..GitInfo::default() }),
+            ("# branch.head větev-č\n2 R. N... 1 1 1 a b R100 x\tstary\nu UU N... 1 1 1 1 a b c f\n", GitInfo { branch: Some("větev-č".into()), dirty: 2, ..GitInfo::default() }),
+        ];
+        for (input, want) in cases {
+            assert_eq!(parse_porcelain_v2(input), want, "{input:?}");
+        }
     }
 
     #[test]

@@ -18,7 +18,7 @@ zmínka pro Claude Code), otevřít, ukázat ve složce, odebrat, vyprázdnit, p
 | `src-tauri/src/commands/shelf.rs` | Tauri příkazy; pracují jen s cestami, které v přihrádce jsou (`contains`) | `shelf_list` `shelf_icon` `shelf_copy` `shelf_open` `shelf_reveal` `shelf_remove` `shelf_clear` `shelf_drag_out` `shelf_paste` `shelf_copy_content` `shelf_resize_image` |
 | `threads/hover.rs` | `shelf::Arm::step` každý tik → `drop::set_armed`; při aktivní zóně neotevírá šuplík; mrtvý Ledge = `set_armed(None)` | |
 | `strip.rs` | `StripModel.shelf` (`Hint`), před kreslením `shelf::overlay` na kopii modelu | |
-| `src/shelf/ShelfCard.tsx` · `api.ts` · `model.ts` · `shelf.css` | karta (Práce i Osobní, jen neprázdná; Vložit v hlavičce, u textu Obsah, u obrázku Zmenšit), most k jádru, čistá logika (`isDrag`, `cardVisible`, `carriesFiles`; akce navíc `extra` posílá jádro), styly `shelf-*`; paleta „Vložit schránku do přihrádky“ (`palette/items.ts`, jen s kartou v rozložení) | `ShelfCard` `pasteToShelf` `shelfApi` `DRAG_PX` |
+| `src/shelf/ShelfCard.tsx` · `src/shelf/api.ts` · `model.ts` · `shelf.css` | karta (Práce i Osobní, jen neprázdná; Vložit v hlavičce, u textu Obsah, u obrázku Zmenšit), most k jádru, čistá logika (`isDrag`, `cardVisible`, `carriesFiles`; akce navíc `extra` posílá jádro), styly `shelf-*`; paleta „Vložit schránku do přihrádky“ (`palette/items.ts`, jen s kartou v rozložení) | `ShelfCard` `pasteToShelf` `shelfApi` `DRAG_PX` |
 | `src/i18n/en-shelf.ts` | angličtina `cards.shelf.*` | |
 
 ## Toky

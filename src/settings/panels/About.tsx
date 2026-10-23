@@ -1,10 +1,12 @@
-// Sekce „O aplikaci“ a „Aktualizace“ (panel Záloha a aplikace, `AppPanel.tsx`): verze, stav kontroly nové verze (Rust `update.rs`, jen čte
-// snapshot), nastavení kontroly, odkaz na repo, diagnostický log a cesta ke configu.
-import { createResource, Show } from "solid-js";
+// Sekce „O aplikaci“ a „Aktualizace“ (panel Záloha a aplikace, `AppPanel.tsx`): verze, stav kontroly nové verze (Rust `updater.rs`, jen čte
+// snapshot), nastavení kontroly a tichého stažení, „Co je nového“ (poznámky z cache), „Vrátit předchozí verzi“
+// (s potvrzením), odkaz na repo, diagnostický log a cesta ke configu.
+import { createResource, createSignal, Show } from "solid-js";
 import { api, type UpdateView } from "../../api";
+import ReleaseNotes from "../../update/ReleaseNotes";
 import { ago } from "../../format";
-import { t } from "../../i18n";
-import { sayError } from "../../ui/toast";
+import { t, tp } from "../../i18n";
+import { say, sayError } from "../../ui/toast";
 import { useSettings } from "../ctx";
 import { Slider, Text, Toggle } from "../fields/controls";
 import { Row, Section } from "../fields/Row";
@@ -17,12 +19,58 @@ function updateState(u: UpdateView): { text: string; tone: "ok" | "warn" | "bad"
     case "off": return { text: t("settings.about.st.off", "Kontrola je vypnutá"), tone: "" };
     case "neovereno": return { text: t("settings.about.st.pending", "První kontrola proběhne minutu po startu"), tone: "" };
     case "aktualni": return { text: t("settings.about.st.current", "Máš nejnovější verzi") + when, tone: "ok" };
-    case "dostupna": return { text: t("settings.about.st.available", "Dostupná verze {v} — nainstaluješ ji z hlavičky šuplíku", { v: u.verze }) + when, tone: "warn" };
+    case "dostupna": return {
+      text: (u.fetch.state === "ready"
+        ? t("settings.about.st.ready", "Verze {v} je stažená a ověřená — restartuješ ji z hlavičky šuplíku", { v: u.verze })
+        : t("settings.about.st.available", "Dostupná verze {v} — nainstaluješ ji z hlavičky šuplíku", { v: u.verze })) + when,
+      tone: "warn",
+    };
     case "nelze_overit": return { text: t("settings.about.st.unknown", "Nelze ověřit: {why}", { why: u.duvod }) + when, tone: "bad" };
   }
 }
 
 const open = (p: Promise<unknown>) => p.catch(sayError);
+
+/** „Vrátit předchozí verzi X“: první klik ukáže potvrzení, druhý spustí ověřený instalátor (Ledge se restartuje).
+ *  Běží-li servery, Rust vrátí jejich seznam a chce třetí, výslovné potvrzení (jako u instalace). */
+function Rollback(p: { u: UpdateView }) {
+  const [ask, setAsk] = createSignal<string[] | null>(null);
+  const [busy, setBusy] = createSignal(false);
+  const rb = () => p.u.rollback;
+  async function go(confirmed: string[]) {
+    setBusy(true);
+    try {
+      const out = await api.updateRollback(confirmed);
+      if (out?.outcome === "confirm") setAsk(out.running);
+      else if (out?.outcome === "started") say(t("settings.about.rb.started", "Vracím předchozí verzi — Ledge se za chvíli spustí znovu"));
+    } catch (e) {
+      sayError(e);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Show when={rb()} fallback={<span class="st-status">{t("settings.about.rb.none", "Není kam se vrátit — instalátor předchozí verze se uloží při příští aktualizaci.")}</span>}>
+      {(r) => (
+        <Show when={ask()} fallback={<button class="mini" disabled={busy() || p.u.installing} onClick={() => setAsk([])}>{t("settings.about.rb.btn", "Vrátit na {v}", { v: r().verze })}</button>}>
+          {(running) => (
+            <span class="st-inline">
+              <span>
+                {running().length
+                  ? tp("settings.about.rb.stops", running().length, ["Zastaví se {n} běžící server: {list}.", "Zastaví se {n} běžící servery: {list}.", "Zastaví se {n} běžících serverů: {list}."], { list: running().join(", ") })
+                  : r().local
+                    ? t("settings.about.rb.askLocal", "Nainstalovat zpět verzi {v}? Instalátor je uložený a ověří se znovu; Ledge se restartuje.", { v: r().verze })
+                    : t("settings.about.rb.askRemote", "Nainstalovat zpět verzi {v}? Instalátor se stáhne z GitHubu a ověří SHA256; Ledge se restartuje.", { v: r().verze })}
+              </span>
+              <button class="mini" disabled={busy()} onClick={() => setAsk(null)}>{t("settings.about.rb.cancel", "Zpět")}</button>
+              <button class="mini" disabled={busy() || p.u.installing} onClick={() => go(running())}>{busy() ? t("settings.about.rb.working", "Pracuji…") : t("settings.about.rb.confirm", "Ano, vrátit")}</button>
+            </span>
+          )}
+        </Show>
+      )}
+    </Show>
+  );
+}
 
 export default function AboutPanel(_p: PanelProps) {
   const c = useSettings();
@@ -49,7 +97,16 @@ export default function AboutPanel(_p: PanelProps) {
           <Row id="update.intervalH">
             <Slider path="update.intervalH" min={1} max={48} label={t("settings.f.update.intervalH", "Jak často kontrolovat")} fmt={(v) => t("settings.about.every", "každých {v} h", { v })} />
           </Row>
+          <Row id="update.prefetch"><Toggle path="update.prefetch" label={t("settings.f.update.prefetch", "Stahovat nové verze předem")} /></Row>
         </Show>
+        <Show when={u().whatsNew}>
+          {(w) => (
+            <Row id="update.whatsNew" label={t("settings.about.whatsNew", "Co je nového ve verzi {v}", { v: w().verze })} stack>
+              <ReleaseNotes md={w().poznamky} />
+            </Row>
+          )}
+        </Show>
+        <Row id="update.rollback"><Rollback u={u()} /></Row>
       </Section>
     </>
   );

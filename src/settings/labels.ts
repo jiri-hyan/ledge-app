@@ -61,6 +61,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "claude.toast": { panel: "claude", label: "Oznámení Windows", hint: "Když Claude čeká na schválení nebo otázku, nebo dokončí práci. Nebere fokus; ve hře, v herním režimu a při Nerušit nikdy", kw: "toast oznámení notifikace upozornění hotovo" },
   "claude.hooks": { panel: "claude", label: "Propojení s Claude Code", hint: "Aby Ledge viděl session a mohl ukázat žádosti o povolení. Změní jen nastavení Claude Code, cizí nastavení zůstane.", kw: "hooky hooks settings.json zapojit odpojit propojit" },
   "claude.questionHoldS": { panel: "claude", label: "Odpovídat na otázky z Ledge", hint: "Když se Claude Code zeptá, odpovíš kliknutím v šuplíku", kw: "otázky clauda otázka odpověď askuserquestion" },
+  "claude.questionUnseenS": { panel: "claude", label: "Neviděnou otázku pustit do Claude", hint: "Když otázku v Ledge nikdo nevidí (šuplík zavřený, hra), Claude se zeptá ve svém okně", kw: "otázky clauda pojistka neviděno nikdo neviděl zavřený šuplík hra" },
   "claude.statusLine": { panel: "claude", label: "Číst limity 5h / týden", hint: "Ledge obalí stavový řádek Claude Code a čte z něj limity 5h / týden; tvůj původní poběží dál", kw: "stavový řádek limit kvóta 5h týden statusline" },
   "claude.limitsReminder": { panel: "claude", label: "Připomenout reset limitu", hint: "Když limit 5h nebo týden dosáhne 100 %, v čase resetu krátce vyjede šuplík (ve hře nic)", kw: "limit kvóta reset připomínka" },
   "claude.costs": { panel: "claude", label: "Hodnota v cenách API", hint: "Část karty Claude: tokeny a odhad ceny v cenách API (ne účet) podle projektu a dne z lokálních transcriptů; počítá se jen po rozbalení", kw: "útrata cena tokeny dolary náklady odhad" },
@@ -137,6 +138,9 @@ export const FIELDS: Record<string, FieldDef> = {
   "update.check": { panel: "aplikace", label: "Hlídat nové verze", hint: "Jen upozorní v hlavičce, instaluje se až na klik.", kw: "aktualizace update" },
   "update.repo": { panel: "aplikace", label: "Repo s vydáními", hint: "owner/name na GitHubu. Dotazy jdou přes přihlášené gh (GitHub CLI).", kw: "github releases" },
   "update.intervalH": { panel: "aplikace", label: "Jak často kontrolovat", hint: "1–48 h; první kontrola minutu po startu", kw: "interval hodiny" },
+  "update.prefetch": { panel: "aplikace", label: "Stahovat nové verze předem", hint: "Nová verze se tiše stáhne a ověří na pozadí — pak stačí jeden klik Restartovat a aktualizovat. Sama se nikdy nenainstaluje.", kw: "stáhnout pozadí předem restartovat" },
+  "update.whatsNew": { panel: "aplikace", label: "Co je nového", hint: "Poznámky k vydání běžící verze (uložené při stažení, bez internetu)", kw: "novinky změny poznámky k vydání changelog" },
+  "update.rollback": { panel: "aplikace", label: "Vrátit předchozí verzi", hint: "Když se nová verze nepovedla: nainstaluje zpět tu, která běžela předtím (ověřený instalátor, s potvrzením)", kw: "downgrade návrat starší verze zpět" },
   "about.files": { panel: "aplikace", label: "Soubory Ledge", hint: "Diagnostický log a složka s nastavením", kw: "log ledge.log diagnostika config cesta" },
 };
 

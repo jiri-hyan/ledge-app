@@ -1,4 +1,4 @@
-// Export poznámky ven: Markdown / HTML do souboru (dialog Uložit jako v Rustu), tělo do schránky a „Otevřít v …“
+// Export poznámky ven: Markdown / HTML / PDF do souboru (dialog Uložit jako v Rustu), tělo do schránky a „Otevřít v …“
 // aplikacích, které má Windows registrované pro .md. Společné pro menu editoru (⋯) i lístku; výsledek vždy krátká
 // hláška, chyba textem z jádra.
 
@@ -8,8 +8,8 @@ import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { trimBody } from "./editdraft";
 
-/** Uloží poznámku jako `.md` / `.html`; zrušený dialog nic neřekne. */
-export async function exportNote(path: string, format: "md" | "html") {
+/** Uloží poznámku jako `.md` / `.html` / `.pdf` (PDF tiskne skryté WebView2 v Rustu, pár sekund); zrušený dialog nic neřekne. */
+export async function exportNote(path: string, format: "md" | "html" | "pdf") {
   try {
     const out = await api.noteExport(path, format);
     if (out) say(t("notes.export.saved", "Uloženo do {path}", { path: out }));
@@ -52,6 +52,7 @@ export function exportItems(path: string, body: () => string): { label: string; 
   return [
     { label: t("notes.export.md", "Uložit jako Markdown…"), run: () => void exportNote(path, "md") },
     { label: t("notes.export.html", "Uložit jako HTML…"), run: () => void exportNote(path, "html") },
+    { label: t("notes.export.pdf", "Uložit jako PDF…"), run: () => void exportNote(path, "pdf") },
     { label: t("notes.export.copy", "Kopírovat jako Markdown"), run: () => void copyMarkdown(body()) },
     ...apps().map((a) => ({ label: t("notes.export.openWith", "Otevřít v {name}", { name: a.name }), run: () => void openWith(path, a.id) })),
   ];

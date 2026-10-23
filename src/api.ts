@@ -79,7 +79,7 @@ export const api = {
   noteToggleTask: (path: string, line: number, checked: boolean, expectedHash: string) => call<SaveOutcome>("note_toggle_task", { path, line, checked, expectedHash }),
   noteRender: (body: string) => call<string>("note_render", { body }),
   /** Export poznámky do souboru (dialog Uložit jako): vrací uloženou cestu, null = uživatel zrušil. */
-  noteExport: (path: string, format: "md" | "html") => call<string | null>("note_export", { path, format }),
+  noteExport: (path: string, format: "md" | "html" | "pdf") => call<string | null>("note_export", { path, format }),
   /** Aplikace registrované ve Windows pro `.md` (nabídka „Otevřít v …“). */
   noteOpenWithApps: () => call<{ id: string; name: string }[]>("note_open_with_apps"),
   /** Otevře poznámku v aplikaci `app` (id z `noteOpenWithApps`); chyba = český text z jádra. */
@@ -115,6 +115,12 @@ export const api = {
   updateCheckNow: () => call("update_check_now"),
   /** `confirmed` = běžící servery, které šéf odsouhlasil zastavit; běží-li jiné, vrátí `confirm`. */
   updateInstall: (confirmed: string[]) => call<InstallOutcome>("update_install", { confirmed }),
+  /** „Zkusit znovu“ po selhaném tichém stažení (výsledek ve snapshotu `update.fetch`). */
+  updateRetry: () => call("update_retry"),
+  /** „Co je nového“ přečteno — upozornění v šuplíku zmizí. */
+  updateNotesRead: () => call("update_notes_read"),
+  /** Návrat k předchozí verzi; stejné potvrzení běžících serverů jako `updateInstall`. */
+  updateRollback: (confirmed: string[]) => call<InstallOutcome>("update_rollback", { confirmed }),
   /** Klik na session: přepnout do jejího okna / skončenou obnovit v terminálu. Chyba = česky. */
   sessionOpen: (id: string) => call("session_open", { id }),
   /** Panel Git session (jen na klik; null = cwd není v gitu). Destruktivní akce Rust znovu ověří. */

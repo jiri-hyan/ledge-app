@@ -45,6 +45,9 @@ Zavolat Řehořovi kvůli fakturám
 - Tělo je Markdown (nadpisy, **tučně**, *kurzíva*, `kód`, bloky kódu, odrážky, `1.`, úkoly `- [ ]` /
   `- [x]`, odkazy jen http(s), obrázky relativně `./…png`). Raw HTML se nezobrazí (escapuje se).
   Úkoly Ledge počítá (karta „2/5“) a uživatel je odklikává v náhledu.
+- **Export** (⋯ editoru / lístku, Bento karta): Markdown (bez frontmatteru), samostatné HTML (obrázky jako data URL)
+  nebo PDF (A4, totéž HTML vytištěné skrytým WebView2 bez okna a bez fokusu, nejdéle 30 s). Tauri `note_export(path,
+  format: "md" | "html" | "pdf")` — dialog „Uložit jako“, poznámka se nemění.
 - Uživatel poznámky upravuje přímo v Ledge (klik na řádek); uložení přepíše soubor atomicky, **jméno ani
   složku nemění** (sync gitem) a zachová neznámé klíče i `created`. Když se soubor mezitím změnil
   (sync, agent), Ledge nepřepíše naslepo — nabídne načíst znovu / uložit jako kopii. Frontmatter musí začínat

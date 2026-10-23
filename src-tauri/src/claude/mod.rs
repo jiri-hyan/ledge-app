@@ -17,7 +17,7 @@
 //! Ochrana: požadavky s hlavičkou `Origin` (prohlížeč) se odmítají; Host musí být loopback.
 //!
 //! Podmoduly: `bridge` (HTTP server), `hygiene` (hlídač nedokončené práce, git), `paths` (cesty a
-//! porcelain, čisté), `questions` (otázky Clauda), `rules` („Vždy povolit“ a důvod zamítnutí, čisté),
+//! porcelain, čisté), `questions` (otázky Clauda) + `unseen` (pojistka neviděné otázky), `rules` („Vždy povolit“ a důvod zamítnutí, čisté),
 //! `preview` + `diff` (náhled změny Edit/Write v kartě), `plan` + `planhook` (review plánu ExitPlanMode). Tady stav
 //! session a schvalování. Mapa: `docs/codemap/sessions.md`.
 
@@ -30,6 +30,7 @@ mod planhook;
 pub mod preview;
 mod questions;
 pub mod rules;
+pub mod unseen;
 #[cfg(test)]
 mod testkit;
 
@@ -149,6 +150,9 @@ pub struct Claude {
     timeout: Arc<Mutex<Duration>>,
     /// jak dlouho drží otázku Clauda (`claude.questionHoldS`); 0 = jen ukázat
     question_hold: Arc<Mutex<Duration>>,
+    /// pojistka otázek (`claude.questionUnseenS`): drženou otázku, kterou UI do té doby neukázalo,
+    /// Ledge pustí do Claude; 0 = vypnuto (`questions::step`)
+    question_unseen: Arc<Mutex<Duration>>,
     enforce: Arc<Mutex<EnforceCommit>>,
     /// testy: práce „na pozadí“ běží hned ve volajícím vlákně (deterministicky)
     inline: bool,
@@ -193,6 +197,7 @@ impl Claude {
             on_change,
             timeout: Arc::new(Mutex::new(timeout.min(MAX_APPROVAL))),
             question_hold: Arc::new(Mutex::new(Duration::from_secs(questions::MAX_HOLD_S))),
+            question_unseen: Arc::new(Mutex::new(Duration::ZERO)),
             enforce: Arc::new(Mutex::new(EnforceCommit::default())),
             inline: false,
             budgets: Budgets::default(),

@@ -61,6 +61,8 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   oznámení Windows: bez fokusu, nikdy ve fullscreen hře, v herním režimu, při „nerušit“ (QUNS) ani při
   otevřeném šuplíku; stejná session + událost nejvýš 1× za 30 s. Toast potřebuje nainstalovaný Ledge
   (AppUserModelID `cz.hyan.ledge` ze zástupce ve Startu), jinak ho Windows zahodí (chyba v logu).
+  Dokud otázka Clauda čeká a šuplík je zavřený, puls se opakuje po 10 s (jen po tu dobu, v klidu nic).
+  Přišla-li otázka / schválení ve fullscreen hře nebo herním režimu, peek vyjede po návratu.
 - **Herní režim** — Ledge „mrtvý“ jako při fullscreen hře (šuplík zavřený, proužek pryč, myš, zkratky,
   peek ani připomínky nic). Zapíná se v Nastavení → Chování → Hry a celá obrazovka, v paletě Ctrl+K („Zapnout herní
   režim“) nebo zkratkou `hotkeys.gameMode`; stav je v `%APPDATA%\Ledge\game-mode.json` (`{"on": true}`,

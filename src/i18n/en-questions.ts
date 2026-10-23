@@ -30,5 +30,6 @@ registerDict("en", {
   "questions.log.expired": "Expired",
   "questions.log.turnEnded": "Turn ended",
   "questions.log.skipped": "Skipped",
+  "questions.log.releasedUnseen": "Nobody saw it — passed to Claude",
   "questions.log.untitled": "Claude's question",
 });

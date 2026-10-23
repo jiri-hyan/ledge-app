@@ -168,6 +168,9 @@ fn inline(s: &str, out: &mut String, plain: bool) {
     let b = s.as_bytes();
     let mut i = 0;
     let mut text_start = 0;
+    // poslední `](` v řádku: za ním už žádný `[` odkaz být nemůže, takže se nehledá znovu a znovu do konce
+    // řádku (řádek plný `[` bez `](`, třeba zhuštěné JSON pole, by jinak byl kvadratický)
+    let last_link = s.rfind("](");
     let flush = |out: &mut String, from: usize, to: usize| {
         if to > from {
             if plain {
@@ -198,7 +201,7 @@ fn inline(s: &str, out: &mut String, plain: bool) {
             text_start = i;
             continue;
         }
-        if c == b'!' && b.get(i + 1) == Some(&b'[') && let Some((alt, src, len)) = bracket_link(&s[i + 1..]) {
+        if c == b'!' && b.get(i + 1) == Some(&b'[') && last_link.is_some_and(|l| l > i) && let Some((alt, src, len)) = bracket_link(&s[i + 1..]) {
             flush(out, text_start, i);
             if plain {
                 out.push_str(alt);
@@ -211,7 +214,7 @@ fn inline(s: &str, out: &mut String, plain: bool) {
             text_start = i;
             continue;
         }
-        if c == b'[' && let Some((text, url, len)) = bracket_link(&s[i..]) {
+        if c == b'[' && last_link.is_some_and(|l| l > i) && let Some((text, url, len)) = bracket_link(&s[i..]) {
             flush(out, text_start, i);
             if !plain && safe_url(url) {
                 out.push_str(&format!("<a class=\"md-link\" data-href=\"{}\" title=\"{}\">", esc(url.trim()), esc(url.trim())));
@@ -506,5 +509,41 @@ mod tests {
         }
         // CRLF: řádky se počítají po \n, \r zůstane
         assert_eq!(toggle_line("x\r\n- [ ] a\r\n", 1, true).unwrap(), "x\r\n- [x] a\r\n");
+    }
+
+    /// Text poznámky píše uživatel (a sync ho nosí z jiného PC): žádná kombinace značek a vícebajtových znaků
+    /// nesmí shodit převod na HTML, hledání úkolů ani titulek.
+    #[test]
+    fn hostile_markdown_never_panics() {
+        let bits = [
+            "# ", "## ", "- ", "* ", "1. ", "10) ", "- [ ] ", "- [x] ", "> ", "```", "`", "**", "*", "_", "~~", "[", "](", ")", "![", "](./a.png)", "](javascript:x)", "<", ">", "&", "\"", "\n", "\r\n", "  ",
+            "\t", "é", "ů", "ß", "İ", "ﬁ", "🙂", "\u{200d}", "\u{0}", "http://x.cz/a_b_c", "|", "---", "***", "    ", "text ",
+        ];
+        let mut rng = crate::testrng::Rng(0xC0FF_EE12_3456_789A);
+        for i in 0..3000 {
+            let body = rng.soup(&bits, 24);
+            let r = std::panic::catch_unwind(|| {
+                let html = to_html(&body);
+                assert!(!html.contains("<script"), "skript v HTML: {body:?}");
+                let _ = (title(&body), plain(&body), image_refs(&body));
+                for (line, _) in tasks(&body) {
+                    let _ = toggle_line(&body, line, true);
+                }
+                let _ = toggle_line(&body, usize::MAX, true);
+            });
+            assert!(r.is_ok(), "panika v kole {i}: {body:?}");
+        }
+        // obří vstupy (strop poznámky je 1 MiB): jeden řádek plný nedovřených značek a 20 000 krátkých řádků
+        let inputs = [
+            ("nedovřené značky", "é*_`[".repeat(200_000)),
+            ("zhuštěné JSON pole", "[[1,2],".repeat(150_000)),
+            ("nedovřené obrázky", "![a".repeat(300_000)),
+            ("úkoly", "- [ ] x\n".repeat(20_000)),
+        ];
+        for (name, text) in inputs {
+            let t0 = std::time::Instant::now();
+            let _ = to_html(&text);
+            assert!(t0.elapsed() < std::time::Duration::from_secs(5), "{name}: {:?}", t0.elapsed());
+        }
     }
 }
