@@ -28,7 +28,7 @@ pub(crate) fn next_wake(now_ms: i64, deadlines: impl IntoIterator<Item = Option<
 }
 
 /// Termíny pro `next_wake` ze stavu jádra (jen čtení paměti).
-fn deadlines(last_git: Instant) -> [Option<i64>; 12] {
+fn deadlines(last_git: Instant) -> [Option<i64>; 13] {
     let c = core();
     let now = now_ms();
     let in_ms = |left: Duration| now + left.as_millis() as i64 + 1;
@@ -45,7 +45,8 @@ fn deadlines(last_git: Instant) -> [Option<i64>; 12] {
     // jen když hraje a proužek ho ukazuje (`media::next_deadline_live`); připomínka schůzky jen na čas
     // okna připomínky / začátku (`calendar::remind::next_deadline`, bez kalendáře s připomínkou nic);
     // opakovaný puls jen dokud čeká otázka Clauda se zavřeným šuplíkem (`attention::next_deadline`)
-    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline(), crate::media::next_deadline_live(), crate::calendar::remind::next_deadline(), crate::accounts::calsync::next_deadline(), crate::accounts::mail::next_deadline(), crate::attention::next_deadline()]
+    // schovaný lístek („Schovat do…“) jen ve svém jednom termínu (`pins::win::next_deadline`)
+    [reminder, flash, git, weather, crate::limitslive::next_deadline(), crate::timer::next_deadline_live(), crate::calendar::live::next_deadline(), crate::media::next_deadline_live(), crate::calendar::remind::next_deadline(), crate::accounts::calsync::next_deadline(), crate::accounts::mail::next_deadline(), crate::attention::next_deadline(), crate::pins::win::next_deadline()]
 }
 
 pub(crate) fn spawn_emit_thread() {
@@ -71,8 +72,11 @@ pub(crate) fn spawn_emit_thread() {
                 crate::timer::tick_live(now_ms());
                 crate::calendar::live::tick(now_ms());
                 crate::calendar::remind::tick(now_ms());
+                crate::pins::win::tick(now_ms());
                 // počasí na Osobní: jen porovnání času, stahuje až backoff/30 min (žádný nový interval)
                 maybe_refresh_weather(false);
+                // stav incidentů Anthropicu: jen zapnuto + karta vidět + po `everyMin` (`incidents.rs`)
+                crate::incidents::maybe_refresh(false);
                 crate::calendar::live::maybe_refresh(false);
                 // účty: kalendář jen s viditelnou kartou, pošta s kartou nebo položkou proužku `mail`
                 crate::accounts::calsync::maybe_refresh(false);
@@ -88,6 +92,8 @@ pub(crate) fn spawn_emit_thread() {
                 } else if dirty {
                     // šuplík zavřený → poslat až při otevření (UiCmd::Show posílá vždy čerstvý)
                 }
+                // widgety na ploše: data jen viditelným a jen při změně (`desk::live`), jinak nic
+                crate::desk::live::tick();
                 if last_git.elapsed() >= GIT_EVERY {
                     last_git = Instant::now();
                     refresh_git_async();

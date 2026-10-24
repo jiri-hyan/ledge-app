@@ -14,6 +14,7 @@ import type { NotesNav } from "./nav";
 import ClaudeSessions, { ClaudeInbox } from "./ClaudeSessions";
 import { NotesCard } from "./notes/NotesCard";
 import { pinMenuItems } from "./notes/pins";
+import { exportMenuItems } from "./exports/usage";
 import type { NotePreset } from "./notes/store";
 import Projects from "./cards/Projects";
 import Running from "./cards/Running";
@@ -32,6 +33,7 @@ import SystemCard from "./integrations/SystemCard";
 import ShelfCard, { shelfShown } from "./shelf/ShelfCard";
 import BgLaunch from "./sessions/BgLaunch";
 import CardMenu, { HiddenNotice } from "./cards/CardMenu";
+import { dropped } from "./actions/dropstate";
 import TileOptions from "./cards/TileOptions";
 import Tour from "./layout/Tour";
 import HoldTip from "./layout/HoldTip";
@@ -45,7 +47,7 @@ import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
 import { isLink, visibleGroups } from "./actions/model";
 import { lastResult } from "./actions/api";
 import Deck from "./layout/Deck";
-import { CardLookPanel, Catalog } from "./lazyViews";
+import { CardLookPanel, Catalog, DropNew } from "./lazyViews";
 import EditBar from "./layout/EditBar";
 import { beginEdit, catalogOpen, draft, editing, editPage, saveLayout, setCatalogOpen } from "./layout/edit";
 import { LIMIT_CARDS, limitOf, normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type CardSize, type PartKey } from "./layout/model";
@@ -110,7 +112,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     void closeCardLook(true);
   }, { defer: true }));
   const menu = (card: CardId, parts: PartKey[] = []) => (
-    <CardMenu card={card} page={page().id} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} outcome={outcome(card)} limit={LIMIT_CARDS.includes(card) ? limitOf(cardOf(card)) : undefined} look={cardOf(card)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={card === "notes" ? pinMenuItems(p.s) : undefined}>
+    <CardMenu card={card} page={page().id} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} outcome={outcome(card)} limit={LIMIT_CARDS.includes(card) ? limitOf(cardOf(card)) : undefined} look={cardOf(card)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={card === "notes" ? pinMenuItems(p.s) : card === "claude" ? exportMenuItems(p.s) : undefined}>
       <Show when={card === "projects"}>
         <TileOptions page={page().id} tiles={tiles()} projects={p.s.projects} cfgError={p.s.cfgError} />
       </Show>
@@ -182,6 +184,8 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       <Show when={has("media") || has("clock")}><PersonalLive /></Show>
       {/* kontextové návrhy (max 3 chipy) — jen z reálných událostí, `src/suggest/` */}
       <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
+      {/* přetažení odkazu / souboru na otevřený šuplík → editor akce s návrhem (`actions/DropNew.tsx`) */}
+      <Show when={dropped() && !editing()}><DropNew s={p.s} page={page().id} /></Show>
       <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} begin={() => edit()} />
       <Show when={cardLookTarget()?.page === page().id}><CardLookPanel page={page().id} s={p.s} /></Show>
       <TileMenu />

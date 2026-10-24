@@ -44,6 +44,7 @@ zmínka pro Claude Code), otevřít, ukázat ve složce, odebrat, vyprázdnit, p
 - Ukládají se jen cesty; chybějící soubor se označí „chybí“, nikdy se sám neodebere. Výjimka: obrázek / text
   ze schránky a zmenšená kopie nemají cestu → Ledge je uloží jako nový soubor do `shelf-drops` (nikdy vedle
   originálu, nikdy přes existující soubor). Po odebrání / Vyprázdnit je úklid smaže (jen tyhle vlastní soubory, nikdy cesty z Průzkumníka).
+- **Kolo 20:** tentýž cíl OLE slouží i otevřenému šuplíku (`Kind::Shortcut`, [smart.md](smart.md)) — zóna se vybírá stavem šuplíku (`shortcut::target_for`), přihrádka při otevřeném šuplíku dál nepřijímá.
 - Do Claude session se nic neposílá samo (žádné SendInput / fokus) — jen schránka a tah člověkem.
 - **Click-through proužek** drop nedostane → zvláštní okno, viditelné JEN během tahu. Zóna se aktivuje jen
   vjezdem s drženým tlačítkem (klik na taby prohlížeče pod proužkem ne) a jen při OLE kurzoru (posun okna,

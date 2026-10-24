@@ -23,6 +23,7 @@ import { actionIcon, actionText } from "./lifelabels";
 import { runAction } from "./RowMenu";
 import NoteMenu from "./NoteMenu";
 import { listKey } from "./listkeys";
+import { useWikiFollow, useWikiSuggest, WikiList, WikiMissing } from "./WikiLinks";
 import { editPath, notePreset, openExternal, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
 
 export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => void }) {
@@ -49,6 +50,9 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   const imgs = () => (editing() ? D.edImgs() : D.draftImgs());
   const setImgs = (v: string[]) => (editing() ? D.setEdImgs(v) : D.setDraftImgs(v));
   const hasContent = () => text().trim() !== "" || imgs().length > 0;
+  // vazby [[…]]: klik v náhledu otevře poznámku (rozepsanou úpravu odloží lišta), psaní `[[` našeptává
+  const wiki = useWikiFollow((path) => setEditPath(path));
+  const wikiS = useWikiSuggest((v) => setText(v));
   const dirty = () => (editing() ? D.edDirty() : hasContent());
 
   // rozepsané na disk s debounce; obrázky konceptu hned (jsou vzácné)
@@ -328,16 +332,22 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
           autofocus
           placeholder={t("notes.editor.placeholder", "Co tě napadlo… Markdown: **tučně**, - [ ] úkol. Obrázek: Win+Shift+S a pak Ctrl+V.")}
           value={text()}
-          onInput={(e) => setText(e.currentTarget.value)}
-          onKeyDown={(e) => listKey(e, e.currentTarget, setText)}
+          onInput={(e) => {
+            setText(e.currentTarget.value);
+            wikiS.onInput(e.currentTarget);
+          }}
+          onKeyDown={(e) => wikiS.onKey(e) || listKey(e, e.currentTarget, setText)}
+          onBlur={() => wikiS.close()}
         />
       }>
         <div class="note-preview">
           <Show when={text().trim()} fallback={<div class="empty">{t("notes.editor.emptyPreview", "Zatím prázdné.")}</div>}>
-            <Markdown body={text()} images={editing() ? D.edBase()?.imageData ?? [] : []} onToggle={toggleTask} />
+            <Markdown body={text()} images={editing() ? D.edBase()?.imageData ?? [] : []} onToggle={toggleTask} onWiki={(n) => void wiki.follow(n)} />
           </Show>
         </div>
       </Show>
+      <WikiList s={wikiS} />
+      <WikiMissing w={wiki} />
       <Show when={imgs().length > 0}>
         <div class="note-imgs">
           <For each={imgs()}>

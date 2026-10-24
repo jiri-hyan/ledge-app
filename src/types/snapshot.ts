@@ -5,11 +5,28 @@ import type { PersonalView } from "./personal";
 import type { ProcView, ProjectView, View } from "./projects";
 import type { UpdateView } from "./settings";
 import type { WidgetView } from "./widgets";
+import type { DeskView } from "./desk";
 import type { SectionKey } from "../cards/sections";
 import type { Layout } from "../layout/model";
 
 /** `drawer.sections` — viditelnost karet a jejich částí, ODVOZENÁ v Rustu z `layout` (seznam v `cards/sections.ts`). */
 export type Sections = Record<SectionKey, boolean>;
+
+/** Probíhající incident Anthropicu (`incidents.rs`). Název je cizí text (anglicky), stav a dopad jsou kódy. */
+export interface Incident {
+  name: string;
+  status: "investigating" | "identified" | "monitoring" | "other";
+  impact: "minor" | "major" | "critical" | "none";
+  /** kolik dalších probíhajících incidentů je kromě tohoto */
+  more: number;
+}
+
+/** `smart.*` pro UI: klávesy Alt+1…9 a šipky, přetažení na šuplík, kolečko nad záložkami (`smartconf.rs`). */
+export interface SmartView {
+  quickKeys: boolean;
+  dropShortcut: boolean;
+  tabWheel: boolean;
+}
 
 export interface Snapshot {
   /** id záložky, která je vidět (`layout.pages[].id`; vestavěné `prace` / `osobni`) */
@@ -23,7 +40,7 @@ export interface Snapshot {
   layout: Layout;
   claudeEnabled: boolean;
   projects: ProjectView[];
-  /** upozornění na neuloženou práci (`config.gitAlerts`; chybí = starší jádro = zapnuto) */
+  /** upozornění na neuloženou práci (`config.gitAlerts`; chybí = starší jádro = vypnuto) */
   gitAlerts?: { enabled: boolean; read?: string };
   procs: ProcView[];
   pending: Pending[];
@@ -52,6 +69,8 @@ export interface Snapshot {
   notesArchived: number;
   /** lístky na plochu: připnuté poznámky (a jestli průchozí) a zkratka průchozího režimu (Rust `pins::win::view`) */
   pins?: PinsView;
+  /** widgety na ploše: připnuté widgety a profily (Rust `desk::win::view`) */
+  desk?: DeskView;
   /** záložka Osobní */
   personal: PersonalView;
   notesSync: NotesSyncView;
@@ -67,6 +86,10 @@ export interface Snapshot {
   limits?: LimitsView;
   /** útrata Claude (chybí jen ve starém jádře) */
   costs?: import("../costs/model").CostsView;
+  /** probíhající incident Anthropicu (`smart.incidents`; chybí = vypnuto nebo žádný) */
+  incident?: Incident;
+  /** přepínače chytřejšího šuplíku (`smart.*`; chybí = starší jádro = vypnuto) */
+  smart?: SmartView;
   /** časovač (chybí jen ve starém jádře) */
   timer?: import("../timer/model").TimerView;
   /** widgety umístěné na záložce nebo v proužku (chybí = žádné) */

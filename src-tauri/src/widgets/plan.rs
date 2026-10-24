@@ -32,6 +32,8 @@ pub struct Ctx {
     pub strip_on: bool,
     /// fullscreen hra / herní režim
     pub dead: bool,
+    /// widgety na ploše, které jsou teď vidět (`desk/`) — běží i se zavřeným šuplíkem, ve hře ne
+    pub desk: Vec<String>,
 }
 
 /// Aktivní widgety (id bez duplicit, v pořadí karta → proužek) a jestli nějaký čeká, až Ledge ožije
@@ -41,6 +43,13 @@ pub fn active(c: &Ctx) -> (Vec<String>, bool) {
     let widgets = |v: &[String]| v.iter().filter(|id| id.starts_with(PREFIX)).cloned().collect::<Vec<_>>();
     if c.drawer_full && !c.dead {
         out.extend(widgets(&c.page_cards));
+    }
+    if !c.dead {
+        for id in widgets(&c.desk) {
+            if !out.contains(&id) {
+                out.push(id);
+            }
+        }
     }
     let strip = widgets(&c.strip_items);
     let parked = c.strip_on && c.dead && !strip.is_empty();
@@ -149,13 +158,21 @@ mod tests {
             ("hra bez proužku", true, false, true, vec![], false),
         ];
         for (name, full, strip_on, dead, want, parked) in cases {
-            let c = Ctx { page_cards: page.clone(), drawer_full: full, strip_items: strip.clone(), strip_on, dead };
+            let c = Ctx { page_cards: page.clone(), drawer_full: full, strip_items: strip.clone(), strip_on, dead, desk: vec![] };
             let (a, p) = active(&c);
             assert_eq!(a, want.iter().map(|x| s(x)).collect::<Vec<_>>(), "{name}");
             assert_eq!(p, parked, "{name}: parked");
         }
         let none = Ctx { strip_on: true, dead: true, ..Default::default() };
         assert_eq!(active(&none), (vec![], false), "proužek bez widgetu nečeká");
+        // widget na ploše: běží se zavřeným šuplíkem, bez duplicit s kartou, ve hře ne
+        let desk = vec![s("widget:d.ps1"), s("widget:a.ps1"), s("limits")];
+        let c = Ctx { page_cards: page.clone(), drawer_full: true, desk: desk.clone(), ..Default::default() };
+        assert_eq!(active(&c).0, vec![s("widget:a.ps1"), s("widget:b.py"), s("widget:d.ps1")], "plocha + karta");
+        let c = Ctx { desk: desk.clone(), ..Default::default() };
+        assert_eq!(active(&c).0, vec![s("widget:d.ps1"), s("widget:a.ps1")], "jen plocha");
+        let c = Ctx { desk, dead: true, ..Default::default() };
+        assert_eq!(active(&c), (vec![], false), "plocha ve hře nic");
     }
 
     #[test]

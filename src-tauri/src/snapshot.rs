@@ -74,6 +74,11 @@ pub(crate) struct Snapshot {
     timer: crate::timer::TimerView,
     /// útrata Claude — odhad v cenách API (`costslive::view`, jen paměť)
     costs: crate::costslive::CostsView,
+    /// probíhající incident Anthropicu (`incidents::view`, jen když ho volba `smart.incidents` zapíná a nějaký je)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    incident: Option<crate::incidents::Incident>,
+    /// přepínače chytřejšího šuplíku pro UI: klávesy, přetažení, kolečko (`smart.*`)
+    smart: crate::smartconf::SmartView,
     notes_enabled: bool,
     /// kompaktní paleta (`palette.compact`, `src/palette/compact.ts`)
     palette_compact: bool,
@@ -98,6 +103,8 @@ pub(crate) struct Snapshot {
     notes_archived: usize,
     /// lístky na plochu (`pins/`): připnuté poznámky a zkratka průchozího režimu
     pins: crate::pins::win::PinsView,
+    /// widgety na ploše (`desk/`): které jsou připnuté, profily (⋯ karty, Ctrl+K, Nastavení)
+    desk: crate::desk::win::DeskView,
     personal: PersonalView,
     /// synchronizace poznámek mezi PC (štítek v kartě Poznámky)
     notes_sync: notesync::Status,
@@ -247,6 +254,8 @@ pub(crate) fn snapshot() -> Snapshot {
         limits: crate::limitslive::view(),
         timer: crate::timer::view(&cfg.timer),
         costs: crate::costslive::view(),
+        incident: crate::incidents::view(cfg.smart.incidents.enabled),
+        smart: crate::smartconf::view(&cfg.smart),
         notes_enabled: cfg.notes.enabled,
         palette_compact: cfg.palette.compact,
         palette_win_settings: cfg.palette.win_settings,
@@ -260,6 +269,7 @@ pub(crate) fn snapshot() -> Snapshot {
         notes_rev,
         notes_archived,
         pins: crate::pins::win::view(&cfg.hotkeys.note_passthrough),
+        desk: crate::desk::win::view(),
         personal,
         notes_sync: c.notes_sync.lock().clone(),
         update: c.updater.view(),

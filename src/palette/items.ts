@@ -20,6 +20,7 @@ import { placeOf } from "../projects/model";
 import { restartProject, startProject, stopAll } from "../projects/state";
 import { styleItems } from "./styles";
 import { isPinned, newPin, throughAll, throughLabel, togglePin } from "../notes/pins";
+import { deskItems } from "../desk/palette";
 
 export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows" | "calc" | "convert" | "emoji" | "clip";
 export interface PItem extends Item {
@@ -142,6 +143,8 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
   add({ id: "app:editDrawer", section: "app", order: 6, title: t("palette.app.editDrawer", "Upravit šuplík (karty a záložky)"), keywords: "upravit rozlozeni karty zalozky presunout pridat odebrat velikost katalog edit layout", run: () => nav.onEditDrawer() });
   for (const x of timerItems(s)) add(x);
   for (const x of styleItems(s)) add(x);
+  // widgety na ploše (`desk/palette.ts`): připnout / odepnout, schovat vše, profily, průchozí
+  for (const x of deskItems(s)) add(x);
   add({ id: "app:keys", section: "app", order: 6, title: t("ui.keys.palette.cmd", "? Klávesy a gesta"), sub: t("ui.keys.palette.sub", "Všechny zkratky a gesta na jednom místě (Nastavení → Začínáme)"), keywords: "? klavesy zkratky gesta napoveda help keys shortcuts gestures", run: () => nav.onSettings("f-onboarding.keys") });
   add({ id: "app:gamemode", section: "app", order: 7, title: t("palette.app.gameMode", "Zapnout herní režim (Ledge zmizí)"), keywords: "hra game fullscreen schovat skryt nerusit herni rezim", run: () => api.setGameMode(true) });
   add({ id: "app:close", section: "app", order: 7, title: t("palette.app.close", "Zavřít šuplík"), run: () => api.close() });

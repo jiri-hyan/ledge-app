@@ -34,6 +34,25 @@ pub(crate) fn pin_toggle(path: String) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Šuplík / lístek (klik na `[[vazbu]]`): otevře poznámku jako lístek (bez fokusu); už otevřený nechá.
+#[tauri::command(async)]
+pub(crate) fn pin_open(path: String) -> Result<(), String> {
+    win::open(&path, false)
+}
+
+/// Zkratka `hotkeys.notePin`: nový lístek mimo vlákno zkratek. V herním režimu / hře přes celou
+/// obrazovku nic (nekrade fokus hře), chyba jen do logu.
+pub(crate) fn quick_new() {
+    if core().game_mode.load(std::sync::atomic::Ordering::SeqCst) || win::yielding_now() || notes_root().is_none() {
+        return;
+    }
+    std::thread::spawn(|| {
+        if let Err(e) = pin_new() {
+            crate::state::log(&format!("nový lístek zkratkou: {e}"));
+        }
+    });
+}
+
 /// Šuplík / paleta: nový lístek = nová poznámka (obecná, s datem v titulku) hned na ploše s fokusem.
 #[tauri::command(async)]
 pub(crate) fn pin_new() -> Result<String, String> {
@@ -68,6 +87,8 @@ pub(crate) struct PinInit {
     lang: crate::uiconf::Lang,
     /// právě vytvořený „Nový lístek“ → UI hned otevře „+ bod“
     fresh: bool,
+    /// barva podle štítku (`notes.tagColors`), když poznámka nemá vlastní
+    tag_colors: std::collections::BTreeMap<String, String>,
 }
 
 #[tauri::command(async)]
@@ -78,7 +99,7 @@ pub(crate) fn pin_init(window: WebviewWindow) -> Result<PinInit, String> {
     let cfg = core().cfg.read().clone();
     let key = cfg.hotkeys.note_passthrough.trim().to_string();
     let key_ok = !key.is_empty() && crate::hotkeys::is_registered(&key);
-    Ok(PinInit { path, prefs, key, key_ok, hint_seen: win::hint_seen(), lang: cfg.ui.lang, fresh: win::take_fresh(&label) })
+    Ok(PinInit { path, prefs, key, key_ok, hint_seen: win::hint_seen(), lang: cfg.ui.lang, fresh: win::take_fresh(&label), tag_colors: cfg.notes.tag_colors.clone() })
 }
 
 /// Okno lístku: změna voleb (navrchu, zámek, průchozí, průhlednosti, sbalení).
@@ -120,6 +141,24 @@ pub(crate) fn pin_unpin(window: WebviewWindow) -> Result<(), String> {
     } else {
         let _ = window.destroy();
     }
+    mark_dirty();
+    Ok(())
+}
+
+/// Okno lístku: „Použít na všechny lístky“ — jeho vzhled (pozadí, text, styl) dostanou všechny lístky
+/// i každý nový. Vrací počet připnutých lístků.
+#[tauri::command(async)]
+pub(crate) fn pin_look_all(window: WebviewWindow) -> Result<usize, String> {
+    win::look_all(&pin_label(&window)?)
+}
+
+/// Okno lístku: „Schovat do…“ — lístek zmizí a v `until` (lokální čas z výběru nebo ISO s offsetem)
+/// se sám vrátí na stejné místo. Rozepsaný text uloží UI předem.
+#[tauri::command(async)]
+pub(crate) fn pin_hide(window: WebviewWindow, until: String) -> Result<(), String> {
+    let label = pin_label(&window)?;
+    let at = notes::parse_time(until.trim()).ok_or_else(|| trf!("Neplatné datum „{until}“.", "Invalid date “{until}”."))?;
+    win::hide(&label, at.timestamp_millis())?;
     mark_dirty();
     Ok(())
 }

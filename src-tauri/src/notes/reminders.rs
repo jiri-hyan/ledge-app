@@ -86,6 +86,8 @@ mod tests {
             updated: None,
             tasks_done: 0,
             tasks_total: 0,
+            color: None,
+            tags: Vec::new(),
         }
     }
 

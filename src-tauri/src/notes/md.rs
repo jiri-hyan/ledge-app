@@ -214,6 +214,26 @@ fn inline(s: &str, out: &mut String, plain: bool) {
             text_start = i;
             continue;
         }
+        // `[[poznámka]]` / `[[poznámka|popisek]]` — vazba na jinou poznámku (otevře UI přes `data-wiki`)
+        if c == b'[' && let Some((target, label, len)) = super::links::wiki_at(&s[i..]) {
+            flush(out, text_start, i);
+            if plain {
+                out.push_str(label);
+            } else {
+                out.push_str(&format!("<a class=\"md-wiki\" data-wiki=\"{}\" title=\"{}\">{}</a>", esc(target), esc(target), esc(label)));
+            }
+            i += len;
+            text_start = i;
+            continue;
+        }
+        // `#štítek` (ne nadpis, ne `#1`, ne kotva v URL)
+        if c == b'#' && !plain && let Some((tag, len)) = super::links::tag_at(s, i) {
+            flush(out, text_start, i);
+            out.push_str(&format!("<span class=\"md-tag\" data-tag=\"{}\">{}</span>", esc(&tag), esc(&s[i..i + len])));
+            i += len;
+            text_start = i;
+            continue;
+        }
         if c == b'[' && last_link.is_some_and(|l| l > i) && let Some((text, url, len)) = bracket_link(&s[i..]) {
             flush(out, text_start, i);
             if !plain && safe_url(url) {
@@ -477,6 +497,18 @@ mod tests {
         // uvozovky v URL ani v textu odkazu nevylezou z atributu
         let h = to_html("[\"><b>](https://x.cz/\"onmouseover=\"a)");
         assert!(h.contains("data-href=\"https://x.cz/&quot;onmouseover=&quot;a\"") && h.contains("&quot;&gt;&lt;b&gt;</a>"), "{h}");
+        // vazby a štítky: escapované, jen data atributy (žádné href)
+        let cases: &[(&str, &str)] = &[
+            ("viz [[Nákup]]", "<p>viz <a class=\"md-wiki\" data-wiki=\"Nákup\" title=\"Nákup\">Nákup</a></p>"),
+            ("[[a\"><b>|<i>x</i>]]", "<p><a class=\"md-wiki\" data-wiki=\"a&quot;&gt;&lt;b&gt;\" title=\"a&quot;&gt;&lt;b&gt;\">&lt;i&gt;x&lt;/i&gt;</a></p>"),
+            ("úkol #QA a #1", "<p>úkol <span class=\"md-tag\" data-tag=\"qa\">#QA</span> a #1</p>"),
+            ("`[[ne]] #ne`", "<p><code>[[ne]] #ne</code></p>"),
+            ("https://a.cz/#kotva", "<p><a class=\"md-link\" data-href=\"https://a.cz/#kotva\" title=\"https://a.cz/#kotva\">https://a.cz/#kotva</a></p>"),
+        ];
+        for (src, want) in cases {
+            assert_eq!(to_html(src), *want, "{src}");
+        }
+        assert_eq!(title("[[Nákup|seznam]] na zítra"), "seznam na zítra");
     }
 
     #[test]

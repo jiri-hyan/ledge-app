@@ -77,6 +77,8 @@ features = [
   # bublina MSIX (`pkgctx.rs`: GetCurrentPackageFullName) a spuštění mimo ni (`outside.rs`: Plánovač úloh)
   "Win32_Storage_Packaging_Appx",
   "Win32_System_TaskScheduler",
+  # tiché pípnutí u schvalování Clauda (`approvalsound.rs`: MessageBeep)
+  "Win32_System_Diagnostics_Debug",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_JobObjects",
   "Win32_System_LibraryLoader",

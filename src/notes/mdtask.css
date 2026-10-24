@@ -5,3 +5,8 @@
 .md li[data-task] > ul, .md li[data-task] > ol { flex-basis: 100%; padding-left: var(--md-task-nest, 43px); }
 .md-check { width: 15px; height: 15px; margin-top: 3px; border-radius: 4px; border: 1.5px solid var(--md-check-line); flex-shrink: 0; position: relative; cursor: pointer; transition: background var(--dur-1), border-color var(--dur-1); }
 .md-check.on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid var(--md-check-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+/* Lístky 2.0: vazba `[[poznámka]]` a štítek `#štítek` z `md::to_html` (data atributy, klik obslouží
+   `Markdown.tsx`). Barvu si okno nastaví proměnnými --md-wiki / --md-tag-bg (výchozí = akcent). */
+.md-wiki { color: var(--md-wiki, #7ab8ff); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+.md-wiki:hover { text-decoration-style: solid; }
+.md-tag { display: inline-block; padding: 0 5px; border-radius: 999px; font-size: 0.92em; line-height: 1.45; background: var(--md-tag-bg, rgba(122, 184, 255, 0.16)); color: var(--md-tag-fg, inherit); cursor: pointer; }

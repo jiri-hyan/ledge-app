@@ -38,6 +38,9 @@ export function setTab(t: string) {
   }
 }
 
+/** Filtr karty Poznámky podle štítku (bez `#`), null = všechny. Jen do zavření Ledge. */
+export const [tagFilter, setTagFilter] = createSignal<string | null>(null);
+
 export const projName = (s: Snapshot, id: string | null) => (id ? s.projects.find((x) => x.id === id)?.name ?? id : t("notes.general", "Obecné"));
 
 const hhmmOf = (ms: number) => {

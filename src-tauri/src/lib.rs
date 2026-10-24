@@ -14,6 +14,7 @@
 //! - `claude-bridge` — HTTP pro hooky a `/mcp` (MCP server pro Clauda, `mcp/`; každý požadavek vlastní krátké vlákno)
 //! - `notes-watch` — sleduje složku poznámek (události, žádný poll) a přepočítá připomínky
 //! - `pins-save` — zpožděný zápis stavu lístků na plochu (`pins/`); vznikne s prvním lístkem, spí na kanálu
+//! - `desk-save` — totéž pro widgety na ploše (`desk/`); vznikne s prvním widgetem, spí na kanálu
 //! - `media` / `volume` (záložka Osobní) — vzniknou až při prvním zobrazení záložky (`personal_live`),
 //!   pak jen čekají na události GSMTC / Core Audio; baterie = callback Windows, žádné vlákno
 //! - počasí (záložka Osobní) — žádné vlákno navíc: jedno stažení na runtime Tauri, jen při otevření
@@ -34,6 +35,7 @@ mod actionstate;
 mod agentrun;
 mod agentview;
 mod appearance;
+mod approvalsound;
 mod attention;
 mod autostart;
 mod calendar;
@@ -41,12 +43,14 @@ mod battery;
 mod claude;
 mod cliphist;
 mod cloning;
+mod dataexport;
 mod commands;
 mod config;
 mod costslive;
 mod configerr;
 mod configio;
 mod ctl;
+mod desk;
 mod drawer;
 mod drawerfit;
 mod edge;
@@ -61,6 +65,7 @@ mod integrations;
 mod hovermode;
 mod iconimg;
 mod icons;
+mod incidents;
 mod limits;
 mod layout;
 mod limitslive;
@@ -76,6 +81,7 @@ mod notesync;
 mod onboarding;
 mod outside;
 mod paletteconf;
+mod smartconf;
 mod personal;
 mod pins;
 mod pkgctx;
@@ -295,6 +301,8 @@ pub fn run() {
             std::thread::spawn(|| {
                 std::thread::sleep(Duration::from_millis(2500));
                 pins::win::restore_all();
+                // widgety na ploše (`desk/`): bez `desk.json` se nic neotevře
+                desk::win::restore_all();
             });
             // šuplík připravit na pozadí (studený start WebView2 trvá sekundy) — ne v úsporném režimu
             if cfg.drawer.keep_warm_s == 0 {
@@ -386,6 +394,25 @@ pub fn run() {
             commands::pins::pin_unpin,
             commands::pins::pin_edit_in_ledge,
             commands::pins::pin_hint_seen,
+            commands::pins::pin_open,
+            commands::pins::pin_look_all,
+            commands::pins::pin_hide,
+            commands::notelinks::note_set_meta,
+            commands::notelinks::note_tags,
+            commands::notelinks::note_link_resolve,
+            commands::notelinks::note_link_suggest,
+            commands::notelinks::note_link_create,
+            commands::desk::desk_pin,
+            commands::desk::desk_unpin,
+            commands::desk::desk_init,
+            commands::desk::desk_set,
+            commands::desk::desk_drag,
+            commands::desk::desk_menu,
+            commands::desk::desk_open_drawer,
+            commands::desk::desk_profile_save,
+            commands::desk::desk_profile_apply,
+            commands::desk::desk_profile_delete,
+            commands::desk::desk_hide_all,
             commands::drawer::take_page,
             commands::drawer::open_link,
             commands::update::update_check_now,
@@ -415,6 +442,7 @@ pub fn run() {
             commands::limits::statusline_remove,
             commands::timer::timer,
             commands::costs::costs_refresh,
+            commands::smart::export_usage,
             commands::media::personal_live,
             commands::media::media_control,
             commands::media::media_cover,
@@ -502,6 +530,7 @@ pub fn run() {
                 c.procs.stop_all();
                 // poslední posun lístku mohl čekat na zpožděný zápis
                 pins::win::flush();
+                desk::save::flush();
             }
         });
 }

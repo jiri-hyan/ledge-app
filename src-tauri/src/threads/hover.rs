@@ -28,6 +28,7 @@ pub(crate) fn spawn_hover_thread() {
             let raw = rawpush::RawPush::start();
             let mut raw_armed = false;
             let mut shelf_arm = crate::shelf::Arm::default();
+            let mut drawer_arm = crate::shelf::Arm::default();
             let mut others = screen::monitors().iter().map(|m| m.rect).collect::<Vec<_>>();
             let own_pid = std::process::id();
             let t0 = Instant::now();
@@ -35,7 +36,12 @@ pub(crate) fn spawn_hover_thread() {
                 let c = core();
                 if last_mon.elapsed() > Duration::from_secs(3) {
                     mon = c.monitor_fresh();
-                    others = screen::monitors().iter().map(|m| m.rect).collect::<Vec<_>>();
+                    let now_mons = screen::monitors().iter().map(|m| m.rect).collect::<Vec<_>>();
+                    if now_mons != others {
+                        // připojený monitor → widgety na ploše, které stály mimo domov, jdou domů
+                        crate::desk::win::on_monitors();
+                    }
+                    others = now_mons;
                     last_mon = Instant::now();
                 }
                 if last_fs_check.elapsed() > Duration::from_millis(500) {
@@ -52,6 +58,7 @@ pub(crate) fn spawn_hover_thread() {
                             None => crate::pins::FsKind::CoverOther,
                         },
                     };
+                    crate::desk::win::set_fs_kind(kind);
                     let kind_changed = crate::pins::win::set_fs_kind(kind);
                     if c.fullscreen.swap(fs, Ordering::Relaxed) != fs {
                         log(&format!("fullscreen: {fs}"));
@@ -61,17 +68,20 @@ pub(crate) fn spawn_hover_thread() {
                         refresh_strip();
                         // lístky „Vždy navrchu“ hře ustoupí (a pak se vrátí)
                         crate::pins::win::sync_dead();
+                        crate::desk::win::sync_yield();
                         // konec fullscreenu → emit vlákno hned dožene peek připomínky (`check_reminders`)
                         mark_dirty();
                     } else if kind_changed {
                         // fullscreen trvá, ale změnilo se okno v popředí (prohlížeč ↔ hra)
                         crate::pins::win::sync_dead();
+                        crate::desk::win::sync_yield();
                     }
                 }
                 // mrtvý Ledge (fullscreen hra nebo herní režim): myš nic, kontrola fullscreenu jede dál
                 if c.dead() {
                     zone_since = None;
                     shelf_arm = crate::shelf::Arm::default();
+                    drawer_arm = crate::shelf::Arm::default();
                     crate::shelf::drop::set_armed(None);
                     push = edge::PushTracker::default();
                     if raw_armed {
@@ -135,10 +145,26 @@ pub(crate) fn spawn_hover_thread() {
                 let on_strip = in_x && p.y >= mon.rect.top && p.y < zb;
                 // přihrádka: tah souborů na proužek (šuplík zavřený / peek) → neviditelný cíl přetažení
                 // nad zónou (`shelf::drop`); tlačítko a kurzor se čtou jen s kurzorem v zóně
-                let shelf_zone = (!view.covers_strip() && c.cfg.read().shelf.enabled).then(|| crate::shelf::zone(zl, zr, zb, mon.rect.top, scale));
-                let dropping = shelf_arm.step(shelf_zone, p.x, p.y, || screen::primary_button_down() && crate::shelf::drop::ole_drag_likely());
-                crate::shelf::drop::set_armed(dropping);
-                let dropping = dropping.is_some();
+                // zóna se vybírá STAVEM šuplíku (`shelf::shortcut::target_for`): zavřený = přihrádka, otevřený naplno
+                // = nový zástupce (kolo 20) — nepřekrývají se. Tah musí začít mimo Ledge (v popředí nesmí být
+                // šuplík), jinak by vlastní tah karet v šuplíku mohl cíl přetažení nechtěně zapnout.
+                let (shelf_on, shortcut_on) = {
+                    let cfg = c.cfg.read();
+                    (cfg.shelf.enabled, cfg.smart.drop_shortcut)
+                };
+                let target = crate::shelf::shortcut::target_for(view == View::Full, shelf_on && !view.covers_strip(), shortcut_on);
+                let shelf_zone = (target == Some(crate::shelf::shortcut::Kind::Shelf)).then(|| crate::shelf::zone(zl, zr, zb, mon.rect.top, scale));
+                let shortcut_zone = (target == Some(crate::shelf::shortcut::Kind::Shortcut)).then(|| c.drawer.rect());
+                let shelf_rect = shelf_arm.step(shelf_zone, p.x, p.y, || screen::primary_button_down() && crate::shelf::drop::ole_drag_likely());
+                let shortcut_rect = drawer_arm.step(shortcut_zone, p.x, p.y, || {
+                    screen::primary_button_down() && crate::shelf::drop::ole_drag_likely() && fg.read().is_some_and(|f| f.pid != own_pid)
+                });
+                crate::shelf::drop::set_armed(
+                    shelf_rect
+                        .map(|r| (r, crate::shelf::shortcut::Kind::Shelf))
+                        .or(shortcut_rect.map(|r| (r, crate::shelf::shortcut::Kind::Shortcut))),
+                );
+                let dropping = shelf_rect.is_some();
                 // tlak na hranu (lištová okna): raw myš jen pár px u hrany v zóně, jinak v klidu žádné WM_INPUT
                 let bar_push = c.bar_window.load(Ordering::Relaxed);
                 let want_raw = bar_push

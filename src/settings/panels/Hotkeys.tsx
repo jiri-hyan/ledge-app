@@ -41,6 +41,10 @@ export function HotkeysSection() {
       <Row id="hotkeys.notePassthrough" dim={!c.cfg.notes?.enabled} hint={!c.cfg.notes?.enabled ? t("settings.hotkeys.noteOff", "Poznámky jsou vypnuté — tahle zkratka se neregistruje") : undefined}>
         <HotkeyInput value={h().notePassthrough ?? ""} onChange={(v) => c.set("hotkeys.notePassthrough", v)} label={fieldLabel("hotkeys.notePassthrough")} conflict={h().enabled ? conflict("notePassthrough") : null} />
       </Row>
+      {/* rychlý nový lístek: výchozí bez zkratky, platí i s vypnutými zkratkami, ve hře nic */}
+      <Row id="hotkeys.notePin" dim={!c.cfg.notes?.enabled} hint={!c.cfg.notes?.enabled ? t("settings.hotkeys.noteOff", "Poznámky jsou vypnuté — tahle zkratka se neregistruje") : undefined}>
+        <HotkeyInput value={h().notePin ?? ""} onChange={(v) => c.set("hotkeys.notePin", v)} label={fieldLabel("hotkeys.notePin")} conflict={h().enabled ? conflict("notePin") : null} />
+      </Row>
     </Section>
   );
 }

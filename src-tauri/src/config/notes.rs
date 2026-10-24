@@ -4,6 +4,7 @@ use crate::configerr::{FieldError, fe};
 use crate::i18n::tr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -19,12 +20,58 @@ pub struct NotesConfig {
     /// Kategorie poznámek (klíč `kind:` ve frontmatteru) — záložky karty a výběr v editoru, v tomhle
     /// pořadí. Poznámka bez `kind` patří do `info`. Neznámé `kind` (z druhého PC) se ukáže jako text.
     pub kinds: Vec<NoteKind>,
+    /// Lístky na plochu: výchozí vzhled nového lístku (`pins/`).
+    pub pins: PinDefaults,
+    /// Barva lístku podle štítku (`štítek` → id barvy z palety, např. `{"qa": "red"}`); platí, když
+    /// poznámka nemá vlastní `color:`. Prázdné = nic.
+    pub tag_colors: BTreeMap<String, String>,
 }
 
 impl Default for NotesConfig {
     fn default() -> Self {
-        Self { enabled: true, root: String::new(), sync: NotesSyncConfig::default(), kinds: default_note_kinds() }
+        Self { enabled: true, root: String::new(), sync: NotesSyncConfig::default(), kinds: default_note_kinds(), pins: PinDefaults::default(), tag_colors: BTreeMap::new() }
     }
+}
+
+/// Výchozí vzhled nového lístku (Nastavení → Poznámky → Lístky). Výchozí hodnoty = původní vzhled.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PinDefaults {
+    /// Styl: `classic` (tmavé sklo), `paper`, `glass`, `stripe`, `minimal`, `dark`. Neznámý = `classic`.
+    pub style: String,
+    /// Neprůhlednost pozadí 0–100 %.
+    pub bg: u8,
+    /// Neprůhlednost textu 50–100 %.
+    pub text: u8,
+    /// Nový lístek převezme naposledy použitý vzhled (jinak vždy tenhle výchozí).
+    pub remember_last: bool,
+}
+
+impl Default for PinDefaults {
+    fn default() -> Self {
+        Self { style: "classic".into(), bg: 88, text: 100, remember_last: true }
+    }
+}
+
+pub(super) fn validate_pin_defaults(p: &PinDefaults, tag_colors: &BTreeMap<String, String>) -> Result<(), FieldError> {
+    if crate::pins::PinStyle::from_id(&p.style).is_none() {
+        return Err(fe("notes.pins.style", trf!("notes.pins.style: styl „{}“ neexistuje.", "notes.pins.style: style “{}” doesn't exist.", p.style)));
+    }
+    if p.bg > 100 {
+        return Err(fe("notes.pins.bg", tr("notes.pins.bg: 0–100 %.", "notes.pins.bg: 0–100 %.")));
+    }
+    if !(crate::pins::TEXT_MIN..=100).contains(&p.text) {
+        return Err(fe("notes.pins.text", tr("notes.pins.text: 50–100 % (text musí zůstat čitelný).", "notes.pins.text: 50–100 % (text must stay readable).")));
+    }
+    for (tag, color) in tag_colors {
+        if crate::notes::meta::norm_tag(tag).as_deref() != Some(tag.as_str()) {
+            return Err(fe("notes.tagColors", trf!("notes.tagColors: štítek „{tag}“ piš malými písmeny bez #.", "notes.tagColors: write tag “{tag}” in lower case without #.")));
+        }
+        if !crate::notes::meta::valid_color(color) {
+            return Err(fe("notes.tagColors", trf!("notes.tagColors: barva „{color}“ u „{tag}“ neexistuje.", "notes.tagColors: color “{color}” of “{tag}” doesn't exist.")));
+        }
+    }
+    Ok(())
 }
 
 /// Jedna kategorie poznámek.

@@ -304,6 +304,38 @@ fn pin_passthrough_hotkey() {
     assert!(load_str(r#"{"notes":{"enabled":false},"hotkeys":{"enabled":true,"notePassthrough":"Ctrl+Alt+Space"}}"#).is_ok());
 }
 
+/// Lístky 2.0: zkratka „Nový lístek“ výchozí vypnutá, s vyplněnou platí i s vypnutými zkratkami;
+/// výchozí vzhled lístku a barvy štítků — starý config = původní vzhled, nesmysly se nenačtou.
+#[test]
+fn pin_new_hotkey_and_pin_defaults() {
+    let keys = |v: &[(&'static str, String)]| v.iter().map(|(a, k)| format!("{a}={k}")).collect::<Vec<_>>();
+    let old = load_str(r#"{"hotkeys":{"toggle":"Ctrl+Alt+Space"},"notes":{"enabled":true,"root":""}}"#).unwrap();
+    assert_eq!(old.hotkeys.note_pin, "");
+    assert!(active_hotkeys_pins(&old, false, false).is_empty(), "výchozí = žádná zkratka");
+    let p = &old.notes.pins;
+    assert_eq!((p.style.as_str(), p.bg, p.text, p.remember_last), ("classic", 88, 100, true));
+    assert!(old.notes.tag_colors.is_empty());
+    let cases: &[(bool, bool, &[&str])] = &[
+        // (zkratky zapnuté, poznámky zapnuté, registrované)
+        (false, true, &["notePin=Ctrl+Alt+L"]),
+        (false, false, &[]),
+        (true, true, &["toggle=Ctrl+Alt+Space", "note=Ctrl+Alt+N", "notePin=Ctrl+Alt+L"]),
+    ];
+    for (enabled, notes, want) in cases {
+        let mut cfg = old.clone();
+        cfg.hotkeys.note_pin = "Ctrl+Alt+L".into();
+        cfg.hotkeys.enabled = *enabled;
+        cfg.notes.enabled = *notes;
+        assert_eq!(keys(&active_hotkeys_pins(&cfg, false, false)), *want, "{enabled} {notes}");
+    }
+    assert!(load_str(r#"{"hotkeys":{"enabled":true,"notePin":"Ctrl+Alt+N"}}"#).unwrap_err().contains("hotkeys.notePin"));
+    assert!(load_str(r#"{"notes":{"pins":{"style":"paper","bg":40}}}"#).is_ok());
+    for bad in [r#"{"notes":{"pins":{"style":"neon"}}}"#, r#"{"notes":{"pins":{"text":10}}}"#, r#"{"notes":{"pins":{"bg":101}}}"#, r#"{"notes":{"tagColors":{"QA":"red"}}}"#, r#"{"notes":{"tagColors":{"qa":"neon"}}}"#] {
+        assert!(load_str(bad).is_err(), "{bad}");
+    }
+    assert!(load_str(r##"{"notes":{"tagColors":{"qa":"red","práce":"#aabbcc"}}}"##).is_ok());
+}
+
 fn load_str(s: &str) -> Result<Config, String> {
     let cfg: Config = serde_json::from_str(s).map_err(|e| e.to_string())?;
     validate(&cfg)?;

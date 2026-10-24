@@ -22,6 +22,7 @@ import { cardName, partName, sizeName, sizeNoteText, tx } from "../layout/text";
 import { createMenu, PopCap, PopItem, PopMenu, PopSep } from "../ui/Popover";
 import { openCardLook } from "../layout/lookState";
 import type { CardLook } from "../layout/look";
+import { DeskPinItems } from "../desk/pin";
 
 const UNDO_MS = 6000;
 const [hidden, setHidden] = createSignal<{ text: string; undo: (l: Layout) => Layout } | null>(null);
@@ -162,6 +163,8 @@ export default function CardMenu(p: {
             </Show>
             {p.children}
             <PopSep />
+            {/* widgety na ploše (`desk/`): karta, kterou jde mít na ploše, nabídne „Připnout na plochu“ */}
+            <DeskPinItems card={p.card} close={close} />
             <PopItem onClick={() => { close(); openCardLook(p.page, p.card, p.look, p.cfgError); }}>{t("cards.cardlook.menu", "Vzhled karty…")}</PopItem>
             <PopItem onClick={hideCard}>{t("cards.hide.card", "Skrýt kartu")}</PopItem>
             <For each={p.parts ?? []}>

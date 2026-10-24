@@ -65,7 +65,9 @@ pub fn placed(cfg: &Config) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let cards = cfg.layout.pages.iter().flat_map(|p| p.cards.iter().map(|c| c.id.clone()));
     let strip = cfg.strip.items.iter().map(|i| i.key());
-    for id in cards.chain(strip) {
+    // widgety ze skriptů připnuté na plochu (`desk/`) — snapshot je ukáže, plánovač je spustí, když jsou vidět
+    let desk = crate::desk::win::script_ids(false);
+    for id in cards.chain(strip).chain(desk) {
         if id.starts_with(plan::PREFIX) && !out.contains(&id) {
             out.push(id);
         }
@@ -120,6 +122,7 @@ fn ctx(cfg: &Config) -> plan::Ctx {
         strip_items: cfg.strip.items.iter().map(|i| i.key()).collect(),
         strip_on: cfg.strip.enabled,
         dead: c.dead(),
+        desk: crate::desk::win::script_ids(true),
     }
 }
 

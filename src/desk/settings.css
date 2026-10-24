@@ -1,0 +1,11 @@
+/* Nastavení → Šuplík a karty → sekce „Na ploše“ (`DeskSettings.tsx`, šuplík): seznam widgetů s volbami,
+   připnutí, profily. Okno widgetu má vlastní `desk.css`. */
+.dk-set-list { display: flex; flex-direction: column; gap: var(--s2, 8px); }
+.dk-set-item { border: 1px solid var(--line); border-radius: var(--r-md, 8px); padding: var(--s2, 8px) var(--s3, 12px); display: flex; flex-direction: column; gap: 6px; }
+.dk-set-head { display: flex; align-items: center; gap: var(--s2, 8px); font-weight: 600; }
+.dk-set-opts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: var(--fs-xs); color: var(--t2); }
+.dk-set-opts label { display: inline-flex; align-items: center; gap: 6px; }
+.dk-set-add { display: flex; flex-wrap: wrap; gap: 6px; }
+.dk-set-prof { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dk-set-prof input { min-width: 10em; }
+.dk-set-active { color: var(--accent); font-size: var(--fs-xs); }

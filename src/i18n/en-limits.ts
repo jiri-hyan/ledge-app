@@ -34,4 +34,12 @@ registerDict("en", {
   "sessions.limits.setup.ask.remove.detail": "The statusLine key goes back to its original value (or disappears if it wasn't there). The rest of the settings stays.",
   "sessions.limits.setup.install.yes": "Connect",
   "sessions.limits.setup.remove.yes": "Disconnect",
+  "sessions.incident.lead": "Anthropic reports an incident",
+  "sessions.incident.open": "Open Anthropic's status page",
+  "sessions.incident.more.one": "(+{n} more)",
+  "sessions.incident.more.other": "(+{n} more)",
+  "sessions.incident.st.investigating": "investigating",
+  "sessions.incident.st.identified": "cause found",
+  "sessions.incident.st.monitoring": "monitoring",
+  "sessions.incident.st.other": "ongoing",
 });

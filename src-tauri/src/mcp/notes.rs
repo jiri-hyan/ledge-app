@@ -69,6 +69,7 @@ pub fn list(root: &Path, a: &Value, now: &DateTime<FixedOffset>) -> Value {
         include_done: a.get("includeDone").and_then(Value::as_bool).unwrap_or(false),
         archived: false,
         limit: Some(limit),
+        tag: None,
     };
     let r = edit::query(&notes::scan(root), &q, notes::end_of_day_ms(now));
     json!({ "total": r.total, "notes": r.notes.iter().map(row).collect::<Vec<_>>() })

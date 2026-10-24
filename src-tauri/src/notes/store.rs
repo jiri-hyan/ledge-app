@@ -41,6 +41,12 @@ pub struct NoteView {
     /// úkoly `- [x]` / `- [ ]` v těle
     pub tasks_done: usize,
     pub tasks_total: usize,
+    /// barva lístku (`color:` — id z `meta::COLORS` nebo `#rrggbb`), `None` = výchozí
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// štítky: `tags:` ze frontmatteru + `#štítek` v těle (`meta::tags_of`)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 fn first_line(body: &str) -> String {
@@ -82,6 +88,8 @@ pub fn parse_note(path: &Path, text: &str, folder_project: Option<&str>, fallbac
         updated: get(&front, "updated").and_then(|s| parse_time(&s)).as_ref().map(iso),
         tasks_done: tasks.iter().filter(|t| t.1).count(),
         tasks_total: tasks.len(),
+        color: super::meta::color_of(&front),
+        tags: super::meta::tags_of(&front, body),
     }
 }
 

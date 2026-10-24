@@ -1,14 +1,17 @@
 // Karta Poznámky (záložky podle `kind`), řádek poznámky, záložky a peek připomínky.
 // „Vše“ bere řádky ze snapshotu (pořadí a strop dělá Rust `notes::card`); jiná záložka je dotaz
 // `note_query` obnovený při změně `notesRev`. Klik na řádek = úprava v Ledge (`onOpen`). Varianta zobrazení
-// karty (vzhled karty, vlna 8 P): seznam / dlaždice / kompaktní (`.note-list[data-view]`).
+// karty (vzhled karty, vlna 8 P): seznam / dlaždice / kompaktní (`.note-list[data-view]`). Lístky 2.0: řádek nese
+// barvu poznámky (proužek vlevo) a štítky, pod záložkami filtr podle štítku (`note_tags`, jen když nějaké jsou).
 
 import { createResource, For, Show, type JSX } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { ago } from "../format";
 import { IconBell } from "../icons";
 import { KindBadge, kindOf, kindColor, KindIcon } from "./kinds";
-import { doneBusy, openExternal, projName, remindLabel, setDone, setPageArchive, setTab, tab } from "./store";
+import { doneBusy, openExternal, projName, remindLabel, setDone, setPageArchive, setTab, setTagFilter, tab, tagFilter } from "./store";
+import { colorHex } from "./meta";
+import { notesApi } from "./api";
 import { t, tp } from "../i18n";
 import type { CardView } from "../layout/look";
 import { IconPin } from "../pin/icons";
@@ -45,14 +48,14 @@ const CARD_ROWS = 8;
 export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: NoteView) => void; /** řádek v Archivu: bez zaškrtnutí a lístku, ⋯ nabídne Vrátit z archivu */ archived?: boolean }) {
   const n = () => p.n;
   return (
-    <div class="row note-row" classList={{ done: n().done && !p.archived }}>
+    <div class="row note-row" classList={{ done: n().done && !p.archived }} style={colorHex(n().color) ? { "box-shadow": `inset 3px 0 0 ${colorHex(n().color)}` } : undefined}>
       <Show when={!p.archived}>
         <button class="check" classList={{ on: n().done }} role="checkbox" aria-checked={n().done} disabled={doneBusy().has(n().path)} title={n().done ? t("notes.row.undo", "Vrátit mezi nehotové") : t("notes.done", "Hotovo")} onClick={() => (n().done ? setDone(n(), false) : void completeNote(n()))} />
       </Show>
       <KindBadge kinds={p.s.noteKinds} id={n().kind} />
       <button class="grow note-open" title={t("notes.row.edit", "Upravit v Ledge")} onClick={() => p.onOpen(n())}>
         <div class="name">{n().title || t("notes.imageOnly", "(jen obrázek)")}</div>
-        <div class="sub">{projName(p.s, n().project)} · {ago(n().createdMs, p.now)}{n().images ? tp("notes.row.images", n().images, " · {n}× obrázek") : ""}</div>
+        <div class="sub">{projName(p.s, n().project)} · {ago(n().createdMs, p.now)}{n().images ? tp("notes.row.images", n().images, " · {n}× obrázek") : ""}{n().tags?.length ? ` · ${n().tags!.slice(0, 4).map((x) => `#${x}`).join(" ")}` : ""}</div>
       </button>
       <Show when={n().tasksTotal > 0}>
         <span class="pill" classList={{ g: n().tasksDone === n().tasksTotal, n: n().tasksDone < n().tasksTotal }} title={t("notes.row.tasks", "Splněné úkoly")}>{n().tasksDone}/{n().tasksTotal}</span>
@@ -135,12 +138,18 @@ export function NotesCard(p: {
   const tabs = () => (p.personal ? [] : tabsOf(p.s));
   // uložená záložka bez nehotových poznámek → Vše (volba zůstane zapamatovaná)
   const cur = () => (tabs().length > 2 && tabs().some((tb) => tb.id === tab()) ? tab() : "all");
+  // štítky pro filtr: jen z paměti jádra, znovu jen při změně poznámek (notesRev)
+  const [tags] = createResource(() => (p.personal ? null : { rev: p.s.notesRev }), () => notesApi.tags().catch(() => []));
+  const tagList = () => (tags.latest ?? []).slice(0, 8);
+  // vybraný štítek, který už žádná nehotová poznámka nemá → bez filtru
+  const tag = () => (tagFilter() && (tags.latest ?? []).some((x) => x.tag === tagFilter()) ? tagFilter() : null);
+  const filtered = () => cur() !== "all" || !!tag();
   const [picked] = createResource(
-    () => (cur() === "all" ? null : { kind: cur(), rev: p.s.notesRev }),
-    (k) => api.noteQuery({ kind: k.kind, limit: CARD_ROWS }),
+    () => (filtered() ? { kind: cur() === "all" ? null : cur(), tag: tag(), rev: p.s.notesRev } : null),
+    (k) => api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }),
   );
-  const items = () => (p.personal ? p.s.personal.notes : cur() === "all" ? p.s.notes : picked.latest?.notes ?? []);
-  const moreCount = () => (p.personal ? p.s.personal.notesMore : cur() === "all" ? p.s.notesMore : Math.max(0, (picked.latest?.total ?? 0) - items().length));
+  const items = () => (p.personal ? p.s.personal.notes : !filtered() ? p.s.notes : picked.latest?.notes ?? []);
+  const moreCount = () => (p.personal ? p.s.personal.notesMore : !filtered() ? p.s.notesMore : Math.max(0, (picked.latest?.total ?? 0) - items().length));
   const open = () => (p.personal ? items().filter((n) => !n.done).length : tabs().find((tb) => tb.id === cur())?.count ?? 0);
   const newKind = () => (cur() === "all" ? undefined : cur());
 
@@ -171,6 +180,17 @@ export function NotesCard(p: {
       </h4>
       <Show when={tabs().length > 2}>
         <Tabs tabs={tabs()} value={cur()} onChange={setTab} />
+      </Show>
+      <Show when={tagList().length}>
+        <div class="note-tagbar" role="group" aria-label={t("notes.card.tagFilter", "Filtr podle štítku")}>
+          <For each={tagList()}>
+            {(x) => (
+              <button class="note-tagchip" classList={{ on: tag() === x.tag }} aria-pressed={tag() === x.tag} title={tag() === x.tag ? t("notes.card.tagOff", "Zrušit filtr štítku") : t("notes.card.tagOn", "Jen poznámky se štítkem #{tag}", { tag: x.tag })} onClick={() => setTagFilter(tag() === x.tag ? null : x.tag)}>
+                #{x.tag}<span class="cnt">{x.count}</span>
+              </button>
+            )}
+          </For>
+        </div>
       </Show>
       <Show when={!items().length}>
         <div class="empty">

@@ -53,6 +53,7 @@ pub(crate) fn apply_config(mut new: Config) {
         maybe_refresh_weather(false);
     }
     crate::calendar::live::on_config(&old, &new);
+    crate::incidents::on_config(&old, &new);
     crate::accounts::calsync::on_config(&old, &new);
     crate::accounts::mail::on_config(&old, &new);
     if old.personal.links != new.personal.links {
@@ -66,6 +67,8 @@ pub(crate) fn apply_config(mut new: Config) {
     }
     // widgety: jiná složka = sken znovu; nová karta / položka proužku = probudit plánovač
     crate::widgets::live::on_config(&old, &new);
+    // widgety na ploše: motiv a jazyk do jejich oken
+    crate::desk::win::on_config(&old, &new);
     if old.drawer.sections != new.drawer.sections || old.modes != new.modes {
         // právě hraje / hlasitost / baterie: vypnutá karta = konec odběrů (`media.rs` a spol.)
         crate::media::sync(&new);

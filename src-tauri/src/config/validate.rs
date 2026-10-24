@@ -2,7 +2,7 @@
 
 use super::Config;
 use super::hotkeys::hotkey_collision;
-use super::notes::validate_note_kinds;
+use super::notes::{validate_note_kinds, validate_pin_defaults};
 use super::{MAX_LINK_TARGET, MAX_LINKS, ProjectKind, Trigger, valid_aumid, valid_notes_remote, valid_repo};
 use crate::configerr::{FieldError, fe};
 use crate::i18n::tr;
@@ -73,6 +73,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     }
     crate::calendar::conf::validate(&cfg.personal.calendars).map_err(|(path, msg)| fe(path, msg))?;
     validate_note_kinds(&cfg.notes.kinds)?;
+    validate_pin_defaults(&cfg.notes.pins, &cfg.notes.tag_colors)?;
     let sync = &cfg.notes.sync;
     if !(1..=120).contains(&sync.interval_min) {
         return Err(fe("notes.sync.intervalMin", tr("notes.sync.intervalMin musí být 1–120 minut.", "notes.sync.intervalMin must be 1–120 minutes.")));
@@ -110,6 +111,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     crate::appearance::validate(&cfg.appearance)?;
     crate::stripconf::validate(&cfg.strip)?;
     crate::timer::validate(&cfg.timer)?;
+    crate::smartconf::validate(&cfg.smart)?;
     crate::mediaconf::validate(&cfg.media)?;
     crate::cliphist::validate(&cfg.clipboard)?;
     crate::github::conf::validate(&cfg.github)?;

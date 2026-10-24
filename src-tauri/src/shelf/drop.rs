@@ -9,18 +9,25 @@
 //!
 //! Cíl bere jen `CF_HDROP` (soubory z Průzkumníka) a vrací `DROPEFFECT_LINK` / `COPY` — nikdy `MOVE`
 //! (zdroj by soubor po „přesunu“ smazal). Ukládají se jen cesty (`shelf::add_paths`).
+//!
+//! Stejné okno slouží i druhé zóně (kolo 20, `smart.dropShortcut`): nad OTEVŘENÝM šuplíkem (`Kind::Shortcut`,
+//! `shortcut.rs`) bere navíc odkaz a text s cestou a puštěné jen NAVRHNE jako událost `drop-shortcut`
+//! (UI otevře editor akce, člověk potvrdí). Zóna se vybírá stavem šuplíku, ne polohou — nepřekrývají se.
 
+use super::shortcut::{self, Kind};
 use super::{DONE_MS, Hint};
 use crate::state::{core, log};
 use parking_lot::Mutex;
 use std::cell::Cell;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU8, Ordering};
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, POINTL, RECT, S_OK, WPARAM};
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance, DVASPECT_CONTENT, FORMATETC, IDataObject, TYMED_HGLOBAL};
+use windows::Win32::System::DataExchange::RegisterClipboardFormatW;
+use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Ole::{
-    CF_HDROP, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_NONE, IDropTarget, IDropTarget_Impl, OleInitialize,
+    CF_HDROP, CF_UNICODETEXT, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_LINK, DROPEFFECT_NONE, IDropTarget, IDropTarget_Impl, OleInitialize,
     RegisterDragDrop, ReleaseStgMedium,
 };
 use windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS;
@@ -52,7 +59,9 @@ struct Win {
 }
 
 static WIN: OnceLock<Win> = OnceLock::new();
-static LAST: Mutex<Option<RECT>> = Mutex::new(None);
+static LAST: Mutex<Option<(RECT, Kind)>> = Mutex::new(None);
+/// zóna, která je právě aktivní (0 = přihrádka, 1 = nový zástupce); čte ji cíl při `DragEnter` / `Drop`
+static KIND: AtomicU8 = AtomicU8::new(0);
 /// tah je právě nad oknem (mezi `DragEnter` a `DragLeave`/`Drop`)
 static OVER: AtomicBool = AtomicBool::new(false);
 
@@ -70,20 +79,27 @@ fn win() -> &'static Win {
 }
 
 /// Vlákno `hover`: aktivní zóna (`Some`) / konec tahu (`None`). Posílá jen změnu.
-pub fn set_armed(r: Option<RECT>) {
+pub fn set_armed(z: Option<(RECT, Kind)>) {
     {
         let mut last = LAST.lock();
-        if *last == r {
+        if *last == z {
             return;
         }
-        *last = r;
+        *last = z;
     }
-    if r.is_none() && WIN.get().is_none() {
+    if z.is_none() && WIN.get().is_none() {
         return;
     }
+    if let Some((_, k)) = z {
+        KIND.store(k as u8, Ordering::Release);
+    }
     let w = win();
-    *w.rect.lock() = r;
+    *w.rect.lock() = z.map(|(r, _)| r);
     post(w);
+}
+
+fn kind() -> Kind {
+    if KIND.load(Ordering::Acquire) == Kind::Shortcut as u8 { Kind::Shortcut } else { Kind::Shelf }
 }
 
 fn post(w: &Win) {
@@ -218,6 +234,72 @@ fn hdrop_format() -> FORMATETC {
     FORMATETC { cfFormat: CF_HDROP.0, ptd: std::ptr::null_mut(), dwAspect: DVASPECT_CONTENT.0, lindex: -1, tymed: TYMED_HGLOBAL.0 as u32 }
 }
 
+fn format(cf: u16) -> FORMATETC {
+    FORMATETC { cfFormat: cf, ptd: std::ptr::null_mut(), dwAspect: DVASPECT_CONTENT.0, lindex: -1, tymed: TYMED_HGLOBAL.0 as u32 }
+}
+
+/// Registrovaný formát odkazu z prohlížeče (`UniformResourceLocatorW`, text UTF-16 zakončený nulou).
+fn url_format() -> u16 {
+    static F: OnceLock<u16> = OnceLock::new();
+    *F.get_or_init(|| unsafe { RegisterClipboardFormatW(w!("UniformResourceLocatorW")) } as u16)
+}
+
+/// Strop počtu UTF-16 znaků, které smíme přečíst z bloku paměti o `size_bytes` bajtech (kolik zdroj skutečně
+/// přidělil, ne kolik si myslíme): nejvýš 4096 a nikdy za konec bloku (zdroj nemusí text ukončit nulou).
+fn text_cap(size_bytes: usize) -> usize {
+    (size_bytes / 2).min(4096)
+}
+
+/// Odkaz nebo text z přetahovaných dat (nejdřív odkaz z prohlížeče, pak běžný text), strop 4096 znaků.
+unsafe fn dropped_text(obj: &IDataObject) -> Option<String> {
+    unsafe {
+        for cf in [url_format(), CF_UNICODETEXT.0] {
+            if cf == 0 {
+                continue;
+            }
+            let fmt = format(cf);
+            if obj.QueryGetData(&fmt) != S_OK {
+                continue;
+            }
+            let Ok(mut medium) = obj.GetData(&fmt) else { continue };
+            // jen paměťové médium (HGLOBAL); jiné (stream, soubor…) by `hGlobal` vykládalo špatně
+            if medium.tymed != TYMED_HGLOBAL.0 as u32 {
+                ReleaseStgMedium(&mut medium);
+                continue;
+            }
+            let h = medium.u.hGlobal;
+            let cap = text_cap(GlobalSize(h));
+            let p = GlobalLock(h) as *const u16;
+            let text = if p.is_null() || cap == 0 {
+                None
+            } else {
+                let mut n = 0;
+                while n < cap && *p.add(n) != 0 {
+                    n += 1;
+                }
+                Some(String::from_utf16_lossy(std::slice::from_raw_parts(p, n)))
+            };
+            let _ = GlobalUnlock(h);
+            ReleaseStgMedium(&mut medium);
+            if text.as_deref().is_some_and(|t| !t.trim().is_empty()) {
+                return text;
+            }
+        }
+        None
+    }
+}
+
+/// Nabízí obsah něco, co zóna `k` bere? Přihrádka jen soubory, nový zástupce i odkaz / text.
+unsafe fn offers(obj: &IDataObject, k: Kind) -> bool {
+    unsafe {
+        let files = obj.QueryGetData(&hdrop_format()) == S_OK;
+        match k {
+            Kind::Shelf => files,
+            Kind::Shortcut => files || [url_format(), CF_UNICODETEXT.0].iter().any(|cf| *cf != 0 && obj.QueryGetData(&format(*cf)) == S_OK),
+        }
+    }
+}
+
 /// Cesty z `CF_HDROP`.
 unsafe fn files(obj: &IDataObject) -> Vec<String> {
     unsafe {
@@ -258,7 +340,8 @@ impl IDropTarget_Impl for Target_Impl {
     fn DragEnter(&self, pdataobj: Ref<IDataObject>, _keys: MODIFIERKEYS_FLAGS, p: &POINTL, pdweffect: *mut DROPEFFECT) -> windows::core::Result<()> {
         unsafe {
             let obj = pdataobj.ok()?;
-            self.accept.set(obj.QueryGetData(&hdrop_format()) == S_OK);
+            let k = kind();
+            self.accept.set(offers(obj, k));
             let e = self.effect(pdweffect);
             if let Some(h) = &self.helper {
                 let _ = h.DragEnter(self.hwnd, obj, &pt(p), e);
@@ -266,7 +349,9 @@ impl IDropTarget_Impl for Target_Impl {
             let _ = KillTimer(Some(self.hwnd), HIDE_TIMER);
             if self.accept.get() {
                 OVER.store(true, Ordering::Release);
-                hint(Hint::Over);
+                if k == Kind::Shelf {
+                    hint(Hint::Over);
+                }
             }
         }
         Ok(())
@@ -287,7 +372,7 @@ impl IDropTarget_Impl for Target_Impl {
             if let Some(h) = &self.helper {
                 let _ = h.DragLeave();
             }
-            if OVER.swap(false, Ordering::AcqRel) {
+            if OVER.swap(false, Ordering::AcqRel) && kind() == Kind::Shelf {
                 hint(Hint::None);
             }
             if WIN.get().is_some_and(|w| w.rect.lock().is_none()) {
@@ -306,6 +391,13 @@ impl IDropTarget_Impl for Target_Impl {
             }
             OVER.store(false, Ordering::Release);
             hide(self.hwnd);
+            if kind() == Kind::Shortcut {
+                // otevřený šuplík: puštěné jen NAVRHNEME (editor akce, člověk potvrdí) — nic se neukládá ani nespouští
+                if self.accept.get() {
+                    propose(&files(obj), dropped_text(obj).as_deref());
+                }
+                return Ok(());
+            }
             let paths = if self.accept.get() { files(obj) } else { vec![] };
             match (!paths.is_empty()).then(|| super::add_paths(&paths)) {
                 Some(Ok(a)) => {
@@ -324,9 +416,37 @@ impl IDropTarget_Impl for Target_Impl {
     }
 }
 
+/// Návrh zástupce z puštěných dat → událost `drop-shortcut` pro okno šuplíku (UI otevře editor akce).
+fn propose(files: &[String], text: Option<&str>) {
+    use tauri::Emitter;
+    let is_dir = |p: &str| std::fs::metadata(p).is_ok_and(|m| m.is_dir());
+    let p = match shortcut::judge(files, text, &is_dir) {
+        shortcut::Verdict::Propose(p) => p,
+        shortcut::Verdict::Refuse(why) => {
+            log("zástupce z puštěného: typ souboru akce neotevře");
+            let _ = core().app.emit_to(crate::drawer::LABEL, "drop-refused", why);
+            return;
+        }
+        shortcut::Verdict::Nothing => {
+            log("zástupce z puštěného: nic použitelného");
+            return;
+        }
+    };
+    log(&format!("zástupce z puštěného: {} (další přeskočeno {})", p.kind, p.skipped));
+    let _ = core().app.emit_to(crate::drawer::LABEL, "drop-shortcut", p);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_cap_never_passes_block_end() {
+        // (velikost bloku v bajtech, strop znaků)
+        for (size, want) in [(0, 0), (1, 0), (2, 1), (7, 3), (8192, 4096), (8193, 4096), (1 << 20, 4096)] {
+            assert_eq!(text_cap(size), want, "{size}");
+        }
+    }
 
     #[test]
     fn effect_never_move() {

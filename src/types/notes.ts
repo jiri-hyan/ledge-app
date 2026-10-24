@@ -19,6 +19,10 @@ export interface NoteView {
   updated: string | null;
   tasksDone: number;
   tasksTotal: number;
+  /** barva lístku (`color:` — id z palety nebo `#rrggbb`), chybí = výchozí */
+  color?: string;
+  /** štítky: `tags:` ze frontmatteru + `#štítek` v textu; chybí = žádné */
+  tags?: string[];
 }
 
 /** Kategorie poznámek z `notes.kinds`. */
@@ -48,12 +52,12 @@ export interface SaveNote {
 export type SaveOutcome = { outcome: "saved"; note: NoteDetail } | { outcome: "changed" };
 
 /** Volby lístku na plochu (Rust `pins::PinPrefs`). `bg` 0–100 %, `text` 50–100 % neprůhlednost. */
-export interface PinPrefs { onTop: boolean; locked: boolean; through: boolean; bg: number; text: number; collapsed: boolean }
+export interface PinPrefs { onTop: boolean; locked: boolean; through: boolean; bg: number; text: number; collapsed: boolean; /** styl (Rust `pins::PinStyle`) */ style: "classic" | "paper" | "glass" | "stripe" | "minimal" | "dark" }
 export interface PinsView { open: { path: string; through: boolean }[]; key: string }
 /** Start okna lístku (`pin_init`): poznámka, volby, zkratka průchozího režimu (a jestli je zaregistrovaná). */
-export interface PinInit { path: string; prefs: PinPrefs; key: string; keyOk: boolean; hintSeen: boolean; lang: "cs" | "en"; fresh: boolean }
+export interface PinInit { path: string; prefs: PinPrefs; key: string; keyOk: boolean; hintSeen: boolean; lang: "cs" | "en"; fresh: boolean; /** `notes.tagColors` — barva podle štítku */ tagColors: Record<string, string> }
 
-export interface NoteQuery { kind?: string | null; project?: string | null; includeDone?: boolean; /** archivované místo aktivních */ archived?: boolean; limit?: number }
+export interface NoteQuery { kind?: string | null; project?: string | null; includeDone?: boolean; /** archivované místo aktivních */ archived?: boolean; limit?: number; /** štítek bez `#` */ tag?: string | null }
 /** Výsledek smazání poznámky: id pro „Zpět“ a titulek pro lištu. */
 export interface Deleted { id: string; title: string }
 export interface QueryResult { notes: NoteView[]; total: number }

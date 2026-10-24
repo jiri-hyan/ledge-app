@@ -68,11 +68,15 @@ const FIELD_PANELS: [string, string][] = [
   ["drawer.sections", "suplik"],
   ["layout", "suplik"],
   ["shelf", "suplik"],
+  ["desk", "suplik"],
   ["strip", "vzhled"],
   ["timer.strip", "vzhled"],
   ["autostart", "chovani"],
   ["hotkeys", "chovani"],
   ["palette", "chovani"],
+  ["smart", "chovani"],
+  ["smart.approvalSound", "claude"],
+  ["smart.incidents", "claude"],
   ["fullscreen", "chovani"],
   ["gameMode", "chovani"],
   ["modes", "osobni"],
@@ -182,11 +186,11 @@ export function hotkeyFromEvent(e: { key: string; code: string; ctrlKey: boolean
   return [...mods, key].join("+");
 }
 
-export type HotkeyAction = "toggle" | "approve" | "deny" | "note" | "gameMode" | "notePassthrough";
+export type HotkeyAction = "toggle" | "approve" | "deny" | "note" | "gameMode" | "notePassthrough" | "notePin";
 
 /** Kolize zkratek: akce → jiná akce se stejnou zkratkou (jen akce, které se registrují — jako Rust). */
 export function hotkeyCollisions(h: Record<HotkeyAction, string>, notesEnabled: boolean): Partial<Record<HotkeyAction, HotkeyAction>> {
-  const acts: HotkeyAction[] = ["toggle", "approve", "deny", ...(notesEnabled ? (["note"] as const) : []), "gameMode", ...(notesEnabled ? (["notePassthrough"] as const) : [])];
+  const acts: HotkeyAction[] = ["toggle", "approve", "deny", ...(notesEnabled ? (["note"] as const) : []), "gameMode", ...(notesEnabled ? (["notePassthrough", "notePin"] as const) : [])];
   const out: Partial<Record<HotkeyAction, HotkeyAction>> = {};
   for (const a of acts) {
     for (const b of acts) {

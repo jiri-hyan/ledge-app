@@ -320,6 +320,10 @@ pub(crate) fn on_change() {
     if events.is_empty() {
         return;
     }
+    // zvuk (volitelný, výchozí vypnuto; `approvalsound.rs` si hlídá brány sám) jen u nového schválení / otázky
+    if events.iter().any(|(_, e)| *e == Event::NeedsInput) {
+        crate::approvalsound::on_needs_input();
+    }
     let toast_on = c.cfg.read().claude.toast;
     // „čeká“ má přednost (barva pulsu), pak hotovo (`Event::rank`)
     let first = events.iter().min_by_key(|(_, e)| e.rank()).cloned();

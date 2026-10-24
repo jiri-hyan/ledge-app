@@ -42,6 +42,14 @@ Zavolat Řehořovi kvůli fakturám
   neztratí. Vlastní kategorie: config `notes.kinds` (`id`, `label`, `color` `#rrggbb`, `icon` z
   `bulb chat checklist note flag star bug heart`).
 - `updated` = poslední úprava v Ledge (ISO s offsetem) — píše Ledge, agent ho nastavovat nemusí.
+- `color` (volitelné) = barva lístku: `yellow` `orange` `red` `pink` `purple` `blue` `teal` `green` nebo
+  `"#rrggbb"`; chybí = výchozí. `tags` (volitelné) = štítky `tags: [prace, qa]` (Ledge píše jen tenhle inline
+  tvar; čte i `tags: a, b` a blokový seznam `- a`). Štítkem je i `#štítek` v textu (ne v kódu, ne `# Nadpis`,
+  ne `#1`). Štítek = písmena, číslice, `-` `_` `/`, Ledge ho bere malými písmeny. **Agent smí `color` i `tags`
+  nastavit.** Barva podle štítku: config `notes.tagColors` (`{"qa": "red"}`), platí jen bez vlastní `color`.
+- Vazba na jinou poznámku: `[[titulek poznámky]]` nebo `[[titulek|popisek]]` (jako Obsidian). Ledge cíl hledá
+  podle titulku (první řádek, bez ohledu na velikost písmen a diakritiku), pak podle jména souboru; v náhledu i
+  lístku je vazba klikatelná, neexistující nabídne vytvořit novou poznámku s tím titulkem.
 - Tělo je Markdown (nadpisy, **tučně**, *kurzíva*, `kód`, bloky kódu, odrážky, `1.`, úkoly `- [ ]` /
   `- [x]`, odkazy jen http(s), obrázky relativně `./…png`). Raw HTML se nezobrazí (escapuje se).
   Úkoly Ledge počítá (karta „2/5“) a uživatel je odklikává v náhledu.
@@ -84,9 +92,16 @@ otevřený lístek se sám obnoví.
   `hotkeys.notePassthrough` nebo Ctrl+K „Lístky: vypnout průchozí režim“), průhlednost pozadí a textu
   (text nejníž 50 %), sbalení na lištu (dvojklik). Ve fullscreenu / herním režimu lístky přestanou být
   navrchu a nové se neotevřou.
-- Stav (pozice ve fyzických px, velikost v logických, volby) je v `%LOCALAPPDATA%\Ledge\note-pins.json`
-  (zápis se zpožděním ~0,4 s, ne v configu — je to stav okna, ne nastavení). Po startu Ledge se připnuté
-  lístky vrátí na místo; mimo obrazovku → monitor proužku. ✕ = odepnout, poznámka zůstane.
+- Stav (pozice ve fyzických px, velikost v logických, volby, styl) je v `%LOCALAPPDATA%\Ledge\note-pins.json`
+  (zápis se zpožděním ~0,4 s, ne v configu ani v `.md` — je to stav okna **tohoto PC**, nesynchronizuje se).
+  Po startu Ledge se připnuté lístky vrátí na místo; mimo obrazovku → monitor proužku. ✕ = odepnout, poznámka
+  zůstane a Ledge si pamatuje polohu, velikost a vzhled — znovupřipnutí ji otevře tam (posledních 200 odepnutých).
+- Lístky 2.0: styl (`classic` = původní tmavé sklo, `paper`, `glass`, `stripe`, `minimal`, `dark`), „Použít na
+  všechny lístky“, „Schovat do…“ (okno zmizí a v zadaný čas se samo vrátí; termín drží vlákno `emit`, žádný
+  časovač navíc), štítky a barva v ⋯ (zapisují `tags` / `color` do frontmatteru), vazby `[[…]]` otevřou další
+  lístek. Výchozí vzhled nového lístku: config `notes.pins` (`style`, `bg`, `text`, `rememberLast` = převzít
+  naposledy použitý, výchozí `true`). Zkratka „Nový lístek“ `hotkeys.notePin` (výchozí prázdná = vypnutá; platí
+  i s vypnutými zkratkami, ve hře nic).
   Uživatelský návod: [`docs/listky.md`](../listky.md).
 
 ### Synchronizace mezi PC (`notes.sync`)

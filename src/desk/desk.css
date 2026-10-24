@@ -1,0 +1,66 @@
+/* Okno widgetu na ploše (`desk.html`): průhledné okno, uvnitř karta šuplíku (tokeny a `.card` ze styles.css,
+   motiv přes `theme/apply.ts`). Lišta `.dk-bar` leží průhledně přes nadpis karty: tah = posun, ⋯ = volby.
+   Průhlednost celé karty `--dk-o` (30–100 %). Třídy jen s prefixem `dk-` (test kolizí tříd). */
+html, body, #root { height: 100%; }
+#root { padding: 0; }
+
+.dk {
+  position: relative;
+  height: 100%;
+  opacity: var(--dk-o, 1);
+  display: flex;
+  flex-direction: column;
+}
+.dk-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+}
+/* karta (vlastní i znovupoužitá) vyplní okno; okraje okna kreslí karta */
+.dk-body > div { flex: 1; min-height: 100%; }
+.dk-card { display: flex; flex-direction: column; }
+
+.dk-bar {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 6px;
+  cursor: grab;
+  z-index: 3;
+}
+.dk-through .dk-bar { cursor: default; }
+.dk-btn {
+  width: 24px;
+  height: 22px;
+  border-radius: var(--r-sm, 6px);
+  color: var(--t2);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.dk:hover .dk-btn, .dk-menu-open .dk-btn, .dk-btn:focus-visible { opacity: 1; }
+.dk-btn:hover { background: var(--card-2); color: var(--t1); }
+.dk-lock { font-size: var(--fs-2xs); opacity: 0.7; }
+
+/* „Čeká na tebe“ */
+.dk-wait { width: 100%; text-align: left; align-items: center; }
+.dk-wait-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-wait-sum { width: 100%; text-align: left; font-weight: 600; color: var(--amber, var(--t1)); }
+.dk-calm { color: var(--t3); }
+.dk-foot { margin-top: auto; padding-top: 4px; font-size: var(--fs-2xs); color: var(--t3); }
+
+/* posuvník průhlednosti ve volbách */
+.dk-range { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: var(--fs-xs); color: var(--t2); }
+.dk-range input { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.dk-pct { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+
+.dk-gone { padding: 10px; color: var(--t3); font-size: var(--fs-xs); }
+
+/* kompaktní: menší písmo a mezery (velikost okna řeší Rust) */
+.dk-compact { --fz: 0.9; --dens: 0.8; }

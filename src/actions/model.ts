@@ -69,6 +69,15 @@ export function visibleGroups<T extends { showOn: ShowOn; group: string | null }
   return [...groups].filter(([, items]) => items.length).map(([group, items]) => ({ group, items }));
 }
 
+/** Popisek z cíle, když ho člověk nevyplnil: host webu, jméno souboru / složky. */
+export function labelFrom(target: string): string {
+  const s = target.trim();
+  const host = /^https?:\/\/(?:www\.)?([^/:?#]+)/i.exec(s)?.[1];
+  if (host) return host;
+  const name = s.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+  return name.replace(/\.exe$/i, "");
+}
+
 /** Akce k uložení: oříznuté texty, bez prázdných a nepatřičných polí (výchozí hodnoty se nepíšou). */
 export function cleanAction(a: ActionCfg): ActionCfg {
   const runs = a.kind === "app" || a.kind === "command";

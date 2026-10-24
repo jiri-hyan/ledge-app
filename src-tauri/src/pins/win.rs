@@ -9,6 +9,10 @@
 //!   `pins-save`, které jinak spí na kanálu (žádný časovač, žádný polling). `flush` při ukončení.
 //! - Obnova po startu (`restore_all`), zprávy oknům: `pin-prefs` (volby změnil někdo jiný — zkratka,
 //!   paleta) a `pin-note` (otisk souboru po přenačtení poznámek; UI si podle něj přečte znovu).
+//! - Lístky 2.0: odepnutý lístek si pamatuje polohu, velikost a vzhled (`PinsFile::close` / `reopen`),
+//!   nový převezme naposledy použitý vzhled (`last`, `notes.pins`), „Použít na všechny“ (`look_all`) a
+//!   „Schovat do…“ (`hide`): jediný termín `next_deadline` čte vlákno `emit`, které se v něm probudí a
+//!   zavolá `tick` — žádný vlastní časovač.
 
 use super::*;
 use crate::i18n::tr;
@@ -16,7 +20,7 @@ use crate::state::{core, log, mark_dirty};
 use crate::threads::notes_watch::notes_root;
 use parking_lot::Mutex;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -38,6 +42,8 @@ static OPENING: Mutex<()> = Mutex::new(());
 static FRESH: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// Zpoždění zápisu po posledním pohybu / změně.
 const SAVE_DELAY: Duration = Duration::from_millis(400);
+/// Nejbližší „vynoř se“ schovaného lístku (ms epochy, 0 = žádný) — vlákno `emit` jen čte číslo.
+static NEXT_UNHIDE: AtomicI64 = AtomicI64::new(0);
 
 fn store_path() -> PathBuf {
     crate::actionrun::local_dir().join(FILE)
@@ -50,6 +56,8 @@ fn with<R>(f: impl FnOnce(&mut PinsFile) -> R) -> R {
 
 /// Zapsat se zpožděním (série pohybů = jeden zápis).
 fn persist() {
+    let next = STATE.lock().as_ref().and_then(|s| s.next_unhide(i64::MIN)).unwrap_or(0);
+    NEXT_UNHIDE.store(next, Ordering::Relaxed);
     let mut g = SAVER.lock();
     if g.as_ref().is_some_and(|tx| tx.send(()).is_ok()) {
         return;
@@ -96,6 +104,15 @@ pub(crate) fn path_of(label: &str) -> Option<String> {
 
 pub(crate) fn prefs_of(label: &str) -> Option<PinPrefs> {
     STATE.lock().as_ref()?.by_label(label).map(|p| p.prefs)
+}
+
+/// Vzhled nového lístku: naposledy použitý (když to `notes.pins.rememberLast` dovolí), jinak výchozí
+/// z Nastavení (`notes.pins`).
+fn new_pin_look(last: Option<PinLook>) -> PinLook {
+    let cfg = core().cfg.read();
+    let d = &cfg.notes.pins;
+    let def = PinLook { bg: d.bg, text: d.text, style: PinStyle::from_id(&d.style).unwrap_or_default() };
+    new_look(last, d.remember_last, def)
 }
 
 /// Je lístek čerstvě vytvořený („Nový lístek“)? Jednou — podruhé už ne.
@@ -154,7 +171,7 @@ fn changed_set() {
 }
 
 /// Monitor proužku jako `Mon` + mezera pod proužkem (fyzicky) — sem jdou nové lístky.
-fn fallback() -> (Mon, i32) {
+pub(crate) fn fallback() -> (Mon, i32) {
     let c = core();
     let mon = c.monitor();
     let scale = mon.dpi as f64 / 96.0;
@@ -165,7 +182,7 @@ fn fallback() -> (Mon, i32) {
     (Mon { work, scale }, gap)
 }
 
-fn monitors() -> Vec<Mon> {
+pub(crate) fn monitors() -> Vec<Mon> {
     crate::screen::monitors().iter().map(|m| Mon { work: Area::from(m.work), scale: m.dpi as f64 / 96.0 }).collect()
 }
 
@@ -192,7 +209,9 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
         }
         return Ok(());
     }
-    let pin = with(|s| s.ensure(path).clone());
+    let last = with(|s| s.last);
+    let look = new_pin_look(last);
+    let pin = with(|s| s.reopen(path, look).clone());
     let index = windows().len();
     let (fb, gap) = fallback();
     let place = restore(&pin, &monitors(), &fb, gap, index);
@@ -220,7 +239,7 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
     let _ = w.set_size(PhysicalSize::new(place.w, place.h));
     apply(&w, &pin.prefs);
     with(|s| {
-        let p = s.ensure(path);
+        let p = s.reopen(path, look);
         (p.x, p.y) = (Some(place.x), Some(place.y));
     });
     watch(&w, &label);
@@ -275,7 +294,7 @@ fn watch(w: &WebviewWindow, label: &str) {
         }
         tauri::WindowEvent::CloseRequested { .. } => {
             if let Some(path) = path_of(&label) {
-                with(|s| s.remove(&path));
+                with(|s| s.close(&path, crate::state::now_ms()));
                 persist();
             }
         }
@@ -284,10 +303,10 @@ fn watch(w: &WebviewWindow, label: &str) {
     });
 }
 
-/// Odepne lístek (poznámka zůstane) a zavře jeho okno.
+/// Odepne lístek (poznámka zůstane, poloha a vzhled se pamatují) a zavře jeho okno.
 pub(crate) fn close(path: &str) {
     let label = label_for(path);
-    with(|s| s.remove(path));
+    with(|s| s.close(path, crate::state::now_ms()));
     persist();
     if let Some(w) = app().get_webview_window(&label) {
         let _ = w.destroy();
@@ -307,7 +326,12 @@ pub(crate) fn set(label: &str, patch: &PinPatch) -> Result<PinPrefs, String> {
         let pin = s.by_label_mut(label)?;
         let old = pin.prefs;
         pin.prefs = patch.apply(old);
-        Some((old, pin.prefs, (pin.w, pin.h)))
+        let out = (old, pin.prefs, (pin.w, pin.h));
+        // naposledy použitý vzhled převezme příští nový lístek
+        if patch.touches_look() {
+            s.last = Some(out.1.look());
+        }
+        Some(out)
     })
     .ok_or_else(|| tr("Lístek už není připnutý.", "The sticky is no longer pinned."))?;
     if old.collapsed != new.collapsed {
@@ -328,6 +352,77 @@ pub(crate) fn set(label: &str, patch: &PinPatch) -> Result<PinPrefs, String> {
     Ok(new)
 }
 
+/// „Použít na všechny lístky“: vzhled lístku `label` (pozadí, text, styl) dostanou všechny lístky —
+/// i odepnuté (vrátí se tak) — a každý nový. Otevřená okna dostanou `pin-prefs`. Vrací počet lístků.
+pub(crate) fn look_all(label: &str) -> Result<usize, String> {
+    let look = prefs_of(label).map(|p| p.look()).ok_or_else(|| tr("Lístek už není připnutý.", "The sticky is no longer pinned."))?;
+    let n = with(|s| {
+        s.last = Some(look);
+        for p in s.pins.iter_mut() {
+            p.prefs = p.prefs.with_look(look);
+        }
+        s.pins.iter().filter(|p| p.open).count()
+    });
+    for (l, w) in windows() {
+        if let Some(p) = prefs_of(&l) {
+            let _ = w.emit_to(l.as_str(), "pin-prefs", p);
+        }
+    }
+    persist();
+    Ok(n)
+}
+
+/// „Schovat do…“: okno lístku zmizí a v `until_ms` se samo vrátí na stejné místo (termín drží vlákno
+/// `emit`, viz `next_deadline` / `tick`). Čas v minulosti = chyba.
+pub(crate) fn hide(label: &str, until_ms: i64) -> Result<(), String> {
+    if until_ms <= crate::state::now_ms() {
+        return Err(tr("Ten čas už byl — vyber čas v budoucnu.", "That time has passed — pick a future time.").into());
+    }
+    let path = path_of(label).ok_or_else(|| tr("Lístek už není připnutý.", "The sticky is no longer pinned."))?;
+    with(|s| s.hide(&path, until_ms));
+    persist();
+    if let Some(w) = app().get_webview_window(label) {
+        let _ = w.destroy();
+    }
+    changed_set();
+    Ok(())
+}
+
+/// Nejbližší čas, kdy se má schovaný lístek vynořit (jen čtení čísla — vlákno `emit`).
+pub(crate) fn next_deadline() -> Option<i64> {
+    let t = NEXT_UNHIDE.load(Ordering::Relaxed);
+    (t > 0).then_some(t)
+}
+
+/// Vlákno `emit`: nastal čas schovaného lístku? Otevře ho (bez fokusu) mimo vlákno `emit`. Při hře /
+/// herním režimu počká — otevře ho obnova po konci hry (`sync_dead` → `restore_all`).
+pub(crate) fn tick(now_ms: i64) {
+    if next_deadline().is_none_or(|t| t > now_ms) {
+        return;
+    }
+    let Some(c) = crate::state::CORE.get() else { return };
+    if yielding(c) {
+        RESTORE_PENDING.store(true, Ordering::Relaxed);
+        NEXT_UNHIDE.store(0, Ordering::Relaxed);
+        return;
+    }
+    let due = with(|s| s.due_hidden(now_ms));
+    NEXT_UNHIDE.store(0, Ordering::Relaxed);
+    std::thread::spawn(move || {
+        for p in due {
+            if let Err(e) = open(&p, false) {
+                log(&format!("lístek {p}: {e}"));
+            }
+        }
+        persist();
+    });
+}
+
+/// Mají lístky teď ustoupit hře (pro zkratku „Nový lístek“ — ve hře nic)?
+pub(crate) fn yielding_now() -> bool {
+    crate::state::CORE.get().is_some_and(|c| yielding(c))
+}
+
 /// Zkratka / paleta: je-li některý lístek průchozí, vypne průchozí u všech; jinak ho zapne všem.
 /// Vrací nový stav (`None` = žádný lístek není otevřený).
 pub(crate) fn toggle_through_all() -> Option<bool> {
@@ -345,7 +440,7 @@ pub(crate) fn toggle_through_all() -> Option<bool> {
     Some(!any)
 }
 
-const KINDS: [FsKind; 5] = [FsKind::None, FsKind::Exclusive, FsKind::CoverBrowser, FsKind::CoverOwn, FsKind::CoverOther];
+pub(crate) const KINDS: [FsKind; 5] = [FsKind::None, FsKind::Exclusive, FsKind::CoverBrowser, FsKind::CoverOwn, FsKind::CoverOther];
 
 /// Zapíše, co leží přes monitor; vrací, jestli se to změnilo (pak má volající zavolat `sync_dead`).
 pub(crate) fn set_fs_kind(k: FsKind) -> bool {
@@ -354,7 +449,7 @@ pub(crate) fn set_fs_kind(k: FsKind) -> bool {
 }
 
 /// Mají teď lístky ustoupit (herní režim, hra / prezentace přes celou obrazovku)? Prohlížeč ve F11 ne.
-fn yielding(c: &crate::state::Core) -> bool {
+pub(crate) fn yielding(c: &crate::state::Core) -> bool {
     let kind = KINDS.get(FS_KIND.load(Ordering::Relaxed) as usize).copied().unwrap_or(FsKind::None);
     // `fullscreen` je pravda o monitoru; druh doplňuje jen to, co leží přes něj
     let kind = if c.fullscreen.load(Ordering::Relaxed) { kind } else { FsKind::None };
@@ -367,15 +462,17 @@ fn yielding(c: &crate::state::Core) -> bool {
 pub(crate) fn sync_dead() {
     let Some(c) = crate::state::CORE.get() else { return };
     let dead = yielding(c);
-    if DEAD.swap(dead, Ordering::Relaxed) == dead {
-        return;
-    }
-    for (l, w) in windows() {
-        if let Some(p) = prefs_of(&l) {
-            let _ = w.set_always_on_top(p.on_top && !dead);
+    let was = DEAD.swap(dead, Ordering::Relaxed);
+    // i beze změny stavu: Ledge mohl startovat ve hře / herním režimu (`DEAD` je zpočátku false) a obnova čeká
+    let plan = dead_plan(was, dead, RESTORE_PENDING.load(Ordering::Relaxed));
+    if plan.retop {
+        for (l, w) in windows() {
+            if let Some(p) = prefs_of(&l) {
+                let _ = w.set_always_on_top(p.on_top && !dead);
+            }
         }
     }
-    if !dead && RESTORE_PENDING.swap(false, Ordering::Relaxed) {
+    if plan.restore && RESTORE_PENDING.swap(false, Ordering::Relaxed) {
         std::thread::spawn(restore_all);
     }
 }
@@ -390,7 +487,10 @@ pub(crate) fn restore_all() {
         RESTORE_PENDING.store(true, Ordering::Relaxed);
         return;
     }
-    let paths: Vec<String> = with(|s| s.pins.iter().map(|p| p.path.clone()).collect());
+    let paths: Vec<String> = with(|s| s.visible(crate::state::now_ms()));
+    // termín schovaných lístků pro vlákno `emit`
+    let next = with(|s| s.next_unhide(i64::MIN)).unwrap_or(0);
+    NEXT_UNHIDE.store(next, Ordering::Relaxed);
     for p in paths {
         if let Err(e) = open(&p, false) {
             log(&format!("lístek {p}: {e}"));

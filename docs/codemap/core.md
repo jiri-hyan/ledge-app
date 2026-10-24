@@ -41,6 +41,7 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 | `screen.rs` | monitory, DPI, kurzor, fullscreen (QUNS + okno v popředí) | `monitors`, `pick`, `fullscreen_state`, `FsState`, `ForegroundProbe` |
 | `procman.rs` | dev servery / appky v Job Objectu, URL z logu, porty | `ProcMan::{launch_dev, launch_app, stop, stop_all, snapshot}`, `Phase`, `ProcEvent` |
 | `config/*` (`config/{claude,drawer,hotkeys,io,personal,project,sections,validate}.rs`) | `config.json` + schéma, validace (s polem: `validate_field` → `configerr::FieldError`), zkratky; `Sections` (`drawer.sections`) generuje makro `sections!` — plochý seznam boolů ODVOZENÝ z `layout` (`layout.rs` `derive`, → [layout.md](layout.md)) | `Config`, `Sections`, `sections!`, `load`, `save`, `validate`, `validate_field`, `active_hotkeys`, `rebind_plan`, `config_dir` |
+| `src-tauri/src/config/validate.rs` | `validate` / `validate_field` celého configu: první chyba s cestou k poli (`FieldError`), volá validace sekcí (`smartconf::validate`, poznámky, zkratky, projekty) | `validate` `validate_field` |
 | `drawerfit.rs` | strop výšky šuplíku (80 % pracovní plochy monitoru) a širší Full pro Nastavení → [settings.md](settings.md) | `limits`, `fit_full` |
 | `autostart.rs` / `migrate.rs` | HKCU Run (míří na instalovanou kopii; v bublině MSIX nic — `gate`) / Notch → Ledge při startu | `apply`, `gate`, `decide`, `install_target` / `at_startup`, `plan_notes` |
 | `pkgctx.rs` | bublina MSIX (Ledge spuštěný z Claude desktop): identita `GetCurrentPackageFullName`, jinak sonda virtualizace `%LOCALAPPDATA%` → `Packages\*\LocalCache`; jednou za proces, log při startu; fyzická kopie virtualizované cesty; `--after-pid` (nová instance čeká na starou, `run()` před builderem) | `ctx`, `current`, `detect`, `classify`, `combine`, `probe_virtualization`, `bubble_twin`, `twin_of`, `relaunch_target`, `after_pid`, `wait_for_predecessor`, `view` |
@@ -51,6 +52,7 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 | `updseen.rs` | `updates\seen.json`: naposledy spuštěná verze, předchozí (cíl návratu), přečtené „Co je nového“ a SHA256 dřív ověřených instalátorů podle verze (návrat odmítne přepsané vydání); zápis jen při změně verze, po ověřeném stažení a po „Rozumím“ | `Seen`, `Known`, `on_start`, `unread`, `mark_read`, `remember`, `check_known`, `load`, `save` |
 | `actions.rs` · `actionrun.rs` · `actionicons.rs` · `actionstate.rs` | rychlé akce → [actions.md](actions.md) | `Action`, `run_action`, `actionstate::refresh`, `views` |
 | `pins/*` | lístky na plochu — okna `note-<klíč>` s UI Ledge (`pin.html`), stav `note-pins.json` → [notes.md](notes.md) | `win::open`, `win::sync_dead`, `win::restore_all` |
+| `desk/*` | widgety na ploše — okna `desk-<id>` s UI Ledge (`desk.html`), stav `desk.json`, data `desk-data` z vlákna `emit` jen viditelným → [desk.md](desk.md) | `win::pin`, `win::sync_yield`, `live::tick` |
 | `webpanel.rs` | okno s webem `web-<id>` (rychlá akce `kind: "web"`): normální okno s rámem, sdílí WebView2 se šuplíkem, zavření = zničení → [actions.md](actions.md) | `open`, `nav_allowed`, `frame_allowed`, `place` |
 | `personal.rs` / `weather.rs` | rychlé odkazy (nedůvěryhodný cíl) / Open-Meteo | `classify_fs`, `LinkTarget` / `fetch`, `needs_fetch`, `loading_live`, `status` |
 | `cliphist/*` | historie schránky (vlákno `cliphist` jen se zapnutým `clipboard.enabled`) → [clipboard.md](clipboard.md) | `sync`, `paste` |
@@ -67,7 +69,7 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 - `ui`, `notes-watch`, `notes-sync`, `config-watch`, `strip`, `rawpush`, `update`, `media` a `volume` (vzniknou až při prvním zobrazení záložky Osobní; `media` i dřív, je-li v proužku položka `media`, [media.md](media.md)), `shelf-drop` (vznikne až
   při prvním tahu souborů na proužek, [shelf.md](shelf.md)), `cliphist` (jen se zapnutou historií schránky, [clipboard.md](clipboard.md)): blokují na kanálu / událostech. `strip` má časovač (~30 fps) jen během pulsu `attention::PULSE_MS` (1,2 s) a ~240 ms po změně šířky ostrůvku, střídání `ticker` po 5 s jen při víc událostech; v klidu žádný;
   `toast` je jednorázové vlákno na jedno oznámení. `pins-save` (zpožděný zápis stavu lístků na plochu) vznikne s
-  prvním lístkem a spí na kanálu. `logos`, `links`, git (`refresh_git_async`) jsou krátká jednorázová vlákna.
+  prvním lístkem a spí na kanálu; `desk-save` totéž pro widgety na ploše ([desk.md](desk.md)). `logos`, `links`, git (`refresh_git_async`) jsou krátká jednorázová vlákna.
 
 ## Invarianty a pasti
 

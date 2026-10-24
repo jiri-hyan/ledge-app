@@ -94,6 +94,12 @@ pub struct Config {
     /// rozložení, proužek, vzhled), nic nespouští, nic neposílá ven. Výchozí vypnuto; klíč je ve Správci
     /// pověření Windows (`Ledge/mcp`), nikdy tady.
     pub mcp: crate::mcp::McpConfig,
+    /// Widgety na ploše (`desk/`): výchozí chování nových widgetů (vrstva, schovat ve hře, průhlednost,
+    /// přichycení). Které widgety a kde jsou, je v `%LOCALAPPDATA%\Ledge\desk.json` (jen tento PC).
+    pub desk: crate::desk::DeskConfig,
+    /// Chytřejší šuplík (kolo 20): klávesy Alt+1…9, přetažení na šuplík, kolečko nad záložkami, zvuk u
+    /// schvalování, stav incidentů Anthropicu (`smartconf.rs`). Zvuk a síť jsou výchozí vypnuté.
+    pub smart: crate::smartconf::SmartConfig,
 }
 
 impl Default for Config {
@@ -129,6 +135,8 @@ impl Default for Config {
             layout: Default::default(),
             accounts: Default::default(),
             mcp: Default::default(),
+            desk: Default::default(),
+            smart: Default::default(),
         }
     }
 }

@@ -153,6 +153,9 @@ registerDict("en", {
   "notes.card.add": "Add note",
   "notes.card.addPin": "New desktop sticky",
   "notes.card.archive": "Archive ({n})",
+  "notes.card.tagFilter": "Filter by tag",
+  "notes.card.tagOn": "Only notes tagged #{tag}",
+  "notes.card.tagOff": "Clear the tag filter",
   "notes.card.archiveTitle": "Archived notes — you can restore or delete them",
   // splnit · archivovat · smazat
   "notes.life.actDone": "Complete",

@@ -11,6 +11,7 @@ pub mod dragout;
 pub mod drop;
 pub mod drops;
 pub mod paste;
+pub mod shortcut;
 
 use crate::i18n::tr;
 use crate::strip::{Rgba, Segment, StripModel};

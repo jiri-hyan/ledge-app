@@ -40,6 +40,29 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `hotkeys.notePassthrough` (výchozí `Ctrl+Alt+P`, prázdné = bez zkratky) přepne průchozí režim u všech
   lístků na ploše — **výjimka z `enabled`**: registruje se jen, když je na ploše aspoň jeden lístek, i se
   zkratkami vypnutými (na průchozí lístek nejde kliknout). Kolize se hlásí jen při `enabled: true`.
+  `hotkeys.notePin` (výchozí prázdné = vypnuto) = rychlý nový lístek na plochu (nová poznámka rovnou v lístku
+  s fokusem); jako `notePassthrough` platí i s `hotkeys.enabled: false`, jen se zapnutými poznámkami, a ve hře /
+  herním režimu nic neudělá.
+- **Chytřejší šuplík** (`smart`, kolo 20; Nastavení → Chování a Claude) — všechno jsou volby, chybějící sekce
+  = dnešní chování (od opravy v kole 21 jsou `quickKeys`, `dropShortcut` i `tabWheel` ve výchozím stavu VYPNUTÉ a zapíná je člověk):
+  `smart.quickKeys` (výchozí `false`): má-li otevřený šuplík fokus, `Alt+1…9` spustí N-tého zástupce na záložce
+  (dlaždice projektu, rychlá akce, odkaz; čísla se ukážou při držení Alt), šipky procházejí zástupce, Enter spustí;
+  nic mimo šuplík, ne v úpravách a ne s paletou. `smart.dropShortcut` (výchozí `false`): odkaz, soubor, složka nebo
+  `.exe` puštěné na OTEVŘENÝ šuplík otevřou editor akce s návrhem — nic se neuloží ani nespustí, dokud člověk
+  nedá Přidat (`.exe` má předvyplněné „ptát se před spuštěním“, příkaz z puštěného nevznikne nikdy); na ZAVŘENÝ proužek
+  dál jde přihrádka (`shelf`). `smart.tabWheel` (výchozí `false`): kolečko myši nad záložkami v hlavičce přepíná
+  záložky (kolečko nad kartami dál posouvá obsah; dřív nad záložkami nedělalo nic).
+  `smart.approvalSound` (`enabled` výchozí `false`, `minGapS` 5–600, výchozí 30): jedno tiché systémové pípnutí
+  (`MessageBeep`, hlasitost řídí Windows), když přijde nové schválení nebo otázka Clauda; zticha při hře / herním
+  režimu, při Nerušit (QUNS), s otevřeným šuplíkem a když je v popředí terminál nebo okno Claude.
+  `smart.incidents` (`enabled` výchozí `false`, `everyMin` 5–120, výchozí 10): řádek s probíhajícím incidentem
+  Anthropicu v kartě Claude u limitů. Jediná síť této sekce: `GET https://status.anthropic.com/api/v2/incidents/unresolved.json`
+  (veřejné API, termín 5 s, ≤ 256 kB, přesměrování jen v rámci Anthropicu), nejvýš jednou za `everyMin` minut a jen když
+  je šuplík otevřený a karta s limity vidět; žádná data uživatele neodcházejí. Mezi dvěma pokusy je vždy aspoň 60 s,
+  i když se volba v Nastavení opakovaně přepíná (vypnout + zapnout odstup neobejde). Text incidentu se čistí od
+  řídicích i neviditelných formátovacích znaků (nulové mezery, značky směru textu).
+  Přetažený soubor, který by akce stejně odmítla (`.lnk`, `.url`, `.bat`, `.cmd`, cokoli mimo povolené přípony), se
+  nenavrhne; šuplík ukáže větu proč (událost `drop-refused`).
 - **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Chování →
   Kompaktní paleta příkazů): `Ctrl+K` / 🔍 ukáže jen vyhledávací pole, výsledky se rozbalí až při psaní,
   s prázdným polem šipka dolů ukáže nedávné. Chybějící sekce `palette` = dnešní chování.
@@ -76,6 +99,17 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   @ (zmínka pro Claude Code `@C:\…`, s mezerou `@"C:\… …"`) do schránky, Otevřít, Ve složce, ✕, Kopírovat
   vše, Vyprázdnit, tah řádku ven (Průzkumník, terminál). Chybějící soubor = „chybí“, sám se nemaže.
   Nic se neposílá do session samo. Ve fullscreen hře / herním režimu nic. Mapa `docs/codemap/shelf.md`.
+- **Widgety na ploše** — sekce `desk` (Nastavení → Šuplík a karty → Na ploše) = jen výchozí chování NOVÝCH
+  widgetů: `layer` (`top` navrchu · `normal` výchozí · `desktop` jen na ploše, pod okny), `hideInGame`
+  (výchozí `true`: ve hře přes celou obrazovku a v herním režimu se widget schová a nic nepočítá), `opacity`
+  (30–100 %, výchozí 100), `snap` (výchozí `true`: po přesunu přichytit k okraji plochy a k ostatním widgetům).
+  Chybí-li sekce = výchozí hodnoty a žádný widget; pole se špatným typem = jeho výchozí hodnota (rozbitá sekce
+  nikdy neshodí celý config). KTERÉ widgety a KDE jsou, není v configu (ten se může
+  synchronizovat mezi PC), ale v `%LOCALAPPDATA%\Ledge\desk.json` (`{"widgets":[{"id":"lim1","kind":"limits",
+  "x":…,"y":…,"w":…,"h":…,"layer":"normal","locked":false,"through":false,"opacity":100,"hideInGame":true,
+  "compact":false}],"profiles":[{"name":"Práce","widgets":[…]}],"active":"Práce"}`); druhy `limits`, `waiting`,
+  `dev`, `agenda`, `widget:<soubor>`; nejvýš 6 widgetů a 8 profilů. Ruční úprava souboru za běhu se přepíše —
+  měň ho jen se zavřeným Ledge. Návod `docs/widgety-na-plose.md`, mapa `docs/codemap/desk.md`.
 - **Historie schránky** — sekce `clipboard` (Nastavení → Osobní → Historie schránky; zapnout
   jde i přímo z palety): `enabled` (výchozí **`false`** — nic se neposlouchá ani neukládá), `max` (1–200,
   výchozí 25 nepřipnutých), `skipSecrets` (výchozí `true`: neukládat tvary `sk-…`, `ghp_…`/`github_pat_…`,

@@ -77,3 +77,8 @@
 .act-card[data-view="compact"] .act-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: var(--s1); }
 .act-card[data-view="compact"] .act-tile { padding: 6px 4px; }
 .act-card[data-view="compact"] .act-label { display: none; }
+
+/* Nový zástupce z přetaženého (`DropNew.tsx`, kolo 20): panel s editorem akce pod hlavičkou hlavní stránky */
+.act-drop { margin-bottom: var(--s3); }
+.act-dropnote { margin: 0 0 var(--s2); font-size: var(--fs-sm); color: var(--t2); }
+.act-drophost { margin-top: var(--s2); }

@@ -15,3 +15,10 @@
 .lim-empty { font: var(--fs-xs) var(--mono); color: var(--t3); padding: var(--s1) 0 var(--s2); }
 .lim-ico { width: 38px; height: 38px; border-radius: var(--r-md); background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); display: grid; place-items: center; flex-shrink: 0; }
 .lim-ico svg { width: 19px; height: 19px; }
+/* Probíhající incident Anthropicu (`IncidentLine` v LimitsRow.tsx, volba `smart.incidents`): jeden řádek nad limity */
+.lim-inc { display: flex; align-items: flex-start; gap: var(--s2); width: 100%; text-align: left; background: none; border: 0; padding: var(--s1) 0 var(--s2); cursor: pointer; font: var(--fs-xs) var(--mono); color: var(--t2); }
+.lim-inc:hover { color: var(--t0); }
+.lim-inc-dot { flex: none; width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: var(--t3); }
+.lim-inc[data-sev="warn"] .lim-inc-dot { background: var(--amber); }
+.lim-inc[data-sev="bad"] .lim-inc-dot { background: var(--red); }
+.lim-inc-text { min-width: 0; overflow-wrap: anywhere; }

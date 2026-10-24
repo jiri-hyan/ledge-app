@@ -2,28 +2,32 @@
 // okna. Obsah jen přes příkazy poznámek s otiskem (`note_read` / `note_save` / `note_toggle_task`),
 // obrázek ze schránky stejnou cestou jako editor (`pasteImages` → `images` v `note_save` → PNG vedle
 // poznámky). Změnu zvenku hlásí Rust událostí `pin-note` (otisk souboru), volby `pin-prefs`.
-// Lišta: tah = posun (`pin_drag`), dvojklik = sbalit; ⋯ = volby (navrchu, zámek, průchozí,
-// průhlednosti); ✕ = odepnout (poznámka zůstane). Průchozí lístek myš nevidí — vypíná ho zkratka
-// (`hotkeys.notePassthrough`) nebo Ctrl+K v Ledge; nápověda se ukáže při prvním zapnutí.
+// Lišta: tah = posun (`pin_drag`), dvojklik = sbalit; ⋯ = volby (`PinMenu`: vzhled a styl, barva, štítky,
+// okno, Schovat do…, export); ✕ = odepnout (poznámka zůstane, poloha a vzhled se pamatují). Průchozí lístek
+// myš nevidí — vypíná ho zkratka (`hotkeys.notePassthrough`) nebo Ctrl+K v Ledge; nápověda při prvním zapnutí.
+// Barva a štítky jdou do frontmatteru poznámky (`note_set_meta`), vazby `[[…]]` otevřou další lístek.
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api, on, type NoteDetail, type PinInit, type PinPrefs } from "../api";
 import Markdown from "../notes/Markdown";
 import { b64Of, pasteImages } from "../notes/draft";
 import { trimBody } from "../notes/editdraft";
-import { exportItems } from "../notes/exportActions";
 import { listKey } from "../notes/listkeys";
 import { fromMs } from "../notes/remind";
 import { setLang, t } from "../i18n";
 import { errorText, say, sayError, Toast } from "../ui/toast";
 import UndoBar from "../notes/UndoBar";
 import { archiveNote, completeNote, deleteNote, reopenNote } from "../notes/lifecycle";
-import { lifeActions, type LifeAction } from "../notes/lifeactions";
-import { actionText } from "../notes/lifelabels";
+import type { LifeAction } from "../notes/lifeactions";
 import { IconX } from "../icons";
 import { debounce } from "../util/time";
-import { PopCap, PopItem, PopMenu, PopSep } from "../ui/Popover";
 import { IconEdit, IconLock, IconMore, IconPin, IconPlus, IconThrough } from "./icons";
-import { appendLine, caretFromText, pinColors, pinSuggestVisible, pointLine, remindAskText, SAVE_DELAY, TEXT_MIN, type SaveState } from "./model";
+import { appendLine, caretFromText, pinSuggestVisible, pointLine, remindAskText, SAVE_DELAY, type SaveState } from "./model";
+import { pinLook } from "./styles";
+import PinMenu from "./PinMenu";
+import { colorHex, noteColor, withoutTag } from "../notes/meta";
+import { pinMeta } from "./pinmeta";
+import { notesApi } from "../notes/api";
+import { useWikiFollow, useWikiSuggest, WikiList, WikiMissing } from "../notes/WikiLinks";
 import { SUGGEST_DELAY, toLocalValue, type Suggest } from "../notes/suggest";
 
 /** Štítek zápisu v patičce — jen to, co se opravdu děje (žádné „uloženo“ dřív, než se uložilo). */
@@ -69,10 +73,18 @@ export default function PinApp() {
   const p = () => prefs();
   const through = () => !!p()?.through;
   const dirty = () => editing() && text().trimEnd() !== trimBody(note()?.body ?? "").trimEnd();
+  /** barva podle štítku (`notes.tagColors`), když poznámka nemá vlastní */
+  const tagColor = () => noteColor({ tags: note()?.tags }, init()?.tagColors);
   const colors = () => {
     const l = look();
-    return pinColors(l?.bg ?? p()?.bg ?? 88, l?.text ?? p()?.text ?? 100);
+    return pinLook(p()?.style, l?.bg ?? p()?.bg ?? 88, l?.text ?? p()?.text ?? 100, noteColor(note(), init()?.tagColors));
   };
+  // vazby [[…]]: klik otevře poznámku jako další lístek, neexistující nabídne vytvořit
+  const wiki = useWikiFollow((path) => void notesApi.pinOpen(path).catch(sayError));
+  const wikiS = useWikiSuggest((v) => {
+    setText(v);
+    schedule();
+  });
 
   async function patch(x: Partial<PinPrefs>) {
     try {
@@ -320,6 +332,9 @@ export default function PinApp() {
     }
   }
 
+  // ---------- barva a štítky (frontmatter poznámky, `pinmeta.ts`) ----------
+  const { meta, front, addTag } = pinMeta({ note, setNote, flush, busy, markSaved, load });
+
   // ---------- schránka: obrázek (Win+Shift+S → Ctrl+V) i text ----------
   async function paste(e: ClipboardEvent) {
     if (through() || !note()) return;
@@ -400,6 +415,22 @@ export default function PinApp() {
     await api.pinUnpin().catch(sayError);
   }
 
+  /** „Schovat do…“: rozepsané se uloží, lístek zmizí a v ten čas se vrátí. */
+  async function hide(until: string) {
+    setMenu(false);
+    if (!(await settle())) return say(t("notes.pin.unpinBlocked", "Odepnutí počká — rozepsaný text se nepodařilo uložit (viz upozornění v lístku)."), true);
+    await notesApi.pinHide(until).catch(sayError);
+  }
+
+  async function lookAll() {
+    try {
+      const n = await notesApi.pinLookAll();
+      say(t("notes.pin.lookAllDone", "Vzhled platí pro všechny lístky ({n}) i pro nové.", { n: n ?? 0 }));
+    } catch (e) {
+      sayError(e);
+    }
+  }
+
   onMount(() => {
     const offs = [on<string>("pin-note", external), on<PinPrefs>("pin-prefs", setPrefs)];
     onCleanup(() => offs.forEach((o) => o.then((f) => f())));
@@ -444,8 +475,9 @@ export default function PinApp() {
   return (
     <div
       class="pin"
-      classList={{ through: through(), collapsed: !!p()?.collapsed, locked: !!p()?.locked, after: after() }}
-      style={{ "--pin-bg": colors().background, "--pin-bar": colors().bar, "--pin-fg": colors().color, "--pin-shadow": colors().shadow }}
+      classList={{ through: through(), collapsed: !!p()?.collapsed, locked: !!p()?.locked, after: after(), tinted: !!colors()["--pin-tint"] }}
+      data-style={p()?.style ?? "classic"}
+      style={colors()}
     >
       <div class="pin-bar" onMouseDown={barDown} title={p()?.locked ? t("notes.pin.lockedTitle", "Zamčeno na místě") : t("notes.pin.barTitle", "Táhni = posunout · dvojklik = sbalit / rozbalit")}>
         <span class="pin-title">{title()}</span>
@@ -470,8 +502,8 @@ export default function PinApp() {
           <Show when={!gone() && note()}>
             {(n) => (
               <Show when={editing()} fallback={
-                <div class="pin-md" onDblClick={(e) => !(e.target as HTMLElement).closest(".md-check, .md-link") && startEdit(caretAt(e))}>
-                  <Markdown body={n().body} images={n().imageData} onToggle={toggle} />
+                <div class="pin-md" onDblClick={(e) => !(e.target as HTMLElement).closest(".md-check, .md-link, .md-wiki") && startEdit(caretAt(e))}>
+                  <Markdown body={n().body} images={n().imageData} onToggle={toggle} onWiki={(name) => !through() && void wiki.follow(name)} />
                 </div>
               }>
                 <textarea
@@ -482,8 +514,11 @@ export default function PinApp() {
                   onInput={(e) => {
                     setText(e.currentTarget.value);
                     schedule();
+                    wikiS.onInput(e.currentTarget);
                   }}
+                  onBlur={() => wikiS.close()}
                   onKeyDown={(e) => {
+                    if (wikiS.onKey(e)) return;
                     if (e.key === "Enter" && e.ctrlKey) {
                       e.preventDefault();
                       void finishEdit();
@@ -497,6 +532,15 @@ export default function PinApp() {
                 />
               </Show>
             )}
+          </Show>
+          <Show when={editing()}>
+            <WikiList s={wikiS} pin />
+          </Show>
+          <WikiMissing w={wiki} pin />
+          <Show when={!editing() && note()?.tags?.length}>
+            <div class="pin-tags" aria-label={t("notes.pin.tags", "Štítky")}>
+              <For each={note()?.tags ?? []}>{(tg) => <span class="pin-tag">#{tg}</span>}</For>
+            </div>
           </Show>
           <Show when={conflict()}>
             <div class="pin-banner">
@@ -550,39 +594,32 @@ export default function PinApp() {
 
       <Show when={menu() && !through() && p()}>
         {(pr) => (
-          <PopMenu fill anchor={{ left: 0, top: 0, right: 0, bottom: 0 }} trigger={menuBtn} onClose={() => setMenu(false)} label={t("notes.pin.more", "Volby lístku")}>
-            <PopItem checked={pr().onTop} onClick={() => patch({ onTop: !pr().onTop })}>{t("notes.pin.onTop", "Vždy navrchu")}</PopItem>
-            <PopItem checked={pr().locked} onClick={() => patch({ locked: !pr().locked })}>{t("notes.pin.lock", "Zamknout na místě")}</PopItem>
-            <PopItem checked={false} onClick={wantThrough}>{t("notes.pin.through", "Průchozí — myš projde na stránku pod lístkem")}</PopItem>
-            <label class="pin-range">
-              <span>{t("notes.pin.bg", "Pozadí")} <b>{look()?.bg ?? pr().bg} %</b></span>
-              <input type="range" min="0" max="100" step="5" value={pr().bg} onInput={(e) => setLook({ bg: +e.currentTarget.value, text: look()?.text ?? pr().text })} onChange={(e) => patch({ bg: +e.currentTarget.value }).then(() => setLook(null))} />
-            </label>
-            <label class="pin-range">
-              <span>{t("notes.pin.text", "Text")} <b>{look()?.text ?? pr().text} %</b></span>
-              <input type="range" min={TEXT_MIN} max="100" step="5" value={pr().text} onInput={(e) => setLook({ bg: look()?.bg ?? pr().bg, text: +e.currentTarget.value })} onChange={(e) => patch({ text: +e.currentTarget.value }).then(() => setLook(null))} />
-            </label>
-            <PopItem onClick={() => startEdit()}>{t("notes.pin.editText", "Upravit text")}</PopItem>
-            <PopItem onClick={() => { setMenu(false); void patch({ collapsed: true }); }}>{t("notes.pin.collapse", "Sbalit na lištu (dvojklik na lištu)")}</PopItem>
-            <PopItem onClick={() => { setMenu(false); const n = note(); if (n) void settle().then((ok) => ok && api.pinEditInLedge(n.path).catch(sayError)); }}>{t("notes.pin.editInLedge", "Upravit v Ledge")}</PopItem>
-            <PopItem onClick={() => { setMenu(false); const n = note(); if (n) api.noteOpen(n.path).catch(sayError); }}>{t("notes.pin.openExternal", "Otevřít v externím editoru")}</PopItem>
-            <PopItem onClick={unpin}>{t("notes.pin.unpinLong", "Odepnout z plochy (poznámka zůstane)")}</PopItem>
-            <PopSep />
-            <Show when={note()}>
-              {(n) => (
-                <>
-                  <PopCap>{t("notes.export.title", "Export")}</PopCap>
-                  <For each={exportItems(n().path, () => (editing() ? text() : n().body))}>
-                    {(it) => <PopItem onClick={() => { setMenu(false); void settle().then((ok) => ok && it.run()); }}>{it.label}</PopItem>}
-                  </For>
-                  <PopSep />
-                </>
-              )}
-            </Show>
-            <For each={lifeActions(!!note()?.done, false)}>
-              {(a) => <PopItem danger={a === "delete"} onClick={() => void life(a)}>{actionText(a)}</PopItem>}
-            </For>
-          </PopMenu>
+          <PinMenu
+            prefs={pr()}
+            note={note()}
+            trigger={menuBtn}
+            look={look()}
+            setLook={setLook}
+            color={note()?.color ?? null}
+            tagColor={tagColor()}
+            tags={note()?.tags ?? []}
+            frontTags={note() ? front(note()!) : []}
+            body={() => (editing() ? text() : note()?.body ?? "")}
+            onClose={() => setMenu(false)}
+            patch={patch}
+            setColor={(c) => void meta((n) => ((colorHex(n.color) ?? "") === (colorHex(c) ?? "") ? null : { color: c }))}
+            addTag={addTag}
+            removeTag={(tg) => void meta((n) => ({ tags: withoutTag(front(n), tg) }))}
+            lookAll={() => void lookAll()}
+            hide={(v) => void hide(v)}
+            wantThrough={() => void wantThrough()}
+            edit={() => startEdit()}
+            editInLedge={() => { const n = note(); if (n) void settle().then((ok) => ok && api.pinEditInLedge(n.path).catch(sayError)); }}
+            openExternal={() => { const n = note(); if (n) api.noteOpen(n.path).catch(sayError); }}
+            unpin={() => void unpin()}
+            life={(a) => void life(a)}
+            settle={settle}
+          />
         )}
       </Show>
 

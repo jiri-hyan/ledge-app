@@ -9,7 +9,7 @@ export type PanelMeta = { id: string; key: string; cs: string; kw: readonly [str
 
 export const PANEL_META: PanelMeta[] = [
   { id: "zaciname", key: "settings.nav.zaciname", cs: "Začínáme", kw: ["settings.nav.zaciname.kw", "průvodce první spuštění onboarding tipy novinky co je nového nápověda vítejte"] },
-  { id: "suplik", key: "settings.nav.suplik", cs: "Šuplík a karty", kw: ["settings.nav.suplik.kw", "záložky karty rozložení pořadí velikost části karet upravit šuplík přihrádka"] },
+  { id: "suplik", key: "settings.nav.suplik", cs: "Šuplík a karty", kw: ["settings.nav.suplik.kw", "záložky karty rozložení pořadí velikost části karet upravit šuplík přihrádka widgety na ploše plocha monitor profily rozmístění"] },
   { id: "vzhled", key: "settings.nav.vzhled", cs: "Vzhled", kw: ["settings.nav.vzhled.kw", "styl motiv barva akcent animace průhlednost písmo hustota šířka proužek jazyk vzhled a animace"] },
   { id: "akce", key: "settings.nav.akce", cs: "Projekty, odkazy a akce", kw: ["settings.nav.akce.kw", "projekt dlaždice repo složka rychlé akce odkaz odkazy web aplikace příkaz skripty paleta"] },
   { id: "claude", key: "settings.nav.claude", cs: "Claude", kw: ["settings.nav.claude.kw", "claude code hooky schvalování otázky clauda limity útrata hlídač commit"] },

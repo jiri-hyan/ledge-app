@@ -42,7 +42,7 @@ test("menuKey: Esc a Tab zavírají vždy, šipky jen když patří menu", () =>
 
 test("zapojení: všechna menu jedou na PopMenu, žádné vlastní posluchače Esc / pointerdown", async () => {
   const { readFileSync } = await import("node:fs");
-  const files = ["../cards/CardMenu.tsx", "../notes/NoteMenu.tsx", "../notes/RowMenu.tsx", "../tilelook/TileMenu.tsx", "../media/VariantPicker.tsx", "../pin/PinApp.tsx"];
+  const files = ["../cards/CardMenu.tsx", "../notes/NoteMenu.tsx", "../notes/RowMenu.tsx", "../tilelook/TileMenu.tsx", "../media/VariantPicker.tsx", "../pin/PinMenu.tsx"];
   for (const f of files) {
     const s = readFileSync(new URL(f, import.meta.url), "utf8");
     assert.ok(s.includes("PopMenu"), `${f}: menu přes PopMenu`);

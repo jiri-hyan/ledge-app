@@ -23,6 +23,7 @@ export const NoteEditor = view(() => import("./notes/NoteEditor"));
 export const UpdatePanel = view(() => import("./cards/UpdatePanel"));
 export const Catalog = view(() => import("./layout/Catalog"));
 export const CardLookPanel = view(() => import("./layout/CardLook"));
+export const DropNew = view(() => import("./actions/DropNew"));
 // Paleta hledá i anglicky při české UI (`tIn("en", …)` u Nastavení Windows, jednotek, emoji) → před ní počká na slovník.
 export const Palette = view(async () => {
   await loadDict("en").catch(() => {});

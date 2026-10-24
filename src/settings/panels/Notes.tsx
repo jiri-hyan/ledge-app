@@ -1,6 +1,7 @@
 // Panel „Poznámky“: zapnutí, složka, kategorie (`notes.kinds` — přidat, upravit, barva, ikona, pořadí
-// přetažením, smazat s Vrátit) a synchronizace mezi PC přes git (zapnutí, repo, interval, „teď“).
-import { createSignal, For, Show } from "solid-js";
+// přetažením, smazat s Vrátit), lístky na plochu (výchozí styl a průhlednost nového lístku, barvy štítků) a
+// synchronizace mezi PC přes git (zapnutí, repo, interval, „teď“).
+import { createResource, createSignal, For, Show } from "solid-js";
 import { api, type NoteKind } from "../../api";
 import { ago } from "../../format";
 import { t } from "../../i18n";
@@ -13,6 +14,9 @@ import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
 import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 import type { PanelProps } from "../types";
+import StyleGallery, { colorName } from "../../pin/StyleGallery";
+import { notesApi } from "../../notes/api";
+import { colorHex, NOTE_COLORS } from "../../notes/meta";
 
 const ICONS = ["bulb", "chat", "checklist", "note", "flag", "star", "bug", "heart"];
 const MAX_KINDS = 12;
@@ -94,6 +98,50 @@ function KindsEditor() {
   );
 }
 
+/** Lístky na plochu: výchozí vzhled nového lístku (galerie stylů s náhledem, pozadí, text, pamatovat poslední)
+ *  a barvy štítků (lístek bez vlastní barvy dostane barvu podle prvního štítku). */
+function PinsSection() {
+  const c = useSettings();
+  const pins = () => c.cfg.notes.pins ?? { style: "classic", bg: 88, text: 100, rememberLast: true };
+  const tagColors = (): Record<string, string> => c.cfg.notes.tagColors ?? {};
+  const [tags] = createResource(() => notesApi.tags().catch(() => []));
+  const tagList = () => [...new Set([...Object.keys(tagColors()), ...(tags() ?? []).map((x) => x.tag)])].slice(0, 16);
+  const setTagColor = (tag: string, v: string | undefined) => c.set("notes.tagColors." + tag, v);
+  return (
+    <Section title={t("settings.notes.pins", "Lístky na ploše")}>
+      <Row id="notes.pins.style" stack>
+        <StyleGallery value={pins().style} bg={pins().bg} text={pins().text} color={null} onPick={(s) => c.set("notes.pins.style", s)} />
+      </Row>
+      <Row id="notes.pins.bg">
+        <Slider path="notes.pins.bg" min={0} max={100} step={5} label={t("settings.f.notes.pins.bg", "Pozadí nového lístku")} fmt={(v) => v + " %"} />
+      </Row>
+      <Row id="notes.pins.text">
+        <Slider path="notes.pins.text" min={50} max={100} step={5} label={t("settings.f.notes.pins.text", "Text nového lístku")} fmt={(v) => v + " %"} />
+      </Row>
+      <Row id="notes.pins.rememberLast"><Toggle path="notes.pins.rememberLast" label={t("settings.f.notes.pins.rememberLast", "Nový lístek jako naposledy upravený")} /></Row>
+      <Row id="notes.tagColors" stack>
+        <Show when={tagList().length} fallback={<p class="st-empty">{t("settings.notes.tagColors.none", "Zatím žádné štítky — přidáš je v lístku (⋯ → Štítky) nebo napíšeš #štítek do poznámky.")}</p>}>
+          <For each={tagList()}>
+            {(tag) => (
+              <div class="st-item">
+                <span class="grow">#{tag}</span>
+                <div class="st-icons" role="radiogroup" aria-label={t("settings.notes.tagColors.of", "Barva štítku #{tag}", { tag })}>
+                  <button role="radio" aria-checked={!tagColors()[tag]} classList={{ on: !tagColors()[tag] }} title={t("settings.notes.tagColors.noColor", "Bez barvy")} onClick={() => setTagColor(tag, undefined)}>–</button>
+                  <For each={NOTE_COLORS}>
+                    {(col) => (
+                      <button role="radio" aria-checked={colorHex(tagColors()[tag]) === col.hex} classList={{ on: colorHex(tagColors()[tag]) === col.hex }} title={colorName(col.id)} style={{ color: col.hex }} onClick={() => setTagColor(tag, col.id)}>●</button>
+                    )}
+                  </For>
+                </div>
+              </div>
+            )}
+          </For>
+        </Show>
+      </Row>
+    </Section>
+  );
+}
+
 export default function NotesPanel(_p: PanelProps) {
   const c = useSettings();
   const n = () => c.cfg.notes;
@@ -129,6 +177,7 @@ export default function NotesPanel(_p: PanelProps) {
           </Row>
           <KindsEditor />
         </Section>
+        <PinsSection />
         <Section title={t("settings.notes.sync", "Synchronizace mezi počítači")}>
           <Row id="notes.sync.enabled"><Toggle path="notes.sync.enabled" label={t("settings.f.notes.sync.enabled", "Synchronizace mezi počítači")} /></Row>
           <Show when={n().sync.enabled}>

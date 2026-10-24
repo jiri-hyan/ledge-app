@@ -26,6 +26,10 @@ pub struct HotkeyConfig {
     /// `enabled`: registruje se, JEN když je na ploše aspoň jeden lístek, i s vypnutými zkratkami —
     /// na průchozí lístek nejde kliknout, tohle je cesta ven. Prázdné = bez zkratky (zbývá Ctrl+K).
     pub note_passthrough: String,
+    /// Rychlý nový lístek na plochu (nová poznámka rovnou v lístku, s fokusem). Výchozí prázdné = bez
+    /// zkratky. Jako `notePassthrough` platí i s vypnutými zkratkami (`enabled`), jen se zapnutými
+    /// poznámkami; v herním režimu / hře přes celou obrazovku nedělá nic.
+    pub note_pin: String,
 }
 
 impl Default for HotkeyConfig {
@@ -38,6 +42,7 @@ impl Default for HotkeyConfig {
             note: "Ctrl+Alt+N".into(),
             game_mode: String::new(),
             note_passthrough: "Ctrl+Alt+P".into(),
+            note_pin: String::new(),
         }
     }
 }
@@ -77,6 +82,7 @@ fn hotkey_actions(cfg: &Config) -> Vec<(&'static str, &str)> {
     v.push(("gameMode", h.game_mode.as_str()));
     if cfg.notes.enabled {
         v.push(("notePassthrough", h.note_passthrough.as_str()));
+        v.push(("notePin", h.note_pin.as_str()));
     }
     v
 }
@@ -101,21 +107,26 @@ pub fn active_hotkeys(cfg: &Config, approve: bool) -> Vec<(&'static str, String)
     hotkey_actions(cfg)
         .into_iter()
         .filter(|(a, _)| approve || !matches!(*a, "approve" | "deny"))
-        .filter(|(a, _)| *a != "notePassthrough")
+        .filter(|(a, _)| !matches!(*a, "notePassthrough" | "notePin"))
         .filter(|(_, k)| !k.trim().is_empty())
         .map(|(a, k)| (a, k.to_string()))
         .collect()
 }
 
 /// `active_hotkeys` + zkratka průchozího režimu lístků, když je na ploše aspoň jeden lístek
-/// (`pins_open`) — i s `hotkeys.enabled = false` (jediná cesta z průchozího lístku myší nevede).
+/// (`pins_open`) — i s `hotkeys.enabled = false` (jediná cesta z průchozího lístku myší nevede) — a
+/// zkratka „Nový lístek“ (`notePin`), je-li vyplněná (výchozí prázdná), taky bez ohledu na `enabled`.
 /// Stejnou zkratku jako jiná registrovaná akce nepřidá (kolizi hlásí validace jen se zapnutými zkratkami).
 pub fn active_hotkeys_pins(cfg: &Config, approve: bool, pins_open: bool) -> Vec<(&'static str, String)> {
     let mut v = active_hotkeys(cfg, approve);
-    let k = cfg.hotkeys.note_passthrough.trim();
-    if pins_open && cfg.notes.enabled && !k.is_empty() && !v.iter().any(|(_, o)| normalize_hotkey(o) == normalize_hotkey(k)) {
-        v.push(("notePassthrough", k.to_string()));
-    }
+    let mut add = |action: &'static str, k: &str, on: bool| {
+        let k = k.trim();
+        if on && cfg.notes.enabled && !k.is_empty() && !v.iter().any(|(_, o)| normalize_hotkey(o) == normalize_hotkey(k)) {
+            v.push((action, k.to_string()));
+        }
+    };
+    add("notePassthrough", &cfg.hotkeys.note_passthrough, pins_open);
+    add("notePin", &cfg.hotkeys.note_pin, true);
     v
 }
 

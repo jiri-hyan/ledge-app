@@ -4,6 +4,7 @@ export * from "./actions";
 export * from "./appearance";
 export * from "./calendar";
 export * from "./claude";
+export * from "./desk";
 export * from "./media";
 export * from "./notes";
 export * from "./onboarding";

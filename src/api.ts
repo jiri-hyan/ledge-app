@@ -140,6 +140,8 @@ export const api = {
   statuslineRemove: () => call<StatusLineStatus>("statusline_remove"),
   /** Útrata Claude: přepočet indexu na pozadí (Rust ho pustí nejvýš 1× / 60 s); výsledek ve snapshotu. */
   costsRefresh: () => call("costs_refresh"),
+  /** Export útrat a limitů do CSV / Markdownu (dialog Uložit jako v jádře); vrací cestu, `null` = zrušeno. */
+  exportUsage: (format: "csv" | "md") => call<string | null>("export_usage", { format }),
   /** Časovač: akce (`{ op: "start", minutes: 25 }`, pause, resume, cancel, add, swStart, swPause, swReset) → nový stav. */
   timer: (op: TimerOp) => call<TimerState>("timer", { op }),
   // --- Osobní: právě hraje, hlasitost, baterie (Rust `media.rs`, `volume.rs`, `battery.rs`) ---

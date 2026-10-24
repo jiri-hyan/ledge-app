@@ -23,13 +23,16 @@ import SmallView from "./hover/SmallView";
 import { isHoverView, smallWidth } from "./hover/model";
 import { asPage, typing, type Page } from "./nav";
 import { EMPTY_SNAPSHOT } from "./snapshot";
-import { Toast } from "./ui/toast";
+import { Toast, say } from "./ui/toast";
 import UndoBar from "./notes/UndoBar";
 import { gotoSettingsPanel } from "./palette/goto";
 import { checkFirstRun, wizardOpen } from "./onboarding/state";
 import { beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, escEdit, resumeEdit, setCatalogOpen, setEditPage } from "./layout/edit";
 import { normalizeLayout } from "./layout/model";
 import { NoteEditor, NotesPage, Palette, Settings, UpdatePanel, Wizard, preloadViews } from "./lazyViews";
+import { installQuickKeys } from "./quick/quick";
+import "./quick/quick.css";
+import { clearDrop, offerDrop } from "./actions/dropstate";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
@@ -150,6 +153,7 @@ export default function App() {
   }
 
   async function closing(msg: ViewMsg) {
+    clearDrop(); // nepotvrzený návrh zástupce z přetaženého se zavřením šuplíku zahodí
     panel.getAnimations().forEach((a) => a.cancel());
     measure("close", 250);
     const hide = concealContent(content, 110);
@@ -176,6 +180,10 @@ export default function App() {
       on<string>("page", (p) => setPage(asPage(p))),
       // lístek na ploše → „Upravit v Ledge“ (Rust pošle cestu poznámky, šuplík se otevře na jejím editoru)
       on<string>("edit-note", editNotePath),
+      // přetažení odkazu / souboru na otevřený šuplík → návrh zástupce (`actions/DropNew.tsx`), vždy na hlavní stránce
+      on<unknown>("drop-shortcut", (x) => offerDrop(x) && setPage("main")),
+      // puštěný soubor, který by akce stejně odmítla (.lnk, .url, .bat, .cmd…): jedna srozumitelná věta z jádra
+      on<string>("drop-refused", (why) => typeof why === "string" && why && say(why)),
       initAppearance(),
     );
 
@@ -209,6 +217,8 @@ export default function App() {
     };
     window.addEventListener("keydown", key);
     onCleanup(() => window.removeEventListener("keydown", key));
+    // Alt+1…9 = N-tý zástupce, šipky mezi zástupci (`quick/`, volba `smart.quickKeys`)
+    onCleanup(installQuickKeys(() => ({ enabled: s.smart?.quickKeys ?? false, page: page(), editing: editing(), paletteOpen: !!palette() })));
 
     // reflektor pod kurzorem pro karty a dlaždice (jen CSS proměnné, žádný re-render)
     const spot = (e: PointerEvent) => {

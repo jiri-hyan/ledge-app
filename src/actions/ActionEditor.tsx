@@ -6,7 +6,7 @@ import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { createStore, unwrap } from "solid-js/store";
 import type { ActionCfg, ActionKind, ActionView } from "../types";
 import { actionsApi, runAction } from "./api";
-import { cleanAction, draftError, WEB_SIZE } from "./model";
+import { cleanAction, draftError, labelFrom, WEB_SIZE } from "./model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "./ui";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
@@ -25,15 +25,6 @@ export const kindLabel = (k: ActionKind) => {
   const m = KINDS.find((x) => x.kind === k)!;
   return t(m.key, m.cs);
 };
-
-/** Popisek z cíle, když ho člověk nevyplnil: host webu, jméno souboru / složky. */
-function labelFrom(target: string): string {
-  const s = target.trim();
-  const host = /^https?:\/\/(?:www\.)?([^/:?#]+)/i.exec(s)?.[1];
-  if (host) return host;
-  const name = s.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
-  return name.replace(/\.exe$/i, "");
-}
 
 export default function ActionEditor(p: {
   initial: ActionCfg;

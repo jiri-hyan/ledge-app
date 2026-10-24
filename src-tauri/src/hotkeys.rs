@@ -70,6 +70,11 @@ pub(crate) fn on_shortcut(sc: &Shortcut) {
         crate::pins::win::toggle_through_all();
         return;
     }
+    // rychlý nový lístek: platí i s vypnutými zkratkami (výchozí prázdná = neregistruje se), ve hře nic
+    if !hk.note_pin.trim().is_empty() && parse_shortcut(&hk.note_pin).as_ref() == Some(sc) {
+        crate::commands::pins::quick_new();
+        return;
+    }
     if !hk.enabled {
         return; // vypnuto za běhu: registrace už se ruší v `sync_hotkeys`
     }

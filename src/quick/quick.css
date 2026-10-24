@@ -1,0 +1,12 @@
+/* Čísla zástupců při držení Alt (`quick.ts`): jen atribut `data-qn`, žádné třídy (kolize CSS tříd). */
+[data-qn] { position: relative; }
+[data-qn]::after {
+  content: attr(data-qn);
+  position: absolute; top: 3px; left: 3px; z-index: 6;
+  min-width: calc(16px * var(--fz)); height: calc(16px * var(--fz)); padding: 0 4px; box-sizing: border-box;
+  display: grid; place-items: center;
+  border-radius: 999px; background: var(--accent); color: var(--on-light);
+  font-size: var(--fs-2xs); font-weight: 700; line-height: 1;
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+}

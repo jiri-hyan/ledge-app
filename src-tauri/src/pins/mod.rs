@@ -55,6 +55,52 @@ pub fn same_note(a: &str, b: &str) -> bool {
     normalize(a) == normalize(b)
 }
 
+/// Styl lístku (galerie v ⋯ → Vzhled). `Classic` = původní tmavé sklo s posuvníky průhlednosti.
+/// Neznámé id (např. z novějšího Ledge) = `Classic`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PinStyle {
+    #[default]
+    Classic,
+    Paper,
+    Glass,
+    Stripe,
+    Minimal,
+    Dark,
+}
+
+impl PinStyle {
+    pub const ALL: [PinStyle; 6] = [Self::Classic, Self::Paper, Self::Glass, Self::Stripe, Self::Minimal, Self::Dark];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Classic => "classic",
+            Self::Paper => "paper",
+            Self::Glass => "glass",
+            Self::Stripe => "stripe",
+            Self::Minimal => "minimal",
+            Self::Dark => "dark",
+        }
+    }
+
+    /// Ze jména v configu (`notes.pins.style`); neznámé = `None`.
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|s| s.id() == id.trim())
+    }
+}
+
+impl Serialize for PinStyle {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(self.id())
+    }
+}
+
+impl<'de> Deserialize<'de> for PinStyle {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let id = String::deserialize(d)?;
+        Ok(Self::from_id(&id).unwrap_or_default())
+    }
+}
+
 /// Volby lístku, které vidí a mění UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -71,11 +117,13 @@ pub struct PinPrefs {
     pub text: u8,
     /// sbaleno na lištu (dvojklik na lištu)
     pub collapsed: bool,
+    /// styl (vzhled) lístku
+    pub style: PinStyle,
 }
 
 impl Default for PinPrefs {
     fn default() -> Self {
-        Self { on_top: true, locked: false, through: false, bg: 88, text: 100, collapsed: false }
+        Self { on_top: true, locked: false, through: false, bg: 88, text: 100, collapsed: false, style: PinStyle::Classic }
     }
 }
 
@@ -85,6 +133,35 @@ impl PinPrefs {
         self.text = self.text.clamp(TEXT_MIN, 100);
         self
     }
+
+    pub fn look(&self) -> PinLook {
+        PinLook { bg: self.bg, text: self.text, style: self.style }
+    }
+
+    pub fn with_look(self, l: PinLook) -> Self {
+        Self { bg: l.bg, text: l.text, style: l.style, ..self }.sanitized()
+    }
+}
+
+/// Vzhled, který si nový lístek převezme (naposledy použitý, nebo výchozí z Nastavení `notes.pins`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PinLook {
+    pub bg: u8,
+    pub text: u8,
+    pub style: PinStyle,
+}
+
+impl Default for PinLook {
+    fn default() -> Self {
+        PinPrefs::default().look()
+    }
+}
+
+/// Vzhled nového lístku: naposledy použitý (když si ho Ledge má pamatovat a nějaký je), jinak výchozí.
+pub fn new_look(last: Option<PinLook>, remember: bool, default: PinLook) -> PinLook {
+    let l = if remember { last.unwrap_or(default) } else { default };
+    PinPrefs::default().with_look(l).look()
 }
 
 /// Změna voleb z UI (chybějící pole = beze změny).
@@ -97,6 +174,7 @@ pub struct PinPatch {
     pub bg: Option<u8>,
     pub text: Option<u8>,
     pub collapsed: Option<bool>,
+    pub style: Option<PinStyle>,
 }
 
 impl PinPatch {
@@ -108,18 +186,26 @@ impl PinPatch {
             bg: self.bg.unwrap_or(p.bg),
             text: self.text.unwrap_or(p.text),
             collapsed: self.collapsed.unwrap_or(p.collapsed),
+            style: self.style.unwrap_or(p.style),
         }
         .sanitized()
     }
+
+    /// Mění vzhled (pozadí, text, styl)? Pak se zapamatuje jako „naposledy použitý“.
+    pub fn touches_look(&self) -> bool {
+        self.bg.is_some() || self.text.is_some() || self.style.is_some()
+    }
 }
 
-/// Připnutý lístek (řádek v `note-pins.json`).
+/// Lístek (řádek v `note-pins.json`). Po odepnutí řádek zůstane (`open: false`) — znovupřipnutí ho
+/// otevře na stejném místě, ve stejné velikosti a vzhledu. Jen tento počítač (`%LOCALAPPDATA%`), nikdy
+/// do `.md` ani do syncu.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Pin {
     /// absolutní cesta poznámky (jak ji zná UI)
     pub path: String,
-    /// vnější pozice (fyzické px); `None` = ještě neumístěný
+    /// vnější pozice (fyzické px — určuje i monitor); `None` = ještě neumístěný
     pub x: Option<i32>,
     pub y: Option<i32>,
     /// vnitřní velikost rozbaleného lístku (logické px)
@@ -127,11 +213,19 @@ pub struct Pin {
     pub h: f64,
     #[serde(flatten)]
     pub prefs: PinPrefs,
+    /// připnutý na ploše (starý soubor bez pole = připnutý); `false` = odepnutý, pamatuje se poloha a vzhled
+    pub open: bool,
+    /// schovaný do data (ms epochy): okno je zavřené, v ten čas se samo znovu otevře
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hidden_until: Option<i64>,
+    /// kdy se odepnul (ms) — z odepnutých se pamatuje jen `MAX_CLOSED` naposledy odepnutých
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closed_ms: Option<i64>,
 }
 
 impl Default for Pin {
     fn default() -> Self {
-        Self { path: String::new(), x: None, y: None, w: DEFAULT_W, h: DEFAULT_H, prefs: PinPrefs::default() }
+        Self { path: String::new(), x: None, y: None, w: DEFAULT_W, h: DEFAULT_H, prefs: PinPrefs::default(), open: true, hidden_until: None, closed_ms: None }
     }
 }
 
@@ -147,10 +241,21 @@ impl Pin {
         if self.x.is_none() || self.y.is_none() {
             (self.x, self.y) = (None, None);
         }
+        if !self.open {
+            self.hidden_until = None;
+        }
         self.prefs = self.prefs.sanitized();
         self
     }
+
+    /// Má být teď na ploše (připnutý a ne schovaný do budoucna)?
+    pub fn visible_at(&self, now_ms: i64) -> bool {
+        self.open && self.hidden_until.is_none_or(|t| t <= now_ms)
+    }
 }
+
+/// Kolik odepnutých lístků si Ledge pamatuje (polohu a vzhled) — soubor neroste donekonečna.
+pub const MAX_CLOSED: usize = 200;
 
 /// Celý soubor stavu lístků.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -158,6 +263,9 @@ impl Pin {
 pub struct PinsFile {
     /// nápověda „jak z průchozího režimu ven“ už se ukázala
     pub hint_seen: bool,
+    /// naposledy použitý vzhled (pozadí, text, styl) — převezme ho nový lístek
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last: Option<PinLook>,
     pub pins: Vec<Pin>,
 }
 
@@ -170,20 +278,77 @@ impl PinsFile {
         self.pins.iter_mut().find(|p| label_for(&p.path) == label)
     }
 
-    /// Lístek poznámky `path` — existující, jinak nový s výchozími volbami.
-    pub fn ensure(&mut self, path: &str) -> &mut Pin {
+    /// Lístek poznámky `path` — existující (i odepnutý, s pamětí polohy), jinak nový se vzhledem `look`.
+    pub fn ensure(&mut self, path: &str, look: PinLook) -> &mut Pin {
         if let Some(i) = self.pins.iter().position(|p| same_note(&p.path, path)) {
             return &mut self.pins[i];
         }
-        self.pins.push(Pin::new(path));
+        let mut p = Pin::new(path);
+        p.prefs = p.prefs.with_look(look);
+        self.pins.push(p);
         self.pins.last_mut().expect("právě vložený")
     }
 
-    /// Odepnout (poznámka zůstane). Vrací true, když lístek byl.
-    pub fn remove(&mut self, path: &str) -> bool {
-        let before = self.pins.len();
-        self.pins.retain(|p| !same_note(&p.path, path));
-        self.pins.len() != before
+    /// Připnout (znovu): odepnutý / schovaný lístek se vrátí se zapamatovanou polohou a vzhledem.
+    pub fn reopen(&mut self, path: &str, look: PinLook) -> &mut Pin {
+        let p = self.ensure(path, look);
+        if !p.open {
+            // průchozí lístek po znovupřipnutí jde ovládat (jinak by na něj nešlo kliknout)
+            p.prefs.through = false;
+        }
+        p.open = true;
+        p.hidden_until = None;
+        p.closed_ms = None;
+        p
+    }
+
+    /// Odepnout (poznámka zůstane, poloha a vzhled se pamatují). Vrací true, když byl připnutý.
+    pub fn close(&mut self, path: &str, now_ms: i64) -> bool {
+        let Some(p) = self.pins.iter_mut().find(|p| same_note(&p.path, path)) else { return false };
+        let was = p.open;
+        p.open = false;
+        p.hidden_until = None;
+        p.closed_ms = Some(now_ms);
+        self.prune_closed();
+        was
+    }
+
+    /// Z odepnutých nechá jen `MAX_CLOSED` naposledy odepnutých (připnuté zůstanou vždy).
+    fn prune_closed(&mut self) {
+        let mut closed: Vec<(i64, usize)> = self.pins.iter().enumerate().filter(|(_, p)| !p.open).map(|(i, p)| (p.closed_ms.unwrap_or(0), i)).collect();
+        if closed.len() <= MAX_CLOSED {
+            return;
+        }
+        closed.sort_unstable_by(|a, b| b.cmp(a));
+        let drop: Vec<usize> = closed[MAX_CLOSED..].iter().map(|(_, i)| *i).collect();
+        let mut i = 0;
+        self.pins.retain(|_| {
+            let keep = !drop.contains(&i);
+            i += 1;
+            keep
+        });
+    }
+
+    /// Schovat do data: okno zmizí, v `until_ms` se samo vrátí. Vrací true, když je lístek připnutý.
+    pub fn hide(&mut self, path: &str, until_ms: i64) -> bool {
+        let Some(p) = self.pins.iter_mut().find(|p| same_note(&p.path, path) && p.open) else { return false };
+        p.hidden_until = Some(until_ms);
+        true
+    }
+
+    /// Cesty lístků, které mají být teď na ploše (po startu, po konci hry).
+    pub fn visible(&self, now_ms: i64) -> Vec<String> {
+        self.pins.iter().filter(|p| p.visible_at(now_ms)).map(|p| p.path.clone()).collect()
+    }
+
+    /// Schované lístky, jejichž čas nastal.
+    pub fn due_hidden(&self, now_ms: i64) -> Vec<String> {
+        self.pins.iter().filter(|p| p.open && p.hidden_until.is_some_and(|t| t <= now_ms)).map(|p| p.path.clone()).collect()
+    }
+
+    /// Nejbližší čas, kdy se má schovaný lístek vrátit (jeden termín pro vlákno `emit`).
+    pub fn next_unhide(&self, now_ms: i64) -> Option<i64> {
+        self.pins.iter().filter(|p| p.open).filter_map(|p| p.hidden_until).filter(|&t| t > now_ms).min()
     }
 }
 
@@ -334,6 +499,19 @@ pub(crate) fn pins_yield(game_mode: bool, fs: FsKind) -> bool {
     game_mode || matches!(fs, FsKind::Exclusive | FsKind::CoverOther)
 }
 
+/// Co udělat při změně fullscreenu / herního režimu (`win::sync_dead`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DeadPlan {
+    /// přepnout oknům „vždy navrchu“ (jen při skutečné změně)
+    pub retop: bool,
+    /// spustit odloženou obnovu po startu — i BEZ změny stavu (start ve hře: `DEAD` začíná na false)
+    pub restore: bool,
+}
+
+pub(crate) fn dead_plan(was_dead: bool, dead: bool, restore_pending: bool) -> DeadPlan {
+    DeadPlan { retop: was_dead != dead, restore: !dead && restore_pending }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,6 +534,23 @@ mod tests {
         ];
         for (gm, fs, want) in cases {
             assert_eq!(pins_yield(gm, fs), want, "herní {gm}, {fs:?}");
+        }
+    }
+
+    #[test]
+    fn dead_plan_table() {
+        // (dřív ustupovaly, teď ustupují, čeká obnova) → (přepnout navrchu, obnovit)
+        let cases = [
+            (false, false, false, false, false),
+            // start v herním režimu: obnova čekala, `DEAD` se nezměnil (false → false) — dřív se nespustila
+            (false, false, true, false, true),
+            (true, false, true, true, true),
+            (true, false, false, true, false),
+            (false, true, true, true, false),
+            (true, true, true, false, false),
+        ];
+        for (was, dead, pending, retop, restore) in cases {
+            assert_eq!(dead_plan(was, dead, pending), DeadPlan { retop, restore }, "{was} {dead} {pending}");
         }
     }
 
@@ -414,6 +609,41 @@ mod tests {
         // UI posílá jen změněné pole
         let patch: PinPatch = serde_json::from_str(r#"{"collapsed":true}"#).unwrap();
         assert_eq!(patch.apply(p), PinPrefs { collapsed: true, ..p });
+        assert!(!patch.touches_look());
+        // styl: id malými písmeny, vzhled se pamatuje
+        let patch: PinPatch = serde_json::from_str(r#"{"style":"paper"}"#).unwrap();
+        assert_eq!(patch.apply(p).style, PinStyle::Paper);
+        assert!(patch.touches_look() && PinPatch { bg: Some(1), ..Default::default() }.touches_look());
+    }
+
+    #[test]
+    fn style_ids_and_unknown() {
+        for s in PinStyle::ALL {
+            assert_eq!(PinStyle::from_id(s.id()), Some(s));
+            assert_eq!(serde_json::to_string(&s).unwrap(), format!("\"{}\"", s.id()));
+        }
+        assert_eq!(PinStyle::from_id("neon"), None);
+        // neznámý styl ze souboru (novější Ledge) = původní vzhled, nic se neztratí
+        let p: PinPrefs = serde_json::from_str(r#"{"style":"neon","bg":40}"#).unwrap();
+        assert_eq!((p.style, p.bg), (PinStyle::Classic, 40));
+        assert_eq!(PinPrefs::default().style, PinStyle::Classic);
+    }
+
+    #[test]
+    fn new_look_table() {
+        let def = PinLook::default();
+        let custom = PinLook { bg: 40, text: 70, style: PinStyle::Glass };
+        let last = PinLook { bg: 20, text: 90, style: PinStyle::Dark };
+        let cases: &[(Option<PinLook>, bool, PinLook, PinLook, &str)] = &[
+            (None, true, def, def, "nic naposledy → výchozí (dnešní vzhled)"),
+            (None, true, custom, custom, "nic naposledy → výchozí z Nastavení"),
+            (Some(last), true, custom, last, "naposledy použitý vyhrává"),
+            (Some(last), false, custom, custom, "pamatování vypnuté → vždy z Nastavení"),
+            (Some(PinLook { bg: 200, text: 0, style: PinStyle::Paper }), true, def, PinLook { bg: 100, text: TEXT_MIN, style: PinStyle::Paper }, "meze"),
+        ];
+        for (l, remember, d, want, why) in cases {
+            assert_eq!(new_look(*l, *remember, *d), *want, "{why}");
+        }
     }
 
     #[test]
@@ -438,9 +668,13 @@ mod tests {
         // jen x bez y = neumístěný
         assert_eq!((f.pins[1].x, f.pins[1].y), (None, None));
         // zápis a zpět beze ztráty
+        assert!(f.pins.iter().all(|p| p.open), "starý soubor bez `open` = připnuté");
         let mut g = f.clone();
         g.hint_seen = true;
-        g.ensure(r"C:\n\c.md").prefs.locked = true;
+        g.last = Some(PinLook { bg: 30, text: 80, style: PinStyle::Stripe });
+        g.ensure(r"C:\n\c.md", PinLook::default()).prefs.locked = true;
+        g.close(r"C:\n\b.md", 5);
+        g.hide(r"C:\n\a.md", 99);
         save(&path, &g).unwrap();
         assert_eq!(load(&path), g);
         let raw = std::fs::read_to_string(&path).unwrap();
@@ -450,16 +684,76 @@ mod tests {
     }
 
     #[test]
-    fn ensure_remove_lookup() {
+    fn ensure_close_reopen_remembers() {
+        let look = PinLook { bg: 40, text: 70, style: PinStyle::Paper };
         let mut f = PinsFile::default();
-        f.ensure(r"C:\n\a.md").w = 400.0;
-        f.ensure("c:/n/A.md").h = 300.0;
+        f.ensure(r"C:\n\a.md", look).w = 400.0;
+        f.ensure("c:/n/A.md", PinLook::default()).h = 300.0;
         assert_eq!(f.pins.len(), 1);
         assert_eq!((f.pins[0].w, f.pins[0].h), (400.0, 300.0));
+        assert_eq!(f.pins[0].prefs.look(), look, "nový lístek dostane vzhled, existující si nechá svůj");
         assert!(f.by_label(&label_for(r"C:\N\a.md")).is_some());
-        assert!(f.remove("C:/n/a.md"));
-        assert!(!f.remove("C:/n/a.md"));
-        assert!(f.pins.is_empty());
+        f.pins[0].x = Some(2100);
+        f.pins[0].y = Some(50);
+        f.pins[0].prefs.through = true;
+        // odepnutí: řádek zůstane i s polohou, velikostí a vzhledem
+        assert!(f.close("C:/n/a.md", 10));
+        assert!(!f.close("C:/n/a.md", 11), "druhé odepnutí nic");
+        assert!(!f.close("C:/n/jiny.md", 11));
+        let p = &f.pins[0];
+        assert_eq!((p.open, p.x, p.y, p.w, p.h, p.closed_ms), (false, Some(2100), Some(50), 400.0, 300.0, Some(11)));
+        assert!(f.visible(0).is_empty());
+        // znovupřipnutí: stejné místo a vzhled, průchozí vypnutý (jinak by na něj nešlo kliknout)
+        let p = f.reopen(r"C:\N\A.md", PinLook::default()).clone();
+        assert_eq!((p.open, p.x, p.y, p.w, p.prefs.style, p.prefs.through, p.closed_ms), (true, Some(2100), Some(50), 400.0, PinStyle::Paper, false, None));
+        assert_eq!(f.pins.len(), 1);
+    }
+
+    #[test]
+    fn hide_until_and_wake() {
+        let mut f = PinsFile::default();
+        f.reopen("C:/n/a.md", PinLook::default());
+        f.reopen("C:/n/b.md", PinLook::default());
+        f.reopen("C:/n/c.md", PinLook::default());
+        f.close("C:/n/c.md", 1);
+        assert!(f.hide("C:/n/a.md", 1_000));
+        assert!(f.hide("C:/n/b.md", 500));
+        assert!(!f.hide("C:/n/c.md", 300), "odepnutý se neschovává");
+        assert!(!f.hide("C:/n/x.md", 300));
+        // (teď, viditelné, k vynoření, další termín)
+        type Case<'a> = (i64, &'a [&'a str], &'a [&'a str], Option<i64>);
+        let cases: &[Case] = &[
+            (0, &[], &[], Some(500)),
+            (499, &[], &[], Some(500)),
+            (500, &["C:/n/b.md"], &["C:/n/b.md"], Some(1_000)),
+            (2_000, &["C:/n/a.md", "C:/n/b.md"], &["C:/n/a.md", "C:/n/b.md"], None),
+        ];
+        for (now, vis, due, next) in cases {
+            assert_eq!(f.visible(*now), *vis, "visible @{now}");
+            assert_eq!(f.due_hidden(*now), *due, "due @{now}");
+            assert_eq!(f.next_unhide(*now), *next, "next @{now}");
+        }
+        // znovu otevřít = schování zrušené
+        f.reopen("C:/n/a.md", PinLook::default());
+        assert_eq!(f.next_unhide(0), Some(500));
+        // odepnutí schování zruší
+        f.close("C:/n/b.md", 3);
+        assert_eq!(f.next_unhide(0), None);
+    }
+
+    #[test]
+    fn closed_are_capped_open_kept() {
+        let mut f = PinsFile::default();
+        f.reopen("C:/n/stale-pripnuty.md", PinLook::default());
+        for i in 0..(MAX_CLOSED + 5) {
+            let p = format!("C:/n/{i}.md");
+            f.reopen(&p, PinLook::default());
+            f.close(&p, i as i64);
+        }
+        assert_eq!(f.pins.iter().filter(|p| !p.open).count(), MAX_CLOSED);
+        assert!(f.pins.iter().any(|p| p.open), "připnutý nikdy nevypadne");
+        // vypadly nejdřív odepnuté
+        assert!(!f.pins.iter().any(|p| p.path == "C:/n/0.md") && f.pins.iter().any(|p| p.path == format!("C:/n/{}.md", MAX_CLOSED + 4)));
     }
 
     #[test]

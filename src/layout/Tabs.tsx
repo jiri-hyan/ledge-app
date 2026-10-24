@@ -17,6 +17,7 @@ import { NEW_TAB } from "./dnd";
 import { previewOrder } from "./drag";
 import { flipEls } from "./flip";
 import { createTabDrag } from "./tabDrag";
+import { nextTab, pxOf, WHEEL_INIT, wheelAllowed, wheelStep } from "./tabwheel";
 import "./dnd.css";
 
 /** Pole pro název záložky: fokus po otevření (otevírá se jen výslovným klikem), Enter / Esc. */
@@ -79,6 +80,18 @@ export default function Tabs(p: { s: Snapshot }) {
   });
 
   const go = (id: string) => (editing() ? setEditPage(id) : void api.setMode(id));
+
+  /** kolečko nad záložkami (volba `smart.tabWheel`, výchozí vypnuto): další / předchozí záložka, na kraji stop */
+  let wheel = WHEEL_INIT;
+  function onWheel(e: WheelEvent) {
+    if (!wheelAllowed({ enabled: p.s.smart?.tabWheel ?? false, editing: editing(), tabs: l().pages.length, ctrl: e.ctrlKey })) return;
+    const r = wheelStep(wheel, pxOf(e.deltaY || e.deltaX, e.deltaMode), e.timeStamp);
+    wheel = r.state;
+    e.preventDefault();
+    if (r.dir === 0) return;
+    const to = nextTab(l().pages.findIndex((x) => x.id === cur()), l().pages.length, r.dir);
+    if (to !== null) go(l().pages[to].id);
+  }
   const title = (pg: LayoutPage, i: number) => `${pageName(pg)} (${i + 1})`;
 
   function rename(id: string, v: string | null) {
@@ -144,7 +157,7 @@ export default function Tabs(p: { s: Snapshot }) {
 
   return (
     <Show when={editing() || l().pages.length > 1}>
-      <div class="seg lay-tabs" classList={{ editing: editing(), dragging: !!drag() }} role="tablist" aria-label={t("cards.head.tab", "Záložka")} ref={box}>
+      <div class="seg lay-tabs" classList={{ editing: editing(), dragging: !!drag() }} role="tablist" aria-label={t("cards.head.tab", "Záložka")} ref={box} onWheel={onWheel}>
         <For each={l().pages}>
           {(pg, i) => (
             <span class="lay-tab" data-page={pg.id} style={{ order: String(view().indexOf(pg.id)) }} classList={{ drop: dropTab() === pg.id, "lp-gap": drag()?.id === pg.id }}>

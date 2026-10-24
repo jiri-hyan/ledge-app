@@ -24,7 +24,7 @@
 //! (`create`, `scan`, `set_done`), aby šlo testovat bez disku a nikdy ne v reálném `%USERPROFILE%`.
 //! Tady: kořen, čas, obrázky (base64/PNG) a společné I/O (`write_atomic`, `path_lock`). Podmoduly:
 //! `frontmatter`, `store` (NoteView, create, scan, set_done), `reminders` (karta, peek), `draft`
-//! (koncept, předvyplnění), `md` (Markdown náhled, úkoly, titulek), `edit` (čtení / uložení / úkol /
+//! (koncept, předvyplnění), `md` (Markdown náhled, úkoly, titulek), `meta` (barva, štítky), `links` (`[[vazby]]`, `#štítky`), `edit` (čtení / uložení / úkol /
 //! filtr karty). Veřejné API je re-exportované, cesty `notes::…` platí dál. Mapa: `docs/codemap/notes.md`.
 
 mod draft;
@@ -32,10 +32,12 @@ pub mod edit;
 pub mod export;
 mod frontmatter;
 pub mod lifecycle;
+pub mod links;
 pub mod openwith;
 pub mod pdf;
 pub mod md;
 mod md_list;
+pub mod meta;
 mod recycle;
 mod reminders;
 pub mod search;

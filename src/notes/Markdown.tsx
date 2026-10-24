@@ -1,13 +1,20 @@
 // Náhled Markdownu poznámky. HTML dělá Rust (`note_render` → `notes::md::to_html`: vše escapované,
 // žádné raw HTML ze vstupu); tady se jen vloží, doplní obrázky (data URL z `note_read`) a obslouží
-// kliky: odkaz → `open_url` (Rust znovu ověří http/https), úkol → `onToggle(řádek, stav)`.
+// kliky: odkaz → `open_url` (Rust znovu ověří http/https), úkol → `onToggle(řádek, stav)`, vazba `[[…]]`
+// → `onWiki(název)`, štítek `#…` → `onTag(štítek)` (jen data atributy, žádné href).
 
 import { createEffect, createSignal, on } from "solid-js";
 import { api } from "../api";
 import { t } from "../i18n";
 import "./mdtask.css";
 
-export default function Markdown(p: { body: string; images: { src: string; data: string }[]; onToggle: (line: number, checked: boolean) => void }) {
+export default function Markdown(p: {
+  body: string;
+  images: { src: string; data: string }[];
+  onToggle: (line: number, checked: boolean) => void;
+  onWiki?: (name: string) => void;
+  onTag?: (tag: string) => void;
+}) {
   const [html, setHtml] = createSignal("");
   let box!: HTMLDivElement;
   let seq = 0;
@@ -31,6 +38,17 @@ export default function Markdown(p: { body: string; images: { src: string; data:
     if (link?.dataset.href) {
       e.preventDefault();
       api.openUrl(link.dataset.href);
+      return;
+    }
+    const wiki = t.closest<HTMLElement>(".md-wiki");
+    if (wiki?.dataset.wiki) {
+      e.preventDefault();
+      p.onWiki?.(wiki.dataset.wiki);
+      return;
+    }
+    const tag = t.closest<HTMLElement>(".md-tag");
+    if (tag?.dataset.tag) {
+      p.onTag?.(tag.dataset.tag);
       return;
     }
     const box = t.closest<HTMLElement>(".md-check");

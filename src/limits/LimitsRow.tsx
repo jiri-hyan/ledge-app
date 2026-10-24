@@ -4,8 +4,10 @@
 import { For, Show } from "solid-js";
 import type { LimitsView, Snapshot } from "../api";
 import { dayNames, fmtClock } from "../format";
-import { t } from "../i18n";
+import { t, tp } from "../i18n";
 import { bar, left, level, otherDay, pctText, resetHint, winState, type LimitWindow } from "./model";
+import { severity, shown, statusText, STATUS_URL } from "./incident";
+import { api } from "../api";
 import "./limits.css";
 import { gotoSettingsPanel } from "../palette/goto";
 
@@ -60,6 +62,23 @@ function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now
   );
 }
 
+/** Probíhající incident Anthropicu (jen s volbou `smart.incidents` a skutečným incidentem; jinak nic). */
+function IncidentLine(p: { s: Snapshot }) {
+  return (
+    <Show when={shown(p.s.incident) ? p.s.incident : null}>
+      {(i) => (
+        <button class="lim-inc" data-sev={severity(i().impact)} title={t("sessions.incident.open", "Otevřít stránku stavu Anthropicu")} onClick={() => void api.openUrl(STATUS_URL)}>
+          <span class="lim-inc-dot" aria-hidden="true" />
+          <span class="lim-inc-text">
+            {t("sessions.incident.lead", "Anthropic hlásí incident")}: {i().name} · {statusText(i().status)}
+            <Show when={i().more > 0}> {tp("sessions.incident.more", i().more, ["(+{n} další)", "(+{n} další)", "(+{n} dalších)"])}</Show>
+          </span>
+        </button>
+      )}
+    </Show>
+  );
+}
+
 export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () => void }) {
   const lv = () => p.s.limits;
   /** pracuje aspoň jedna session (`SessionView.status`) — jen pak má smysl zvýrazňovat reset 5h okna */
@@ -69,6 +88,8 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
     return l ? [{ label: "5h", w: l.fiveHour, hot: working() }, { label: t("sessions.limits.week", "týden"), w: l.sevenDay, hot: false }] : [];
   };
   return (
+    <>
+    <IncidentLine s={p.s} />
     <Show when={lv()}>
       {(l) => (
         <Show when={l().at != null} fallback={
@@ -86,5 +107,6 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
         </Show>
       )}
     </Show>
+    </>
   );
 }

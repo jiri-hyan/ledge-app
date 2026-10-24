@@ -440,7 +440,7 @@ mod tests {
             for key in ["windows", "webviews"] {
                 for w in v.get(key).and_then(|x| x.as_array()).into_iter().flatten() {
                     let w = w.as_str().unwrap_or("");
-                    let pins = w == format!("{}*", crate::pins::LABEL_PREFIX);
+                    let pins = w == format!("{}*", crate::pins::LABEL_PREFIX) || w == format!("{}*", crate::desk::LABEL_PREFIX);
                     assert!((pins || !w.contains('*')) && !w.starts_with(LABEL_PREFIX), "{p:?}: {key} {w}");
                 }
             }

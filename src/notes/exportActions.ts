@@ -47,13 +47,13 @@ export async function openWith(path: string, app: string) {
 }
 
 /** Volby exportu pro poznámku `path` (`body` = co se zkopíruje jako Markdown). Sdílí editor i lístek. */
-export function exportItems(path: string, body: () => string): { label: string; run: () => void }[] {
+export function exportItems(path: string, body: () => string): { label: string; run: () => void; /** kopie do schránky (lístek ji má zvlášť) */ copy?: boolean }[] {
   ensureApps();
   return [
     { label: t("notes.export.md", "Uložit jako Markdown…"), run: () => void exportNote(path, "md") },
     { label: t("notes.export.html", "Uložit jako HTML…"), run: () => void exportNote(path, "html") },
     { label: t("notes.export.pdf", "Uložit jako PDF…"), run: () => void exportNote(path, "pdf") },
-    { label: t("notes.export.copy", "Kopírovat jako Markdown"), run: () => void copyMarkdown(body()) },
+    { label: t("notes.export.copy", "Kopírovat jako Markdown"), run: () => void copyMarkdown(body()), copy: true },
     ...apps().map((a) => ({ label: t("notes.export.openWith", "Otevřít v {name}", { name: a.name }), run: () => void openWith(path, a.id) })),
   ];
 }

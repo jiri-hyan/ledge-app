@@ -1,0 +1,31 @@
+{
+  "page": { "id": "example", "name": "Example status", "url": "https://status.example.com" },
+  "incidents": [
+    {
+      "id": "i1",
+      "name": "Elevated errors on app-v2 requests",
+      "status": "identified",
+      "impact": "major",
+      "created_at": "2026-10-23T08:00:00.000Z",
+      "updated_at": "2026-10-23T09:30:00.000Z",
+      "shortlink": "https://stspg.io/example1",
+      "incident_updates": [{ "status": "identified", "body": "We have identified the cause.", "created_at": "2026-10-23T09:30:00.000Z" }]
+    },
+    {
+      "id": "i2",
+      "name": "Slow responses in one region",
+      "status": "monitoring",
+      "impact": "minor",
+      "created_at": "2026-10-23T07:00:00.000Z",
+      "updated_at": "2026-10-23T10:00:00.000Z"
+    },
+    {
+      "id": "i3",
+      "name": "Degraded login for some users",
+      "status": "investigating",
+      "impact": "major",
+      "created_at": "2026-10-23T06:00:00.000Z",
+      "updated_at": "2026-10-23T08:15:00.000Z"
+    }
+  ]
+}

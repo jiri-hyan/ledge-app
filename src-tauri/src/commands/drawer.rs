@@ -19,6 +19,7 @@ pub(crate) fn set_mode(mode: String) {
     let id = crate::layout::page_id(&core().cfg.read().layout, &mode);
     *core().mode.lock() = id;
     maybe_refresh_weather(false);
+    crate::incidents::maybe_refresh(false);
     crate::calendar::live::maybe_refresh(false);
     crate::widgets::live::wake_if_used(&core().cfg.read());
     mark_dirty();

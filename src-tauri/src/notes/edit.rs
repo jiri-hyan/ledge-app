@@ -82,13 +82,13 @@ fn mtime_ms(p: &Path) -> i64 {
 }
 
 /// Ověřená poznámka: (kanonická cesta, kanonický kořen).
-fn resolve(root: &Path, path: &Path) -> Result<(PathBuf, PathBuf), String> {
+pub(super) fn resolve(root: &Path, path: &Path) -> Result<(PathBuf, PathBuf), String> {
     let real = check_note_path(root, path)?;
     let real_root = root.canonicalize().map_err(|e| crate::errors::io(tr("Složku poznámek nejde otevřít", "Can't open the notes folder"), &e))?;
     Ok((real, real_root))
 }
 
-fn read_bytes(real: &Path) -> Result<Vec<u8>, String> {
+pub(super) fn read_bytes(real: &Path) -> Result<Vec<u8>, String> {
     let meta = std::fs::metadata(real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))?;
     if meta.len() > MAX_NOTE_BYTES {
         return Err(tr("Poznámka je větší než 1 MB — otevři ji v editoru.", "The note is larger than 1 MB — open it in an editor.").into());
@@ -102,7 +102,7 @@ fn general_folder(real_root: &Path, real: &Path) -> bool {
     parent == real_root || parent.file_name().is_some_and(|n| n == GENERAL)
 }
 
-fn detail(path: &Path, real: &Path, real_root: &Path, bytes: &[u8]) -> NoteDetail {
+pub(super) fn detail(path: &Path, real: &Path, real_root: &Path, bytes: &[u8]) -> NoteDetail {
     let text = String::from_utf8_lossy(bytes);
     let parent = real.parent().unwrap_or(real_root);
     let folder = (parent != real_root).then(|| parent.file_name().map(|n| n.to_string_lossy().into_owned())).flatten();
@@ -278,6 +278,8 @@ pub struct NoteQuery {
     /// archivované poznámky (`_archiv`) místo aktivních
     pub archived: bool,
     pub limit: Option<usize>,
+    /// štítek (bez `#`, jakkoli velkými písmeny); `None` = všechny
+    pub tag: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -291,8 +293,10 @@ pub struct QueryResult {
 /// Výběr pro záložku: nehotové jako karta (připomínky do konce dneška první), pak hotové.
 /// `all` je seřazené nejnovější první (jak vrací `scan`); klonuje se jen to, co se vrátí.
 pub fn query(all: &[NoteView], q: &NoteQuery, today_end_ms: i64) -> QueryResult {
+    let tag = q.tag.as_deref().and_then(super::meta::norm_tag);
     let hit = |n: &&NoteView| {
-        q.kind.as_deref().is_none_or(|k| n.kind == k)
+        tag.as_deref().is_none_or(|t| n.tags.iter().any(|x| x == t))
+            && q.kind.as_deref().is_none_or(|k| n.kind == k)
             && match q.project.as_deref() {
                 None => true,
                 Some(GENERAL) => n.project.is_none(),
@@ -316,6 +320,17 @@ pub fn open_kind_counts(all: &[NoteView]) -> BTreeMap<String, usize> {
         *m.entry(n.kind.clone()).or_insert(0) += 1;
     }
     m
+}
+
+/// Štítky nehotových poznámek s počty (filtr v kartě Poznámky), nejčastější první, pak abecedně.
+pub fn tag_counts(all: &[NoteView]) -> Vec<(String, usize)> {
+    let mut m: BTreeMap<&str, usize> = BTreeMap::new();
+    for t in all.iter().filter(|n| !n.done).flat_map(|n| n.tags.iter()) {
+        *m.entry(t.as_str()).or_insert(0) += 1;
+    }
+    let mut v: Vec<(String, usize)> = m.into_iter().map(|(t, n)| (t.to_string(), n)).collect();
+    v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    v
 }
 
 // ---------- rozepsaná úprava ----------
@@ -568,6 +583,8 @@ mod tests {
             updated: None,
             tasks_done: 0,
             tasks_total: 0,
+            color: None,
+            tags: Vec::new(),
         };
         let all = [
             mk("nova", "napad", Some("a"), None, false),
@@ -585,6 +602,16 @@ mod tests {
         assert_eq!((r.notes.len(), r.total), (2, 4));
         let c = open_kind_counts(&all);
         assert_eq!((c.get("napad"), c.get(DEFAULT_KIND)), (Some(&3), Some(&1)));
+        // štítky: filtr bez ohledu na velikost / `#`, počty jen nehotových
+        let mut tagged = all.to_vec();
+        tagged[0].tags = vec!["qa".into(), "web".into()];
+        tagged[1].tags = vec!["qa".into()];
+        tagged[3].tags = vec!["qa".into()];
+        let t = |tag: &str, done: bool| query(&tagged, &NoteQuery { tag: Some(tag.into()), include_done: done, ..Default::default() }, 1_000).notes.into_iter().map(|n| n.title).collect::<Vec<_>>();
+        assert_eq!(t("#QA", false), ["nova", "info"]);
+        assert_eq!(t("qa", true), ["nova", "info", "hotova"]);
+        assert_eq!(t("nic", true), Vec::<String>::new());
+        assert_eq!(tag_counts(&tagged), [("qa".to_string(), 2), ("web".to_string(), 1)]);
     }
 
     #[test]

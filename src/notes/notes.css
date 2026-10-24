@@ -177,3 +177,13 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-bento-tool { flex: 1; font-size: var(--fs-2xs); justify-content: center; }
 .note-list[data-view="bento"] { display: flex; flex-direction: column; gap: 2px; }
 .note-act-copy:hover { color: var(--blue); }
+/* Lístky 2.0: našeptávač vazby `[[` pod polem editoru (`WikiLinks.tsx`) */
+.note-wiki-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.note-wiki-list button { font-size: var(--fs-xs); padding: 2px 8px; border-radius: var(--r-sm); border: 1px solid var(--line-2); background: var(--well); color: var(--t2); cursor: pointer; }
+.note-wiki-list button.on, .note-wiki-list button:hover { border-color: var(--focus); color: var(--t1); }
+/* Lístky 2.0: filtr karty podle štítku (`NotesCard.tsx`) */
+.note-tagbar { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px; }
+.note-tagchip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; font-size: calc(11.5px * var(--fz)); color: var(--t2); border: 1px dashed var(--line-2); }
+.note-tagchip:hover { background: var(--card-2); color: var(--t1); }
+.note-tagchip.on { border-style: solid; border-color: var(--blue); color: var(--t1); background: color-mix(in srgb, var(--blue) 14%, transparent); }
+.note-tagchip .cnt { font: 600 var(--fs-2xs) var(--mono); color: var(--t3); }

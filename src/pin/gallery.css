@@ -1,0 +1,19 @@
+/* Galerie stylů lístku (`StyleGallery.tsx`) — v okně lístku i v Nastavení. Náhled = malý lístek z proměnných
+   `pinLook` (--pin-bg, --pin-bar, --pin-fg, --pin-tint, --pin-line); šachovnice pod ním ukáže průhlednost. */
+.pin-gal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 4px 6px 6px; }
+.pin-gal-tile { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 3px; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; cursor: pointer; font: inherit; }
+.pin-gal-tile:hover { border-color: rgba(127, 127, 127, 0.45); }
+.pin-gal-tile.on { border-color: #7ab8ff; box-shadow: 0 0 0 1px #7ab8ff inset; }
+.pin-gal-prev {
+  position: relative; display: flex; flex-direction: column; gap: 4px; height: 44px; padding: 0 0 6px; overflow: hidden;
+  border-radius: 6px; border: 1px solid var(--pin-line); background: var(--pin-bg); color: var(--pin-fg);
+  background-image: linear-gradient(var(--pin-bg), var(--pin-bg)), repeating-conic-gradient(#8a8f99 0 25%, #c9ccd2 0 50%);
+  background-size: auto, 10px 10px;
+}
+.pin-gal-bar { height: 10px; flex: 0 0 10px; background: var(--pin-bar); border-bottom: 1px solid var(--pin-line); }
+.pin-gal-line { height: 3px; margin: 0 8px; border-radius: 2px; background: currentColor; opacity: 0.75; }
+.pin-gal-short { width: 45%; }
+.pin-gal-prev[data-style="stripe"]::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--pin-tint); }
+.pin-gal-prev[data-style="minimal"] .pin-gal-bar { border-bottom: 0; }
+.pin-gal-prev[data-style="paper"] { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); }
+.pin-gal-name { font-size: 11px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.85; }

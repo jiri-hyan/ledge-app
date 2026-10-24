@@ -219,3 +219,11 @@ ceník nezná, ukáže tokeny a cenu „—“. Config `claude.costs` (výchozí
 `drawer.sections.claudeCosts` nebo celá karta `drawer.sections.claude` = taky nic se nečte. Tauri: `costs_refresh`; stav ve
 snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
 
+
+**Export útrat a limitů** (kolo 20): v ⋯ karty Claude „Exportovat útratu a limity (CSV / Markdown)…“ → dialog Uložit
+jako → soubor. Jen data, která Ledge už drží v paměti (spočítaný přehled útrat v cenách API, poslední vzorek limitů 5h /
+týden); co chybí (cena neznámého modelu, okno bez dat), zůstane prázdné. CSV má sloupce `kind,name,period,tokens,cost_usd_api_estimate,pct,resets_at`
+(řádky `limit`, `total`, `project`, `model`, `day`; UTF-8 s BOM; texty začínající `= + - @` dostanou apostrof), Markdown
+tabulky s větou, že jde o odhad, ne fakturaci. Tauri `export_usage(format)`, žádná síť. Mapa: `docs/codemap/smart.md`.
+
+**Stav incidentů Anthropicu** v kartě limitů: volba `smart.incidents`, viz [config-behavior.md](config-behavior.md) (Chytřejší šuplík).

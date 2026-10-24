@@ -104,6 +104,7 @@ pub(crate) fn set(on: bool) {
     }
     crate::stripview::refresh_strip();
     crate::pins::win::sync_dead();
+    crate::desk::win::sync_yield();
     // vypnutí → emit vlákno dožene peek připomínek a stav
     mark_dirty();
 }

@@ -94,6 +94,14 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.toast" dim={!c.cfg.claude.enabled}>
           <Toggle path="claude.toast" label={fieldLabel("claude.toast")} />
         </Row>
+        <Row id="smart.approvalSound.enabled" dim={!c.cfg.claude.enabled}>
+          <Toggle path="smart.approvalSound.enabled" label={fieldLabel("smart.approvalSound.enabled")} />
+        </Row>
+        <Show when={c.cfg.smart?.approvalSound?.enabled}>
+          <Row id="smart.approvalSound.minGapS" nested>
+            <Slider path="smart.approvalSound.minGapS" min={5} max={600} step={5} label={fieldLabel("smart.approvalSound.minGapS")} fmt={(v) => (v >= 60 ? `${Math.floor(v / 60)} min ${v % 60 ? `${v % 60} s` : ""}` : `${v} s`)} />
+          </Row>
+        </Show>
         <HooksSetup />
       </Section>
       <McpSettings />
@@ -105,6 +113,17 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.limitsReminder">
           <Toggle path="claude.limitsReminder" label={fieldLabel("claude.limitsReminder")} />
         </Row>
+        <Row id="smart.incidents.enabled" stack>
+          <Toggle path="smart.incidents.enabled" label={fieldLabel("smart.incidents.enabled")} />
+          <small class="st-note">
+            {t("settings.smart.incidents.sentence", "Ledge se bude ptát status.anthropic.com každých {n} min, jen když je karta s limity vidět. Posílá se prázdný dotaz bez tvých dat; ukáže se jen probíhající incident.", { n: c.cfg.smart?.incidents?.everyMin ?? 10 })}
+          </small>
+        </Row>
+        <Show when={c.cfg.smart?.incidents?.enabled}>
+          <Row id="smart.incidents.everyMin" nested>
+            <Slider path="smart.incidents.everyMin" min={5} max={120} step={5} label={fieldLabel("smart.incidents.everyMin")} fmt={(v) => `${v} min`} />
+          </Row>
+        </Show>
       </Section>
       <Section title={t("settings.claude.costs", "Hodnota v cenách API")}>
         <Row id="claude.costs">
