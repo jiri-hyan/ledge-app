@@ -1,0 +1,25 @@
+/* Galerie karet 2026 a bento šablon (`CardsGallery.tsx`, kolo 22) — miniatury karet z tokenů `--k-*`
+   rozpracovaného vzhledu (`.theme-scope`), statické (žádná animace ani filtr). */
+.cg-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: var(--s2); }
+.cg-pages-l { font-size: var(--fs-xs); color: var(--t3); margin-right: 2px; }
+.cg-pages > .cg-on { color: var(--t0); border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
+.cg-sub { margin-top: var(--s3); }
+.cg-hint { display: block; margin: -4px 0 var(--s2); color: var(--t3); font-size: var(--fs-xs); }
+.cg-mini { display: block; height: 96px; padding: 6px; border-radius: var(--r-md); background: var(--tint-solid); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.cg-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 18px; gap: 4px; height: 100%; }
+.cg-grid:not(.cg-bento) { grid-auto-rows: 1fr; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cg-bento { grid-auto-flow: row dense; grid-auto-rows: 15px; gap: 3px; }
+.cg-mcard { position: relative; isolation: isolate; display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden; padding: 3px 4px; border-radius: calc(5px * var(--rr, 1)); background: var(--m-card-bg, var(--card)); border: var(--m-card-bd, 1px solid var(--line)); }
+.cg-mcard.cg-wide { grid-column: span 2; }
+.cg-mcard[data-s="layer"] { background: var(--k-base, var(--raised)); border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 9%, transparent); box-shadow: 0 3px 6px -3px rgba(0, 0, 0, 0.6); }
+.cg-mcard[data-s="glass"] { background: var(--k-glass, color-mix(in srgb, var(--t1) 7%, transparent)); border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 16%, transparent); }
+.cg-mcard[data-s="glass"]::after { content: ""; position: absolute; z-index: -1; inset: 7px 2px 2px; border-radius: calc(3px * var(--rr, 1)); background: var(--k-base, var(--raised)); }
+.cg-mcard[data-grain]::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='60' height='60' filter='url(%23g)'/%3E%3C/svg%3E"); }
+.cg-mh { display: block; height: 3px; width: 40%; border-radius: 2px; background: var(--t3); opacity: 0.7; }
+.cg-ml { display: block; height: 3px; width: 80%; border-radius: 2px; background: var(--t2); opacity: 0.45; }
+.cg-ml.cg-short { width: 50%; }
+.cg-mnum { display: block; height: 9px; width: 46%; border-radius: 2px; background: var(--t0); }
+.cg-mlabel { font-size: var(--fs-2xs); font-weight: 600; line-height: 1.05; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* náhled dole (`CardsMini` v PreviewDock): stejná miniatura, vyšší */
+.cg-mini.cg-tall { height: 132px; }

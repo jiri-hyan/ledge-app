@@ -57,6 +57,9 @@ pub struct DeskData {
     pub calendar: Option<crate::calendar::live::CalendarView>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub widgets: Option<Vec<crate::widgets::live::WidgetView>>,
+    /// kolo 22: útrata Claude (widget Claude dnes) — jen paměť; přepočet nejvýš 1× / čtvrthodinu
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub costs: Option<crate::costslive::CostsView>,
 }
 
 /// Nejvýš tolik čekajících řádků (widget je malý; zbytek je v šuplíku).
@@ -128,8 +131,12 @@ fn build(kinds: &[Kind]) -> DeskData {
         d.procs = Some(c.procs.snapshot());
         d.projects = cfg.projects.iter().map(|p| NameRef { id: p.id.clone(), name: p.name.clone() }).collect();
     }
-    if has(&Kind::Agenda) {
+    if has(&Kind::Agenda) || has(&Kind::Week) {
         d.calendar = Some(crate::calendar::live::view(&cfg, now));
+    }
+    if has(&Kind::Usage) {
+        crate::costslive::request_desk();
+        d.costs = Some(crate::costslive::desk_view());
     }
     if kinds.iter().any(|k| matches!(k, Kind::Script(_))) {
         let ids: Vec<String> = kinds.iter().filter_map(|k| if let Kind::Script(id) = k { Some(id.clone()) } else { None }).collect();
@@ -145,28 +152,37 @@ pub(crate) fn data_for(kind: &Kind) -> DeskData {
 
 /// Vlákno `emit` po každém probuzení: poslat data viditelným widgetům, když se změnila.
 pub(crate) fn tick() {
-    let labels = super::win::shown_labels();
-    if labels.is_empty() {
-        return;
-    }
-    let kinds = super::win::shown_kinds();
-    if kinds.is_empty() {
+    let windows = super::win::shown_windows();
+    if windows.is_empty() {
         return;
     }
     // Záměrně se staví vše najednou a porovnává otisk, ne jednotlivé zdroje: `build` jen čte paměť (žádný disk,
-    // žádná síť), jen pro VIDITELNÉ druhy a jen při probuzení vlákna `emit` (událostmi, jinak 1× za minutu).
+    // žádná síť), jen pro VIDITELNÁ okna a jen při probuzení vlákna `emit` (událostmi, jinak 1× za minutu).
     // Dílčí `invalidate()` po zdrojích by potřebovalo vědět, který zdroj probuzení způsobil (`mark_dirty` to
     // neříká) a při chybě by widget ukazoval zastaralá data; otisk je jediná pojistka bez takového rizika.
-    let data = build(&kinds);
-    let Ok(json) = serde_json::to_string(&data) else { return };
+    let per = per_window(&windows, build);
+    let mut json = String::new();
+    for (label, data) in &per {
+        let Ok(one) = serde_json::to_string(data) else { return };
+        json.push_str(label);
+        json.push('\n');
+        json.push_str(&one);
+        json.push('\n');
+    }
     let h = fnv(&json);
     if LAST.swap(h, Ordering::Relaxed) == h {
         return;
     }
     let app = &core().app;
-    for l in labels {
-        let _ = app.emit_to(l.as_str(), "desk-data", &data);
+    for (l, data) in &per {
+        let _ = app.emit_to(l.as_str(), "desk-data", data);
     }
+}
+
+/// Data pro každé viditelné okno jen jeho druhu: okno Hodin ani Týdne nedostane útratu Clauda, okno Útraty
+/// kalendář apod. `build` se volá s právě jedním druhem okna (druhy ostatních oken se nesčítají).
+pub(crate) fn per_window(windows: &[(String, Kind)], build: impl Fn(&[Kind]) -> DeskData) -> Vec<(String, DeskData)> {
+    windows.iter().map(|(label, kind)| (label.clone(), build(std::slice::from_ref(kind)))).collect()
 }
 
 #[cfg(test)]
@@ -195,6 +211,22 @@ mod tests {
         assert_eq!(folder_name(r"C:\code\app\"), "app");
         assert_eq!(folder_name("C:/code/app"), "app");
         assert_eq!(folder_name("app"), "app");
+    }
+
+    #[test]
+    fn each_window_gets_only_its_own_kind() {
+        use std::cell::RefCell;
+        // `build` dostane vždy jediný druh okna, pro které se staví
+        let seen: RefCell<Vec<Vec<Kind>>> = RefCell::new(vec![]);
+        let fake = |kinds: &[Kind]| {
+            seen.borrow_mut().push(kinds.to_vec());
+            DeskData { working: kinds.contains(&Kind::Usage), ..Default::default() }
+        };
+        let windows = [("desk-clock".to_string(), Kind::Clock), ("desk-week".to_string(), Kind::Week), ("desk-usage".to_string(), Kind::Usage)];
+        let got = per_window(&windows, fake);
+        assert_eq!(*seen.borrow(), [vec![Kind::Clock], vec![Kind::Week], vec![Kind::Usage]]);
+        assert_eq!(got.iter().map(|(l, d)| (l.as_str(), d.working)).collect::<Vec<_>>(), [("desk-clock", false), ("desk-week", false), ("desk-usage", true)]);
+        assert!(per_window(&[], fake).is_empty());
     }
 
     #[test]

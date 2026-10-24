@@ -113,6 +113,13 @@ export const STYLES: readonly StyleDef[] = [
     desc: ["appearance.style.warm.desc", "Teplé espresso a jantarové tóny, oblé rohy a měkké teplé stíny."],
     parts: { theme: "warm", density: "normal", fontScale: 1, radius: "round", opacity: 0.95, strip: "pill", stripSize: "normal", font: "system", material: "tinted", layout: "mosaic", width: "medium", blur: false },
   },
+  // kolo 22 — široký notch (lišta sekcí v pevné šířce, `src/notch/`)
+  {
+    id: "notch",
+    name: ["appearance.style.notch", "Široký notch"],
+    desc: ["appearance.style.notch.desc", "Černá lišta u hrany jako výřez notebooku: přehrávač, dny s časem, systém a hlasitost vedle sebe. Ostatní karty pod ní."],
+    parts: { theme: "oled", density: "compact", fontScale: 1, radius: "round", opacity: 1, strip: "pill", stripSize: "normal", font: "system", material: "solid", layout: "notch", width: "narrow", blur: false },
+  },
 ];
 
 export const STYLE_IDS = STYLES.map((s) => s.id);
@@ -147,11 +154,21 @@ export const FONTS: Record<FontLook, Look> = {
 
 // ---------- materiál ploch (záře, stíny, rámečky — vše statické, žádná animace v klidu) ----------
 const NONE_SH = "0 0 0 0 transparent";
+// Tokeny karet 2026 (kolo 22, `--k-*`): JEDNA sada pro volby plochy karty (`layout/look.ts` `surface`, `grain`,
+// `hero`; pravidla `layout/layout.css` (blok „plocha karty 2026“)). Bez té volby je nic nečte → výchozí vzhled beze změny.
+//  základ `k-base` = stabilní neprůhledná plocha pod textem (mezi pozadím a vystouplou vrstvou motivu),
+//  kontrast `k-contrast` = barva linek a hloubky (průhlednost bílé / černé podle motivu), akcent = `--accent` karty;
+//  poloměr vnitřní = vnější − odsazení (`k-r` − `k-in`), mezera bento mřížky `k-gap` 16 px, zrnění `k-grain` ~3,5 %.
+const CARD_TOKENS: Record<string, string> = {
+  "k-base": "color-mix(in srgb, rgb(var(--bg)), var(--raised) 55%)", "k-contrast": "var(--t1)",
+  "k-glass": "color-mix(in srgb, var(--t1) 7%, transparent)", "k-r": "var(--r-xl)", "k-in": "6px", "k-gap": "16px", "k-grain": "0.035",
+};
 const SOLID: Record<string, string> = {
   "m-glow": "1", "m-shell-ring": NONE_SH, "m-sig": "1", "m-sig-glow": "none",
   "m-card-bg": "var(--card)", "m-card-bd": "1px solid var(--line)", "m-card-sh": "none",
   "m-h-color": "var(--t3)", "m-h-prefix": "none", "m-h-shadow": "none",
   "m-pill-r": "var(--r-xs)", "m-ctl-w": "1px", "m-ctl-sh": "none",
+  ...CARD_TOKENS,
 };
 
 export const MATERIALS: Record<Material, Look> = {
@@ -162,6 +179,7 @@ export const MATERIALS: Record<Material, Look> = {
       ...SOLID, "m-glow": "1.3", "m-shell-ring": "inset 0 -1px 0 color-mix(in srgb, var(--t1) 16%, transparent)",
       "m-card-bg": "color-mix(in srgb, var(--t1) 6%, transparent)", "m-card-bd": "1px solid color-mix(in srgb, var(--t1) 14%, transparent)",
       "m-card-sh": "inset 0 1px 0 color-mix(in srgb, var(--t1) 10%, transparent)", "m-h-color": "var(--t2)", "m-pill-r": "var(--r-pill)",
+      "k-glass": "color-mix(in srgb, var(--t1) 10%, transparent)",
     },
   },
   paper: {
@@ -169,7 +187,7 @@ export const MATERIALS: Record<Material, Look> = {
     vars: {
       ...SOLID, "m-glow": "0", "m-sig": "0.5",
       "m-card-bg": "var(--raised)", "m-card-sh": "0 1px 2px color-mix(in srgb, var(--logo-shadow) 45%, transparent), 0 8px 18px -10px var(--logo-shadow)",
-      "m-h-color": "var(--t2)",
+      "m-h-color": "var(--t2)", "k-base": "var(--raised)",
     },
   },
   glow: {
@@ -188,7 +206,7 @@ export const MATERIALS: Record<Material, Look> = {
     vars: {
       ...SOLID, "m-glow": "0", "m-shell-ring": "inset 0 -3px 0 var(--t1), inset 3px 0 0 var(--t1), inset -3px 0 0 var(--t1)",
       "m-card-bg": "var(--raised)", "m-card-bd": "2px solid var(--t1)", "m-card-sh": "4px 4px 0 var(--t1)",
-      "m-h-color": "var(--t1)", "m-pill-r": "0px", "m-ctl-w": "2px", "m-ctl-sh": "2px 2px 0 var(--t1)",
+      "m-h-color": "var(--t1)", "m-pill-r": "0px", "m-ctl-w": "2px", "m-ctl-sh": "2px 2px 0 var(--t1)", "k-in": "4px",
     },
   },
   soft: {
@@ -240,7 +258,14 @@ export const LAYOUTS: Record<LayoutId, LayoutDef> = {
   mosaic: { name: ["appearance.layout.mosaic", "Mozaika"], cols: 3, vars: { "deck-gap": "var(--s4)", "deck-pad": "0 6px 6px 0", "l-pad": PAD } },
   tiles: { name: ["appearance.layout.tiles", "Dlaždice"], cols: 3, vars: { "deck-gap": "var(--s4)", "deck-pad": "10px", "l-pad": PAD } },
   panel: { name: ["appearance.layout.panel", "Panel"], cols: 4, vars: { "deck-gap": "var(--s3)", "deck-pad": "0px", "l-pad": PAD } },
+  // kolo 22: lišta sekcí nahoře (`notch/NotchBar.tsx`), mezera 16; zbylé karty pod ní ve 2 sloupcích
+  notch: { name: ["appearance.layout.notch", "Široký notch"], cols: 2, vars: { "deck-gap": "16px", "deck-pad": "0px", "l-pad": "var(--s3) 16px 16px" } },
 };
+
+/** Šířka šuplíku v rozložení „Široký notch“ (zrcadlo `look::NOTCH_PX` v Rustu; předvolba šířky se nepoužije). */
+export const NOTCH_PX = 720;
+/** Dolní rohy otevřeného notche (px); sekce uvnitř mají 19 (`notch/notch.css`), mezera 16. */
+export const NOTCH_RADIUS = 24;
 
 /** Šířka předvolby v px (zrcadlo `WidthPreset::px` v look.rs); null = vlastní (`drawer.width`) / celá šířka. */
 export const WIDTHS: Record<WidthPreset, { name: Pair; px: number | null }> = {

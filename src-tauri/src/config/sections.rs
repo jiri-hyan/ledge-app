@@ -61,7 +61,8 @@ sections! {
     links,
     /// Karta Claude: řádek limitů 5h / týden.
     claude_limits,
-    /// Karta Claude: sekce „Útrata (odhad)“. Skrytá = transcripty se neindexují (jako `claude.costs: false`).
+    /// Karta Claude: sekce „Útrata (odhad)“. Skrytá = karta Claude kvůli ní transcripty neindexuje; indexaci ale zapne i karta
+    /// „Claude dnes“ (`usage`) na záložce a widget na ploše (`costslive::wanted`). Úplně vypne `claude.costs: false`.
     claude_costs,
     /// Karta Claude: panel Git u session.
     claude_git,

@@ -8,6 +8,7 @@
 // (`media.variant`, miniatury z `media/VariantPicker.tsx`; ukládá se hned jako ikonka v rohu karty a
 // Nastavení → Obsah karet — jeden zdroj v configu), u karet se zástupci (Projekty, Akce) výběr dlaždice, jejíž
 // vzhled (`tilelook/*`) se má upravit. Ikonka v rohu přehrávače a pravý klik na dlaždici jsou zkratky.
+// Kolo 22: Plocha (Podle stylu / Sklo / Plné), Jemné zrnění a u karet s hlavním číslem „Číslo jako hrdina“.
 import { For, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../i18n";
 import { MenuChoice } from "../cards/CardMenu";
@@ -17,7 +18,7 @@ import { VARIANTS } from "../media/timeline";
 import { openLook } from "../tilelook/state";
 import { closeCardLook, draft, setDraft, target, type Target } from "./lookState";
 import {
-  ACCENT_NAMES, accentCss, BG_NAMES, BGS, CARD_ACCENTS, DENSITIES, DENSITY_NAMES, patchCardLook, VIEW_CARDS, VIEW_NAMES, viewsOf,
+  ACCENT_NAMES, accentCss, BG_NAMES, BGS, CARD_ACCENTS, DENSITIES, DENSITY_NAMES, heroable, patchCardLook, SURFACE_NAMES, SURFACES, VIEW_CARDS, VIEW_NAMES, viewsOf,
   type CardLook,
 } from "./look";
 import { cardName, tx } from "./text";
@@ -83,6 +84,7 @@ function Panel(p: { tg: Target; s?: Snapshot }) {
         </label>
       </div>
       <MenuChoice label={t("cards.cardlook.bg", "Pozadí")} items={BGS.map((b) => ({ v: b, text: tx(BG_NAMES[b]) }))} value={look().bg ?? "style"} onPick={(v) => patch({ bg: v })} />
+      <MenuChoice label={t("cards.cardlook.surface", "Plocha")} items={SURFACES.map((x) => ({ v: x, text: tx(SURFACE_NAMES[x]), title: x === "glass" ? t("cards.cardlook.surface.glassHint", "Průsvitný rám a hlavička, pod textem plná plocha") : undefined }))} value={look().surface ?? "style"} onPick={(v) => patch({ surface: v })} />
       <MenuChoice label={t("cards.cardlook.density", "Hustota")} items={DENSITIES.map((d) => ({ v: d, text: tx(DENSITY_NAMES[d]) }))} value={look().density ?? "style"} onPick={(v) => patch({ density: v })} />
       <Show when={view}>
         {(def) => (
@@ -100,6 +102,18 @@ function Panel(p: { tg: Target; s?: Snapshot }) {
       <Show when={(p.tg.card === "projects" || p.tg.card === "actions") && p.s}>
         {(s) => <TileLooks s={s()} card={p.tg.card} />}
       </Show>
+      <div class="tl-ed-row">
+        <label class="tl-ed-check">
+          <input type="checkbox" checked={!!look().grain} onChange={(e) => patch({ grain: e.currentTarget.checked })} />
+          {t("cards.cardlook.grain", "Jemné zrnění plochy")}
+        </label>
+        <Show when={heroable(p.tg.card)}>
+          <label class="tl-ed-check" title={t("cards.cardlook.heroHint", "Jen skutečné číslo; bez dat zůstane karta jako dřív")}>
+            <input type="checkbox" checked={!!look().hero} onChange={(e) => patch({ hero: e.currentTarget.checked })} />
+            {t("cards.cardlook.hero", "Číslo jako hrdina (velké číslo s grafem)")}
+          </label>
+        </Show>
+      </div>
       <div class="tl-ed-row">
         <label class="tl-ed-check">
           <input type="checkbox" checked={!!look().hideHead} onChange={(e) => patch({ hideHead: e.currentTarget.checked })} />

@@ -34,6 +34,9 @@ fn glyph(g: Glyph) -> &'static str {
         Glyph::Timer => "timer",
         Glyph::Bell => "bell",
         Glyph::Check => "check",
+        Glyph::Sun => "sun",
+        Glyph::Moon => "moon",
+        Glyph::Cloud => "cloud",
     }
 }
 
@@ -46,6 +49,8 @@ fn parts_sig(v: &[Part]) -> String {
             Part::Icon { glyph: g, color, badge: None } => format!("[{}:{}]", glyph(*g), col(*color)),
             Part::Icon { glyph: g, color, badge: Some(b) } => format!("[{}:{} {b}]", glyph(*g), col(*color)),
             Part::Sep => "|".into(),
+            Part::Battery { percent, .. } => format!("▭{percent}"),
+            Part::Ring { fill, color } => format!("◯{}:{}", fill.map(|x| format!("{:.0}", x * 100.0)).unwrap_or_default(), col(*color)),
         })
         .collect::<Vec<_>>()
         .join(" ")
@@ -228,7 +233,8 @@ fn table_11_looks_x_6_states() {
             ],
         ),
     ];
-    assert_eq!(table.len() + 1, Look::ALL.len(), "každý styl kromě classic má řádek");
+    // classic nic neskládá; minimum, trio a rings (kolo 22) mají vlastní tabulku v `capsule::tests`
+    assert_eq!(table.len() + 4, Look::ALL.len(), "každý styl kromě classic a kapslí kola 22 má řádek");
     for (look, want) in &table {
         for (st, w) in STATES.iter().zip(want) {
             let f = facts(*st);
@@ -508,6 +514,55 @@ fn config_old_and_new() {
     assert!(schema.contains("lookHide"));
     // neznámý styl = chyba (jako jiné volby), ne tiché zahození
     assert!(serde_json::from_str::<crate::config::StripConfig>(r#"{"look":"bubble"}"#).is_err());
+    // tvar kapsle (kolo 22): chybí = dnešní tvar; zapisuje se camelCase
+    assert_eq!(cfg.strip.look_shape, Shape::Round);
+    std::fs::write(&p, r#"{"strip":{"look":"trio","lookShape":"island"}}"#).unwrap();
+    let cfg = crate::config::load(&p).unwrap().unwrap();
+    assert_eq!((cfg.strip.look, cfg.strip.look_shape), (Look::Trio, Shape::Island));
+    assert_eq!(serde_json::to_value(&cfg.strip).unwrap()["lookShape"].as_str(), Some("island"));
+    assert!(schema.contains("lookShape"));
+}
+
+#[test]
+fn capsule_shapes() {
+    let s = Show::default();
+    let ks = 1.0;
+    let axis2 = anchor_c2(MON.left, MON.right, 1080, StripPosition::Center, 96);
+    // (styl, tvar) → (rádius, odsazení, celá pilulka, odstup od hrany)
+    let cases = [
+        (Look::Trio, Shape::Round, (18.0, 16.0, false, 0.0)),
+        (Look::Trio, Shape::Sharp, (4.0, 16.0, false, 0.0)),
+        (Look::Trio, Shape::Long, (18.0, 32.0, false, 0.0)),
+        (Look::Trio, Shape::Island, (18.0, 16.0, true, frame::ISLAND_GAP)),
+        (Look::Island, Shape::Sharp, (4.0, 14.0, false, 0.0)),
+        // tvar u stylů bez kapsle nic nemění
+        (Look::Notch, Shape::Island, (18.0, 18.0, false, 0.0)),
+        (Look::Corner, Shape::Sharp, (11.0, 10.0, true, 8.0)),
+        (Look::Line, Shape::Long, (0.0, 0.0, false, 0.0)),
+    ];
+    for (look, shape, (r, pad, pill, gap)) in cases {
+        let sp = frame::shaped(look, frame::spec(look, &s), shape);
+        assert_eq!((sp.r, sp.pad, sp.pill, sp.top_gap), (r, pad, pill, gap), "{look:?} {shape:?}");
+    }
+    // „jako Mac“: tělo 6 px pod hranou, okno o to vyšší, zóna pokryje tělo
+    let sp = frame::shaped(Look::Rings, frame::spec(Look::Rings, &s), Shape::Island);
+    let p = frame::place(Look::Rings, StripPosition::Center, MON, axis2, 100, 28, &sp, ks);
+    assert_eq!((p.oy, p.win.bottom - p.win.top), (6, 34));
+    let (_, _, zb) = frame::zone(p.win, axis2 / 2, MON, 96);
+    assert!(zb >= 34);
+    // prodloužená je širší než dnešní
+    let long = frame::shaped(Look::Minimum, frame::spec(Look::Minimum, &s), Shape::Long);
+    let round = frame::spec(Look::Minimum, &s);
+    assert!(frame::body_width(Look::Minimum, 80.0, &long, ks, MON) > frame::body_width(Look::Minimum, 80.0, &round, ks, MON));
+    // které styly tvar mají
+    let shapeable: Vec<_> = Look::ALL.into_iter().filter(|l| l.shapeable()).map(|l| l.id()).collect();
+    assert_eq!(shapeable, ["island", "icons", "clock", "ghost", "progress", "ticker", "minimum", "trio", "rings"]);
+    // kolo 22: baterie a systém jen u svých stylů; hudbu nové kapsle nespouští
+    for l in Look::ALL {
+        assert_eq!(l.shows_battery(), matches!(l, Look::Minimum | Look::Trio), "{l:?}");
+        assert_eq!(l.shows_system(), l == Look::Trio, "{l:?}");
+    }
+    assert!(!Look::Rings.shows_music() && !Look::Trio.shows_music() && Look::Rings.retreats());
 }
 
 #[test]
@@ -668,4 +723,35 @@ fn island_width_anim() {
     assert!((next - cur).abs() < 5.0, "bez skoku: {cur} → {next}");
     a.reset();
     assert_eq!(a.step(150.0, true, 9000), 150.0, "po skrytí rovnou v cílové šířce");
+}
+
+#[test]
+fn config_080_loads_unchanged() {
+    // tvar configu z vydání 0.8.0 (styly zavřeného Ledge, Pokročilé, design styl s rozložením) — nic z kola 22
+    // se samo nezapne: tvar kapsle = dnešní, rozložení a šířka beze změny, žádné vzorkování systému navíc
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("config.json");
+    let v080 = r##"{
+      "drawer": { "width": 1300, "trigger": "hover", "hover": "full", "hoverDelayMs": 300 },
+      "appearance": { "style": "fluent", "theme": "dark", "layout": "panel", "width": "medium", "material": "acrylic",
+                      "motion": { "style": "smooth", "speed": 1 }, "strip": { "style": "pill", "size": "normal", "position": "center" } },
+      "strip": { "enabled": true, "items": ["clock", "mode", "waiting"], "itemsRev": 2, "look": "island", "lookHide": ["media"] },
+      "media": { "variant": "cover" }
+    }"##;
+    std::fs::write(&p, v080).unwrap();
+    let cfg = crate::config::load(&p).unwrap().unwrap();
+    assert!(crate::config::validate(&cfg).is_ok());
+    assert_eq!((cfg.strip.look, cfg.strip.look_shape, cfg.strip.look_hide.as_slice()), (Look::Island, Shape::Round, &[StripItem::Media][..]));
+    assert_eq!(cfg.appearance.layout, crate::appearance::look::Layout::Panel);
+    assert_eq!(crate::appearance::geom::drawer_width_for(&cfg, 1920, 96), 1080.0);
+    assert!(!crate::integrations::wants(&cfg).system);
+    // tvar kapsle Round = přesně dnešní rozměry každého stylu
+    for look in Look::ALL {
+        let s = show(look, &facts(State::Work));
+        assert_eq!(frame::shaped(look, frame::spec(look, &s), Shape::Round), frame::spec(look, &s), "{look:?}");
+    }
+    // skutečný config stávajícího uživatele (fixture) = klasický proužek, klasické rozložení
+    std::fs::write(&p, include_str!("../fixtures/config-existing-user.json")).unwrap();
+    let cfg = crate::config::load(&p).unwrap().unwrap();
+    assert_eq!((cfg.strip.look, cfg.strip.look_shape, cfg.appearance.layout), (Look::Classic, Shape::Round, crate::appearance::look::Layout::Classic));
 }

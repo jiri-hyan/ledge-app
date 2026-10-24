@@ -31,6 +31,8 @@ registerDict("en", {
   "appearance.style.oled.desc": "Pure black without shadows or blur, sharp accents and maximum contrast for OLED displays.",
   "appearance.style.warm": "Warm",
   "appearance.style.warm.desc": "Warm espresso and amber tones, round corners and soft warm shadows.",
+  "appearance.style.notch": "Wide notch",
+  "appearance.style.notch.desc": "A black bar at the edge like a laptop notch: player, days with the time, system and volume side by side. Other cards below it.",
   "appearance.style.pastel": "Pastel",
   "appearance.style.pastel.desc": "Soft raised tiles, big round corners and pastel colours in three columns.",
   "appearance.part.colors": "colours",
@@ -86,6 +88,7 @@ registerDict("en", {
   "appearance.layout.mosaic": "Mosaic",
   "appearance.layout.tiles": "Tiles",
   "appearance.layout.panel": "Panel",
+  "appearance.layout.notch": "Wide notch",
   // animace
   "appearance.motion.bounce": "Bounce",
   "appearance.motion.fade": "Fade",

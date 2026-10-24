@@ -1,4 +1,5 @@
-//! Index → přehled pro kartu: dnes / 7 dní / okno, top projekty, modely, sloupce po dnech.
+//! Index → přehled pro kartu: dnes / 7 dní / okno, top projekty, modely, sloupce po dnech a dnešek po
+//! hodinách a projektech (časová osa karty „Claude dnes“, kolo 22).
 //! Čisté: projekt podle `cwd` dodá volající (`project_of`). Cena jen z ceníku (`price::cost`);
 //! tokeny modelů bez ceny se sčítají zvlášť (`unpriced`) a cena se za ně nevymýšlí.
 
@@ -34,10 +35,10 @@ pub struct Line {
 
 impl Line {
     fn add(&mut self, tokens: u64, cost: Option<f64>) {
-        self.tokens += tokens;
+        self.tokens = self.tokens.saturating_add(tokens);
         match cost {
             Some(c) => self.cost = Some(self.cost.unwrap_or(0.0) + c),
-            None => self.unpriced += tokens,
+            None => self.unpriced = self.unpriced.saturating_add(tokens),
         }
     }
 }
@@ -62,6 +63,18 @@ pub struct Day {
     pub cost: Option<f64>,
 }
 
+/// Řádek časové osy: projekt a jeho tokeny po místních hodinách dneška (24 čísel; hodina bez odpovědí = 0).
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HourRow {
+    pub name: String,
+    pub tokens: Vec<u64>,
+    /// počet odpovědí API za den
+    pub requests: u64,
+    /// součet zbytku za `TOP`
+    pub other: bool,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Summary {
@@ -69,6 +82,36 @@ pub struct Summary {
     pub ranges: Vec<Range>,
     /// sloupce po dnech od nejstaršího po dnešek (dny bez odpovědí = 0)
     pub days: Vec<Day>,
+    /// dnešek po hodinách a projektech (nejaktivnější první, zbytek za `TOP` v řádku `other`)
+    pub hours: Vec<HourRow>,
+}
+
+/// Dnešek z hodinové agregace indexu → řádky časové osy. Čisté.
+fn hour_rows(ix: &Index, today: i32, project_of: &dyn Fn(&str) -> String) -> Vec<HourRow> {
+    let mut names: HashMap<&str, String> = HashMap::new();
+    let mut rows: HashMap<String, HourRow> = HashMap::new();
+    for (k, s) in ix.hours.iter().filter(|(k, _)| k.day == today) {
+        let name = names.entry(k.cwd.as_str()).or_insert_with(|| project_of(&k.cwd)).clone();
+        let r = rows.entry(name.clone()).or_insert_with(|| HourRow { name, tokens: vec![0; 24], ..HourRow::default() });
+        let h = usize::from(k.hour.min(23));
+        r.tokens[h] = r.tokens[h].saturating_add(s.t.total());
+        r.requests = r.requests.saturating_add(s.n);
+    }
+    let mut v: Vec<HourRow> = rows.into_values().collect();
+    let sum = |r: &HourRow| r.tokens.iter().copied().fold(0, u64::saturating_add);
+    v.sort_by(|a, b| sum(b).cmp(&sum(a)).then(a.name.cmp(&b.name)));
+    if v.len() > TOP + 1 {
+        let rest = v.split_off(TOP);
+        let mut o = HourRow { tokens: vec![0; 24], other: true, ..HourRow::default() };
+        for r in rest {
+            for (i, t) in r.tokens.iter().enumerate() {
+                o.tokens[i] = o.tokens[i].saturating_add(*t);
+            }
+            o.requests = o.requests.saturating_add(r.requests);
+        }
+        v.push(o);
+    }
+    v
 }
 
 /// Den (dny od 1970-01-01) → `YYYY-MM-DD`.
@@ -83,8 +126,8 @@ fn top(map: HashMap<String, Line>) -> Vec<Line> {
         let rest = v.split_off(TOP);
         let mut o = Line { other: true, ..Line::default() };
         for l in rest {
-            o.tokens += l.tokens;
-            o.unpriced += l.unpriced;
+            o.tokens = o.tokens.saturating_add(l.tokens);
+            o.unpriced = o.unpriced.saturating_add(l.unpriced);
             if let Some(c) = l.cost {
                 o.cost = Some(o.cost.unwrap_or(0.0) + c);
             }
@@ -132,12 +175,12 @@ pub fn build(ix: &Index, today: i32, window: u32, project_of: &dyn Fn(&str) -> S
             Day { date: date_of(d), tokens: l.tokens, cost: l.cost }
         })
         .collect();
-    Summary { ranges, days }
+    Summary { ranges, days, hours: hour_rows(ix, today, project_of) }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::index::{Key, Sum};
+    use super::super::index::{HourKey, Key, Sum};
     use super::super::parse::Tokens;
     use super::*;
 
@@ -216,5 +259,59 @@ mod tests {
         assert_eq!(sp.input + sp.output + sp.cache_write + sp.cache_read, t.total());
         assert_eq!(date_of(0), "1970-01-01");
         assert_eq!(date_of(20_743), "2026-10-17");
+    }
+
+    #[test]
+    fn hours_rows_today_by_project() {
+        let mut ix = Index::default();
+        let put = |ix: &mut Index, day: i32, hour: u8, cwd: &str, n: u64| {
+            let s = ix.hours.entry(HourKey { day, hour, cwd: cwd.into() }).or_default();
+            s.t.add(&out(n));
+            s.n += 1;
+        };
+        put(&mut ix, 10, 9, r"C:\ledge", 100);
+        put(&mut ix, 10, 9, r"C:\ledge\wt", 50); // stejný projekt
+        put(&mut ix, 10, 23, r"C:\x\app", 7);
+        put(&mut ix, 9, 22, r"C:\x\app", 1_000); // včera — do dneška nepatří
+        let rows = build(&ix, 10, 30, &proj).hours;
+        assert_eq!(rows.len(), 2);
+        assert_eq!((rows[0].name.as_str(), rows[0].tokens[9], rows[0].requests), ("Ledge", 150, 2));
+        assert_eq!(rows[0].tokens.len(), 24);
+        assert_eq!((rows[1].name.as_str(), rows[1].tokens[23], rows[1].tokens[22]), ("app", 7, 0));
+        // prázdný dnešek = žádné řádky (ne vymyšlené nuly projektů)
+        assert!(build(&ix, 11, 30, &proj).hours.is_empty());
+        // víc projektů než TOP + 1 → zbytek v řádku „ostatní“
+        let mut many = Index::default();
+        for i in 0..8u8 {
+            put(&mut many, 0, i, &format!(r"C:\p{i}"), u64::from(i) + 1);
+        }
+        let r = build(&many, 0, 30, &proj).hours;
+        assert_eq!(r.len(), TOP + 1);
+        assert_eq!(r[0].name, "p7");
+        assert!(r[TOP].other);
+        assert_eq!(r[TOP].tokens.iter().sum::<u64>(), 1 + 2 + 3);
+    }
+
+    #[test]
+    fn hours_huge_numbers_saturate_instead_of_panicking() {
+        // rozbitý řádek s obřím číslem (u64::MAX) v jedné hodině a dvou složkách téhož projektu: žádný přetečení
+        // (debug panic / zalomení do malého čísla), řazení i „ostatní“ taky
+        let mut ix = Index::default();
+        for (cwd, n) in [(r"C:\ledge", u64::MAX), (r"C:\ledge\wt", u64::MAX)] {
+            let s = ix.hours.entry(HourKey { day: 3, hour: 5, cwd: cwd.into() }).or_default();
+            s.t.add(&out(n));
+            s.n = u64::MAX;
+        }
+        for i in 0..8u8 {
+            let s = ix.hours.entry(HourKey { day: 3, hour: i, cwd: format!(r"C:\p{i}") }).or_default();
+            s.t.add(&out(u64::MAX));
+            s.n = u64::MAX;
+        }
+        let r = build(&ix, 3, 30, &proj).hours;
+        assert_eq!(r.len(), TOP + 1);
+        assert_eq!((r[0].tokens[5], r[0].requests), (u64::MAX, u64::MAX));
+        let other = &r[TOP];
+        assert!(other.other);
+        assert!(other.tokens.iter().all(|t| *t == u64::MAX || *t == 0) && other.requests == u64::MAX);
     }
 }

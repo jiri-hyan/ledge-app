@@ -99,8 +99,11 @@ function Publish-Release([string]$repo, [string]$target) {
   }
   if ($LASTEXITCODE -ne 0) { Fail "nahrání konceptu $tag do $repo selhalo — koncept zůstal neveřejný, spusť publish.ps1 znovu" }
   $want = @($assets | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object)
-  $got = @(gh release view $tag --repo $repo --json assets --jq '.assets[] | select(.state == "uploaded") | .name' | Sort-Object)
-  if ($LASTEXITCODE -ne 0 -or ($want -join '|') -ne ($got -join '|')) { Fail "koncept $tag v $repo nemá přesně soubory $($want -join ', ') (má: $($got -join ', ')) — nepublikuji" }
+  # bez --jq s uvozovkami: Windows PowerShell 5.1 vnitřní " u nativních příkazů zahodí (jq pak hlásí „uploaded/0“)
+  $json = gh release view $tag --repo $repo --json assets
+  $viewOk = $LASTEXITCODE -eq 0
+  $got = @(($json | ConvertFrom-Json).assets | Where-Object { $_.state -eq 'uploaded' } | ForEach-Object { $_.name } | Sort-Object)
+  if (-not $viewOk -or ($want -join '|') -ne ($got -join '|')) { Fail "koncept $tag v $repo nemá přesně soubory $($want -join ', ') (má: $($got -join ', ')) — nepublikuji" }
   gh release edit $tag --repo $repo --draft=false
   if ($LASTEXITCODE -ne 0) { Fail "publikace konceptu $tag ($repo) selhala — koncept je úplný: gh release edit $tag --repo $repo --draft=false" }
 }

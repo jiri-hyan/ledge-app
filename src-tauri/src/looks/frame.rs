@@ -2,7 +2,7 @@
 //! šířka těla, okno vrstveného proužku a poloha těla v něm (`place`), hover zóna (`zone`), výchozí
 //! tvar morfu šuplíku (`morph_body`) a plynulá změna šířky ostrůvku (`WidthAnim`). Kreslí `stripdraw`.
 
-use super::{Look, Show};
+use super::{Look, Shape, Show};
 use crate::appearance::StripPosition;
 use crate::appearance::geom::span_x;
 use crate::strip::Rgba;
@@ -115,6 +115,26 @@ pub fn spec(look: Look, show: &Show) -> Spec {
             ..base
         },
         Look::Ticker => Spec { h: 24.0, r: 12.0, min_w: 200.0, font: 12.0, fill: Rgba(0.0, 0.0, 0.0, 0.7), ..base },
+        // kolo 22: malá kapsle (baterie + čas), trojice ~360 × 36, stav Clauda s prstenci (`dot` = průměr prstence)
+        Look::Minimum => Spec { h: 24.0, r: 12.0, pad: 12.0, gap: 6.0, min_w: 64.0, font: 12.0, ..base },
+        Look::Trio => Spec { h: 36.0, r: 18.0, pad: 16.0, gap: 8.0, min_w: 200.0, font: 12.5, ..base },
+        Look::Rings => Spec { h: 28.0, r: 14.0, pad: 12.0, gap: 6.0, min_w: 72.0, font: 13.0, dot: 16.0, ..base },
+    }
+}
+
+/// Odstup kapsle „jako Mac“ od horní hrany (logické px).
+pub const ISLAND_GAP: f32 = 6.0;
+
+/// Tvar kapsle (`strip.lookShape`) na rozměry stylu; styly bez `shapeable` beze změny.
+pub fn shaped(look: Look, sp: Spec, shape: Shape) -> Spec {
+    if !look.shapeable() {
+        return sp;
+    }
+    match shape {
+        Shape::Round => sp,
+        Shape::Sharp => Spec { r: sp.r.min(4.0), ..sp },
+        Shape::Long => Spec { pad: sp.pad * 2.0, min_w: sp.min_w.max(200.0), ..sp },
+        Shape::Island => Spec { pill: true, top_gap: ISLAND_GAP, ..sp },
     }
 }
 
@@ -159,7 +179,9 @@ pub fn place(look: Look, pos: StripPosition, mon: RECT, axis2: i32, bw: i32, bh:
     let e = (sp.ears * ks).ceil() as i32;
     let w = bw + 2 * e;
     let x = fit(span_x(axis2, bw) - e, w);
-    Placed { win: RECT { left: x, top, right: x + w, bottom: top + bh }, ox: e, oy: 0, bw, bh }
+    // kapsle „jako Mac“ (`Shape::Island`) visí kousek pod hranou; ostatní tvary u hrany (`top_gap` 0)
+    let tg = (sp.top_gap * ks).round() as i32;
+    Placed { win: RECT { left: x, top, right: x + w, bottom: top + tg + bh }, ox: e, oy: tg, bw, bh }
 }
 
 /// Hover zóna u horní hrany (px): obdélník proužku (`srect`, i s okolím 24 px) oříznutý na monitor,

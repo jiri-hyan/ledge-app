@@ -1,0 +1,76 @@
+/* Nové widgety kola 22 (`src/board/`): Claude dnes, Týden, Velké hodiny, Rychlé přepínače. Prefix `bd-`, jen
+   tokeny ze styles.css (barvy, písma, mezery) — design styly je přebarví samy. Žádná animace v klidu. */
+
+/* kořeny karet (obsah nesmí roztáhnout mřížku) */
+.bd-usage, .bd-week, .bd-clock, .bd-toggles { min-width: 0; }
+
+/* štítek původu čísla (oficiální / odhad) */
+.bd-origin { margin-left: var(--s2); padding: 0 6px; border-radius: var(--r-pill); font: 600 var(--fs-2xs) var(--sans); color: var(--amber); background: var(--well); letter-spacing: 0.02em; }
+.bd-origin-off { color: var(--green); }
+
+/* společné */
+.bd-note { font: var(--fs-xs) var(--sans); color: var(--t3); display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.bd-calm { color: var(--t2); }
+.bd-h { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: var(--s2); }
+.bd-foot { font: var(--fs-2xs) var(--mono); color: var(--t3); margin-top: var(--s1); }
+.bd-sub { font: var(--fs-2xs) var(--mono); color: var(--t3); }
+
+/* Claude dnes: číslo jako hrdina + sloupce 7 dní + časová osa */
+.bd-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s3, 12px); margin-top: 2px; }
+.bd-hero-main, .bd-hero-side { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bd-hero-side { align-items: flex-end; text-align: right; }
+.bd-big { font: 650 calc(34px * var(--fz))/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--t0, var(--t1)); }
+.bd-mid { font: 600 calc(18px * var(--fz))/1 var(--display); font-variant-numeric: tabular-nums; color: var(--t1); }
+/* sloupce 7 dní = sdílený `src/charts/Bars` (barva fialová přes --chart-c) */
+.bd-bars { --chart-c: var(--violet); margin-top: var(--s2); }
+.bd-tl { display: flex; flex-direction: column; gap: 3px; margin-top: var(--s1); }
+.bd-tl-row { display: grid; grid-template-columns: minmax(3em, 7em) minmax(0, 1fr); align-items: center; gap: var(--s2); }
+.bd-tl-name { font: var(--fs-2xs) var(--sans); color: var(--t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-tl-cells { display: grid; grid-template-columns: repeat(var(--bd-cols, 24), minmax(0, 1fr)); gap: 2px; }
+.bd-cell { display: block; height: 9px; border-radius: 2px; background: var(--well); }
+.bd-cell[data-l="1"] { background: color-mix(in srgb, var(--violet) 30%, transparent); }
+.bd-cell[data-l="2"] { background: color-mix(in srgb, var(--violet) 55%, transparent); }
+.bd-cell[data-l="3"] { background: color-mix(in srgb, var(--violet) 78%, transparent); }
+.bd-cell[data-l="4"] { background: var(--violet); }
+.bd-tl-axis .bd-tl-cells { display: flex; justify-content: space-between; font: var(--fs-2xs) var(--mono); color: var(--t3); }
+
+/* Týden: velký měsíc + čas, pás dnů, zbytek dneška */
+.bd-wk-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
+.bd-month { font: 650 calc(30px * var(--fz))/1 var(--display); letter-spacing: -0.01em; text-transform: capitalize; color: var(--t1); }
+.bd-wk-time { font: 600 calc(22px * var(--fz))/1 var(--display); font-variant-numeric: tabular-nums; color: var(--t2); }
+.bd-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin-top: var(--s2); }
+.bd-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0 4px; border-radius: var(--r-sm); }
+.bd-dow { font: 600 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; }
+.bd-dnum { font: 600 var(--fs-body) var(--display); font-variant-numeric: tabular-nums; color: var(--t1); }
+.bd-weekend .bd-dnum, .bd-weekend .bd-dow { color: var(--rose, var(--red)); }
+.bd-today { background: var(--accent); }
+.bd-today .bd-dnum, .bd-today .bd-dow { color: var(--on-accent, #fff); }
+.bd-dot { display: block; width: 4px; height: 4px; border-radius: 50%; background: transparent; }
+.bd-dot.on { background: var(--t2); }
+.bd-today .bd-dot.on { background: var(--on-accent, #fff); }
+.bd-evs { display: flex; flex-direction: column; gap: 2px; margin-top: var(--s2); }
+.bd-ev { display: grid; grid-template-columns: 4.2em minmax(0, 1fr); gap: var(--s2); font: var(--fs-xs) var(--sans); color: var(--t2); }
+.bd-ev.on { color: var(--t1); }
+.bd-ev-t { font-family: var(--mono); color: var(--t3); font-variant-numeric: tabular-nums; }
+.bd-ev-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-week .bd-note { margin-top: var(--s2); }
+
+/* Velké hodiny */
+.bd-digits { display: flex; align-items: baseline; gap: 0.12em; font: 650 calc(64px * var(--fz))/0.95 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--t0, var(--t1)); margin-top: 2px; }
+.bd-hh { color: inherit; }
+.bd-mm { color: var(--t2); }
+.bd-ss { font-size: 0.32em; font-weight: 500; color: var(--t3); margin-left: 0.2em; }
+.bd-cdate { font-size: var(--fs-body); color: var(--t2); margin-top: var(--s2); }
+
+/* Rychlé přepínače */
+.bd-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: var(--s2); }
+.bd-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--s2); border-radius: var(--r-sm); background: var(--well); color: var(--t2); text-align: left; min-width: 0; }
+.bd-tile.on { background: color-mix(in srgb, var(--accent) 22%, var(--well)); color: var(--t1); }
+.bd-tile:not(.bd-tile-ro):hover { background: var(--well-2, var(--well)); }
+.bd-tile-ic { font-size: calc(18px * var(--fz)); line-height: 1; }
+.bd-tile-n { font: 600 var(--fs-xs) var(--sans); }
+.bd-tile-v { font: var(--fs-2xs) var(--mono); color: var(--t3); font-variant-numeric: tabular-nums; }
+.bd-vol { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s2); margin-top: var(--s2); }
+.bd-vol-track { display: block; height: 6px; border-radius: var(--r-pill); background: var(--well); overflow: hidden; }
+.bd-vol-track i { display: block; height: 100%; background: var(--accent); border-radius: var(--r-pill); }
+.bd-vol-track i.bd-vol-mute { background: var(--t3); }

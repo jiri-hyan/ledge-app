@@ -90,7 +90,7 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
 
 test("katalog: co na záložce není a kde to je", () => {
   const d = fullLayout();
-  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today"]);
+  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today", "usage", "week", "bigclock", "toggles"]);
   // GitHub, Systém a Pošta jsou v katalogu, ale na žádné záložce (výchozí rozložení se nemění)
   assert.deepEqual(catalog(d, "prace").filter((x) => ["github", "system", "mail", "today"].includes(x.id)).map((x) => x.on), [[], [], [], []]);
   assert.deepEqual(catalog(d, "osobni").find((x) => x.id === "mail").on, []);

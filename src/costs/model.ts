@@ -26,6 +26,13 @@ export interface CostDay {
   tokens: number;
   cost: number | null;
 }
+/** Řádek časové osy (Rust `usage::view::HourRow`): projekt a tokeny po místních hodinách dneška (24 čísel). */
+export interface CostHourRow {
+  name: string;
+  tokens: number[];
+  requests: number;
+  other: boolean;
+}
 export interface CostsView {
   state: "off" | "idle" | "computing" | "ok" | "error";
   /** 0–1, jen při přepočtu */
@@ -33,7 +40,8 @@ export interface CostsView {
   computedAt: number | null;
   error: string | null;
   windowDays: number;
-  summary: { ranges: CostRange[]; days: CostDay[] } | null;
+  /** `hours` = dnešek po hodinách a projektech (kolo 22, karta Claude dnes); starý snapshot bez pole = nic */
+  summary: { ranges: CostRange[]; days: CostDay[]; hours?: CostHourRow[] } | null;
   pricesVerified: string;
   pricesSource: string;
 }

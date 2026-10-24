@@ -11,9 +11,9 @@ dnech. Zdroj = lokální transcripty Claude Code `~/.claude/projects/<slug>/**/*
 |---|---|---|
 | `src-tauri/src/usage/parse.rs` | řádek JSONL → záznam (součty tokenů nasycené, ne přetékající) (jen `type:"assistant"` s `message.usage`), předfiltr bajtů, klíč deduplikace, `cwd` z libovolného řádku | `parse_line`, `Rec`, `Tokens`, `maybe_usage`, `fnv`, `iso_ms`, `line_cwd` |
 | `src-tauri/src/usage/price.rs` | ceník USD / 1M tokenů jako data (datum ověření + zdroj), kanonické id modelu, pásma (Haiku 5.5 > 100k, fast, `inference_geo: us`), cena | `MODELS`, `VERIFIED`, `SOURCE`, `canonical`, `lookup`, `tier`, `cost`, `display`, `TIER_*`, `LONG_PROMPT` |
-| `src-tauri/src/usage/index.rs` | inkrementální index na disku: výpis souborů, čtení od offsetu, dedup, agregace den × cwd × model × pásmo, uložení | `Index`, `Index::update`, `Index::add`, `list_files`, `Found`, `Window`, `Stats`, `FileEntry`, `Key`, `Sum`, `load`, `save`, `encode_seen`, `decode_seen`, `VERSION` |
-| `src-tauri/src/usage/view.rs` | index → přehled (rozsahy, top projekty/modely + „ostatní“, dny) | `build`, `Summary`, `Range`, `Line`, `Day`, `Split`, `TOP`, `date_of` |
-| `src-tauri/src/costslive.rs` | za běhu: žádost s omezením, vlákno s nízkou prioritou, průběh, přehled v paměti, projekt z `cwd` | `request`, `view`, `CostsView`, `compute`, `project_name`, `local_day`, `THROTTLE` |
+| `src-tauri/src/usage/index.rs` | inkrementální index na disku: výpis souborů, čtení od offsetu po celých řádcích (řádek nad `MAX_LINE` = 8 MB se přeskočí bez načtení do paměti), dedup, agregace den × cwd × model × pásmo a (kolo 22) dnešek + včerejšek po místních hodinách × cwd (`hours`, verze 2 = jednou přepočet), uložení | `Index`, `Index::update`, `Index::add`, `list_files`, `Found`, `Window`, `Stats`, `FileEntry`, `Key`, `HourKey`, `HOUR_DAYS`, `MAX_LINE`, `Sum`, `load`, `save`, `encode_seen`, `decode_seen`, `VERSION` |
+| `src-tauri/src/usage/view.rs` | index → přehled (rozsahy, top projekty/modely + „ostatní“, dny, dnešek po hodinách a projektech `hours` pro kartu Claude dnes) | `build`, `Summary`, `Range`, `Line`, `Day`, `HourRow`, `hour_rows`, `Split`, `TOP`, `date_of` |
+| `src-tauri/src/costslive.rs` | za běhu: žádost s omezením, vlákno s nízkou prioritou, průběh, přehled v paměti, projekt z `cwd`; kolo 22: kdo přehled chce (`wanted`: sekce v kartě Claude nebo karta Claude dnes `USAGE_CARD`), místní hodina pro časovou osu, widget na ploše (`request_desk` 1× / `DESK_EVERY`, `desk_view`) — [board.md](board.md) | `request`, `view`, `CostsView`, `compute`, `project_name`, `local_day`, `local_hour`, `wanted`, `request_desk`, `desk_view`, `THROTTLE`, `DESK_EVERY` |
 | `src-tauri/src/commands/costs.rs` | Tauri příkaz | `costs_refresh` |
 | lepidlo | `lib.rs` (`mod usage`, `mod costslive`, registrace `costs_refresh`), `snapshot.rs` (`Snapshot.costs`), `config/*` (`ClaudeConfig.costs`), `Cargo.toml` (`memchr`, už ve stromu přes regex) | |
 | `src/costs/model.ts` | čistá logika UI + typy zrcadla (`CostsView`) — test `model.test.mjs` | `compact`, `usdDigits`, `bars`, `share`, `progressPct`, `pickRange` |
@@ -32,8 +32,9 @@ podle `cwd` → `Live.summary` → `Snapshot.costs` → `CostsSection`. Vlákno 
 ## Invarianty a pasti
 
 - **Žádný sken v klidu:** přepočet jen na žádost UI s rozbalenou sekcí v otevřeném šuplíku, nejvýš 1× za
-  `THROTTLE` (60 s), nikdy dva naráz; vypnuté `claude.costs` nebo skrytá sekce/karta (`drawer.sections.claudeCosts`
-  / `.claude`, `costslive::enabled`) = nic se nečte a sekce zmizí. V paměti zůstane
+  `THROTTLE` (60 s), nikdy dva naráz; vypnuté `claude.costs` = nic se nečte; skrytá sekce/karta (`drawer.sections.claudeCosts`
+  / `.claude`, `costslive::enabled`) = nic se nečte, jen když přehled neukazuje i karta `usage` na záložce
+  nebo widget na ploše (`costslive::wanted`). V paměti zůstane
   jen hotový `Summary` (pár kB); index, množina viděných i výpis souborů se po běhu zahodí.
 - **Inkrement:** soubor s mtime před místní půlnocí začátku okna se neotevře (stat z výpisu složky) a vypadne
   z indexu; nezměněný (délka + mtime) se neotevře; změněný se čte od `FileEntry.off` jen do délky z výpisu a

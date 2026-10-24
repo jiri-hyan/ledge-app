@@ -53,10 +53,19 @@ import { beginEdit, catalogOpen, draft, editing, editPage, saveLayout, setCatalo
 import { LIMIT_CARDS, limitOf, normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type CardSize, type PartKey } from "./layout/model";
 import { sizeOutcome } from "./layout/size";
 import { colsNow } from "./layout/cols";
+import { heroFacts } from "./layout/hero";
+import HeroCard from "./layout/HeroCard";
 import { t } from "./i18n";
 import WidgetCard from "./widgets/WidgetCard";
 import { rememberWidgets } from "./widgets/registry";
 import SuggestBar from "./suggest/SuggestBar";
+import NotchBar from "./notch/NotchBar";
+import { notchSections, takenCards } from "./notch/model";
+import { layoutNow } from "./theme/apply";
+import UsageCard from "./board/UsageCard";
+import WeekCard from "./board/WeekCard";
+import BigClockCard from "./board/BigClockCard";
+import TogglesCard from "./board/TogglesCard";
 
 export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
   // stejné rozložení = stejný objekt (nový snapshot karty nepřestaví)
@@ -76,7 +85,13 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     media: !!((on("nowPlaying") && p.s.personal.media) || (on("sound") && p.s.personal.volume) || (on("favorites") && p.s.personal.mediaLook?.favorites?.length)),
   });
   const shown = () => shownCards(page(), facts()).map((c) => c.id);
-  const shows = (id: CardId) => shown().includes(id);
+  // široký notch (rozložení `notch`, kolo 22): lišta sekcí z karet záložky; převzaté karty se pod ní nekreslí
+  const notch = createMemo(() => {
+    if (layoutNow() !== "notch" || editing()) return { sections: [], taken: [] as string[] };
+    const sections = notchSections(shown(), { media: on("nowPlaying") && !!p.s.personal.media, volume: on("sound") && !!p.s.personal.volume });
+    return { sections, taken: takenCards(shown(), sections) };
+  });
+  const shows = (id: CardId) => shown().includes(id) && !notch().taken.includes(id);
   const edit = (catalog = false) => beginEdit(p.s, catalog);
   const cardOf = (id: CardId) => page().cards.find((c) => c.id === id);
   /** co udělá volba velikosti v ⋯ (karty v pořadí, jak je mřížka ukazuje; `size.ts` `sizeOutcome`) */
@@ -112,7 +127,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     void closeCardLook(true);
   }, { defer: true }));
   const menu = (card: CardId, parts: PartKey[] = []) => (
-    <CardMenu card={card} page={page().id} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} outcome={outcome(card)} limit={LIMIT_CARDS.includes(card) ? limitOf(cardOf(card)) : undefined} look={cardOf(card)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={card === "notes" ? pinMenuItems(p.s) : card === "claude" ? exportMenuItems(p.s) : undefined}>
+    <CardMenu card={card} page={page().id} bento={!!page().bento} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} outcome={outcome(card)} limit={LIMIT_CARDS.includes(card) ? limitOf(cardOf(card)) : undefined} look={cardOf(card)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={card === "notes" ? pinMenuItems(p.s) : card === "claude" ? exportMenuItems(p.s) : undefined}>
       <Show when={card === "projects"}>
         <TileOptions page={page().id} tiles={tiles()} projects={p.s.projects} cfgError={p.s.cfgError} />
       </Show>
@@ -169,6 +184,15 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         return <GithubCard now={p.now} cfgError={p.s.cfgError} menu={menu("github")} />;
       case "system":
         return <SystemCard menu={menu("system")} />;
+      // kolo 22 (nové widgety, `src/board/`)
+      case "usage":
+        return <UsageCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("usage")} />;
+      case "week":
+        return <WeekCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("week")} />;
+      case "bigclock":
+        return <BigClockCard now={p.now} menu={menu("bigclock")} />;
+      case "toggles":
+        return <TogglesCard s={p.s} menu={menu("toggles")} />;
       default:
         // widget ze skriptu (`widget:<soubor>`)
         return <WidgetCard s={p.s} id={id} now={p.now} menu={(extra) => <CardMenu card={id} page={page().id} size={cardOf(id)?.size} h={cardOf(id)?.h} outcome={outcome(id)} look={cardOf(id)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={extra} />} />;
@@ -181,12 +205,13 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       <Show when={!has("claude")}><ClaudeInbox s={p.s} /></Show>
       <BgLaunch s={p.s} />
       {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
-      <Show when={has("media") || has("clock")}><PersonalLive /></Show>
+      <Show when={has("media") || has("clock") || has("toggles")}><PersonalLive /></Show>
       {/* kontextové návrhy (max 3 chipy) — jen z reálných událostí, `src/suggest/` */}
       <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
       {/* přetažení odkazu / souboru na otevřený šuplík → editor akce s návrhem (`actions/DropNew.tsx`) */}
       <Show when={dropped() && !editing()}><DropNew s={p.s} page={page().id} /></Show>
-      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} begin={() => edit()} />
+      <Show when={notch().sections.length > 0}><NotchBar s={p.s} now={p.now} sections={notch().sections} /></Show>
+      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} begin={() => edit()} hero={{ facts: (id) => heroFacts(id, p.s, p.now), render: (id, f) => <HeroCard id={id} facts={f()} menu={menu(id)} /> }} />
       <Show when={cardLookTarget()?.page === page().id}><CardLookPanel page={page().id} s={p.s} /></Show>
       <TileMenu />
       <Show when={editing() && catalogOpen()}><Catalog layout={layout()} /></Show>

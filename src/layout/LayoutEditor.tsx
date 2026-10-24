@@ -14,7 +14,8 @@ import {
   type CardHeight, type CardId, type Layout, type LayoutCard, type PartKey,
 } from "./model";
 import { heightLabel } from "./Deck";
-import { packSpans } from "./size";
+import { packSpans, spanOf } from "./size";
+import { setBento } from "./bento";
 import { patchCardLook, setCardLook, VIEW_CARDS, VIEW_NAMES, viewOf, viewsOf, type CardView } from "./look";
 import { colsNow } from "./cols";
 import { tileSizeName } from "../cards/TileOptions";
@@ -131,7 +132,7 @@ export default function LayoutEditor() {
 
   // náhled se stejným počtem sloupců, jaký má mřížka šuplíku teď (`--deck-cols` stylu)
   const cols = () => colsNow();
-  const spans = createMemo(() => packSpans(pg().cards.map((k) => k.size), cols()));
+  const spans = createMemo(() => (pg().bento ? pg().cards.map((k) => spanOf(k.size, cols())) : packSpans(pg().cards.map((k) => k.size), cols())));
 
   return (
     <>
@@ -199,6 +200,10 @@ export default function LayoutEditor() {
                 else put(next);
               }}
             />
+            <label class="lay-st-bento" title={t("settings.layout.bentoHint", "Karty jako dlaždice 1 × 1, 2 × 1, 2 × 2 v pevných řádcích, mezery se zaplní samy. Velikost dlaždice: ⋯ na kartě → Dlaždice.")}>
+              <input type="checkbox" checked={!!pg().bento} onChange={(e) => put(setBento(L(), pg().id, e.currentTarget.checked))} />
+              {t("settings.layout.bento", "Bento mřížka")}
+            </label>
             <span class="grow" />
             <Show when={L().pages.length > 1}>
               <button
@@ -227,12 +232,12 @@ export default function LayoutEditor() {
               <div class="lay-st-pv-lbl">
                 <span>{t("settings.layout.preview", "Náhled mřížky záložky (klik na kartu změní šířku)")}</span>
               </div>
-              <div class="lay-st-pv-grid">
+              <div class="lay-st-pv-grid" data-bento={pg().bento ? "" : undefined}>
                 <For each={pg().cards}>
                   {(cd, idx) => (
                     <button
                       class="lay-st-pv-cell"
-                      style={{ "--span": String(spans()[idx()] ?? 2) }}
+                      style={{ "--span": String(spans()[idx()] ?? 2), "--h": pg().bento ? String(cd.h ?? 2) : undefined }}
                       title={t("cards.layout.sizeTitle", "Velikost: {size} — klik změní", { size: sizeName(cd.size) })}
                       onClick={() => put(setSize(L(), pg().id, cd.id, nextSize(cd.size)))}
                     >

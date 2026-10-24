@@ -1,5 +1,7 @@
 //! Vlákno `hover`: poloha myši (100 ms daleko od okraje, 16 ms u něj), fullscreen (500 ms),
 //! lištové okno v popředí (100 ms), tlak na hranu (`edge.rs`, `rawpush.rs`) → otevření/zavření šuplíku.
+//! Skrytý nebo do okna zamčený kurzor (hra) šuplík neotevře (`pointer::blocked_now`); změna monitoru / DPI
+//! proužek hned přepočítá (`pointer::display_changed`).
 
 use crate::appearance::geom;
 use crate::config::{self, Trigger};
@@ -35,7 +37,14 @@ pub(crate) fn spawn_hover_thread() {
             loop {
                 let c = core();
                 if last_mon.elapsed() > Duration::from_secs(3) {
+                    let before = mon;
                     mon = c.monitor_fresh();
+                    // jiné rozlišení / DPI / monitor (probuzení, odpojení): proužek a zóna hned na nové místo
+                    if super::pointer::display_changed(&before, &mon) {
+                        log(&format!("monitor proužku se změnil: {:?} @ {} dpi", (mon.rect.left, mon.rect.top, mon.rect.right, mon.rect.bottom), mon.dpi));
+                        refresh_strip();
+                        mark_dirty();
+                    }
                     let now_mons = screen::monitors().iter().map(|m| m.rect).collect::<Vec<_>>();
                     if now_mons != others {
                         // připojený monitor → widgety na ploše, které stály mimo domov, jdou domů
@@ -214,8 +223,10 @@ pub(crate) fn spawn_hover_thread() {
                         let delays = edge::Delays { edge: edge_ms, dwell: dwell_ms, hover: hover_ms };
                         let armed = edge::armed(trigger, bar_push, at_edge, on_strip, push_state, &delays);
                         let (armed, full) = edge::hover_open(armed, peek_hover, dwell_ms, c.claude.attention());
-                        // tah na přihrádku šuplík neotevírá
-                        let armed = if dropping { None } else { armed };
+                        // tah na přihrádku šuplík neotevírá; skrytý / zamčený kurzor (hra v okně) taky ne —
+                        // kurzor se čte jen u hrany v zóně
+                        let blocked = armed.is_some() && (at_edge || on_strip) && super::pointer::blocked_now();
+                        let armed = if dropping || blocked { None } else { armed };
                         // při tlačení proužek (linka) „nažhaví“ už během nabíjení
                         let pushing = bar_push && trigger != Trigger::Off && push_state != edge::Push::Idle;
                         let hot = (armed.is_some() || pushing) && !peek_hover;

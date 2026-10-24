@@ -5,7 +5,7 @@
 //  - náhled „monitor ve skutečném poměru“: šířka šuplíku v px (zrcadlo Rust `appearance::geom::preset_width`),
 //    skutečný počet sloupců mřížky (rozložení stylu, `theme/looks.ts` `LAYOUTS`) a ukázkové karty.
 import type { Appearance, LayoutId, WidthPreset } from "../types.ts";
-import { LAYOUTS, WIDTHS } from "../theme/looks.ts";
+import { LAYOUTS, NOTCH_PX, WIDTHS } from "../theme/looks.ts";
 
 export const STEPS = ["closed", "hover", "open", "motion"] as const;
 export type StepId = (typeof STEPS)[number];
@@ -106,7 +106,9 @@ export function monitorModel(
 ): MonitorModel {
   const known = !!screen && screen.w > 0 && screen.h > 0;
   const mon = known ? screen! : FALLBACK_MONITOR;
-  const drawerW = Math.min(drawerWidth(a.width, customW, known ? mon.w : 0), mon.w);
+  // široký notch má vlastní šířku (Rust `geom::layout_width`), předvolba se nepoužije
+  const w = a.layout === "notch" ? drawerWidth("custom", NOTCH_PX, known ? mon.w : 0) : drawerWidth(a.width, customW, known ? mon.w : 0);
+  const drawerW = Math.min(w, mon.w);
   return {
     monW: mon.w, monH: mon.h, known, drawerW,
     left: drawerLeft(a.strip.position, mon.w, drawerW),

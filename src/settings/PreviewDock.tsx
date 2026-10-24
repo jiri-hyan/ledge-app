@@ -14,9 +14,11 @@ import { LAYOUTS } from "../theme/looks";
 import { cfg } from "./ctx";
 import { StateSwitch, peek, peekHover, peekLook, peeking, previewState, withThemeDraft } from "./panels/apUi";
 import { normLook } from "./panels/AppearanceClosed";
+import { normShape } from "../strip/looks";
 import { normHover } from "./panels/AppearanceHover";
 import StripLookPreview from "./previews/StripLookPreview";
 import HoverPreview from "./previews/HoverPreview";
+import { CardsMini, peekingCards } from "../layout/CardsGallery";
 import "./panels/appearance.css";
 
 const DOCK_KEY = "ledge.settings.dock";
@@ -65,10 +67,10 @@ export default function PreviewDock() {
   const hover = () => peekHover() ?? normHover(cfg.drawer?.hover);
   const opacity = () => cfg.strip?.opacity ?? 0.82;
   return (
-    <section class="st-dock" classList={{ shut: !open(), peeking: peeking() }} aria-label={t("settings.dock.title", "Náhled — takhle to vyjede")}>
+    <section class="st-dock" classList={{ shut: !open(), peeking: peeking() || peekingCards() }} aria-label={t("settings.dock.title", "Náhled — takhle to vyjede")}>
       <header class="st-dock-head">
         <b>{t("settings.dock.title", "Náhled — takhle to vyjede")}</b>
-        <small>{peeking() ? t("settings.dock.peek", "Náhled dlaždice pod myší — klikni pro výběr") : t("settings.dock.hint", "Najetí na dlaždici se ukáže jen tady; skutečný Ledge se změní po kliknutí a Uložit.")}</small>
+        <small>{peeking() || peekingCards() ? t("settings.dock.peek", "Náhled dlaždice pod myší — klikni pro výběr") : t("settings.dock.hint", "Najetí na dlaždici se ukáže jen tady; skutečný Ledge se změní po kliknutí a Uložit.")}</small>
         <button class="mini" aria-expanded={open()} onClick={() => setOpen(!open())}>
           {open() ? t("settings.dock.hide", "Skrýt náhled") : t("settings.dock.show", "Ukázat náhled")}
         </button>
@@ -77,7 +79,7 @@ export default function PreviewDock() {
         <StateSwitch />
         <div class="st-dock-grid">
           <figure>
-            <StripLookPreview look={look()} state={previewState()} a={a()} opacity={opacity()} />
+            <StripLookPreview look={look()} state={previewState()} a={a()} opacity={opacity()} shape={normShape(cfg.strip?.lookShape)} />
             <figcaption>{t("settings.dock.closed", "Zavřený")}</figcaption>
           </figure>
           <figure>
@@ -87,6 +89,11 @@ export default function PreviewDock() {
           <figure>
             <DrawerMini a={a()} />
             <figcaption>{t("settings.dock.open", "Otevřený")}</figcaption>
+          </figure>
+          {/* karty 2026 / bento (kolo 22, `layout/CardsGallery.tsx`): dlaždice pod myší, jinak vybraná záložka galerie */}
+          <figure>
+            <CardsMini a={a()} />
+            <figcaption>{t("settings.dock.cards", "Karty")}</figcaption>
           </figure>
         </div>
       </Show>

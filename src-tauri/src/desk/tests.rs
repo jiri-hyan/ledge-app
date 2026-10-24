@@ -18,6 +18,10 @@ fn kinds_parse_and_key() {
         (" waiting ", Some(Kind::Waiting)),
         ("dev", Some(Kind::Dev)),
         ("agenda", Some(Kind::Agenda)),
+        // kolo 22
+        ("week", Some(Kind::Week)),
+        ("clock", Some(Kind::Clock)),
+        ("usage", Some(Kind::Usage)),
         ("widget:docker.ps1", Some(Kind::Script("widget:docker.ps1".into()))),
         ("widget:", None),
         ("widget:..\\x.ps1", None),
@@ -45,6 +49,9 @@ fn ids_and_labels() {
     assert_eq!(new_id(&Kind::Dev, &[]), "dev1");
     assert_eq!(new_id(&Kind::Dev, &["dev1", "dev2"]), "dev3");
     assert_eq!(new_id(&Kind::Script("widget:x".into()), &["dev1"]), "wg1");
+    for k in [Kind::Week, Kind::Clock, Kind::Usage] {
+        assert!(valid_id(&new_id(&k, &[])), "{k:?}");
+    }
     // nikdy se nepotká s lístkem, oknem webu ani šuplíkem
     let l = label_for("lim1");
     assert!(!l.starts_with(crate::pins::LABEL_PREFIX) && !l.starts_with(crate::webpanel::LABEL_PREFIX) && l != crate::drawer::LABEL);

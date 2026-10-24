@@ -109,6 +109,16 @@ pub enum CardView {
     Compact,
 }
 
+/// Plocha karty 2026 (kolo 22). Chybí = podle design stylu (dnešní). Tokeny `--k-*` dává materiál stylu.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CardSurface {
+    /// sklo jen na rámu a hlavičce, pod textem plná stabilní plocha (čitelnost)
+    Glass,
+    /// plná vrstva s hloubkou (základ + kontrast)
+    Layer,
+}
+
 /// Vzhled jedné karty na záložce (`layout.pages[].cards[].look`). Prázdné = podle design stylu.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
@@ -126,6 +136,16 @@ pub struct CardLook {
     pub density: Option<CardDensity>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub view: Option<CardView>,
+    /// Plocha karty: `glass` (sklo na rámu, plná plocha pod textem) / `layer` (plná vrstva). Chybí = podle stylu.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub surface: Option<CardSurface>,
+    /// Jemné zrnění plochy (~3 %, statický vzor bez obrázků zvenku).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub grain: bool,
+    /// „Číslo jako hrdina“: velké hlavní číslo karty s popiskem a trendem (jen karty s hlavním číslem —
+    /// `claude`, `weather`; u jiných se ignoruje). Bez skutečného čísla karta zůstane jako dřív.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub hero: bool,
 }
 
 /// Složka zástupců v kartě Projekty (přetažení dlaždice na jinou, jako na telefonu).
@@ -321,6 +341,14 @@ mod tests {
         let c: CardLook = serde_json::from_value(json!({"accent":"teal","bg":"tint","hideHead":true,"density":"airy","view":"list"})).unwrap();
         assert_eq!((c.bg, c.density, c.view, c.hide_head), (Some(CardBg::Tint), Some(CardDensity::Airy), Some(CardView::List), true));
         assert!(serde_json::from_value::<TileLook>(json!({"shape":"star"})).is_err());
+        // kolo 22: plocha, zrnění, hrdina — tam a zpět, nepravda se nepíše
+        let k = json!({"surface":"glass","grain":true,"hero":true});
+        let c: CardLook = serde_json::from_value(k.clone()).unwrap();
+        assert_eq!((c.surface, c.grain, c.hero), (Some(CardSurface::Glass), true, true));
+        assert_eq!(serde_json::to_value(&c).unwrap(), k);
+        let off: CardLook = serde_json::from_value(json!({"grain":false,"hero":false,"surface":"layer"})).unwrap();
+        assert_eq!(serde_json::to_value(&off).unwrap(), json!({"surface":"layer"}));
+        assert!(serde_json::from_value::<CardLook>(json!({"surface":"metal"})).is_err());
     }
 
     #[test]
@@ -427,7 +455,7 @@ mod tests {
     #[test]
     fn schema_mentions_looks() {
         let schema = crate::config::schema_json();
-        for needle in ["\"look\"", "\"folders\"", "\"hideLabel\"", "\"glass\"", "\"tint\""] {
+        for needle in ["\"look\"", "\"folders\"", "\"hideLabel\"", "\"glass\"", "\"tint\"", "\"surface\"", "\"grain\"", "\"hero\""] {
             assert!(schema.contains(needle), "{needle} ve schématu");
         }
     }

@@ -36,8 +36,31 @@ fn with<R>(f: impl FnOnce(&mut Live) -> R) -> R {
 
 fn enabled() -> bool {
     let cfg = core().cfg.read();
-    // vypnutá útrata, nebo skrytá sekce / celá karta Claude (`drawer.sections`) = nic se neindexuje
-    cfg.claude.costs && cfg.drawer.sections.claude && cfg.drawer.sections.claude_costs
+    wanted(cfg.claude.costs, cfg.drawer.sections.claude && cfg.drawer.sections.claude_costs, crate::layout::placed(&cfg.layout, USAGE_CARD))
+}
+
+/// Karta „Claude dnes“ (`board/`, kolo 22) čte tentýž přehled.
+pub(crate) const USAGE_CARD: &str = "usage";
+
+/// Indexovat na žádost šuplíku? Vypnutá útrata = nikdy; jinak když přehled někdo ukazuje: sekce v kartě
+/// Claude nebo karta „Claude dnes“ na některé záložce. Skryté obojí = nic se nečte (widget na ploše má
+/// vlastní cestu `request_desk`). Čistá funkce.
+pub(crate) fn wanted(costs_on: bool, claude_section: bool, usage_card: bool) -> bool {
+    costs_on && (claude_section || usage_card)
+}
+
+/// Rozestup přepočtů kvůli widgetu na ploše (šuplík zavřený — nikdo se nedívá zblízka, stačí čtvrthodina).
+pub(crate) const DESK_EVERY: Duration = Duration::from_secs(15 * 60);
+
+/// Widget „Claude dnes“ na ploše je vidět: přepočet nejvýš 1× za `DESK_EVERY` (volá `desk::live` při probuzení).
+pub(crate) fn request_desk() {
+    if !core().cfg.read().claude.costs {
+        return;
+    }
+    if with(|l| l.running || l.last_start.is_some_and(|t| t.elapsed() < DESK_EVERY)) {
+        return;
+    }
+    start();
 }
 
 /// Požádá o přepočet; běží-li nebo proběhl před méně než `THROTTLE`, nic. Vypnutá karta = nic.
@@ -45,6 +68,10 @@ pub(crate) fn request() {
     if !enabled() {
         return;
     }
+    start();
+}
+
+fn start() {
     let go = with(|l| {
         if l.running || l.last_start.is_some_and(|t| t.elapsed() < THROTTLE) {
             return false;
@@ -97,6 +124,12 @@ pub(crate) fn local_day(ms: i64) -> i32 {
     Local.timestamp_millis_opt(ms).single().map_or((ms / 86_400_000) as i32, |d| (d.date_naive() - chrono::NaiveDate::default()).num_days() as i32)
 }
 
+/// Místní hodina 0–23 z ms.
+pub(crate) fn local_hour(ms: i64) -> u8 {
+    use chrono::{Local, TimeZone, Timelike};
+    Local.timestamp_millis_opt(ms).single().map_or(((ms / 3_600_000) % 24) as u8, |d| d.hour() as u8)
+}
+
 /// Místní půlnoc dne `day` v ms (při přechodu času nejdřívější možná).
 fn local_midnight(day: i32) -> i64 {
     use chrono::{Local, TimeZone};
@@ -113,7 +146,7 @@ fn compute() -> Result<view::Summary, String> {
     let now = now_ms();
     let today = local_day(now);
     let cutoff_day = today - WINDOW_DAYS as i32 + 1;
-    let w = index::Window { days: WINDOW_DAYS, cutoff_ms: local_midnight(cutoff_day), cutoff_day, day_of: &local_day };
+    let w = index::Window { days: WINDOW_DAYS, cutoff_ms: local_midnight(cutoff_day), cutoff_day, day_of: &local_day, hour_of: &local_hour };
     let mut ix = index::load(&store);
     let found = index::list_files(&root);
     let mut last = Instant::now();
@@ -187,7 +220,15 @@ pub struct CostsView {
 
 /// Pro snapshot — jen paměť.
 pub fn view() -> CostsView {
-    let on = enabled();
+    shaped(enabled())
+}
+
+/// Pro widget na ploše: stačí zapnutá útrata (karta v šuplíku být nemusí).
+pub(crate) fn desk_view() -> CostsView {
+    shaped(core().cfg.read().claude.costs)
+}
+
+fn shaped(on: bool) -> CostsView {
     with(|l| CostsView {
         state: match () {
             _ if !on => "off",
@@ -217,6 +258,22 @@ mod tests {
         assert_eq!(project_name(&dirs, "C:\\Users\\x\\Desktop\\Ledger"), "Ledger", "hranice komponenty, jinak název složky");
         assert_eq!(project_name(&dirs, "D:\\work\\atlas\\"), "atlas");
         assert_eq!(project_name(&dirs, ""), "");
+    }
+
+    #[test]
+    fn wanted_table() {
+        // (útrata zapnutá, sekce v kartě Claude, karta Claude dnes) → indexovat
+        let rows = [((false, true, true), false), ((true, false, false), false), ((true, true, false), true), ((true, false, true), true)];
+        for ((c, s, u), want) in rows {
+            assert_eq!(wanted(c, s, u), want, "{c} {s} {u}");
+        }
+    }
+
+    #[test]
+    fn local_hour_in_range() {
+        for ms in [0, 1_792_238_400_000, 1_792_238_400_000 + 23 * 3_600_000] {
+            assert!(local_hour(ms) < 24);
+        }
     }
 
     #[test]

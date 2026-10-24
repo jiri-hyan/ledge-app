@@ -197,8 +197,12 @@ pub(crate) fn refresh_strip() {
     let line_only = !cfg.strip.enabled || (retreat && !looked);
     let visible = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some()) && !hidden;
     let position = cfg.appearance.strip.position;
-    // plynulá šířka ostrůvku jen se zapnutými animacemi (Ledge i Windows „omezit pohyb“)
-    let animate = closed == crate::looks::Look::Island
+    let shape = cfg.strip.look_shape;
+    // baterie pro kapsle `minimum` / `trio`: stejný odběr změn napájení jako záložka Osobní (událost Windows,
+    // žádný časovač); volá se až bez zámku configu (`battery::ensure` ho čte sám)
+    let wants_battery = looked && closed.shows_battery();
+    // plynulá šířka ostrůvku a točení prstenců (`rings`) jen se zapnutými animacemi (Ledge i Windows „omezit pohyb“)
+    let animate = matches!(closed, crate::looks::Look::Island | crate::looks::Look::Rings)
         && cfg.appearance.motion.style != crate::appearance::MotionStyle::None
         && !attention::os_animations_off();
     let opacity = cfg.strip.opacity;
@@ -207,6 +211,9 @@ pub(crate) fn refresh_strip() {
     // puls „čeká / hotovo“ (`attention::pulse`, s termínem; animuje vlákno `strip`)
     let pulse = attention::pulse();
     drop(cfg);
+    if wants_battery {
+        crate::battery::ensure();
+    }
     c.strip.set(|m| {
         m.visible = visible;
         m.segments = segs;
@@ -225,6 +232,7 @@ pub(crate) fn refresh_strip() {
         m.show = show;
         m.animate = animate;
         m.position = position;
+        m.shape = shape;
     });
 }
 
@@ -282,6 +290,15 @@ fn look_facts(
     let reminder = reminder.or_else(|| meeting.map(|m| (m.to_string(), 1)));
     use windows::Win32::System::SystemInformation::GetLocalTime;
     let lt = unsafe { GetLocalTime() };
+    let limits = crate::limitslive::view();
+    // počasí a systém jen z paměti (karta Počasí / plánovač `integrations`), proužek nic nestahuje
+    let weather = {
+        let w = c.weather.lock();
+        // data k jinému místu (změna configu) se neukazují — jako karta Počasí (`snapshot::personal_view`)
+        let here = w.place.is_some() && w.place == cfg.personal.weather.coords();
+        facts::weather_fact(w.data.as_ref().filter(|_| here), w.fetched_ms, now_ms)
+    };
+    let (cpu, mem) = facts::system_fact(crate::sysmon::last_pct(), now_ms);
     Facts {
         waiting,
         waiting_where,
@@ -295,7 +312,12 @@ fn look_facts(
         servers: procs.iter().filter(|p| p.phase != procman::Phase::Exited).count(),
         server_failed: procs.iter().any(|p| p.phase == procman::Phase::Failed),
         repos,
-        limit5h: facts::limit_fact(&crate::limitslive::view(), now_ms),
+        limit5h: facts::limit_fact(&limits, now_ms),
+        limit7d: facts::limit7d_fact(&limits, now_ms),
+        battery: facts::battery_fact(crate::battery::view().as_ref()),
+        weather,
+        cpu,
+        mem,
         clock: crate::looks::hm(lt.wHour, lt.wMinute),
         date: clock_text(lt.wHour, lt.wMinute, lt.wDayOfWeek, lt.wDay, lt.wMonth),
         mode: mode_title.to_string(),

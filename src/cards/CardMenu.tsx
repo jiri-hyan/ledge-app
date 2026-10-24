@@ -12,6 +12,7 @@
 // volba bez viditelného efektu se ohlásí v liště (`sizeOutcome` → „Karta je v řadě sama…“) a vybere se
 // nejbližší možná — nikdy tiché nic. Každá změna velikosti / výšky / stropu má „Vrátit“; v režimu úprav jde
 // do draftu (`tweak`). „Řádků“ = strop karet Claude, Repa, Běží. Pozice seznamu z `ui/place.ts`.
+// Kolo 22: na bento záložce navíc „Dlaždice: 1 × 1 / 2 × 1 / 2 × 2“ (šířka + výška najednou, `layout/bento.ts`).
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { t } from "../i18n";
 import { change, editing, offerUndo, saveLayout } from "../layout/edit";
@@ -23,6 +24,7 @@ import { createMenu, PopCap, PopItem, PopMenu, PopSep } from "../ui/Popover";
 import { openCardLook } from "../layout/lookState";
 import type { CardLook } from "../layout/look";
 import { DeskPinItems } from "../desk/pin";
+import { setTile, tileOf, TILE_NAMES, TILES, type Tile } from "../layout/bento";
 
 const UNDO_MS = 6000;
 const [hidden, setHidden] = createSignal<{ text: string; undo: (l: Layout) => Layout } | null>(null);
@@ -85,6 +87,8 @@ export default function CardMenu(p: {
   h?: CardHeight;
   /** strop řádků (jen karty, které ho mají) */
   limit?: number;
+  /** záložka je bento mřížka → volba Dlaždice */
+  bento?: boolean;
   /** co udělá volba velikosti na téhle záložce (MainPage zná pořadí karet) */
   outcome?: (want: CardSize) => SizeOutcome;
   /** uložený vzhled karty (`layout…cards[].look`) — výchozí stav panelu Vzhled karty */
@@ -138,6 +142,11 @@ export default function CardMenu(p: {
     const label = QUICK_HEIGHTS.find((q) => q.h === v);
     tweak(t("cards.menu.heightDone", "„{name}“: výška {h}", { name: name(), h: label ? tx(label.name) : String(v) }), (l) => ({ layout: setHeight(l, p.page, p.card, v), undo: (x) => setHeight(x, p.page, p.card, prev) }), p.cfgError);
   };
+  const pickTile = (v: Tile) => {
+    close();
+    const prev = { size: p.size, h: p.h };
+    tweak(t("cards.menu.tileDone", "„{name}“: dlaždice {tile}", { name: name(), tile: tx(TILE_NAMES[v]) }), (l) => ({ layout: setTile(l, p.page, p.card, v), undo: (x) => setHeight(prev.size ? setSize(x, p.page, p.card, prev.size) : x, p.page, p.card, prev.h) }), p.cfgError);
+  };
   const pickLimit = (n: number) => {
     close();
     const prev = p.limit;
@@ -154,6 +163,9 @@ export default function CardMenu(p: {
               {(x) => <PopItem disabled={x.disabled} onClick={() => { close(); x.run(); }}>{x.label}</PopItem>}
             </For>
             <Show when={(p.extra ?? []).length > 0}><PopSep /></Show>
+            <Show when={p.bento && p.size}>
+              {(sz) => <MenuChoice label={t("cards.menu.tile", "Dlaždice")} items={TILES.map((x) => ({ v: x as Tile | null, text: tx(TILE_NAMES[x]) }))} value={tileOf({ size: sz(), h: p.h })} onPick={(v) => v && pickTile(v)} />}
+            </Show>
             <Show when={p.size}>
               {(sz) => <MenuChoice label={t("cards.menu.size", "Velikost")} items={sizeItems()} value={fitSize(sz(), cols())} onPick={pickSize} />}
             </Show>

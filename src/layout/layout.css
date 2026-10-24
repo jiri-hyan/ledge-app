@@ -21,6 +21,12 @@ html[data-motion="none"] .deck-item[data-hold]::after { display: none; }
 .deck-item[data-h] > ::-webkit-scrollbar { width: 6px; }
 .deck-item[data-h] > ::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 3px; }
 .lay-probe { position: absolute; visibility: hidden; height: var(--deck-row); width: 1px; }
+/* bento (kolo 22, `layout.pages[].bento`, `bento.ts`): dlaždice = šířka (`--span`) × výška v řádcích (`--h`, chybí = 2);
+   pevné řádky, mezera `--k-gap` (16 px), volná místa vyplní hustý tok. Jen na záložce s `data-bento` — jinde beze změny. */
+.deck[data-bento] { --deck-row: calc(120px * var(--dens, 1)); --dg: var(--k-gap, 16px); grid-auto-flow: row dense; grid-auto-rows: var(--deck-row); }
+html .deck.deck[data-bento] { gap: var(--k-gap, 16px); }
+.deck[data-bento] > .deck-item.deck-item { grid-row: span var(--h, 2); height: auto; max-height: none; min-height: 0; }
+.deck[data-bento] > .deck-item > :not(.lay-tools, .lay-rs, .lay-target) { min-height: 0; overflow-y: auto; overscroll-behavior-y: auto; }
 
 /* ---------- vzhled karty (`look`, layout/look.ts) — obecně pro každou kartu na `.deck-item` ----------
    Karta = první dítě položky; bez atributů `data-cl-*` se nic nemění (karta podle design stylu).
@@ -41,6 +47,57 @@ html[data-motion="none"] .deck-item[data-hold]::after { display: none; }
   --s1: calc(4px * var(--dens) * var(--cl-k)); --s2: calc(8px * var(--dens) * var(--cl-k)); --s3: calc(12px * var(--dens) * var(--cl-k));
   --s4: calc(16px * var(--dens) * var(--cl-k)); --s5: calc(22px * var(--dens) * var(--cl-k)); --gap-section: calc(14px * var(--dens) * var(--cl-k));
   --pad-card: calc(14px * var(--dens) * var(--cl-k)) calc(15px * var(--dens) * var(--cl-k));
+}
+
+
+/* ---------- plocha karty 2026 ---------- */
+/* Plocha karty 2026 (kolo 22, `layout/look.ts` `surface` / `grain` / `hero`) — obecně pro každou kartu na `.deck-item`,
+   jen s atributem `data-cl-*` (bez něj se nic nemění). Tokeny `--k-*` dává materiál stylu (`theme/looks.ts`
+   `MATERIALS`): základ (stabilní plocha), kontrast (linky, hloubka), akcent karty, poloměr vnější `--k-r` a vnitřní
+   = vnější − odsazení `--k-in`. Vše statické: žádná animace, filtr ani `backdrop-filter` (software rendering WebView2). */
+.deck > .deck-item[data-cl-surface] > :first-child {
+  --k-r-in: max(2px, calc(var(--k-r, var(--r-xl)) - var(--k-in, 6px)));
+  border-radius: var(--k-r, var(--r-xl));
+  isolation: isolate;
+}
+/* Plné: neprůhledná vrstva ze základu, vlasová linka a hloubka z průhlednosti kontrastu / černé */
+.deck > .deck-item[data-cl-surface="layer"] > :first-child {
+  background: var(--k-base, var(--raised));
+  border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 9%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--k-contrast, var(--t1)) 7%, transparent), 0 2px 6px -3px rgba(0, 0, 0, 0.35), 0 14px 30px -20px rgba(0, 0, 0, 0.75);
+}
+/* Sklo: průsvitný jen rám a hlavička; pod obsahem (od hlavičky dolů) plná stabilní plocha s vnitřním poloměrem —
+   text nikdy nesedí na skle (čitelnost). Plocha = `::after` pod obsahem (z-index −1 v izolované kartě). */
+.deck > .deck-item[data-cl-surface="glass"] > :first-child {
+  background: var(--k-glass, color-mix(in srgb, var(--t1) 7%, transparent));
+  border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 16%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--k-contrast, var(--t1)) 14%, transparent), 0 12px 28px -20px rgba(0, 0, 0, 0.7);
+}
+.deck > .deck-item[data-cl-surface="glass"] > :first-child::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: var(--k-in, 6px);
+  right: var(--k-in, 6px);
+  bottom: var(--k-in, 6px);
+  /* pod hlavičkou: odsazení karty + řádek nadpisu */
+  top: calc(14px * var(--dens, 1) * var(--cl-k, 1) + 22px);
+  border-radius: var(--k-r-in);
+  background: var(--k-base, var(--raised));
+  pointer-events: none;
+}
+.deck > .deck-item[data-cl-surface="glass"][data-cl-head="off"] > :first-child::after { top: var(--k-in, 6px); }
+/* jemné zrnění (~3,5 %): statický vzor z vloženého SVG (žádný obrázek zvenku, vykreslí se jednou) přes kartu */
+.deck > .deck-item[data-cl-grain]:not(.lifted, .lay-fly)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: var(--k-r, var(--r-xl));
+  pointer-events: none;
+  opacity: var(--k-grain, 0.035);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
 }
 
 /* ---------- režim úprav ---------- */
@@ -146,6 +203,9 @@ input.lay-st-name { width: 170px; font-weight: 600; }
 .lay-st-pv-lbl { font-size: var(--fs-xs); color: var(--t3); display: flex; align-items: center; justify-content: space-between; }
 .lay-st-pv-grid { display: grid; grid-template-columns: repeat(var(--deck-cols, 4), minmax(0, 1fr)); gap: 6px; }
 .lay-st-pv-cell { grid-column: span var(--span, 2); display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 10px; font-size: var(--fs-xs); font-weight: 600; color: var(--t1); background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-sm); text-align: left; transition: border-color var(--fast), background var(--fast); }
+.lay-st-pv-grid[data-bento] { grid-auto-flow: row dense; grid-auto-rows: 30px; }
+.lay-st-pv-grid[data-bento] > .lay-st-pv-cell { grid-row: span var(--h, 2); align-items: flex-start; }
+.lay-st-bento { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-ui); color: var(--t2); cursor: pointer; }
 .lay-st-pv-cell:hover { border-color: var(--accent); background: var(--card-2); }
 .lay-st-pv-cell small { font: 600 var(--fs-2xs) var(--mono); color: var(--accent); flex-shrink: 0; }
 .lay-st-cards { display: flex; flex-direction: column; gap: 8px; }

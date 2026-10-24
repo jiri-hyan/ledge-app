@@ -181,7 +181,9 @@ test("tabulka stylů je úplná a platná", () => {
   }
   // 6 schválených stylů + Klasický + 3 nové (kolo 13); sestava motiv + rozložení + materiál + písmo je u každého jiná,
   // každé rozložení je aspoň jednou použité
-  assert.deepEqual(STYLE_IDS, ["classic", "glass", "terminal", "paper", "neon", "brutal", "pastel", "aurora", "mono", "retro", "fluent", "oled", "warm"]);
+  // + široký notch (kolo 22) = jediný styl s rozložením `notch`
+  assert.deepEqual(STYLE_IDS, ["classic", "glass", "terminal", "paper", "neon", "brutal", "pastel", "aurora", "mono", "retro", "fluent", "oled", "warm", "notch"]);
+  assert.deepEqual(STYLES.filter((s) => s.parts.layout === "notch").map((s) => s.id), ["notch"]);
   const combo = (s) => [s.parts.theme, s.parts.layout, s.parts.material, s.parts.font].join("|");
   assert.equal(new Set(STYLES.map(combo)).size, STYLES.length);
   assert.deepEqual([...new Set(STYLES.map((s) => s.parts.layout))].sort(), Object.keys(LAYOUTS).sort());

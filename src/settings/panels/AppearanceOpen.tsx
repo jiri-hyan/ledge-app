@@ -1,5 +1,6 @@
 // Panel Vzhled, krok „Otevřený“ (jak vypadá otevřený šuplík): galerie design stylů (`AppearanceStyles.tsx`),
-// pod ní barvy (`AppearanceThemes.tsx`: motivy a vlastní motivy, akcent), vzhled záložek (`AppearancePages.tsx`)
+// pod ní barvy (`AppearanceThemes.tsx`: motivy a vlastní motivy, akcent), vzhled záložek (`AppearancePages.tsx`),
+// karty 2026 a bento šablony (`layout/CardsGallery.tsx`, kolo 22)
 // a monitor ve skutečném poměru (`previews/MonitorPreview.tsx` — šuplík ve skutečné šířce v px vůči
 // monitoru, skutečný počet sloupců a hustota) a dvě hlavní volby: Šířka (4 předvolby) a Hustota. Zbytek je
 // v „Pokročilé“: rozložení karet, vlastní šířka v px, písmo, materiál, rohy, krytí a rozmazání.
@@ -13,6 +14,7 @@ import MonitorPreview from "../previews/MonitorPreview";
 import AppearanceStyles from "./AppearanceStyles";
 import AppearanceThemes from "./AppearanceThemes";
 import AppearancePages from "./AppearancePages";
+import CardsGallery from "../../layout/CardsGallery";
 import { CustomWidth, DRAWER_WIDTH, DetailsRows, LayoutPicker } from "./AppearanceLayout";
 import { Advanced, Seg, lit, type Ap } from "./apUi";
 
@@ -30,6 +32,7 @@ export default function AppearanceOpen(q: { ap: Ap; dirty: boolean; adv: boolean
       <AppearanceStyles ap={q.ap} dirty={q.dirty} />
       <AppearanceThemes ap={q.ap} />
       <AppearancePages ap={q.ap} />
+      <CardsGallery />
       <div class="card ap-top" id="f-appearance.layout" classList={{ hit: lit("appearance.layout") }}>
         <h4>{t("appearance.open.size", "Šířka a hustota na tvém monitoru")}</h4>
         <MonitorPreview a={a()} customW={customW()} blur={q.ap.blur()} />

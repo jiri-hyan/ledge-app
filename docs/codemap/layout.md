@@ -5,7 +5,7 @@ Rozložení šuplíku). Cituj symbolem, ne číslem řádku.
 
 ## Rozhodnutí: jeden model
 
-- `layout` (`pages[] { id, name, icon?, cards[] { id, size, h?, tiles?, look?, limit? } }`, `hiddenParts[]`, `upgrades[]`) je
+- `layout` (`pages[] { id, name, icon?, bento?, cards[] { id, size, h?, tiles?, look?, limit? } }`, `hiddenParts[]`, `upgrades[]`) je
   JEDINÝ zdroj pravdy. Karta, která není na žádné záložce, je skrytá (katalog ji nabídne). `h` = výška
   1–4 řádky (`--deck-row`), chybí = podle obsahu; `tiles` = volby karty Projekty (zástupci) na té záložce
   (i `folders` = složky zástupců); `look` = vzhled té karty (vlna 8 P, typy v `tilelook.rs`); `limit` = strop řádků
@@ -68,7 +68,10 @@ Rozložení šuplíku). Cituj symbolem, ne číslem řádku.
 | `src/layout/LayoutEditor.tsx` | editor stejného modelu v Nastavení (panel Šuplík a karty): lišta záložek (klik = aktivní, ← → pořadí, ikony jako dlaždice), živý náhled mřížky (`packSpans` se sloupci `colsNow`, klik = další velikost), karty v `SortList` se segmenty Velikost S–XL a Zobrazení (`viewsOf`), Výška a Kolik řádků rozbalovací (víc než 4 volby), přesun na záložku tlačítky, u Projektů volby dlaždic a které projekty (čipy), katalog karet jako dlaždice s popisem, části karet, „Upravit přímo v šuplíku“ | `LayoutEditor` |
 | `src/cards/CardMenu.tsx` · `TileOptions.tsx` | ⋯ karty (společné menu `ui/Popover.tsx` `PopMenu`; kořen `[data-cmenu]`): Velikost S/M/L/XL, Výška Auto/Nízká/Vysoká, u Projektů Dlaždice (Malé ikony/Dlaždice/Velké), název, git, které projekty, „Vzhled karty…“; ukládá hned (`saveLayout`) | `CardMenu` `MenuChoice` `TileOptions` `tileSizeName` |
 | `src/layout/text.ts` | lidské názvy z párů v modelu (překlad až při vykreslení) | `tx` `cardName` `partName` `pageName` |
-| `src/layout/look.ts` · `lookState.ts` · `CardLook.tsx` | vzhled karty: čistá logika (normalizace, varianty `VIEW_CARDS` a `viewsOf` (Bento jen Projekty / Repa / Poznámky), atributy pro `.deck-item`, přehled, Obnovit vše; test `look.test.mjs`) · stav bez UI (eager: `lookFor`, `openCardLook`, `closeCardLook`; potřebují je `CardMenu`, `Deck`, `MainPage`, `VariantPicker`) · panel „Vzhled karty…“ pod mřížkou, **líný chunk** přes `lazyViews.tsx` (živý náhled `lookFor`, Hotovo / klik mimo = uložit, v úpravách do draftu, Esc = zahodit) | `normalizeCardLook` `patchCardLook` `cardLookAttrs` `setCardLook` `viewOf` `customizedCards` `resetCardLooks` · `openCardLook` `closeCardLook` `lookFor` (`lookState.ts`) · `CardLookPanel` |
+| `src/layout/look.ts` · `lookState.ts` · `CardLook.tsx` | vzhled karty: čistá logika (normalizace, varianty `VIEW_CARDS` a `viewsOf` (Bento jen Projekty / Repa / Poznámky), atributy pro `.deck-item`, přehled, Obnovit vše; test `look.test.mjs`) · stav bez UI (eager: `lookFor`, `openCardLook`, `closeCardLook`; potřebují je `CardMenu`, `Deck`, `MainPage`, `VariantPicker`) · panel „Vzhled karty…“ pod mřížkou, **líný chunk** přes `lazyViews.tsx` (živý náhled `lookFor`, Hotovo / klik mimo = uložit, v úpravách do draftu, Esc = zahodit) | `normalizeCardLook` `patchCardLook` `cardLookAttrs` `setCardLook` `viewOf` `customizedCards` `resetCardLooks` `SURFACES` `HERO_CARDS` `heroable` · `openCardLook` `closeCardLook` `lookFor` (`lookState.ts`) · `CardLookPanel` |
+| `src/layout/hero.ts` · `HeroCard.tsx` | kolo 22, karty 2026: plocha `surface` (`glass` = sklo jen na rámu a hlavičce, pod obsahem plná plocha `::after` s poloměrem vnější − odsazení; `layer` = plná vrstva s hloubkou) a `grain` (zrnění z vloženého SVG, ~3,5 %) na `.deck-item[data-cl-*]` z tokenů `--k-*` materiálu stylu (`theme/looks.ts` `MATERIALS`); „číslo jako hrdina“ (`hero`, jen `HERO_CARDS`): `heroFacts` vybere skutečné číslo ze snapshotu (Claude limit 5 h / útrata dnes, počasí; čeká-li schválení → `null`), `Deck` pak místo karty kreslí `HeroCard` (`charts/Stat.tsx`); `null` = karta jako dřív. Test `hero.test.mjs` | `heroFacts` `costSeries` `HeroFacts` `HeroCard` `DeckHero` |
+| `src/layout/bento.ts` | kolo 22, bento záložka (`pages[].bento`): dlaždice 1×1 / 2×1 / 2×2 = `size` × `h` (v bento chybí = 2), `tileOf` / `setTile` (⋯ karty → Dlaždice), `setBento`, šablony `TEMPLATES` (Pracovní, Minimal, Hudba — 6–7 dlaždic, největší první) jako NOVÁ záložka `addTemplatePage`; mechanika v `layout.css` `.deck[data-bento]` (pevné řádky, mezera `--k-gap`, `grid-auto-flow: row dense`; `Deck` bere rozpětí přímo z velikosti, bez `packSpans`). Předvolby vzhledu celé záložky `LOOK_PRESETS` / `applyLookPreset` / `presetOf` jsou v `look.ts`. Test `bento.test.mjs` | `TILES` `TILE_DIM` `tileOf` `setTile` `setBento` `TEMPLATES` `templateCards` `addTemplatePage` `LOOK_PRESETS` `applyLookPreset` `presetOf` |
+| `src/layout/CardsGallery.tsx` · `gallery.css` | kolo 22, Nastavení → Vzhled → Otevřený: galerie „Karty 2026“ (6 předvoleb `LOOK_PRESETS` na všechny karty vybrané záložky, `applyLookPreset`, zvýraznění `presetOf`) a „Bento šablony“ (`addTemplatePage` = nová záložka); klik = draft `layout` + Vrátit, ukládá lišta; najetí = jen náhled dole (`CardsMini` ve `settings/PreviewDock.tsx`, signál `peekingCards`, bez časovačů). Bento na existující záložce: `LayoutEditor` „Bento mřížka“ | `CardsGallery` `CardsMini` `peekingCards` |
 | `src/layout/folders.ts` | složky zástupců (`tiles.folders`): tah dlaždice na dlaždici = složka, na složku = do ní, vyjmout, prázdná zmizí, uspořádání dlaždic; test `folders.test.mjs` | `normalizeFolders` `dropOnTile` `addToFolder` `takeOut` `renameFolder` `removeFolder` `arrange` `folderOf` |
 | `src/layout/LooksOverview.tsx` | Nastavení → Šuplík a karty → „Upravené karty a zástupci“ (Obnovit jednotlivě / vše, draft Nastavení) | |
 
@@ -119,7 +122,13 @@ Rozložení šuplíku). Cituj symbolem, ne číslem řádku.
   Popisky při tahu karty (`dropHint`): „Skrýt kartu“, „Na záložku X“, „Nová záložka“, „už tam je“; v mezeře cíle `data-dim`
   („2 × 3“ = výsledná velikost karty).
 - **Nastavení**: panel Šuplík a karty → `LayoutEditor` mění draft Nastavení (`c.set("layout")`), uloží
-  společná lišta. Pořadí karet ve Vzhledu už není.
+  společná lišta (i „Bento mřížka“ záložky, `setBento`). Pořadí karet ve Vzhledu už není; Vzhled → Otevřený má
+  jen galerii karet 2026 a bento šablon (`CardsGallery.tsx`).
+- **Bento** (kolo 22): `page.bento` → `Deck` `data-bento` + rozpětí `spanOf` (bez `packSpans`), CSS pevné řádky
+  `--deck-row` 120 px × hustota, `grid-row: span var(--h, 2)`, `dense`; tah za okraj mění `size` / `h` jako jinde
+  (= velikost dlaždice), ⋯ → Dlaždice (`CardMenu` prop `bento`).
+- **Hrdina** (kolo 22): `look.hero` + `heroFacts` ≠ null → `Deck` místo `render(id)` kreslí `hero.render` (MainPage
+  `HeroCard` s `menu(id)`); `Show` podle pravdivosti, takže nový snapshot kartu nepřestaví.
 
 ## Invarianty a pasti
 
@@ -131,6 +140,9 @@ Rozložení šuplíku). Cituj symbolem, ne číslem řádku.
 - Nová karta = id do `layout::CARDS` + `model.ts` `CARD_IDS`/`CARD_INFO` + případně pole `sections!`
   v `config/*` (+ `SECTION_KEYS`) + větev v `MainPage` `card`. Nová část = `PARTS` v obou + pole `sections!`.
 - Vzhled karet (barvy, rohy, šířky podle stylu) patří stylům; `layout.css` drží jen mechaniku mřížky a ovládání úprav.
+- Kolo 22: karty `usage`, `week`, `bigclock`, `toggles` (`src/board/`, [board.md](board.md)) jsou jen v katalogu; `week` se
+  počítá jako čtenář kalendáře (`section_on("calendar")`, `page_has_calendar`), `toggles` zapíná zvuk a baterii
+  (`volume::allowed`, `battery::allowed`), `usage` útratu (`costslive::wanted`). Id karet jen malými písmeny (test zrcadla).
 - Výchozí rozložení nového configu je záměrně malé (`clean_default`); karta bez zdroje (Kalendář, Pošta, GitHub, Počasí bez místa) nebo
   duplicitní (Rychlé akce vedle Odkazů) v něm není a katalog ji nabídne. `Sections::default()` se z něj odvozuje (`section_in_default`, bez serde —
   `serde(default)` by se zacyklil), takže `Config::default()` sedí s načteným. Karta Dnes (`today`) je také jen v katalogu a nekreslí se bez řádků (`Facts.today`; [suggest.md](suggest.md)). Karta `OPT_IN` (GitHub, Systém, Pošta) = id i v `layout::OPT_IN` (hlásí ji MCP). Detail [integrations.md](integrations.md).

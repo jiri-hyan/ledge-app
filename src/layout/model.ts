@@ -12,7 +12,11 @@ import { normalizeCardLook, type CardLook } from "./look.ts";
 import { normalizeFolders, type TileFolder } from "./folders.ts";
 
 
-export const CARD_IDS = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today"] as const;
+export const CARD_IDS = [
+  "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today",
+  // kolo 22 (nové widgety, `src/board/`) — jen z katalogu, výchozí rozložení beze změny
+  "usage", "week", "bigclock", "toggles",
+] as const;
 export type BuiltinCardId = (typeof CARD_IDS)[number];
 /** Dynamická karta: widget ze skriptu (`widget:<soubor>`). */
 export type DynCardId = `widget:${string}`;
@@ -33,7 +37,8 @@ export type TileSize = (typeof TILE_SIZES)[number];
 export type TileOpts = { size: TileSize; label: boolean; git: boolean; hidden: string[]; folders?: TileFolder[] };
 /** `limit` = kolik řádků karta ukáže, než nabídne „Zobrazit další“ (0 = bez stropu, chybí = `DEFAULT_LIMIT`). */
 export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts; look?: CardLook; limit?: number; parts?: string[] };
-export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[] };
+/** `bento` (kolo 22) = mřížka dlaždic (šířka × výška v řádcích, hustý tok; `bento.ts`); chybí = běžná mřížka. */
+export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[]; bento?: true };
 /** `upgrades` = jednorázové úpravy, které už proběhly (Rust `apply_upgrades`) — musí přežít každé uložení. */
 export type Layout = { pages: LayoutPage[]; hiddenParts: string[]; upgrades?: string[] };
 export const UP_PERSONAL_PROJECTS = "personalProjects";
@@ -98,6 +103,11 @@ export const CARD_INFO: Record<BuiltinCardId, { name: Text; desc: Text; size: Ca
   mail: { name: ["cards.layout.card.mail", "Pošta"], desc: ["cards.layout.desc.mail", "Nepřečtené a nejnovější předměty z Outlooku (účet Microsoft)"], size: "m" },
   // jen z katalogu (výchozí rozložení ji nemá); bez dat se nekreslí (`Facts.today`)
   today: { name: ["cards.layout.card.today", "Dnes"], desc: ["cards.layout.desc.today", "Další schůzka, připomínky na dnes, PR k revizi a reset limitu Claude — jen to, co dnes něco znamená"], size: "m" },
+  // kolo 22 (nové widgety, `src/board/`)
+  usage: { name: ["cards.layout.card.usage", "Claude dnes"], desc: ["cards.layout.desc.usage", "Útrata a tokeny dnes a za 7 dní a časová osa dneška po projektech (odhad z transcriptů). Čte místní záznamy Claude Code na tomto počítači."], size: "m" },
+  week: { name: ["cards.layout.card.week", "Týden"], desc: ["cards.layout.desc.week", "Velký měsíc a čas, pás dnů s dneškem a dnešní události z kalendáře"], size: "m" },
+  bigclock: { name: ["cards.layout.card.bigclock", "Velké hodiny"], desc: ["cards.layout.desc.bigclock", "Čas obřími číslicemi a pod ním datum"], size: "s" },
+  toggles: { name: ["cards.layout.card.toggles", "Rychlé přepínače"], desc: ["cards.layout.desc.toggles", "Ztlumit zvuk a mikrofon, hlasitost − / + a baterie"], size: "s" },
 };
 export const PART_INFO: Record<PartKey, Text> = {
   claudeLimits: ["cards.layout.part.claudeLimits", "Limity 5h / týden"],
@@ -176,6 +186,7 @@ export function normalizeLayout(raw: unknown): Layout {
     }
     const page: LayoutPage = { id: x.id as string, name: typeof x.name === "string" ? x.name : "", cards };
     if (typeof x.icon === "string" && x.icon) page.icon = x.icon;
+    if (x.bento === true) page.bento = true;
     pages.push(page);
   }
   if (!pages.length) return defaultLayout();

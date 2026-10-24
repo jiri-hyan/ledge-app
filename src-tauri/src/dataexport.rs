@@ -196,7 +196,7 @@ mod tests {
             projects: vec![line("app", 2000, Some(1.0)), line("=evil, \"x\"", 1000, None)],
             models: vec![line("Model A", 3000, Some(1.5))],
         };
-        let s = Summary { ranges: vec![range], days: vec![Day { date: "2026-10-22".into(), tokens: 10, cost: Some(0.25) }, Day { date: "2026-10-23".into(), tokens: 0, cost: None }] };
+        let s = Summary { ranges: vec![range], days: vec![Day { date: "2026-10-22".into(), tokens: 10, cost: Some(0.25) }, Day { date: "2026-10-23".into(), tokens: 0, cost: None }], hours: vec![] };
         (costs(Some(s)), limits(Some(Window { pct: 42.5, resets_at: Some(1_790_003_600_000) }), None))
     }
 

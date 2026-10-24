@@ -349,7 +349,7 @@
 .st-dock-head small { flex: 1; min-width: 200px; color: var(--t3); font-size: var(--fs-xs); }
 .st-dock.peeking .st-dock-head small { color: var(--amber); }
 .st-dock.shut { gap: 0; }
-.st-dock-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); align-items: end; }
+.st-dock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s3); align-items: end; }
 .st-dock-grid figure { display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0; }
 .st-dock-grid figcaption { color: var(--t3); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; }
 .st-dock .st-dock-mini { height: 132px; }

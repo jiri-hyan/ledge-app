@@ -50,6 +50,12 @@ pub enum Kind {
     Dev,
     /// kalendář dne
     Agenda,
+    /// kolo 22: pás týdne s dnešními událostmi (karta Týden)
+    Week,
+    /// kolo 22: velké hodiny a datum (karta Velké hodiny)
+    Clock,
+    /// kolo 22: útrata a tokeny Claude dnes a za týden (karta Claude dnes)
+    Usage,
     /// widget ze skriptu (`widgets/`), id `widget:<soubor>`
     Script(String),
 }
@@ -61,6 +67,9 @@ impl Kind {
             "waiting" => Some(Kind::Waiting),
             "dev" => Some(Kind::Dev),
             "agenda" => Some(Kind::Agenda),
+            "week" => Some(Kind::Week),
+            "clock" => Some(Kind::Clock),
+            "usage" => Some(Kind::Usage),
             id => crate::widgets::plan::file_of(id).map(|_| Kind::Script(id.to_string())),
         }
     }
@@ -71,6 +80,9 @@ impl Kind {
             Kind::Waiting => "waiting".into(),
             Kind::Dev => "dev".into(),
             Kind::Agenda => "agenda".into(),
+            Kind::Week => "week".into(),
+            Kind::Clock => "clock".into(),
+            Kind::Usage => "usage".into(),
             Kind::Script(id) => id.clone(),
         }
     }
@@ -82,6 +94,9 @@ impl Kind {
             Kind::Waiting => ((320.0, 190.0), (230.0, 72.0)),
             Kind::Dev => ((330.0, 190.0), (240.0, 96.0)),
             Kind::Agenda => ((310.0, 240.0), (250.0, 120.0)),
+            Kind::Week => ((330.0, 150.0), (260.0, 96.0)),
+            Kind::Clock => ((260.0, 150.0), (200.0, 96.0)),
+            Kind::Usage => ((330.0, 230.0), (240.0, 110.0)),
             Kind::Script(_) => ((300.0, 210.0), (240.0, 110.0)),
         }
     }
@@ -244,6 +259,9 @@ pub fn new_id(kind: &Kind, taken: &[&str]) -> String {
         Kind::Waiting => "wait",
         Kind::Dev => "dev",
         Kind::Agenda => "cal",
+        Kind::Week => "week",
+        Kind::Clock => "clock",
+        Kind::Usage => "use",
         Kind::Script(_) => "wg",
     };
     (1..).map(|n| format!("{base}{n}")).find(|id| !taken.contains(&id.as_str())).expect("nekonečná řada")

@@ -1,0 +1,60 @@
+/* Široký notch (rozložení `notch`, `NotchBar.tsx`, kolo 22): lišta sekcí vedle sebe, výška ~190 px, mezera 16,
+   sekce s rohy 19 (šuplík má dole 24 — `theme/apply.ts`). Prefix `nb-`, jen tokeny ze styles.css. Žádná
+   nekonečná animace; přechody jen na najetí a krátké. */
+.nb {
+  display: flex; gap: 16px; align-items: stretch;
+  min-height: 150px; max-height: 190px; margin: 0 0 16px;
+}
+.nb-sec {
+  flex: 1 1 0; min-width: 0; padding: 14px 16px; border-radius: 19px;
+  background: var(--card); box-shadow: inset 0 0 0 1px var(--line-soft);
+  display: flex; flex-direction: column; justify-content: center; gap: 8px; overflow: hidden;
+}
+.nb-btn {
+  display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--t1); cursor: pointer; transition: background-color 120ms var(--ease);
+}
+.nb-btn:hover:not(:disabled) { background: var(--card-2); }
+.nb-btn:disabled { color: var(--t3); cursor: default; }
+.nb-btn svg { width: 16px; height: 16px; }
+.nb-main { width: 36px; height: 36px; background: var(--card-2); }
+.nb-main svg { width: 18px; height: 18px; }
+
+/* přehrávač: obal vlevo, název a ovládání vpravo */
+.nb-player { flex: 1.6 1 0; flex-direction: row; align-items: center; justify-content: flex-start; gap: 12px; }
+.nb-cover > * { width: 72px; height: 72px; border-radius: 12px; }
+.nb-pl { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nb-title, .nb-by { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-title { font-size: var(--fs-body); }
+.nb-by { color: var(--t2); }
+.nb-ctl { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+
+/* dny: velký měsíc vlevo, pás dnů a čas vpravo (dnešek = akcent, víkend = jemně barevně) */
+.nb-days { flex: 1.5 1 0; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
+.nb-month { font-family: var(--display); font-size: 34px; line-height: 1; font-weight: 600; text-transform: capitalize; }
+.nb-dright { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.nb-week { display: flex; gap: 2px; }
+.nb-day { display: flex; flex-direction: column; align-items: center; min-width: 22px; padding: 2px 0; border-radius: 8px; font-variant-numeric: tabular-nums; }
+.nb-day i { font-style: normal; font-size: var(--fs-2xs); color: var(--t3); }
+.nb-day b { font-size: 13px; font-weight: 500; color: var(--t2); }
+.nb-weekend b { color: var(--red); }
+.nb-today { background: var(--accent); }
+.nb-today i, .nb-today b { color: var(--white); font-weight: 700; }
+.nb-time { font-family: var(--display); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
+
+/* systém: řádek = název, mini graf, procenta */
+.nb-sys { gap: 6px; }
+.nb-row { display: grid; grid-template-columns: 34px 1fr 44px; align-items: center; gap: 8px; }
+.nb-rn { font-size: 11px; color: var(--t2); }
+.nb-rv { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+/* mini graf = sdílený `src/charts/Sparkline` (jen čára); přetížení = jantar přes --chart-c */
+.nb-spark { display: block; min-width: 0; height: 24px; }
+.nb-hot { --chart-c: var(--amber); }
+.nb-row[data-load="hot"] .nb-rv { color: var(--red); }
+.nb-bar { height: 4px; border-radius: 2px; background: var(--card-3); overflow: hidden; }
+.nb-bar i { display: block; height: 100%; background: var(--accent); }
+
+/* hlasitost: svislý posuvník a ztlumení */
+.nb-vol { flex: 0 0 64px; align-items: center; padding: 12px 8px; }
+.nb-slider { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 104px; accent-color: var(--accent); cursor: pointer; }
+.nb-mute { color: var(--t2); }

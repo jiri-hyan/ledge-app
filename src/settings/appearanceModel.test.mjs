@@ -71,6 +71,8 @@ test("monitor ve skutečném poměru: rozměr ze screen, jinak 16:9 bez čísel"
   assert.equal(u.monW / u.monH, 16 / 9);
   assert.equal(u.share, 1, "celá šířka i bez známého monitoru = celý náhled");
   assert.equal(monitorModel({ width: "narrow", layout: "classic", strip: C }, 1080, { w: 0, h: 0 }).known, false);
+  // široký notch (kolo 22): vlastní šířka 720 px bez ohledu na předvolbu, 2 sloupce pod lištou
+  assert.deepEqual(monitorModel({ width: "wide", layout: "notch", strip: C }, 1300, { w: 1920, h: 1080 }), { monW: 1920, monH: 1080, known: true, drawerW: 720, left: 600, share: 720 / 1920, cols: 2 });
   // pozice u hrany = geom::anchor_c2 (odstup 24 px; celá šířka přiléhá k hraně)
   for (const [pos, mon, w, want] of [["center", 1920, 1080, 420], ["left", 1920, 1080, 24], ["right", 1920, 1080, 816], ["left", 1920, 1920, 0], ["right", 1920, 1920, 0], ["center", 1921, 1080, 420]]) {
     assert.equal(drawerLeft(pos, mon, w), want, `${pos} ${w} na ${mon}`);

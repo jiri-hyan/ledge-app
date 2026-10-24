@@ -26,4 +26,10 @@ registerDict("en", {
   "appearance.look.progress.desc": "Short text with a thin bar below: Claude's 5h limit, the timer or the song. The bar only from real data.",
   "appearance.look.ticker": "Rotating line",
   "appearance.look.ticker.desc": "One line. When several things happen they rotate every 5 s; otherwise nothing moves.",
+  "appearance.look.minimum": "Minimal",
+  "appearance.look.minimum.desc": "A small capsule with just the battery and the time. On a computer without a battery, just the time.",
+  "appearance.look.trio": "Trio",
+  "appearance.look.trio.desc": "Weather, time with date and the computer's load with battery in one capsule. Weather only from the Weather card, nothing extra is downloaded. Trio checks the system load every 10 s.",
+  "appearance.look.rings": "Claude status",
+  "appearance.look.rings.desc": "Claude's limit rings (5 h and week) and the time. A ring spins only while Claude works; orange when it waits for you.",
 });

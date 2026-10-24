@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { LOOK_HIDEABLE, STRIP_LOOKS, STRIP_LOOK_IDS, lookOf, withLookShown } from "./looks.ts";
+import { LOOK_HIDEABLE, LOOK_SHAPES, SHAPEABLE_LOOKS, STRIP_LOOKS, STRIP_LOOK_IDS, lookOf, normShape, withLookShown } from "./looks.ts";
 
 test("id stylů = varianty `Look` v Rustu (looks/mod.rs), ve stejném pořadí", () => {
   const src = readFileSync(new URL("../../src-tauri/src/looks/mod.rs", import.meta.url), "utf8");
@@ -49,4 +49,18 @@ test("Pokročilé: co styl nemá ukazovat (strip.lookHide)", () => {
     const v = id[0].toUpperCase() + id.slice(1);
     assert.ok(src.includes(`StripItem::${v} =>`), v);
   }
+});
+
+test("tvar kapsle (strip.lookShape): zrcadlo `Shape` a `Look::shapeable` v Rustu, neznámý = round", () => {
+  const src = readFileSync(new URL("../../src-tauri/src/looks/mod.rs", import.meta.url), "utf8");
+  const start = src.indexOf("pub enum Shape {");
+  const body = src.slice(start, src.indexOf("\n}", start));
+  const rust = [...body.matchAll(/^\s*([A-Z][A-Za-z]*),\s*$/gm)].map((m) => m[1].toLowerCase());
+  assert.deepEqual(rust, [...LOOK_SHAPES]);
+  const at = src.indexOf("pub fn shapeable");
+  const fn = src.slice(at, src.indexOf("}", at));
+  const ids = [...fn.matchAll(/Look::([A-Z][a-z]+)/g)].map((m) => m[1].toLowerCase());
+  assert.deepEqual(ids, [...SHAPEABLE_LOOKS]);
+  for (const id of SHAPEABLE_LOOKS) assert.ok(STRIP_LOOK_IDS.includes(id), id);
+  for (const [v, want] of [["island", "island"], ["sharp", "sharp"], [undefined, "round"], ["pill", "round"], [3, "round"]]) assert.equal(normShape(v), want, String(v));
 });

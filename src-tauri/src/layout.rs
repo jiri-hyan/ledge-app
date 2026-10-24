@@ -27,11 +27,18 @@ use serde_json::Value;
 pub const WORK: &str = "prace";
 pub const PERSONAL: &str = "osobni";
 /// Karty, které jde dát na záložku (zrcadlo `CARD_IDS` v `src/layout/model.ts`).
-pub const CARDS: [&str; 17] = ["projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today"];
-/// Karty, které potřebují zdroj nebo jsou nové funkce (GitHub, Systém, Pošta — přihlášený účet Microsoft):
+pub const CARDS: [&str; 21] = [
+    "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today",
+    // kolo 22 (nové widgety, `src/board/`): Claude dnes, Týden, Velké hodiny, Rychlé přepínače — jen z katalogu
+    "usage", "week", "bigclock", "toggles",
+];
+/// Karty kola 22, které čtou kalendář (pás týdne ukazuje dnešní události) a zvuk (rychlé přepínače).
+pub const WEEK_CARD: &str = "week";
+pub const TOGGLES_CARD: &str = "toggles";
+/// Karty, které potřebují zdroj nebo jsou nové funkce (GitHub, Systém, Pošta — přihlášený účet Microsoft; Claude dnes, Rychlé přepínače — kolo 22):
 /// uživatel je přidá z katalogu a MCP je jako „opt-in“ hlásí Claudovi. Ve výchozím rozložení nejsou
 /// (kromě nich ani Kalendář, Počasí, Claude, Repa… — viz [`clean_default`]); `Sections::default()` je má vypnuté.
-pub const OPT_IN: [&str; 3] = ["github", "system", "mail"];
+pub const OPT_IN: [&str; 5] = ["github", "system", "mail", "usage", "toggles"];
 /// Dynamická karta: id s prefixem (dnes jen widgety ze skriptů `widget:<soubor>`, `widgets/`).
 /// Validace hlídá jen tvar — soubor nemusí existovat (karta pak ukáže, že chybí). Katalog je nabízí
 /// podle toho, co je na disku (zrcadlo `isDynamic` v `src/layout/model.ts`).
@@ -159,6 +166,10 @@ pub struct LayoutPage {
     pub icon: String,
     /// Karty v pořadí zleva doprava, shora dolů.
     pub cards: Vec<LayoutCard>,
+    /// Bento mřížka (kolo 22): karty jako dlaždice 1×1, 2×1, 2×2… = šířka `size` × výška `h` v řádcích (chybí = 2),
+    /// volná místa vyplní hustý tok mřížky. Chybí = běžná mřížka (dnešní).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bento: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -321,7 +332,7 @@ pub fn derive(cfg: &mut Config) {
 fn section_on(l: &LayoutConfig, key: &str) -> Option<bool> {
     // karta Dnes čte kalendář z paměti: i bez karty Kalendář musí být jeho zdroj zapnutý (jinak by `view` hlásil „off“)
     if key == "calendar" {
-        return Some(placed(l, "calendar") || placed(l, "today"));
+        return Some(placed(l, "calendar") || placed(l, "today") || placed(l, WEEK_CARD));
     }
     if CARDS.contains(&key) {
         Some(placed(l, key))
@@ -378,7 +389,7 @@ pub fn page_has(l: &LayoutConfig, mode: &str, card: &str) -> bool {
 
 /// Je na právě viditelné záložce karta, která čte kalendář (Kalendář, nebo Dnes — ta ukazuje další schůzku)?
 pub fn page_has_calendar(l: &LayoutConfig, mode: &str) -> bool {
-    page_has(l, mode, "calendar") || page_has(l, mode, "today")
+    page_has(l, mode, "calendar") || page_has(l, mode, "today") || page_has(l, mode, WEEK_CARD)
 }
 
 /// Název záložky pro proužek (ikona + název; vestavěná bez názvu podle jazyka).
@@ -927,5 +938,64 @@ mod tests {
         let again = crate::config::load(&path).unwrap().unwrap();
         assert_eq!(again.layout, cfg.layout);
         assert_eq!(again.drawer.sections, cfg.drawer.sections);
+    }
+
+    /// Kolo 22: starý config (tvar z 0.8.0 — záložky s kartami, vzhledy, části, skryté části, úpravy) se načte
+    /// a uloží beze změny (žádné `bento` ani nové klíče vzhledu); bento záložka a nové volby vzhledu tam a zpět.
+    #[test]
+    fn bento_and_card_surface_keep_old_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let old = r##"{"layout":{"pages":[
+          {"id":"prace","name":"","cards":[{"id":"projects","size":"xl","tiles":{"size":"tile","label":true,"git":true,"hidden":[]}},{"id":"claude","size":"m","h":3,"limit":6,"parts":["claudeLimits","body","claudeCosts"],"look":{"accent":"teal","density":"airy"}},{"id":"notes","size":"m","look":{"view":"bento"}}]},
+          {"id":"osobni","name":"","cards":[{"id":"clock","size":"s"},{"id":"media","size":"m"},{"id":"weather","size":"s","look":{"bg":"tint","hideHead":true}}]},
+          {"id":"hry","name":"Hry","icon":"🎮","cards":[{"id":"timer","size":"s","h":1}]}],
+          "hiddenParts":["claudeSubagents"],"upgrades":["personalProjects"]}}"##;
+        std::fs::write(&path, old).unwrap();
+        let cfg = crate::config::load(&path).unwrap().unwrap();
+        assert!(cfg.layout.pages.iter().all(|p| !p.bento));
+        crate::config::save(&path, &cfg).unwrap();
+        let saved: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let before: serde_json::Value = serde_json::from_str(old).unwrap();
+        assert_eq!(saved["layout"], before["layout"], "rozložení z 0.8.0 se uloží beze změny");
+        // bento záložka a nové volby vzhledu karty: load → save → load beze ztráty, zápis jen zapnutého
+        let mut cfg = crate::config::load(&path).unwrap().unwrap();
+        cfg.layout.pages[2].bento = true;
+        cfg.layout.pages[1].cards[2].look = Some(crate::tilelook::CardLook { surface: Some(crate::tilelook::CardSurface::Glass), grain: true, hero: true, ..Default::default() });
+        validate(&cfg.layout).unwrap();
+        crate::config::save(&path, &cfg).unwrap();
+        let saved: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(saved["layout"]["pages"][2]["bento"], json!(true));
+        assert!(saved["layout"]["pages"][0].get("bento").is_none(), "vypnuté se nepíše");
+        assert_eq!(saved["layout"]["pages"][1]["cards"][2]["look"], json!({"surface":"glass","grain":true,"hero":true}));
+        let back = crate::config::load(&path).unwrap().unwrap();
+        assert_eq!(back.layout, cfg.layout);
+    }
+
+    /// Kolo 22: config tvaru 0.8.0 (rozložení s Osobní: Čas, Právě hraje, Kalendář) se načte beze změny —
+    /// nové karty se samy nepřidají a odvozené sekce zůstanou; nová karta Týden / Rychlé přepínače zapne jen svůj zdroj.
+    #[test]
+    fn round22_old_config_unchanged_and_new_cards_opt_in() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let old = r#"{"layout":{"pages":[{"id":"prace","name":"","cards":[{"id":"projects","size":"xl"},{"id":"claude","size":"m"}]},{"id":"osobni","name":"","cards":[{"id":"projects","size":"xl"},{"id":"clock","size":"s"},{"id":"media","size":"m"}]}],"hiddenParts":["sound"],"upgrades":["personalProjects"]},"drawer":{"sections":{"calendar":false}}}"#;
+        std::fs::write(&path, old).unwrap();
+        let cfg = crate::config::load(&path).unwrap().unwrap();
+        for id in ["usage", "week", "bigclock", "toggles"] {
+            assert!(!placed(&cfg.layout, id), "{id} se nepřidá samo");
+        }
+        assert!(!cfg.drawer.sections.calendar && !cfg.drawer.sections.sound);
+        assert!(!crate::volume::allowed(&cfg), "skrytá hlasitost zůstane vypnutá");
+        crate::config::save(&path, &cfg).unwrap();
+        let again = crate::config::load(&path).unwrap().unwrap();
+        assert_eq!(again.layout, cfg.layout);
+        // přidaná karta Týden zapne čtení kalendáře, Rychlé přepínače zvuk
+        let mut with = cfg.clone();
+        with.layout.pages[1].cards.push(serde_json::from_str(r#"{"id":"week","size":"m"}"#).unwrap());
+        with.layout.pages[1].cards.push(serde_json::from_str(r#"{"id":"toggles","size":"s"}"#).unwrap());
+        derive(&mut with);
+        assert!(with.drawer.sections.calendar && page_has_calendar(&with.layout, PERSONAL));
+        assert!(crate::volume::allowed(&with) && !with.drawer.sections.sound, "zvuk pro přepínače, část karty Právě hraje dál skrytá");
+        assert!(validate(&with.layout).is_ok(), "nové karty projdou validací");
     }
 }

@@ -5,7 +5,8 @@
 
 /* ---------- karta s průběhem (výchozí) ---------- */
 /* podbarvení barvou obalu (`media.tint`, `tint.ts`) — jen se zapnutou volbou a obalem */
-.med-card.med-tinted { background: color-mix(in srgb, var(--media-tint) 16%, var(--card)); transition: background var(--dur-3) var(--ease); }
+/* kolo 22: barva obalu je i JEDINÝ akcent karty (průběh, ekvalizér, režimy) — zbytek zůstává neutrální */
+.med-card.med-tinted { --accent: var(--media-tint); background: color-mix(in srgb, var(--media-tint) 16%, var(--card)); transition: background var(--dur-3) var(--ease); }
 .med-tinted .med-range { accent-color: var(--media-tint); }
 .med-now { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 2px 0; }
 .med-cover { width: 44px; height: 44px; border-radius: var(--r-sm); flex-shrink: 0; overflow: hidden; display: grid; place-items: center; background: var(--card-2); color: var(--t3); }

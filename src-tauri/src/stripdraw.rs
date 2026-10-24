@@ -2,7 +2,8 @@
 //! DirectWrite jako `strip::draw`, data z čistých funkcí `looks::show` (co) a `looks::frame` (tvar,
 //! místo). Ikony ze systémového písma Segoe Fluent Icons (Windows 11), záložně Segoe MDL2 Assets,
 //! jinak obyčejné znaky (`Glyph::fallback`) — žádné soubory navíc. Kreslí se jen při změně modelu,
-//! při plynulé změně šířky ostrůvku (`frame::WidthAnim`, ~240 ms) a při pulsu; v klidu nic.
+//! při plynulé změně šířky ostrůvku (`frame::WidthAnim`, ~240 ms), při pulsu a u prstenců stylu `rings`
+//! jen dokud Claude pracuje (`Show.spin`, ~8 snímků/s, bez animací vůbec); v klidu nic.
 
 use crate::looks::frame::{self, Placed, Spec, WidthAnim};
 use crate::looks::{Glyph, Look, Part, Show};
@@ -101,6 +102,49 @@ unsafe fn part_w(r: &Renderer, fm: &Fmts, p: &Part, sp: &Spec, ks: f32) -> f32 {
                 w + badge.as_ref().map(|b| (measure(&r.dw, &fm.badge, b) + 4.0 * ks) * 0.6).unwrap_or(0.0)
             }
             Part::Sep => 1.0,
+            Part::Battery { .. } => BATT_W * ks,
+            Part::Ring { .. } => sp.dot * ks,
+        }
+    }
+}
+
+/// Šířka a výška tvaru baterie (logické px, bez „čudlíku“).
+const BATT_W: f32 = 20.0;
+const BATT_H: f32 = 10.0;
+/// Jedna otáčka točícího se oblouku prstence (ms).
+pub(crate) const SPIN_MS: u64 = 1400;
+
+/// Bod na kružnici; úhel 0 = nahoře, po směru hodinových ručiček.
+fn on_circle(c: Vector2, r: f32, turn: f32) -> Vector2 {
+    let a = turn * std::f32::consts::TAU;
+    Vector2 { X: c.X + r * a.sin(), Y: c.Y - r * a.cos() }
+}
+
+/// Oblouk od `from` do `to` (podíl otáčky, 0 = nahoře) jako tah štětcem.
+#[allow(clippy::too_many_arguments)]
+unsafe fn arc(t: &ID2D1DCRenderTarget, r: &Renderer, c: Vector2, rad: f32, from: f32, to: f32, b: &windows::Win32::Graphics::Direct2D::ID2D1SolidColorBrush, w: f32) {
+    unsafe {
+        let span = (to - from).clamp(0.0, 1.0);
+        if span <= 0.001 {
+            return;
+        }
+        if span >= 0.999 {
+            t.DrawEllipse(&D2D1_ELLIPSE { point: c, radiusX: rad, radiusY: rad }, b, w, None);
+            return;
+        }
+        let Ok(path) = r.d2d.CreatePathGeometry() else { return };
+        let Ok(sink) = path.Open() else { return };
+        sink.BeginFigure(on_circle(c, rad, from), windows::Win32::Graphics::Direct2D::Common::D2D1_FIGURE_BEGIN_HOLLOW);
+        sink.AddArc(&D2D1_ARC_SEGMENT {
+            point: on_circle(c, rad, from + span),
+            size: D2D_SIZE_F { width: rad, height: rad },
+            rotationAngle: 0.0,
+            sweepDirection: D2D1_SWEEP_DIRECTION_CLOCKWISE,
+            arcSize: if span > 0.5 { windows::Win32::Graphics::Direct2D::D2D1_ARC_SIZE_LARGE } else { D2D1_ARC_SIZE_SMALL },
+        });
+        sink.EndFigure(windows::Win32::Graphics::Direct2D::Common::D2D1_FIGURE_END_OPEN);
+        if sink.Close().is_ok() {
+            t.DrawGeometry(&path, b, w, None);
         }
     }
 }
@@ -126,9 +170,10 @@ fn brush(t: &ID2D1DCRenderTarget, c: Rgba, a: f32) -> Option<windows::Win32::Gra
     unsafe { t.CreateSolidColorBrush(&color(c, a), None).ok() }
 }
 
-/// Části vedle sebe od `x`, svisle na středu pásu `y0..y1`.
+/// Části vedle sebe od `x`, svisle na středu pásu `y0..y1`. `spin` = natočení točícího se oblouku
+/// prstenců (podíl otáčky), `None` = netočí se.
 #[allow(clippy::too_many_arguments)]
-unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[Part], sp: &Spec, ks: f32, mut x: f32, y0: f32, y1: f32) {
+unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[Part], sp: &Spec, ks: f32, mut x: f32, y0: f32, y1: f32, spin: Option<f32>) {
     unsafe {
         let mid = (y0 + y1) / 2.0;
         let gap = sp.gap * ks;
@@ -178,8 +223,45 @@ unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[
                     }
                 }
                 Part::Sep => {
-                    if let Some(b) = brush(t, Rgba(0.11, 0.16, 0.125, 1.0), 1.0) {
+                    // stavová lišta (mono) = tmavě zelená jako dřív, kapsle (trojice) = jemná bílá
+                    let tone = if sp.mono { Rgba(0.11, 0.16, 0.125, 1.0) } else { Rgba(1.0, 1.0, 1.0, 0.2) };
+                    if let Some(b) = brush(t, tone, 1.0) {
                         t.FillRectangle(&D2D_RECT_F { left: x, top: mid - 6.0 * ks, right: x + 1.0, bottom: mid + 6.0 * ks }, &b);
+                    }
+                }
+                Part::Battery { percent, charging } => {
+                    // obrys, „čudlík“ vpravo a výplň podle procent (≤ 20 % červeně, nabíjení zeleně)
+                    let (bw, bh) = ((BATT_W - 2.0) * ks, BATT_H * ks);
+                    let top = mid - bh / 2.0;
+                    let rr = D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: x + 0.5, top, right: x + bw, bottom: top + bh }, radiusX: 2.5 * ks, radiusY: 2.5 * ks };
+                    if let Some(b) = brush(t, Rgba::TEXT, 0.7) {
+                        t.DrawRoundedRectangle(&rr, &b, 1.0 * ks, None);
+                        t.FillRectangle(&D2D_RECT_F { left: x + bw + 0.5, top: mid - 2.0 * ks, right: x + bw + 2.0 * ks, bottom: mid + 2.0 * ks }, &b);
+                    }
+                    let tone = if *charging { Rgba::GREEN } else if *percent <= 20 { Rgba::RED } else { Rgba::TEXT };
+                    let inner = (bw - 3.0 * ks) * (*percent as f32 / 100.0).clamp(0.0, 1.0);
+                    if inner > 0.5
+                        && let Some(b) = brush(t, tone, 1.0)
+                    {
+                        let ir = D2D_RECT_F { left: x + 2.0 * ks, top: top + 1.5 * ks, right: x + 2.0 * ks + inner, bottom: top + bh - 1.5 * ks };
+                        t.FillRoundedRectangle(&D2D1_ROUNDED_RECT { rect: ir, radiusX: 1.2 * ks, radiusY: 1.2 * ks }, &b);
+                    }
+                }
+                Part::Ring { fill, color: c } => {
+                    // dráha, výplň od vrcholu po směru hodin (jen ze skutečného limitu), při práci krátký
+                    // točící se oblouk vně
+                    let d = sp.dot * ks;
+                    let center = Vector2 { X: x + d / 2.0, Y: mid };
+                    let sw = 2.2 * ks;
+                    let rad = d / 2.0 - sw / 2.0;
+                    if let Some(b) = brush(t, *c, 0.25) {
+                        t.DrawEllipse(&D2D1_ELLIPSE { point: center, radiusX: rad, radiusY: rad }, &b, sw, None);
+                    }
+                    if let (Some(f), Some(b)) = (fill, brush(t, *c, 1.0)) {
+                        arc(t, r, center, rad, 0.0, *f, &b, sw);
+                    }
+                    if let (Some(turn), Some(b)) = (spin, brush(t, Rgba::TEXT, 0.9)) {
+                        arc(t, r, center, rad, turn, turn + 0.22, &b, sw * 0.7);
                     }
                 }
             }
@@ -237,10 +319,12 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
             (false, v) => &v[rot % v.len()],
             _ => &show.parts,
         };
-        let sp = frame::spec(look, &show);
+        let sp = frame::shaped(look, frame::spec(look, &show), m.shape);
         let scale = m.dpi as f32 / 96.0;
         let ks = scale * m.metrics.k;
         let fm = fmts(r, look, &sp, ks)?;
+        // natočení prstenců: jen když Claude pracuje a animace jsou zapnuté (jinak statický oblouk nic)
+        let spin = (show.spin && m.animate).then(|| (now % SPIN_MS) as f32 / SPIN_MS as f32);
         let pulse = crate::strip::pulse_now(m);
         let mon = m.monitor;
         let axis2 = m.axis2.unwrap_or(2 * mon.left + (mon.right - mon.left));
@@ -358,13 +442,13 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
                 let pad = sp.pad * ks;
                 match look {
                     Look::Bar => {
-                        draw_parts(t, r, &fm, parts, &sp, ks, pad, 0.0, bhf);
-                        draw_parts(t, r, &fm, &show.right, &sp, ks, bwf - pad - right_w, 0.0, bhf);
+                        draw_parts(t, r, &fm, parts, &sp, ks, pad, 0.0, bhf, None);
+                        draw_parts(t, r, &fm, &show.right, &sp, ks, bwf - pad - right_w, 0.0, bhf, None);
                     }
                     Look::Progress => {
                         let row_b = if show.progress.is_some() { bhf - 8.0 * ks } else { bhf };
-                        draw_parts(t, r, &fm, parts, &sp, ks, pad, 1.0 * ks, row_b);
-                        draw_parts(t, r, &fm, &show.right, &sp, ks, bwf - pad - right_w, 1.0 * ks, row_b);
+                        draw_parts(t, r, &fm, parts, &sp, ks, pad, 1.0 * ks, row_b, None);
+                        draw_parts(t, r, &fm, &show.right, &sp, ks, bwf - pad - right_w, 1.0 * ks, row_b, None);
                         if let Some((frac, c)) = show.progress {
                             let (ty, th) = (bhf - 7.0 * ks, 3.0 * ks);
                             let track = D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: pad, top: ty, right: bwf - pad, bottom: ty + th }, radiusX: th / 2.0, radiusY: th / 2.0 };
@@ -379,7 +463,7 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
                             }
                         }
                     }
-                    _ => draw_parts(t, r, &fm, parts, &sp, ks, (bwf - content) / 2.0, 0.0, bhf),
+                    _ => draw_parts(t, r, &fm, parts, &sp, ks, (bwf - content) / 2.0, 0.0, bhf, spin),
                 }
                 t.PopAxisAlignedClip();
                 // puls „čeká / hotovo“: obrys těla v barvě události; nažhavení: linka akcentu dole

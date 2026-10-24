@@ -1,6 +1,7 @@
 //! Inkrementální index spotřeby nad transcripty Claude Code. Na disku (`%LOCALAPPDATA%\Ledge\
 //! usage-index.json` + `usage-index.seen`): per soubor offset + délka + mtime, agregace
-//! den × cwd × model × pásmo a množina viděných klíčů odpovědí (jen pro dny v okně).
+//! den × cwd × model × pásmo, po hodinách za dnešek a včerejšek (časová osa karty Claude dnes, kolo 22)
+//! a množina viděných klíčů odpovědí (jen pro dny v okně).
 //!
 //! Pravidla výkonu: soubor s mtime před začátkem okna se neotevře (jen stat z výpisu složky);
 //! nezměněný soubor (délka i mtime) se neotevře; změněný se čte od uloženého offsetu a jen celé
@@ -14,8 +15,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-/// Verze formátu indexu — jiná na disku = přepočet od nuly.
-pub const VERSION: u32 = 1;
+/// Verze formátu indexu — jiná na disku = přepočet od nuly. 2 = přibyly hodiny (`hours`, kolo 22):
+/// starý index je nemá, takže dnešní časová osa by byla neúplná → raději jednou přepočítat.
+pub const VERSION: u32 = 2;
+/// Kolik dní zpět (včetně dneška) se drží po hodinách — dnešek + včerejšek (přes půlnoc), víc karta neukazuje.
+pub const HOUR_DAYS: i32 = 2;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FileEntry {
@@ -45,11 +49,21 @@ pub struct Sum {
     pub n: u64,
 }
 
+/// Klíč hodinové agregace: místní den, místní hodina 0–23, `cwd`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct HourKey {
+    pub day: i32,
+    pub hour: u8,
+    pub cwd: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Index {
     pub window_days: u32,
     pub files: BTreeMap<String, FileEntry>,
     pub agg: HashMap<Key, Sum>,
+    /// po hodinách, jen posledních `HOUR_DAYS` dní okna
+    pub hours: HashMap<HourKey, Sum>,
     /// klíč odpovědi → den (den kvůli pročištění starých)
     pub seen: HashMap<u64, i32>,
 }
@@ -60,6 +74,8 @@ struct Disk {
     window_days: u32,
     files: BTreeMap<String, FileEntry>,
     agg: Vec<(Key, Sum)>,
+    #[serde(default)]
+    hours: Vec<(HourKey, Sum)>,
 }
 
 /// Soubor z výpisu složky: cesta, délka, mtime (ms).
@@ -76,6 +92,15 @@ pub struct Window<'a> {
     pub cutoff_ms: i64,
     pub cutoff_day: i32,
     pub day_of: &'a dyn Fn(i64) -> i32,
+    /// místní hodina 0–23 z ms
+    pub hour_of: &'a dyn Fn(i64) -> u8,
+}
+
+impl Window<'_> {
+    /// Dnešek = poslední den okna.
+    pub fn today(&self) -> i32 {
+        self.cutoff_day + self.days as i32 - 1
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
@@ -127,6 +152,8 @@ impl Index {
 
     fn prune(&mut self, w: &Window) {
         self.agg.retain(|k, _| k.day >= w.cutoff_day);
+        let first_hour_day = w.today() - HOUR_DAYS + 1;
+        self.hours.retain(|k, _| k.day >= first_hour_day);
         self.seen.retain(|_, d| *d >= w.cutoff_day);
     }
 
@@ -146,6 +173,11 @@ impl Index {
         let model = price::canonical(&r.model);
         let tier = price::tier(&model, &r.tokens, r.fast, r.geo_us);
         let cwd = r.cwd.as_deref().or(file_cwd).unwrap_or_default().to_string();
+        if day > w.today() - HOUR_DAYS {
+            let h = self.hours.entry(HourKey { day, hour: (w.hour_of)(r.ts_ms).min(23), cwd: cwd.clone() }).or_default();
+            h.t.add(&r.tokens);
+            h.n += 1;
+        }
         let s = self.agg.entry(Key { day, cwd, model, tier }).or_default();
         s.t.add(&r.tokens);
         s.n += 1;
@@ -201,12 +233,15 @@ impl Index {
         let mut r = BufReader::with_capacity(256 * 1024, file.take(f.len.saturating_sub(e.off)));
         let mut line = Vec::with_capacity(64 * 1024);
         loop {
-            line.clear();
-            let n = r.read_until(b'\n', &mut line)?;
-            if n == 0 || line.last() != Some(&b'\n') {
-                break; // konec nebo useknutý poslední řádek — offset zůstane před ním
-            }
-            e.off += n as u64;
+            let n = match read_line_capped(&mut r, &mut line, MAX_LINE)? {
+                Line::End => break, // konec nebo useknutý poslední řádek — offset zůstane před ním
+                Line::Skipped(n) => {
+                    e.off += n; // řádek nad strop (obří výstup nástroje): přeskočen bez načtení do paměti
+                    continue;
+                }
+                Line::Whole(n) => n,
+            };
+            e.off += n;
             if let Some(rec) = parse::parse_line(&line) {
                 if rec.cwd.is_some() {
                     e.cwd.clone_from(&rec.cwd);
@@ -224,6 +259,51 @@ impl Index {
             }
         }
         Ok(())
+    }
+}
+
+/// Nejdelší řádek transcriptu, který se parsuje (8 MB). Delší (obří výstup nástroje, vložený soubor) se přeskočí:
+/// `read_until` by ho jinak celý nacpal do paměti a Ledge má držet pod 25 MB.
+pub const MAX_LINE: usize = 8 * 1024 * 1024;
+
+/// Výsledek čtení jednoho řádku.
+#[derive(Debug, PartialEq, Eq)]
+enum Line {
+    /// konec vstupu, nebo poslední řádek bez `\n` (příště)
+    End,
+    /// celý řádek (s `\n`) v bufferu; počet přečtených bajtů
+    Whole(u64),
+    /// řádek delší než strop, přeskočený (buffer prázdný); počet přečtených bajtů včetně `\n`
+    Skipped(u64),
+}
+
+/// Přečte jeden řádek do `buf` (smaže ho předem), ale nikdy neukládá víc než `max` bajtů: delší řádek dočte po
+/// kouscích bez ukládání a vrátí `Skipped`. Paměť je tedy omezená `max` + velikostí bufferu čtečky.
+fn read_line_capped(r: &mut impl BufRead, buf: &mut Vec<u8>, max: usize) -> std::io::Result<Line> {
+    buf.clear();
+    let (mut total, mut skipping) = (0u64, false);
+    loop {
+        let chunk = r.fill_buf()?;
+        if chunk.is_empty() {
+            buf.clear();
+            return Ok(Line::End);
+        }
+        let (take, done) = match chunk.iter().position(|b| *b == b'\n') {
+            Some(i) => (i + 1, true),
+            None => (chunk.len(), false),
+        };
+        if !skipping && buf.len() + take > max {
+            skipping = true;
+            buf.clear();
+        }
+        if !skipping {
+            buf.extend_from_slice(&chunk[..take]);
+        }
+        r.consume(take);
+        total += take as u64;
+        if done {
+            return Ok(if skipping { Line::Skipped(total) } else { Line::Whole(total) });
+        }
     }
 }
 
@@ -247,7 +327,7 @@ pub fn load(dir: &Path) -> Index {
     let Some(seen) = std::fs::read(seen_path(dir)).ok().and_then(|b| decode_seen(&b)) else {
         return Index::default(); // bez množiny viděných by se přírůstky počítaly dvakrát
     };
-    Index { window_days: d.window_days, files: d.files, agg: d.agg.into_iter().collect(), seen }
+    Index { window_days: d.window_days, files: d.files, agg: d.agg.into_iter().collect(), hours: d.hours.into_iter().collect(), seen }
 }
 
 /// Uloží index (tmp + rename, nejdřív `.seen`, pak `.json`).
@@ -255,7 +335,9 @@ pub fn save(dir: &Path, ix: &Index) -> std::io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let mut agg: Vec<(Key, Sum)> = ix.agg.iter().map(|(k, v)| (k.clone(), *v)).collect();
     agg.sort_by(|a, b| a.0.cmp(&b.0));
-    let disk = Disk { v: VERSION, window_days: ix.window_days, files: ix.files.clone(), agg };
+    let mut hours: Vec<(HourKey, Sum)> = ix.hours.iter().map(|(k, v)| (k.clone(), *v)).collect();
+    hours.sort_by(|a, b| a.0.cmp(&b.0));
+    let disk = Disk { v: VERSION, window_days: ix.window_days, files: ix.files.clone(), agg, hours };
     write_atomic(&seen_path(dir), &encode_seen(&ix.seen))?;
     write_atomic(&json_path(dir), &serde_json::to_vec(&disk).map_err(std::io::Error::other)?)
 }
@@ -298,11 +380,50 @@ pub fn decode_seen(b: &[u8]) -> Option<HashMap<u64, i32>> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn read_line_capped_table() {
+        // (vstup, strop, očekávané výsledky po řádcích: (výsledek, obsah bufferu))
+        type Case<'a> = (&'a [u8], usize, Vec<(Line, &'a str)>);
+        let cases: [Case; 5] = [
+            (b"ab\ncd\n", 10, vec![(Line::Whole(3), "ab\n"), (Line::Whole(3), "cd\n"), (Line::End, "")]),
+            (b"ab\ncd", 10, vec![(Line::Whole(3), "ab\n"), (Line::End, "")]),
+            (b"ab\n0123456789X\nzz\n", 5, vec![(Line::Whole(3), "ab\n"), (Line::Skipped(12), ""), (Line::Whole(3), "zz\n")]),
+            (b"0123456789", 5, vec![(Line::End, "")]),
+            (b"\n\n", 5, vec![(Line::Whole(1), "\n"), (Line::Whole(1), "\n")]),
+        ];
+        for (input, max, want) in cases {
+            // malý buffer čtečky = řádek se čte po kouscích (jako velký řádek v souboru)
+            let mut r = BufReader::with_capacity(4, input);
+            let mut buf = Vec::new();
+            for (res, text) in want {
+                assert_eq!(read_line_capped(&mut r, &mut buf, max).unwrap(), res, "{input:?}");
+                assert_eq!(String::from_utf8_lossy(&buf), text, "{input:?}");
+                assert!(buf.len() <= max, "buffer nad strop");
+            }
+        }
+    }
+
+    #[test]
+    fn read_line_capped_never_holds_more_than_max() {
+        // 1 MB řádek se stropem 1 kB: buffer nikdy neroste nad strop, následující řádek se přečte
+        let mut data = vec![b'x'; 1_000_000];
+        data.extend_from_slice(b"\nok\n");
+        let mut r = BufReader::with_capacity(8 * 1024, &data[..]);
+        let mut buf = Vec::new();
+        assert_eq!(read_line_capped(&mut r, &mut buf, 1024).unwrap(), Line::Skipped(1_000_001));
+        assert!(buf.capacity() < 100_000, "nealokuje se pro obří řádek");
+        assert_eq!(read_line_capped(&mut r, &mut buf, 1024).unwrap(), Line::Whole(3));
+        assert_eq!(buf, b"ok\n");
+    }
+
     const DAY: i64 = 86_400_000;
     /// „místní“ čas pro testy: UTC+2 (půlnoc je v 22:00 UTC)
     const OFF: i64 = 2 * 3_600_000;
     fn day_of(ms: i64) -> i32 {
         (ms + OFF).div_euclid(DAY) as i32
+    }
+    fn hour_of(ms: i64) -> u8 {
+        ((ms + OFF).rem_euclid(DAY) / 3_600_000) as u8
     }
     /// 2026-10-17 12:00 UTC
     const NOW: i64 = 1_792_238_400_000;
@@ -315,7 +436,7 @@ mod tests {
 
     fn with_win<R>(days: u32, f: impl FnOnce(&Window) -> R) -> R {
         let (cutoff_day, cutoff_ms) = win(days);
-        f(&Window { days, cutoff_ms, cutoff_day, day_of: &day_of })
+        f(&Window { days, cutoff_ms, cutoff_day, day_of: &day_of, hour_of: &hour_of })
     }
 
     fn iso(ms: i64) -> String {
@@ -514,5 +635,60 @@ mod tests {
         s.insert(7, 20_000);
         assert_eq!(decode_seen(&encode_seen(&s)), Some(s));
         assert_eq!(decode_seen(b"XXXX"), None);
+    }
+
+    #[test]
+    fn hours_today_and_yesterday_only() {
+        let fx = Fx::new();
+        let h = 3_600_000;
+        // NOW = 14:00 místního času (UTC+2); řádky: dnes 13:xx, dnes 9:xx, včera 23:xx, předevčírem
+        let today_13 = NOW - 30 * 60_000;
+        let today_9 = NOW - 5 * h;
+        let yday_23 = NOW - 14 * h - 30 * 60_000;
+        let older = NOW - 2 * DAY;
+        fx.write(
+            "p/s.jsonl",
+            &format!(
+                "{}{}{}{}{}",
+                rec_line("a", today_13, "C:/p/app", "claude-opus-5-5", 10),
+                rec_line("b", today_13 + 60_000, "C:/p/app", "claude-opus-5-5", 5),
+                rec_line("c", today_9, "C:/p/app-v2", "claude-opus-5-5", 7),
+                rec_line("d", yday_23, "C:/p/app", "claude-opus-5-5", 3),
+                rec_line("e", older, "C:/p/app", "claude-opus-5-5", 1),
+            ),
+        );
+        let mut ix = Index::default();
+        run(&mut ix, &fx.found(&|_| NOW), 30);
+        let today = day_of(NOW);
+        let got = |day: i32, hour: u8, cwd: &str| ix.hours.get(&HourKey { day, hour, cwd: cwd.into() }).map(|s| (s.t.output, s.n));
+        assert_eq!(got(today, 13, "C:/p/app"), Some((15, 2)), "dvě odpovědi ve 13:xx");
+        assert_eq!(got(today, 9, "C:/p/app-v2"), Some((7, 1)));
+        assert_eq!(got(today - 1, 23, "C:/p/app"), Some((3, 1)), "včerejšek zůstává (přes půlnoc)");
+        assert_eq!(ix.hours.len(), 3, "předevčírem po hodinách ne");
+        assert_eq!(total_out(&ix), 26, "denní součty beze změny");
+        // další den: včerejšek se stane předevčírem a vypadne
+        let next = NOW + DAY;
+        let (cutoff_day, cutoff_ms) = {
+            let t = day_of(next);
+            let c = t - 30 + 1;
+            (c, c as i64 * DAY - OFF)
+        };
+        ix.update(&fx.found(&|_| NOW), &Window { days: 30, cutoff_ms, cutoff_day, day_of: &day_of, hour_of: &hour_of }, &mut |_, _| {});
+        assert!(ix.hours.keys().all(|k| k.day >= today), "drží se jen dva dny");
+        // uložení a načtení drží hodiny
+        let store = fx.path("store");
+        save(&store, &ix).unwrap();
+        assert_eq!(load(&store).hours, ix.hours);
+    }
+
+    #[test]
+    fn old_index_version_is_rebuilt() {
+        let fx = Fx::new();
+        let store = fx.path("store");
+        std::fs::create_dir_all(&store).unwrap();
+        // index verze 1 (bez hodin) z dřívějšího Ledge = prázdný → přepočet od nuly
+        std::fs::write(json_path(&store), br#"{"v":1,"window_days":30,"files":{},"agg":[]}"#).unwrap();
+        std::fs::write(seen_path(&store), encode_seen(&HashMap::new())).unwrap();
+        assert_eq!(load(&store), Index::default());
     }
 }

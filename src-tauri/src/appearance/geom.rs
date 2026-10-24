@@ -51,9 +51,18 @@ pub fn drawer_width(cfg_w: u32, mon_w: i32, dpi: u32) -> f64 {
 }
 
 /// Šířka velkého šuplíku podle configu (logické px): předvolba `appearance.width` (úzký / střední /
-/// široký = pevné px, celá šířka = monitor bez stropu 95 %), jinak `drawer.width` jako dřív.
+/// široký = pevné px, celá šířka = monitor bez stropu 95 %), jinak `drawer.width` jako dřív. Rozložení
+/// „Široký notch“ má vlastní šířku (`look::NOTCH_PX`) a předvolbu nepoužije.
 pub fn drawer_width_for(cfg: &crate::config::Config, mon_w: i32, dpi: u32) -> f64 {
-    preset_width(cfg.appearance.width, cfg.drawer.width, mon_w, dpi)
+    layout_width(cfg.appearance.layout, cfg.appearance.width, cfg.drawer.width, mon_w, dpi)
+}
+
+/// Čistá část `drawer_width_for` včetně rozložení (tabulkový test).
+pub fn layout_width(layout: super::look::Layout, preset: WidthPreset, custom: u32, mon_w: i32, dpi: u32) -> f64 {
+    if layout == super::look::Layout::Notch {
+        return drawer_width(super::look::NOTCH_PX, mon_w, dpi);
+    }
+    preset_width(preset, custom, mon_w, dpi)
 }
 
 /// Čistá část `drawer_width_for` (tabulkový test).
@@ -335,6 +344,12 @@ mod tests {
         for (p, custom, mon, dpi, want) in cases {
             assert_eq!(preset_width(p, custom, mon, dpi), want, "{p:?} {custom} na {mon} @ {dpi}");
         }
+        // široký notch (kolo 22): vlastní šířka bez ohledu na předvolbu; ostatní rozložení = předvolba
+        use super::super::look::{Layout, NOTCH_PX};
+        assert_eq!(layout_width(Layout::Notch, Wide, 1080, 1920, 96), NOTCH_PX as f64);
+        assert_eq!(layout_width(Layout::Notch, Custom, 2000, 1920, 96), NOTCH_PX as f64);
+        assert_eq!(layout_width(Layout::Classic, Wide, 1080, 1920, 96), 1440.0);
+        assert_eq!(layout_width(Layout::Panel, Custom, 1300, 1920, 96), 1300.0);
         // celá šířka leží na ose u levé hrany monitoru (bez přesahu)
         let full = preset_width(Full, 1080, 1920, 96) as i32;
         assert_eq!(span_x(anchor_c2(0, 1920, full, StripPosition::Right, 96), full), 0);

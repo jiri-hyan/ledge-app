@@ -6,7 +6,7 @@ import { widgetFile } from "../widgets/model";
 import { BODY, builtinName, CARD_INFO, isBuiltin, PART_INFO, type CardId, type CardSize, type LayoutPage, type PartKey, type Text } from "./model";
 import type { SizeOutcome } from "./size";
 
-export const tx = (x: Text): string => t(x[0], x[1]);
+export const tx = (x: Text, vars?: Record<string, string | number>): string => t(x[0], x[1], vars);
 export const cardName = (id: CardId): string => {
   if (isBuiltin(id)) return tx(CARD_INFO[id].name);
   const w = widgetInfo(id);

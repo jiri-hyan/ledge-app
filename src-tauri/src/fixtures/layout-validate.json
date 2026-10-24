@@ -718,5 +718,59 @@
    ]
   },
   "field": "layout.pages.0.cards.0.parts.0"
+ },
+ {
+  "name": "bento záložka s dlaždicemi a vzhledy 2026 (kolo 22)",
+  "layout": {
+   "pages": [
+    {
+     "id": "hudba",
+     "name": "Hudba",
+     "icon": "🎵",
+     "bento": true,
+     "cards": [
+      {
+       "id": "media",
+       "size": "m",
+       "h": 2,
+       "look": {
+        "surface": "glass",
+        "grain": true
+       }
+      },
+      {
+       "id": "weather",
+       "size": "s",
+       "h": 1,
+       "look": {
+        "surface": "layer",
+        "hero": true
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "field": null
+ },
+ {
+  "name": "bento: výška dlaždice nad 4 řádky",
+  "layout": {
+   "pages": [
+    {
+     "id": "hudba",
+     "name": "Hudba",
+     "bento": true,
+     "cards": [
+      {
+       "id": "media",
+       "size": "m",
+       "h": 5
+      }
+     ]
+    }
+   ]
+  },
+  "field": "layout.pages.0.cards.0.h"
  }
 ]

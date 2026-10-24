@@ -41,13 +41,17 @@ pub struct StripConfig {
     #[serde(default)]
     pub items_rev: u32,
     /// Styl zavřeného Ledge: `classic` (výchozí = proužek podle `items`, tvar `appearance.strip.style`),
-    /// `island`, `dots`, `line`, `icons`, `clock`, `corner`, `ghost`, `bar`, `notch`, `progress`, `ticker`.
+    /// `island`, `dots`, `line`, `icons`, `clock`, `corner`, `ghost`, `bar`, `notch`, `progress`, `ticker`,
+    /// `minimum`, `trio`, `rings`.
     /// Ostatní styly než `classic` samy určí tvar, místo i obsah podle toho, co se děje (`looks.rs`);
     /// `items`, `quiet`, `colors`, `custom` a `opacity` platí jen pro `classic`.
     pub look: crate::looks::Look,
     /// Pokročilé u stylů mimo `classic`: co styl nemá ukazovat (`claude` = pracuje / hotovo, `waiting`,
     /// `running`, `repos`, `timer`, `media`, `limits`, `clock`). Výchozí prázdné = všechno.
     pub look_hide: Vec<StripItem>,
+    /// Tvar kapsle stylů s tělem: round, sharp, long, island (jako Mac).
+    // kolo 22; linka, lišta, tečky, roh a výřez ho nepoužijí (`Look::shapeable`)
+    pub look_shape: crate::looks::Shape,
 }
 
 impl Default for StripConfig {
@@ -65,6 +69,7 @@ impl Default for StripConfig {
             items_rev: crate::attention::ITEMS_REV,
             look: crate::looks::Look::Classic,
             look_hide: Vec::new(),
+            look_shape: crate::looks::Shape::Round,
         }
     }
 }

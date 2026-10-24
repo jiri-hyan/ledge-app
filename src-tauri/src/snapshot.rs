@@ -346,8 +346,9 @@ pub(crate) fn personal_view(cfg: &Config, (notes, notes_more): (Vec<notes::NoteV
         notes_more,
         media: crate::media::view().filter(|_| sec.now_playing),
         media_look: cfg.media.clone(),
-        volume: crate::volume::view().filter(|_| sec.sound),
-        battery: crate::battery::view().filter(|_| sec.battery),
+        // i pro kartu Rychlé přepínače (kolo 22); karta Právě hraje hlídá svou část `sound` sama
+        volume: crate::volume::view().filter(|_| crate::volume::allowed(cfg)),
+        battery: crate::battery::view().filter(|_| crate::battery::allowed(cfg)),
         calendar: crate::calendar::live::view(cfg, now),
         mail: crate::accounts::mail::view(cfg, now),
     }

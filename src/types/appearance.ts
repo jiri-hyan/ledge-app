@@ -9,7 +9,7 @@ export type { StripLookId } from "../strip/looks";
 /** složky design stylu (vlna 6, `appearance/look.rs`); tabulka stylů je `theme/styles.ts` */
 export type FontLook = "system" | "mono" | "serif" | "grotesk";
 export type Material = "solid" | "glass" | "paper" | "glow" | "hard" | "soft" | "frame" | "acrylic" | "tinted";
-export type LayoutId = "classic" | "float" | "band" | "sheet" | "panorama" | "mosaic" | "tiles" | "panel";
+export type LayoutId = "classic" | "float" | "band" | "sheet" | "panorama" | "mosaic" | "tiles" | "panel" | "notch";
 export type WidthPreset = "custom" | "narrow" | "medium" | "wide" | "full";
 export interface Appearance {
   /** design styl (`classic` = vzhled před vlnou 6); hodnoty stylu jsou v polích níž */

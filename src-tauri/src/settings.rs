@@ -74,6 +74,14 @@ pub(crate) fn apply_config(mut new: Config) {
         crate::media::sync(&new);
         crate::volume::sync(&new);
         crate::battery::sync(&new);
+    } else {
+        // karta Rychlé přepínače (kolo 22) přidaná / odebraná beze změny `drawer.sections`
+        if crate::volume::allowed(&old) != crate::volume::allowed(&new) {
+            crate::volume::sync(&new);
+        }
+        if crate::battery::allowed(&old) != crate::battery::allowed(&new) {
+            crate::battery::sync(&new);
+        }
     }
     if crate::media::strip_wants(&old) != crate::media::strip_wants(&new) {
         // položka `media` v proužku drží odběry GSMTC i bez záložky Osobní

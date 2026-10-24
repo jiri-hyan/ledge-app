@@ -179,13 +179,13 @@ pub(crate) fn shown_labels() -> Vec<String> {
     SHOWN.lock().clone()
 }
 
-/// Druhy widgetů, které jsou vidět (co má `live.rs` počítat).
-pub(crate) fn shown_kinds() -> Vec<Kind> {
+/// Viditelná okna s druhem widgetu (label, druh): každé okno dostane jen data svého druhu (`live::tick`).
+pub(crate) fn shown_windows() -> Vec<(String, Kind)> {
     let labels = shown_labels();
     if labels.is_empty() {
         return vec![];
     }
-    with(|s| s.widgets.iter().filter(|w| labels.contains(&w.label())).filter_map(|w| w.kind()).collect())
+    with(|s| s.widgets.iter().filter(|w| labels.contains(&w.label())).filter_map(|w| w.kind().map(|k| (w.label(), k))).collect())
 }
 
 /// Widgety ze skriptů na ploše (pro `widgets::live::placed`: snapshot je ukáže, plánovač je spustí).
@@ -284,6 +284,9 @@ fn title_of(w: &DeskWidget) -> String {
         Some(Kind::Waiting) => tr("Ledge: čeká na tebe", "Ledge: waiting for you").into(),
         Some(Kind::Dev) => tr("Ledge: dev servery", "Ledge: dev servers").into(),
         Some(Kind::Agenda) => tr("Ledge: agenda dne", "Ledge: today's agenda").into(),
+        Some(Kind::Week) => tr("Ledge: týden", "Ledge: week").into(),
+        Some(Kind::Clock) => tr("Ledge: hodiny", "Ledge: clock").into(),
+        Some(Kind::Usage) => tr("Ledge: Claude dnes", "Ledge: Claude today").into(),
         Some(Kind::Script(id)) => format!("Ledge: {}", crate::widgets::plan::file_of(&id).unwrap_or("widget")),
         None => "Ledge".into(),
     }

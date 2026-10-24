@@ -13,11 +13,14 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   (dřívější `appearance.cards` se převede). Šířka šuplíku zůstává `drawer.width`
   (za běhu nejvýš 95 % monitoru), krytí proužku `strip.opacity`. Změna se projeví bez restartu.
   **Design styly (vlna 6):** `style` (`classic` výchozí = vzhled před vlnou 6, `glass`, `terminal`, `paper`,
-  `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`, `fluent`, `oled`, `warm`) je jen jméno — výběr stylu v Nastavení / paletě (`Styl: Neon`) zapíše jeho
+  `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`, `fluent`, `oled`, `warm`, `notch`) je jen jméno — výběr stylu v Nastavení / paletě (`Styl: Neon`) zapíše jeho
   hodnoty do polí výš a níž, ta jdou dál přebít (krok Otevřený → „Pokročilé“, „Obnovit styl“ je vrátí). Nová pole:
   `font` (`system|mono|serif|grotesk`, jen systémová písma Windows), `material`
-  (`solid|glass|paper|glow|hard|soft|frame|acrylic|tinted`), `layout` (`classic|float|band|sheet|panorama|mosaic|tiles|panel` —
-  sloupce a mezery karet), `width` (`custom` = `drawer.width` | `narrow` 820 | `medium` 1080 | `wide` 1440 |
+  (`solid|glass|paper|glow|hard|soft|frame|acrylic|tinted`), `layout` (`classic|float|band|sheet|panorama|mosaic|tiles|panel|notch` —
+  sloupce a mezery karet; `notch` = **široký notch** z kola 22: šuplík v pevné šířce 720 px bez ohledu na `width`,
+  nahoře lišta sekcí z karet záložky — přehrávač (karta `media`, jen když něco hraje) | dny týdne s velkým měsícem
+  a časem (karta `clock`) | systém s mini grafy (karta `system`, vzorek po 2 s jen s otevřeným šuplíkem) |
+  svislá hlasitost (karta `media`; velké hodiny `bigclock` = dny); ostatní karty pod lištou ve 2 sloupcích; v režimu úprav běžná mřížka), `width` (`custom` = `drawer.width` | `narrow` 820 | `medium` 1080 | `wide` 1440 |
   `full` = celá šířka monitoru). Další motivy: `terminal`, `paper`, `neon`, `brutal`, `pastel`; animace navíc
   `bounce`, `fade`, `notch`; tvary proužku navíc `term`, `tag`, `glow`, `block`, `drop`. Systémové „omezit
   pohyb“ (Windows → Efekty animace) vypíná animace i vysunutí okna. Tabulka stylů: `src/theme/looks.ts`.
@@ -86,6 +89,10 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   (AppUserModelID `cz.hyan.ledge` ze zástupce ve Startu), jinak ho Windows zahodí (chyba v logu).
   Dokud otázka Clauda čeká a šuplík je zavřený, puls se opakuje po 10 s (jen po tu dobu, v klidu nic).
   Přišla-li otázka / schválení ve fullscreen hře nebo herním režimu, peek vyjede po návratu.
+- **Styl zavřeného Ledge Trojice** (`strip.look: "trio"`) — Trojice zjišťuje vytížení systému každých 10 s (CPU a paměť do
+  kapsle; jako položka proužku `system`). Vzorek se bere jen při zapnutém proužku, ne ve fullscreen hře ani herním režimu
+  a ne navíc, dokud je šuplík otevřený (vzorkuje karta Systém po 2 s). Skrytí v Pokročilých (`strip.lookHide: ["system"]`) vzorkování vypne.
+
 - **Herní režim** — Ledge „mrtvý“ jako při fullscreen hře (šuplík zavřený, proužek pryč, myš, zkratky,
   peek ani připomínky nic). Zapíná se v Nastavení → Aplikace → Spouštění a hry → Hry a celá obrazovka, v paletě Ctrl+K („Zapnout herní
   režim“) nebo zkratkou `hotkeys.gameMode`; stav je v `%APPDATA%\Ledge\game-mode.json` (`{"on": true}`,

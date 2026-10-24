@@ -162,6 +162,12 @@ pub fn next_strip_due(now: i64, every_ms: i64) -> i64 {
     }
 }
 
+/// Poslední vzorek pro styly zavřeného Ledge (`looks::facts::system_fact`): (CPU %, paměť %, kdy). Jen paměť.
+/// Paměť bez známé velikosti (0) = `None`, ne 0 %.
+pub fn last_pct() -> Option<(Option<f32>, Option<f32>, i64)> {
+    STATE.lock().last.map(|l| (l.cpu, (l.mem_total > 0).then(|| calc::mem_pct(l.mem_used, l.mem_total)), l.at))
+}
+
 /// Segment položky proužku `system` z posledního vzorku (jen paměť). Bez vzorku nic.
 pub fn strip_now() -> Vec<Segment> {
     let Some(l) = STATE.lock().last else { return Vec::new() };

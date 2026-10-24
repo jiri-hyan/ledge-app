@@ -9,14 +9,18 @@
 import { createSignal } from "solid-js";
 import { api, on } from "../api";
 import { setMotion, setShellRadius, setStripRadius } from "../motion";
-import type { Appearance } from "../types";
+import type { Appearance, LayoutId } from "../types";
 import { DEFAULT_APPEARANCE, RADIUS, appearanceVars, effectiveMotion, normalizeAppearance, stripShape } from "./appearance";
 import { themeOf } from "./customThemes";
 import { effectiveAppearance } from "./pages";
+import { NOTCH_RADIUS } from "./looks";
 
 const [saved, setSaved] = createSignal<Appearance>(DEFAULT_APPEARANCE);
 /** Uložený (platný) vzhled — čte ho i `MainPage` (pořadí karet). */
 export const savedAppearance = saved;
+const [layoutNowSig, setLayoutNow] = createSignal<LayoutId>(DEFAULT_APPEARANCE.layout);
+/** Rozložení, které právě platí na `<html>` (i rozpracované v náhledu) — `MainPage` podle něj kreslí lištu notche. */
+export const layoutNow = layoutNowSig;
 
 const reducedQuery = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 const reduced = () => reducedQuery?.matches ?? false;
@@ -61,7 +65,9 @@ export function applyAppearance(raw: unknown) {
   // pro CSS, které potřebuje tón motivu (podklad ikon opačného tónu, `ui/iconTone.ts`)
   root.dataset.scheme = theme.light ? "light" : "dark";
   setMotion(motion, a.motion.speed);
-  setShellRadius(26 * RADIUS[a.radius]);
+  // široký notch má vlastní rohy (dole 24); ostatní rozložení podle `radius`
+  setShellRadius(a.layout === "notch" ? NOTCH_RADIUS : 26 * RADIUS[a.radius]);
+  setLayoutNow(a.layout);
   setStripRadius(stripShape(a.strip.style, a.strip.size).r);
 }
 

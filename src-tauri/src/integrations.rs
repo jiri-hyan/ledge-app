@@ -31,10 +31,12 @@ impl Want {
 }
 
 /// Co si proužek žádá: položka v `strip.items` při zapnutém proužku; `github` navíc jen se zapnutým
-/// GitHubem a sekcí „čeká na revizi“ (jinak by nebylo co ukázat).
+/// GitHubem a sekcí „čeká na revizi“ (jinak by nebylo co ukázat). Systém chce i styl zavřeného Ledge, který
+/// CPU a paměť ukazuje (`looks::Look::shows_system`, kapsle „Trojice“), pokud ho uživatel v Pokročilých neskryl.
 pub fn wants(cfg: &Config) -> Want {
     let on = |i: StripItem| cfg.strip.enabled && cfg.strip.items.contains(&i);
-    Want { github: on(StripItem::Github) && cfg.github.enabled && cfg.github.review, system: on(StripItem::System) }
+    let by_look = cfg.strip.enabled && cfg.strip.look.shows_system() && !cfg.strip.look_hide.contains(&StripItem::System);
+    Want { github: on(StripItem::Github) && cfg.github.enabled && cfg.github.review, system: on(StripItem::System) || by_look }
 }
 
 /// Co plánovač udělá teď a za jak dlouho se má znovu podívat.
@@ -147,6 +149,15 @@ mod tests {
         c.github.review = true;
         c.strip.enabled = false;
         assert_eq!(wants(&c), Want::default(), "vypnutý proužek nic nepotřebuje");
+        // kapsle Trojice (kolo 22) ukazuje CPU a paměť → vzorek jako položka „Systém“; skrytá v Pokročilých = nic
+        let mut c = Config::default();
+        c.strip.look = crate::looks::Look::Trio;
+        assert_eq!(wants(&c), Want { github: false, system: true });
+        c.strip.look_hide = vec![StripItem::System];
+        assert_eq!(wants(&c), Want::default());
+        c.strip.look = crate::looks::Look::Minimum;
+        c.strip.look_hide.clear();
+        assert_eq!(wants(&c), Want::default(), "minimum systém neukazuje");
     }
 
     #[test]

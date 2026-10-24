@@ -182,12 +182,12 @@ pub const TOOLS: &[Tool] = &[
         input: || embed(schema::of::<LayoutConfig>(), Some("layout"), &[], &[]),
         desc: "Save a whole layout (tabs, cards, sizes) — same validation as layout_preview. A card on no tab is hidden and fetches nothing. Example: {\"layout\":{\"pages\":[{\"id\":\"prace\",\"cards\":[{\"id\":\"projects\",\"size\":\"xl\"}]}],\"hiddenParts\":[]}}." },
     Tool { name: "strip_get", title: "Get the closed strip", write: false, input: no_args,
-        desc: "Read what the closed Ledge shows at the top edge: strip on/off, items in order (clock, mode, running, claude, waiting, repos, limits, custom, timer, media, github, system, mail, widget:<file>), custom text, per-item colors, items hidden when idle, strip.look. The catalog lists allowed values." },
+        desc: "Read what the closed Ledge shows at the top edge: strip on/off, items in order, custom text, per-item colors, items hidden when idle, strip.look. The catalog lists allowed values." },
     Tool { name: "strip_set", title: "Change the closed strip", write: true,
         input: || embed(schema::of::<StripConfig>(), None, &[], &["itemsRev"]),
         desc: "Change the closed strip (only the fields you send). Example: {\"items\":[\"mode\",\"clock\"],\"look\":\"classic\"}." },
     Tool { name: "appearance_get", title: "Get the appearance", write: false, input: no_args,
-        desc: "Read the look: design style, theme, accent, density, font, material, main page layout, drawer width, corner radius, opacity, animation, strip shape and position, blur. The catalog lists the styles and every allowed value." },
+        desc: "Read the look (style, theme, accent, density, font, material, layout, width, radius, opacity, motion, strip, blur) and the catalog of allowed values." },
     Tool { name: "appearance_set", title: "Change the appearance", write: true,
         input: || {
             // vzhled záložek a vlastní motivy (11 barev) jsou pro MCP moc velké — `tools/list` < 20 kB; mění se v Nastavení

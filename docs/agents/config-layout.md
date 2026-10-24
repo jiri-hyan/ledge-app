@@ -42,7 +42,14 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `projects` (výchozí `tiles`), `repos` a `notes` (výchozí `list`), `actions` (výchozí `tiles`): `list` |
   `tiles` | `compact`, u `projects` / `repos` / `notes` i `bento` (kolo 18: velká dlaždice + menší kolem — u Projektů
   dva první, běžící dopředu; u Poznámek připnutá / nejnovější poznámka + dlaždice Nová .md, šablony, Uložit HTML).
-  V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu).
+  Kolo 22 (karty 2026, vše volitelné, chybí = podle stylu): `surface` (`glass` = sklo jen na rámu a hlavičce, pod
+  textem plná stabilní plocha | `layer` = plná vrstva s jemnou hloubkou), `grain` (`true` = jemné zrnění ~3,5 %,
+  statický vzor bez obrázků zvenku), `hero` (`true` = „číslo jako hrdina“: velké skutečné číslo s popiskem a grafem,
+  jen karty `claude` — limit 5 h, po resetu útrata dnes; čeká-li schválení, karta zůstane normální — a `weather`
+  — teplota; bez čísla z reálného zdroje karta zůstane jako dřív). Tokeny (základ, kontrast, poloměr, mezera) dává
+  materiál design stylu.
+  V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu); pro celou záložku najednou
+  Nastavení → Vzhled → Otevřený → „Karty 2026“ (galerie předvoleb).
   `limit` (volitelné, jen karty `claude`, `repos`, `running`; 0–50, `0` = bez stropu, chybí = 4) = kolik řádků
   karta ukáže, zbytek pod „Zobrazit další (k)“ ↔ „Méně“; session, které čekají na tebe, se nikdy neschovají
   (⋯ karty → Řádků 3/4/6/Vše, nebo Nastavení → Šuplík a karty).
@@ -52,12 +59,17 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   pořadí (chybějící části se doplní na konec); neznámá nebo dvojitá část = chyba `layout.pages.i.cards.j.parts.k`.
   `claudeGit` a `claudeSubagents` v pořadí nejsou (kreslí se u každé session zvlášť). Skrývání částí zůstává
   v `hiddenParts` (platí pro kartu na všech záložkách).
+  Záložka může mít `bento` (`true`, kolo 22; chybí = běžná mřížka): karty jako dlaždice 1×1, 2×1, 2×2… = šířka
+  `size` × výška `h` v řádcích (řádek ≈ 120 px × hustota, v bento chybějící `h` = 2), mezera 16 px, volná místa
+  vyplní hustý tok mřížky. ⋯ karty → Dlaždice 1 × 1 / 2 × 1 / 2 × 2. Šablony „Pracovní“, „Minimal“, „Hudba“
+  (Nastavení → Vzhled → Otevřený → „Bento šablony“) přidají NOVOU záložku s 6–7 dlaždicemi; stávající záložky
+  se nemění.
   `upgrades` = jednorázové úpravy rozložení po aktualizaci,
   které už proběhly — neměň ručně: `personalProjects` dá kartu Projekty nahoru na Osobní, když
   tam nikdy nebyla (jen když ji uživatel používá na jiné záložce a Osobní existuje); odebereš-li ji
   potom, už se nevrátí.
   Karta, která není na žádné záložce, je skrytá a nic nepočítá: skryté počasí ani kalendář se nestahují
-  (stahují se, jen když je karta na otevřené záložce), skrytá útrata / karta Claude neindexuje transcripty,
+  (stahují se, jen když je karta na otevřené záložce), skrytá útrata / karta Claude kvůli sobě neindexuje transcripty (indexaci zapne i karta „Claude dnes“ `usage` na záložce nebo widget na ploše; úplně ji vypne jen `claude.costs: false`),
   skryté Právě hraje / hlasitost / Čas (baterie) zruší odběry událostí Windows, skrytý GitHub / Systém
   nevolá `gh` ani nevzorkuje. `hiddenParts` = skryté části
   karet: `claudeLimits`, `claudeCosts`, `claudeGit`, `claudeSubagents` (karta Claude), `nowPlaying`, `sound`, `favorites`
@@ -117,10 +129,18 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     pravý), `ghost` (v klidu nic, jen „čeká na tebe“ / „hotovo“; najetí k hraně šuplík otevře dál), `bar` (lišta
     přes celou šířku, monospace, vpravo limit 5h a čas), `notch` (černý výřez s oušky), `progress` (text + lišta
     průběhu: limit 5h / časovač / skladba, jen z reálných dat), `ticker` (jeden řádek; víc událostí se střídá po
-    5 s, jinak žádný časovač). Priorita: čeká na tebe (i připomínka) > hotovo (session doběhlá za 5 min) >
+    5 s, jinak žádný časovač). Kolo 22: `minimum` (baterie + čas; bez baterie jen čas), `trio` (počasí z paměti karty
+    Počasí — proužek nic nestahuje, starší než 3 h = nic | čas a den | CPU a paměť jako u položky „Systém“ po 10 s,
+    baterie), `rings` (stav Clauda: prstence limitů 5h a týden + čas; bez limitu jen prázdná dráha, točí se jen
+    když Claude pracuje a animace jsou zapnuté, oranžově = čeká na tebe). Baterii čte Ledge z oznámení Windows
+    o napájení (žádný časovač) za stejných podmínek jako karta Čas (`battery::allowed`). Priorita: čeká na tebe (i připomínka) > hotovo (session doběhlá za 5 min) >
     časovač > Claude pracuje > hudba > klid. U stylů mimo `classic` se `items`, `quiet`, `colors`, `custom`,
     `opacity` a `appearance.strip.style`/`color` nepoužijí; `appearance.strip.size` styl zvětší / zmenší.
     `strip.enabled: false` = jako dřív jen linka při událostech; nad taby prohlížeče ustoupí na linku všechny
     styly kromě `line`, `dots`, `corner`, `ghost`. Seznam s názvy pro Nastavení: `src/strip/looks.ts` (`STRIP_LOOKS`).
   - `strip.lookHide` — Pokročilé u stylů mimo `classic`: co styl nemá ukazovat (`waiting`, `claude` = pracuje /
-    hotovo, `running`, `repos`, `timer`, `media`, `limits`, `clock`). Výchozí `[]` = všechno.
+    hotovo, `running`, `repos`, `timer`, `media`, `limits`, `clock`, `system` = CPU a paměť kapsle `trio` — pak se
+    ani nevzorkuje). Výchozí `[]` = všechno.
+  - `strip.lookShape` — tvar kapsle u stylů s tělem (`island`, `icons`, `clock`, `ghost`, `progress`, `ticker`,
+    `minimum`, `trio`, `rings`; kolo 22): `round` (výchozí = dnešní tvar), `sharp` (ostré rohy), `long`
+    (prodloužená), `island` („jako Mac“: oblá ze všech stran, 6 px pod hranou). Ostatní styly ho ignorují.

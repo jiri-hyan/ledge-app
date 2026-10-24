@@ -50,6 +50,10 @@ const PULSE_TIMER: usize = 1;
 const PULSE_FRAME_MS: u32 = 33;
 /// id časovače střídání řádků stylu `ticker` (jen při víc než jedné události, `looks::ROTATE_MS`)
 const ROTATE_TIMER: usize = 2;
+/// id časovače točení prstenců stylu `rings` (jen dokud Claude pracuje a animace jsou zapnuté)
+const SPIN_TIMER: usize = 3;
+/// snímek točení (~8 fps: plynulé dost, software D2D 28px kapsle ≈ desetiny ms)
+const SPIN_FRAME_MS: u32 = 125;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rgba(pub f32, pub f32, pub f32, pub f32);
@@ -108,6 +112,8 @@ pub struct StripModel {
     pub animate: bool,
     /// místo u hrany (roh u stylu `corner`)
     pub position: crate::appearance::StripPosition,
+    /// tvar kapsle (`strip.lookShape`, `looks::frame::shaped`)
+    pub shape: crate::looks::Shape,
 }
 
 /// Jas běžícího pulsu (barva, 0–1); `None` = puls není / skončil.
@@ -137,6 +143,7 @@ impl Default for StripModel {
             show: None,
             animate: false,
             position: crate::appearance::StripPosition::Center,
+            shape: crate::looks::Shape::Round,
         }
     }
 }
@@ -254,6 +261,7 @@ unsafe fn run(strip: Arc<Strip>) {
         let mut pulsing = false;
         // styly zavřeného Ledge: střídání řádků (`ticker`, jen při víc událostech) a šířka ostrůvku
         let mut rotating = false;
+        let mut spinning = false;
         let mut rot: usize = 0;
         let mut anim = crate::looks::frame::WidthAnim::default();
         let t0 = Instant::now();
@@ -261,10 +269,11 @@ unsafe fn run(strip: Arc<Strip>) {
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             let frame = msg.message == WM_TIMER && msg.wParam.0 == PULSE_TIMER;
             let turn = msg.message == WM_TIMER && msg.wParam.0 == ROTATE_TIMER;
+            let spin = msg.message == WM_TIMER && msg.wParam.0 == SPIN_TIMER;
             if turn {
                 rot = rot.wrapping_add(1);
             }
-            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE || frame || turn {
+            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE || frame || turn || spin {
                 // sloučit nahromaděné požadavky na překreslení
                 let mut peek = MSG::default();
                 while PeekMessageW(&mut peek, Some(hwnd), WM_STRIP_REDRAW, WM_STRIP_VISIBLE, PM_REMOVE).as_bool() {}
@@ -280,6 +289,10 @@ unsafe fn run(strip: Arc<Strip>) {
                     if rotating {
                         let _ = KillTimer(Some(hwnd), ROTATE_TIMER);
                         rotating = false;
+                    }
+                    if spinning {
+                        let _ = KillTimer(Some(hwnd), SPIN_TIMER);
+                        spinning = false;
                     }
                     anim.reset();
                     if shown {
@@ -314,6 +327,16 @@ unsafe fn run(strip: Arc<Strip>) {
                     }
                     rotating = turns;
                 }
+                // točení prstenců: jen `Show.spin` (Claude pracuje) se zapnutými animacemi; jinak žádný časovač
+                let spins = looked && model.animate && model.shelf == crate::shelf::Hint::None && model.show.as_ref().is_some_and(|s| s.spin);
+                if spins != spinning {
+                    if spins {
+                        SetTimer(Some(hwnd), SPIN_TIMER, SPIN_FRAME_MS, None);
+                    } else {
+                        let _ = KillTimer(Some(hwnd), SPIN_TIMER);
+                    }
+                    spinning = spins;
+                }
                 if let Some((r, body)) = drawn {
                     *strip.rect.lock() = r;
                     // výchozí tvar morfu = tělo proužku (bez stínů a záře kolem)
@@ -323,7 +346,7 @@ unsafe fn run(strip: Arc<Strip>) {
                     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                     shown = true;
                 }
-                if !frame && !turn {
+                if !frame && !turn && !spin {
                     let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
                 }
                 continue;

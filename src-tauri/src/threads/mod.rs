@@ -7,4 +7,5 @@ pub(crate) mod hover;
 pub(crate) mod notes_folder;
 pub(crate) mod notes_sync;
 pub(crate) mod notes_watch;
+pub(crate) mod pointer;
 pub(crate) mod ui;

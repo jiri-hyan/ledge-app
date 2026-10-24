@@ -1,6 +1,7 @@
 // Widgety na ploše (Rust `desk/`): zrcadlo serde struktur — `DeskWidget` (řádek `desk.json`), `DeskView`
 // (snapshot šuplíku), `DeskData` (událost `desk-data` do okna widgetu), `DeskInit` (`desk_init`).
 import type { CalendarView } from "./calendar";
+import type { CostsView } from "../costs/model";
 import type { LimitsView } from "./claude";
 import type { ProcView } from "./projects";
 import type { WidgetView } from "./widgets";
@@ -9,7 +10,7 @@ export type DeskLayer = "top" | "normal" | "desktop";
 
 export interface DeskWidget {
   id: string;
-  /** `limits` · `waiting` · `dev` · `agenda` · `widget:<soubor>` */
+  /** `limits` · `waiting` · `dev` · `agenda` · `week` · `clock` · `usage` · `widget:<soubor>` */
   kind: string;
   x: number | null;
   y: number | null;
@@ -53,6 +54,8 @@ export interface DeskData {
   projects?: { id: string; name: string }[];
   calendar?: CalendarView;
   widgets?: WidgetView[];
+  /** kolo 22: útrata Claude (widget Claude dnes) */
+  costs?: CostsView;
 }
 
 export interface DeskInit {

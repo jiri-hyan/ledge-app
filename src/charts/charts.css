@@ -1,0 +1,33 @@
+/* Vlastní SVG grafy (src/charts, kolo 22): barvy z tokenů motivu, žádná animace ani filtr. Barva grafu =
+   `currentColor` obalu (výchozí akcent, přebije `--chart-c`), stopy a nulové buňky = linky motivu. */
+.chart { display: inline-block; flex-shrink: 0; position: relative; vertical-align: middle; color: var(--chart-c, var(--accent)); line-height: 0; }
+.chart svg { display: block; overflow: visible; }
+.chart-fluid { display: block; width: 100%; }
+/* druh grafu (háček pro rodiče, např. barva jen sparklinu v kartě) */
+.chart-spark, .chart-bars, .chart-heat { overflow: visible; }
+.chart-ring { border-radius: 50%; }
+.chart-line { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.chart-area { fill: currentColor; opacity: 0.14; stroke: none; }
+.chart-dot { fill: currentColor; stroke: var(--k-base, var(--raised)); stroke-width: 1.5; }
+.chart-track { fill: none; stroke: var(--line-2); }
+.chart-arc { fill: none; stroke: currentColor; stroke-linecap: round; }
+.chart-ring-in { position: absolute; inset: 0; display: grid; place-items: center; line-height: 1; font: 700 var(--fs-xs) var(--sans); font-variant-numeric: tabular-nums; color: var(--t1); }
+.chart-bar { fill: currentColor; opacity: 0.45; }
+.chart-bar.chart-hi { opacity: 1; }
+.chart-cell { fill: currentColor; }
+.chart-cell[data-l="0"] { fill: var(--line-2); }
+.chart-cell[data-l="1"] { opacity: 0.35; }
+.chart-cell[data-l="2"] { opacity: 0.55; }
+.chart-cell[data-l="3"] { opacity: 0.78; }
+.chart-cell[data-l="4"] { opacity: 1; }
+/* číslo jako hrdina (Stat.tsx): 2,6 × tělo, tabulkové číslice, popisek malý a tlumený */
+.chart-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.chart-stat-top { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
+.chart-stat-num { font: 650 calc(var(--fs-body) * 2.6) / 1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--t0); white-space: nowrap; }
+.chart-stat[data-size="md"] .chart-stat-num { font-size: calc(var(--fs-body) * 2); }
+.chart-stat-unit { font-size: 0.5em; font-weight: 600; margin-left: 2px; color: var(--t2); letter-spacing: 0; }
+.chart-stat-trend { font: 700 var(--fs-md) var(--sans); color: var(--t2); }
+.chart-stat-label { font-size: var(--fs-ui); font-weight: 600; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart-stat-sub { font: var(--fs-xs) var(--mono); color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart-stat-spark { display: block; margin-top: var(--s1); }
+.chart-stat-empty .chart-stat-num { color: var(--t3); }

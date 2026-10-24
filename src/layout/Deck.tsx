@@ -20,6 +20,9 @@
 // Části karet (kolo 13): `PartsCtx.Provider` dává obalům `PartSlot` v kartách pořadí, skrytí a lištu pro tah
 // (`partDrag.ts`, stejný motor jako karty: duch, mezera, FLIP, zóna Skrýt); klávesy na úchytu části ve `partKey`.
 // `--accent` na `.deck-item` (živý náhled z panelu `CardLook.tsx` (stav `lookState.ts`)); karta bez vzhledu = žádný atribut.
+// Kolo 22: `data-cl-surface` / `data-cl-grain` / `data-cl-hero` (plocha 2026, `layout.css`); s hrdinou a skutečným
+// číslem (`hero.facts`) se místo karty vykreslí `hero.render` (bez čísla karta jako dřív). Bento záložka
+// (`page.bento`) = `data-bento` na mřížce: rozpětí přímo z velikosti (bez dorovnání řady), díry zavře hustý tok.
 import { batch, createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { t, tp } from "../i18n";
 import { change, dropTab, editPage, offerUndo, setCatalogOpen, setEditPage, setRenameAsk } from "./edit";
@@ -27,7 +30,7 @@ import {
   BODY, MAX_PAGES, moveCard, movePart, moveToNewPage, moveToPageAt, nextHeight, pageMoveBlock, pageOf, partsOf, removeCard, restoreCard, setHeight, setPartHidden, setSize,
   type CardHeight, type CardId, type CardSize, type Layout, type LayoutPage,
 } from "./model";
-import { deckCols, nextSizeFor, packSpans, resizeTo, sizeOutcome, stepHeight, stepSize, type DeckMetrics, type Dim, type Edge } from "./size";
+import { deckCols, nextSizeFor, packSpans, resizeTo, sizeOutcome, spanOf, stepHeight, stepSize, type DeckMetrics, type Dim, type Edge } from "./size";
 import { keyAction, previewOrder, type DropAction } from "./drag";
 import { NEW_TAB, dropHint, insertAt } from "./dnd";
 import { flipEls } from "./flip";
@@ -39,6 +42,7 @@ import { cardName, pageName, sizeName, sizeNoteText, slotName } from "./text";
 import { cardLookAttrs } from "./look";
 import type { PartKey } from "./model";
 import { lookFor } from "./lookState";
+import type { HeroFacts } from "./hero";
 import "./layout.css";
 import "./dnd.css";
 
@@ -48,7 +52,10 @@ export const sizeLabel = (s: CardSize) => sizeName(s);
 export const heightLabel = (h: CardHeight | undefined) =>
   h === undefined ? t("cards.layout.height.autoLong", "podle obsahu") : tp("cards.layout.height.rows", h, ["{n} řádek", "{n} řádky", "{n} řádků"]);
 
-export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boolean; shown: (id: CardId) => boolean; render: (id: CardId) => JSX.Element; begin?: () => void }) {
+/** Hrdina karty (`look.hero`): skutečné číslo ze snapshotu, nebo null = karta jako dřív. */
+export type DeckHero = { facts: (id: CardId) => HeroFacts | null; render: (id: CardId, facts: () => HeroFacts) => JSX.Element };
+
+export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boolean; shown: (id: CardId) => boolean; render: (id: CardId) => JSX.Element; begin?: () => void; hero?: DeckHero }) {
   let box!: HTMLDivElement;
   let zoneEl: HTMLDivElement | undefined;
   const [rs, setRs] = createSignal<Resize | null>(null);
@@ -113,9 +120,13 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
     const d = drag();
     return !!d && !parked() && d.home !== p.page.id && !blocked(d, p.page.id);
   });
+  const bento = () => !!p.page.bento;
+  /** hrdina: zapnutý ve vzhledu karty A skutečné číslo (jinak karta jako dřív) */
+  const heroOf = (id: CardId) => (p.hero && cl(id).attrs["data-cl-hero"] !== undefined ? p.hero.facts(id) : null);
   const spans = createMemo(() => {
     const v = view();
-    const sp = packSpans(v.map(sizeNow), cols());
+    // bento: rozpětí přímo z velikosti dlaždice — volná místa zavře hustý tok mřížky, ne roztažení karet
+    const sp = bento() ? v.map((id) => spanOf(sizeNow(id), cols())) : packSpans(v.map(sizeNow), cols());
     return new Map(v.map((id, k) => [id, sp[k] ?? 1]));
   });
 
@@ -359,7 +370,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
   };
 
   return (
-    <div class="deck" classList={{ editing: p.editing, dragging: dragging() || partDragging(), resizing: !!rs() }} ref={box} data-page={p.page.id}>
+    <div class="deck" classList={{ editing: p.editing, dragging: dragging() || partDragging(), resizing: !!rs() }} ref={box} data-page={p.page.id} data-bento={bento() ? "" : undefined}>
       <PartsCtx.Provider value={pctl}>
       <For each={ids()}>
         {(id, i) => (
@@ -373,6 +384,9 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
             data-cl-head={cl(id).attrs["data-cl-head"]}
             data-cl-dens={cl(id).attrs["data-cl-dens"]}
             data-cl-accent={cl(id).attrs["data-cl-accent"]}
+            data-cl-surface={cl(id).attrs["data-cl-surface"]}
+            data-cl-grain={cl(id).attrs["data-cl-grain"]}
+            data-cl-hero={cl(id).attrs["data-cl-hero"]}
             style={{
               "--span": String(spans().get(id) ?? 1),
               "--h": hNow(id) === undefined ? undefined : String(hNow(id)),
@@ -388,7 +402,9 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
                 <div class="empty">{t("cards.layout.ghost", "Teď nemá co ukázat — objeví se sama, až bude mít data.")}</div>
               </div>
             }>
-              {p.render(id)}
+              <Show when={heroOf(id)} fallback={p.render(id)}>
+                {(f) => p.hero!.render(id, f)}
+              </Show>
             </Show>
             <Show when={p.editing}>
               <div class="lay-tools">

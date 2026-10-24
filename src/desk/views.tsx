@@ -9,6 +9,9 @@ import LimitsRow from "../limits/LimitsRow";
 import Running from "../cards/Running";
 import CalendarCard from "../calendar/CalendarCard";
 import WidgetCard from "../widgets/WidgetCard";
+import WeekCard from "../board/WeekCard";
+import BigClockCard from "../board/BigClockCard";
+import UsageCard from "../board/UsageCard";
 import type { DeskData, DeskWidget } from "../types";
 import { deskApi } from "./api";
 import { deskSnapshot, isScriptKind, waitMinutes } from "./model";
@@ -100,6 +103,16 @@ export default function DeskBody(p: { w: DeskWidget; d: DeskData | null; title: 
         <Show when={p.d?.calendar?.status !== "off"} fallback={<Card title={p.title}><div class="empty">{t("cards.desk.agenda.off", "Kalendář je v šuplíku skrytý — přidej kartu Kalendář (✎ → + Přidat kartu).")}</div></Card>}>
           <CalendarCard s={s()} now={now()} onSettings={open("settings")} readOnly />
         </Show>
+      </Match>
+      {/* kolo 22 (`src/board/`): stejné karty jako v šuplíku nad daty z `desk-data` (čas po minutách) */}
+      <Match when={p.w.kind === "week"}>
+        <WeekCard s={s()} now={now()} />
+      </Match>
+      <Match when={p.w.kind === "clock"}>
+        <BigClockCard now={now()} desk />
+      </Match>
+      <Match when={p.w.kind === "usage"}>
+        <UsageCard s={s()} now={now()} desk />
       </Match>
       <Match when={isScriptKind(p.w.kind)}>
         <Script kind={p.w.kind} d={p.d} title={p.title} />

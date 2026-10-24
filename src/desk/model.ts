@@ -8,7 +8,7 @@ export type Pair = readonly [string, string];
 
 export const WIDGET_PREFIX = "widget:";
 /** Vestavěné druhy (pořadí = pořadí v Nastavení a v Ctrl+K). */
-export const BUILTIN_KINDS = ["limits", "waiting", "dev", "agenda"] as const;
+export const BUILTIN_KINDS = ["limits", "waiting", "dev", "agenda", "week", "clock", "usage"] as const;
 export type BuiltinKind = (typeof BUILTIN_KINDS)[number];
 
 export const KIND_NAME: Record<BuiltinKind, Pair> = {
@@ -16,6 +16,10 @@ export const KIND_NAME: Record<BuiltinKind, Pair> = {
   waiting: ["cards.desk.kind.waiting", "Čeká na tebe"],
   dev: ["cards.desk.kind.dev", "Dev servery"],
   agenda: ["cards.desk.kind.agenda", "Agenda dne"],
+  // kolo 22 (`src/board/`)
+  week: ["cards.desk.kind.week", "Týden"],
+  clock: ["cards.desk.kind.clock", "Velké hodiny"],
+  usage: ["cards.desk.kind.usage", "Claude dnes"],
 };
 
 export const KIND_HINT: Record<BuiltinKind, Pair> = {
@@ -23,6 +27,9 @@ export const KIND_HINT: Record<BuiltinKind, Pair> = {
   waiting: ["cards.desk.kind.waiting.hint", "schválení a otázky Clauda — klik otevře šuplík"],
   dev: ["cards.desk.kind.dev.hint", "co běží, porty, Otevřít a Stop"],
   agenda: ["cards.desk.kind.agenda.hint", "dnešek a zítřek z kalendáře"],
+  week: ["cards.desk.kind.week.hint", "pás dnů a dnešní události z kalendáře"],
+  clock: ["cards.desk.kind.clock.hint", "čas obřími číslicemi a datum"],
+  usage: ["cards.desk.kind.usage.hint", "útrata a tokeny dnes a za týden (odhad), přepočet 1× za čtvrt hodiny"],
 };
 
 export const LAYERS: readonly { v: DeskLayer; name: Pair; hint: Pair }[] = [
@@ -47,6 +54,13 @@ export function kindsOfCard(card: string): string[] {
       return ["dev"];
     case "calendar":
       return ["agenda"];
+    // kolo 22
+    case "week":
+      return ["week"];
+    case "bigclock":
+      return ["clock"];
+    case "usage":
+      return ["usage"];
     default:
       return isScriptKind(card) ? [card] : [];
   }
@@ -97,6 +111,7 @@ export function deskSnapshot(d: DeskData | null): Snapshot {
     procs: d?.procs ?? [],
     projects: (d?.projects ?? []).map((p) => ({ id: p.id, name: p.name })),
     personal: { calendar: d?.calendar },
+    costs: d?.costs,
     widgets: d?.widgets ?? [],
   };
   return s as unknown as Snapshot;

@@ -110,3 +110,22 @@
 .apv-mon-l { display: block; height: calc(13px * var(--fz)); width: 85%; border-radius: 4px; background: var(--t2); opacity: 0.35; }
 .apv-mon-l.apv-short { width: 55%; }
 .apv-mon-cap { align-self: center; font-size: var(--fs-sm); color: var(--t2); text-align: center; }
+
+/* kapsle kola 22: minimum, trojice, stav Clauda (prstence; točení = statická značka, žádná smyčka) */
+.apv-sx[data-look="minimum"] { height: 19px; padding: 0 10px; background: #000; color: #fff; border-radius: 0 0 10px 10px; }
+.apv-sx[data-look="trio"] { height: 28px; padding: 0 13px; background: #000; color: #fff; border-radius: 0 0 14px 14px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
+.apv-sx[data-look="trio"] .apv-sep { background: rgba(255, 255, 255, 0.2); }
+.apv-sx[data-look="rings"] { height: 22px; padding: 0 10px; background: #000; color: #fff; border-radius: 0 0 11px 11px; gap: calc(5px * var(--k)); }
+.apv-batt { position: relative; display: inline-block; width: calc(17px * var(--k)); height: calc(8px * var(--k)); border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 2px; flex: none;
+  background: linear-gradient(90deg, currentColor var(--p), transparent var(--p)) content-box; padding: 1px; }
+.apv-batt::after { content: ""; position: absolute; right: -3px; top: 25%; width: 2px; height: 50%; background: rgba(255, 255, 255, 0.7); border-radius: 0 1px 1px 0; }
+.apv-ring2 { display: inline-block; width: calc(13px * var(--k)); height: calc(13px * var(--k)); border-radius: 50%; flex: none;
+  background: conic-gradient(var(--c) var(--p), color-mix(in srgb, var(--c) 25%, transparent) 0);
+  -webkit-mask: radial-gradient(closest-side, transparent 64%, #000 66%); mask: radial-gradient(closest-side, transparent 64%, #000 66%); }
+.apv-scr [data-c="call"] { --c: #ff8f33; }
+.apv-scr [data-c="warm"] { --c: var(--amber); }
+.apv-ring-spin { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55); }
+/* tvar kapsle (`strip.lookShape`): ostré rohy, prodloužená, „jako Mac“ (oblá, kousek pod hranou) */
+.apv-sx[data-lshape="sharp"] { border-radius: 0 0 3px 3px; }
+.apv-sx[data-lshape="long"] { padding-left: calc(28px * var(--k)); padding-right: calc(28px * var(--k)); }
+.apv-sx[data-lshape="island"] { top: 5px; border-radius: var(--r-pill); }

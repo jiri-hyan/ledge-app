@@ -42,3 +42,68 @@ pub fn limit_fact(v: &crate::limitslive::LimitsView, now: i64) -> Option<f64> {
         _ => None,
     }
 }
+
+/// Čerstvé procento týdenního okna (stejná pravidla jako `limit_fact`).
+pub fn limit7d_fact(v: &crate::limitslive::LimitsView, now: i64) -> Option<f64> {
+    let (w, at) = (v.seven_day?, v.at?);
+    match crate::limits::state(w, at, now) {
+        crate::limits::State::Fresh(p) => Some(p),
+        _ => None,
+    }
+}
+
+/// Baterie pro styly (`battery::view` je `None` na stroji bez baterie i při vypnutém údaji).
+pub fn battery_fact(v: Option<&crate::battery::BatteryView>) -> Option<super::BatteryFact> {
+    v.map(|b| super::BatteryFact { percent: b.percent.min(100), charging: b.charging })
+}
+
+/// Jak staré počasí z karty Počasí proužek ještě ukáže (proužek sám nic nestahuje; starší = nic).
+pub const WEATHER_SHOW_MS: i64 = 3 * 60 * 60 * 1000;
+
+/// Počasí z paměti (`Core.weather`): jen data mladší než `WEATHER_SHOW_MS`, jinak `None`.
+pub fn weather_fact(data: Option<&crate::weather::Weather>, fetched_ms: Option<i64>, now: i64) -> Option<super::WeatherFact> {
+    let (w, at) = (data?, fetched_ms?);
+    if now - at >= WEATHER_SHOW_MS || !w.temp.is_finite() {
+        return None;
+    }
+    Some(super::WeatherFact { temp: w.temp.round() as i32, glyph: super::capsule::weather_glyph(w.code, w.is_day) })
+}
+
+/// Jak starý vzorek CPU / paměti proužek ještě ukáže (plánovač bere vzorek po 10 s).
+pub const SYSTEM_SHOW_MS: i64 = 30_000;
+
+/// CPU a paměť v % z posledního vzorku `sysmon` (`(cpu, paměť, kdy)`); starší než `SYSTEM_SHOW_MS` = nic.
+pub fn system_fact(sample: Option<(Option<f32>, Option<f32>, i64)>, now: i64) -> (Option<f64>, Option<f64>) {
+    match sample {
+        Some((cpu, mem, at)) if now - at < SYSTEM_SHOW_MS && now >= at => (cpu.map(f64::from), mem.map(f64::from)),
+        _ => (None, None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_facts_only_fresh_real_data() {
+        let now = 10_000_000_000;
+        // systém: čerstvý vzorek ano, starý / z budoucnosti ne, CPU bez prvního vzorku = jen paměť
+        assert_eq!(system_fact(Some((Some(8.0), Some(46.0), now - 5_000)), now), (Some(8.0), Some(46.0)));
+        assert_eq!(system_fact(Some((None, Some(46.0), now)), now), (None, Some(46.0)));
+        assert_eq!(system_fact(Some((Some(8.0), None, now)), now), (Some(8.0), None), "neznámá velikost paměti ≠ 0 %");
+        assert_eq!(system_fact(Some((Some(8.0), Some(46.0), now - SYSTEM_SHOW_MS)), now), (None, None));
+        assert_eq!(system_fact(Some((Some(8.0), Some(46.0), now + 1)), now), (None, None));
+        assert_eq!(system_fact(None, now), (None, None));
+        // baterie
+        let b = crate::battery::BatteryView { percent: 82, charging: true, plugged: true, remaining_s: None };
+        assert_eq!(battery_fact(Some(&b)), Some(super::super::BatteryFact { percent: 82, charging: true }));
+        assert_eq!(battery_fact(None), None);
+        // počasí: čerstvé ano, staré / bez času ne
+        let w = crate::weather::parse(include_str!("../fixtures/open-meteo-praha.json")).unwrap();
+        let f = weather_fact(Some(&w), Some(now - 60_000), now).unwrap();
+        assert_eq!(f.temp, w.temp.round() as i32);
+        assert_eq!(weather_fact(Some(&w), Some(now - WEATHER_SHOW_MS), now), None);
+        assert_eq!(weather_fact(Some(&w), None, now), None);
+        assert_eq!(weather_fact(None, Some(now), now), None);
+    }
+}

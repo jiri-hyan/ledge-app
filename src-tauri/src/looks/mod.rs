@@ -5,6 +5,7 @@
 //! pracuje > hudba > klid (`events`). Pokročilé doladění: `strip.lookHide` = co styl nemá ukazovat
 //! (`without`). Tvar a místo u hrany: `frame`. Kreslí `stripdraw`.
 
+pub mod capsule;
 pub mod facts;
 pub mod frame;
 #[cfg(test)]
@@ -45,12 +46,35 @@ pub enum Look {
     Progress,
     /// jeden řádek, víc událostí se střídá po 5 s
     Ticker,
+    // kolo 22 (obyčejné komentáře: popisy variant jdou do schématu MCP `tools/list`, strop 20 kB):
+    // jen baterie a čas
+    Minimum,
+    // počasí | čas a datum | CPU, paměť, baterie
+    Trio,
+    // stav Clauda: 1–2 prstence limitů (5h, týden) + čas; prstenec se točí, jen když Claude pracuje
+    Rings,
+}
+
+/// Tvar kapsle u stylů s tělem (`strip.lookShape`, kolo 22): volba tvaru, ne nový styl. Platí jen pro styly
+/// s `Look::shapeable` (ne linka, lišta, tečky, roh, výřez, klasický).
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+pub enum Shape {
+    // dnešní tvar stylu (oblé dolní rohy, horní za hranou)
+    #[default]
+    Round,
+    // ostré rohy
+    Sharp,
+    // prodloužená kapsle (víc místa po stranách)
+    Long,
+    // „jako Mac“: oblá ze všech stran, kousek pod hranou (Dynamic Island)
+    Island,
 }
 
 impl Look {
     /// všechny styly v pořadí galerie (testy zrcadel)
     #[allow(dead_code)]
-    pub const ALL: [Look; 12] = [
+    pub const ALL: [Look; 15] = [
         Look::Classic,
         Look::Island,
         Look::Dots,
@@ -63,6 +87,9 @@ impl Look {
         Look::Notch,
         Look::Progress,
         Look::Ticker,
+        Look::Minimum,
+        Look::Trio,
+        Look::Rings,
     ];
 
     #[allow(dead_code)]
@@ -80,6 +107,9 @@ impl Look {
             Look::Notch => "notch",
             Look::Progress => "progress",
             Look::Ticker => "ticker",
+            Look::Minimum => "minimum",
+            Look::Trio => "trio",
+            Look::Rings => "rings",
         }
     }
 
@@ -99,12 +129,33 @@ impl Look {
             Look::Notch => tr("Výřez", "Notch"),
             Look::Progress => tr("Průběh", "Progress"),
             Look::Ticker => tr("Střídající se řádek", "Rotating line"),
+            Look::Minimum => tr("Minimum", "Minimal"),
+            Look::Trio => tr("Trojice", "Trio"),
+            Look::Rings => tr("Stav Clauda", "Claude status"),
         }
     }
 
     /// Ukazuje styl hudbu? (vlákno `media` se pak pustí i bez položky `media` v `strip.items`)
     pub fn shows_music(self) -> bool {
-        !matches!(self, Look::Classic | Look::Ghost)
+        !matches!(self, Look::Classic | Look::Ghost | Look::Minimum | Look::Trio | Look::Rings)
+    }
+
+    /// Ukazuje styl baterii? (`battery::ensure` = odběr změn napájení od Windows, žádný časovač)
+    pub fn shows_battery(self) -> bool {
+        matches!(self, Look::Minimum | Look::Trio)
+    }
+
+    /// Ukazuje styl CPU a paměť? (plánovač `integrations` pak vzorkuje jako u položky proužku „Systém“)
+    pub fn shows_system(self) -> bool {
+        self == Look::Trio
+    }
+
+    /// Jde u stylu zvolit tvar kapsle (`Shape`)?
+    pub fn shapeable(self) -> bool {
+        matches!(
+            self,
+            Look::Island | Look::Icons | Look::Clock | Look::Ghost | Look::Progress | Look::Ticker | Look::Minimum | Look::Trio | Look::Rings
+        )
     }
 
     /// Nad taby prohlížeče (lištové okno v popředí) ustoupí na tenkou linku jako klasický proužek?
@@ -125,7 +176,7 @@ pub const DONE_MS: u64 = 5 * 60 * 1000;
 /// Střídání řádků stylu `ticker` (jen při víc než jedné události).
 pub const ROTATE_MS: u32 = 5000;
 
-/// Barvy stavů (shodné s náhledem v Nastavení).
+/// Barvy stavů (shodné s náhledem v Nastavení). `WAIT` = i oranžový prstenec „čeká na tebe“ stylu `rings`.
 pub const RUN: Rgba = Rgba::BLUE;
 pub const WAIT: Rgba = Rgba::AMBER;
 pub const OK: Rgba = Rgba::GREEN;
@@ -158,6 +209,21 @@ pub struct MusicFact {
     pub progress: Option<f32>,
 }
 
+/// Baterie z `battery::view` (jen stroj s baterií; Windows hlásí změny samo).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct BatteryFact {
+    pub percent: u8,
+    pub charging: bool,
+}
+
+/// Počasí z paměti karty Počasí (`Core.weather`, jen čerstvá data) — proužek nic nestahuje.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WeatherFact {
+    /// zaokrouhlené °C
+    pub temp: i32,
+    pub glyph: Glyph,
+}
+
 /// Co se děje — jen paměť jádra (žádné I/O). Prázdné = nevíme / nic.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Facts {
@@ -181,6 +247,15 @@ pub struct Facts {
     pub repos: usize,
     /// čerstvé procento limitu 5h (`limits::State::Fresh`)
     pub limit5h: Option<f64>,
+    /// čerstvé procento týdenního limitu
+    pub limit7d: Option<f64>,
+    /// baterie (jen stroj s baterií a zapnutý údaj Baterie)
+    pub battery: Option<BatteryFact>,
+    /// počasí (jen čerstvá data karty Počasí)
+    pub weather: Option<WeatherFact>,
+    /// CPU a paměť v % z posledního čerstvého vzorku (`sysmon`)
+    pub cpu: Option<f64>,
+    pub mem: Option<f64>,
     /// „14:32“
     pub clock: String,
     /// „14:32 · ne 18. 10.“
@@ -207,6 +282,11 @@ impl Default for Facts {
             server_failed: false,
             repos: 0,
             limit5h: None,
+            limit7d: None,
+            battery: None,
+            weather: None,
+            cpu: None,
+            mem: None,
             clock: String::new(),
             date: String::new(),
             mode: String::new(),
@@ -232,14 +312,21 @@ pub fn without(mut f: Facts, hide: &[StripItem]) -> Facts {
             StripItem::Repos => f.repos = 0,
             StripItem::Timer => f.timer = None,
             StripItem::Media => f.music = None,
-            StripItem::Limits => f.limit5h = None,
+            StripItem::Limits => {
+                f.limit5h = None;
+                f.limit7d = None;
+            }
+            StripItem::System => {
+                f.cpu = None;
+                f.mem = None;
+            }
             StripItem::Clock => {
                 f.clock.clear();
                 f.date.clear();
             }
             StripItem::Mode => f.mode.clear(),
             // GitHub, Systém, widgety ze skriptů a poštu styly zavřeného Ledge (zatím) nekreslí
-            StripItem::Custom | StripItem::Github | StripItem::System | StripItem::Widget(_) | StripItem::Mail => {}
+            StripItem::Custom | StripItem::Github | StripItem::Widget(_) | StripItem::Mail => {}
         }
     }
     f
@@ -291,6 +378,9 @@ pub enum Glyph {
     Timer,
     Bell,
     Check,
+    Sun,
+    Moon,
+    Cloud,
 }
 
 impl Glyph {
@@ -304,6 +394,9 @@ impl Glyph {
             Glyph::Timer => '\u{E916}',
             Glyph::Bell => '\u{EA8F}',
             Glyph::Check => '\u{E73E}',
+            Glyph::Sun => '\u{E706}',
+            Glyph::Moon => '\u{E708}',
+            Glyph::Cloud => '\u{E753}',
         }
     }
 
@@ -317,6 +410,9 @@ impl Glyph {
             Glyph::Timer => "⏱",
             Glyph::Bell => "!",
             Glyph::Check => "✓",
+            Glyph::Sun => "☀",
+            Glyph::Moon => "☾",
+            Glyph::Cloud => "☁",
         }
     }
 }
@@ -326,8 +422,12 @@ pub enum Part {
     Text { text: String, color: Rgba, strong: bool },
     Dot(Rgba),
     Icon { glyph: Glyph, color: Rgba, badge: Option<String> },
-    /// oddělovač segmentů (styl `bar`)
+    /// oddělovač segmentů (styl `bar`, `trio`)
     Sep,
+    /// baterie jako tvar (obrys, výplň podle procent, blesk při nabíjení); procenta jsou zvlášť text
+    Battery { percent: u8, charging: bool },
+    /// prstenec limitu (`rings`): podíl 0–1, `None` = jen dráha bez čísla (limit neznáme)
+    Ring { fill: Option<f32>, color: Rgba },
 }
 
 /// Co styl právě ukáže (čistá data pro `stripdraw`).
@@ -346,15 +446,17 @@ pub struct Show {
     pub line: Vec<(f32, Rgba)>,
     /// střídané řádky (`ticker`); víc než jeden = střídání po `ROTATE_MS`
     pub rotate: Vec<Vec<Part>>,
+    /// prstence se točí (`rings`, Claude pracuje) — jen se zapnutými animacemi (`StripModel.animate`)
+    pub spin: bool,
 }
 
-fn text(t: impl Into<String>, color: Rgba) -> Part {
+pub(crate) fn text(t: impl Into<String>, color: Rgba) -> Part {
     Part::Text { text: t.into(), color, strong: false }
 }
-fn strong(t: impl Into<String>, color: Rgba) -> Part {
+pub(crate) fn strong(t: impl Into<String>, color: Rgba) -> Part {
     Part::Text { text: t.into(), color, strong: true }
 }
-fn icon(glyph: Glyph, color: Rgba) -> Part {
+pub(crate) fn icon(glyph: Glyph, color: Rgba) -> Part {
     Part::Icon { glyph, color, badge: None }
 }
 fn badge(glyph: Glyph, color: Rgba, n: usize) -> Part {
@@ -365,7 +467,7 @@ fn at(where_: &str) -> String {
 }
 
 /// „Čeká na tebe · ledge +1“, jen připomínka = její titulek.
-fn wait_text(f: &Facts) -> String {
+pub(crate) fn wait_text(f: &Facts) -> String {
     if f.waiting > 0 {
         let more = if f.waiting > 1 { format!(" +{}", f.waiting - 1) } else { String::new() };
         format!("{}{}{more}", tr("Čeká na tebe", "Waiting for you"), at(&f.waiting_where))
@@ -378,10 +480,10 @@ fn wait_text(f: &Facts) -> String {
     }
 }
 /// tečka čekání (Claude) nebo zvonek (jen připomínka)
-fn wait_lead(f: &Facts) -> Part {
+pub(crate) fn wait_lead(f: &Facts) -> Part {
     if f.waiting > 0 { Part::Dot(WAIT) } else { icon(Glyph::Bell, WAIT) }
 }
-fn done_text(f: &Facts) -> String {
+pub(crate) fn done_text(f: &Facts) -> String {
     if f.done_where.is_empty() { tr("Hotovo", "Done").into() } else { trf!("Hotovo: {}", "Done: {}", f.done_where) }
 }
 fn work_text(f: &Facts) -> String {
@@ -420,6 +522,7 @@ pub fn show(look: Look, f: &Facts) -> Show {
     let mut s = Show { idle, ..Show::default() };
     match look {
         Look::Classic => {}
+        Look::Minimum | Look::Trio | Look::Rings => capsule::fill(look, f, &mut s),
         Look::Island => {
             s.parts = if idle { vec![Part::Dot(IDLE)] } else { event_line(st, f) };
         }

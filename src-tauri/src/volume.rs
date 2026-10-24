@@ -93,7 +93,8 @@ unsafe trait IPolicyConfig: windows::core::IUnknown {
 // ---------- čistá logika ----------
 
 pub(crate) fn allowed(cfg: &Config) -> bool {
-    cfg.modes.personal_enabled && cfg.drawer.sections.sound
+    // hlasitost a mikrofon ukazuje i karta Rychlé přepínače (kolo 22, `src/board/TogglesCard.tsx`)
+    cfg.modes.personal_enabled && (cfg.drawer.sections.sound || crate::layout::placed(&cfg.layout, crate::layout::TOGGLES_CARD))
 }
 
 /// Skalár Core Audio (0.0–1.0) → procenta 0–100 (zaokrouhleno; mimo rozsah / NaN oříznuto).
@@ -498,5 +499,9 @@ mod tests {
         assert!(allowed(&on));
         let off: Config = serde_json::from_str(r#"{"drawer":{"sections":{"sound":false}}}"#).unwrap();
         assert!(!allowed(&off));
+        // bez karty Právě hraje, ale s kartou Rychlé přepínače = zvuk se čte
+        let mut toggles = off.clone();
+        toggles.layout.pages[0].cards.push(serde_json::from_str(r#"{"id":"toggles","size":"s"}"#).unwrap());
+        assert!(allowed(&toggles));
     }
 }

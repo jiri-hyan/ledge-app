@@ -75,7 +75,13 @@ pub enum Layout {
     Tiles,
     /// čistý 4sloupcový panel bez okrajů (Fluent; kolo 18)
     Panel,
+    /// široký notch: lišta sekcí (přehrávač | dny a čas | systém | hlasitost) v pevné šířce `NOTCH_PX`,
+    /// zbylé karty záložky pod ní ve 2 sloupcích (kolo 22)
+    Notch,
 }
+
+/// Šířka šuplíku v rozložení „Široký notch“ (logické px; = spodní mez `DRAWER_WIDTH`).
+pub const NOTCH_PX: u32 = 720;
 
 /// Předvolba šířky šuplíku.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]

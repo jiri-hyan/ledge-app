@@ -1,14 +1,15 @@
-// Panel Vzhled, krok „Zavřený“ (jak vypadá Ledge u horní hrany, když je šuplík zavřený): galerie 12 vzhledů
+// Panel Vzhled, krok „Zavřený“ (jak vypadá Ledge u horní hrany, když je šuplík zavřený): galerie 15 vzhledů
 // (`strip.look`, data `strip/looks.ts`) s živými HTML náhledy na „horní hraně monitoru“
 // (`previews/StripLookPreview.tsx`; co se v nich „děje“, se přepíná v náhledu dole), pod ní pozice a velikost
 // proužku a „Co proužek ukazuje“ (`StripSettings.tsx`: položky, barvy, klid, vlastní text, časovač, monitor —
 // od kola 21 v Základním, není to technika). V „Pokročilé“ zbyl jen tvar klasického proužku (galerie, ne řada
 // 8 tlačítek), linka dole a krytí. Najetí na dlaždici = náhled dole (`peekLookOn`), živý Ledge se nemění;
-// klik = rozpracovaný config + „Vrátit“ v liště; skutečný proužek se překreslí po Uložit.
+// klik = rozpracovaný config + „Vrátit“ v liště; skutečný proužek se překreslí po Uložit. Kolo 22: pod galerií
+// „Tvar kapsle“ (`strip.lookShape`, 4 volby) jen u stylů, které tvar mají (`SHAPEABLE_LOOKS`).
 import { For, Show } from "solid-js";
 import { lang, t } from "../../i18n";
 import type { StripLookId, StripStyle } from "../../types";
-import { STRIP_LOOKS } from "../../strip/looks";
+import { LOOK_SHAPES, SHAPEABLE_LOOKS, STRIP_LOOKS, normShape, type LookShape } from "../../strip/looks";
 import { STRIP_STYLES, isHex, stripShape } from "../../theme/appearance";
 import { offerUndo } from "../ctx";
 import { POSITION_STEPS, SIZE_STEPS } from "../appearanceModel";
@@ -37,6 +38,16 @@ const LOOK_DESC: Record<StripLookId, () => string> = {
   notch: () => t("appearance.look.notch.short", "Černý výřez s oblými oušky — jako součást monitoru."),
   progress: () => t("appearance.look.progress.short", "Krátký text a lišta průběhu: limit, časovač, skladba."),
   ticker: () => t("appearance.look.ticker.short", "Jeden řádek; víc věcí se jemně střídá."),
+  minimum: () => t("appearance.look.minimum.short", "Jen baterie a čas v malé kapsli."),
+  trio: () => t("appearance.look.trio.short", "Počasí | čas a datum | CPU, paměť a baterie."),
+  rings: () => t("appearance.look.rings.short", "Prstence limitů Clauda a čas; točí se, jen když pracuje."),
+};
+
+const SHAPE_NAME: Record<LookShape, () => string> = {
+  round: () => t("appearance.lookShape.round", "Oblá"),
+  sharp: () => t("appearance.lookShape.sharp", "Ostré rohy"),
+  long: () => t("appearance.lookShape.long", "Prodloužená"),
+  island: () => t("appearance.lookShape.island", "Jako Mac"),
 };
 
 const SHAPE_LABEL: Record<StripStyle, () => string> = {
@@ -64,6 +75,13 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
     offerUndo(t("appearance.closed.picked", "Zavřený Ledge: {name} — proužek se změní po Uložit", { name: x ? lookName(x) : id }), () => setStripCfg("look", prev));
   };
   const setStrip = (patch: Partial<ReturnType<typeof a>["strip"]>) => q.ap.set("strip", { ...a().strip, ...patch });
+  const shape = () => normShape(p.cfg.strip?.lookShape);
+  const pickShape = (v: LookShape) => {
+    const prev = shape();
+    if (prev === v) return;
+    setStripCfg("lookShape", v);
+    offerUndo(t("appearance.lookShape.picked", "Tvar kapsle: {name} — proužek se změní po Uložit", { name: SHAPE_NAME[v]() }), () => setStripCfg("lookShape", prev));
+  };
   const opacity = () => p.cfg.strip?.opacity ?? STRIP_OPACITY;
 
   return (
@@ -75,13 +93,19 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
           <For each={STRIP_LOOKS}>
             {(x) => (
               <button class="ap-style" classList={{ on: look() === x.id }} role="radio" aria-checked={look() === x.id} title={LOOK_DESC[x.id]()} {...peekLookOn(x.id)} onClick={() => pick(x.id)}>
-                <StripLookPreview look={x.id} state={previewState()} a={a()} opacity={opacity()} />
+                <StripLookPreview look={x.id} state={previewState()} a={a()} opacity={opacity()} shape={shape()} />
                 <span class="ap-name">{lookName(x)}</span>
                 <small class="ap-desc">{LOOK_DESC[x.id]()}</small>
               </button>
             )}
           </For>
         </div>
+        <Show when={SHAPEABLE_LOOKS.includes(look())}>
+          <div class="opt" id="f-strip.lookShape" classList={{ hit: lit("strip.lookShape") }}>
+            <span>{t("appearance.lookShape.title", "Tvar kapsle")}<small>{t("appearance.lookShape.hint", "„Jako Mac“ visí kousek pod hranou a je oblá ze všech stran.")}</small></span>
+            <Seg<LookShape> label={t("appearance.lookShape.title", "Tvar kapsle")} value={shape()} set={pickShape} options={LOOK_SHAPES.map((v) => [v, SHAPE_NAME[v]()])} />
+          </div>
+        </Show>
       </div>
 
       <div class="card ap-top" id="f-appearance.strip" classList={{ hit: lit("appearance.strip") }}>
