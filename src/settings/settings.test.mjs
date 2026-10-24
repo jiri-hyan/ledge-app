@@ -16,14 +16,17 @@ const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 
 /** panel id → soubory, které ho vykreslují (že je panel opravdu skládá, hlídá test „složení panelů“) */
 const PANEL_FILES = {
+  doporucene: ["panels/Recommended.tsx"],
   zaciname: ["panels/Start.tsx"],
-  suplik: ["panels/Drawer.tsx", "../layout/LayoutEditor.tsx", "../desk/DeskSettings.tsx"],
+  suplik: ["panels/Drawer.tsx", "../layout/LayoutEditor.tsx"],
+  naplose: ["panels/Desk.tsx", "../desk/DeskSettings.tsx"],
   vzhled: ["panels/Appearance.tsx", "panels/AppearanceClosed.tsx", "panels/AppearanceHover.tsx", "panels/AppearanceOpen.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceThemes.tsx", "panels/AppearancePages.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
   akce: ["panels/ProjectsActions.tsx", "panels/Projects.tsx", "panels/ProjectEditor.tsx", "panels/Actions.tsx", "../actions/ScriptsSettings.tsx", "panels/LegacyLinks.tsx", "../widgets/WidgetsSettings.tsx"],
   claude: ["panels/Claude.tsx", "panels/Questions.tsx", "../mcp/McpSettings.tsx"],
   osobni: ["panels/Personal.tsx", "../media/MediaSettings.tsx", "../suggest/SuggestSettings.tsx", "../cliphist/ClipSettings.tsx", "../calendar/CalendarSettings.tsx", "../integrations/IntegrationsSettings.tsx", "../accounts/AccountsSettings.tsx"],
-  poznamky: ["panels/Notes.tsx"],
-  chovani: ["panels/Behavior.tsx", "panels/Hotkeys.tsx", "../pkgctx/BubbleNotice.tsx"],
+  poznamky: ["panels/Notes.tsx", "../notes/FolderLinkSection.tsx"],
+  chovani: ["panels/Behavior.tsx", "panels/Hotkeys.tsx"],
+  spousteni: ["panels/Startup.tsx", "../pkgctx/BubbleNotice.tsx"],
   aplikace: ["panels/AppPanel.tsx", "panels/Backup.tsx", "panels/About.tsx"],
 };
 const ALL_FILES = [...new Set(Object.values(PANEL_FILES).flat())];
@@ -64,10 +67,11 @@ test("katalog: každá volba má kotvu ve svém panelu a v žádném jiném", ()
   assert.deepEqual(bad, []);
 });
 
-test("sjednocené volby: vzhled i celý proužek jen ve Vzhledu, chování jen v Chování", () => {
+test("sjednocené volby: vzhled i celý proužek jen ve Vzhledu, otevírání v Otevírání a klávesy, spouštění a hry v Aplikace", () => {
   const f = fields();
   for (const id of ["drawer.glass", "drawer.width", "drawer.hover", "strip.look", "appearance.motion", "appearance.strip", "strip.enabled", "strip.items", "strip.custom", "strip.monitor", "timer.strip"]) assert.equal(f[id].panel, "vzhled", id);
-  for (const id of ["drawer.trigger", "drawer.keepWarmS", "drawer.barWindows", "autostart", "hotkeys.enabled", "palette.compact", "gameMode"]) assert.equal(f[id].panel, "chovani", id);
+  for (const id of ["drawer.trigger", "drawer.barWindows", "hotkeys.enabled", "hotkeys.gameMode", "palette.compact"]) assert.equal(f[id].panel, "chovani", id);
+  for (const id of ["drawer.keepWarmS", "autostart", "gameMode", "fullscreen"]) assert.equal(f[id].panel, "spousteni", id);
   for (const id of ["clipboard.enabled", "timer.presets", "media.variant", "personal.weather"]) assert.equal(f[id].panel, "osobni", id);
   assert.equal(f["claude.questionHoldS"].panel, "claude");
   assert.equal(f["drawer.animationMs"], undefined);
@@ -225,10 +229,11 @@ test("chyba pole → panel (nejdelší prefix vyhrává)", () => {
   const cases = [
     ["drawer.trigger", "chovani"],
     ["drawer.barWindows.pushMs", "chovani"],
-    ["drawer.keepWarmS", "chovani"],
+    ["drawer.keepWarmS", "spousteni"],
     ["drawer.glass", "vzhled"],
     ["drawer.width", "vzhled"],
     ["drawer.hover", "vzhled"],
+    ["drawer.hoverExpandMs", "vzhled"],
     ["strip.look", "vzhled"],
     ["drawer.widthX", "chovani"],
     ["strip.items", "vzhled"],
@@ -242,7 +247,7 @@ test("chyba pole → panel (nejdelší prefix vyhrává)", () => {
     ["personal.calendars.1.url", "osobni"],
     ["claude.questionHoldS", "claude"],
     ["hotkeys.toggle", "chovani"],
-    ["autostart", "chovani"],
+    ["autostart", "spousteni"],
     ["update.repo", "aplikace"],
     ["onboarding.done", "zaciname"],
     ["ui.lang", "zaciname"],

@@ -2,7 +2,7 @@
 // čistá `pick` v `model.ts`): připomínka po termínu, spadlé CI na mém PR, PR čekající na mou revizi, právě
 // naběhlý dev server, adresa ve schránce, kterou ještě nemám mezi odkazy. Nic nepolluje: počítá se při změně
 // snapshotu a `now` (sekundový tik šuplíku, když je vidět); schránku čte jen na událost `cliphist` a jen se
-// zapnutým zdrojem. Chip jde zavřít (24 h, v paměti), každý zdroj vypne Nastavení → Osobní → Kontextové návrhy.
+// zapnutým zdrojem. Chip jde zavřít (24 h, v paměti), každý zdroj vypne Nastavení → Obsah karet → Kontextové návrhy.
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js";
 import { api, on as onEvent, type Snapshot } from "../api";
 import { clipApi } from "../cliphist/api";

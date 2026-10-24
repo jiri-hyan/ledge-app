@@ -46,7 +46,7 @@
 .gh-foot { display: flex; align-items: center; gap: var(--s2); margin-top: 10px; }
 .gh-meta { font: var(--fs-xs) var(--mono); color: var(--t3); margin-right: auto; white-space: nowrap; }
 
-/* ---------- Nastavení → Osobní → GitHub, Systém ---------- */
+/* ---------- Nastavení → Obsah karet → GitHub, Systém ---------- */
 .int-note { font-size: var(--fs-sm); color: var(--t2); margin: 4px 0 0; line-height: 1.5; }
 .int-disks { display: flex; flex-wrap: wrap; gap: var(--s1); }
 .int-disk { font: 600 var(--fs-sm) var(--mono); color: var(--t2); background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 4px 10px; transition: background var(--fast), color var(--fast), border-color var(--fast); }

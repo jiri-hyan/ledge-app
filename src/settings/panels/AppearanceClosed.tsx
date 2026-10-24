@@ -1,9 +1,10 @@
 // Panel Vzhled, krok „Zavřený“ (jak vypadá Ledge u horní hrany, když je šuplík zavřený): galerie 12 vzhledů
 // (`strip.look`, data `strip/looks.ts`) s živými HTML náhledy na „horní hraně monitoru“
-// (`previews/StripLookPreview.tsx`) a přepínačem ukázkového dění, pod ní jen pozice a velikost proužku.
-// Zbytek je v „Pokročilé“: tvar klasického proužku (galerie, ne řada 8 tlačítek), linka dole, krytí a celé
-// „Co proužek ukazuje“ (`StripSettings.tsx`: položky, barvy, klid, vlastní text, časovač, monitor).
-// Klik na dlaždici = rozpracovaný config + „Vrátit“ v liště; skutečný proužek se překreslí po Uložit.
+// (`previews/StripLookPreview.tsx`; co se v nich „děje“, se přepíná v náhledu dole), pod ní pozice a velikost
+// proužku a „Co proužek ukazuje“ (`StripSettings.tsx`: položky, barvy, klid, vlastní text, časovač, monitor —
+// od kola 21 v Základním, není to technika). V „Pokročilé“ zbyl jen tvar klasického proužku (galerie, ne řada
+// 8 tlačítek), linka dole a krytí. Najetí na dlaždici = náhled dole (`peekLookOn`), živý Ledge se nemění;
+// klik = rozpracovaný config + „Vrátit“ v liště; skutečný proužek se překreslí po Uložit.
 import { For, Show } from "solid-js";
 import { lang, t } from "../../i18n";
 import type { StripLookId, StripStyle } from "../../types";
@@ -13,7 +14,7 @@ import { offerUndo } from "../ctx";
 import { POSITION_STEPS, SIZE_STEPS } from "../appearanceModel";
 import StripLookPreview from "../previews/StripLookPreview";
 import StripSettings from "./StripSettings";
-import { Advanced, Seg, Slider, StateSwitch, lit, pct, previewState, type Ap } from "./apUi";
+import { Advanced, Seg, Slider, clearPeek, lit, pct, peekLookOn, previewState, type Ap } from "./apUi";
 
 /** Výchozí krytí proužku (`strip.opacity`, config.rs `Default`). */
 const STRIP_OPACITY = 0.82;
@@ -55,6 +56,7 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
   const look = () => normLook(p.cfg.strip?.look);
   const setStripCfg = (k: string, v: unknown) => (p.cfg.strip ? p.setCfg("strip", k, v) : p.setCfg("strip", { [k]: v }));
   const pick = (id: StripLookId) => {
+    clearPeek();
     const prev = look();
     if (prev === id) return;
     setStripCfg("look", id);
@@ -68,12 +70,11 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
     <>
       <div class="card ap-top" id="f-strip.look" classList={{ hit: lit("strip.look") }}>
         <h4>{t("appearance.closed.title", "Jak vypadá zavřený Ledge")}</h4>
-        <p class="ap-note">{t("appearance.closed.lead", "Vyber obrázek. Nahoře přepínej, co se zrovna děje — náhledy ukážou, jak na to vzhled zareaguje. Data jsou ukázková.")}</p>
-        <StateSwitch />
+        <p class="ap-note">{t("appearance.closed.lead", "Vyber obrázek. V náhledu dole přepínej, co se zrovna děje — obrázky ukážou, jak na to vzhled zareaguje. Data jsou ukázková.")}</p>
         <div class="ap-looks" role="radiogroup" aria-label={t("appearance.closed.title", "Jak vypadá zavřený Ledge")}>
           <For each={STRIP_LOOKS}>
             {(x) => (
-              <button class="ap-style" classList={{ on: look() === x.id }} role="radio" aria-checked={look() === x.id} title={LOOK_DESC[x.id]()} onClick={() => pick(x.id)}>
+              <button class="ap-style" classList={{ on: look() === x.id }} role="radio" aria-checked={look() === x.id} title={LOOK_DESC[x.id]()} {...peekLookOn(x.id)} onClick={() => pick(x.id)}>
                 <StripLookPreview look={x.id} state={previewState()} a={a()} opacity={opacity()} />
                 <span class="ap-name">{lookName(x)}</span>
                 <small class="ap-desc">{LOOK_DESC[x.id]()}</small>
@@ -96,7 +97,9 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
         </div>
       </div>
 
-      <Advanced open={q.adv} onToggle={q.setAdv} hint={t("appearance.closed.advHint", "Co proužek ukazuje, barvy položek, klid, vlastní text, tvar, linka, krytí a monitor")}>
+      <StripSettings />
+
+      <Advanced open={q.adv} onToggle={q.setAdv} hint={t("appearance.closed.advHint", "Tvar klasického proužku, linka dole a krytí")}>
         <Show when={look() === "classic"}>
           <div class="ap-col">
             <span>{t("appearance.strip.shape", "Tvar klasického proužku")}<small>{t("appearance.strip.styleHint", "„Tečky“ ukazují jen stavy, bez textu a času.")}</small></span>
@@ -126,7 +129,6 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
           </span>
         </div>
         <Slider label={t("appearance.strip.opacity", "Krytí proužku")} min={0.3} max={1} step={0.05} value={opacity()} fmt={pct} set={(v) => setStripCfg("opacity", +v.toFixed(2))} />
-        <StripSettings />
       </Advanced>
     </>
   );

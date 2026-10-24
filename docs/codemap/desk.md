@@ -20,7 +20,7 @@ Widgety na ploše); které widgety a kde = `%LOCALAPPDATA%\Ledge\desk.json` (jen
 | `src/desk/views.tsx` | obsah podle druhu: `LimitsRow`, `Running`, `CalendarCard`, `WidgetCard` nad `deskSnapshot`; vlastní „Čeká na tebe“ (klik = šuplík, nic neschvaluje) a skript bez souhlasu = odkaz do šuplíku | `DeskBody` |
 | `src/desk/model.ts` | čistá logika (test `model.test.mjs`): druhy a názvy (páry), `kindsOfCard`, stav připnutí, vrstvy, průhlednost, jméno profilu, data → tvar snapshotu | `BUILTIN_KINDS` `KIND_NAME` `KIND_HINT` `LAYERS` `kindsOfCard` `kindName` `isKind` `widgetOf` `canPin` `clampOpacity` `cleanProfileName` `sameName` `waitMinutes` `deskSnapshot` `liveCount` |
 | `src/desk/api.ts` · `pin.tsx` · `palette.ts` | invoke · ⋯ karty „Připnout na plochu“ (`DeskPinItems` v `cards/CardMenu.tsx`), hlášky, názvy · Ctrl+K (`deskItems` v `palette/items.ts`) | `deskApi` `DeskPatch` · `DeskPinItems` `pinKind` `unpinWidget` `deskKindName` · `deskItems` |
-| `src/desk/DeskSettings.tsx` · `settings.css` | Nastavení → Šuplík a karty → Na ploše: seznam widgetů s volbami (hned), + připnout, schovat vše, profily, výchozí chování (`desk.layer`, `desk.hideInGame`, `desk.opacity`, `desk.snap` — lišta Uložit) | `DeskSettings` |
+| `src/desk/DeskSettings.tsx` · `settings.css` | Nastavení → Na ploše: seznam widgetů s volbami (hned), + připnout, schovat vše, profily, výchozí chování (`desk.layer`, `desk.hideInGame`, `desk.opacity`, `desk.snap` — lišta Uložit) | `DeskSettings` |
 | `src/types/desk.ts` · `src/desk/en.ts` | typy (`Snapshot.desk`, `desk-data`) · angličtina `cards.desk.*`, `settings.desk.*` | `DeskWidget` `DeskView` `DeskData` `DeskInit` `DeskWaitRow` |
 
 Lepidlo (cizí soubory, jeden až pár řádků): `lib.rs` (`mod desk`, příkazy, `restore_all` po lístcích, `flush`),
@@ -77,8 +77,11 @@ Lepidlo (cizí soubory, jeden až pár řádků): `lib.rs` (`mod desk`, příkaz
 - Výchozí stav = žádný widget, žádné okno, žádné vlákno (`desk-save` vznikne s prvním zápisem); `desk.json` se čte
   až při startu ve vlákně obnovy (snapshot na disk nesahá).
 - `desk.json` jen na tomto PC (`actionrun::local_dir`), config se může synchronizovat — poloha do něj nepatří.
-- Capability `desk.json` dává oknům `desk-*` jen poslech událostí; posun / velikost / volby jdou vlastními příkazy
-  a Rust bere id z labelu volajícího okna. Test `webpanel::tests::capabilities_never_reach_web_windows` zná `desk-*`.
+- Capability `desk.json` dává oknům `desk-*` poslech událostí a jen příkazy widgetu (tabulka `DESK_WINDOW`
+  v `ipcacl.rs`, AppManifest v `build.rs`): `desk_*` svého okna, kliky / výstup / obnovení widgetu, karty Běží a Agenda,
+  čtení configu. Zápis configu ani souhlas se skriptem z widgetu neprojde (Agenda proto na ploše `readOnly`). Nové volání
+  z okna widgetu = řádek v `capabilities/desk.json` + v tabulce. Rust bere id z labelu volajícího okna. Test
+  `webpanel::tests::capabilities_never_reach_web_windows` zná `desk-*`, `ipcacl::tests::allowed_table` hlídá hranice.
 - Třídy CSS jen `dk-` (`desk.css` okno, `settings.css` Nastavení — `desk.css` nastavuje `html, body, #root`, do
   šuplíku se nesmí importovat).
 - Návrh sjednocení s `pins`: `win.rs` má kopii `pins::win::fallback`, `monitors`, převod `KINDS` a výpočet
@@ -90,5 +93,5 @@ Lepidlo (cizí soubory, jeden až pár řádků): `lib.rs` (`mod desk`, příkaz
 Rust `cargo test desk` (`desk::tests::*` tabulky, `desk::live::tests` řádky čekajících, ořez, otisk),
 `widgets::plan::tests::active_table` (plocha), `config::tests` (starý config), `webpanel::tests`. UI
 `src/desk/model.test.mjs` (karty → druhy, zrcadlo Rustu, strop, průhlednost, profily, tvar snapshotu, nic
-neschvaluje), `settings.test.mjs` (kotvy `desk.*` v panelu Šuplík a karty), `segments.test.mjs`, i18n, třídy CSS.
+neschvaluje), `settings.test.mjs` (kotvy `desk.*` na stránce Na ploše, `panels/Desk.tsx`), `segments.test.mjs`, i18n, třídy CSS.
 Okna samotná jen naživo (GUI) — postup v reportu kola 20.

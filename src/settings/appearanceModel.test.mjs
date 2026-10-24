@@ -24,9 +24,10 @@ test("každá volba panelu Vzhled leží v kroku (nebo vědomě mimo kroky) a ni
 test("skok z hledání: krok a Pokročilé", () => {
   const cases = [
     ["strip.look", "closed", false],
-    ["strip.items", "closed", true],
-    ["strip.monitor", "closed", true],
+    ["strip.items", "closed", false],
+    ["strip.monitor", "closed", false],
     ["drawer.hover", "hover", false],
+    ["drawer.hoverExpandMs", "hover", true],
     ["appearance.style", "open", false],
     ["appearance.density", "open", false],
     ["drawer.width", "open", true],

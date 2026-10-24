@@ -15,6 +15,7 @@ pub(crate) mod geo;
 pub(crate) mod limits;
 pub(crate) mod mcp;
 pub(crate) mod media;
+pub(crate) mod notefolder;
 pub(crate) mod notes;
 pub(crate) mod notelinks;
 pub(crate) mod noteslife;

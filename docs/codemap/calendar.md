@@ -30,7 +30,7 @@ Napojení (jednořádkové): `threads/ui.rs` (otevření šuplíku), `threads/em
 barva), `attention.rs` (`Event::Meeting`), `toast.rs` (`toast_xml_actions`), `commands/calendar.rs`
 (`calendar_test`, `calendar_join`, `calendar_outlook_probe`, `calendar_outlook_load`), `lib.rs` (registrace).
 Kalendáře účtů bez řádku v `personal.calendars`: `live::view` přidá za ně zdroje z `accounts::calsync::infos`
-(`CalInfo.account`; čip v kartě vede do Nastavení → Osobní → Kalendáře → Pokročilé; bez připomínky). Řádek `graph`/`google` má přednost.
+(`CalInfo.account`; čip v kartě vede do Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé; bez připomínky). Řádek `graph`/`google` má přednost.
 
 ### Zdroje (`source.rs`)
 
@@ -92,7 +92,7 @@ zahodí (zůstane jen odkaz Připojit).
 | soubor | co dělá |
 |---|---|
 | `CalendarCard.tsx` | karta (Dnes/Zítra/Příští, prázdné a chybové stavy, výzva „Přidat kalendář“, patička s vypnutím jedním klikem); u schůzky „za N min“ a **Připojit** (`api.calendarJoin`); Outlook zavřený → „Načíst z Outlooku“; `openCalendarSettings` |
-| `CalendarSettings.tsx` | editor v Nastavení → Osobní (kotva `f-personal.calendars` je `Section` v `settings/panels/Personal.tsx`): dlaždice zdrojů `SOURCES` (Odkaz ICS / Outlook v tomto PC; účty doplní Q), barva, název, zapnutí, Otestovat / Změnit odkaz (ICS) nebo Načíst z Outlooku, připomínka (`Remind`: minuty předem + oznámení), Odebrat s Vrátit, návod |
+| `CalendarSettings.tsx` | editor v Nastavení → Šuplík a karty → Obsah karet (kotva `f-personal.calendars` je `Section` v `settings/panels/Personal.tsx`): dlaždice zdrojů `SOURCES` (Odkaz ICS / Outlook v tomto PC; účty doplní Q), barva, název, zapnutí, Otestovat / Změnit odkaz (ICS) nebo Načíst z Outlooku, připomínka (`Remind`: minuty předem + oznámení), Odebrat s Vrátit, návod |
 | `model.ts` (+ `model.test.mjs`) | barvy, `normalizeUrl` (zrcadlo Rust), `domainOf`, `timeLabel`, `withCalendar`; `sourceOf`, `providerName`, `placeLabel`, `joinable`, `startsIn`, `remindOptions`, `remindOf`, `outlookFeed` |
 | `calendar.css` | jen třídy `cal-*` |
 

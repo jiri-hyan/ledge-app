@@ -98,7 +98,7 @@ export default function DeskBody(p: { w: DeskWidget; d: DeskData | null; title: 
       </Match>
       <Match when={p.w.kind === "agenda"}>
         <Show when={p.d?.calendar?.status !== "off"} fallback={<Card title={p.title}><div class="empty">{t("cards.desk.agenda.off", "Kalendář je v šuplíku skrytý — přidej kartu Kalendář (✎ → + Přidat kartu).")}</div></Card>}>
-          <CalendarCard s={s()} now={now()} onSettings={open("settings")} />
+          <CalendarCard s={s()} now={now()} onSettings={open("settings")} readOnly />
         </Show>
       </Match>
       <Match when={isScriptKind(p.w.kind)}>

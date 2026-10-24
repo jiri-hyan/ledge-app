@@ -1,5 +1,5 @@
 // Panel Vzhled, krok Otevřený → „Barvy“: galerie motivů (vestavěných i vlastních) jako barevné vzorníky,
-// najetí = dočasný náhled na celém šuplíku (`apUi` `peekOn`), klik = výběr; pod ní akcent. Vlastní motivy
+// najetí = dočasný náhled jen v náhledu dole pod editorem (`apUi` `peekOn`), klik = výběr; pod ní akcent. Vlastní motivy
 // (`appearance.customThemes`, logika `theme/customThemes.ts`): „Uložit aktuální barvy jako vlastní motiv“,
 // editor 11 barev se živým náhledem a ŽIVOU kontrolou kontrastu textu (≥ 4.5:1, stejné funkce jako test
 // motivů) — uložení s nízkým kontrastem je zablokované —, přejmenování, smazání a export / import jako JSON.

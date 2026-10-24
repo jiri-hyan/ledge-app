@@ -1,4 +1,4 @@
-// Nastavení → Osobní → GitHub a Systém. GitHub je výchozí vypnutý a zapíná se jedním přepínačem s jasnou
+// Nastavení → Obsah karet → GitHub a Systém. GitHub je výchozí vypnutý a zapíná se jedním přepínačem s jasnou
 // větou, co Ledge čte a kam to jde; Systém nic nevypíná (vzorkuje jen viditelná karta nebo položka proužku),
 // jen volí disky a jednotky sítě. Mění se jen návrh Nastavení — uloží ho společná lišta Uložit / Vrátit.
 import { createResource, For, Show } from "solid-js";
@@ -31,7 +31,7 @@ export function GithubSettings() {
       <Row id="github.refreshMin" dim={!g().enabled}>
         <Select value={String(g().refreshMin)} onChange={(v) => c.set("github.refreshMin", Number(v))} options={options()} label={fieldLabel("github.refreshMin")} />
       </Row>
-      <p class="int-note">{t("settings.github.note", "Přihlášení řeší příkaz gh auth login v terminálu — Ledge žádné heslo ani token nevidí a nic neukládá. Do proužku GitHub přidáš v panelu Vzhled (položka „GitHub“).")}</p>
+      <p class="int-note">{t("settings.github.note", "Přihlášení řeší příkaz gh auth login v terminálu — Ledge žádné heslo ani token nevidí a nic neukládá. Do proužku GitHub přidáš ve Vzhledu → Zavřený → Co proužek ukazuje (položka „GitHub“).")}</p>
     </>
   );
 }

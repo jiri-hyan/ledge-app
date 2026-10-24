@@ -1,7 +1,7 @@
 // Výběr vzhledu karty Právě hraje: malé tlačítko v rohu karty (vidět při najetí) → nabídka (společné menu
 // `ui/Popover.tsx`) s miniaturami všech pěti vzhledů; klik = okamžitá změna (uloží jen `media.variant` existující cestou Nastavení:
 // `get_config` → jedno pole → `save_config`), v nabídce pak „Vrátit“. Miniatury (`Thumb`) používá i
-// Nastavení → Osobní. Do potvrzení snapshotem platí vybraný vzhled hned (`shownVariant`). Je to zkratka:
+// Nastavení → Obsah karet. Do potvrzení snapshotem platí vybraný vzhled hned (`shownVariant`). Je to zkratka:
 // kompletní vzhled karty (akcent, pozadí, hlavička, hustota + tytéž miniatury) je v panelu „Vzhled karty…“
 // (`layout/CardLook.tsx`), kam vede poslední položka nabídky (`openMediaCardLook`).
 import { createSignal, For, Show } from "solid-js";

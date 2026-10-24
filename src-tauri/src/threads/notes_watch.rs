@@ -81,6 +81,8 @@ pub(crate) fn reload_notes() {
     }
     // lístky na plochu si podle otisku přečtou svou poznámku znovu (jen když nějaký je)
     crate::pins::win::on_notes_changed();
+    // propojení se složkou: změna poznámek v Ledge (jen když je zapnuté)
+    super::notes_folder::poke();
     mark_dirty();
 }
 

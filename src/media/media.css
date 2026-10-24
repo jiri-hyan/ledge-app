@@ -1,5 +1,5 @@
 /* Záložka Osobní: právě hraje + hlasitost (MediaCard, pět vzhledů `med-v-*`), baterie v kartě Čas (Battery),
-   výběr vzhledu (VariantPicker, Nastavení → Osobní). Prefix `med-`, jen tokeny ze styles.css (barvy, rohy,
+   výběr vzhledu (VariantPicker, Nastavení → Obsah karet). Prefix `med-`, jen tokeny ze styles.css (barvy, rohy,
    stíny) — pevnou barvu nemá nic kromě obalu alba. Pohyb (deska, ekvalizér) jen s `med-disc-spin` /
    `med-eq-live` (hraje + otevřený šuplík); omezení pohybu ho vypne globálně (styles.css). */
 
@@ -117,7 +117,7 @@
 .med-th-strip .med-th-line { left: 24%; top: 8%; width: 52%; height: 10%; background: var(--t1); }
 .med-th-strip .med-th-bar { display: none; }
 
-/* Nastavení → Osobní: výběr s náhledy */
+/* Nastavení → Obsah karet: výběr s náhledy */
 .med-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: var(--s2); width: 100%; }
 .med-look { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); color: var(--t1); text-align: left; transition: border-color var(--fast), background var(--fast); }
 .med-look:hover { background: var(--card-2); }

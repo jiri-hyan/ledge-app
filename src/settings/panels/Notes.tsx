@@ -1,6 +1,8 @@
-// Panel „Poznámky“: zapnutí, složka, kategorie (`notes.kinds` — přidat, upravit, barva, ikona, pořadí
-// přetažením, smazat s Vrátit), lístky na plochu (výchozí styl a průhlednost nového lístku, barvy štítků) a
-// synchronizace mezi PC přes git (zapnutí, repo, interval, „teď“).
+// Stránka „Poznámky a lístky“: hlavní vypínač v hlavičce a tři sbalovací skupiny (`fields/Group.tsx`, kolo 21):
+// Poznámky (složka, kategorie `notes.kinds` — přidat, upravit, barva, ikona, pořadí přetažením, smazat
+// s Vrátit), Lístky na ploše (výchozí styl a průhlednost nového lístku, barvy štítků; zkratky lístků jsou
+// u ostatních zkratek v Otevírání a klávesy) a Propojení (synchronizace mezi PC přes git: zapnutí, „teď“,
+// repo a interval v Pokročilé). Do skupiny Propojení patří i další způsoby propojení poznámek (složka).
 import { createResource, createSignal, For, Show } from "solid-js";
 import { api, type NoteKind } from "../../api";
 import { ago } from "../../format";
@@ -9,6 +11,8 @@ import { KindIcon } from "../../notes/kinds";
 import { say, sayError } from "../../ui/toast";
 import { base, offerUndo, useSettings } from "../ctx";
 import { Advanced } from "../fields/Advanced";
+import { Group } from "../fields/Group";
+import { gotoSettingsPanel } from "../../palette/goto";
 import { Color, PathPick, Slider, Text, Toggle } from "../fields/controls";
 import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
 import { SortList } from "../fields/SortList";
@@ -17,6 +21,7 @@ import type { PanelProps } from "../types";
 import StyleGallery, { colorName } from "../../pin/StyleGallery";
 import { notesApi } from "../../notes/api";
 import { colorHex, NOTE_COLORS } from "../../notes/meta";
+import FolderLinkSection from "../../notes/FolderLinkSection";
 
 const ICONS = ["bulb", "chat", "checklist", "note", "flag", "star", "bug", "heart"];
 const MAX_KINDS = 12;
@@ -99,8 +104,8 @@ function KindsEditor() {
 }
 
 /** Lístky na plochu: výchozí vzhled nového lístku (galerie stylů s náhledem, pozadí, text, pamatovat poslední)
- *  a barvy štítků (lístek bez vlastní barvy dostane barvu podle prvního štítku). */
-function PinsSection() {
+ *  a barvy štítků (lístek bez vlastní barvy dostane barvu podle prvního štítku). Jen řádky — skupinu dává panel. */
+function PinsRows() {
   const c = useSettings();
   const pins = () => c.cfg.notes.pins ?? { style: "classic", bg: 88, text: 100, rememberLast: true };
   const tagColors = (): Record<string, string> => c.cfg.notes.tagColors ?? {};
@@ -108,7 +113,7 @@ function PinsSection() {
   const tagList = () => [...new Set([...Object.keys(tagColors()), ...(tags() ?? []).map((x) => x.tag)])].slice(0, 16);
   const setTagColor = (tag: string, v: string | undefined) => c.set("notes.tagColors." + tag, v);
   return (
-    <Section title={t("settings.notes.pins", "Lístky na ploše")}>
+    <>
       <Row id="notes.pins.style" stack>
         <StyleGallery value={pins().style} bg={pins().bg} text={pins().text} color={null} onPick={(s) => c.set("notes.pins.style", s)} />
       </Row>
@@ -138,7 +143,11 @@ function PinsSection() {
           </For>
         </Show>
       </Row>
-    </Section>
+      <p class="st-note st-inline">
+        {t("settings.notes.pins.keys", "Zkratky pro nový lístek a průchozí režim jsou u ostatních zkratek.")}
+        <button class="mini" onClick={() => gotoSettingsPanel("f-hotkeys.notePin")}>{t("settings.notes.pins.keysBtn", "Ukázat zkratky")}</button>
+      </p>
+    </>
   );
 }
 
@@ -167,45 +176,51 @@ export default function NotesPanel(_p: PanelProps) {
   const st = () => c.s.notesSync;
   return (
     <>
-      <PanelHead id="notes.enabled" title={t("settings.nav.poznamky", "Poznámky")} desc={t("settings.notes.desc", "Rychlé poznámky a připomínky jsou obyčejné Markdown soubory ve tvé složce.")}>
+      <PanelHead id="notes.enabled" title={t("settings.nav.poznamky", "Poznámky a lístky")} desc={t("settings.notes.desc", "Rychlé poznámky a připomínky jsou obyčejné Markdown soubory ve tvé složce.")}>
         <Toggle path="notes.enabled" label={t("settings.f.notes.enabled", "Rychlé poznámky a připomínky")} />
       </PanelHead>
       <Show when={n().enabled} fallback={<p class="st-empty">{t("settings.notes.off", "Poznámky jsou vypnuté — karta, připomínky i zkratka zmizí. Soubory na disku zůstanou.")}</p>}>
-        <Section>
+        <Group gid="poznamky.notes" title={t("settings.notes.g.notes", "Poznámky")} desc={t("settings.notes.g.notesDesc", "Kde leží soubory poznámek a jaké mají kategorie — kategorie jsou záložky karty Poznámky.")}>
           <Row id="notes.root" stack>
             <PathPick path="notes.root" kind="folder" label={t("settings.f.notes.root", "Složka poznámek")} placeholder={t("settings.notes.root.ph", "výchozí: Ledge\\notes v profilu")} />
           </Row>
           <KindsEditor />
-        </Section>
-        <PinsSection />
-        <Section title={t("settings.notes.sync", "Synchronizace mezi počítači")}>
-          <Row id="notes.sync.enabled"><Toggle path="notes.sync.enabled" label={t("settings.f.notes.sync.enabled", "Synchronizace mezi počítači")} /></Row>
-          <Show when={n().sync.enabled}>
-            <Row
-              id="notes.sync.now"
-              label={t("settings.notes.sync.now", "Synchronizovat teď")}
-              hint={syncDirty() ? t("settings.notes.sync.saveFirst", "Nejdřív ulož změny — synchronizuje se podle uloženého nastavení.") : undefined}
-            >
-              <span class="st-status">
-                <span class="st-dot" classList={{ ok: st().state === "ok", warn: st().state === "offline" || st().state === "syncing", bad: ["neprihlaseno", "konflikt", "chyba"].includes(st().state) }} />
-                <span>
-                  {t(...(SYNC_TEXT[st().state] ?? ["", st().state]))}
-                  <Show when={st().lastOkMs}><small>{t("settings.notes.sync.last", "naposledy {when}", { when: ago(st().lastOkMs!) })}</small></Show>
-                  <Show when={st().message}><small>{st().message}</small></Show>
+        </Group>
+        <Group gid="poznamky.pins" title={t("settings.notes.pins", "Lístky na ploše")} desc={t("settings.notes.g.pinsDesc", "Poznámka připnutá na plochu Windows jako lístek: jak vypadá nový lístek a jakou barvu dostanou štítky.")}>
+          <PinsRows />
+        </Group>
+        {/* Propojení: jak se poznámky dostanou jinam (git mezi počítači a propojení se složkou `notes/FolderLinkSection.tsx`) */}
+        <Group gid="poznamky.link" title={t("settings.notes.g.link", "Propojení")} desc={t("settings.notes.g.linkDesc", "Poznámky na víc místech — třeba na druhém počítači. Výchozí vypnuto; nic se nikam neposílá, dokud to nezapneš.")}>
+          <Section title={t("settings.notes.sync", "Synchronizace mezi počítači")}>
+            <Row id="notes.sync.enabled"><Toggle path="notes.sync.enabled" label={t("settings.f.notes.sync.enabled", "Synchronizace mezi počítači")} /></Row>
+            <Show when={n().sync.enabled}>
+              <Row
+                id="notes.sync.now"
+                label={t("settings.notes.sync.now", "Synchronizovat teď")}
+                hint={syncDirty() ? t("settings.notes.sync.saveFirst", "Nejdřív ulož změny — synchronizuje se podle uloženého nastavení.") : undefined}
+              >
+                <span class="st-status">
+                  <span class="st-dot" classList={{ ok: st().state === "ok", warn: st().state === "offline" || st().state === "syncing", bad: ["neprihlaseno", "konflikt", "chyba"].includes(st().state) }} />
+                  <span>
+                    {t(...(SYNC_TEXT[st().state] ?? ["", st().state]))}
+                    <Show when={st().lastOkMs}><small>{t("settings.notes.sync.last", "naposledy {when}", { when: ago(st().lastOkMs!) })}</small></Show>
+                    <Show when={st().message}><small>{st().message}</small></Show>
+                  </span>
+                  <button class="mini" disabled={syncing() || syncDirty()} onClick={syncNow}>{syncing() ? t("settings.notes.sync.running", "Synchronizuji…") : t("settings.notes.sync.now", "Synchronizovat teď")}</button>
                 </span>
-                <button class="mini" disabled={syncing() || syncDirty()} onClick={syncNow}>{syncing() ? t("settings.notes.sync.running", "Synchronizuji…") : t("settings.notes.sync.now", "Synchronizovat teď")}</button>
-              </span>
-            </Row>
-            <Advanced id="poznamky" inline hint={t("settings.notes.adv.hint", "Repo pro poznámky, přihlášení ke gitu a interval")}>
-              <Row id="notes.sync.remote" stack>
-                <Text path="notes.sync.remote" label={t("settings.f.notes.sync.remote", "Repo pro poznámky")} placeholder={t("settings.notes.sync.remote.ph", "https://github.com/ty/poznamky.git")} mono grow />
               </Row>
-              <Row id="notes.sync.intervalMin">
-                <Slider path="notes.sync.intervalMin" min={1} max={120} label={t("settings.f.notes.sync.intervalMin", "Jak často synchronizovat")} fmt={(v) => t("settings.notes.sync.every", "každých {v} min", { v })} />
-              </Row>
-            </Advanced>
-          </Show>
-        </Section>
+              <Advanced id="poznamky" inline hint={t("settings.notes.adv.hint", "Repo pro poznámky, přihlášení ke gitu a interval")}>
+                <Row id="notes.sync.remote" stack>
+                  <Text path="notes.sync.remote" label={t("settings.f.notes.sync.remote", "Repo pro poznámky")} placeholder={t("settings.notes.sync.remote.ph", "https://github.com/ty/poznamky.git")} mono grow />
+                </Row>
+                <Row id="notes.sync.intervalMin">
+                  <Slider path="notes.sync.intervalMin" min={1} max={120} label={t("settings.f.notes.sync.intervalMin", "Jak často synchronizovat")} fmt={(v) => t("settings.notes.sync.every", "každých {v} min", { v })} />
+                </Row>
+              </Advanced>
+            </Show>
+          </Section>
+          <FolderLinkSection />
+        </Group>
       </Show>
     </>
   );

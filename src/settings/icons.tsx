@@ -2,7 +2,11 @@
 const st = { fill: "none", stroke: "currentColor", "stroke-width": 1.6, "stroke-linecap": "round", "stroke-linejoin": "round" } as const;
 
 const PATHS: Record<string, string> = {
-  // Začínáme: hvězda
+  // Doporučené: odznak s fajfkou
+  doporucene: "M12 3l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21l-2.4-1.8-3 .2-.9-2.9L3.3 14.7l1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2zM8.5 12l2.5 2.5 4.5-5",
+  // Na ploše: monitor s malým widgetem
+  naplose: "M3 4h18v12H3zM8 20h8M12 16v4M14 7h4v4h-4z",
+  // Jazyk a průvodce (dřív Začínáme): hvězda
   zaciname: "M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z",
   // Šuplík a karty: mřížka karet pod lištou
   suplik: "M3 4h18M5 8h6v5H5zM13 8h6v5h-6zM5 15h14v5H5z",

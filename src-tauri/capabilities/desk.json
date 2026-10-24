@@ -1,12 +1,31 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desk",
-  "description": "Widgety na ploše (okna desk-*): jen poslech událostí (desk-data, desk-prefs, desk-lang, appearance); okno ovládají vlastní příkazy desk_*",
+  "description": "Widgety na ploše (okna desk-*): poslech událostí (desk-data, desk-prefs, desk-lang, appearance) a jen příkazy widgetu — desk_* svého okna, kliky a výstup widgetu, karty Běží a Agenda, čtení configu pro vzhled (tabulka DESK_WINDOW v ipcacl.rs). Zápis configu a souhlas se skriptem jen v šuplíku.",
   "windows": [
     "desk-*"
   ],
   "permissions": [
     "core:event:allow-listen",
-    "core:event:allow-unlisten"
+    "core:event:allow-unlisten",
+    "allow-anim-stats",
+    "allow-calendar-join",
+    "allow-calendar-outlook-load",
+    "allow-desk-drag",
+    "allow-desk-init",
+    "allow-desk-menu",
+    "allow-desk-open-drawer",
+    "allow-desk-set",
+    "allow-desk-unpin",
+    "allow-dismiss",
+    "allow-get-config",
+    "allow-logs",
+    "allow-open-url",
+    "allow-stop",
+    "allow-widget-click",
+    "allow-widget-edit",
+    "allow-widget-output",
+    "allow-widget-refresh",
+    "allow-widgets-list"
   ]
 }

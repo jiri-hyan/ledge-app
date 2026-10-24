@@ -20,6 +20,7 @@ export const ANCHOR_STEP: Record<string, StepId | null> = {
   "timer.strip": "closed",
   "strip.monitor": "closed",
   "drawer.hover": "hover",
+  "drawer.hoverExpandMs": "hover",
   "appearance.style": "open",
   "appearance.layout": "open",
   "appearance.density": "open",
@@ -32,9 +33,10 @@ export const ANCHOR_STEP: Record<string, StepId | null> = {
   "appearance.motion": "motion",
 };
 
-/** Kotvy schované v rozbalovacím „Pokročilé“ svého kroku (skok na ně ho rozbalí). */
+/** Kotvy schované v rozbalovacím „Pokročilé“ svého kroku (skok na ně ho rozbalí). „Co proužek ukazuje“
+ *  (položky, vlastní text, časovač, monitor) je od kola 21 v Základním — není to technika. */
 export const ADVANCED: readonly string[] = [
-  "strip.enabled", "strip.items", "strip.custom", "timer.strip", "strip.monitor",
+  "drawer.hoverExpandMs",
   "appearance.details", "drawer.width", "drawer.glass",
 ];
 

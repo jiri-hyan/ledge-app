@@ -58,6 +58,8 @@ const DYNAMIC = [
   { file: "settings/labels.ts", key: "`settings.f.${id}`", why: TABLE },
   { file: "settings/labels.ts", key: "`settings.f.${id}.hint`", why: TABLE },
   { file: "settings/labels.ts", key: "`settings.f.${id}.kw`", why: TABLE },
+  { file: "settings/labels.ts", key: "p[0]", why: "Doporučené a věty sekcí (settings/structure.ts) — " + PAIRS },
+  { file: "settings/labels.ts", key: "s.key", why: "názvy sekcí Nastavení (settings/structure.ts SECTIONS) — " + PAIRS },
   { file: "theme/label.ts", key: "p[0]", why: "styly, písma, materiály, rozložení, šířky (theme/looks.ts) a animace (AppearanceMotion.tsx) — " + PAIRS },
   { file: "onboarding/steps/Basics.tsx", key: "THEMES[id()].key", why: "motivy v theme/themes.ts — " + PAIRS },
   { file: "layout/text.ts", key: "x[0]", why: "názvy karet, částí a záložek z layout/model.ts (CARD_INFO, PART_INFO, builtinName), volby vzhledu karty z layout/look.ts (ACCENT_NAMES, BG_NAMES, DENSITY_NAMES, VIEW_NAMES) a vzhledu zástupce z tilelook/ (SHAPE_NAMES, GLYPHS, MODES) — " + PAIRS },

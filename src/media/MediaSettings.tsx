@@ -1,4 +1,4 @@
-// Nastavení → Osobní → Přehrávač: vzhled karty Právě hraje s náhledy (`media.variant`), čas skladby
+// Nastavení → Obsah karet → Přehrávač: vzhled karty Právě hraje s náhledy (`media.variant`), čas skladby
 // v proužku (`media.stripTime`), ozdoba ekvalizéru (`media.equalizer`) a podbarvení obalem (`media.tint`). Mění se jen návrh Nastavení —
 // uloží (a vrátí) ho společná lišta Uložit / Zahodit / Vrátit. Pod tím oblíbené playlisty a stanice
 // (`FavoritesSettings.tsx`). Totéž pole `media.variant` mění i panel

@@ -1,4 +1,4 @@
-// Nastavení → Osobní → Kalendáře: přidání = výběr zdroje dlaždicí („Odkaz ICS“ — vložit odkaz a Přidat,
+// Nastavení → Obsah karet → Kalendáře: přidání = výběr zdroje dlaždicí („Odkaz ICS“ — vložit odkaz a Přidat,
 // jedno zkušební stažení, s návodem, kde odkaz vzít — PRVNÍ a při prázdném seznamu rovnou rozbalená volba;
 // „Outlook v tomto PC“ — klasický Outlook přes COM, bez přihlášení). Přihlášení účtem Microsoft/Google
 // (vlastní registrace aplikace) je až v „Pokročilé“ pod kalendáři (`accounts/AccountsSettings.tsx`, skládá

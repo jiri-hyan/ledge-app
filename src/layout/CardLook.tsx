@@ -6,7 +6,7 @@
 // Panel (UI) — stav a `openCardLook` / `lookFor` jsou v malém `lookState.ts` (eager); tenhle soubor se načítá líně.
 // Jediný panel vzhledu karty (kolo 13): u karty Právě hraje v něm je i výběr varianty přehrávače
 // (`media.variant`, miniatury z `media/VariantPicker.tsx`; ukládá se hned jako ikonka v rohu karty a
-// Nastavení → Osobní — jeden zdroj v configu), u karet se zástupci (Projekty, Akce) výběr dlaždice, jejíž
+// Nastavení → Obsah karet — jeden zdroj v configu), u karet se zástupci (Projekty, Akce) výběr dlaždice, jejíž
 // vzhled (`tilelook/*`) se má upravit. Ikonka v rohu přehrávače a pravý klik na dlaždici jsou zkratky.
 import { For, onCleanup, onMount, Show } from "solid-js";
 import { t } from "../i18n";

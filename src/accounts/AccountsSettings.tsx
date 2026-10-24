@@ -1,4 +1,4 @@
-// Nastavení → Osobní → Kalendáře → Pokročilé (skládá `settings/panels/Personal.tsx`): přidat účet (dlaždice Microsoft / Google), stav (přihlášen jako…, co Ledge smí
+// Nastavení → Obsah karet → Kalendáře → Pokročilé (skládá `settings/panels/Personal.tsx`): přidat účet (dlaždice Microsoft / Google), stav (přihlášen jako…, co Ledge smí
 // číst), Odhlásit a průvodce vlastní registrací aplikace (Client ID). Ledge nemá vlastní ověřenou
 // registraci — výchozí Client ID je prázdné a panel řekne proč. Přihlášení samo běží v systémovém
 // prohlížeči; refresh token a client secret jdou rovnou do Správce pověření Windows (Rust), do configu

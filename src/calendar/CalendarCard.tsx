@@ -13,7 +13,7 @@ import { say, sayError } from "../ui/toast";
 import { calColor, joinable, placeLabel, providerName, startsIn, timeLabel, withCalendar } from "./model";
 import "./calendar.css";
 
-/** Nastavení → Osobní → Kalendáře (přidání, úpravy). */
+/** Nastavení → Obsah karet → Kalendáře (přidání, úpravy). */
 export function openCalendarSettings(onSettings: () => void) {
   onSettings();
   gotoSettingsPanel("f-personal.calendars");
@@ -98,7 +98,8 @@ function Row(p: { it: CalendarItem; day: string; color: string; now: number }) {
   );
 }
 
-export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: () => void; menu?: JSX.Element }) {
+/** `readOnly` = okno widgetu na ploše: config tam zapisovat nesmí (capability `desk`), klik na kalendář otevře Nastavení. */
+export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: () => void; menu?: JSX.Element; readOnly?: boolean }) {
   const v = () => p.s.personal.calendar;
   const cals = () => v()?.calendars ?? [];
   const color = (i: number) => calColor(cals()[i]?.color, i);
@@ -159,14 +160,16 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
               <button
                 class="cal-chip"
                 classList={{ "cal-chip-off": !c.enabled, "cal-chip-bad": !!c.error }}
-                title={c.account
-                  ? t("cards.calendar.chipAccount", "{name} ({domain}) — účet nastavíš v Nastavení → Osobní → Kalendáře → Pokročilé", { name: c.name, domain: c.domain })
+                title={p.readOnly
+                  ? t("cards.calendar.chipDesk", "{name} — zapneš nebo vypneš v Nastavení Ledge", { name: c.name })
+                  : c.account
+                  ? t("cards.calendar.chipAccount", "{name} ({domain}) — účet nastavíš v Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé", { name: c.name, domain: c.domain })
                   : c.enabled
                   ? c.domain
                     ? t("cards.calendar.chipOff", "{name} ({domain}) — kliknutím vypneš", { name: c.name, domain: c.domain })
                     : t("cards.calendar.chipOffLocal", "{name} — kliknutím vypneš", { name: c.name })
                   : t("cards.calendar.chipOn", "{name} je vypnutý — kliknutím zapneš", { name: c.name })}
-                onClick={() => (c.account ? openAccountSettings(p.onSettings, c.account) : setEnabled(i(), !c.enabled, c.name, p.s.cfgError))}
+                onClick={() => (p.readOnly ? p.onSettings() : c.account ? openAccountSettings(p.onSettings, c.account) : setEnabled(i(), !c.enabled, c.name, p.s.cfgError))}
               >
                 <span class="cal-dot" style={{ background: color(i()) }} />
                 {c.name}

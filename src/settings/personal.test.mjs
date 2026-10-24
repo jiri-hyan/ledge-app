@@ -16,22 +16,26 @@ test("layoutCardIds: karty ze všech záložek, rozbitá struktura = nic", () =>
   for (const bad of [null, undefined, 5, {}, { pages: "x" }, { pages: [null, { cards: 3 }, { cards: [null, { id: 4 }] }] }]) assert.deepEqual(layoutCardIds(bad), [], String(bad));
 });
 
-test("splitPersonal: nejdřív sekce karet z rozložení, zbytek za „Další sekce“", () => {
+test("splitPersonal: nahoře karty z rozložení, pak ostatní karty, nakonec funkce bez karty", () => {
+  const helpers = ["suggest", "clipboard"];
   const cases = [
-    [[], [], ["weather", "calendars", "media", "timer", "github", "system", "suggest", "clipboard"]],
-    [["weather", "calendar"], ["weather", "calendars"], ["media", "timer", "github", "system", "suggest", "clipboard"]],
-    [["system", "weather"], ["weather", "system"], ["calendars", "media", "timer", "github", "suggest", "clipboard"]],
-    [["clock", "projects", "weather"], ["weather"], ["calendars", "media", "timer", "github", "system", "suggest", "clipboard"]],
-    [["weather", "calendar", "media", "timer", "github", "system"], ["weather", "calendars", "media", "timer", "github", "system"], ["suggest", "clipboard"]],
+    [[], [], ["weather", "calendars", "media", "timer", "github", "system"]],
+    [["weather", "calendar"], ["weather", "calendars"], ["media", "timer", "github", "system"]],
+    [["system", "weather"], ["weather", "system"], ["calendars", "media", "timer", "github"]],
+    [["clock", "projects", "weather"], ["weather"], ["calendars", "media", "timer", "github", "system"]],
+    [["weather", "calendar", "media", "timer", "github", "system"], ["weather", "calendars", "media", "timer", "github", "system"], []],
   ];
-  for (const [cards, shown, rest] of cases) assert.deepEqual(splitPersonal(cards), { shown, rest }, cards.join());
-  // každá sekce je právě v jedné části a pomocné sekce bez karty jsou vždy vzadu
-  for (const s of PERSONAL_SECTIONS.filter((x) => !x.card)) assert.ok(splitPersonal(PERSONAL_SECTIONS.map((x) => x.card).filter(Boolean)).rest.includes(s.id));
+  for (const [cards, shown, more] of cases) assert.deepEqual(splitPersonal(cards), { shown, more, helpers }, cards.join());
+  // každá skupina je právě v jedné části
+  const all = splitPersonal(["weather"]);
+  assert.deepEqual([...all.shown, ...all.more, ...all.helpers].sort(), PERSONAL_SECTIONS.map((s) => s.id).sort());
 });
 
-test("Personal.tsx skládá všechny sekce z modelu", () => {
+test("Personal.tsx: každá skupina z modelu, po kartách, bez zneužitého „Pokročilé“", () => {
   const src = readFileSync(new URL("panels/Personal.tsx", import.meta.url), "utf8");
   for (const s of PERSONAL_SECTIONS) assert.ok(new RegExp(`^  ${s.id}: `, "m").test(src), s.id);
+  assert.match(src, /<Group[\s\S]*gid=\{`osobni\.\$\{id\}`\}/, "skupina na kartu");
+  assert.ok(!/<Advanced[^>]*\bbasic\b/.test(src), "„Další sekce…“ už není Pokročilé v Základním");
 });
 
 test("geoQuery: aspoň 2 znaky po ořezu, jinak se nic neptá", () => {
@@ -79,10 +83,16 @@ test("upgradedFrom: „Co je nového“ jen po přechodu z nižší verze, nový
   for (const [seen, cur, want] of cases) assert.equal(upgradedFrom(seen, cur), want, `${seen} → ${cur}`);
 });
 
-test("Začínáme: Co je nového a staré názvy jen pro upgrade, tlačítko spouští průvodce znovu", () => {
-  const src = readFileSync(new URL("panels/Start.tsx", import.meta.url), "utf8");
-  assert.match(src, /<Show when=\{up\}>[\s\S]*Co je nového/);
-  assert.match(src, /old \? t\("settings\.start\.tip\.search\.text"/);
-  assert.match(src, /Spustit průvodce znovu/);
-  assert.match(src, /startWizard\(\)/);
+test("Co je nového a staré názvy jen pro upgrade (Doporučené), průvodce znovu (Jazyk a průvodce), žádná duplicita", () => {
+  const rec = readFileSync(new URL("panels/Recommended.tsx", import.meta.url), "utf8");
+  const start = readFileSync(new URL("panels/Start.tsx", import.meta.url), "utf8");
+  assert.match(rec, /<Show when=\{up\}>[\s\S]*Co je nového/);
+  assert.match(rec, /old \? t\("settings\.start\.tip\.search\.text"/);
+  assert.match(start, /Spustit průvodce znovu/);
+  assert.match(start, /startWizard\(\)/);
+  // tipy a novinky jen na jednom místě
+  for (const k of ["settings.start.tip.", "settings.start.new.", "seenVersion"]) assert.ok(!start.includes(k), `Start.tsx: ${k}`);
+  // novinka, která je dlaždicí Doporučených, se neopakuje v seznamu novinek
+  const news = rec.slice(rec.indexOf("const NEWS"), rec.indexOf("const NEW_TILES"));
+  for (const m of rec.slice(rec.indexOf("const NEW_TILES")).matchAll(/^  "(f-[\w.]+)":/gm)) assert.ok(!news.includes(`"${m[1]}"`), m[1]);
 });

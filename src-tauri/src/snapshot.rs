@@ -108,6 +108,8 @@ pub(crate) struct Snapshot {
     personal: PersonalView,
     /// synchronizace poznámek mezi PC (štítek v kartě Poznámky)
     notes_sync: notesync::Status,
+    /// propojení poznámek se složkou (`threads/notes_folder.rs`)
+    notes_folder: crate::threads::notes_folder::Status,
     /// nová verze Ledge: stav poslední kontroly (chip v hlavičce jen při `dostupna`)
     update: update::UpdateView,
     /// rychlé akce (karta, paleta) — ikony jen jako `iconKey` (`action_icon`)
@@ -272,6 +274,7 @@ pub(crate) fn snapshot() -> Snapshot {
         desk: crate::desk::win::view(),
         personal,
         notes_sync: c.notes_sync.lock().clone(),
+        notes_folder: crate::threads::notes_folder::status(),
         update: c.updater.view(),
         actions: crate::actionstate::views(&cfg.actions),
         widgets: crate::widgets::live::snapshot_views(&cfg),

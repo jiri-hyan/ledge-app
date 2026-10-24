@@ -1,5 +1,5 @@
 // Angličtina pro widgety na ploše (`src/desk/*`): okno widgetu, ⋯ karty, Ctrl+K (`cards.desk.*`) a sekce
-// Nastavení → Šuplík a karty → Na ploše (`settings.desk.*`). Načítá ji `i18n/dicts.ts` (líně).
+// Nastavení → Na ploše (`settings.desk.*`). Načítá ji `i18n/dicts.ts` (líně).
 import { registerDict } from "../i18n";
 
 registerDict("en", {
@@ -34,7 +34,7 @@ registerDict("en", {
   "cards.desk.script.consent": "The script isn't allowed yet — allow it in Ledge on the widget's card.",
   "cards.desk.settings": "Widget settings…",
   "cards.desk.through": "Click-through",
-  "cards.desk.throughTip": "Clicks go to the window below the widget. Turn it off in Settings → Drawer and cards → On the desktop.",
+  "cards.desk.throughTip": "Clicks go to the window below the widget. Turn it off in Settings → On the desktop.",
   "cards.desk.unknown": "Ledge no longer knows this widget — unpin it under ⋯.",
   "cards.desk.unpin": "Unpin from the desktop",
   "cards.desk.wait.approve": "approve",
@@ -58,8 +58,10 @@ registerDict("en", {
   "cards.desk.pal.throughOff": "Desktop widgets: turn off click-through",
   "cards.desk.pal.profile": "Desktop layout: {name}",
   "cards.desk.throughOffDone": "The widgets can be grabbed with the mouse again.",
-  // Nastavení → Šuplík a karty → Na ploše
-  "settings.desk.title": "On the desktop",
+  // Nastavení → Na ploše
+  "settings.desk.list": "Pinned widgets",
+  "settings.desk.behave": "How widgets behave",
+  "settings.desk.behaveDesc": "Layer, transparency and games apply to the widget you pin next — every widget also has its own under ⋯.",
   "settings.desk.desc": "Ledge cards as small windows on the desktop or a second monitor — they live even with the drawer closed. You can also pin them with ⋯ on a card → Pin to the desktop.",
   "settings.desk.widgets": "Desktop widgets",
   "settings.desk.widgetsHint": "At most {n} — each widget is its own window and uses a little memory.",

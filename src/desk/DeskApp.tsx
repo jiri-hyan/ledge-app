@@ -109,7 +109,7 @@ export default function DeskApp() {
                   <PopItem checked={wd().locked} onClick={() => void patch({ locked: !wd().locked })}>{t("cards.desk.lock", "Zamknout na místě")}</PopItem>
                   <PopItem
                     checked={wd().through}
-                    title={t("cards.desk.throughTip", "Klik projde na okno pod widgetem. Vypneš ho v Nastavení → Šuplík a karty → Na ploše.")}
+                    title={t("cards.desk.throughTip", "Klik projde na okno pod widgetem. Vypneš ho v Nastavení → Na ploše.")}
                     onClick={run(() => patch({ through: !wd().through }))}
                   >
                     {t("cards.desk.through", "Průchozí (klik projde)")}

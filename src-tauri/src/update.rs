@@ -17,8 +17,9 @@
 //! selhání se samo neopakuje — „Zkusit znovu“ je klik) a UI pak nabídne „Restartovat a aktualizovat“.
 //! Instalace až na klik ([`Updater::install`]): instalátor z cache (SHA256 se před spuštěním počítá
 //! znovu), jinak stažení přes HTTPS (záložně `gh release download`) → SHA256 souboru se
-//! musí shodovat s řádkem v poznámkách (a s `digest`, který počítá GitHub, když ho vydání má) — bez
-//! shody se nic nespustí → odpojený `cmd` počká ~2 s, pustí tichý instalátor `/S` a pak nainstalovaný
+//! musí shodovat s řádkem v poznámkách (a s `digest`, který počítá GitHub, když ho vydání má) **a podpis
+//! `<instalátor>.sig` musí sedět na zapečený veřejný klíč** (`updsign.rs`; vydání bez podpisu se ani
+//! nenabídne) — bez shody se nic nespustí → odpojený `cmd` počká ~2 s, pustí tichý instalátor `/S` a pak nainstalovaný
 //! `ledge.exe`; volající (lib.rs) mezitím Ledge ukončí. Běžící dev servery (Job Object) by s Ledge
 //! umřely — proto `update_install` v lib.rs chce u nich druhé potvrzení.
 //!
@@ -39,6 +40,7 @@
 use crate::gitinfo::{self, RunError};
 use crate::updatenet;
 use crate::updcache;
+use crate::updsign;
 use serde::Deserialize;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -138,6 +140,8 @@ pub struct Release {
     pub digest: Option<String>,
     /// HTTPS adresa instalátoru z odpovědi (ověří se `updatenet::download_ok` až při stažení)
     pub download_url: Option<String>,
+    /// adresa podpisu `<asset>.sig` (`updsign.rs`); vydání bez podpisu se vůbec nenabízí
+    pub sig_url: Option<String>,
 }
 
 /// Výsledek jedné kontroly.
@@ -193,6 +197,11 @@ fn release_of(r: &GhRelease) -> Result<Release, String> {
     let Some(sha256) = sha_for(body, &asset.name) else {
         return Err(trf!("vydání {} nemá v poznámkách SHA256 instalátoru — nejde ověřit", "release {} has no installer SHA256 in its notes — can't verify it", r.tag_name));
     };
+    // podpis (S1): bez `<instalátor>.sig` se vydání nenabízí — Ledge 0.6.0 tenhle soubor přehlíží (není *-setup.exe)
+    let sig_name = updsign::sig_asset(&asset.name);
+    let Some(sig) = r.assets.iter().find(|a| a.name == sig_name) else {
+        return Err(updsign::SignError::Missing.text(&r.tag_name));
+    };
     let digest = asset.digest.as_deref().and_then(|d| d.strip_prefix("sha256:")).filter(|h| is_hex64(h)).map(str::to_ascii_lowercase);
     Ok(Release {
         tag: r.tag_name.trim().to_string(),
@@ -203,6 +212,7 @@ fn release_of(r: &GhRelease) -> Result<Release, String> {
         sha256,
         digest,
         download_url: asset.browser_download_url.clone().or_else(|| asset.url.clone()),
+        sig_url: sig.browser_download_url.clone().or_else(|| sig.url.clone()),
     })
 }
 
@@ -325,46 +335,60 @@ pub(crate) fn fetch_release_tag(repo: &str, tag: &str) -> Result<String, String>
     })
 }
 
-/// Stáhne instalátor vydání do `<root>/<tag>/` (přes `.part`), ověří SHA256 a zapíše manifest.
-pub(crate) fn download_and_verify(rel: &Release, repo: &str, root: &Path, progress: updatenet::Progress) -> Result<PathBuf, String> {
-    let dir = root.join(&rel.tag);
-    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))?;
-    let file = dir.join(&rel.asset);
-    let part = dir.join(format!("{}.part", rel.asset));
-    let _ = std::fs::remove_file(dir.join(updcache::MANIFEST));
+/// Jeden soubor vydání (`name`) do `dir` (přes `.part`): HTTPS z `url` (jen z vydání repa), záložně `gh`.
+fn fetch_asset(rel: &Release, repo: &str, dir: &Path, name: &str, url: Option<&str>, progress: updatenet::Progress) -> Result<PathBuf, String> {
+    let file = dir.join(name);
+    let part = dir.join(format!("{name}.part"));
     let _ = std::fs::remove_file(&file);
-    let url = rel.download_url.as_deref().filter(|u| updatenet::download_ok(u, repo, &rel.tag, &rel.asset));
-    let https = match url {
+    let https = match url.filter(|u| updatenet::download_ok(u, repo, &rel.tag, name)) {
         Some(u) => updatenet::download(u, &part, progress).and_then(|()| std::fs::rename(&part, &file).map_err(|e| crate::errors::io(&file.display().to_string(), &e))),
-        None => Err(crate::i18n::tr("vydání neuvádí adresu instalátoru", "the release doesn't list the installer's address").into()),
+        None => Err(trf!("vydání neuvádí adresu souboru {name}", "the release doesn't list the address of {name}")),
     };
     if let Err(e) = https {
         if gh_exe().is_none() {
             return Err(trf!("Stažení selhalo: {e}", "Download failed: {e}"));
         }
         let dir_s = dir.to_string_lossy();
-        gh(&["release", "download", &rel.tag, "--repo", repo, "--pattern", &rel.asset, "--dir", &dir_s, "--clobber"], DOWNLOAD_TIMEOUT)
+        gh(&["release", "download", &rel.tag, "--repo", repo, "--pattern", name, "--dir", &dir_s, "--clobber"], DOWNLOAD_TIMEOUT)
             .map_err(|g| trf!("Stažení selhalo: {e}; záloha přes gh: {g}", "Download failed: {e}; fallback via gh: {g}"))?;
     }
     if !file.is_file() {
         return Err(trf!("Nic se nestáhlo ({} chybí).", "Nothing was downloaded ({} is missing).", file.display()));
     }
-    let got = sha256_file(&file)?;
-    if let Err(e) = verify(&got, rel) {
-        let _ = std::fs::remove_file(&file);
-        return Err(e);
-    }
-    updcache::write_manifest(&dir, &updcache::Manifest::of(rel))?;
     Ok(file)
 }
 
-/// Instalátor z cache znovu ověřený (SHA256 se počítá teď — soubor mohl kdokoli vyměnit). Neshoda →
-/// složka pryč a chyba.
+/// Stáhne instalátor vydání a jeho podpis do `<root>/<tag>/`, ověří SHA256 i podpis (`updsign.rs`, zapečený
+/// klíč) a teprve pak zapíše manifest (s podpisem — cache se před spuštěním ověřuje znovu). Cokoli neprojde →
+/// instalátor pryč, nic se nespustí.
+pub(crate) fn download_and_verify(rel: &Release, repo: &str, root: &Path, progress: updatenet::Progress) -> Result<PathBuf, String> {
+    let dir = root.join(&rel.tag);
+    std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))?;
+    let _ = std::fs::remove_file(dir.join(updcache::MANIFEST));
+    let file = fetch_asset(rel, repo, &dir, &rel.asset, rel.download_url.as_deref(), progress)?;
+    let checked = sha256_file(&file).and_then(|got| verify(&got, rel)).and_then(|()| {
+        let sig_file = fetch_asset(rel, repo, &dir, &updsign::sig_asset(&rel.asset), rel.sig_url.as_deref(), &|_, _| {})?;
+        let sig = std::fs::read_to_string(&sig_file).map_err(|e| crate::errors::io(&sig_file.display().to_string(), &e));
+        let _ = std::fs::remove_file(&sig_file);
+        let sig = sig?;
+        updsign::verify_release_file(&file, &sig, &rel.asset, &rel.version).map(|()| sig)
+    });
+    let sig = checked.inspect_err(|_| {
+        let _ = std::fs::remove_file(&file);
+    })?;
+    updcache::write_manifest(&dir, &updcache::Manifest { signature: Some(sig), ..updcache::Manifest::of(rel) })?;
+    Ok(file)
+}
+
+/// Instalátor z cache znovu ověřený (SHA256 i podpis se počítají teď — soubor mohl kdokoli vyměnit;
+/// položka bez podpisu z dřívějška neprojde). Neshoda → složka pryč a chyba.
 pub(crate) fn verified_cached(root: &Path, e: &updcache::Entry) -> Result<PathBuf, String> {
     let (Some(m), Some(path)) = (e.manifest.as_ref(), updcache::installer(root, e)) else {
         return Err(crate::i18n::tr("Instalátor v cache není celý.", "The cached installer is incomplete.").into());
     };
-    let res = sha256_file(&path).and_then(|got| verify(&got, &m.release()));
+    let res = sha256_file(&path)
+        .and_then(|got| verify(&got, &m.release()))
+        .and_then(|()| updsign::verify_release_file(&path, m.signature.as_deref().unwrap_or(""), &m.asset, &m.version));
     if res.is_err() {
         updcache::remove(root, std::slice::from_ref(&e.name));
     }
@@ -388,10 +412,49 @@ pub fn installer_command(setup: &Path, exe: &Path) -> Result<String, String> {
 /// Argumenty instalátoru spuštěného mimo bublinu: tiše a po instalaci spustit Ledge (`/R`).
 pub const OUTSIDE_ARGS: &str = "/S /R";
 
+/// Podsložka `<local>` (`%LOCALAPPDATA%\Ledge`), do které se instalátor těsně před spuštěním zkopíruje.
+const RUN_DIR: &str = "run-upd";
+
+/// Okno mezi „ověřeno“ a „spuštěno“ zmenšíme tím, že ověřený instalátor zkopírujeme do nově vytvořené složky
+/// s náhodným jménem (`create_dir` ji vytvoří přímo a selže, kdyby už existovala; jméno je z CSPRNG, takže
+/// ho nikdo předem nezná) a **podpis se ověří nad touto kopií** — spustí se přesně ten soubor, který prošel.
+/// Podpis, soubor a verzi bere z manifestu vedle `setup`, ale verze musí souhlasit s `version` od volajícího
+/// (starší platně podepsaný instalátor tak nejde podstrčit pod novější číslo) a jméno souboru s `setup`.
+/// Zvolená varianta (kopie), ne držení handle: handle bez sdílení by dál nešel spustit přes `cmd /c`
+/// (CreateProcess potřebuje číst soubor) a kopie je jednoduchá a nezávislá na tom, kdo startuje proces.
+/// Zbytky po minulém spuštění (`base`) se smažou předem. Vrací cestu ke kopii.
+pub(crate) fn stage_verified(setup: &Path, version: &str, base: &Path) -> Result<PathBuf, String> {
+    let name = setup.file_name().and_then(|n| n.to_str()).filter(|n| safe_asset(n)).ok_or_else(|| crate::i18n::tr("Instalátor má nepovolené jméno.", "The installer has a disallowed name.").to_string())?;
+    let dir = setup.parent().ok_or_else(|| crate::i18n::tr("Instalátor nemá složku.", "The installer has no folder.").to_string())?;
+    let m = std::fs::read_to_string(dir.join(updcache::MANIFEST))
+        .ok()
+        .and_then(|s| serde_json::from_str::<updcache::Manifest>(&s).ok())
+        .filter(|m| m.asset == name && m.version == version)
+        .ok_or_else(|| crate::i18n::tr("Instalátor v cache nemá odpovídající záznam.", "The cached installer has no matching record.").to_string())?;
+    let sig = m.signature.as_deref().ok_or_else(|| crate::i18n::tr("Instalátor v cache není podepsaný.", "The cached installer isn't signed.").to_string())?;
+    let _ = std::fs::remove_dir_all(base);
+    std::fs::create_dir_all(base).map_err(|e| crate::errors::io(&base.display().to_string(), &e))?;
+    let random = crate::accounts::pkce::random(16)?;
+    let stage = base.join(crate::accounts::pkce::b64url(&random));
+    std::fs::create_dir(&stage).map_err(|e| crate::errors::io(&stage.display().to_string(), &e))?;
+    let copy = stage.join(name);
+    let res = std::fs::copy(setup, &copy)
+        .map_err(|e| crate::errors::io(&copy.display().to_string(), &e))
+        .and_then(|_| updsign::verify_release_file(&copy, sig, name, version));
+    match res {
+        Ok(()) => Ok(copy),
+        Err(e) => {
+            let _ = std::fs::remove_dir_all(&stage);
+            Err(e)
+        }
+    }
+}
+
 /// Spustí instalaci odpojeně od Ledge: vlastní skupina procesů, skrytá konzole (CREATE_NO_WINDOW —
 /// ne DETACHED_PROCESS, s ním by si `ping` otevřel viditelné okno konzole) a mimo případný Job Object
-/// rodiče (CREATE_BREAKAWAY_FROM_JOB, když ho job nedovolí, tak bez něj).
-pub(crate) fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
+/// rodiče (CREATE_BREAKAWAY_FROM_JOB, když ho job nedovolí, tak bez něj). `version` = verze, kterou volající
+/// ověřoval (viz [`stage_verified`]); mimo balíček MSIX se spouští ověřená kopie, ne soubor z cache.
+pub(crate) fn launch_installer(setup: &Path, exe: &Path, version: &str) -> Result<(), String> {
     if crate::pkgctx::current().is_some() {
         // cache v %LOCALAPPDATA% je v bublině virtualizovaná — mimo ni platí fyzická kopie
         let setup = &crate::pkgctx::relaunch_target(setup, crate::pkgctx::twin_of(setup), |p| p.is_file());
@@ -402,7 +465,8 @@ pub(crate) fn launch_installer(setup: &Path, exe: &Path) -> Result<(), String> {
                 trf!("{why} Spusť ho ručně z Průzkumníka: {}", "{why} Run it yourself from Explorer: {}", setup.display())
             });
     }
-    let line = installer_command(setup, exe)?;
+    let staged = stage_verified(setup, version, &crate::actionrun::local_dir().join(RUN_DIR))?;
+    let line = installer_command(&staged, exe)?;
     let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
     let cmd_exe = root.join("System32").join("cmd.exe");
     let spawn = |flags: u32| {
@@ -478,6 +542,7 @@ mod tests {
         let repo = "jiri-hyan/ledge-app";
         for r in [&api, &gh] {
             assert!(updatenet::download_ok(r.download_url.as_deref().unwrap(), repo, &r.tag, &r.asset), "{:?}", r.download_url);
+            assert!(updatenet::download_ok(r.sig_url.as_deref().unwrap(), repo, &r.tag, &updsign::sig_asset(&r.asset)), "{:?}", r.sig_url);
         }
         assert!(!updatenet::download_ok("https://api.github.com/repos/jiri-hyan/ledge-app/releases/assets/1", repo, &api.tag, &api.asset));
         assert_eq!(evaluate(API_FIXTURE, "0.2.14"), Verdict::Current);
@@ -491,7 +556,10 @@ mod tests {
         let with = |tag: &str, body: &str, assets: &str| {
             format!(r#"{{"tagName":"{tag}","name":"x","body":{},"assets":[{assets}],"publishedAt":"2026-10-16T10:00:05Z"}}"#, serde_json::json!(body))
         };
-        let setup = r#"{"name":"Ledge_0.2.14_x64-setup.exe","digest":null}"#;
+        let one = r#"{"name":"Ledge_0.2.14_x64-setup.exe","digest":null}"#;
+        let sig = r#"{"name":"Ledge_0.2.14_x64-setup.exe.sig","digest":null}"#;
+        // instalátor + podpis (kromě případů, kde jde právě o podpis)
+        let setup = &format!("{one},{sig}");
         let line = format!("SHA256 (Ledge_0.2.14_x64-setup.exe) = {SHA_TEST}");
         let unver = |v: Verdict| matches!(v, Verdict::Unverifiable(_));
         // předběžný / nevalidní tag
@@ -502,7 +570,12 @@ mod tests {
         assert!(unver(evaluate(&with("v0.2.14", "SHA256 (Ledge_0.2.14_x64-setup.exe) = abc", setup), "0.2.0")));
         // žádný / dva instalátory, nebezpečné jméno
         assert!(unver(evaluate(&with("v0.2.14", &line, ""), "0.2.0")));
-        assert!(unver(evaluate(&with("v0.2.14", &line, &format!("{setup},{setup}")), "0.2.0")));
+        assert!(unver(evaluate(&with("v0.2.14", &line, &format!("{one},{one},{sig}")), "0.2.0")));
+        // bez podpisu (S1) / podpis jiného souboru → vydání se nenabízí
+        for assets in [one.to_string(), format!(r#"{one},{{"name":"Ledge_0.2.13_x64-setup.exe.sig"}}"#)] {
+            let Verdict::Unverifiable(why) = evaluate(&with("v0.2.14", &line, &assets), "0.2.0") else { panic!("{assets}") };
+            assert!(why.contains("není podepsané"), "{why}");
+        }
         assert!(unver(evaluate(&with("v0.2.14", "SHA256 (..\\x-setup.exe) = 0", r#"{"name":"..\\x-setup.exe"}"#), "0.2.0")));
         // nečitelný JSON
         assert!(unver(evaluate("<html>", "0.2.0")));
@@ -597,5 +670,43 @@ mod tests {
         assert!(installer_command(Path::new(r#"C:\a"b\x-setup.exe"#), exe).is_err());
         assert!(installer_command(setup, Path::new(r"C:\%PATH%\ledge.exe")).is_err());
         assert!(installer_command(setup, Path::new("")).is_err());
+    }
+
+    /// Kopie pro spuštění: náhodná nová složka, podpis ověřený nad kopií; cizí verze, vyměněný obsah a chybějící
+    /// podpis neprojdou a po sobě nezanechají nic.
+    #[test]
+    fn stage_verified_copies_and_verifies_the_copy() {
+        use sha2::{Digest, Sha256};
+        let data: &[u8] = include_bytes!("fixtures/sign-payload.bin");
+        let sig = include_str!("fixtures/sign-payload.bin.sig").to_string();
+        let asset = "App_0.7.0_x64-setup.exe";
+        let rel = Release { tag: "v0.7.0".into(), version: "0.7.0".into(), notes: String::new(), published: String::new(), asset: asset.into(), sha256: format!("{:x}", Sha256::digest(data)), digest: None, download_url: None, sig_url: None };
+        let tmp = tempfile::tempdir().unwrap();
+        let cache = tmp.path().join("cache");
+        std::fs::create_dir_all(&cache).unwrap();
+        let setup = cache.join(asset);
+        std::fs::write(&setup, data).unwrap();
+        let signed = updcache::Manifest { signature: Some(sig.clone()), ..updcache::Manifest::of(&rel) };
+        updcache::write_manifest(&cache, &signed).unwrap();
+        let base = tmp.path().join("run");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("zbytek.txt"), "x").unwrap();
+
+        let a = stage_verified(&setup, "0.7.0", &base).unwrap();
+        assert_eq!(std::fs::read(&a).unwrap(), data);
+        assert_eq!(a.file_name().unwrap(), asset);
+        assert_eq!(a.parent().unwrap().parent().unwrap(), base, "kopie leží v podsložce se vzdáleným jménem");
+        assert!(!base.join("zbytek.txt").exists(), "zbytky po minulém spuštění pryč");
+        let b = stage_verified(&setup, "0.7.0", &base).unwrap();
+        assert!(!a.exists() && b.is_file(), "další spuštění uklidí předchozí kopii");
+
+        // jiná verze než ověřovaná, vyměněný obsah, podpis chybí → chyba a žádná kopie
+        assert!(stage_verified(&setup, "0.8.0", &base).is_err());
+        std::fs::write(&setup, "jiny obsah").unwrap();
+        assert!(stage_verified(&setup, "0.7.0", &base).is_err());
+        assert!(std::fs::read_dir(&base).unwrap().next().is_none(), "neplatná kopie se smaže");
+        std::fs::write(&setup, data).unwrap();
+        updcache::write_manifest(&cache, &updcache::Manifest { signature: None, ..signed }).unwrap();
+        assert!(stage_verified(&setup, "0.7.0", &base).is_err());
     }
 }

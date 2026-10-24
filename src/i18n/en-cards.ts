@@ -128,7 +128,7 @@ registerDict("en", {
   "cards.clock.date": "{date}, {year}",
   "cards.weather.title": "Weather",
   "cards.weather.observedDay": "{m}/{d} {time}",
-  "cards.weather.unset": "Pick a city in Settings → Personal. Nothing is downloaded without it.",
+  "cards.weather.unset": "Pick a city in Settings → Drawer and cards → Card contents. Nothing is downloaded without it.",
   "cards.weather.setPlace": "Set place…",
   "cards.weather.loading": "Loading weather…",
   "cards.weather.notYet": "Weather not loaded yet — it downloads when the drawer opens.",

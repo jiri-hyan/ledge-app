@@ -17,7 +17,7 @@
 .cal-chip-off { opacity: 0.5; text-decoration: line-through; }
 .cal-chip-bad { border-color: color-mix(in srgb, var(--red) 40%, transparent); }
 
-/* Nastavení → Osobní → Kalendáře */
+/* Nastavení → Obsah karet → Kalendáře */
 .cal-set-list { display: flex; flex-direction: column; gap: var(--s2); width: 100%; }
 .cal-set-item { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
 .cal-set-name { flex: 1; min-width: 140px; }

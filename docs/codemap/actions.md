@@ -111,7 +111,7 @@ Widgety ze skriptů (spouštěné samy, karta / proužek) mají vlastní mapu [w
   ≤ 256 KB; nikdy periodicky. Snapshot nedělá I/O (`views` = paměť).
 - Skrytý příkaz čte stdout do konce → příkaz, který nechá běžet potomka (server), doběhne až
   termínem (zabije se strom) — na to je `terminal: true`.
-- **Kompaktní paleta** (`palette.compact`, výchozí vypnuto; Nastavení → Chování): bez dotazu
+- **Kompaktní paleta** (`palette.compact`, výchozí vypnuto; Nastavení → Šuplík a karty → Otevírání a klávesy): bez dotazu
   jen pole (`pal-bare`, seznam není v DOM → `ResizeObserver` v `App.tsx` šuplík přeměří sám, morf se
   nemění); psaní = výsledky, ↓ s prázdným polem = nedávné (bez nich vše), ↑ z prvního řádku sbalí,
   smazání dotazu sbalí. Rozhoduje `compact.ts`, `Palette.tsx` jen kreslí.

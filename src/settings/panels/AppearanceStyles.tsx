@@ -1,6 +1,6 @@
 // Galerie design stylů nahoře v panelu Vzhled: každý styl jako živá miniatura (proužek + šuplík ve
 // sloupcích jeho rozložení, s jeho barvami, písmem a materiálem přes `scopeStyle`). Klik = náhled na
-// celém šuplíku (panel aplikuje rozpracovaný vzhled), najetí = dočasný náhled (`peekOn`); uložit / zahodit / vrátit = společná lišta
+// celém šuplíku (panel aplikuje rozpracovaný vzhled), najetí = dočasný náhled jen v náhledu dole (`peekOn`); uložit / zahodit / vrátit = společná lišta
 // Nastavení. Pod galerií: které složky jsou oproti stylu upravené a „Obnovit styl“.
 import { For, Show } from "solid-js";
 import { t } from "../../i18n";

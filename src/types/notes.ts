@@ -88,6 +88,28 @@ export interface NotesSyncView {
   root: string | null;
 }
 
+/** Konflikt propojení se složkou: obě strany se změnily, druhá verze je uložená jako kopie. */
+export interface NotesFolderConflict {
+  name: string;
+  atMs: number;
+  /** absolutní cesta kopie v Ledge (poznámka), null = tam nevznikla */
+  ledge: string | null;
+  /** absolutní cesta kopie ve složce */
+  folder: string | null;
+  /** čí verze zůstala na původním místě */
+  kept: "folder" | "ledge";
+}
+
+/** Propojení poznámek se složkou (`threads/notes_folder.rs`); `off` = vypnuté. */
+export interface NotesFolderView {
+  state: "off" | "idle" | "syncing" | "error";
+  /** poslední úspěšný běh v tomto běhu Ledge */
+  lastMs: number | null;
+  /** věta o posledním běhu, nebo chyba */
+  message: string | null;
+  conflicts: NotesFolderConflict[];
+}
+
 /** Rozepsaná poznámka — leží na disku (`<root>\.draft\`), přežije zavření šuplíku i pád. */
 export interface DraftMeta {
   text: string;

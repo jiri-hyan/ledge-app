@@ -1,4 +1,4 @@
-// Klávesy a gesta Ledge na JEDNOM místě (zdroj pravdy): zobrazuje je Nastavení → Začínáme → Klávesy a gesta
+// Klávesy a gesta Ledge na JEDNOM místě (zdroj pravdy): zobrazuje je Nastavení → Jazyk a průvodce → Klávesy a gesta
 // a paleta (Ctrl+K, napiš „?“). Záznam = `keys` (klávesy, stejné v obou jazycích; u čistě myších gest prázdné) a
 // věta `cs` (`t(key, cs)`, angličtina v `i18n/en-keys.ts`). Test `shortcuts.test.mjs`: každý záznam má obě
 // verze a klíče jsou jedinečné. Nová klávesa nebo gesto = řádek tady, ne text v panelu.

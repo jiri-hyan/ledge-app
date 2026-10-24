@@ -1,15 +1,17 @@
 // Panel Nastavení „Vzhled“ (vlna 7): nahoře 4 kroky jako záložky — Zavřený (`AppearanceClosed.tsx`: galerie
-// vzhledů zavřeného Ledge, pozice a velikost proužku; v Pokročilé tvar, linka, krytí a celé „Co proužek
-// ukazuje“), Po najetí (`AppearanceHover.tsx`: 3 dlaždice `drawer.hover`), Otevřený (`AppearanceOpen.tsx`:
+// vzhledů zavřeného Ledge, pozice a velikost proužku a „Co proužek ukazuje“; v Pokročilé tvar, linka, krytí),
+// Po najetí (`AppearanceHover.tsx`: 3 dlaždice `drawer.hover`; v Pokročilé prodleva rozbalení), Otevřený (`AppearanceOpen.tsx`:
 // galerie stylů, monitor ve skutečném poměru, šířka a hustota; v Pokročilé barvy, rozložení, vlastní šířka,
 // písmo, rohy, pozadí) a Pohyb (`AppearanceMotion.tsx`: 7 animací s ukázkou + rychlost).
 // Každý krok je hlavně galerie; žádný přepínač nemá víc než 4 volby. Skok z hledání (`hit`) přepne krok
 // a rozbalí jeho Pokročilé (`appearanceModel.ts` `stepOf`/`isAdvanced`).
-// Každá změna se hned náhledově aplikuje na celý šuplík (`applyAppearance`); odchod bez uložení vrátí
-// uložený vzhled. Ukládá JEN společná lišta Nastavení (Uložit / Zahodit / Vrátit) → Rust pošle `appearance`
+// Kliknutá volba (rozpracovaný vzhled) se hned aplikuje na celý šuplík (`applyAppearance`); najetí myší na
+// dlaždici (styl, motiv, vzhled zavřeného Ledge, Po najetí) živý Ledge NEMĚNÍ — ukáže se jen v náhledu dole
+// pod editorem (`settings/PreviewDock.tsx`, kolo 21); tam je i jediný přepínač „Co se zrovna děje“.
+// Odchod z Nastavení bez uložení vrátí uložený vzhled. Ukládá JEN společná lišta Nastavení (Uložit / Zahodit / Vrátit) → Rust pošle `appearance`
 // a překreslí proužek. Pozadí (`drawer.glass`), šířka (`drawer.width`), animace a celý proužek se nastavují
-// JEN tady — panel Chování má jen chování. Kotvy hledání `f-<id>` = klíče z `labels.ts`.
-// Jazyk rozhraní (`ui.lang`) tu už není — je v panelu Začínáme úplně nahoře (přepne se po Uložit, `ctx.loadBase` → `setLang`).
+// JEN tady — Otevírání a klávesy má jen chování. Kotvy hledání `f-<id>` = klíče z `labels.ts`.
+// Jazyk rozhraní (`ui.lang`) tu už není — je v Aplikace → Jazyk a průvodce úplně nahoře (přepne se po Uložit, `ctx.loadBase` → `setLang`).
 import { For, Match, Switch, createEffect, createSignal, on, onCleanup } from "solid-js";
 import type { PanelProps } from "../types";
 import type { Appearance } from "../../types";
@@ -22,7 +24,7 @@ import AppearanceClosed from "./AppearanceClosed";
 import AppearanceHover from "./AppearanceHover";
 import AppearanceOpen from "./AppearanceOpen";
 import AppearanceMotion from "./AppearanceMotion";
-import { peek, withThemeDraft, type Ap } from "./apUi";
+import { withThemeDraft, type Ap } from "./apUi";
 import "./appearance.css";
 
 const STEP_LABEL: Record<StepId, () => string> = {
@@ -50,9 +52,9 @@ export default function AppearancePanel(p: PanelProps) {
     p.setCfg("appearance", k, structuredClone(v));
   }
 
-  // náhled na celém šuplíku hned (najetí na dlaždici = dočasný náhled `peek`, rozpracovaný vlastní motiv z editoru);
+  // rozpracovaný vzhled (i vlastní motiv z editoru) na celém šuplíku hned; najetí (`peek`) jen v náhledu dole;
   // odchod bez uložení → zpět uložený vzhled
-  createEffect(() => applyAppearance(peek() ?? withThemeDraft(a())));
+  createEffect(() => applyAppearance(withThemeDraft(a())));
   onCleanup(() => applyAppearance(savedAppearance()));
 
   // skok z hledání / odjinud: přepnout krok a rozbalit jeho Pokročilé
@@ -106,7 +108,7 @@ export default function AppearancePanel(p: PanelProps) {
 
       <Switch>
         <Match when={lastStep() === "closed"}><AppearanceClosed ap={ap} adv={adv("closed")} setAdv={setAdv("closed")} /></Match>
-        <Match when={lastStep() === "hover"}><AppearanceHover ap={ap} /></Match>
+        <Match when={lastStep() === "hover"}><AppearanceHover ap={ap} adv={adv("hover")} setAdv={setAdv("hover")} /></Match>
         <Match when={lastStep() === "open"}><AppearanceOpen ap={ap} dirty={dirty()} adv={adv("open")} setAdv={setAdv("open")} /></Match>
         <Match when={lastStep() === "motion"}><AppearanceMotion ap={ap} reduced={reduced} /></Match>
       </Switch>

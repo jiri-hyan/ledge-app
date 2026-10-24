@@ -8,7 +8,8 @@ import { createSignal } from "solid-js";
 import { OVERLAP, spring, collapsedClip, FULL_CLIP, motionNow, shellRadius } from "../motion";
 import { widenMotion } from "../theme/appearance";
 
-export const SETTINGS_WIDE = 1200;
+/** Šířka Nastavení (kolo 21 větší: postranní sekce + stránka + náhled dole vedle sebe). */
+export const SETTINGS_WIDE = 1280;
 const [holdWide, setHoldWide] = createSignal(false);
 export { holdWide };
 

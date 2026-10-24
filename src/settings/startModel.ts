@@ -1,6 +1,6 @@
-// Čistá logika panelu Začínáme (bez DOM a Solid): kdy ukázat „Co je nového“ a starší tipy. Nový uživatel
+// Čistá logika stránky Doporučené (bez DOM a Solid): kdy ukázat „Co je nového“ a starší tipy. Nový uživatel
 // (Ledge poprvé v tomhle okně) je nezajímá; jen ten, kdo přešel z nižší verze. Poslední viděnou verzi
-// drží panel v localStorage (`Start.tsx`) — config pro ni pole nemá.
+// drží stránka v localStorage (`Recommended.tsx`) — config pro ni pole nemá.
 
 /** „0.4.1“ → [0, 4, 1]; cokoli, co není tečkované číslo (i prázdné), = null. Předpona `v` se ignoruje. */
 export function parseVersion(v: string | null | undefined): number[] | null {

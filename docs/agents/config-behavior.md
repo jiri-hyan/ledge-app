@@ -30,7 +30,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   motivu pro celý vzhled (prázdné = vestavěný `theme`; ten pak slouží jen jako základ pro nativní proužek). Všechna tři
   pole se zapisují jen když nejsou prázdná; starý config je nemá.
 - **Zkratky** — globální zkratky jsou ve výchozím stavu **vypnuté** (nic se neregistruje, v UI se
-  nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Chování → Klávesové zkratky, nebo v configu:
+  nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Šuplík a karty → Otevírání a klávesy → Klávesové zkratky, nebo v configu:
   `hotkeys.enabled: true` + `hotkeys.toggle|approve|deny|note` (formát `Ctrl+Alt+Space`). Config bez
   `enabled` = vypnuto, i když má zkratky vypsané. Kolize zkratek se kontrolují jen při `enabled: true`.
   Když si Ledge vezme fokus (zkratka, klik do poznámky / palety / Nastavení), výslovné zavření (Esc, ✕,
@@ -43,7 +43,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `hotkeys.notePin` (výchozí prázdné = vypnuto) = rychlý nový lístek na plochu (nová poznámka rovnou v lístku
   s fokusem); jako `notePassthrough` platí i s `hotkeys.enabled: false`, jen se zapnutými poznámkami, a ve hře /
   herním režimu nic neudělá.
-- **Chytřejší šuplík** (`smart`, kolo 20; Nastavení → Chování a Claude) — všechno jsou volby, chybějící sekce
+- **Chytřejší šuplík** (`smart`, kolo 20; Nastavení → Šuplík a karty → Otevírání a klávesy a Claude) — všechno jsou volby, chybějící sekce
   = dnešní chování (od opravy v kole 21 jsou `quickKeys`, `dropShortcut` i `tabWheel` ve výchozím stavu VYPNUTÉ a zapíná je člověk):
   `smart.quickKeys` (výchozí `false`): má-li otevřený šuplík fokus, `Alt+1…9` spustí N-tého zástupce na záložce
   (dlaždice projektu, rychlá akce, odkaz; čísla se ukážou při držení Alt), šipky procházejí zástupce, Enter spustí;
@@ -63,7 +63,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   řídicích i neviditelných formátovacích znaků (nulové mezery, značky směru textu).
   Přetažený soubor, který by akce stejně odmítla (`.lnk`, `.url`, `.bat`, `.cmd`, cokoli mimo povolené přípony), se
   nenavrhne; šuplík ukáže větu proč (událost `drop-refused`).
-- **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Chování →
+- **Paleta příkazů** — `palette.compact: true` (výchozí `false`; Nastavení → Šuplík a karty → Otevírání a klávesy →
   Kompaktní paleta příkazů): `Ctrl+K` / 🔍 ukáže jen vyhledávací pole, výsledky se rozbalí až při psaní,
   s prázdným polem šipka dolů ukáže nedávné. Chybějící sekce `palette` = dnešní chování.
   `palette.winSettings` (výchozí `true`; tamtéž → Nastavení Windows v paletě): při psaní paleta najde
@@ -87,7 +87,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   Dokud otázka Clauda čeká a šuplík je zavřený, puls se opakuje po 10 s (jen po tu dobu, v klidu nic).
   Přišla-li otázka / schválení ve fullscreen hře nebo herním režimu, peek vyjede po návratu.
 - **Herní režim** — Ledge „mrtvý“ jako při fullscreen hře (šuplík zavřený, proužek pryč, myš, zkratky,
-  peek ani připomínky nic). Zapíná se v Nastavení → Chování → Hry a celá obrazovka, v paletě Ctrl+K („Zapnout herní
+  peek ani připomínky nic). Zapíná se v Nastavení → Aplikace → Spouštění a hry → Hry a celá obrazovka, v paletě Ctrl+K („Zapnout herní
   režim“) nebo zkratkou `hotkeys.gameMode`; stav je v `%APPDATA%\Ledge\game-mode.json` (`{"on": true}`,
   přežije restart; smazání souboru = vypnuto po dalším startu). Vypnutí: znovu spustit Ledge
   (zástupce / Start), hlavní zkratka `hotkeys.toggle` (vypne a otevře šuplík) nebo `hotkeys.gameMode`.
@@ -99,7 +99,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   @ (zmínka pro Claude Code `@C:\…`, s mezerou `@"C:\… …"`) do schránky, Otevřít, Ve složce, ✕, Kopírovat
   vše, Vyprázdnit, tah řádku ven (Průzkumník, terminál). Chybějící soubor = „chybí“, sám se nemaže.
   Nic se neposílá do session samo. Ve fullscreen hře / herním režimu nic. Mapa `docs/codemap/shelf.md`.
-- **Widgety na ploše** — sekce `desk` (Nastavení → Šuplík a karty → Na ploše) = jen výchozí chování NOVÝCH
+- **Widgety na ploše** — sekce `desk` (Nastavení → Na ploše) = jen výchozí chování NOVÝCH
   widgetů: `layer` (`top` navrchu · `normal` výchozí · `desktop` jen na ploše, pod okny), `hideInGame`
   (výchozí `true`: ve hře přes celou obrazovku a v herním režimu se widget schová a nic nepočítá), `opacity`
   (30–100 %, výchozí 100), `snap` (výchozí `true`: po přesunu přichytit k okraji plochy a k ostatním widgetům).
@@ -110,7 +110,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   "compact":false}],"profiles":[{"name":"Práce","widgets":[…]}],"active":"Práce"}`); druhy `limits`, `waiting`,
   `dev`, `agenda`, `widget:<soubor>`; nejvýš 6 widgetů a 8 profilů. Ruční úprava souboru za běhu se přepíše —
   měň ho jen se zavřeným Ledge. Návod `docs/widgety-na-plose.md`, mapa `docs/codemap/desk.md`.
-- **Historie schránky** — sekce `clipboard` (Nastavení → Osobní → Historie schránky; zapnout
+- **Historie schránky** — sekce `clipboard` (Nastavení → Šuplík a karty → Obsah karet → Historie schránky; zapnout
   jde i přímo z palety): `enabled` (výchozí **`false`** — nic se neposlouchá ani neukládá), `max` (1–200,
   výchozí 25 nepřipnutých), `skipSecrets` (výchozí `true`: neukládat tvary `sk-…`, `ghp_…`/`github_pat_…`,
   `glpat-…`, `AKIA…`, `AIza…`, `xox?-…`, `sk_live_…`, JWT, PEM soukromý klíč), `excludeApps` (exe, ze kterých
@@ -122,7 +122,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   / `CanUploadToCloudClipboard=0` (správci hesel, hesla z Chromu/Edge), prázdný, jen bílé znaky, delší než
   64 KB (neořezává se). Paleta: `v:` (+ hledání), Enter = zpět do schránky (nový záznam nevznikne),
   Ctrl+P připnout, Ctrl+Delete smazat, řádek „Vymazat historii“. Mapa `docs/codemap/clipboard.md`.
-- **Přehrávač (Právě hraje)** — sekce `media` (Nastavení → Osobní → Přehrávač, nebo ikonka v rohu karty):
+- **Přehrávač (Právě hraje)** — sekce `media` (Nastavení → Šuplík a karty → Obsah karet → Přehrávač, nebo ikonka v rohu karty):
   `variant` = vzhled karty: `compact` (kompaktní řádek), `card` (výchozí, karta s průběhem), `cover` (velký
   rozmazaný obal), `vinyl` (deska se točí jen při přehrávání), `strip` (jen v proužku — v šuplíku tenký ovladač,
   proužek ukáže skladbu i bez položky `media` v `strip.items`); `stripTime` = čas skladby v proužku po minutách
@@ -136,7 +136,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   (`open.spotify.com`, `music.youtube.com`, jakýkoli jiný web); jiné schéma config odmítne
   (`media.favorites.N.uri`). Klik odkaz jen otevře ve Spotify / prohlížeči (stejný opener jako odkazy),
   Ledge nic nepřehrává — play / pauza / další zůstávají na GSMTC. Prázdné se do souboru nepíše.
-- **Kontextové návrhy** — sekce `suggest` (Nastavení → Osobní → Kontextové návrhy): malý pruh nahoře v šuplíku, max 3
+- **Kontextové návrhy** — sekce `suggest` (Nastavení → Šuplík a karty → Obsah karet → Kontextové návrhy): malý pruh nahoře v šuplíku, max 3
   chipy, **jen z reálných událostí** (bez zdroje se nic neukáže), každý jde zavřít na 24 h (jen v paměti).
   `clipboard` (výchozí **`false`** — čte historii schránky, která musí být zapnutá: adresu, kterou ještě nemáš mezi
   odkazy, nabídne „Uložit odkaz / Do poznámky“), `devServer` (`true`: krátce po naběhnutí dev serveru z Ledge

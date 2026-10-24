@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ADV_KEY, parseAdvOpen, withAdv } from "./advModel.ts";
+import { ADV_KEY, GROUP_KEY, groupOpen, parseAdvOpen, parseGroups, withAdv, withGroup } from "./advModel.ts";
 import { search } from "./model.ts";
 import { PANEL_META } from "./registry.ts";
 
@@ -35,6 +35,37 @@ test("withAdv: rozbalení se přidá, sbalení vypustí; původní mapa se nemě
   assert.deepEqual(a, { claude: true });
   assert.deepEqual(withAdv(b, "claude", false), { akce: true });
   assert.deepEqual(withAdv({}, "nic", false), {});
+});
+
+test("skupiny: paměť drží obě hodnoty, výchozí stav jen když uživatel nic nezvolil", () => {
+  const cases = [
+    [null, {}],
+    ["", {}],
+    ["nesmysl", {}],
+    ["[]", {}],
+    ['{"akce.git":true,"osobni.media":false,"x":1,"y":"ano"}', { "akce.git": true, "osobni.media": false }],
+    [`{"${"a".repeat(65)}":true}`, {}],
+  ];
+  for (const [raw, want] of cases) assert.deepEqual(parseGroups(raw), want, String(raw));
+  assert.equal(GROUP_KEY, "ledge.settings.groups");
+  assert.notEqual(GROUP_KEY, ADV_KEY);
+  assert.equal(groupOpen({}, "g", true), true);
+  assert.equal(groupOpen({}, "g", false), false);
+  assert.equal(groupOpen({ g: false }, "g", true), false);
+  assert.equal(groupOpen({ g: true }, "g", false), true);
+  const m = { a: true };
+  assert.deepEqual(withGroup(m, "b", false, true), { a: true, b: false }, "zavřená výchozí otevřená se zapamatuje");
+  assert.deepEqual(withGroup({ b: false }, "b", true, true), {}, "shoda s výchozím = záznam pryč");
+  assert.deepEqual(m, { a: true }, "původní mapa se nemění");
+});
+
+test("dlouhé stránky mají skupiny (ne Pokročilé) a Skupina pamatuje v try/catch", () => {
+  for (const f of ["panels/ProjectsActions.tsx", "panels/Projects.tsx", "panels/Actions.tsx", "panels/Personal.tsx", "panels/Notes.tsx"]) assert.match(read(f), /<Group\s/, f);
+  assert.match(read("panels/Notes.tsx"), /gid="poznamky\.link"/, "skupina Propojení v Poznámkách");
+  const src = read("fields/Group.tsx");
+  assert.equal((src.match(/localStorage\./g) ?? []).length, 2);
+  assert.equal((src.match(/try \{/g) ?? []).length, 2);
+  assert.match(src, /on\(hit,/, "skok rozbalí skupinu");
 });
 
 /** Obsah prvního `<tag …>…</tag>` s ohledem na vnoření (JSX jako text). */

@@ -53,7 +53,7 @@ export default function MailCard(p: { s: Snapshot; now: number; onSettings: () =
       <Show when={status() !== "unset" && status() !== "off"} fallback={
         <div class="empty mail-empty">
           {status() === "off"
-            ? t("cards.mail.off", "Pošta je v Nastavení → Osobní → Kalendáře → Pokročilé vypnutá.")
+            ? t("cards.mail.off", "Pošta je v Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé vypnutá.")
             : t("cards.mail.unset", "Přihlas účet Microsoft (Outlook) a uvidíš tu počet nepřečtených a nejnovější předměty. Ledge čte jen hlavičky zpráv a nic nikam neposílá.")}
           <button class="mini ok" onClick={() => openAccountsSettings(p.onSettings)}>{t("cards.mail.connect", "Nastavit účet…")}</button>
         </div>

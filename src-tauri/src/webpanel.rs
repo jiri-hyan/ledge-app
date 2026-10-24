@@ -442,7 +442,16 @@ mod tests {
                     let w = w.as_str().unwrap_or("");
                     let pins = w == format!("{}*", crate::pins::LABEL_PREFIX) || w == format!("{}*", crate::desk::LABEL_PREFIX);
                     assert!((pins || !w.contains('*')) && !w.starts_with(LABEL_PREFIX), "{p:?}: {key} {w}");
+                    // ani jednorázové okno PDF (navigace `file:`) nedostane IPC
+                    assert!(!crate::notes::pdf::label(1).starts_with(w.trim_end_matches('*')), "{p:?}: {key} {w}");
                 }
+            }
+            // jen poslech událostí a vlastní příkazy (`allow-<příkaz>`, AppManifest v build.rs, `ipcacl.rs`) —
+            // žádné pluginy (fs, shell, opener, dialog…) ani okna/webview jádra
+            for perm in v["permissions"].as_array().into_iter().flatten() {
+                let perm = perm.as_str().unwrap_or("?");
+                let ok = matches!(perm, "core:event:allow-listen" | "core:event:allow-unlisten") || (perm.starts_with("allow-") && !perm.contains(':'));
+                assert!(ok, "{p:?}: oprávnění {perm}");
             }
         }
         assert!(n > 0);

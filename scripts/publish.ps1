@@ -7,6 +7,20 @@
 # Pak lokální build (stejný tvar jako dřív) a GitHub Release vX.Y.<Z+1> (nebo -Version) ve veřejném repu s řádkem
 # `SHA256 (<instalátor>) = <hex>`, který čte Ledge (update.rs `sha_for`).
 #
+# Podpis (kolo 21): instalátor se podepíše soukromým klíčem MIMO repo (`-SigningKey`, proměnná LEDGE_SIGNING_KEY,
+# výchozí %USERPROFILE%\.ledge-signing\ledge-update.key; vytvoří ho jednou scripts/signing-setup.ps1) přes
+# `tauri signer sign` → `<instalátor>.sig`, který Ledge ověří zapečeným veřejným klíčem (updsign.rs). Heslo ke klíči
+# (bez člověka, nic se neptá): TAURI_SIGNING_PRIVATE_KEY_PASSWORD, jinak DPAPI soubor vedle klíče
+# (`ledge-update.pass.dpapi`, `-PasswordFile`; vytvoří ho `signing-setup.ps1 -NonInteractive`). Heslo se nikdy
+# nevypisuje; proměnnou dostane jen podproces podpisu a hned po něm zmizí. Bez klíče/hesla, s cizím klíčem nebo
+# bez podpisu se nevydává.
+# Authenticode (podpis Windows): na stroji není certifikát pro podepisování kódu → zatím ne (docs/podpis-vydani.md).
+#
+# Neměnná vydání (immutable releases na GitHubu): po publikaci už nejde nic nahrát ani přepsat. Proto vždy
+# koncept (draft) → nahrát VŠECHNY soubory (instalátor, .sig, SHA256SUMS.txt, pro-claude.md) → zkontrolovat
+# seznam → teprve pak publikovat. Koncept z nepovedeného běhu se při dalším běhu doplní (`--clobber`), publikované
+# vydání se nikdy nepřepisuje (vydej vyšší verzi).
+#
 # Použití: powershell -NoProfile -File scripts/publish.ps1 [-Public jiri-hyan/ledge-app]
 #          [-Private jiri-hyan/ledge] [-AlsoPrivate] [-Clone <složka klonu veřejného repa>] [-DryRun] [-Version x.y.z]
 #   -AlsoPrivate  stejný instalátor vydá i v soukromém repu (přechod: Ledge ≤ 0.2.8 hledá aktualizace tam)
@@ -18,7 +32,9 @@ param(
   [switch]$AlsoPrivate,
   [string]$Clone = (Join-Path $env:LOCALAPPDATA 'ledge-public'),
   [switch]$DryRun,
-  [string]$Version
+  [string]$Version,
+  [string]$SigningKey = $(if ($env:LEDGE_SIGNING_KEY) { $env:LEDGE_SIGNING_KEY } else { Join-Path $env:USERPROFILE '.ledge-signing\ledge-update.key' }),
+  [string]$PasswordFile
 )
 # 'Continue': git/gh píšou průběh na stderr, PowerShell 5.1 by to pod 'Stop' bral jako chybu —
 # návratové kódy se kontrolují výslovně ($LASTEXITCODE) a chyby končí `exit 1`
@@ -30,6 +46,64 @@ $root = Split-Path -Parent $PSScriptRoot
 (Get-Process -Id $PID).PriorityClass = 'BelowNormal'
 
 function Fail([string]$msg) { Write-Error $msg; exit 1 }
+
+# Soukromý klíč existuje, je mimo repo a jeho veřejná půlka je ta zapečená v src-tauri/signing/update.pub
+# (jinak by vydání nešlo v Ledge ověřit). Kontroluje se PŘED snapshotem a buildem — nic se nezačne napůl.
+function Assert-SigningKey {
+  $setupHint = 'jednou spusť: powershell -NoProfile -File scripts/signing-setup.ps1 (nebo nastav LEDGE_SIGNING_KEY / -SigningKey)'
+  if (-not (Test-Path -LiteralPath $SigningKey -PathType Leaf)) { Fail "chybí soukromý klíč pro podpis vydání: $SigningKey — $setupHint" }
+  $full = [IO.Path]::GetFullPath($SigningKey)
+  if ($full.StartsWith([IO.Path]::GetFullPath($root) + '\', [StringComparison]::OrdinalIgnoreCase)) { Fail "soukromý klíč $full leží v repu — přesuň ho mimo (např. %USERPROFILE%\.ledge-signing)" }
+  $pubFile = "$full.pub"
+  if (-not (Test-Path -LiteralPath $pubFile)) { Fail "chybí $pubFile (veřejná půlka klíče ze signing-setup.ps1)" }
+  $embedded = Get-Content (Join-Path $root 'src-tauri\signing\update.pub') -Raw -Encoding UTF8
+  if (-not $embedded -or -not $embedded.Trim()) { Fail "src-tauri/signing/update.pub je prázdný — Ledge by podpis neověřil; $setupHint a commitni update.pub" }
+  if ($embedded.Trim() -ne (Get-Content -LiteralPath $pubFile -Raw -Encoding UTF8).Trim()) { Fail "src-tauri/signing/update.pub nepatří ke klíči $full — vydání by v Ledge neprošlo ověřením" }
+  # heslo: z proměnné (a hned pryč z prostředí — build ani gh ho nevidí), jinak DPAPI soubor; drží se jen jako SecureString
+  if ($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+    $script:signPw = ConvertTo-SecureString -String $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -AsPlainText -Force
+  } else {
+    $pf = if ($PasswordFile) { $PasswordFile } else { $full -replace '\.key$', '.pass.dpapi' }
+    if (-not (Test-Path -LiteralPath $pf -PathType Leaf)) { Fail "chybí heslo ke klíči: ani TAURI_SIGNING_PRIVATE_KEY_PASSWORD, ani DPAPI soubor $pf — $setupHint" }
+    try { $script:signPw = Get-Content -LiteralPath $pf -Raw -Encoding ASCII | ForEach-Object { $_.Trim() } | ConvertTo-SecureString -ErrorAction Stop }
+    catch { Fail "DPAPI soubor $pf nejde odemknout (je vázaný na účet a stroj, kde vznikl) — heslo obnov ze zálohy do TAURI_SIGNING_PRIVATE_KEY_PASSWORD" }
+  }
+  Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+}
+
+# Podpis souboru: heslo jen v prostředí podprocesu podpisu a hned po něm pryč (i při chybě); výstup tauri hesla neobsahuje.
+function Invoke-Sign([string]$file) {
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($script:signPw)
+  try {
+    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    & node (Join-Path $root 'node_modules\@tauri-apps\cli\tauri.js') signer sign -f $SigningKey --app-version $v $file | Out-Host  # výstup do konzole, ne do návratové hodnoty
+    return $LASTEXITCODE
+  } finally {
+    Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+  }
+}
+
+# Neměnné vydání: koncept → všechny soubory → kontrola seznamu → publikovat. Po publikaci se nic nenahrává.
+function Publish-Release([string]$repo, [string]$target) {
+  $tag = "v$v"
+  $isDraft = gh release view $tag --repo $repo --json isDraft --jq .isDraft 2>$null
+  if ($LASTEXITCODE -eq 0) {
+    if ("$isDraft".Trim() -ne 'true') { Fail "vydání $tag v $repo už je publikované — neměnné vydání se nepřepisuje; vydej vyšší verzi (-Version)" }
+    "koncept:    $tag v $repo z dřívějšího běhu — doplňuji soubory"
+    gh release edit $tag --repo $repo --title "Ledge $v" --notes-file $notesFile --target $target
+    if ($LASTEXITCODE -ne 0) { Fail "úprava konceptu $tag ($repo) selhala" }
+    gh release upload $tag @assets --repo $repo --clobber
+  } else {
+    gh release create $tag @assets --repo $repo --draft --title "Ledge $v" --notes-file $notesFile --target $target
+  }
+  if ($LASTEXITCODE -ne 0) { Fail "nahrání konceptu $tag do $repo selhalo — koncept zůstal neveřejný, spusť publish.ps1 znovu" }
+  $want = @($assets | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object)
+  $got = @(gh release view $tag --repo $repo --json assets --jq '.assets[] | select(.state == "uploaded") | .name' | Sort-Object)
+  if ($LASTEXITCODE -ne 0 -or ($want -join '|') -ne ($got -join '|')) { Fail "koncept $tag v $repo nemá přesně soubory $($want -join ', ') (má: $($got -join ', ')) — nepublikuji" }
+  gh release edit $tag --repo $repo --draft=false
+  if ($LASTEXITCODE -ne 0) { Fail "publikace konceptu $tag ($repo) selhala — koncept je úplný: gh release edit $tag --repo $repo --draft=false" }
+}
 
 # Řádky denylistu = regulární výrazy (bez ohledu na velikost písmen); # = komentář.
 function Get-Denylist {
@@ -60,12 +134,14 @@ try {
   $head = git rev-parse HEAD
   if ($head -ne (git rev-parse origin/main)) { Fail 'HEAD není shodný s origin/main — nejdřív push/pull' }
   $deny = Get-Denylist
+  if (-not $DryRun) { Assert-SigningKey }
 
   # další verze = nejvyšší vydaná vX.Y.Z v OBOU repech, patch + 1 (jedna řada verzí; Ledge porovnává čísla);
   # -Version x.y.z vydá zadanou verzi (musí být vyšší než poslední vydaná) — např. skok na 0.3.0
   $last = [version]'0.0.0'
   foreach ($r in @($Public, $Private)) {
-    $tags = @(gh release list --repo $r --limit 200 --json tagName --jq '.[].tagName' 2>$null)
+    # koncepty (nepovedený běh) se nepočítají — další běh tak vydá stejnou verzi a koncept doplní
+    $tags = @(gh release list --repo $r --limit 200 --json tagName,isDraft --jq '.[] | select(.isDraft | not) | .tagName' 2>$null)
     foreach ($tg in $tags) { if ($tg -match '^v(\d+\.\d+\.\d+)$' -and [version]$Matches[1] -gt $last) { $last = [version]$Matches[1] } }
   }
   if ($Version) {
@@ -139,6 +215,17 @@ try {
   if (-not $setup) { Fail "nenašel jsem instalátor pro $v" }
   $sha = (Get-FileHash -Algorithm SHA256 -Path $setup.FullName).Hash.ToLowerInvariant()
 
+  # ---- podpis (minisign přes tauri signer; soubor `<instalátor>.sig`, ověřuje updsign.rs) ----
+  $sigPath = "$($setup.FullName).sig"
+  Remove-Item -LiteralPath $sigPath -ErrorAction SilentlyContinue
+  Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue  # -f a -k se vylučují
+  $signExit = Invoke-Sign $setup.FullName
+  if ($signExit -ne 0 -or -not (Test-Path -LiteralPath $sigPath)) { Fail 'podpis instalátoru selhal (špatné heslo ke klíči? DPAPI soubor / TAURI_SIGNING_PRIVATE_KEY_PASSWORD) — nic se nevydalo' }
+  # důvěryhodný komentář musí jmenovat tenhle soubor a verzi — jinak by ho Ledge odmítl (updsign::comment_names)
+  $sigText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content -LiteralPath $sigPath -Raw).Trim()))
+  if ($sigText -notmatch "(?m)^trusted comment: .*\tfile:$([regex]::Escape($setup.Name))\tversion:$([regex]::Escape($v))\s*$") { Fail "podpis $sigPath nejmenuje $($setup.Name) / verzi $v — nevydávám" }
+  "podpis:     $sigPath"
+
   # řádek SHA256 čte Ledge (update.rs `sha_for`) — tvar neměnit
   if ($log.Count -eq 0) { $log = @('- (žádné nové změny)') }
   # sekce „Nastav s Claudem“ (kolo 9): odkaz na návod pro Clauda + zadání, které stačí vložit do Clauda.
@@ -158,21 +245,18 @@ try {
   $assetDir = Join-Path $env:TEMP "ledge-release-assets-$v"
   New-Item -ItemType Directory -Force $assetDir | Out-Null
   $sumsFile = Join-Path $assetDir 'SHA256SUMS.txt'
+  # jen instalátor: návod pro Clauda (docs/pro-claude.md) hledá řádek podle jména a `.sig` by se mu přimíchal
   [IO.File]::WriteAllText($sumsFile, "$sha  $($setup.Name)`n", (New-Object System.Text.UTF8Encoding($false)))
   $guideSrc = Join-Path $root 'docs\pro-claude.md'
   if (-not (Test-Path $guideSrc)) { Fail 'chybí docs/pro-claude.md — návod pro Clauda patří ke každému vydání' }
   $guideFile = Join-Path $assetDir 'pro-claude.md'
   Copy-Item $guideSrc $guideFile -Force
-  $assets = @($setup.FullName, $sumsFile, $guideFile)
+  $assets = @($setup.FullName, $sigPath, $sumsFile, $guideFile)
 
   git -C $Clone push -q origin main
   if ($LASTEXITCODE -ne 0) { Fail 'push snapshotu do veřejného repa selhal' }
-  gh release create "v$v" @assets --repo $Public --title "Ledge $v" --notes-file $notesFile --target $pubHead
-  if ($LASTEXITCODE -ne 0) { Fail "gh release create ($Public) selhal" }
-  if ($AlsoPrivate) {
-    gh release create "v$v" @assets --repo $Private --title "Ledge $v" --notes-file $notesFile --target $head
-    if ($LASTEXITCODE -ne 0) { Fail "gh release create ($Private) selhal" }
-  }
+  Publish-Release $Public $pubHead
+  if ($AlsoPrivate) { Publish-Release $Private $head }
   if (-not $AlsoPrivate) {
     # tag i ve vývojovém repu — příští vydání z něj počítá seznam změn
     git tag "v$v" $head

@@ -2,7 +2,7 @@
 
 Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsah je doslovný výřez původního AGENTS.md (odkazy typu „viz sekce …“ míří na sekce v souborech podle indexu).
 
-- **Časovač** — sekce `timer` (Nastavení → Osobní → Časovač, `src-tauri/src/timer.rs`): `presets`
+- **Časovač** — sekce `timer` (Nastavení → Šuplík a karty → Obsah karet → Časovač, `src-tauri/src/timer.rs`): `presets`
   (minuty, 1–600, nejvýš 6; výchozí `[5, 15, 25, 50]`), `toast` (výchozí `true`: oznámení Windows po
   doběhnutí odpočtu — bez fokusu, ne ve hře / herním režimu / při „nerušit“ / s otevřeným šuplíkem), `strip`
   (výchozí `true`: běžící časovač se ukáže na začátku proužku i bez položky `timer`; přepínač je i v Nastavení →
@@ -14,7 +14,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   hře nic. Stav (časy, ne tik) je v `%APPDATA%\Ledge\timer.json` — zapisuje se jen při akci, takže běžící
   odpočet přežije restart Ledge (aktualizace); doběhl-li mezitím, ukáže se jen tiše „čas vypršel“. Smazání
   souboru = nic neběží po dalším startu.
-- **Kalendář (jen čtení, bez přihlášení)** — `personal.calendars` (Nastavení → Osobní → Kalendáře; kód
+- **Kalendář (jen čtení, bez přihlášení)** — `personal.calendars` (Nastavení → Šuplík a karty → Obsah karet → Kalendáře; kód
   `src-tauri/src/calendar/`, mapa `docs/codemap/calendar.md`): seznam `{ "name", "url", "color", "enabled", "source", "remindMin", "remindToast" }`
   (nejvýš 8). `url` = **tajná adresa ve formátu iCal** (Google: Nastavení kalendáře → Integrovat kalendář;
   Outlook: Nastavení → Kalendář → Sdílené kalendáře → Publikovat kalendář → ICS), jen `https://`
@@ -34,7 +34,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     jen po kliku „Načíst z Outlooku“ (COM ho spustí na pozadí). Text pozvánky (odkaz Teams) čte jen když
     Outlook volajícímu věří (`Application.IsTrusted`) — jinak by vyskočila bezpečnostní výzva Outlooku.
     Nový Outlook COM nemá → odkaz ICS. `"graph"` / `"google"` + `account` = účty Microsoft / Google
-    (`calendar/graph.rs`, `google.rs` přes `source::adapter`; přihlášení v Nastavení → Osobní → Kalendáře → Pokročilé). Bez řádku tady
+    (`calendar/graph.rs`, `google.rs` přes `source::adapter`; přihlášení v Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé). Bez řádku tady
     dá kalendář účtu do karty přepínač `accounts.*.calendar` (bez připomínky); je-li zapnutý řádek téhož
     účtu tady, vede ho tenhle (připomínka, Připojit) a přepínač účtu se nezdvojí.
   - **Připojit:** z vlastností schůzky (`X-MICROSOFT-SKYPETEAMSMEETINGURL`, `X-GOOGLE-CONFERENCE`,
@@ -46,7 +46,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     tebe“ a „hotovo“), blikne a pulsne; `remindToast: true` (výchozí `false`) navíc pošle toast Windows
     s tlačítkem Připojit. Budík jen na čas připomínky, nic se kvůli ní nestahuje (data z posledního
     načtení / cache). Ve fullscreen hře / herním režimu nic, toast ani při „nerušit“ nebo otevřeném šuplíku.
-- **Účty Microsoft a Google (OAuth)** — sekce `accounts` (Nastavení → Osobní → Kalendáře → Pokročilé; kód `src-tauri/src/accounts/`,
+- **Účty Microsoft a Google (OAuth)** — sekce `accounts` (Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé; kód `src-tauri/src/accounts/`,
   mapa `docs/codemap/accounts.md`, návod pro uživatele `docs/ucty.md`). Výchozí = nic nepřihlášeno, žádná síť.
   ```json
   "accounts": {

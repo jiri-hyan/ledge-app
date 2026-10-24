@@ -42,6 +42,9 @@ pub struct Manifest {
     pub notes: String,
     #[serde(default)]
     pub published: String,
+    /// obsah `<asset>.sig` (`updsign.rs`); položka z doby před podpisy ho nemá → před spuštěním neprojde
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
 }
 
 impl Manifest {
@@ -54,6 +57,7 @@ impl Manifest {
             digest: rel.digest.clone(),
             notes: rel.notes.clone(),
             published: rel.published.clone(),
+            signature: None,
         }
     }
 
@@ -68,6 +72,7 @@ impl Manifest {
             sha256: self.sha256.clone(),
             digest: self.digest.clone(),
             download_url: None,
+            sig_url: None,
         }
     }
 
@@ -257,6 +262,7 @@ mod tests {
             digest: None,
             notes: "- feat: x".into(),
             published: String::new(),
+            signature: None,
         }
     }
 

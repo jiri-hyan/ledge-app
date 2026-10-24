@@ -32,7 +32,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   s ozdobou ▂▅▃ místo ♪). Změna skladby / pauza → událost GSMTC → `mark_dirty` → překreslení; čas jen po minutách
   (≤ 1 probuzení vlákna `emit` za minutu při přehrávání), sekundy proužek neukazuje. Ve fullscreen hře / herním režimu je proužek pryč jako vždy.
 
-## GitHub a Systém (karty `github`, `system`; Nastavení → Osobní)
+## GitHub a Systém (karty `github`, `system`; Nastavení → Šuplík a karty → Obsah karet)
 
 Dvě karty z katalogu (✎ → + Přidat kartu), **výchozí na žádné záložce**. Starý config se nemění.
 

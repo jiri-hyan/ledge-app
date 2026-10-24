@@ -1,6 +1,6 @@
 import type { ActionView, ScriptView } from "./actions";
 import type { Ask, HooksStatus, LimitsView, Pending, QuestionLog, SessionView } from "./claude";
-import type { NoteKind, NoteView, NotesSyncView, PinsView } from "./notes";
+import type { NoteKind, NoteView, NotesFolderView, NotesSyncView, PinsView } from "./notes";
 import type { PersonalView } from "./personal";
 import type { ProcView, ProjectView, View } from "./projects";
 import type { UpdateView } from "./settings";
@@ -74,6 +74,8 @@ export interface Snapshot {
   /** záložka Osobní */
   personal: PersonalView;
   notesSync: NotesSyncView;
+  /** propojení poznámek se složkou */
+  notesFolder: NotesFolderView;
 
   update: UpdateView;
   /** rychlé akce (chybí jen ve starém jádře) */

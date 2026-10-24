@@ -8,9 +8,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
 `src/settings/registry.ts`; staré id vedou dál): **Začínáme** (průvodce, tipy, novinky) · **Šuplík a karty**
 (záložky, karty, přihrádka) · **Vzhled** (4 kroky: Zavřený — vzhled zavřeného Ledge a celý proužek; Po najetí; Otevřený — styl, šířka a hustota na monitoru ve skutečném poměru, barvy; Pohyb — animace; jazyk) · **Projekty,
 akce a odkazy** (projekty se autodetekcí ze složky, jeden seznam akcí — odkaz je akce —, skripty) · **Claude**
-(schvalování, otázky, Claude (MCP), limity, útrata, hlídač, hooky) · **Osobní** (počasí, kalendář, přehrávač, časovač,
-historie schránky, GitHub, Systém) · **Poznámky** (i sync) · **Chování** (otevírání, zkratky, paleta, herní režim, šuplík nad
-prohlížečem, spouštění po startu, šetřit paměť) · **Záloha a aplikace** (export / import s výběrem částí /
+(schvalování, otázky, Claude (MCP), limity, útrata, hlídač, hooky) · **Obsah karet** (po kartách: počasí, kalendář, přehrávač,
+časovač, GitHub, Systém; historie schránky) · **Poznámky** (poznámky, lístky, propojení) · **Otevírání a klávesy** (otevírání,
+zkratky, paleta, šuplík nad prohlížečem) · **Spouštění a hry** (spouštění po startu, šetřit paměť, herní režim) · **Záloha a aplikace** (export / import s výběrem částí /
 obnova výchozích, verze, aktualizace). Hledání (Ctrl+F) najde i staré názvy voleb. Ruční
 úprava souboru níže je pro pokročilé a pro agenty; Nastavení ukáže chybu validace přímo u pole.
 
@@ -29,7 +29,7 @@ hooky Claude Code, odkazy, motiv) — každý krok se hned ukládá, nic nemaže
 Ctrl+K) — přeskočitelná, bez modalu a bez braní fokusu; dokončení i přeskočení zapíše `"ui": { "tips":
 ["tour1"] }` a už se neukáže (smazáním `tour1` z `ui.tips` se ukáže znovu). Po prohlídce jednou ještě
 tip „Podrž kartu a přetáhni ji“ (značka `hold1` v `ui.tips`, stejně: smazáním se ukáže znovu).
-Ručně: Nastavení → Začínáme → Spustit průvodce. **Existující config se nemění:** chybějící `onboarding` = `done: true`
+Ručně: Nastavení → Aplikace → Jazyk a průvodce → Spustit průvodce. **Existující config se nemění:** chybějící `onboarding` = `done: true`
 (průvodce se neukáže); chybějící `notes.sync.remote` se při načtení vezme z `origin` pracovní kopie
 poznámek (kde sync běžel, běží dál), jinak zůstane sync vypnutý; `update.repo` = dřívější
 `jiri-hyan/ledge` se při načtení převede na `jiri-hyan/ledge-app` (zapíše se až dalším uložením).

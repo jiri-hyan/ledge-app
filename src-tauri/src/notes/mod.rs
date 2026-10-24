@@ -30,6 +30,12 @@
 mod draft;
 pub mod edit;
 pub mod export;
+pub mod folder_sync;
+pub mod folder_sync_apply;
+pub mod folder_sync_plan;
+pub mod folder_sync_scan;
+#[cfg(test)]
+mod folder_sync_tests;
 mod frontmatter;
 pub mod lifecycle;
 pub mod links;

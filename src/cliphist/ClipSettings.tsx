@@ -1,12 +1,13 @@
-// Nastavení → Osobní → Historie schránky (`clipboard.*`): lidsky popsané volby (co se ukládá,
-// kde, co ne), vyloučené aplikace s lidskými názvy a „Přidat běžící program“ (výběr, ne psaní exe),
-// „Vymazat historii teď“. Popisky voleb jsou v `settings/labels.ts` (hledání v Nastavení).
+// Nastavení → Šuplík a karty → Obsah karet → Historie schránky (`clipboard.*`): lidsky popsané volby (co se
+// ukládá, kde, co ne), vyloučené aplikace s lidskými názvy a „Přidat běžící program“ (výběr, ne psaní exe),
+// „Vymazat historii teď“. Jen řádky — nadpis a větu skupiny dává `settings/panels/Personal.tsx`. Popisky voleb
+// jsou v `settings/labels.ts` (hledání v Nastavení).
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { api } from "../api";
 import { t } from "../i18n";
 import { useSettings } from "../settings/ctx";
 import { Slider, Toggle } from "../settings/fields/controls";
-import { Row, Section } from "../settings/fields/Row";
+import { Row } from "../settings/fields/Row";
 import { fieldLabel } from "../settings/labels";
 import { say, sayError } from "../ui/toast";
 import { clipApi, type AppChoice } from "./api";
@@ -90,10 +91,7 @@ export function ClipSettings() {
     }
   }
   return (
-    <Section
-      title={t("settings.clip.title", "Historie schránky")}
-      desc={t("settings.clip.desc", "V paletě (Ctrl+K) napiš v: a uvidíš, co jsi naposled zkopíroval. Pamatuje si jen text, jen v paměti Ledge — po restartu je pryč (kromě připnutých) a nikam se neposílá. Hesla zkopírovaná ze správce hesel nebo prohlížeče se neukládají.")}
-    >
+    <>
       <Row id="clipboard.enabled"><Toggle path="clipboard.enabled" label={fieldLabel("clipboard.enabled")} /></Row>
       <Show when={on()}>
         <Row id="clipboard.max"><Slider path="clipboard.max" min={5} max={200} step={5} label={fieldLabel("clipboard.max")} /></Row>
@@ -105,6 +103,6 @@ export function ClipSettings() {
           <button class="mini" onClick={() => void clearNow()}>{t("settings.clip.clearBtn", "Vymazat")}</button>
         </Row>
       </Show>
-    </Section>
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 Historie zkopírovaného textu v paletě (`Ctrl+K`, prefix `v:` nebo příkaz „Historie schránky…“).
 Soukromí napřed: **výchozí vypnuto**, jen text (`CF_UNICODETEXT`), jen paměť, hesla ze správců hesel
-a prohlížeče se neukládají. Config `clipboard.*` (Nastavení → Osobní → Historie schránky,
+a prohlížeče se neukládají. Config `clipboard.*` (Nastavení → Šuplík a karty → Obsah karet → Historie schránky,
 zapnutí i přímo z palety). Cituj symbolem, ne číslem řádku.
 
 ## Soubory

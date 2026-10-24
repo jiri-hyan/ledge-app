@@ -15,7 +15,7 @@ Poznámky. Co změníš v lístku, je hned v kartě, a naopak.
 - **Připnout existující poznámku:** najeď na řádek poznámky a klikni na špendlík vpravo (připnutá ho
   má modrý). Jde to i v editoru poznámky nebo přes Ctrl+K → „Připnout na plochu: …“.
 
-- **Klávesovou zkratkou odkudkoli:** v Nastavení → Chování → Klávesové zkratky si nastav „Nový lístek na
+- **Klávesovou zkratkou odkudkoli:** v Nastavení → Šuplík a karty → Otevírání a klávesy → Klávesové zkratky si nastav „Nový lístek na
   plochu“ (výchozí je bez zkratky). Zkratka funguje, i když máš jiné zkratky Ledge vypnuté. Při hře nebo
   v herním režimu nedělá nic — hře nic nevezme.
 
@@ -64,7 +64,7 @@ zůstane vidět, jen ho nejde ovládat myší — v rohu to ukazuje štítek „
   nějaký lístek, i když máš jinak klávesové zkratky v Ledge vypnuté), nebo
 - v Ledge: Ctrl+K → „Lístky: vypnout průchozí režim“ (taky v ⋯ karty Poznámky).
 
-Zkratku změníš v Nastavení → Chování → Klávesové zkratky („Lístky na ploše: průchozí režim“).
+Zkratku změníš v Nastavení → Šuplík a karty → Otevírání a klávesy → Klávesové zkratky („Lístky na ploše: průchozí režim“).
 
 ## Barvy a štítky v kartě Poznámky
 

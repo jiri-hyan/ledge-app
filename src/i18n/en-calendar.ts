@@ -10,6 +10,7 @@ registerDict("en", {
   "cards.calendar.cfgError": "The settings contain an error — you can only turn the calendar off in Settings now.",
   "cards.calendar.chipOff": "{name} ({domain}) — click to turn off",
   "cards.calendar.chipOn": "{name} is off — click to turn on",
+  "cards.calendar.chipDesk": "{name} — turn it on or off in Ledge Settings",
   "cards.calendar.fetched": "downloaded {ago}",
   "cards.calendar.later": "Next · {date}",
   "cards.calendar.loading": "Loading calendar…",

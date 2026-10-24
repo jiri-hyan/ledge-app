@@ -27,7 +27,7 @@ export function checkFirstRun(): Promise<void> {
   return checked;
 }
 
-/** Ruční spuštění (Nastavení → Začínáme): vždy od začátku. */
+/** Ruční spuštění (Nastavení → Jazyk a průvodce): vždy od začátku. */
 export function startWizard() {
   resetWizard();
   setOpen(true);

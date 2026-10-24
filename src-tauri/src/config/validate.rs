@@ -88,6 +88,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
             ),
         ));
     }
+    crate::notes::folder_sync::validate_link(&cfg.notes.folder_link)?;
     if !(1..=48).contains(&cfg.update.interval_h) {
         return Err(fe("update.intervalH", tr("update.intervalH musí být 1–48 (hodin).", "update.intervalH must be 1–48 (hours).")));
     }

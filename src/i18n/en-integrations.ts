@@ -66,11 +66,11 @@ registerDict("en", {
   // záloha a import
   "settings.section.github": "GitHub",
   "settings.section.system": "System card",
-  // Nastavení → Osobní
+  // Nastavení → Obsah karet
   "settings.github.section": "GitHub",
   "settings.github.desc": "The GitHub card and strip item: PRs waiting for your review, your PRs with CI, and notifications. Off by default; add the card in the card catalogue.",
   "settings.github.everyN": "every {n} min",
-  "settings.github.note": "Logging in is handled by gh auth login in a terminal — Ledge never sees or stores a password or token. Add GitHub to the strip in the Look panel (the “GitHub” item).",
+  "settings.github.note": "Logging in is handled by gh auth login in a terminal — Ledge never sees or stores a password or token. Add GitHub to the strip in Look → Closed → What the strip shows (the “GitHub” item).",
   "settings.system.section": "System",
   "settings.system.desc": "The System card: CPU, memory, drives and network. Add it in the card catalogue (✎ in the drawer).",
   "settings.system.noDisks": "Couldn't detect drives.",

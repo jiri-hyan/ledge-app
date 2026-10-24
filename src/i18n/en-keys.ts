@@ -29,5 +29,5 @@ registerDict("en", {
   "ui.keys.sortList": "In sortable lists, moves the selected item up or down.",
   "ui.keys.title": "Keys and gestures",
   "ui.keys.palette.cmd": "? Keys and gestures",
-  "ui.keys.palette.sub": "Every shortcut and gesture in one list (Settings → Getting started)",
+  "ui.keys.palette.sub": "Every shortcut and gesture in one list (Settings → App → Language and guide)",
 });

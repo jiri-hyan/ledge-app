@@ -4,7 +4,7 @@ Pruh nahoře v šuplíku (max 3 chipy) — **výhradně z reálných událostí*
 proužku, když se u GitHubu objeví nové PR k revizi nebo spadne CI na tvém PR. Společné pravidlo: **žádný vlastní
 polling, vlákno ani časovač**; návrhy se přepočítají při změně snapshotu / sekundovém tiku šuplíku (`now`), puls
 vzniká jen při načtení GitHubu, které už dělá karta nebo plánovač proužku. Config `suggest.*`
-(Nastavení → Osobní → Kontextové návrhy), formát: [agents/config-behavior.md](../agents/config-behavior.md).
+(Nastavení → Šuplík a karty → Obsah karet → Kontextové návrhy), formát: [agents/config-behavior.md](../agents/config-behavior.md).
 Cituj symbolem, ne číslem řádku.
 
 ## Soubory
@@ -17,7 +17,7 @@ Cituj symbolem, ne číslem řádku.
 | `src/suggest/model.ts` | čistá logika (test `model.test.mjs`): `pick(input, dismissed, now)` — pořadí připomínka · schůzka (Připojit 10 min před začátkem do konce, jen s `join`) / poznámka ze schůzky (do 15 min po konci) · spadlé CI · PR k revizi · dev server · schránka, jeden chip na druh (`more` = další téhož druhu), strop `MAX_CHIPS`; `dismiss` / `isDismissed` (24 h, v paměti), `clipUrl` (nejnovější položka historie schránky = jedna celá adresa, ≤ 30 min), `isKnown` / `knownLinks` / `normUrl` (adresa už mezi odkazy), `devUrl` (jen loopback), `sameSuggestions` (tik času chipy nepřekreslí) | `pick` `dismiss` `clipUrl` `isKnown` `knownLinks` `normUrl` `devUrl` `sameSuggestions` `MAX_CHIPS` `DISMISS_MS` |
 | `src/suggest/SuggestBar.tsx` | pruh: schránku čte (`clip_list`) jen se zapnutým zdrojem a na událost `cliphist`; akce chipů (otevřít poznámku → `nav.onOpen`, PR → `github_open`, dev server → `open_url`, uložit odkaz, do poznámky); × zavře na 24 h | `SuggestBar` |
 | `src/suggest/actions.ts` | zavřené návrhy (signál v paměti), `saveLink` (nová akce `url` v configu, `get_config` → `save_config`), `urlToNote` (`note_create`) | `closeSuggestion` `saveLink` `urlToNote` `meetingToNote` |
-| `src/suggest/SuggestSettings.tsx` · `suggest.css` · `src/i18n/en-suggest.ts` | přepínače zdrojů v Nastavení → Osobní · styly (`sg-*`) · angličtina `cards.suggest.*`, `settings.suggest.*`, `settings.f.suggest.*` | `SuggestSettings` |
+| `src/suggest/SuggestSettings.tsx` · `suggest.css` · `src/i18n/en-suggest.ts` | přepínače zdrojů v Nastavení → Šuplík a karty → Obsah karet · styly (`sg-*`) · angličtina `cards.suggest.*`, `settings.suggest.*`, `settings.f.suggest.*` | `SuggestSettings` |
 | `src/types/suggest.ts` | zrcadlo `SuggestConfig` / `SuggestView` | |
 
 Lepidlo: `config/mod.rs` (`Config.suggest`), `snapshot.rs` (`suggest: suggest::view`), `github/mod.rs` (`cached_prs`;

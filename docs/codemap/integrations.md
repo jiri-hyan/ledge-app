@@ -23,7 +23,7 @@ Cituj symbolem, ne číslem řádku.
 | `src/integrations/api.ts` | typy `SystemView` / `GithubView` a `intApi` (vlastní, aby se nesahalo do `types.ts` / `api.ts`) | `intApi` |
 | `src/integrations/SystemCard.tsx` | karta Systém: CPU, paměť, disky, síť + sparkline; polling 2 s jen s `drawerShown()`; klik na CPU / paměť → Správce úloh | `SystemCard` |
 | `src/integrations/GithubCard.tsx` | karta GitHub: sekce a prázdné stavy (vypnuto / bez `gh` / nepřihlášeno / chyba), smyčka podle `nextInMs` jen s viditelnou kartou | `GithubCard` |
-| `src/integrations/IntegrationsSettings.tsx` | Nastavení → Osobní → GitHub a Systém (přepínač s větou, sekce, frekvence, disky jako dlaždice, jednotky) | `GithubSettings` `SystemSettings` |
+| `src/integrations/IntegrationsSettings.tsx` | Nastavení → Šuplík a karty → Obsah karet → GitHub a Systém (přepínač s větou, sekce, frekvence, disky jako dlaždice, jednotky) | `GithubSettings` `SystemSettings` |
 | `src/integrations/integrations.css` · `src/i18n/en-integrations.ts` | styly (`sys-*`, `gh-*`, `int-*`) · angličtina `cards.github.*`, `cards.system.*`, `settings.github.*`, `settings.f.github.*`… | |
 
 Napojení (jednořádkové): `config/*` (`Config.github` / `.system`, `sections!` `github` / `system` s výchozím `false`

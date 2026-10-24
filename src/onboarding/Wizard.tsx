@@ -76,7 +76,7 @@ export default function Wizard(p: { onExit: () => void }) {
             )}
           </For>
         </ol>
-        <button class="mini" disabled={wiz.busy} title={last() ? undefined : t("onboarding.skipAllHint", "Průvodce jde kdykoli spustit znovu: Nastavení → Začínáme.")} onClick={() => void exit()}>
+        <button class="mini" disabled={wiz.busy} title={last() ? undefined : t("onboarding.skipAllHint", "Průvodce jde kdykoli spustit znovu: Nastavení → Aplikace → Jazyk a průvodce.")} onClick={() => void exit()}>
           {last() ? t("onboarding.close", "Zavřít") : t("onboarding.skipAll", "Přeskočit průvodce")}
         </button>
       </header>

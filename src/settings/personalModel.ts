@@ -1,7 +1,9 @@
-// Pořadí sekcí panelu Osobní (bez DOM a Solid): nejdřív sekce karet, které jsou v rozložení šuplíku
-// (`layout.pages[].cards`), ostatní za „Další sekce…“. Hledání najde volby ve všech sekcích vždy.
+// Pořadí skupin stránky Obsah karet (dřív Osobní; bez DOM a Solid): u každé karty její volby pohromadě
+// (kolo 21). Nahoře karty, které jsou v rozložení šuplíku (`layout.pages[].cards`) — otevřené; pod nimi
+// ostatní karty a nakonec funkce bez vlastní karty — sbalené (ne „Pokročilé“: vidět jsou vždy, i v režimu
+// Základní). Hledání najde volby ve všech skupinách a skupinu rozbalí.
 
-/** Sekce panelu a karta, ke které patří (`layout.rs` `CARDS`); bez karty = pomocná sekce bez vlastní karty. */
+/** Skupiny stránky a karta, ke které patří (`layout.rs` `CARDS`); bez karty = funkce bez vlastní karty. */
 export const PERSONAL_SECTIONS = [
   { id: "weather", card: "weather" },
   { id: "calendars", card: "calendar" },
@@ -27,11 +29,13 @@ export function layoutCardIds(layout: unknown): string[] {
   return out;
 }
 
-/** Rozdělení sekcí: `shown` = jejich karta je v rozložení (pořadí jako v `PERSONAL_SECTIONS`), `rest` = ostatní. */
-export function splitPersonal(cardIds: readonly string[]): { shown: PersonalSectionId[]; rest: PersonalSectionId[] } {
+/** Rozdělení skupin (pořadí jako v `PERSONAL_SECTIONS`): `shown` = karta je v rozložení, `more` = karta,
+ *  která teď v šuplíku není, `helpers` = funkce bez vlastní karty. */
+export function splitPersonal(cardIds: readonly string[]): { shown: PersonalSectionId[]; more: PersonalSectionId[]; helpers: PersonalSectionId[] } {
   const on = new Set(cardIds);
   const shown: PersonalSectionId[] = [];
-  const rest: PersonalSectionId[] = [];
-  for (const s of PERSONAL_SECTIONS) (s.card && on.has(s.card) ? shown : rest).push(s.id);
-  return { shown, rest };
+  const more: PersonalSectionId[] = [];
+  const helpers: PersonalSectionId[] = [];
+  for (const s of PERSONAL_SECTIONS) (!s.card ? helpers : on.has(s.card) ? shown : more).push(s.id);
+  return { shown, more, helpers };
 }

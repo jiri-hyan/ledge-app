@@ -25,11 +25,56 @@ pub struct NotesConfig {
     /// Barva lístku podle štítku (`štítek` → id barvy z palety, např. `{"qa": "red"}`); platí, když
     /// poznámka nemá vlastní `color:`. Prázdné = nic.
     pub tag_colors: BTreeMap<String, String>,
+    /// Propojení poznámek se složkou `.md` souborů, kterou umí jiné aplikace (Obsidian, Logseq, Joplin…).
+    pub folder_link: FolderLinkConfig,
 }
 
 impl Default for NotesConfig {
     fn default() -> Self {
-        Self { enabled: true, root: String::new(), sync: NotesSyncConfig::default(), kinds: default_note_kinds(), pins: PinDefaults::default(), tag_colors: BTreeMap::new() }
+        Self {
+            enabled: true,
+            root: String::new(),
+            sync: NotesSyncConfig::default(),
+            kinds: default_note_kinds(),
+            pins: PinDefaults::default(),
+            tag_colors: BTreeMap::new(),
+            folder_link: FolderLinkConfig::default(),
+        }
+    }
+}
+
+/// Směr propojení se složkou: co se kam zapisuje.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LinkDirection {
+    /// Ze složky do Ledge (složka se nikdy nemění).
+    Import,
+    /// Z Ledge do složky (poznámky ve složce se nikdy nenačítají zpět).
+    Export,
+    /// Oběma směry.
+    #[default]
+    Both,
+}
+
+/// Propojení poznámek Ledge se složkou `.md` souborů (`notes::folder_sync`). Výchozí vypnuto; bez
+/// vybrané složky se nic neděje. Žádná síť, žádné sledování v klidu (události systému souborů).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FolderLinkConfig {
+    /// Zapnuto. Vypnutí složku a stav pamatuje, jen se přestane synchronizovat.
+    pub enabled: bool,
+    /// Absolutní cesta ke složce (Obsidian vault, `pages` Logsequ, export Joplinu…). Prázdné = nic.
+    pub path: String,
+    /// `import` | `export` | `both` (výchozí).
+    pub direction: LinkDirection,
+    /// Propagovat i mazání na druhou stranu (výchozí `false` = smazaná poznámka se na druhé straně nechá
+    /// být). Smazaný soubor ve složce jde do její podsložky `.trash`, smazaná poznámka Ledge do Archivu.
+    pub propagate_deletes: bool,
+}
+
+impl Default for FolderLinkConfig {
+    fn default() -> Self {
+        Self { enabled: false, path: String::new(), direction: LinkDirection::Both, propagate_deletes: false }
     }
 }
 

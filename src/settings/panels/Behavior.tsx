@@ -1,17 +1,15 @@
-// Panel „Chování“: jak se Ledge chová, ne jak vypadá — otevírání šuplíku (najetí / přitlačení /
-// podržení, prodlevy), klávesové zkratky (`Hotkeys.tsx`), paleta příkazů, hry a herní režim, šuplík nad
-// prohlížečem (`drawer.barWindows`, dřív „Okna s taby nahoře“), spouštění po startu Windows s upozorněním
-// na bublinu MSIX (`pkgctx/BubbleNotice.tsx`) a „Šetřit paměť“ (`drawer.keepWarmS`, dřív „Uvolnit paměť
-// při nečinnosti“). Vzhled (pozadí, šířka, animace, proužek) je v panelu Vzhled.
+// Stránka „Otevírání a klávesy“ (Šuplík a karty; dřív panel Chování): jak se šuplík otevírá (najetí /
+// přitlačení / podržení, prodlevy), šuplík nad prohlížečem (`drawer.barWindows`, dřív „Okna s taby nahoře“),
+// klávesové zkratky (`Hotkeys.tsx`), paleta příkazů a ovládání otevřeného šuplíku. Spouštění po startu,
+// „Šetřit paměť“, hry a herní režim jsou od kola 21 v Aplikace → Spouštění a hry (`Startup.tsx`); vzhled
+// (pozadí, šířka, animace, proužek, prodleva rozbalení náhledu) je ve Vzhledu.
 import { Show } from "solid-js";
-import { api } from "../../api";
 import { lang, t } from "../../i18n";
 import { useSettings } from "../ctx";
 import { Chips, Seg, Slider, Toggle } from "../fields/controls";
 import { PanelHead, Row, Section } from "../fields/Row";
 import { fieldHint, fieldLabel } from "../labels";
 import type { PanelProps } from "../types";
-import BubbleNotice, { bubble } from "../../pkgctx/BubbleNotice";
 import { HotkeysSection } from "./Hotkeys";
 
 const ms = (v: number) => (v >= 1000 ? `${(v / 1000).toLocaleString(lang() === "cs" ? "cs-CZ" : "en-US", { maximumFractionDigits: 2 })} s` : `${v} ms`);
@@ -30,7 +28,7 @@ export default function BehaviorPanel(_p: PanelProps) {
 
   return (
     <>
-      <PanelHead title={t("settings.nav.chovani", "Chování")} desc={t("settings.behavior.desc", "Jak se Ledge otevírá, které klávesy poslouchá a kdy se schová.")} />
+      <PanelHead title={t("settings.nav.chovani", "Otevírání a klávesy")} desc={t("settings.behavior.desc", "Jak se šuplík otevírá a zavírá a které klávesy Ledge poslouchá.")} />
 
       <Section title={t("settings.drawer.open", "Otevírání a zavírání")}>
         <Row id="drawer.trigger" hint={triggerHint()} stack>
@@ -61,26 +59,6 @@ export default function BehaviorPanel(_p: PanelProps) {
         </Row>
       </Section>
 
-      <HotkeysSection />
-
-      <Section title={t("settings.drawer.palette", "Paleta příkazů")}>
-        <Row id="palette.compact"><Toggle path="palette.compact" label={fieldLabel("palette.compact")} /></Row>
-        <Row id="palette.winSettings"><Toggle path="palette.winSettings" label={fieldLabel("palette.winSettings")} /></Row>
-      </Section>
-
-      <Section title={t("settings.smart.title", "Klávesnice, myš a přetahování")} desc={t("settings.smart.desc", "Rychlejší ovládání otevřeného šuplíku. Nic z toho se nestane mimo šuplík.")}>
-        <Row id="smart.quickKeys"><Toggle path="smart.quickKeys" label={fieldLabel("smart.quickKeys")} /></Row>
-        <Row id="smart.dropShortcut"><Toggle path="smart.dropShortcut" label={fieldLabel("smart.dropShortcut")} /></Row>
-        <Row id="smart.tabWheel"><Toggle path="smart.tabWheel" label={fieldLabel("smart.tabWheel")} /></Row>
-      </Section>
-
-      <Section title={t("settings.behavior.games", "Hry a celá obrazovka")}>
-        <Row id="fullscreen" />
-        <Row id="gameMode">
-          <button class="mini" onClick={() => void api.setGameMode(true)}>{t("settings.drawer.gameMode.on", "Zapnout")}</button>
-        </Row>
-      </Section>
-
       <Section id="drawer.barWindows" title={fieldLabel("drawer.barWindows")} desc={fieldHint("drawer.barWindows")}>
         <Row id="drawer.barWindows.trigger" label={t("settings.drawer.bar.trigger", "Jak tam šuplík otevřít")} stack>
           <Seg
@@ -105,15 +83,21 @@ export default function BehaviorPanel(_p: PanelProps) {
         </Row>
       </Section>
 
-      <Section title={t("settings.drawer.startMem", "Spouštění a paměť")}>
-        <Row id="autostart" hint={bubble() ? t("settings.pkg.autostartBlocked", "Teď nelze — Ledge běží uvnitř balíčku {family}; Windows by zápis při přihlášení neviděl. Po restartu mimo se zapíše sám.", { family: bubble()!.family }) : undefined}>
-          <Toggle path="autostart" label={fieldLabel("autostart")} />
-        </Row>
-        <BubbleNotice />
-        <Row id="drawer.keepWarmS">
-          <Toggle value={d().keepWarmS > 0} onChange={(v) => c.set("drawer.keepWarmS", v ? 60 : 0)} label={fieldLabel("drawer.keepWarmS")} />
-        </Row>
-      </Section>
+      <HotkeysSection />
+
+      <div class="st-cols">
+        <Section title={t("settings.drawer.palette", "Paleta příkazů")} desc={t("settings.behavior.paletteDesc", "Ctrl+K nebo 🔍 v hlavičce: najde projekty, akce, poznámky i volby Nastavení.")}>
+          <Row id="palette.compact"><Toggle path="palette.compact" label={fieldLabel("palette.compact")} /></Row>
+          <Row id="palette.winSettings"><Toggle path="palette.winSettings" label={fieldLabel("palette.winSettings")} /></Row>
+        </Section>
+
+        <Section title={t("settings.smart.title", "Klávesnice, myš a přetahování")} desc={t("settings.smart.desc", "Rychlejší ovládání otevřeného šuplíku. Nic z toho se nestane mimo šuplík.")}>
+          <Row id="smart.quickKeys"><Toggle path="smart.quickKeys" label={fieldLabel("smart.quickKeys")} /></Row>
+          <Row id="smart.dropShortcut"><Toggle path="smart.dropShortcut" label={fieldLabel("smart.dropShortcut")} /></Row>
+          <Row id="smart.tabWheel"><Toggle path="smart.tabWheel" label={fieldLabel("smart.tabWheel")} /></Row>
+        </Section>
+      </div>
+
     </>
   );
 }

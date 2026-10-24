@@ -1,7 +1,7 @@
 # Codemapa: chytřejší šuplík (kolo 20) — klávesy, přetažení, kolečko, zvuk, incidenty, export
 
 Šest malých voleb kolem otevřeného šuplíku. Config `smart` ([config-behavior.md](../agents/config-behavior.md) → Chytřejší šuplík),
-Nastavení → Chování (klávesy, přetažení, kolečko) a Claude (zvuk, incidenty). Cituj symbolem, ne číslem řádku.
+Nastavení → Šuplík a karty → Otevírání a klávesy (klávesy, přetažení, kolečko) a Claude (zvuk, incidenty). Cituj symbolem, ne číslem řádku.
 
 ## Soubory
 

@@ -11,7 +11,7 @@ registerDict("en", {
   // karta Pošta
   "cards.mail.title": "Mail",
   "cards.mail.unreadTitle": "Unread in the Inbox",
-  "cards.mail.off": "Mail is turned off in Settings → Personal → Calendars → Advanced.",
+  "cards.mail.off": "Mail is turned off in Settings → Drawer and cards → Card contents → Calendars → Advanced.",
   "cards.mail.unset": "Sign in to your Microsoft (Outlook) account to see your unread count and the latest subjects here. Ledge reads only message headers and sends nothing anywhere.",
   "cards.mail.connect": "Set up account…",
   "cards.mail.unavailable": "Couldn't load your mail.",
@@ -28,7 +28,7 @@ registerDict("en", {
   "cards.mail.day": "{m}/{d}",
   "cards.layout.card.mail": "Mail",
   "cards.layout.desc.mail": "Unread count and latest subjects from Outlook (Microsoft account)",
-  "cards.calendar.chipAccount": "{name} ({domain}) — set up the account in Settings → Personal → Calendars → Advanced",
+  "cards.calendar.chipAccount": "{name} ({domain}) — set up the account in Settings → Drawer and cards → Card contents → Calendars → Advanced",
 
   // proužek
   "settings.strip.item.mail": "Mail — unread (Microsoft account)",

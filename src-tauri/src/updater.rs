@@ -252,7 +252,7 @@ impl Updater {
             // není v cache, nebo neprošel novým ověřením → stáhnout teď (s průběhem)
             _ => fetch_now(&self.st, &self.notify, &rel, &repo, &root),
         };
-        let res = setup.and_then(|setup| launch_installer(&setup, installed_exe).map(|()| setup).inspect_err(|e| self.st.lock().install_error = Some(e.clone())));
+        let res = setup.and_then(|setup| launch_installer(&setup, installed_exe, &rel.version).map(|()| setup).inspect_err(|e| self.st.lock().install_error = Some(e.clone())));
         if res.is_err() {
             self.st.lock().installing = false;
         }
@@ -299,7 +299,11 @@ impl Updater {
             }
             Rollback::None => Err(crate::i18n::tr("Není k čemu se vrátit.", "There's nothing to go back to.").into()),
         };
-        let res = setup.and_then(|setup| launch_installer(&setup, installed_exe).map(|()| setup));
+        let version = match &plan {
+            Rollback::Local { version, .. } | Rollback::Remote { version } => ver_of(*version),
+            Rollback::None => String::new(),
+        };
+        let res = setup.and_then(|setup| launch_installer(&setup, installed_exe, &version).map(|()| setup));
         if res.is_err() {
             self.st.lock().installing = false;
             // neprošlé ověření smaže složku → plán znovu (z cache se stane stažení)
@@ -579,6 +583,7 @@ mod tests {
             sha256: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08".into(),
             digest: None,
             download_url: None,
+            sig_url: None,
         }
     }
 
@@ -640,9 +645,31 @@ mod tests {
         assert!(!root.join(tag(prev)).exists());
         refresh_cache_at(&st, now, Some(next));
         assert_eq!(st.lock().rollback, Rollback::Remote { version: prev }, "z cache se stane stažení podle tagu");
-        // ověřený projde
+        // SHA256 sedí, ale položka nemá podpis (stažená před podpisy) → neprojde a složka zmizí
         let e = updcache::scan(&root).into_iter().find(|e| e.name == tag(next)).unwrap();
+        assert!(verified_cached(&root, &e).unwrap_err().contains("není podepsané"));
+        assert!(!root.join(tag(next)).exists());
+        // podepsaná (testovací klíč, `updsign.rs` fixtures) projde; podpis jiné verze ne
+        let data: &[u8] = include_bytes!("fixtures/sign-payload.bin");
+        let sig = include_str!("fixtures/sign-payload.bin.sig").to_string();
+        let sha = {
+            use sha2::{Digest, Sha256};
+            format!("{:x}", Sha256::digest(data))
+        };
+        let signed = Release { asset: "App_0.7.0_x64-setup.exe".into(), sha256: sha, ..rel("v0.7.0", "") };
+        let dir = root.join("v0.7.0");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(&signed.asset), data).unwrap();
+        updcache::write_manifest(&dir, &updcache::Manifest { signature: Some(sig.clone()), ..updcache::Manifest::of(&signed) }).unwrap();
+        let e = updcache::scan(&root).into_iter().find(|e| e.name == "v0.7.0").unwrap();
         assert!(verified_cached(&root, &e).is_ok());
+        let renamed = Release { tag: "v0.8.0".into(), version: "0.8.0".into(), ..signed };
+        let dir = root.join("v0.8.0");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(&renamed.asset), data).unwrap();
+        updcache::write_manifest(&dir, &updcache::Manifest { signature: Some(sig), ..updcache::Manifest::of(&renamed) }).unwrap();
+        let e = updcache::scan(&root).into_iter().find(|e| e.name == "v0.8.0").unwrap();
+        assert!(verified_cached(&root, &e).unwrap_err().contains("jinému souboru nebo verzi"), "starý podepsaný instalátor pod novější verzí");
     }
 
     #[test]

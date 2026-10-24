@@ -235,7 +235,7 @@ export async function applyStep(id: StepId): Promise<boolean> {
 }
 
 /** Konec (Hotovo i Přeskočit průvodce): `onboarding.done = true`, ať se průvodce sám znovu neukáže. Znovu ho
- *  spustí `startWizard()` (`state.ts`, Nastavení → Začínáme). */
+ *  spustí `startWizard()` (`state.ts`, Nastavení → Jazyk a průvodce). */
 export async function finish(): Promise<boolean> {
   try {
     // `claude`: průvodce našel Claude Code → Rust přidá na Práci kartu Claude (jen při prvním dokončení)

@@ -123,6 +123,9 @@ mod updatenet;
 mod updater;
 mod updcache;
 mod updseen;
+mod updsign;
+#[cfg(test)]
+mod ipcacl;
 mod weather;
 mod webpanel;
 mod widgets;
@@ -282,6 +285,7 @@ pub fn run() {
             watch_config();
             spawn_notes_watch(notes_rx, notes_tx);
             spawn_notes_sync(sync_rx);
+            threads::notes_folder::spawn_notes_folder();
             limitslive::start_watch();
             // právě hraje v proužku (`strip.items` + `media`): odběry GSMTC hned, ne až po záložce Osobní
             media::sync(&core().cfg.read());
@@ -385,6 +389,9 @@ pub fn run() {
             commands::notes::note_draft_images,
             commands::notes::note_draft_clear,
             commands::notes::notes_sync_now,
+            commands::notefolder::note_folder_sync_now,
+            commands::notefolder::note_folder_check,
+            commands::notefolder::note_folder_clear_conflicts,
             commands::pins::pin_toggle,
             commands::pins::pin_new,
             commands::pins::pin_through_all,

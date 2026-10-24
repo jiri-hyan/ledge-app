@@ -93,6 +93,10 @@ export const api = {
   noteDraftClear: () => call("note_draft_clear"),
   /** Synchronizace poznámek hned — počká na doběhnutí, vrátí krátký výsledek (chyba = text). */
   notesSyncNow: () => call<string>("notes_sync_now"),
+  /** propojení se složkou: „Synchronizovat teď“ (podle uloženého nastavení), kontrola složky, „Rozumím“ u konfliktů */
+  noteFolderSyncNow: () => call<string>("note_folder_sync_now"),
+  noteFolderCheck: (path: string) => call<{ n: number; warn?: string | null }>("note_folder_check", { path }),
+  noteFolderClearConflicts: () => call("note_folder_clear_conflicts"),
   // --- lístky na plochu (Rust `pins/`, `commands/pins.rs`) ---
   /** Šuplík: připnout poznámku na plochu / odepnout; true = je připnutá. */
   pinToggle: (path: string) => call<boolean>("pin_toggle", { path }),

@@ -1,12 +1,45 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "pins",
-  "description": "Lístky na plochu (okna note-*): jen poslech událostí (pin-note, pin-prefs); okno ovládají vlastní příkazy pin_*",
+  "description": "Lístky na plochu (okna note-*): poslech událostí (pin-note, pin-prefs) a jen příkazy lístku — pin_* svého okna a práce s poznámkou (tabulka PIN_WINDOW v ipcacl.rs). Žádný config, akce, widgety ani šuplík.",
   "windows": [
     "note-*"
   ],
   "permissions": [
     "core:event:allow-listen",
-    "core:event:allow-unlisten"
+    "core:event:allow-unlisten",
+    "allow-note-archive",
+    "allow-note-delete",
+    "allow-note-delete-undo",
+    "allow-note-done",
+    "allow-note-draft-clear",
+    "allow-note-draft-load",
+    "allow-note-draft-save",
+    "allow-note-edit-draft-load",
+    "allow-note-edit-draft-save",
+    "allow-note-export",
+    "allow-note-link-create",
+    "allow-note-link-resolve",
+    "allow-note-link-suggest",
+    "allow-note-open",
+    "allow-note-open-with",
+    "allow-note-open-with-apps",
+    "allow-note-read",
+    "allow-note-render",
+    "allow-note-save",
+    "allow-note-set-meta",
+    "allow-note-suggest-remind",
+    "allow-note-toggle-task",
+    "allow-note-unarchive",
+    "allow-open-url",
+    "allow-pin-drag",
+    "allow-pin-edit-in-ledge",
+    "allow-pin-hide",
+    "allow-pin-hint-seen",
+    "allow-pin-init",
+    "allow-pin-look-all",
+    "allow-pin-open",
+    "allow-pin-set",
+    "allow-pin-unpin"
   ]
 }

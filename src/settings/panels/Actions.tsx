@@ -1,4 +1,4 @@
-// Sekce „Akce a odkazy“ panelu Projekty, akce a odkazy: JEDEN seznam akcí z `cfg.actions` — odkaz je akce,
+// Skupina „Odkazy a akce“ stránky Projekty, odkazy a akce (`fields/Group.tsx`, výchozí otevřená): JEDEN seznam akcí z `cfg.actions` — odkaz je akce,
 // která jen otevírá (web, složka, soubor; karta Odkazy je ukazuje, `actions/model.ts` `isLink`) — přidat,
 // upravit, řadit přetažením za úchyt nebo Alt+šipkou (`SortList`), spustit, smazat s Vrátit; editor
 // `actions/ActionEditor`. Starý `personal.links` převádí na akce Rust (`linkmigrate.rs`).
@@ -15,7 +15,7 @@ import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../../actions
 import { say } from "../../ui/toast";
 import { t } from "../../i18n";
 import { afterSave, base, hit, offerUndo } from "../ctx";
-import { Section } from "../fields/Row";
+import { Group } from "../fields/Group";
 import { SortList } from "../fields/SortList";
 
 const NEW: ActionCfg = { id: "", label: "", kind: "url", target: "", showOn: "both" };
@@ -72,10 +72,12 @@ export default function ActionsPanel(p: PanelProps) {
   const lit = (id: string) => hit() === id;
   return (
     <>
-      <Section
-        id="actions"
+      <Group
+        gid="akce.actions"
+        anchor="actions"
         title={t("actions.panel.title", "Akce a odkazy")}
         desc={t("actions.panel.intro", "Weby, složky, soubory, aplikace a příkazy na jedno kliknutí — karta Odkazy a akce, karta Odkazy (weby, složky a soubory) a paleta (Ctrl+K nebo 🔍).")}
+        badge={list().length ? String(list().length) : undefined}
         aside={
           <Show when={!editing()}>
             <span id="f-actions.add" class="act-add" classList={{ hit: lit("actions.add") }}>
@@ -133,7 +135,7 @@ export default function ActionsPanel(p: PanelProps) {
             />
           )}
         </Show>
-      </Section>
+      </Group>
     </>
   );
 }

@@ -11,6 +11,7 @@ import { setLang } from "../i18n";
 import type { FieldError, Snapshot } from "../types";
 import { debounce } from "../util/time";
 import { getPath, pathKeys } from "./model";
+import { FIRST_PAGE } from "./structure";
 
 const [cfg, setCfgRaw] = createStore<any>({});
 /** JSON uložené verze (tak, jak ji vrací jádro) */
@@ -18,7 +19,8 @@ const [base, setBaseSig] = createSignal("");
 const [rev, setRev] = createSignal(0);
 const [fieldError, setFieldError] = createSignal<FieldError | null>(null);
 const [hit, setHit] = createSignal<string | null>(null);
-const [active, setActive] = createSignal("zaciname");
+/** otevřená stránka (id panelu); výchozí = Doporučené (`structure.ts` `FIRST_PAGE`) */
+const [active, setActive] = createSignal(FIRST_PAGE);
 /** rozpracovaná verze se liší od uložené (počítá shell po každé změně, s debounce) */
 const [dirty, setDirty] = createSignal(false);
 const [undoMsg, setUndoMsg] = createSignal<{ text: string; restore: () => void } | null>(null);

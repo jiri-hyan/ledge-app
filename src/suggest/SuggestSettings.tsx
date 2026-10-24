@@ -1,4 +1,4 @@
-// Nastavení → Osobní → Kontextové návrhy: které zdroje smí krmit pruh návrhů v šuplíku (`suggest.*`) a puls
+// Nastavení → Obsah karet → Kontextové návrhy: které zdroje smí krmit pruh návrhů v šuplíku (`suggest.*`) a puls
 // proužku u GitHubu. Mění jen návrh Nastavení — uloží ho společná lišta.
 import { Show } from "solid-js";
 import { t } from "../i18n";

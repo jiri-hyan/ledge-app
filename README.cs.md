@@ -62,7 +62,7 @@ Požadavky: Windows 10 nebo 11 (x64) s Microsoft Edge WebView2 (ve Windows 11 je
 Claude Code je volitelný — bez něj je Ledge spouštěč projektů, poznámky a rychlé akce.
 
 **Aktualizace.** Ledge kontroluje veřejná vydání tohoto repa a ukáže čip „Nová verze“. Nikdy se
-neinstaluje sám: klikneš, stáhne instalátor z GitHubu přes HTTPS, ověří SHA256 a teprve pak ho spustí.
+neinstaluje sám: klikneš, stáhne instalátor z GitHubu přes HTTPS, ověří SHA256 a podpis vydavatele (klíč zabudovaný v Ledge) a teprve pak ho spustí.
 
 **Nastavení s Claudem.** Pošli Claudovi odkaz
 `https://github.com/jiri-hyan/ledge-app/releases/latest/download/pro-claude.md` („Nainstaluj a nastav mi Ledge

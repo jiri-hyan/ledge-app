@@ -1,4 +1,4 @@
-// Čistá logika pole „Město“ (Nastavení → Osobní → Počasí; bez DOM a Solid): kdy se smí ptát na síť
+// Čistá logika pole „Město“ (Nastavení → Obsah karet → Počasí; bez DOM a Solid): kdy se smí ptát na síť
 // (zrcadlo Rust `weather::clean_query`), jak se návrh jmenuje a co z něj vyplní místo pro počasí.
 
 /** Návrh města z jádra (Rust `weather::Place`). */

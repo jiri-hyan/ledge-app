@@ -1,6 +1,8 @@
-// Sekce Projekty (první část panelu „Projekty, akce a odkazy“, `ProjectsActions.tsx`): seznam dlaždic s logy (řazení přetažením, zapnout/vypnout, upravit, smazat
-// s potvrzením a Vrátit), přidání ze složky nebo z naklonovaných rep (návrh z Rust `projectdetect.rs`)
-// a `roots` — složky, kde hledat repa. Editor projektu je v `ProjectEditor.tsx`.
+// Projekty (první část stránky „Projekty, odkazy a akce“, `ProjectsActions.tsx`): hlavička stránky s přidáním
+// (ze složky, z naklonovaných rep — návrh z Rust `projectdetect.rs` — a z katalogu Launcheru) a skupina
+// Projekty se seznamem dlaždic s logy (řazení přetažením, zapnout/vypnout, upravit, smazat s potvrzením
+// a Vrátit). `GitAlerts` (upozornění na neuloženou práci) a `Roots` (kde hledat repa) skládá stránka do
+// vlastních skupin. Editor projektu je v `ProjectEditor.tsx`.
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { api, type DetectedProject, type RepoCandidate } from "../../api";
 import { t } from "../../i18n";
@@ -9,6 +11,7 @@ import { say, sayError } from "../../ui/toast";
 import { base, fieldError, offerUndo, useSettings } from "../ctx";
 import { Confirm } from "../../ui/Confirm";
 import { Toggle } from "../fields/controls";
+import { Group } from "../fields/Group";
 import { PanelHead, Row, Section } from "../fields/Row";
 import { fieldLabel } from "../labels";
 import { SortList } from "../fields/SortList";
@@ -67,7 +70,7 @@ function Candidates(p: { onPick: (c: RepoCandidate) => void; onClose: () => void
   );
 }
 
-function Roots() {
+export function Roots() {
   const c = useSettings();
   const roots = (): string[] => c.cfg.roots ?? [];
   async function add() {
@@ -237,7 +240,7 @@ export default function ProjectsPanel(p: PanelProps) {
           <Candidates onPick={(x) => addFrom(x.path)} onClose={() => setCands(false)} />
         </Section>
       </Show>
-      <Section title={t("settings.proj.title", "Projekty")}>
+      <Group gid="akce.projects" title={t("settings.proj.title", "Projekty")} desc={t("settings.proj.gDesc", "Dev servery a aplikace, které spustíš jedním klikem z hlavní stránky šuplíku.")} badge={list().length ? String(list().length) : undefined}>
         <Row id="projects" stack>
           <Show when={list().length} fallback={<p class="st-empty">{t("settings.proj.empty", "Zatím žádné projekty. Přidej složku s repem — Ledge sám pozná, jestli je to web nebo aplikace, a navrhne příkaz i port.")}</p>}>
             <SortList items={list()} label={fieldLabel("projects")} onMove={(a, b) => { setOpen(null); c.set("projects", moveItem(list(), a, b)); }}>
@@ -272,18 +275,14 @@ export default function ProjectsPanel(p: PanelProps) {
             </SortList>
           </Show>
         </Row>
-      </Section>
-      <Section>
-        <GitAlerts />
-        <Roots />
-      </Section>
+      </Group>
     </>
   );
 }
 
 /** Upozornění na neuloženou / nepushnutou práci (`gitAlerts.enabled`, výchozí ano) a ztišená repa s Odztišit
  *  (`projects[].muteDirty`). Mění draft — uloží společná lišta. */
-function GitAlerts() {
+export function GitAlerts() {
   const c = useSettings();
   const muted = () => (Array.isArray(c.cfg.projects) ? c.cfg.projects : []).map((p: any, i: number) => ({ p, i })).filter((x: any) => x.p?.muteDirty);
   return (

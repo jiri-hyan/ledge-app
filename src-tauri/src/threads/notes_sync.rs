@@ -23,6 +23,12 @@ pub(crate) enum SyncMsg {
 }
 
 pub(crate) fn send_sync(m: SyncMsg) {
+    // propojení se složkou (`notes_folder`) se řídí stejnými příčinami: otevřený šuplík, změna configu
+    match m {
+        SyncMsg::Opened => super::notes_folder::opened(),
+        SyncMsg::Config => super::notes_folder::config_changed(),
+        _ => {}
+    }
     let _ = core().sync_tx.lock().send(m);
 }
 

@@ -11,19 +11,20 @@ export const FIELDS: Record<string, FieldDef> = {
   "ui.lang": { panel: "zaciname", label: "Jazyk", hint: "Jazyk rozhraní Ledge — přepne se hned po uložení", kw: "jazyk language čeština angličtina english czech překlad" },
   "onboarding.keys": { panel: "zaciname", label: "Klávesy a gesta", hint: "Všechny zkratky a gesta myší na jednom místě", kw: "klávesy zkratky gesta nápověda ctrl+k esc dvojklik podržení tah klávesnice" },
   "onboarding.wizard": { panel: "zaciname", label: "Průvodce prvním spuštěním", kw: "průvodce onboarding znovu spustit nastavit od začátku vítejte" },
-  // Šuplík a karty
+  // Šuplík a karty (widgety na ploše `desk.*` = stránka Na ploše)
   "layout": { panel: "suplik", label: "Záložky a karty", hint: "Co šuplík ukazuje, na které záložce a jak velké", kw: "karty záložky rozložení pořadí velikost skrýt zobrazit přidat katalog běží claude poznámky projekty repa akce přihrádka hodiny počasí odkazy limity útrata git subagenti osobní práce" },
   "layout.looks": { panel: "suplik", label: "Upravené karty a zástupci", hint: "Vlastní vzhled karet a zástupců — přehled a obnovení", kw: "vzhled karty akcent pozadí hlavička hustota zobrazení seznam dlaždice ikona emoji barva tvar kruh sklo popisek zástupce obnovit" },
   "shelf.enabled": { panel: "suplik", label: "Přihrádka na soubory", hint: "Přetáhni soubory z Průzkumníka na proužek nahoře — uloží se jen odkazy (cesty) do karty Přihrádka. Kopírování cesty pro Claude Code, otevření, tah ven.", kw: "shelf přihrádka soubory přetáhnout drag drop cesta schránka claude" },
-  "desk.layer": { panel: "suplik", label: "Vrstva nového widgetu", hint: "Kam se nový widget na ploše postaví vůči oknům. Každý widget to má i zvlášť pod ⋯", kw: "widget plocha navrchu pod okny vrstva" },
-  "desk.hideInGame": { panel: "suplik", label: "Schovat widgety ve hře", hint: "Ve hře přes celou obrazovku a v herním režimu nový widget zmizí a nic nepočítá", kw: "hra fullscreen herní režim schovat widget plocha" },
-  "desk.opacity": { panel: "suplik", label: "Průhlednost nového widgetu", kw: "widget plocha průhlednost neprůhlednost" },
-  "desk.snap": { panel: "suplik", label: "Přichytit widgety k okrajům", hint: "Po přesunu se widget přilepí k okraji obrazovky a k ostatním widgetům, když je blízko", kw: "přichytit magnet okraj zarovnat widget plocha" },
+  "desk.layer": { panel: "naplose", label: "Vrstva nového widgetu", hint: "Kam se nový widget na ploše postaví vůči oknům. Každý widget to má i zvlášť pod ⋯", kw: "widget plocha navrchu pod okny vrstva" },
+  "desk.hideInGame": { panel: "naplose", label: "Schovat widgety ve hře", hint: "Ve hře přes celou obrazovku a v herním režimu nový widget zmizí a nic nepočítá", kw: "hra fullscreen herní režim schovat widget plocha" },
+  "desk.opacity": { panel: "naplose", label: "Průhlednost nového widgetu", kw: "widget plocha průhlednost neprůhlednost" },
+  "desk.snap": { panel: "naplose", label: "Přichytit widgety k okrajům", hint: "Po přesunu se widget přilepí k okraji obrazovky a k ostatním widgetům, když je blízko", kw: "přichytit magnet okraj zarovnat widget plocha" },
   // Vzhled (panel `Appearance.tsx` ve 4 krocích: Zavřený · Po najetí · Otevřený · Pohyb; krok každé kotvy
   // a co je v „Pokročilé“ je v `appearanceModel.ts` `ANCHOR_STEP`) — i celý proužek (`StripSettings.tsx`)
   "strip.look": { panel: "vzhled", label: "Vzhled zavřeného Ledge", hint: "Co je vidět u horní hrany, když je šuplík zavřený — vyber obrázek", kw: "zavřený proužek styl vzhled ostrůvek tečky linka ikony hodiny roh neviditelný lišta výřez průběh notch island" },
   "appearance.strip": { panel: "vzhled", label: "Pozice a velikost proužku", hint: "Vlevo, uprostřed nebo vpravo u horní hrany; malý, střední, velký. Tvar, linka a krytí jsou v Pokročilé", kw: "proužek pozice vlevo vpravo uprostřed velikost tvar pilulka linka krytí" },
   "drawer.hover": { panel: "vzhled", label: "Po najetí myší", hint: "Celý šuplík, kompaktní náhled, nebo roztažený ostrůvek", kw: "najetí myš hover kompaktní náhled ostrůvek peek otevření" },
+  "drawer.hoverExpandMs": { panel: "vzhled", label: "Rozbalit náhled samo", hint: "Když myš na kompaktním náhledu nebo ostrůvku chvíli zůstane, otevře se celý šuplík. Vypnuto = jen klikem.", kw: "rozbalit náhled prodleva setrvání najetí kompaktní ostrůvek sekundy automaticky celý šuplík" },
   "appearance.style": { panel: "vzhled", label: "Design styl", hint: "Hotový balíček vzhledu: barvy, tvar, písmo, materiál, rozložení a šířka", kw: "styl design sklo terminál papír neon brutal pastel klasický vzhled otevřený" },
   "appearance.layout": { panel: "vzhled", label: "Šířka šuplíku", hint: "Úzký, střední, široký nebo přes celou obrazovku — náhled ukáže skutečný poměr k monitoru", kw: "šířka rozložení sloupce úzký široký celá šířka monitor panel list panoráma mozaika dlaždice" },
   "appearance.density": { panel: "vzhled", label: "Hustota", hint: "Víc karet na obrazovce, nebo víc vzduchu", kw: "hustota vzdušná běžná hustá úsporná mezery" },
@@ -120,8 +121,12 @@ export const FIELDS: Record<string, FieldDef> = {
   "notes.tagColors": { panel: "poznamky", label: "Barvy štítků", hint: "Lístek bez vlastní barvy dostane barvu podle svého prvního štítku s barvou", kw: "štítek tag barva lístek" },
   "notes.sync.enabled": { panel: "poznamky", label: "Synchronizace mezi počítači", hint: "Poznámky se ukládají do soukromého repa na GitHubu a stáhnou se na druhém počítači. Repo zadáš v Pokročilé.", kw: "sync git" },
   "notes.sync.remote": { panel: "poznamky", label: "Repo pro poznámky", hint: "Soukromé repo: https://… nebo git@…. Přihlášení: gh auth setup-git", kw: "remote github" },
+  "notes.folderLink.enabled": { panel: "poznamky", label: "Propojit poznámky se složkou", hint: "Poznámky se kopírují jako obyčejné .md soubory do vybrané složky a z ní (Obsidian, Logseq, Joplin, VS Code). Výchozí vypnuto, nic nejde po síti.", kw: "složka propojit obsidian vault logseq joplin vs code markdown md kopírovat import export" },
+  "notes.folderLink.path": { panel: "poznamky", label: "Propojená složka", hint: "Složka s .md soubory, se kterou se poznámky propojí", kw: "složka cesta vault obsidian logseq" },
+  "notes.folderLink.direction": { panel: "poznamky", label: "Co se se složkou kopíruje", hint: "Jen ze složky do Ledge, jen z Ledge do složky, nebo oběma směry", kw: "směr import export oběma směry kopírovat" },
+  "notes.folderLink.propagateDeletes": { panel: "poznamky", label: "Přenášet mazání do propojené složky", hint: "Smazání na jedné straně smaže i na druhé (soubor jde do .trash, poznámka do Archivu). Výchozí vypnuto.", kw: "mazání smazat přenášet trash archiv složka" },
   "notes.sync.intervalMin": { panel: "poznamky", label: "Jak často synchronizovat", hint: "Navíc 10 s po změně a při otevření šuplíku", kw: "interval minuty" },
-  // Chování (i klávesové zkratky, `Hotkeys.tsx`)
+  // Otevírání a klávesy (i klávesové zkratky, `Hotkeys.tsx`); spouštění, paměť a hry = stránka Spouštění a hry
   "drawer.trigger": { panel: "chovani", label: "Jak se šuplík otevírá", hint: "Myší u horního okraje obrazovky", kw: "trigger najetí hrana podržet myš" },
   "drawer.delays": { panel: "chovani", label: "Prodlevy", hint: "Jak rychle šuplík reaguje na myš a kdy se zavře", kw: "zpoždění ms rychlost zavření" },
   "hotkeys.enabled": { panel: "chovani", label: "Globální klávesové zkratky", hint: "Vypnuté = nic se neregistruje; šuplík se otevírá myší", kw: "klávesnice" },
@@ -141,11 +146,11 @@ export const FIELDS: Record<string, FieldDef> = {
   "smart.incidents.enabled": { panel: "claude", label: "Stav incidentů Anthropicu", hint: "Když padá služba, uvidíš to v kartě limitů a nebudeš hledat chybu u sebe. Ledge se bude ptát status.anthropic.com, jen když je karta vidět; neposílá nic o tobě", kw: "incident výpadek status anthropic claude služba padá síť" },
   "smart.incidents.everyMin": { panel: "claude", label: "Jak často se ptát", hint: "Nejčastěji jednou za zvolený počet minut, a jen když je karta s limity vidět", kw: "incident interval minuty frekvence status" },
   "palette.winSettings": { panel: "chovani", label: "Nastavení Windows v paletě", hint: "Při psaní v paletě najde i stránky Nastavení Windows (Bluetooth, Zvuk, Wi-Fi…) a klasické ovládací panely", kw: "windows settings ms-settings ovládací panely control bluetooth zvuk wifi" },
-  fullscreen: { panel: "chovani", label: "Hry a video na celou obrazovku", hint: "Ledge je při nich vždy neaktivní: nic neukazuje a nebere myš ani fokus", kw: "fullscreen hra celá obrazovka" },
-  gameMode: { panel: "chovani", label: "Herní režim", hint: "Ledge zmizí jako při hře na celou obrazovku, i po restartu, dokud ho nevypneš: znovu spusť Ledge (zástupce nebo Start), nebo stiskni zkratku šuplíku či herního režimu", kw: "hra game skrýt schovat nerušit mrtvý" },
+  fullscreen: { panel: "spousteni", label: "Hry a video na celou obrazovku", hint: "Ledge je při nich vždy neaktivní: nic neukazuje a nebere myš ani fokus", kw: "fullscreen hra celá obrazovka" },
+  gameMode: { panel: "spousteni", label: "Herní režim", hint: "Ledge zmizí jako při hře na celou obrazovku, i po restartu, dokud ho nevypneš: znovu spusť Ledge (zástupce nebo Start), nebo stiskni zkratku šuplíku či herního režimu", kw: "hra game skrýt schovat nerušit mrtvý" },
   "drawer.barWindows": { panel: "chovani", label: "Šuplík nad prohlížečem", hint: "Maximalizovaný prohlížeč má nahoře taby — aby šuplík nevyjížděl při každém přepnutí tabu, otevře se nad ním jen zatlačením myši nahoru.", kw: "okna s taby nahoře prohlížeč taby chrome opera edge tlak hrana push procesy zatlačit" },
-  autostart: { panel: "chovani", label: "Spouštět po startu Windows", hint: "Ledge se spustí sám po přihlášení do Windows.", kw: "start přihlášení autostart spouštění po startu" },
-  "drawer.keepWarmS": { panel: "chovani", label: "Šetřit paměť", hint: "Když je šuplík minutu zavřený, Ledge uvolní většinu paměti (asi ze 150 MB na desítky). Další otevření pak trvá o chvilku déle. S animacemi nesouvisí.", kw: "uvolnit paměť při nečinnosti ram úspora úsporný režim výkon webview" },
+  autostart: { panel: "spousteni", label: "Spouštět po startu Windows", hint: "Ledge se spustí sám po přihlášení do Windows.", kw: "start přihlášení autostart spouštění po startu" },
+  "drawer.keepWarmS": { panel: "spousteni", label: "Šetřit paměť", hint: "Když je šuplík minutu zavřený, Ledge uvolní většinu paměti (asi ze 150 MB na desítky). Další otevření pak trvá o chvilku déle. S animacemi nesouvisí.", kw: "uvolnit paměť při nečinnosti ram úspora úsporný režim výkon webview" },
   // Záloha a aplikace
   "backup.export": { panel: "aplikace", label: "Exportovat nastavení", hint: "Uloží celé nastavení do souboru — třeba pro druhý počítač", kw: "záloha uložit soubor" },
   "backup.import": { panel: "aplikace", label: "Importovat nastavení", hint: "Ukáže, co se změní, a zeptá se, které části převzít", kw: "načíst soubor obnovit" },
@@ -172,3 +177,7 @@ export const fieldCs = (id: string) => {
 };
 /** Řádek, na který skočit (pole bez vlastního řádku → jeho seznam). */
 export const fieldAnchor = (id: string) => FIELDS[id]?.anchor ?? id;
+/** Text z datového páru [klíč, čeština] (`structure.ts`: Doporučené, věty sekcí). */
+export const tr = (p: readonly [string, string]) => t(p[0], p[1]);
+/** Název sekce Nastavení (`structure.ts` `SECTIONS`). */
+export const sectionLabel = (s: { key: string; cs: string }) => t(s.key, s.cs);

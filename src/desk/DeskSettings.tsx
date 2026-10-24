@@ -1,6 +1,7 @@
-// Nastavení → Šuplík a karty → sekce „Na ploše“: widgety na ploše (seznam s volbami, připnout další, schovat
-// vše), profily rozmístění (uložit / obnovit jedním klikem / smazat) a výchozí chování nových widgetů
-// (config `desk.*` — ukládá společná lišta). Seznam a profily jsou v `desk.json` jen pro tento PC, mění se
+// Nastavení → Na ploše: widgety na ploše (seznam s volbami, připnout další, schovat
+// vše) a profily rozmístění (uložit / obnovit jedním klikem / smazat) v první sekci, výchozí chování nových
+// widgetů a přichytávání ve druhé (config `desk.*` — ukládá společná lišta). Nadpis a větu stránky dává
+// `settings/panels/Desk.tsx` (jednou, ne podruhé v sekci). Seznam a profily jsou v `desk.json` jen pro tento PC, mění se
 // hned (štítek „Platí hned“) a stav bere ze snapshotu (`Snapshot.desk`).
 import { createSignal, For, Show } from "solid-js";
 import { t } from "../i18n";
@@ -78,8 +79,9 @@ export default function DeskSettings(p: { s: Snapshot }) {
   const v = () => p.s.desk;
   const free = () => BUILTIN_KINDS.filter((k) => !widgetOf(v(), k) && ((k !== "limits" && k !== "waiting") || p.s.claudeEnabled));
   return (
-    <Section id="desk" title={t("settings.desk.title", "Na ploše")} desc={t("settings.desk.desc", "Karty Ledge jako malá okna na ploše nebo na druhém monitoru — žijí i se zavřeným šuplíkem. Připneš je i přes ⋯ na kartě → Připnout na plochu.")}>
-      <Row id="desk.widgets" label={t("settings.desk.widgets", "Widgety na ploše")} hint={t("settings.desk.widgetsHint", "Nejvýš {n} — každý widget je samostatné okno a bere trochu paměti.", { n: v()?.max ?? 6 })} stack live>
+    <>
+    <Section id="desk" title={t("settings.desk.widgets", "Widgety na ploše")}>
+      <Row id="desk.widgets" label={t("settings.desk.list", "Připnuté widgety")} hint={t("settings.desk.widgetsHint", "Nejvýš {n} — každý widget je samostatné okno a bere trochu paměti.", { n: v()?.max ?? 6 })} stack live>
         <div class="dk-set-list">
           <For each={v()?.widgets ?? []} fallback={<div class="empty">{t("settings.desk.none", "Zatím žádný widget na ploše.")}</div>}>
             {(w) => <Item w={w} />}
@@ -102,10 +104,13 @@ export default function DeskSettings(p: { s: Snapshot }) {
         </div>
       </Row>
       <Profiles s={p.s} />
+    </Section>
+    <Section title={t("settings.desk.behave", "Jak se widgety chovají")} desc={t("settings.desk.behaveDesc", "Vrstva, průhlednost a hra platí pro widget, který právě připneš — každý widget je má i zvlášť pod ⋯.")}>
       <Row id="desk.layer"><Seg path="desk.layer" options={LAYERS.map(layerOpt)} label={fieldLabel("desk.layer")} /></Row>
       <Row id="desk.hideInGame"><Toggle path="desk.hideInGame" label={fieldLabel("desk.hideInGame")} /></Row>
       <Row id="desk.opacity"><Slider path="desk.opacity" min={OPACITY_MIN} max={100} step={5} unit="%" label={fieldLabel("desk.opacity")} /></Row>
       <Row id="desk.snap"><Toggle path="desk.snap" label={fieldLabel("desk.snap")} /></Row>
     </Section>
+    </>
   );
 }

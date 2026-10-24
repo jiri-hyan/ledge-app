@@ -7,6 +7,7 @@ import "./en-cards";
 import "./en-sessions";
 import "./en-sessiongit";
 import "./en-notes";
+import "../notes/en-folder";
 import "../pin/en";
 import "./en-palette";
 import "./en-actions";

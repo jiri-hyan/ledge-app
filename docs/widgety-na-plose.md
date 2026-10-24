@@ -13,7 +13,7 @@ zavřený, a ukazuje to, co Ledge stejně ví — nic nového se kvůli němu ne
 | **Agenda dne** | dnešek a zítřek z kalendáře, tlačítko Připojit u schůzky | karta Kalendář → ⋯ → Připnout na plochu |
 | **Widget ze skriptu** | to, co vypíše tvůj skript ([widgety ze skriptů](widgets.md)) | karta widgetu → ⋯ → Připnout na plochu |
 
-Totéž najdeš v Ctrl+K (napiš „plocha“) a v Nastavení → Šuplík a karty → **Na ploše**.
+Totéž najdeš v Ctrl+K (napiš „plocha“) a v Nastavení → **Na ploše**.
 
 „Čeká na tebe“ nic neschvaluje. Klik na řádek otevře Ledge s náhledem schválení — rozhoduješ vždycky ty, v šuplíku.
 
@@ -27,7 +27,7 @@ Totéž najdeš v Ctrl+K (napiš „plocha“) a v Nastavení → Šuplík a kar
   - **Kompaktní:** menší widget s tím nejdůležitějším; přepnutím zpět se vrátí plná velikost.
   - **Zamknout na místě:** widget nejde posunout ani zvětšit.
   - **Průchozí:** kliknutí projde na okno pod widgetem. Widget pak myší nevypneš — průchozí vypneš
-    v Nastavení → Šuplík a karty → Na ploše, nebo v Ctrl+K („Widgety na ploše: vypnout průchozí“).
+    v Nastavení → Na ploše, nebo v Ctrl+K („Widgety na ploše: vypnout průchozí“).
   - **Schovat ve hře** (zapnuté): ve hře přes celou obrazovku a v herním režimu widget zmizí a nic nepočítá.
     Po hře se vrátí a nevezme ti fokus.
   - **Průhlednost** 30–100 %.
@@ -35,7 +35,7 @@ Totéž najdeš v Ctrl+K (napiš „plocha“) a v Nastavení → Šuplík a kar
 
 ## Profily rozmístění
 
-V Nastavení → Šuplík a karty → Na ploše napiš jméno (třeba *Práce*) a klikni **Uložit rozmístění**. Pak si
+V Nastavení → Na ploše napiš jméno (třeba *Práce*) a klikni **Uložit rozmístění**. Pak si
 rozmísti widgety jinak a ulož třeba *Hraní*. Mezi profily přepneš jedním klikem (**Obnovit**) nebo v Ctrl+K
 („Rozmístění plochy: Práce“). Profil si pamatuje, které widgety jsou na ploše, kde a jak jsou nastavené.
 
@@ -52,5 +52,5 @@ všechny“) se uspí a nic nepočítá.
 
 ## Výchozí chování
 
-V Nastavení → Šuplík a karty → Na ploše nastavíš, jak se mají chovat **nové** widgety: vrstva, schovat ve hře,
+V Nastavení → Na ploše nastavíš, jak se mají chovat **nové** widgety: vrstva, schovat ve hře,
 průhlednost a přichycení. Uložíš je lištou Uložit dole. Bez widgetů se nic nemění — Ledge žádné okno neotevře.

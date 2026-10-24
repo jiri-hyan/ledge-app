@@ -1,4 +1,4 @@
-// Nastavení → Osobní → Přehrávač → Oblíbené: správa `media.favorites` (přidat, přejmenovat, pořadí, smazat
+// Nastavení → Obsah karet → Přehrávač → Oblíbené: správa `media.favorites` (přidat, přejmenovat, pořadí, smazat
 // s Vrátit). Mění jen návrh Nastavení — uloží ho společná lišta. Rychlé přidání je přímo v kartě Právě hraje
 // („☆ Přidat, co hraje“, `FavoriteTiles.tsx`); tady jde odkaz i vložit rovnou.
 import { Show, createSignal } from "solid-js";

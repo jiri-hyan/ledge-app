@@ -11,7 +11,7 @@ import AboutPanel, { AboutAdvanced } from "./About";
 export default function AppPanel(p: PanelProps) {
   return (
     <>
-      <PanelHead title={t("settings.nav.aplikace", "Záloha a aplikace")} desc={t("settings.backup.desc", "Přenes nastavení na jiný počítač, vrať se k výchozímu, nebo se podívej, jakou verzi Ledge máš.")} />
+      <PanelHead title={t("settings.nav.aplikace", "Záloha a verze")} desc={t("settings.backup.desc", "Přenes nastavení na jiný počítač, vrať se k výchozímu, nebo se podívej, jakou verzi Ledge máš.")} />
       <BackupPanel {...p} />
       <AboutPanel {...p} />
       <Advanced id="aplikace" hint={t("settings.app.adv.hint", "Ruční úprava config.json, repo s vydáními, soubory a log")}>

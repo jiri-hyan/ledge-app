@@ -1,4 +1,4 @@
-// Sekce „Klávesové zkratky“ (panel Chování; dřív samostatný panel Zkratky): globální zkratky zapnout/vypnout
+// Sekce „Klávesové zkratky“ (stránka Otevírání a klávesy; dřív samostatný panel Zkratky): globální zkratky zapnout/vypnout
 // a editor „stiskni kombinaci“ pro každou akci, kolize hned u pole (`model.hotkeyCollisions`, stejné
 // pravidlo jako Rust `hotkey_collision`).
 import { For, Show } from "solid-js";

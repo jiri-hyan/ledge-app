@@ -125,6 +125,7 @@ export default function ClaudePanel(p: PanelProps) {
           </Row>
         </Show>
       </Section>
+      <div class="st-cols">
       <Section title={t("settings.claude.costs", "Hodnota v cenách API")}>
         <Row id="claude.costs">
           <Toggle path="claude.costs" label={fieldLabel("claude.costs")} />
@@ -150,6 +151,7 @@ export default function ClaudePanel(p: PanelProps) {
           </small>
         </Row>
       </Section>
+      </div>
       <Advanced id="claude" hint={t("settings.claude.adv.hint", "Port pro spojení s Claude Code")}>
         <Section>
           <Row id="claude.port" dim={!c.cfg.claude.enabled}>

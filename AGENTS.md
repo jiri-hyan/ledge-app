@@ -29,7 +29,8 @@ typu „viz sekce …“ míří na sekce v souborech níže.
 | Instalace a aktualizace | [install.md](docs/agents/install.md) | `publish.ps1` / `release.ps1`, aktualizace z appky, NSIS/autostart, bublina MSIX, migrace z Notche |
 
 Mapy kódu (kde co leží): [`docs/codemap/`](docs/codemap/README.md). Uživatelské návody (ne pro práci v kódu): `docs/pro-claude.md`
-(instalace a ladění Ledge pro Clauda), `docs/ucty.md`, `docs/listky.md`, `docs/widgets.md`, `docs/widgety-na-plose.md`.
+(instalace a ladění Ledge pro Clauda), `docs/ucty.md`, `docs/listky.md`, `docs/widgets.md`, `docs/widgety-na-plose.md`; vydavatel: `docs/podpis-vydani.md`
+(podpis vydání, záloha a ztráta klíče).
 
 Každý klíč `config.json` (odvozený z Rust struktur) musí být zmíněn v `docs/agents/*.md` — hlídá
 `scripts/config-keys.mjs` (test `scripts/config-keys.test.mjs`).

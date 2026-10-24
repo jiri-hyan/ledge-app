@@ -1,6 +1,7 @@
 /* Nastavení (Settings.tsx + settings/*): skořápka (navigace | panel | lišta), řádky voleb a ovládací
    prvky. Barvy, rádiusy a písmo jen přes tokeny ze styles.css — motiv (APPEARANCE) se propíše sám.
-   Výška = strop šuplíku (`--drawer-max-h`, fit.ts) minus hlavička; posouvá se jen panel. */
+   Výška je PEVNÁ (strop šuplíku `--drawer-max-h` z fit.ts minus hlavička, nejvýš 860 px): přepnutí stránky
+   ani náhled dole nemění výšku okna šuplíku; posouvá se jen stránka. */
 
 /* přepínač — používá ho i NotesPage („i hotové“) */
 .switch, .st-switch { width: 34px; height: 20px; border-radius: var(--r-pill); background: var(--switch-off); position: relative; flex-shrink: 0; transition: background var(--dur-2); }
@@ -13,8 +14,8 @@
 .st {
   display: grid;
   grid-template-columns: 228px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
-  height: min(780px, calc(var(--drawer-max-h, 820px) - 112px));
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  height: min(860px, calc(var(--drawer-max-h, 820px) - 112px));
   min-height: 300px;
   border: 1px solid var(--line);
   border-radius: var(--r-xl);
@@ -24,7 +25,7 @@
 .st .mono { font-family: var(--mono); }
 .st .grow { flex: 1; min-width: 0; }
 
-.st-nav { grid-row: 1; display: flex; flex-direction: column; gap: var(--s3); padding: var(--s3); min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); background: var(--well); }
+.st-nav { grid-row: 1 / 3; display: flex; flex-direction: column; gap: var(--s3); padding: var(--s3); min-height: 0; overflow-y: auto; border-right: 1px solid var(--line); background: var(--well); }
 .st-search { display: flex; align-items: center; gap: var(--s2); padding: 0 10px; background: var(--well-2); border: 1px solid var(--line-2); border-radius: var(--r-md); transition: border-color var(--fast), box-shadow var(--fast); }
 .st-search:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent); }
 .st-search svg { width: 15px; height: 15px; color: var(--t3); flex-shrink: 0; }
@@ -47,6 +48,8 @@
 .st-main::-webkit-scrollbar, .st-nav::-webkit-scrollbar, .st-cand-list::-webkit-scrollbar { width: 8px; }
 .st-main::-webkit-scrollbar-thumb, .st-nav::-webkit-scrollbar-thumb, .st-cand-list::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
 .st-panel { animation: st-in var(--dur-3) var(--ease); }
+/* navštívené stránky žijí dál skryté (Settings.tsx) — skrytá se nevykresluje vůbec */
+.st-panel[hidden] { display: none !important; }
 @keyframes st-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* ---------- panel ---------- */
@@ -105,6 +108,29 @@
 /* sekce uvnitř „Pokročilé“ jsou plošné, ne karta v kartě */
 .st-adv-body > .st-sec { padding-left: 0; padding-right: 0; background: none; border: 0; border-radius: 0; margin-bottom: 0; }
 .st-adv-body > .st-sec + .st-sec { border-top: 1px solid var(--line-soft); }
+
+/* Sbalovací skupina voleb (`fields/Group.tsx`): karta s nadpisem a jednou větou; NE „Pokročilé“ — vidět vždy */
+.st-grp { margin-bottom: var(--s3); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-xl); container-type: inline-size; scroll-margin: 48px; transition: background calc(0.4s / var(--speed)), box-shadow calc(0.4s / var(--speed)); }
+.st-grp.hit { background: color-mix(in srgb, var(--violet) 10%, var(--card)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--violet) 14%, transparent); }
+.st-grp-head { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s4) 0 0; }
+.st-grp-tog { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px; padding: 14px 0 14px var(--s4); text-align: left; border-radius: var(--r-xl); }
+.st-grp-tog:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.st-grp-arrow { width: 12px; flex: none; color: var(--t3); line-height: 1.5; }
+.st-grp-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.st-grp-txt b { display: flex; align-items: center; gap: var(--s2); color: var(--t1); font-size: var(--fs-body); font-weight: 600; }
+.st-grp-txt small { color: var(--t3); font-size: var(--fs-sm); line-height: 1.4; max-width: 90ch; }
+.st-grp-badge { padding: 0 7px; color: var(--t2); font: 600 var(--fs-2xs) var(--sans); font-style: normal; background: var(--card-3); border-radius: var(--r-pill); }
+.st-grp-aside { flex: none; display: flex; align-items: center; gap: var(--s2); }
+.st-grp-body { padding: 0 var(--s4) var(--s2); border-top: 1px solid var(--line-soft); }
+/* sekce uvnitř skupiny jsou plošné, ne karta v kartě */
+.st-grp-body > .st-sec, .st-grp-body > .st-adv:not(.inline) { margin: 0; padding-left: 0; padding-right: 0; background: none; border: 0; border-radius: 0; }
+.st-grp-body > .st-sec + .st-sec, .st-grp-body > .st-sec + .st-adv { border-top: 1px solid var(--line-soft); }
+/* podnadpis nad skupinami (Obsah karet: V šuplíku · Další karty · Bez vlastní karty) */
+.st-grp-sep { margin: var(--s4) 0 var(--s2); color: var(--t3); font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+.st-grp-sep:first-of-type { margin-top: 0; }
+/* dva sloupce malých sekcí vedle sebe, když je stránka široká (větší okno Nastavení); úzká = pod sebou */
+.st-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--s3); align-items: start; margin-bottom: var(--s3); }
+.st-cols > .st-sec, .st-cols > .st-grp { margin-bottom: 0; }
 
 /* ---------- ovládací prvky ---------- */
 .st input[type="text"], .st input[type="number"], .st select { transition: border-color var(--fast), box-shadow var(--fast); }
@@ -275,7 +301,7 @@
 .st-strip-color { max-width: 130px; }
 .st-strip-count { color: var(--t3); font: var(--fs-xs) var(--mono); margin-left: 6px; }
 
-/* Začínáme: tipy a novinky (`panels/Start.tsx`) */
+/* Doporučené: tipy a novinky (`panels/Recommended.tsx`); Jazyk a průvodce: klávesy a gesta (`panels/Start.tsx`) */
 .st-tips { list-style: none; margin: 0; padding: 4px 0 var(--s3); display: grid; gap: 2px; }
 .st-tips li { display: flex; align-items: center; gap: var(--s3); padding: 8px 0; }
 .st-tips li + li { border-top: 1px solid var(--line-soft); }
@@ -286,3 +312,44 @@
 .st-tips .st-kbd-mouse { opacity: 0.7; }
 .st-keys-group { margin: var(--s3) 0 0; font-size: var(--fs-sm); font-weight: 600; color: var(--t3); }
 .act-add { display: inline-flex; border-radius: var(--r-md); }
+
+/* ---------- kostra kola 21: sekce, Základní / Pokročilé, Doporučené, náhled dole ---------- */
+.st-mode { display: flex; }
+.st-mode button { flex: 1; }
+.st-tabs .st-sec-btn { font-weight: 500; }
+.st-tabs .st-sec-btn.group.on { background: transparent; }
+.st-tabs .st-sec-btn.group.on::before { display: none; }
+.st-tabs .st-sub-btn { padding: 5px 10px 5px 37px; font-size: var(--fs-sm); }
+.st-results .st-tag { margin-left: 6px; vertical-align: 1px; }
+.st-results code { font-family: var(--mono); font-size: var(--fs-2xs); }
+
+/* Základní: technické „Pokročilé“ skryté úplně (kromě `basic` sekcí a oddílu, na který vedl skok) */
+.st[data-mode="basic"] [data-adv="hide"] { display: none; }
+.st-advnote { display: none; align-items: center; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); padding: 8px 12px; color: var(--t3); font-size: var(--fs-sm); border: 1px dashed var(--line-2); border-radius: var(--r-md); }
+.st[data-mode="basic"] .st-panel:has([data-adv="hide"]) > .st-advnote { display: flex; }
+.st-advnote span { flex: 1; min-width: 200px; }
+
+/* Doporučené: dlaždice s jednou větou */
+.st-rec { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--s2); margin-bottom: var(--s4); }
+.st-rec-secs { padding-top: var(--s3); border-top: 1px solid var(--line-soft); }
+.st-rec-tile { display: flex; align-items: flex-start; gap: 10px; padding: 12px; text-align: left; color: var(--t1); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); transition: background var(--fast), border-color var(--fast); }
+.st-rec-tile:hover, .st-rec-tile:focus-visible { background: var(--card-2); border-color: var(--line-2); }
+.st-rec-ico { display: grid; place-items: center; flex: none; width: 30px; height: 30px; color: var(--violet); font-size: 16px; background: var(--well-2); border-radius: var(--r-md); }
+.st-rec-ico svg { width: 17px; height: 17px; }
+.st-rec-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.st-rec-txt b { font-size: var(--fs-ui); font-weight: 600; }
+.st-rec-txt small { color: var(--t3); font-size: var(--fs-sm); line-height: 1.35; }
+/* štítek „Nové“ na dlaždici Doporučených (jen po přechodu z nižší verze) */
+.st-rec-new { margin-left: 6px; padding: 0 6px; color: var(--amber); font: 700 var(--fs-2xs) var(--sans); font-style: normal; text-transform: uppercase; letter-spacing: 0.06em; vertical-align: 1px; border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent); border-radius: var(--r-pill); }
+
+/* Náhled dole pod editorem (PreviewDock.tsx): pevná výška řádku, ať se okno nehýbe */
+.st-dock { grid-column: 2; grid-row: 2; display: flex; flex-direction: column; gap: var(--s2); padding: var(--s2) var(--s4) var(--s3); background: var(--well); border-top: 1px solid var(--line); }
+.st-dock-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px var(--s3); }
+.st-dock-head b { font-size: var(--fs-sm); font-weight: 600; color: var(--t1); }
+.st-dock-head small { flex: 1; min-width: 200px; color: var(--t3); font-size: var(--fs-xs); }
+.st-dock.peeking .st-dock-head small { color: var(--amber); }
+.st-dock.shut { gap: 0; }
+.st-dock-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); align-items: end; }
+.st-dock-grid figure { display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0; }
+.st-dock-grid figcaption { color: var(--t3); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em; }
+.st-dock .st-dock-mini { height: 132px; }

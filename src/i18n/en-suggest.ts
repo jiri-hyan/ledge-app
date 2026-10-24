@@ -37,7 +37,7 @@ registerDict("en", {
   "cards.today.review": "waiting for your review · {pr}",
   "cards.today.limit": "Claude limit: {pct} %",
   "cards.today.limitReset": "resets at {clock} · {left}",
-  "settings.suggest.section": "Contextual suggestions",
+  "settings.suggest.section": "Suggestions in the drawer",
   "settings.suggest.desc": "A small strip at the top of the drawer (up to 3 chips) — only from real events, nothing shows without a source. A chip can be dismissed for 24 hours.",
   "settings.suggest.clipNote": "Clipboard history is off — turn it on in “Clipboard history” below, otherwise this source has nothing to read.",
   "settings.f.suggest.clipboard": "Link from the clipboard",

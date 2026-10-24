@@ -7,7 +7,8 @@ import { t } from "../../i18n";
 import { sayError } from "../../ui/toast";
 import { offerUndo, useSettings } from "../ctx";
 import { Text } from "../fields/controls";
-import { FieldErr, Row, Section } from "../fields/Row";
+import { Group } from "../fields/Group";
+import { FieldErr, Row } from "../fields/Row";
 import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 
@@ -36,7 +37,7 @@ export default function LegacyLinks() {
   }
   return (
     <Show when={links().length}>
-      <Section title={t("settings.links.legacy", "Starší odkazy, které se nepřevedly")} desc={t("settings.links.legacy.desc", "Tyhle odkazy nejdou uložit jako akce (třeba cesta bez písmene disku). Oprav cíl na celou cestu (C:\\…) a ulož — převedou se samy. Karta Odkazy je ukazuje dál.")}>
+      <Group gid="akce.legacy" title={t("settings.links.legacy", "Starší odkazy, které se nepřevedly")} desc={t("settings.links.legacy.desc", "Tyhle odkazy nejdou uložit jako akce (třeba cesta bez písmene disku). Oprav cíl na celou cestu (C:\\…) a ulož — převedou se samy. Karta Odkazy je ukazuje dál.")}>
         <Row id="personal.links" label={t("settings.links.legacy.list", "Odkazy")} stack nested>
           <SortList items={links()} label={t("settings.links.legacy.list", "Odkazy")} onMove={(a, b) => c.set("personal.links", moveItem(links(), a, b))}>
             {(_l, i, handle) => (
@@ -57,7 +58,7 @@ export default function LegacyLinks() {
             )}
           </SortList>
         </Row>
-      </Section>
+      </Group>
     </Show>
   );
 }

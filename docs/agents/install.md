@@ -11,7 +11,11 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   i seznam změn se před commitem prověří proti `scripts/private/denylist.txt` (jména klientů, strojů,
   osobní údaje — soubor je jen ve vývojovém repu); jediný nález = konec bez vydání. Pak lokální build
   (verze = nejvyšší `v0.2.x` v obou repech + 1, zapíše se jen dočasně přes `scripts/ci-version.ps1`)
-  a `gh release create` ve veřejném repu: instalátor + přílohy `SHA256SUMS.txt` (`<hex>  <soubor>`) a
+  a podpis instalátoru (`tauri signer sign`, klíč mimo repo — [podpis-vydani.md](../podpis-vydani.md); bez klíče nebo
+  s klíčem, jehož veřejná půlka není `src-tauri/signing/update.pub`, skript skončí ještě před snapshotem)
+  a vydání ve veřejném repu **přes koncept** (kompatibilní s immutable releases: koncept → všechny soubory →
+  kontrola seznamu → publikace; nepovedený běh nechá neveřejný koncept, další běh vydá stejnou verzi a doplní
+  ho): instalátor + `<instalátor>.sig` + přílohy `SHA256SUMS.txt` (`<hex>  <soubor>`) a
   `pro-claude.md` (kopie `docs/pro-claude.md`, návod pro Clauda — „Nastav s Claudem“) + poznámky, první řádek
   `SHA256 (<setup>) = <hex>` (tvar čte `update.rs`, neměnit; řádky začínající `SHA256` se v UI z poznámek
   vypouštějí) a na konci sekce „Nastav s Claudem“ s promptem. Tag se vytvoří i ve vývojovém repu. `-DryRun` = jen snapshot
@@ -30,7 +34,10 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   přes HTTPS jen z `https://github.com/<repo>/releases/download/<tag>/<asset>` (`updatenet::download_ok`,
   strop 200 MB; záložně `gh release download`) do cache `%LOCALAPPDATA%\Ledge\updates\<tag>\` (přes
   `.part`), SHA256 se musí shodovat s poznámkami (a s `digest` GitHubu) — jinak se soubor smaže; vedle
-  něj `release.json` (SHA256, poznámky). Spuštění: SHA256 se z cache počítá znovu → odpojený `cmd`:
+  něj `release.json` (SHA256, poznámky, podpis). **Podpis** (`updsign.rs`): vydání bez `<instalátor>.sig` se
+  nenabídne; po stažení musí `.sig` sedět na zapečený veřejný klíč a jmenovat přesně soubor i verzi, jinak se
+  instalátor smaže (detail [podpis-vydani.md](../podpis-vydani.md)). Spuštění: SHA256 i podpis se z cache
+  ověřují znovu → odpojený `cmd`:
   ~2 s pauza, `setup /S`, start nainstalovaného `ledge.exe` (`autostart::install_target`); Ledge se ukončí.
   Běží-li spravované servery (s Ledge by umřely), `update_install` vrátí jejich seznam a chce druhé
   potvrzení. Předběžné/nevalidní tagy se ignorují.
@@ -94,7 +101,7 @@ přihlášení tu kopii nevidí: Run „v bublině“ nic nespustí, config, dat
 - **Detekce** (`src-tauri/src/pkgctx.rs`, jednou při startu, řádek `pkgctx:` v `ledge.log`): identita
   z `GetCurrentPackageFullName`, jinak **sonda** — malý soubor do kořene `%LOCALAPPDATA%`, hledá se jeho
   kopie v `Packages\*\LocalCache\Local` (rodina = jméno složky), hned se smaže.
-- **Autostart v bublině** (`autostart::gate`): Run se nezapisuje ani nemaže; Nastavení → Chování →
+- **Autostart v bublině** (`autostart::gate`): Run se nezapisuje ani nemaže; Nastavení → Aplikace → Spouštění a hry →
   Spouštění a paměť to říká u přepínače. Instance mimo bublinu Run zapíše při startu.
 - **Restartovat mimo** (stejné místo v Nastavení; v hlavičce tlumený chip „V bublině Claude“ → klik otevře
   Nastavení): jednorázová úloha Plánovače `Ledge-outside-relaunch` (`outside.rs`: `InteractiveToken`, bez

@@ -1,4 +1,4 @@
-// Pole „Město“ s našeptávačem pro počasí (Nastavení → Osobní): píšeš název, po krátké odmlce (450 ms, aspoň
+// Pole „Město“ s našeptávačem pro počasí (Nastavení → Obsah karet): píšeš název, po krátké odmlce (450 ms, aspoň
 // 2 znaky) se Open-Meteo zeptá Rust (`geo_search`), výběr vyplní zeměpisnou šířku a délku i název místa.
 // V klidu se neptá na nic; souřadnice zůstávají vidět v „Pokročilé“ (`Personal.tsx`). Logika `cityModel.ts`.
 import { createSignal, For, onCleanup, Show } from "solid-js";

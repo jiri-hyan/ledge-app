@@ -83,6 +83,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   „▾ celý šuplík“), `"island"` = roztažený ostrůvek (černá kapsle s jedním nejdůležitějším děním: čeká na tebe →
   hotovo → časovač → hudba → Claude pracuje → klid s časem, datem a počasím). Z náhledu otevře celý šuplík klik
   mimo tlačítka nebo setrvání myši `drawer.hoverExpandMs` (výchozí `1200`, `0` = jen klikem, jinak 400–10000;
+  Nastavení → Vzhled → Po najetí → Pokročilé „Rozbalit náhled samo“;
   nad tlačítky a s čekajícím schválením se neodpočítává). Odjetí myši zavře jako šuplík; s čekajícím Claudem
   zůstane peek se schválením (ve všech režimech — najetí při čekání otevře peek). Náhled bere jen data, která
   Ledge už má (nic nestahuje, fokus nebere); ve hře / herním režimu se neukáže. Bez myši:
@@ -105,7 +106,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     pracuje / čeká / je hotový, běží časovač, hraje hudba (`media`), limity ≥ 70 %, připomínka po termínu nebo barevná linka
     (neuložená repa se jako událost nepočítají — je to trvalý stav). Smysl má u `mode`, `clock`, `custom`,
     `limits`; `running`, `claude`, `waiting`, `repos`, `timer`, `media`, `github` se v klidu neukazují samy (`system` je stálá, smysl má „Jen při dění“ i u ní). Výchozí `[]`.
-  - Nastavení → Vzhled → Zavřený → Pokročilé → Co proužek ukazuje (celý proužek je v panelu Vzhled): řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
+  - Nastavení → Vzhled → Zavřený → Co proužek ukazuje (v Základním; celý proužek je ve Vzhledu): řazení tahem nebo Alt+↑/↓, u položky barva a „Jen při dění“,
     náhled s ukázkovými texty (přepínač „V klidu / Když se něco děje“).
   - `strip.look` — **styl zavřeného Ledge** (vlna 7, `src-tauri/src/looks/*`, kreslí `stripdraw.rs`): jedna volba
     určí tvar, místo, velikost i obsah. `classic` (výchozí; starý config = beze změny) = proužek podle `strip.items`

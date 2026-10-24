@@ -2,7 +2,7 @@
 // otevře odkaz v Spotify / prohlížeči (`media_favorite_open`) — Ledge nic nepřehrává sám, ovládání pak
 // jde přes GSMTC (`Controls`). GSMTC odkaz nedává, takže „Přidat“ otevře malý formulář s názvem z toho, co
 // hraje, a polem pro odkaz (předvyplní ho odkaz na hudbu ze schránky, je-li zapnutá historie schránky).
-// Správa (přejmenovat, pořadí, smazat) je v Nastavení → Osobní → Přehrávač (`MediaSettings.tsx`).
+// Správa (přejmenovat, pořadí, smazat) je v Nastavení → Obsah karet → Přehrávač (`MediaSettings.tsx`).
 import { For, Show, createSignal, type JSX } from "solid-js";
 import { api, type MediaView } from "../api";
 import { clipApi } from "../cliphist/api";

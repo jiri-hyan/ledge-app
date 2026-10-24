@@ -123,3 +123,28 @@ ručně „Synchronizovat teď“ v Nastavení. Cyklus: `add -A` → commit `led
 - **Claude poznámky smí vytvářet a upravovat (`done`, `kind`), Ledge je sám commitne a pushne.** Claude
   v kořeni poznámek **necommituje, nepushuje, nepulluje ani nerebasuje** sám — sahal by do běžícího cyklu.
 
+### Propojení se složkou (`notes.folderLink`)
+
+Volitelné a výchozí **vypnuté**: poznámky Ledge se kopírují jako obyčejné `.md` soubory do a ze složky, kterou umí
+jiné aplikace (vault Obsidianu, `pages` Logseq, export Joplinu / Notesnooku, VS Code). Nezávislé na gitové
+synchronizaci výš (`notes.sync`), ta se nemění. Config: `notes.folderLink` = `enabled` (výchozí `false`), `path`
+(absolutní cesta ke složce), `direction` (`import` | `export` | `both`, výchozí `both`), `propagateDeletes`
+(výchozí `false`). Nastavení → Poznámky → „Propojit se složkou“, kód `src-tauri/src/notes/folder_sync*.rs`.
+
+- Jedna poznámka = jeden `.md`, kopie je **bajtová** (frontmatter včetně cizích klíčů, `[[vazby]]`, `#štítky`, konce
+  řádků). Agent smí takové soubory číst i upravovat jako ostatní poznámky; ve složce je Ledge přenese.
+- Čte se jen `.md` / `.markdown` do 1 MB, rekurzivně; skryté složky a soubory (`.obsidian`, `.trash`, `.git`),
+  `logseq/` a odkazy (symlink / junction) se ignorují. Složka nesmí být kořen disku ani se překrývat s úložištěm
+  poznámek. Mimo vybranou složku a kořen poznámek se nezapisuje nikdy.
+- Import jde do `_obecne\<jméno>.md`; export pojmenuje soubor podle titulku (znaky `<>:"/\|?*#^[]` se nahradí
+  mezerou, rezervovaná jména Windows dostanou `_`), poznámky projektu jdou do podsložky, PNG obrázky vedle.
+- Konflikt (od poslední dohody se změnily obě strany): nic se nepřepíše potichu. Zůstane verze ze složky, verze
+  z Ledge se uloží jako `název (konflikt Ledge YYYY-MM-DD).md` (v Ledge i ve složce) a ukáže se v Nastavení
+  s „Rozumím“. Při `direction: export` je naopak zdrojem Ledge a verze ze složky se uloží jako kopie ve složce.
+- Mazání: výchozí je nepřenášet (smazaná poznámka se na druhé straně nechá být a nevrací se, dokud se nezmění).
+  S `propagateDeletes` jde soubor smazaný ve složce do Archivu Ledge a poznámka smazaná nebo archivovaná v Ledge do podsložky
+  `.trash` složky; nikdy natrvalo. Podezřele mnoho smazání najednou (víc než 10 a čtvrtina) se nepřenese.
+- Stav (dvojice cest, hashe, otisky) je v `%LOCALAPPDATA%\Ledge\note-folder-link.json` (jen tento počítač).
+  Bez stavu se shodné soubory spárují podle obsahu, takže nevznikají duplicity.
+- Spouští se událostmi (změna poznámek, změna ve složce přes `notify`, otevření šuplíku, config, „Synchronizovat
+  teď“), nikdy časovačem; v klidu 0 % CPU.

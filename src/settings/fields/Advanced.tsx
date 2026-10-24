@@ -2,6 +2,9 @@
 // ať základ panelu zůstane srozumitelný. Jedna implementace pro všechny panely (Vzhled má vlastní kroky
 // v `apUi.tsx`). Rozbalení si pamatuje úložiště prohlížeče po `id` (try/catch — bez něj je vše sbalené);
 // skok z hledání nebo odjinud na volbu uvnitř (`hit`) oddíl rozbalí, ale do paměti nezapíše.
+// Režim Nastavení „Základní“ (`settings/mode.ts`) oddíl skryje úplně (`data-adv="hide"`, settings.css), kromě
+// oddílu, na který právě vedl skok (`forced`). Jen méně časté (ne technické) volby sem NEpatří — na ty je
+// sbalovací skupina `Group.tsx`, vidět i v Základním (kolo 21).
 import { createEffect, createSignal, on, Show, type JSX } from "solid-js";
 import { t } from "../../i18n";
 import { hit } from "../ctx";
@@ -27,7 +30,7 @@ function remember(id: string, open: boolean) {
 }
 
 /** `id` = klíč paměti (panel, případně `panel.oddíl`), `hint` = co je uvnitř (jedna věta pod nadpisem),
- *  `title` = jiný nadpis než „Pokročilé“ (panel Osobní: „Další sekce…“), `inline` = uvnitř jiné sekce (bez vlastní karty). */
+ *  `title` = jiný nadpis než „Pokročilé“ (třeba „Pokročilé: připojit účet…“), `inline` = uvnitř jiné sekce (bez vlastní karty). */
 export function Advanced(p: { id: string; title?: string; hint?: string; inline?: boolean; children: JSX.Element }) {
   let box!: HTMLDetailsElement;
   /** rozbaleno skokem na volbu uvnitř */
@@ -44,6 +47,7 @@ export function Advanced(p: { id: string; title?: string; hint?: string; inline?
       ref={box}
       class="st-adv"
       classList={{ inline: p.inline }}
+      data-adv={forced() ? "shown" : "hide"}
       open={open()}
       onToggle={(e) => {
         const now = e.currentTarget.open;

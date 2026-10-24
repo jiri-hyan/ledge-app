@@ -1,5 +1,6 @@
 // Čistá logika Nastavení (bez DOM a Solid): hledání bez diakritiky, cesty k polím configu, mapování
-// chyby validace na panel, přesun v seznamu, zkratky (zrcadlo Rust `config::normalize_hotkey`).
+// chyby validace na panel (`placement.ts`), přesun v seznamu, zkratky (zrcadlo Rust `config::normalize_hotkey`).
+import { placeOf } from "./placement.ts";
 
 /** Malá písmena bez diakritiky — „Šuplík“ najde i „suplik“. */
 export const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -52,50 +53,6 @@ export function getPath(obj: any, path: string): any {
   return pathKeys(path).reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
-/** Prefix cesty v configu → panel Nastavení; vyhrává nejdelší shoda (`drawer.glass` dřív než `drawer`).
- *  Neznámé pole = null (chyba se ukáže v liště). Pole vzhledu mimo sekci `appearance` (i celý proužek)
- *  edituje panel Vzhled, chování šuplíku panel Chování, odkazy (`personal.links`) panel akcí. */
-const FIELD_PANELS: [string, string][] = [
-  ["projects", "akce"],
-  ["roots", "akce"],
-  ["actions", "akce"],
-  ["scripts", "akce"],
-  ["personal.links", "akce"],
-  ["drawer", "chovani"],
-  ["drawer.glass", "vzhled"],
-  ["drawer.width", "vzhled"],
-  ["drawer.hover", "vzhled"],
-  ["drawer.sections", "suplik"],
-  ["layout", "suplik"],
-  ["shelf", "suplik"],
-  ["desk", "suplik"],
-  ["strip", "vzhled"],
-  ["timer.strip", "vzhled"],
-  ["autostart", "chovani"],
-  ["hotkeys", "chovani"],
-  ["palette", "chovani"],
-  ["smart", "chovani"],
-  ["smart.approvalSound", "claude"],
-  ["smart.incidents", "claude"],
-  ["fullscreen", "chovani"],
-  ["gameMode", "chovani"],
-  ["modes", "osobni"],
-  ["personal", "osobni"],
-  ["accounts", "osobni"],
-  ["timer", "osobni"],
-  ["media", "osobni"],
-  ["clipboard", "osobni"],
-  ["github", "osobni"],
-  ["system", "osobni"],
-  ["claude", "claude"],
-  ["questions", "claude"],
-  ["notes", "poznamky"],
-  ["update", "aplikace"],
-  ["appearance", "vzhled"],
-  ["onboarding", "zaciname"],
-  ["ui", "zaciname"],
-];
-
 /** Kam vede skok odjinud (`palette/goto.ts` `gotoSettingsPanel`): id panelu (i staré id před vlnou 6 přes
  *  `aliases`) → ten panel; kotva `f-<pole>` → panel toho pole (`fieldPanel`: `labels.ts`, jinak podle cesty)
  *  a řádek. Cokoli jiného = nikam (`panel: null`). */
@@ -113,13 +70,9 @@ export function resolveTarget(
   return { panel: p && panels.includes(p) ? p : null, anchor: field };
 }
 
+/** Chyba validace / skok na pole → stránka Nastavení (nejdelší prefix z `placement.ts`; neznámé = null). */
 export function panelForField(field: string | null | undefined): string | null {
-  if (!field) return null;
-  let best: [string, string] | null = null;
-  for (const e of FIELD_PANELS) {
-    if ((field === e[0] || field.startsWith(`${e[0]}.`)) && (!best || e[0].length > best[0].length)) best = e;
-  }
-  return best?.[1] ?? null;
+  return placeOf(field)?.page ?? null;
 }
 
 /** Přesun položky z `from` na `to` (nová kopie). Mimo rozsah = beze změny. */

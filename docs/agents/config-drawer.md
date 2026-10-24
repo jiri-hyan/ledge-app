@@ -2,7 +2,8 @@
 
 Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Tohle jsou klíče `config.json`, které
 dřív v návodu chyběly; hlídá je `scripts/config-keys.mjs` (test `scripts/config-keys.test.mjs`). Všechno jde
-i klikem: Nastavení → Chování (otevírání, šetření paměti, okna s lištou), Claude (schvalování, hlídač).
+i klikem: Nastavení → Šuplík a karty → Otevírání a klávesy (otevírání, okna s lištou), Aplikace → Spouštění a hry
+(šetření paměti), Claude (schvalování, hlídač).
 
 ## `drawer` — jak se šuplík otevírá a zavírá
 
@@ -48,7 +49,7 @@ Ostatní klíče `claude` (`enabled`, `port`, `questionHoldS`, `limitsReminder`,
 `personal.weather.lat` (−90 až 90) a `personal.weather.lon` (−180 až 180) jsou souřadnice místa pro kartu
 Počasí (Open-Meteo, bez klíče); `label` je jen popisek na kartě. Vyplněná jen jedna souřadnice neprojde
 validací (`config/validate.rs`), obě `null` = nenastaveno (karta jen vyzve k nastavení, žádné volání sítě).
-Polohu podle IP Ledge nikdy nezjišťuje. V Nastavení → Osobní stačí napsat město (`src/settings/cityModel.ts`).
+Polohu podle IP Ledge nikdy nezjišťuje. V Nastavení → Šuplík a karty → Obsah karet stačí napsat město (`src/settings/cityModel.ts`).
 
 ## `projects[].subdir`
 

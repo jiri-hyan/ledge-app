@@ -36,7 +36,6 @@ registerDict("en", {
   "cards.media.vh.cover": "Blurred cover across the whole card.",
   "cards.media.vh.vinyl": "The record spins only while playing.",
   "cards.media.vh.strip": "The track in the strip at the top, just a small control in the drawer.",
-  "settings.media.section": "Player",
   "settings.media.desc": "How the Now playing card looks. You can also switch the look right in the card — with the icon in its corner.",
   "settings.media.time.auto": "Only with the “Strip only” look",
   "settings.media.time.on": "Always, when the player reports the time",
