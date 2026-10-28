@@ -15,7 +15,7 @@
     "cta.star": "Hvězdička na GitHubu", "cta.issue": "Navrhnout funkci",
     "facts.focus": "Nikdy nebere fokus", "facts.game": "Při hře na celou obrazovku mlčí",
     "facts.telemetry": "Bez telemetrie a bez účtu", "facts.mit": "Licence MIT",
-    "hero.note": "Skutečný snímek šuplíku (ukázkové projekty). Vysune se, když se myší dotkneš horního okraje obrazovky.",
+    "hero.note": "Skutečné rozhraní Ledge s ukázkovými daty (vymyšlené projekty). Vysune se, když se myší dotkneš horního okraje obrazovky.",
     "why.kicker": "Proč Ledge", "why.title": "Pořád po ruce. Nikdy v cestě.",
     "why.lead": "Staví ho jeden vývojář pro svou každodenní práci na Windows s Claude Code — a sdílí ho jako open source, takže ho můžeš používat, jak je, doladit si ho, nebo forknout.",
     "why1.t": "Neruší", "why1.p": "Tenký proužek u horního okraje, dokud ho nepotřebuješ. Nikdy ti nevezme klávesnici, při hře na celou obrazovku mlčí a v klidu má rozpočet procesoru pod 0,1 %.",
@@ -46,7 +46,14 @@
     "looks.note": "Tvary jsou ilustrace. Dále: Ikony, Hodiny, Průběh, Ticker, Minimum a Trio.",
     "ch1": "13 designových stylů", "ch2": "16 barevných motivů + vlastní", "ch3": "9 animací otevření včetně tekuté kapsle",
     "ch4": "Kompaktní náhled nebo ostrůvek po najetí", "ch5": "Čeština a angličtina",
-    "g3": "Nastavení s hledáním a živým náhledem vzhledu.",
+    "g3": "Ledge Studio: každá změna platí hned a jde vrátit. Ukázková data.",
+    "g4": "Záložka Osobní: počasí, Právě hraje, kalendář, odkazy a poznámky. Ukázková data.",
+    "g5": "Ctrl+K: jedno okno pro akce, projekty, poznámky i nastavení. Ukázková data.",
+    "lr.closed": "Zavřený", "lr.open": "Otevřený",
+    "lr.cclosed": "Osm vzhledů zavřeného Ledge u horního okraje. Ukázková data.",
+    "lr.copen": "Šest stylů otevřeného šuplíku, stejná data. Ukázková data.",
+    "alt.lclosed": "Osm vzhledů zavřeného Ledge", "alt.lopen": "Šest stylů otevřeného šuplíku se stejnými daty",
+    "alt.personal": "Záložka Osobní s počasím, Právě hraje, kalendářem a poznámkami", "alt.palette": "Paleta Ctrl+K v šuplíku Ledge",
     "y.kicker": "Uprav si ho", "y.title": "Dolaď ho. Nebo forkni.",
     "y.lead": "Ledge se nesnaží sedět každému hned po instalaci. Má hodně nastavení — a když ti pořád nesedí, kód je tvůj a můžeš ho změnit.",
     "y1.t": "Nejdřív nastavení", "y1.p": "Karty a záložky, vzhled zavřeného stavu, designové styly i vlastní barevné motivy, zkratky, rychlé akce a widgety ze skriptů — v aplikaci, nebo v jednom <code>config.json</code> s JSON schématem.",
@@ -159,6 +166,17 @@
       })
       .catch(function () {});
   }
+
+  // galerie „Zavřený / Otevřený“ + video v hlavičce se při „omezit pohyb“ nepřehrává
+  var seg = document.getElementById("looks-real");
+  if (seg) seg.querySelectorAll("button[data-pane]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      seg.querySelectorAll("button[data-pane]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      seg.querySelectorAll("figure[data-pane]").forEach(function (f) { f.hidden = f.getAttribute("data-pane") !== b.getAttribute("data-pane"); });
+    });
+  });
+  var hv = document.getElementById("hero-video");
+  if (hv && window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) { hv.removeAttribute("autoplay"); hv.pause(); }
 
   if (cs()) applyLang(); else document.getElementById("lang").textContent = "CS";
 })();

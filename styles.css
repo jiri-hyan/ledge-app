@@ -208,6 +208,13 @@ section { padding: 88px 0; }
 .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 0.86rem; color: var(--t2); }
 
 /* galerie */
+.looks-real { margin: 44px auto 0; max-width: 980px; text-align: center; }
+.looks-real figure { margin: 18px 0 0; }
+.looks-real img { max-width: 100%; height: auto; border-radius: 14px; box-shadow: var(--shadow); }
+.looks-real figcaption { margin-top: 10px; font-size: 0.88rem; color: var(--t3); }
+.seg { display: inline-flex; padding: 4px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card); }
+.seg button { padding: 7px 18px; border: 0; border-radius: 999px; background: none; color: var(--t2); font: inherit; font-weight: 600; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--t1); color: var(--bg); }
 .gallery { display: grid; grid-template-columns: 1fr; gap: 18px; max-width: 820px; margin-left: auto; margin-right: auto; }
 .gallery figure { margin: 0; }
 .gallery figcaption { margin-top: 10px; font-size: 0.88rem; color: var(--t3); }

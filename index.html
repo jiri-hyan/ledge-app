@@ -94,9 +94,11 @@
     <div class="stage">
       <div class="screen">
         <div class="ledge-bar" aria-hidden="true"><i></i></div>
-        <img class="drawer-shot" src="img/drawer.webp" width="1080" height="928" alt="The Ledge drawer: project tiles with git branches, quick actions, repos with uncommitted changes and notes" fetchpriority="high" data-i18n-alt="alt.drawer">
+        <video class="drawer-shot" id="hero-video" autoplay muted loop playsinline preload="metadata" poster="img/open-poster.webp" width="1280" height="640" aria-label="The Ledge drawer unfolding from the closed island at the top edge of the screen">
+          <source src="media/open.webm" type="video/webm">
+        </video>
       </div>
-      <p class="shot-note" data-i18n="hero.note">Real screenshot of the drawer (sample projects). It slides down when you touch the top edge of the screen.</p>
+      <p class="shot-note" data-i18n="hero.note">The real Ledge interface rendered with sample data (made-up projects). It slides down when you touch the top edge of the screen.</p>
     </div>
   </div>
 </section>
@@ -146,7 +148,7 @@
       </ul>
       <div class="note-box" data-i18n="claude.note"><b>Only a human can approve.</b> There is deliberately no API, MCP tool or setting that lets anything approve on your behalf.</div>
     </div>
-    <div class="shot"><img src="img/question.webp" width="1080" height="425" loading="lazy" alt="A Claude Code question in the Ledge drawer with multiple-choice answers and a Send button" data-i18n-alt="alt.question"></div>
+    <div class="shot"><img src="img/question.webp" width="1400" height="624" loading="lazy" alt="A Claude Code question in the Ledge drawer with multiple-choice answers and a Send button" data-i18n-alt="alt.question"></div>
   </div>
 </section>
 
@@ -196,9 +198,19 @@
       <span class="chip" data-i18n="ch5">Czech and English UI</span>
     </div>
 
-    <!-- galerie: jen skutečné snímky; nové (Ledge Studio, motivy, GIFy) podle SHOTLIST.md -->
+    <!-- skutečné UI vykreslené s ukázkovými daty (scripts/showcase), přepínač zavřený / otevřený -->
+    <div class="looks-real" id="looks-real">
+      <div class="seg" role="group" aria-label="Closed or open">
+        <button type="button" data-pane="closed" aria-pressed="true" data-i18n="lr.closed">Closed</button>
+        <button type="button" data-pane="open" aria-pressed="false" data-i18n="lr.open">Open</button>
+      </div>
+      <figure data-pane="closed"><img src="img/looks-closed.webp" width="1400" height="276" loading="lazy" alt="Eight looks of the closed Ledge" data-i18n-alt="alt.lclosed"><figcaption data-i18n="lr.cclosed">Eight looks of the closed Ledge at the top edge. Sample data.</figcaption></figure>
+      <figure data-pane="open" hidden><img src="img/looks-open.webp" width="1400" height="719" loading="lazy" alt="Six design styles of the open drawer with the same data" data-i18n-alt="alt.lopen"><figcaption data-i18n="lr.copen">Six design styles of the open drawer, same data. Sample data.</figcaption></figure>
+    </div>
     <div class="gallery" style="margin-top:56px">
-      <figure><img src="img/settings.webp" width="1196" height="884" loading="lazy" alt="Ledge settings with a live preview of the look" data-i18n-alt="alt.settings"><figcaption data-i18n="g3">Settings with search and a live preview of the look.</figcaption></figure>
+      <figure><img src="img/studio.webp" width="1400" height="897" loading="lazy" alt="Ledge Studio: the Strip section with a live preview" data-i18n-alt="alt.settings"><figcaption data-i18n="g3">Ledge Studio: every change applies at once and can be undone. Sample data.</figcaption></figure>
+      <figure><img src="img/personal.webp" width="1400" height="1300" loading="lazy" alt="Personal tab with weather, now playing, calendar and notes" data-i18n-alt="alt.personal"><figcaption data-i18n="g4">The Personal tab: weather, now playing, calendar, links and notes. Sample data.</figcaption></figure>
+      <figure><img src="img/palette.webp" width="1400" height="799" loading="lazy" alt="The Ctrl+K command palette in the Ledge drawer" data-i18n-alt="alt.palette"><figcaption data-i18n="g5">Ctrl+K: one box for actions, projects, notes and settings. Sample data.</figcaption></figure>
     </div>
 
     <div class="themes" aria-label="Colour themes">
