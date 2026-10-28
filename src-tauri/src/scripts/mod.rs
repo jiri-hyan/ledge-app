@@ -51,8 +51,7 @@ impl Default for ScriptsConfig {
 
 /// `%USERPROFILE%\Ledge\scripts`.
 pub fn default_dir() -> PathBuf {
-    let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
-    Path::new(&home).join("Ledge").join("scripts")
+    crate::dirs::or_dot(crate::dirs::home()).join("Ledge").join("scripts")
 }
 
 /// Složka z configu: prázdné = výchozí, `%VAR%` rozbalené, musí být absolutní (`C:\…`).

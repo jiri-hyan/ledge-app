@@ -92,16 +92,14 @@ pub fn mark_read(st: &Seen, current: &str) -> Seen {
 
 /// Načíst (chybí / rozbité = prázdné — jako první spuštění).
 pub fn load(dir: &Path) -> Seen {
-    std::fs::read_to_string(dir.join(FILE)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+    crate::fsx::load_json_or_default(&dir.join(FILE))
 }
 
 /// Uložit atomicky (tmp + rename).
 pub fn save(dir: &Path, st: &Seen) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))?;
-    let tmp = dir.join(format!("{FILE}.tmp"));
     let body = serde_json::to_string_pretty(st).map_err(|e| e.to_string())?;
-    std::fs::write(&tmp, body).map_err(|e| crate::errors::io(&tmp.display().to_string(), &e))?;
-    std::fs::rename(&tmp, dir.join(FILE)).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))
+    crate::fsx::write_atomic(&dir.join(FILE), body.as_bytes()).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))
 }
 
 #[cfg(test)]

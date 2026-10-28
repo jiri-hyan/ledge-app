@@ -124,9 +124,7 @@ pub fn allowed(path: &Path, projects_root: Option<&Path>) -> bool {
         && !path.components().any(|c| c.as_os_str() == "..")
 }
 
-pub fn now_ms() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64)
-}
+pub use crate::util::now_ms;
 
 struct Entry {
     mtime: i64,

@@ -540,9 +540,12 @@ fn broad_folders_table() {
 #[test]
 fn check_folder_refuses_profile_and_its_parent() {
     let f = fx();
-    let Some(profile) = std::env::var_os("USERPROFILE").map(PathBuf::from).filter(|p| p.is_dir()) else { return };
+    let profile = f.folder.parent().unwrap().join("uzivatel");
+    std::fs::create_dir_all(&profile).unwrap();
+    let env = profile.canonicalize().unwrap().to_string_lossy().into_owned();
+    let get = |n: &str| (n == "USERPROFILE").then(|| env.clone());
     for bad in [profile.clone(), profile.parent().unwrap().to_path_buf()] {
-        let err = check_folder(&bad.to_string_lossy(), &f.root).unwrap_err();
+        let err = super::folder_sync::check_folder_with(&bad.to_string_lossy(), &f.root, &get).unwrap_err();
         assert!(err.contains("moc široká") || err.contains("too broad"), "{}: {err}", bad.display());
     }
     assert!(check_folder(&f.folder.to_string_lossy(), &f.root).is_ok());

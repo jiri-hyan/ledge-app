@@ -145,9 +145,7 @@ impl Default for Config {
 }
 
 fn default_roots() -> Vec<String> {
-    std::env::var("USERPROFILE")
-        .map(|p| vec![format!("{}\\Desktop", p)])
-        .unwrap_or_default()
+    crate::dirs::home().map(|p| vec![format!("{}\\Desktop", p.display())]).unwrap_or_default()
 }
 
 /// Config proužku žije v `stripconf.rs` (položky, vlastní text, barvy, „v klidu skryté“); re-export,

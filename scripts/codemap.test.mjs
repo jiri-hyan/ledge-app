@@ -105,3 +105,26 @@ test("skutečný strom: codemapy neodkazují na neexistující soubory ani symbo
   const found = lintCodemaps(root, { allowFiles: ALLOW_FILES, allowSymbols: ALLOW_SYMBOLS });
   assert.deepEqual(found.map((f) => `${f.file}:${f.line}  ${f.kind}  ${f.value}`), []);
 });
+
+import { MAX_CORE_BYTES, MAX_LINE_CHARS, budgetFindings } from "./codemap-lint.mjs";
+
+test("rozpočet jádra: strop bajtů, délka řádku, odkaz na detail; -detail je vyňatý", () => {
+  const kinds = (name, md, det) => budgetFindings(name, md, new Set(det)).map((f) => f.kind);
+  assert.deepEqual(kinds("app.md", "# ok\n", []), []);
+  assert.deepEqual(kinds("app.md", "x".repeat(MAX_CORE_BYTES + 1), []), ["size", "line"]);
+  assert.deepEqual(kinds("app.md", "y".repeat(MAX_LINE_CHARS + 1), []), ["line"]);
+  assert.deepEqual(kinds("app.md", "# bez odkazu\n", ["app-detail.md"]), ["detail-link"]);
+  assert.deepEqual(kinds("app.md", "viz [d](app-detail.md)\n", ["app-detail.md"]), []);
+  assert.deepEqual(kinds("app-detail.md", "x".repeat(50000), ["app-detail.md"]), []);
+});
+
+test("skutečný strom: každé jádro mapy ≤ 8 KB a každý řádek ≤ 600 znaků", () => {
+  const dir = path.join(root, "docs", "codemap");
+  const names = new Set(readdirSync(dir));
+  const bad = [];
+  for (const n of names) {
+    if (!n.endsWith(".md")) continue;
+    for (const f of budgetFindings(n, readFileSync(path.join(dir, n), "utf8"), names)) bad.push(`${n}:${f.line} ${f.kind} ${f.value}`);
+  }
+  assert.deepEqual(bad, []);
+});

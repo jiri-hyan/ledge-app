@@ -354,7 +354,7 @@ impl PinsFile {
 
 /// Stav lístků (chybějící / poškozený soubor = žádné; hodnoty mimo rozsah se srovnají, duplicity pryč).
 pub fn load(path: &Path) -> PinsFile {
-    let mut f: PinsFile = std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+    let mut f: PinsFile = crate::fsx::load_json_or_default(path);
     let mut seen: Vec<String> = Vec::new();
     f.pins = f
         .pins
@@ -373,12 +373,7 @@ pub fn load(path: &Path) -> PinsFile {
 
 /// Zápis celého souboru (tmp + přejmenování — nikdy půlka souboru).
 pub fn save(path: &Path, f: &PinsFile) -> std::io::Result<()> {
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_string_pretty(f).unwrap_or_default())?;
-    std::fs::rename(&tmp, path)
+    crate::fsx::save_json(path, f)
 }
 
 // ---------- geometrie ----------

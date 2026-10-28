@@ -45,17 +45,9 @@ static LIVE: OnceLock<Live> = OnceLock::new();
 pub type Hook = Arc<dyn Fn() + Send + Sync>;
 pub type IsOpen = Arc<dyn Fn() -> bool + Send + Sync>;
 
-fn now_ms() -> u64 {
-    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
-}
+use crate::util::now_ms;
 
-/// `CLAUDE_CONFIG_DIR`, jinak `%USERPROFILE%\.claude`.
-pub fn claude_dir() -> Option<PathBuf> {
-    std::env::var_os("CLAUDE_CONFIG_DIR")
-        .filter(|v| !v.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("USERPROFILE").map(|h| PathBuf::from(h).join(".claude")))
-}
+pub use crate::dirs::claude_dir;
 
 /// Spustí vlákno a watcher registru. `on_change` = překreslit (mark_dirty), `is_open` = šuplík otevřený.
 pub fn start(on_change: Hook, is_open: IsOpen) {

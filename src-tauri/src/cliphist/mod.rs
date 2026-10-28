@@ -256,11 +256,7 @@ pub fn save_pins_to(file: &Path, pins: &[Pin]) -> Result<(), String> {
             _ => Ok(()),
         };
     }
-    if let Some(dir) = file.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    let tmp = file.with_extension("json.tmp");
-    std::fs::write(&tmp, serialize_pins(pins)).and_then(|_| std::fs::rename(&tmp, file)).map_err(|e| crate::errors::io(tr("Připnuté ze schránky nejde uložit", "Can't save the pinned clipboard items"), &e))
+    crate::fsx::write_atomic_dir(file, serialize_pins(pins).as_bytes()).map_err(|e| crate::errors::io(tr("Připnuté ze schránky nejde uložit", "Can't save the pinned clipboard items"), &e))
 }
 
 // ---------- stav za běhu ----------

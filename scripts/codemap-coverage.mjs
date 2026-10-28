@@ -97,11 +97,14 @@ export function tokenCovers(tok, file, named = false) {
 }
 
 /**
- * Mezery v pokrytí. files = soubory repa, mds = texty všech docs/codemap/*.md, allow = výjimky.
+ * Mezery v pokrytí. files = soubory repa, mds = texty jader docs/codemap/*.md (bez -detail), allow = výjimky,
+ * details = paralelní pole textů jejich -detail.md (nebo '').
  * → { missing: moduly bez mapy, unnamed: soubory bez řádku v mapě, staleAllow: zbytečné výjimky }
  */
-export function coverageGaps(files, mds, allow = COVERAGE_ALLOW) {
+export function coverageGaps(files, mds, allow = COVERAGE_ALLOW, details = []) {
   const maps = mds.map((md) => pathTokens(md).map(compileToken))
+  // <oblast>-detail.md (details[i] ke mds[i]) smí jen DOPLNIT, které moduly mapa jmenuje celou cestou — řádek souboru musí být v jádru
+  const ctxMaps = mds.map((md, i) => (details[i] ? pathTokens(md + ' ' + details[i]).map(compileToken) : maps[i]))
   // zkrácený zápis (`oauth.rs`) smí kryt soubor jen tehdy, když token od kořene nic nepřesně nepojmenuje —
   // jinak by `timer.rs` (= src-tauri/src/timer.rs) „kryl“ i commands/timer.rs
   for (const cs of maps) for (const c of cs) c.exact = files.some((f) => rootedHit(c, f, true))
@@ -113,7 +116,7 @@ export function coverageGaps(files, mds, allow = COVERAGE_ALLOW) {
     byUnit.get(u).push(f)
   }
   // moduly, které mapa jmenuje celou cestou (jakkoli, i `složka/*`) — podmínka pro zkrácené zápisy v téže mapě
-  const unitsIn = maps.map((cs) => {
+  const unitsIn = ctxMaps.map((cs) => {
     const set = new Set()
     for (const [u, fs_] of byUnit) if (fs_.some((f) => cs.some((c) => rootedHit(c, f, false)))) set.add(u)
     return set

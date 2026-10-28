@@ -175,14 +175,7 @@ pub fn load_stored(path: &Path) -> Result<Option<Stored>, String> {
 
 /// Atomický zápis (tmp + rename) — sdílí ho i wrapper (`statusline.rs`) pro vzorek limitů.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let dir = path.parent().ok_or_else(|| std::io::Error::other("bez složky"))?;
-    std::fs::create_dir_all(dir)?;
-    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let tmp = dir.join(format!("{name}.{}.tmp", std::process::id()));
-    std::fs::write(&tmp, bytes)?;
-    std::fs::rename(&tmp, path).inspect_err(|_| {
-        let _ = std::fs::remove_file(&tmp);
-    })
+    crate::fsx::write_atomic_dir(path, bytes)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

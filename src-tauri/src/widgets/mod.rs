@@ -65,8 +65,7 @@ impl Default for WidgetsConfig {
 
 /// `%USERPROFILE%\Ledge\widgets`.
 pub fn default_dir() -> PathBuf {
-    let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
-    Path::new(&home).join("Ledge").join("widgets")
+    crate::dirs::or_dot(crate::dirs::home()).join("Ledge").join("widgets")
 }
 
 pub fn resolve_dir_with(dir: Option<&str>, var: impl Fn(&str) -> Option<String>) -> Result<PathBuf, String> {

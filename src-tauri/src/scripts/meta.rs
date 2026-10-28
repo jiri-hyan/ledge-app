@@ -155,9 +155,7 @@ pub(crate) fn flag(v: &str) -> Option<bool> {
     }
 }
 
-pub(crate) fn cut(s: &str, max: usize) -> String {
-    if s.chars().count() <= max { s.to_string() } else { format!("{}…", s.chars().take(max - 1).collect::<String>()) }
-}
+pub(crate) use crate::util::cut;
 
 /// Řádky `@ledge.<klíč> <hodnota>` z komentářů hlavičky (klíč malými, u opakovaného platí první).
 /// Sdílí ho hlavička skriptu (`parse`) i widgetu (`widgets::meta`).

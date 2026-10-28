@@ -188,10 +188,8 @@ pub fn remove(root: &Path, names: &[String]) -> usize {
 
 /// Uložit manifest atomicky (tmp + rename).
 pub fn write_manifest(dir: &Path, m: &Manifest) -> Result<(), String> {
-    let tmp = dir.join(format!("{MANIFEST}.tmp"));
     let body = serde_json::to_string_pretty(m).map_err(|e| e.to_string())?;
-    std::fs::write(&tmp, body).map_err(|e| crate::errors::io(&tmp.display().to_string(), &e))?;
-    std::fs::rename(&tmp, dir.join(MANIFEST)).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))
+    crate::fsx::write_atomic(&dir.join(MANIFEST), body.as_bytes()).map_err(|e| crate::errors::io(&dir.display().to_string(), &e))
 }
 
 /// Obnovit průběh v UI? Celá procenta (se známou velikostí), jinak po 512 KiB. Čistá funkce.
@@ -202,9 +200,7 @@ pub fn progress_due(last: u64, got: u64, total: Option<u64>) -> bool {
     }
 }
 
-fn pct(n: u64, total: u64) -> u64 {
-    n.min(total).saturating_mul(100) / total
-}
+use crate::util::pct;
 
 /// Stav tichého stažení dostupné verze (`Snapshot.update.fetch`).
 #[derive(Debug, Clone, PartialEq, Serialize)]

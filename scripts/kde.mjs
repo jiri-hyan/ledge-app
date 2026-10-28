@@ -7,9 +7,11 @@
 //      interface/class/let/var, `X =`, pole `pub x:` / `x?:`; camelCase klíč configu najde i snake_case
 //      pole v Rustu: `muteDirty` → `mute_dirty`), max 15; bez přesné shody hledá jména, která slovo obsahují
 //   2) docs/codemap/*.md a docs/agents/*.md, kde se slovo vyskytuje (soubor:řádek + první výskyt)
+// Použití: node scripts/kde.mjs --file <cesta> — řádek codemapy souboru + osnova deklarací s čísly řádků (bez těl)
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { mapRows, renderFile } from './kde-file.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const MAX = 15
@@ -71,7 +73,22 @@ export function firstMention(lines, word) {
   return i < 0 ? null : { line: i + 1, text: lines[i] }
 }
 
+// --file: řádek codemapy + osnova deklarací (čisté části v kde-file.mjs)
+function fileMode(arg) {
+  const file = path.relative(root, path.resolve(root, arg)).split(path.sep).join('/')
+  const abs = path.join(root, file)
+  if (!fs.existsSync(abs)) { console.error('soubor neexistuje: ' + file); process.exit(2) }
+  const dir = path.join(root, 'docs', 'codemap')
+  const texts = fs.readdirSync(dir).filter((n) => n.endsWith('.md') && !n.endsWith('-detail.md') && n !== 'README.md')
+    .sort().map((n) => [n, fs.readFileSync(path.join(dir, n), 'utf8')])
+  console.log(renderFile(file, mapRows(texts, file), fs.readFileSync(abs, 'utf8').split(/\r?\n/)))
+}
+
 function main() {
+  if (process.argv[2] === '--file') {
+    if (!process.argv[3]) { console.error('použití: node scripts/kde.mjs --file <cesta>'); process.exit(2) }
+    return fileMode(process.argv[3])
+  }
   const word = process.argv[2]
   if (!word) {
     console.error('použití: node scripts/kde.mjs <symbol|slovo>')

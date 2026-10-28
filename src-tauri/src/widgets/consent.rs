@@ -112,11 +112,7 @@ impl Store {
         }
         let text = serde_json::to_string_pretty(&*map).map_err(|e| crate::errors::json(tr("Souhlas nejde uložit", "Can't save the consent"), &e))?;
         let fail = |e: std::io::Error| crate::errors::io(tr("Souhlas nejde uložit", "Can't save the consent"), &e);
-        if let Some(dir) = file.parent() {
-            std::fs::create_dir_all(dir).map_err(fail)?;
-        }
-        let tmp = file.with_extension("tmp");
-        std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &file)).map_err(fail)
+        crate::fsx::write_atomic_dir(&file, text.as_bytes()).map_err(fail)
     }
 }
 

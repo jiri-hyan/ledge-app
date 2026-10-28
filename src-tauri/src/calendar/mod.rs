@@ -75,15 +75,7 @@ pub(crate) fn naive(ms: i64) -> NaiveDateTime {
 }
 
 /// Jeden řádek: nové řádky a vícenásobné mezery → mezera, nejvýš `max` znaků (pak „…“).
-pub fn clip(s: &str, max: usize) -> String {
-    let one: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    if one.chars().count() <= max {
-        return one;
-    }
-    let mut out: String = one.chars().take(max.saturating_sub(1)).collect();
-    out.push('…');
-    out
-}
+pub use crate::util::clip_line as clip;
 
 /// Rozparsuje feed a vrátí výskyty v okně kolem `now_ms`, seřazené podle začátku.
 pub fn collect(bytes: &[u8], now_ms: i64, local: &dyn LocalTz) -> Result<Parsed, String> {

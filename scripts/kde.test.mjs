@@ -28,3 +28,30 @@ test("firstMention: celé slovo, ne podřetězec", () => {
   assert.deepEqual(firstMention(["a keepWarmSx", "b `keepWarmS` c"], "keepWarmS"), { line: 2, text: "b `keepWarmS` c" });
   assert.equal(firstMention(["nic"], "keepWarmS"), null);
 });
+
+import { mapRows, outline, renderFile } from "./kde-file.mjs";
+
+test("outline: Rust hlavičky deklarací s čísly řádků, bez těl a bez komentářů", () => {
+  const lines = ["// fn ne", "pub struct A {", "    x: u8,", "}", "impl A {", "    pub(crate) async fn go(&self) -> u8 {", "    }", "}", "let fn_x = 1;", "pub enum E { A }"];
+  assert.deepEqual(outline(lines, "x.rs").map((o) => `${o.line}:${o.text}`), ["2:pub struct A", "5:impl A", "6:pub(crate) async fn go(&self) -> u8", "10:pub enum E { A }"]);
+});
+
+test("outline: TS jen export function|const|type|interface, jiné soubory nic", () => {
+  const lines = ["const skryte = 1;", "export function a(x: number) {", "export const b = () => 1;", "export type T = string;", "  export interface I {"];
+  assert.deepEqual(outline(lines, "x.ts").map((o) => o.line), [2, 3, 4, 5]);
+  assert.deepEqual(outline(lines, "x.css"), []);
+});
+
+test("mapRows: přesná cesta vyhrává nad zkráceným zápisem; holý vzor nestačí", () => {
+  const core = ["| soubor | účel |", "| `src-tauri/src/app/conf.rs` | plná cesta |", "| `conf.rs` | zkrácená |", "| `src-tauri/src/app/*` | holý vzor |"].join("\n");
+  const rows = mapRows([["app.md", core]], "src-tauri/src/app/conf.rs");
+  assert.deepEqual(rows.map((r) => r.line), [2]);
+  assert.deepEqual(mapRows([["app.md", core]], "src-tauri/src/other/conf.rs").map((r) => r.line), [3]);
+  assert.deepEqual(mapRows([["app.md", "| `a.rs` | x |"]], "src/zzz.ts"), []);
+});
+
+test("renderFile: hlavička, řádek mapy a osnova; bez řádku mapy to řekne", () => {
+  const txt = renderFile("src/a.ts", [{ map: "app.md", line: 4, text: "| `src/a.ts` | účel |" }], ["export const x = 1;"]);
+  assert.match(txt, /^# codemapa: src\/a\.ts\ndocs\/codemap\/app\.md:4 {2}\| `src\/a\.ts` \| účel \|\n# osnova \(1 deklarací z 1 řádků\)\nsrc\/a\.ts:1 {2}export const x = 1;$/);
+  assert.match(renderFile("src/b.ts", [], []), /žádný řádek v docs\/codemap/);
+});

@@ -127,7 +127,7 @@ pub fn detect() -> Ctx {
     if matches!(api, Ctx::Inside(_)) {
         return api;
     }
-    let probed = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).and_then(|la| probe_virtualization(&la));
+    let probed = crate::dirs::localappdata().and_then(|la| probe_virtualization(&la));
     combine(api, probed.as_deref())
 }
 
@@ -219,8 +219,8 @@ fn strip_ci(path: &Path, base: &Path) -> Option<PathBuf> {
 /// Fyzická kopie virtualizované cesty pro TENTO proces (jen uvnitř balíčku).
 pub fn twin_of(path: &Path) -> Option<PathBuf> {
     let pkg = current()?;
-    let la = std::env::var_os("LOCALAPPDATA").map(PathBuf::from)?;
-    let ra = std::env::var_os("APPDATA").map(PathBuf::from)?;
+    let la = crate::dirs::localappdata()?;
+    let ra = crate::dirs::appdata()?;
     bubble_twin(path, &la, &ra, &pkg.family)
 }
 

@@ -80,8 +80,7 @@ const PNG_SIG: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
 /// `%USERPROFILE%\Ledge\notes`.
 pub fn default_root() -> PathBuf {
-    let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".into());
-    Path::new(&home).join("Ledge").join("notes")
+    crate::dirs::or_dot(crate::dirs::home()).join("Ledge").join("notes")
 }
 
 /// Rozbalí `%PROMENNA%` (Windows styl). Neznámá proměnná = chyba, `%%` = `%`.
@@ -243,48 +242,10 @@ pub fn decode_png(b64: &str) -> Result<Vec<u8>, String> {
 
 // ---------- I/O ----------
 
-/// Atomický zápis: unikátní tmp vedle cíle (pid + čítač — dva souběžné zápisy si ho nepřepíšou),
-/// `sync_all`, pak rename. Watcher ani čtenář nikdy neuvidí půlku souboru.
+/// Atomický zápis (`fsx::write_atomic`): unikátní tmp, `sync_all`, rename s opakováním. Watcher ani
+/// čtenář nikdy neuvidí půlku souboru.
 pub(crate) fn write_atomic(path: &Path, data: &[u8]) -> Result<(), String> {
-    use std::io::Write;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static SEQ: AtomicU64 = AtomicU64::new(0);
-    let err = |e: std::io::Error| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e);
-    let mut tmp = path.as_os_str().to_owned();
-    tmp.push(format!(".{}-{}.tmp", std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed)));
-    let tmp = PathBuf::from(tmp);
-    let res = (|| {
-        let mut f = std::fs::File::create(&tmp)?;
-        f.write_all(data)?;
-        f.sync_all()?;
-        drop(f);
-        rename_retry(&tmp, path)
-    })();
-    res.map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        err(e)
-    })
-}
-
-/// Rename s krátkým opakováním: na Windows ho odmítne „přístup odepřen“ / sdílení, když cíl nebo tmp
-/// zrovna drží jiný proces (antivir, indexer, git sync, editor) — typicky na pár ms. Max ~250 ms.
-fn rename_retry(from: &Path, to: &Path) -> std::io::Result<()> {
-    let mut attempt = 0;
-    loop {
-        match std::fs::rename(from, to) {
-            // „neexistuje“ při existujícím tmp i složce = cíl se právě přepisuje jiným zápisem (přechodné)
-            Err(e)
-                if attempt < 10
-                    && (e.kind() == std::io::ErrorKind::PermissionDenied
-                        || e.raw_os_error() == Some(32)
-                        || (e.kind() == std::io::ErrorKind::NotFound && from.exists() && to.parent().is_some_and(Path::is_dir))) =>
-            {
-                attempt += 1;
-                std::thread::sleep(std::time::Duration::from_millis(25));
-            }
-            r => return r,
-        }
-    }
+    crate::fsx::write_atomic(path, data).map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))
 }
 
 /// Zámek read-modify-write pro jednu poznámku (sdílí `set_done` i `edit`).

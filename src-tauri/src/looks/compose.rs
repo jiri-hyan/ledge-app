@@ -192,9 +192,7 @@ pub struct Val {
     pub event: bool,
 }
 
-fn pct(p: f64) -> String {
-    format!("{:.0} %", p.round().clamp(0.0, 100.0))
-}
+use crate::util::pct_text as pct;
 fn frac(p: f64) -> f32 {
     (p / 100.0).clamp(0.0, 1.0) as f32
 }

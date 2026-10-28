@@ -131,6 +131,11 @@ fn too_broad() -> String {
 /// Vybraná složka → kanonická cesta, nebo srozumitelná chyba (neexistuje, kořen disku, příliš široká,
 /// překrývá se se složkou poznámek).
 pub fn check_folder(path: &str, root: &Path) -> Result<PathBuf, String> {
+    check_folder_with(path, root, &|n| std::env::var(n).ok())
+}
+
+/// `check_folder` s dodaným prostředím (testy nesahají na skutečný profil).
+pub(super) fn check_folder_with(path: &str, root: &Path, get: &dyn Fn(&str) -> Option<String>) -> Result<PathBuf, String> {
     let p = PathBuf::from(path.trim());
     if !p.is_absolute() || p.components().any(|c| matches!(c, Component::ParentDir)) {
         return Err(trf!("Cesta „{}“ musí být absolutní.", "The path “{}” must be absolute.", p.display()));
@@ -139,7 +144,7 @@ pub fn check_folder(path: &str, root: &Path) -> Result<PathBuf, String> {
     if c.components().filter(|x| matches!(x, Component::Normal(_))).count() == 0 {
         return Err(super::folder_sync_scan::too_shallow());
     }
-    if is_broad(&key(&c), &broad_folders(&|n| std::env::var(n).ok())) {
+    if is_broad(&key(&c), &broad_folders(get)) {
         return Err(too_broad());
     }
     let root_c = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());

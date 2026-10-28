@@ -48,7 +48,7 @@ fn version_of(exe: &Path) -> Option<String> {
 
 /// Detekce na skutečném stroji (spouští `claude --version`).
 pub fn detect() -> ClaudeInfo {
-    let home = std::env::var("USERPROFILE").ok();
+    let home = crate::dirs::home().map(|h| h.to_string_lossy().into_owned());
     let exe = find_exe(std::env::var("PATH").ok().as_deref(), home.as_deref(), |p| p.is_file());
     let dir = crate::sessionlive::claude_dir().is_some_and(|d| d.is_dir());
     let version = exe.as_deref().and_then(version_of);

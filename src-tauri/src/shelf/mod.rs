@@ -195,11 +195,7 @@ fn load_from(file: &Path) -> Vec<Item> {
 }
 
 fn save_to(file: &Path, items: &[Item]) -> Result<(), String> {
-    if let Some(dir) = file.parent() {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    let tmp = file.with_extension("json.tmp");
-    std::fs::write(&tmp, serialize(items)).and_then(|_| std::fs::rename(&tmp, file)).map_err(|e| crate::errors::io(tr("Přihrádku nejde uložit", "Can't save the shelf"), &e))
+    crate::fsx::write_atomic_dir(file, serialize(items).as_bytes()).map_err(|e| crate::errors::io(tr("Přihrádku nejde uložit", "Can't save the shelf"), &e))
 }
 
 /// Práce se seznamem (načte se líně při prvním použití). `f` vrací `true` = změna → uložit + událost.

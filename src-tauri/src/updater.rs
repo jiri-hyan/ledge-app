@@ -138,9 +138,7 @@ pub fn next_check(enabled: bool, start: Instant, last: Option<Instant>, every: D
     })
 }
 
-fn now_ms() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
-}
+use crate::util::now_ms_i64 as now_ms;
 
 /// Tiché stažení platí jen se zapnutou kontrolou.
 fn auto_fetch(cfg: &UpdateConfig) -> bool {
@@ -600,6 +598,7 @@ mod tests {
     /// stažením i bez cache nic; poznámky běžící verze a návrat se čtou z cache; úklid drží jen potřebné.
     #[test]
     fn prefetch_and_cache_view_without_network() {
+        let _sb = crate::dirs::testing::sandbox();
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().to_path_buf();
         let cfg = UpdateConfig::default();
@@ -706,6 +705,7 @@ mod tests {
     /// přepsaný instalátor v cache (jiný SHA256 než dřív ověřený) se nespustí.
     #[test]
     fn rollback_waits_for_download_and_cleanup_spares_busy_dir() {
+        let _sb = crate::dirs::testing::sandbox();
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().to_path_buf();
         let (tx, _rx) = mpsc::channel();

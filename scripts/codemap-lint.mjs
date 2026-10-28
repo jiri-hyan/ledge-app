@@ -82,6 +82,25 @@ export function parseTables(md) {
   return tables
 }
 
+// Rozpočet orientace: jádro mapy se čte celé, proto strop; toky a historie patří do `<oblast>-detail.md`.
+export const MAX_CORE_BYTES = 8192
+export const MAX_LINE_CHARS = 600
+export const isDetail = (name) => /-detail\.md$/.test(name)
+
+/** Rozpočtové nálezy jednoho souboru mapy: [{ kind: 'size' | 'line' | 'detail-link', value, line }]. */
+export function budgetFindings(name, md, detailNames = new Set()) {
+  if (isDetail(name)) return []
+  const out = []
+  const det = name.replace(/\.md$/, '-detail.md')
+  const bytes = Buffer.byteLength(md)
+  if (bytes > MAX_CORE_BYTES) out.push({ kind: 'size', value: `${bytes} B > ${MAX_CORE_BYTES} B (toky a historii přesuň do ${det})`, line: 1 })
+  md.split(/\r?\n/).forEach((l, i) => {
+    if (l.length > MAX_LINE_CHARS) out.push({ kind: 'line', value: `${l.length} znaků > ${MAX_LINE_CHARS}`, line: i + 1 })
+  })
+  if (detailNames.has(det) && !md.includes(det)) out.push({ kind: 'detail-link', value: `jádro neodkazuje na ${det}`, line: 1 })
+  return out
+}
+
 const ticks = (cell) => [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim())
 
 /**
@@ -145,8 +164,11 @@ export function lintCodemaps(root, opts = {}) {
   const ctx = { ...tree, ...opts }
   const dir = path.join(root, 'docs', 'codemap')
   const found = []
-  for (const n of fs.readdirSync(dir).filter((x) => x.endsWith('.md')).sort()) {
-    for (const f of lintMarkdown(fs.readFileSync(path.join(dir, n), 'utf8'), ctx)) found.push({ file: `docs/codemap/${n}`, ...f })
+  const names = new Set(fs.readdirSync(dir))
+  for (const n of [...names].filter((x) => x.endsWith('.md')).sort()) {
+    const md = fs.readFileSync(path.join(dir, n), 'utf8')
+    for (const f of lintMarkdown(md, ctx)) found.push({ file: `docs/codemap/${n}`, ...f })
+    for (const f of budgetFindings(n, md, names)) found.push({ file: `docs/codemap/${n}`, ...f })
   }
   return found
 }
@@ -155,14 +177,17 @@ export function lintCodemaps(root, opts = {}) {
 export function lintCoverage(root, allow) {
   const { files } = loadTree(root)
   const dir = path.join(root, 'docs', 'codemap')
-  const mds = fs.readdirSync(dir).filter((x) => x.endsWith('.md')).map((n) => fs.readFileSync(path.join(dir, n), 'utf8'))
-  return coverageGaps(files, mds, allow)
+  const cores = fs.readdirSync(dir).filter((x) => x.endsWith('.md') && !isDetail(x)).sort()
+  const read = (n) => (fs.existsSync(path.join(dir, n)) ? fs.readFileSync(path.join(dir, n), 'utf8') : '')
+  const mds = cores.map(read)
+  const details = cores.map((n) => read(n.replace(/.md$/, '-detail.md')))
+  return coverageGaps(files, mds, allow, details)
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const found = lintCodemaps(root)
-  for (const f of found) console.log(`${f.file}:${f.line}  ${f.kind === 'file' ? 'soubor neexistuje' : 'symbol v kódu není'}: ${f.value}`)
+  for (const f of found) console.log(`${f.file}:${f.line}  ${{ file: 'soubor neexistuje', symbol: 'symbol v kódu není', size: 'jádro mapy je dlouhé', line: 'řádek je dlouhý', 'detail-link': 'chybí odkaz na detail' }[f.kind]}: ${f.value}`)
   const cov = lintCoverage(root)
   for (const u of cov.missing) console.log(`bez mapy: ${u}  (jmenuj ho v docs/codemap/*.md, nebo výjimka v COVERAGE_ALLOW s důvodem)`)
   for (const f of cov.unnamed) console.log(`soubor bez řádku v mapě: ${f}  (jmenuj ho výslovně v tabulce některé docs/codemap/*.md)`)

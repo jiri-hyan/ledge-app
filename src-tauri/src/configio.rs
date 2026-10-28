@@ -257,6 +257,7 @@ mod tests {
 
     #[test]
     fn export_roundtrip_and_refuses_invalid() {
+        let _sb = crate::dirs::testing::sandbox();
         let dir = tempfile::tempdir().unwrap();
         let out = dir.path().join("zaloha.json");
         let mut cfg = Config { autostart: false, ..Config::default() };

@@ -1,37 +1,39 @@
 # Codemapy Ledge — kde co je
 
-Přečti si mapu své oblasti (≈1–2k tokenů) **místo** celých souborů. Mapy citují symboly, ne čísla
-řádků — `grep -n <symbol>` tě dovede přesně. Když měníš odpovědnost souboru nebo přidáváš modul,
-oprav i jeho mapu (je to součást hotové práce).
+Každá mapa je **jádro ≤ 8 KB** (≈ 2–4k tokenů): tabulka soubor → jeden řádek s účelem a klíčovými symboly.
+Delší mapy mají vedle sebe `<oblast>-detail.md` (toky, invarianty, testy, co nečíst, historie vln a kol, plné
+popisy řádků) — čti ho jen, když jádro nestačí. Mapy citují symboly, ne čísla řádků — `grep -n <symbol>` tě
+dovede přesně. Když měníš odpovědnost souboru nebo přidáváš modul, oprav řádek v jádru mapy (součást hotové práce).
+Tento přehled je zkrácený; plná verze je v [README-detail.md](README-detail.md).
 
-| oblast | mapa | hlavní soubory |
+| oblast | mapa | klíčová slova (soubory) |
 |---|---|---|
-| Claude session, subagenti, otevření, hooky | [sessions.md](sessions.md) | `sessions.rs`, `sessionlive.rs`, `winfocus.rs`, `subagents.rs`, `hooksetup.rs`, `claude/*`, `src/ClaudeSessions.tsx` |
-| Limity Claude 5h / týden: wrapper stavového řádku, zapojení, připomínka resetu | [limits.md](limits.md) | `limits.rs`, `limitslive.rs`, `statusline.rs`, `statuslinesetup.rs`, `commands/limits.rs`, `src/limits/*` |
-| Útrata Claude (odhad v cenách API): transcripty, inkrementální index, ceník, sekce v kartě Claude | [costs.md](costs.md) | `usage/*` (parse, price, index, view), `costslive.rs`, `commands/costs.rs`, `src/costs/*` |
-| Poznámky, kategorie, Markdown, výběry, Splnit · Archivovat · Smazat (Koš + Zpět), lístky na plochu (overlay okna poznámek) | [notes.md](notes.md) | `notes/*` (md, edit, store, frontmatter, lifecycle, recycle…), `commands/noteslife.rs`, `notesync/*`, `pins/*`, `src/notes/*`, `src/pin/*` |
-| Projekty, loga, klonování, výkon snapshotu, vzhled jednotlivých zástupců (ikona, barva, tvar, popisek) | [projects-icons-perf.md](projects-icons-perf.md) | `icons.rs`, `iconimg.rs`, `cloning.rs`, `resolve.rs`, `tilelook.rs`, `src/logos.ts`, `src/tilelook/*`, `src/projects/*` (co a odkud, Stop všude) |
-| Nastavení: shell, panely, záloha, dialogy, strop výšky šuplíku | [settings.md](settings.md) | `src/Settings.tsx`, `src/settings/*`, `src/fit.ts`, `configerr.rs`, `configio.rs`, `projectdetect.rs`, `drawerfit.rs`, `commands/settings.rs` |
-| Rozložení šuplíku: záložky (i vlastní), karty se šířkou a výškou (tah za okraj, ⋯), řada bez děr, zástupci (karta Projekty) a jejich složky, vzhled každé karty (akcent, pozadí, hlavička, hustota, varianty), režim úprav, katalog, prohlídka prvního spuštění, migrace starého configu | [layout.md](layout.md) | `layout.rs`, `tilelook.rs`, `src/layout/*`, `src/cards/CardMenu.tsx` |
-| Vlastní SVG grafy (kolo 22): sparkline, prstenec, sloupce, pás (heat), číslo jako hrdina — bez knihoven, kreslí jen viditelné | [charts.md](charts.md) | `src/charts/*` (geom, visible, Sparkline, Ring, Bars, Heat, Stat) |
-| Frontend (UI): skořápka, stránky, karty, náhled po najetí, morf, styly | [ui.md](ui.md) | `src/App.tsx`, `src/MainPage.tsx`, `src/cards/*`, `src/hover/*`, `src/api.ts`, `src/types.ts`, `src/motion.ts`, `src/styles.css` |
-| Rychlé akce a odkazy (config `actions`, odkaz = akce, převod `personal.links`, spouštění, ikony, souhlasy) a paleta příkazů | [actions.md](actions.md) | `actions.rs`, `actionrun.rs`, `actionicons.rs`, `actionstate.rs`, `src/actions/*`, `src/palette/*`, `src/cards/ActionsCard.tsx` |
-| Widgety na ploše („Na plochu“): karta Ledge jako okno na ploše / druhém monitoru, vrstvy, schovat ve hře, profily rozmístění, návrat po připojení monitoru, data jen z událostí a jen viditelným | [desk.md](desk.md) | `desk/*` (mod, win, live), `commands/desk.rs`, `desk.html`, `src/desk/*` |
-| Widgety ze skriptů (jako xbar): složka `@ledge.widget`, parser JSON / textu, plánovač jen-když-vidět, souhlas s otiskem, karta `widget:<soubor>`, položka proužku, galerie příkladů | [widgets.md](widgets.md) | `widgets/*` (meta, output, plan, consent, run, live, templates), `commands/widgets.rs`, `src/widgets/*` |
-| Vzhled a animace: design styly (tabulka, písmo, materiál, rozložení, šířka), motivy, tokeny, akcent, animace otevírání, vzhled a pozice proužku, styly zavřeného Ledge (`strip.look`, kapsle a tvar kapsle), široký notch (`src/notch/*`), pojistky hoveru, panel Vzhled | [appearance.md](appearance.md) | `appearance.rs`, `appearance/{geom,look,stripdeco,motion}.rs`, `looks/*`, `stripdraw.rs`, `threads/pointer.rs`, `src/strip/looks.ts`, `src/theme/*`, `src/notch/*`, `src/settings/panels/Appearance*.tsx` |
-| Průvodce prvním spuštěním, čistý config nového uživatele, krok „Claude“ (návod pro Clauda `docs/pro-claude.md`) | [onboarding.md](onboarding.md) | `onboarding/*`, `uiconf.rs`, `commands/onboarding.rs`, `src/onboarding/*`, `src/settings/panels/Start.tsx` |
-| Přihrádka na soubory: tah na proužek (OLE cíl), `shelf.json`, schránka, tah ven, karta | [shelf.md](shelf.md) | `shelf/*`, `commands/shelf.rs`, `src/shelf/*` |
-| Historie schránky v paletě (`v:`): listener událostmi, filtr hesel a tokenů, připnuté, Nastavení | [clipboard.md](clipboard.md) | `cliphist/*`, `commands/cliphist.rs`, `src/cliphist/*` |
-| Osobní: kalendář — zdroje (ICS, Outlook v PC, místo pro účty), parser, opakování, pásma, Připojit, připomínky, karta, editor | [calendar.md](calendar.md) | `calendar/*` (ics, expand, tz, view, conf, source, outlook, meeting, remind, live, cache), `commands/calendar.rs`, `src/calendar/*` |
-| Účty Microsoft / Google (OAuth PKCE, Správce pověření), kalendář účtů, karta Pošta, položka proužku `mail`, Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé | [accounts.md](accounts.md) | `accounts/*`, `calendar/graph.rs`, `calendar/google.rs`, `calendar/source.rs`, `commands/accounts.rs`, `src/accounts/*` |
-| Osobní: právě hraje (GSMTC, průběh skladby, 5 vzhledů karty), hlasitost (Core Audio), baterie — události, žádný polling | [media.md](media.md) | `media.rs`, `mediatime.rs`, `mediaconf.rs`, `volume.rs`, `battery.rs`, `commands/media.rs`, `src/media/*` |
-| Kontextové návrhy: pruh nahoře v šuplíku (max 3 chipy z reálných událostí: připomínka, PR k revizi / spadlé CI, dev server, odkaz ze schránky), `pick`, zavření na 24 h; puls proužku u GitHubu | [suggest.md](suggest.md) | `suggest/*`, `attention.rs` (nové události), `src/suggest/*`, `src/types/suggest.ts` |
-| Integrace: karta GitHub (`gh`, PR k revizi / vlastní PR s CI / notifikace), karta Systém (CPU, paměť, disky, síť z WinAPI), plánovač položek proužku | [integrations.md](integrations.md) | `github/*`, `sysmon/*`, `integrations.rs`, `commands/integrations.rs`, `src/integrations/*` |
-| MCP server pro Clauda: `/mcp` na mostu, JSON-RPC, nástroje (zástupci, akce, rozložení, proužek, vzhled), klíč ve Správci pověření, Vrátit, stdio proxy `ledge.exe --mcp`, Nastavení → Claude (MCP) | [mcp.md](mcp.md) | `mcp/*`, `commands/mcp.rs`, `src/mcp/*` |
-| Chytřejší šuplík (kolo 20): Alt+1…9 a šipky, přetažení odkazu / souboru na otevřený šuplík = nový zástupce, kolečko nad záložkami, tichý zvuk u schvalování, stav incidentů Anthropicu, export útrat a limitů do CSV / Markdownu | [smart.md](smart.md) | `smartconf.rs`, `approvalsound.rs`, `incidents.rs`, `dataexport.rs`, `commands/smart.rs`, `shelf/shortcut.rs`, `src/quick/*`, `src/layout/tabwheel.ts`, `src/actions/Drop*`, `src/exports/*`, `src/limits/incident.ts` |
-| Nové widgety kola 22: Claude dnes (útrata + časová osa po hodinách), Týden (pás dnů + dnešní události), Velké hodiny, Rychlé přepínače (zvuk, mikrofon, baterie); i na ploše | [board.md](board.md) | `src/board/*` (model, text, UsageCard, WeekCard, BigClockCard, TogglesCard), `usage/index.rs` (`hours`), `usage/view.rs` (`hour_rows`), `costslive.rs` (`wanted`, `request_desk`) |
-| Karta Rychlé dlaždice Windows (kolo 23, jen v katalogu): mikrofon, výstup zvuku, terminál ve složce projektu, složky, motiv Windows, Wi-Fi / Bluetooth, Nastavení, poslední snímek obrazovky | [winquick.md](winquick.md) | `winquick.rs`, `winquickwin.rs`, `commands/winquick.rs`, `winsettings.rs`, `src/winquick/*` |
-| Jádro: stav, vlákna, příkazy, okna (vč. náhledu po najetí `drawer.hover`), proužek, trigger, procesy | [core.md](core.md) | `lib.rs`, `state.rs`, `snapshot.rs`, `threads/*`, `commands/*`, `drawer.rs`, `hovermode.rs`, `strip.rs`, `edge.rs`, `screen.rs`, `procman.rs` |
+| Claude session, subagenti, otevření, hooky | [sessions.md](sessions.md) | `sessions.rs` `sessionlive.rs` `winfocus.rs` `subagents.rs` `hooksetup.rs` `claude/*` `src/ClaudeSessions.tsx` |
+| Limity Claude 5h / týden: wrapper stavového řádku, zapojení, připomínka resetu | [limits.md](limits.md) | `limits.rs` `limitslive.rs` `statusline.rs` `statuslinesetup.rs` `commands/limits.rs` `src/limits/*` |
+| Útrata Claude (odhad v cenách API): transcripty, inkrementální index, ceník, sekce v kartě … | [costs.md](costs.md) | `usage/*` `costslive.rs` `commands/costs.rs` `src/costs/*` |
+| Poznámky, kategorie, Markdown, výběry, Splnit · Archivovat · Smazat (Koš + Zpět), lístky … | [notes.md](notes.md) | `notes/*` `commands/noteslife.rs` `notesync/*` `pins/*` `src/notes/*` `src/pin/*` |
+| Projekty, loga, klonování, výkon snapshotu, vzhled jednotlivých zástupců (ikona, barva … | [projects-icons-perf.md](projects-icons-perf.md) | `icons.rs` `iconimg.rs` `cloning.rs` `resolve.rs` `tilelook.rs` `src/logos.ts` `src/tilelook/*` |
+| Nastavení: shell, panely, záloha, dialogy, strop výšky šuplíku | [settings.md](settings.md) | `src/Settings.tsx` `src/settings/*` `src/fit.ts` `configerr.rs` `configio.rs` `projectdetect.rs` |
+| Rozložení šuplíku: záložky (i vlastní), karty se šířkou a výškou (tah za okraj, ⋯), řada … | [layout.md](layout.md) | `layout.rs` `tilelook.rs` `src/layout/*` `src/cards/CardMenu.tsx` |
+| Vlastní SVG grafy: sparkline, prstenec, sloupce, pás (heat), číslo jako hrdina — bez … | [charts.md](charts.md) | `src/charts/*` |
+| Frontend (UI): skořápka, stránky, karty, náhled po najetí, morf, styly | [ui.md](ui.md) | `src/App.tsx` `src/MainPage.tsx` `src/cards/*` `src/hover/*` `src/api.ts` `src/types.ts` `src/motion.ts` |
+| Rychlé akce a odkazy (config `actions`, odkaz = akce, převod `personal.links`, spouštění … | [actions.md](actions.md) | `actions.rs` `actionrun.rs` `actionicons.rs` `actionstate.rs` `src/actions/*` `src/palette/*` |
+| Widgety na ploše („Na plochu“): karta Ledge jako okno na ploše / druhém monitoru, vrstvy … | [desk.md](desk.md) | `desk/*` `commands/desk.rs` `desk.html` `src/desk/*` |
+| Widgety ze skriptů (jako xbar): složka `@ledge.widget`, parser JSON / textu, plánovač … | [widgets.md](widgets.md) | `widgets/*` `commands/widgets.rs` `src/widgets/*` |
+| Vzhled a animace: design styly (tabulka, písmo, materiál, rozložení, šířka), motivy … | [appearance.md](appearance.md) | `appearance.rs` `appearance/{geom,look,stripdeco,motion}.rs` `looks/*` `stripdraw.rs` `threads/pointer.rs` |
+| Průvodce prvním spuštěním, čistý config nového uživatele, krok „Claude“ (návod pro Clauda … | [onboarding.md](onboarding.md) | `onboarding/*` `uiconf.rs` `commands/onboarding.rs` `src/onboarding/*` `src/settings/panels/Start.tsx` |
+| Přihrádka na soubory: tah na proužek (OLE cíl), `shelf.json`, schránka, tah ven, karta | [shelf.md](shelf.md) | `shelf/*` `commands/shelf.rs` `src/shelf/*` |
+| Historie schránky v paletě (`v:`): listener událostmi, filtr hesel a tokenů, připnuté … | [clipboard.md](clipboard.md) | `cliphist/*` `commands/cliphist.rs` `src/cliphist/*` |
+| Osobní: kalendář — zdroje (ICS, Outlook v PC, místo pro účty), parser, opakování, pásma … | [calendar.md](calendar.md) | `calendar/*` `commands/calendar.rs` `src/calendar/*` |
+| Účty Microsoft / Google (OAuth PKCE, Správce pověření), kalendář účtů, karta Pošta … | [accounts.md](accounts.md) | `accounts/*` `calendar/graph.rs` `calendar/google.rs` `calendar/source.rs` `commands/accounts.rs` |
+| Osobní: právě hraje (GSMTC, průběh skladby, 5 vzhledů karty), hlasitost (Core Audio) … | [media.md](media.md) | `media.rs` `mediatime.rs` `mediaconf.rs` `volume.rs` `battery.rs` `commands/media.rs` `src/media/*` |
+| Kontextové návrhy: pruh nahoře v šuplíku (max 3 chipy z reálných událostí: připomínka, PR … | [suggest.md](suggest.md) | `suggest/*` `attention.rs` `src/suggest/*` `src/types/suggest.ts` |
+| Integrace: karta GitHub (`gh`, PR k revizi / vlastní PR s CI / notifikace), karta Systém … | [integrations.md](integrations.md) | `github/*` `sysmon/*` `integrations.rs` `commands/integrations.rs` `src/integrations/*` |
+| MCP server pro Clauda: `/mcp` na mostu, JSON-RPC, nástroje (zástupci, akce, rozložení … | [mcp.md](mcp.md) | `mcp/*` `commands/mcp.rs` `src/mcp/*` |
+| Chytřejší šuplík: Alt+1…9 a šipky, přetažení odkazu / souboru na otevřený šuplík = nový … | [smart.md](smart.md) | `smartconf.rs` `approvalsound.rs` `incidents.rs` `dataexport.rs` `commands/smart.rs` `shelf/shortcut.rs` |
+| Nové widgety kola 22: Claude dnes (útrata + časová osa po hodinách), Týden (pás dnů + … | [board.md](board.md) | `src/board/*` `usage/index.rs` `hours` `usage/view.rs` `hour_rows` `costslive.rs` `wanted` `request_desk` |
+| Karta Rychlé dlaždice Windows: mikrofon, výstup zvuku, terminál ve složce projektu … | [winquick.md](winquick.md) | `winquick.rs` `winquickwin.rs` `commands/winquick.rs` `winsettings.rs` `src/winquick/*` |
+| Jádro: stav, vlákna, příkazy, okna (vč. náhledu po najetí `drawer.hover`), proužek … | [core.md](core.md) | `lib.rs` `state.rs` `snapshot.rs` `threads/*` `commands/*` `drawer.rs` `hovermode.rs` `strip.rs` `edge.rs` |
 
 Mimo mapy: [`AGENTS.md`](../../AGENTS.md) = rozcestník k `docs/agents/*.md` (config, formát poznámek, lokální API,
 MCP, instalace, pravidla) — čti jen potřebný soubor.
@@ -40,6 +42,7 @@ MCP, instalace, pravidla) — čti jen potřebný soubor.
 
 ```
 node scripts/kde.mjs <symbol|slovo>   # definice (soubor:řádek) + které mapy / docs/agents ho zmiňují
+node scripts/kde.mjs --file <cesta>   # řádek mapy souboru + osnova deklarací s čísly řádků (bez těl)
 ```
 
 Mapy hlídají testy v `test:ui` (`node scripts/codemap-lint.mjs` vypíše všechny nálezy najednou):

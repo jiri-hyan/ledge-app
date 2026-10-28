@@ -137,7 +137,7 @@ pub fn run(args: &[String], cwd: Option<&Path>, wait: Duration, cap: usize) -> R
 /// `claude attach <id>` v novém okně terminálu (výslovný klik). Neexistující složka session
 /// (smazaný worktree) → domovská složka; `attach` podle id funguje odkudkoli.
 pub fn attach(cwd: &str, id: &str) -> Result<(), String> {
-    let dir = if Path::new(cwd).is_dir() { cwd.to_string() } else { std::env::var("USERPROFILE").unwrap_or_default() };
+    let dir = if Path::new(cwd).is_dir() { cwd.to_string() } else { crate::dirs::home().map(|h| h.to_string_lossy().into_owned()).unwrap_or_default() };
     let bad = || tr("Session nejde bezpečně připojit (neobvyklé id nebo složka).", "The session can't be attached safely (unusual id or folder).").to_string();
     if let Some(Launch::Wt(args)) = agentview::attach_command(true, &dir, id)
         && Command::new("wt").args(&args).creation_flags(DETACHED).spawn().is_ok()

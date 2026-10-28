@@ -347,7 +347,7 @@ pub fn set_done(root: &Path, path: &Path, done: bool) -> Result<(), String> {
     let real = check_note_path(root, path)?;
     let lock = path_lock(&real);
     let _g = lock.lock();
-    let bytes = std::fs::read(&real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))?;
+    let bytes = crate::fsx::read_retry(&real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))?;
     write_atomic(&real, with_done(&String::from_utf8_lossy(&bytes), done).as_bytes())
 }
 
@@ -550,7 +550,7 @@ mod tests {
             })
             .collect();
         hs.into_iter().for_each(|h| h.join().unwrap());
-        let text = std::fs::read_to_string(&p).unwrap();
+        let text = crate::fsx::read_string_retry(&p).unwrap();
         assert_eq!(text.matches("done:").count(), 1);
         assert!(std::fs::read_dir(p.parent().unwrap()).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().ends_with(".tmp")));
     }

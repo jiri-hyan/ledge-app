@@ -159,7 +159,7 @@ fn installed_exe() -> Option<PathBuf> {
     let bin: Option<String> = uninst
         .as_ref()
         .and_then(|k| k.get_value("MainBinaryName").ok());
-    let la = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+    let la = crate::dirs::localappdata();
     install_candidates(loc.as_deref(), bin.as_deref(), la.as_deref())
         .into_iter()
         .find(|p| p.is_file())
@@ -170,7 +170,7 @@ fn installed_exe() -> Option<PathBuf> {
 /// `%LOCALAPPDATA%\Ledge\ledge.exe` (první spuštění instalátoru z vývojové kopie).
 pub(crate) fn install_target() -> Option<PathBuf> {
     installed_exe().or_else(|| {
-        let la = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+        let la = crate::dirs::localappdata();
         install_candidates(None, None, la.as_deref()).into_iter().next()
     })
 }

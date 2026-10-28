@@ -250,9 +250,7 @@ fn pick_monitor(spec: &str) -> screen::Monitor {
     })
 }
 
-pub(crate) fn now_ms() -> i64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
-}
+pub(crate) use crate::util::now_ms_i64 as now_ms;
 
 pub(crate) fn find_project(id: &str) -> Result<config::Project, String> {
     core().cfg.read().projects.iter().find(|p| p.id == id).cloned().ok_or_else(|| trf!("Neznámý projekt {id}", "Unknown project {id}"))

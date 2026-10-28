@@ -14,6 +14,7 @@
 use super::*;
 use std::collections::HashSet;
 use std::ffi::OsStr;
+use crate::fsx::rename_retry;
 
 /// Podsložka archivu vedle poznámek.
 pub const ARCHIVE_DIR: &str = "_archiv";

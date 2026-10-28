@@ -36,11 +36,11 @@ impl Paths {
         if crate::config::config_dir_override().is_some() {
             return None;
         }
-        let home = std::env::var("USERPROFILE").ok().filter(|h| !h.trim().is_empty())?;
+        let home = crate::dirs::home().filter(|h| !h.to_string_lossy().trim().is_empty())?;
         Some(Self {
             old_cfg_dir: crate::config::legacy_config_dir(),
             new_cfg_dir: crate::config::config_dir(),
-            old_notes: Path::new(&home).join("Notch").join("notes"),
+            old_notes: home.join("Notch").join("notes"),
             new_notes: crate::notes::default_root(),
         })
     }

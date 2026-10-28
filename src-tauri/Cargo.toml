@@ -7,7 +7,16 @@ edition = "2024"
 
 [lib]
 name = "ledge_lib"
+# staticlib + cdylib NECHÁNO: šablona Tauri 2 je má kvůli mobilním cílům; že je desktopový `tauri build` nevyžaduje, jsme neověřili (build se nesmí spouštět)
 crate-type = ["staticlib", "cdylib", "rlib"]
+# bez doctestů: knihovna je jen vnitřek aplikace, žádná veřejná API s příklady (každý doctest = zbytečný překlad + linkování)
+doctest = false
+
+# main.rs jsou jen 3 větve spuštění (statusline / mcp / run) bez testů — nesestavovat zbytečně druhý testovací binár
+[[bin]]
+name = "ledge"
+path = "src/main.rs"
+test = false
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -118,6 +127,8 @@ tempfile = "3"
 
 [profile.dev.package."*"]
 opt-level = 2
+# závislosti bez ladicích symbolů: menší .rlib / .pdb, rychlejší linkování testů; vlastní kód má debug dál
+debug = false
 
 [profile.release]
 # thin LTO + 16 jednotek: vydání se překládá paralelně (fat/1 = jedno jádro, 12–61 min); měřeno od 0.9.0

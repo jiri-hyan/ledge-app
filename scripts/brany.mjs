@@ -6,6 +6,7 @@
 // Použití: node scripts/brany.mjs                 → test, clippy, tsc, ui, build
 //          node scripts/brany.mjs test ui         → jen vybrané (test | clippy | tsc | ui | build)
 //          node scripts/brany.mjs --changed       → brány podle změněných souborů (výběr: scripts/brany-select.mjs)
+//          tsc a ui běží souběžně s cargo bránami (test → clippy za sebou), výstup a exit kód beze změny.
 // CARGO_TARGET_DIR se bere z prostředí (workeři: sdílený src-tauri\target-agents). Exit 0 = vše prošlo.
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -80,12 +81,12 @@ function run(name) {
       fs.writeFileSync(log, text)
       const ok = g.ok(text, code)
       const secs = Math.round((Date.now() - started) / 1000)
-      console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(6)} ${g.sum(text)} (${secs} s)`)
+      const lines = [`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(6)} ${g.sum(text)} (${secs} s)`]
       if (!ok) {
-        for (const l of g.bad(text)) console.log(`      ${l}`)
-        console.log(`      plný log: ${log}`)
+        for (const l of g.bad(text)) lines.push(`      ${l}`)
+        lines.push(`      plný log: ${log}`)
       }
-      resolve(ok)
+      resolve({ ok, lines })
     })
   })
 }
@@ -108,7 +109,18 @@ if (args.includes('--changed')) {
   const wanted = args.filter((a) => a in GATES)
   names = wanted.length ? wanted : Object.keys(GATES)
 }
+// Souběh: tsc + ui běží vedle cargo řetězce (test → clippy za sebou — sdílený zámek target), build až po všem.
+// Výstup (pořadí řádků, exit kód) je stejný jako při běhu za sebou: řádky se tisknou v pořadí `names` po dokončení.
+const results = {}
+const lane = (list) => list.reduce((p, n) => p.then(async () => { results[n] = await run(n) }), Promise.resolve())
+const cargoLane = names.filter((n) => n === 'test' || n === 'clippy')
+const freeLanes = names.filter((n) => n === 'tsc' || n === 'ui').map((n) => [n])
+await Promise.all([lane(cargoLane), ...freeLanes.map(lane)])
+await lane(names.filter((n) => n === 'build'))
 let allOk = true
-for (const n of names) allOk = (await run(n)) && allOk
+for (const n of names) {
+  for (const l of results[n].lines) console.log(l)
+  allOk = results[n].ok && allOk
+}
 console.log(allOk ? 'BRÁNY: vše prošlo' : 'BRÁNY: SELHALO — viz výše')
 process.exit(allOk ? 0 : 1)

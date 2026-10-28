@@ -433,7 +433,7 @@ pub fn diff(cur: &[DeskWidget], target: &[DeskWidget]) -> Diff {
 
 /// Stav widgetů (chybějící / poškozený soubor = žádné; neznámé druhy, duplicity a nesmysly pryč).
 pub fn load(path: &Path) -> DeskFile {
-    let raw: DeskFile = std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+    let raw: DeskFile = crate::fsx::load_json_or_default(path);
     parse_clean(raw)
 }
 
@@ -452,12 +452,7 @@ fn parse_clean(raw: DeskFile) -> DeskFile {
 
 /// Zápis celého souboru (tmp + přejmenování — nikdy půlka souboru).
 pub fn save(path: &Path, f: &DeskFile) -> std::io::Result<()> {
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_string_pretty(f).unwrap_or_default())?;
-    std::fs::rename(&tmp, path)
+    crate::fsx::save_json(path, f)
 }
 
 // ---------- viditelnost ----------

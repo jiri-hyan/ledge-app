@@ -13,7 +13,7 @@ use super::parse::{self, Tokens};
 use super::price;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 /// Verze formátu indexu — jiná na disku = přepočet od nuly. 2 = přibyly hodiny (`hours`, kolo 22):
@@ -362,13 +362,7 @@ pub fn save(dir: &Path, ix: &Index) -> std::io::Result<()> {
 }
 
 fn write_atomic(p: &Path, data: &[u8]) -> std::io::Result<()> {
-    let tmp = p.with_extension("tmp");
-    {
-        let mut f = std::fs::File::create(&tmp)?;
-        f.write_all(data)?;
-        f.sync_all()?;
-    }
-    std::fs::rename(&tmp, p)
+    crate::fsx::write_atomic(p, data)
 }
 
 const SEEN_MAGIC: &[u8; 4] = b"LUS1";
@@ -398,6 +392,7 @@ pub fn decode_seen(b: &[u8]) -> Option<HashMap<u64, i32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     #[test]
     fn read_line_capped_table() {

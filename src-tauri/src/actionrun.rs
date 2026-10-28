@@ -31,8 +31,7 @@ pub fn local_dir() -> PathBuf {
     if let Some(dir) = crate::config::config_dir_override() {
         return dir.join("local");
     }
-    let base = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into());
-    Path::new(&base).join("Ledge")
+    crate::dirs::or_dot(crate::dirs::localappdata()).join("Ledge")
 }
 
 // ---------- kam akce vede ----------
@@ -92,7 +91,7 @@ pub fn check_fs(a: &Action) -> Option<LinkTarget> {
 pub fn work_dir(a: &Action) -> Result<PathBuf, String> {
     let dir = match a.cwd.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
         Some(c) => PathBuf::from(personal::normalize(c)?),
-        None => std::env::var_os("USERPROFILE").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\")),
+        None => crate::dirs::home().unwrap_or_else(|| PathBuf::from(r"C:\")),
     };
     if dir.is_dir() { Ok(dir) } else { Err(trf!("pracovní složka {} neexistuje", "working folder {} doesn't exist", dir.display())) }
 }
@@ -274,11 +273,7 @@ impl Consents {
             set.remove(&old);
         }
         let text = serde_json::to_string_pretty(&set.iter().collect::<Vec<_>>()).map_err(|e| crate::errors::json(tr("Souhlas nejde uložit", "Can't save the consent"), &e))?;
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(tr("Souhlas nejde uložit", "Can't save the consent"), &e))?;
-        }
-        let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &path)).map_err(|e| crate::errors::io(tr("Souhlas nejde uložit", "Can't save the consent"), &e))
+        crate::fsx::write_atomic_dir(&path, text.as_bytes()).map_err(|e| crate::errors::io(tr("Souhlas nejde uložit", "Can't save the consent"), &e))
     }
 }
 

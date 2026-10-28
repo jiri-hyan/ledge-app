@@ -67,10 +67,7 @@ pub const WAIT_MAX: usize = 6;
 const TEXT_MAX: usize = 120;
 
 /// Zkrátit na `max` znaků (ne bajtů) s „…“.
-pub fn clip(s: &str, max: usize) -> String {
-    let s = s.split_whitespace().collect::<Vec<_>>().join(" ");
-    if s.chars().count() <= max { s } else { format!("{}…", s.chars().take(max.saturating_sub(1)).collect::<String>()) }
-}
+pub use crate::util::clip_line as clip;
 
 /// Jméno složky z cesty (`C:\x\app` → `app`).
 pub fn folder_name(cwd: &str) -> String {

@@ -15,9 +15,7 @@ pub const WARN_PCT: f64 = 80.0;
 pub const FULL_PCT: f64 = 100.0;
 
 /// „42 %“ (CPU, paměť, baterie).
-fn pct(p: f64) -> String {
-    format!("{:.0} %", p.round().clamp(0.0, 100.0))
-}
+use crate::util::pct_text as pct;
 
 /// Barva prstence podle čerpání limitu (akcent → jantar od 80 % → červená od 100 %).
 pub fn ring_color(p: f64, accent: Rgba) -> Rgba {

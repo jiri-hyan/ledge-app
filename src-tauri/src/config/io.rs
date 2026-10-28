@@ -19,14 +19,12 @@ pub fn config_dir() -> PathBuf {
     if let Some(dir) = config_dir_override() {
         return dir;
     }
-    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
-    Path::new(&base).join("Ledge")
+    crate::dirs::or_dot(crate::dirs::appdata()).join("Ledge")
 }
 
 /// `%APPDATA%\Notch` — složka starého produktu; čte ji jen migrace (`migrate.rs`).
 pub fn legacy_config_dir() -> PathBuf {
-    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
-    Path::new(&base).join("Notch")
+    crate::dirs::or_dot(crate::dirs::appdata()).join("Notch")
 }
 
 pub fn config_path() -> PathBuf {
@@ -80,11 +78,7 @@ pub fn save(path: &Path, cfg: &Config) -> Result<(), String> {
     let mut n = SAVING.lock();
     *n += 1;
     crate::configio::keep_unreadable(path)?;
-    let tmp = path.with_extension(format!("json.{}-{}.tmp", std::process::id(), *n));
-    let res = std::fs::write(&tmp, text + "\n").and_then(|_| std::fs::rename(&tmp, path));
-    if res.is_err() {
-        let _ = std::fs::remove_file(&tmp);
-    }
+    let res = crate::fsx::write_atomic(path, (text + "\n").as_bytes());
     res.map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))
 }
 

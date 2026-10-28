@@ -6,7 +6,7 @@ Always-on „šuplík“ u horního okraje obrazovky (Windows; Tauri 2 + Rust v 
 **Začni levně:** [`docs/codemap/README.md`](docs/codemap/README.md) → mapa tvé oblasti → teprve pak
 konkrétní soubory. Moduly jsou malé (většinou < 500 řádků) — čti jen ty, které mapa jmenuje.
 Symbol nebo slovo najdeš jedním příkazem: `node scripts/kde.mjs <symbol>` (definice `soubor:řádek` + které
-mapy ho zmiňují). [`AGENTS.md`](AGENTS.md) je rozcestník k `docs/agents/*.md` (config, formát poznámek,
+mapy ho zmiňují); `node scripts/kde.mjs --file <cesta>` dá řádek mapy souboru + osnovu deklarací s čísly řádků (místo čtení celého souboru). Mapa = jádro ≤ 8 KB; toky, invarianty a testy jsou v `docs/codemap/<oblast>-detail.md`. [`AGENTS.md`](AGENTS.md) je rozcestník k `docs/agents/*.md` (config, formát poznámek,
 API/MCP, instalace) — čti jen potřebný soubor, ne celý.
 Historie kol a backlog nejsou v repu (interní předávka mimo strom).
 
@@ -14,10 +14,10 @@ Historie kol a backlog nejsou v repu (interní předávka mimo strom).
 
 | Úkol | Začni tady |
 |---|---|
-| Nová karta | `layout.rs` `CARDS` + `src/layout/model.ts` `CARD_IDS`/`CARD_INFO` + větev `MainPage.tsx` `card` — [layout.md](docs/codemap/layout.md) (Invarianty) |
+| Nová karta | `layout.rs` `CARDS` + `src/layout/model.ts` `CARD_IDS`/`CARD_INFO` + větev `MainPage.tsx` `card` — [layout-detail.md](docs/codemap/layout-detail.md) (Invarianty) |
 | Nový config klíč | struct v `src-tauri/src/config/*` (serde default + `JsonSchema`) → zrcadlo `src/types/*.ts` → zápis do `docs/agents/config*.md` (hlídá `scripts/config-keys.mjs`) → editor v Nastavení → test se starým configem — [core.md](docs/codemap/core.md) `config/*` |
 | Nový příkaz Tauri | `src-tauri/src/commands/<oblast>.rs` + `mod` v `commands/mod.rs` + `generate_handler!` v `lib.rs` + volání v `src/api.ts` (nebo `src/<oblast>/api.ts`) — [core.md](docs/codemap/core.md) |
-| Text / překlad | `t("klíč", "česky")` + angličtina v `src/i18n/en-<oblast>.ts` (nový slovník = import v `dicts.ts`); test `src/i18n.test.mjs` — [ui.md](docs/codemap/ui.md) (i18n) |
+| Text / překlad | `t("klíč", "česky")` + angličtina v `src/i18n/en-<oblast>.ts` (nový slovník = import v `dicts.ts`); test `src/i18n.test.mjs` — [ui-detail.md](docs/codemap/ui-detail.md) (i18n) |
 | Panel nebo volba v Nastavení | `settings/registry.ts` (panel) · `catalog.ts` · `panels/*.tsx` · popisky `settings/labels.ts` + `settings/en.ts` — [settings.md](docs/codemap/settings.md) |
 | Nový modul / soubor | řádek v mapě své oblasti ([README](docs/codemap/README.md)); bez něj spadne `scripts/codemap-coverage.test.mjs` |
 

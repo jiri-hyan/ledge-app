@@ -153,8 +153,7 @@ fn save_cache() {
     });
     let path = cache_path();
     let text = encode_cache(feeds);
-    let tmp = path.with_extension("json.tmp");
-    let res = std::fs::create_dir_all(path.parent().unwrap_or(&path)).and_then(|_| std::fs::write(&tmp, text)).and_then(|_| std::fs::rename(&tmp, &path));
+    let res = crate::fsx::write_atomic_dir(&path, text.as_bytes());
     if let Err(e) = res {
         log(&format!("kalendář: cache nejde uložit ({e})"));
     }

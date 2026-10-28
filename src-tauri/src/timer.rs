@@ -277,10 +277,7 @@ pub(crate) fn save(dir: &Path, s: &TimerState) -> std::io::Result<()> {
             _ => Ok(()),
         };
     }
-    std::fs::create_dir_all(dir)?;
-    let tmp = dir.join(format!("{FILE}.tmp"));
-    std::fs::write(&tmp, serde_json::to_vec_pretty(s).unwrap_or_default())?;
-    std::fs::rename(&tmp, &p)
+    crate::fsx::write_atomic_dir(&p, &serde_json::to_vec_pretty(s).unwrap_or_default())
 }
 
 // ---------- napojení na jádro ----------
