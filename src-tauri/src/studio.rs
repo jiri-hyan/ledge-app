@@ -77,6 +77,20 @@ pub fn place(work: Rect, scale: f64, screens: &[Rect], saved: Option<Rect>) -> R
     Rect { x: work.x + (work.w - w) / 2, y: work.y + (work.h - h) / 2, w, h }
 }
 
+/// Mezera mezi spodkem proužku a horní hranou Studia (fyzické px).
+const STRIP_GAP: i32 = 8;
+
+/// Studio nesmí ležet pod proužkem (ten je topmost nahoře na monitoru Ledge): okno na tomhle monitoru (střed
+/// v `work`) s horní hranou nad `strip_bottom` se posune pod něj a zkrátí na zbytek plochy. Jiný monitor beze změny.
+pub fn below_strip(r: Rect, work: Rect, strip_bottom: i32) -> Rect {
+    let top = strip_bottom.saturating_add(STRIP_GAP).max(work.y);
+    if r.y >= top || !contains(&work, r.x.saturating_add(r.w / 2), r.y.saturating_add(r.h / 2)) {
+        return r;
+    }
+    let room = work.y.saturating_add(work.h).saturating_sub(top);
+    Rect { y: top, h: r.h.min(room).max(1), ..r }
+}
+
 /// Cíl skoku z URL / události: jen písmena, číslice, `.`, `-`, `_` (kotvy `f-strip.look`), nejvýš 80 znaků.
 pub fn clean_target(t: Option<&str>) -> Option<String> {
     let t = t?.trim().trim_start_matches('#');
@@ -128,7 +142,8 @@ pub fn open(target: Option<String>, focus: bool) -> Result<(), String> {
         .map(|m| Rect { x: m.position().x, y: m.position().y, w: m.size().width as i32, h: m.size().height as i32 })
         .collect();
     let saved: Saved = crate::fsx::load_json_or_default(&store());
-    let at = place(work, scale, &screens, saved.rect);
+    let strip_bottom = mon.rect.top.saturating_add((c.strip_logical(&mon).1 * scale).ceil() as i32);
+    let at = below_strip(place(work, scale, &screens, saved.rect), work, strip_bottom);
     let url = format!("settings.html{}", target.clone().map(|t| format!("#{t}")).unwrap_or_default());
     let win = WebviewWindowBuilder::new(&c.app, LABEL, WebviewUrl::App(url.into()))
         .title("Ledge Studio")
@@ -177,6 +192,7 @@ pub fn open(target: Option<String>, focus: bool) -> Result<(), String> {
             });
         }
     });
+    hide_drawer();
     let _ = win.show();
     if focus {
         let _ = win.set_focus();
@@ -184,7 +200,17 @@ pub fn open(target: Option<String>, focus: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Studio otevírá „místo Ledge“: šuplík je topmost, otevřený by Studio zakryl → zavřít (`Hide` = bez vrácení
+/// fokusu, ten dostane Studio).
+fn hide_drawer() {
+    let c = core();
+    if c.drawer.view() != crate::drawer::View::Hidden {
+        c.send_ui(crate::state::UiCmd::Hide);
+    }
+}
+
 fn reveal(w: &WebviewWindow, target: Option<String>, focus: bool) -> Result<(), String> {
+    hide_drawer();
     let _ = w.unminimize();
     let _ = w.show();
     if focus {
@@ -345,5 +371,26 @@ mod tests {
         let s: Saved = serde_json::from_str(r#"{"rect":{"x":1,"y":2,"w":3,"h":4}}"#).unwrap();
         assert_eq!(s.rect, Some(Rect { x: 1, y: 2, w: 3, h: 4 }));
         assert!(!s.max);
+    }
+
+    #[test]
+    fn below_strip_table() {
+        let work = Rect { x: 0, y: 0, w: 1920, h: 1040 };
+        #[rustfmt::skip]
+        let cases: Vec<(Rect, i32, Rect)> = vec![
+            // výchozí poloha (y 80) je pod proužkem 32 px → beze změny
+            (Rect { x: 280, y: 80, w: 1360, h: 880 }, 32, Rect { x: 280, y: 80, w: 1360, h: 880 }),
+            // uložená poloha nahoře → pod proužek + mezera, výška zkrácená na zbytek plochy
+            (Rect { x: 100, y: 0, w: 1400, h: 1040 }, 32, Rect { x: 100, y: 40, w: 1400, h: 1000 }),
+            // posunutá jen dolů, když se vejde
+            (Rect { x: 100, y: 10, w: 1400, h: 700 }, 32, Rect { x: 100, y: 40, w: 1400, h: 700 }),
+            // okno na jiném monitoru (střed mimo work) → beze změny
+            (Rect { x: 2000, y: 0, w: 1400, h: 900 }, 32, Rect { x: 2000, y: 0, w: 1400, h: 900 }),
+            // proužek vypnutý / panel nahoře: work.y už je pod proužkem
+            (Rect { x: 100, y: 0, w: 1400, h: 900 }, -100, Rect { x: 100, y: 0, w: 1400, h: 900 }),
+        ];
+        for (r, strip, want) in cases {
+            assert_eq!(below_strip(r, work, strip), want, "{r:?} strip {strip}");
+        }
     }
 }

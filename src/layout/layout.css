@@ -256,5 +256,5 @@ input.lay-st-name { width: 170px; font-weight: 600; }
 
 /* jedna karta bez pevné výšky nikdy nezabere celý šuplík (vlna 9): nejvýš 70 % stropu šuplíku
    (`--drawer-max-h`, fit.ts), obsah pak scrolluje uvnitř karty a na kraji předá posuv šuplíku */
-.deck-item:not([data-h]) { max-height: calc(var(--drawer-max-h, 100vh) * 0.7); }
+.deck-item:not([data-h]) { max-height: calc(var(--drawer-max-h, 720px) * 0.7); }
 .deck-item:not([data-h]) > :not(.lay-tools, .lay-rs, .lay-target) { min-height: 0; overflow-y: auto; overscroll-behavior-y: auto; }

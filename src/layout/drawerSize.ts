@@ -7,7 +7,7 @@
 import { createSignal } from "solid-js";
 import { api } from "../api";
 import { savedAppearance } from "../theme/apply";
-import { dragWidth, dragged, HEIGHT_LINES, overflowCount, sizeFor, snapTo, switchedSize, WIDTH_LINES, type Side } from "../theme/size";
+import { dragWidth, dragged, heightCss, HEIGHT_LINES, overflowCount, sizeFor, snapTo, switchedSize, WIDTH_LINES, type Side } from "../theme/size";
 import type { DrawerSize, PageSize } from "../types";
 
 type Live = { page: string; width: number; height: number; done: boolean };
@@ -43,8 +43,7 @@ export function sizeNow(page: string): Required<PageSize> {
 
 /** Pevná výška hlavní stránky jako CSS (`.content` v App), `undefined` = podle obsahu (dnešní). */
 export function mainHeight(): string | undefined {
-  const h = sizeNow(tab()).height;
-  return h > 0 ? `min(${h}px, var(--drawer-max-h, 100vh))` : undefined;
+  return heightCss(sizeNow(tab()).height);
 }
 
 const content = () => document.querySelector<HTMLElement>(".content");

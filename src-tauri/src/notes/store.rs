@@ -168,12 +168,14 @@ pub(crate) fn inside(root: &Path, p: &Path) -> bool {
 
 /// `canonicalize` s krátkým opakováním: atomický zápis jiného vlákna (`write_atomic`) soubor na pár ms
 /// přepisuje a Windows ho mezitím hlásí jako neexistující — poznámka by pak „nebyla poznámka Ledge“.
-/// Skutečně chybějící soubor ve skutečné složce selže po ~40 ms.
+/// Skutečně chybějící soubor ve skutečné složce selže po ~200 ms.
 fn canonicalize_settled(path: &Path) -> Option<PathBuf> {
-    for attempt in 0..5 {
+    // ~200 ms: souběžný zápis jiné poznámkové operace (atomické přejmenování, antivir na novém souboru)
+    // umí soubor na Windows „schovat“ déle než pár ms — 5 × 10 ms padalo pod zátěží (flaky test kola 24)
+    for attempt in 0..20 {
         match path.canonicalize() {
             Ok(p) => return Some(p),
-            Err(_) if attempt < 4 && path.parent().is_some_and(Path::is_dir) => std::thread::sleep(std::time::Duration::from_millis(10)),
+            Err(_) if attempt < 19 && path.parent().is_some_and(Path::is_dir) => std::thread::sleep(std::time::Duration::from_millis(10)),
             Err(_) => return None,
         }
     }

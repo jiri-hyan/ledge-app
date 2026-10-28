@@ -115,3 +115,17 @@ export function dragged(w: number, h: number, free: boolean): Required<PageSize>
 export function overflowCount(bottoms: readonly number[], viewBottom: number): number {
   return bottoms.filter((b) => b > viewBottom + 1).length;
 }
+
+/** Strop výšky obsahu jako Rust `drawerfit::limits` (80 % pracovní plochy, nejvýš 20 px od spodku, aspoň 240) —
+ *  záloha pro `--drawer-max-h` (`fit.ts`), než přijde přesná hodnota v události `view`. */
+export function fallbackMaxH(availH: number): number {
+  const a = Number.isFinite(availH) && availH > 0 ? availH : 0;
+  return Math.max(Math.floor(Math.min(a * 0.8, a - 20)), 240);
+}
+
+/** CSS výška hlavní stránky s pevnou výškou `h` (0 = podle obsahu). Strop jen `--drawer-max-h`, NIKDY `100vh`:
+ *  výška obsahu odvozená z výšky okna, kterou Rust nastaví podle výšky obsahu, je zpětná smyčka — v 0.11.0 tak
+ *  šuplík zamrzl na 219 px a nepomohl ani restart. */
+export function heightCss(h: number): string | undefined {
+  return h > 0 ? `min(${h}px, var(--drawer-max-h, ${h}px))` : undefined;
+}

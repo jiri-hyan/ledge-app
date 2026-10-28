@@ -4,7 +4,7 @@
 //   node --experimental-strip-types --test src/theme/size.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clampSize, dragged, dragWidth, HEIGHT_LINES, isDefaultSize, normalizeSize, overflowCount, pruneSizePages, switchedSize, setSize, sizeFor, snapTo, widthSides, WIDTH_LINES } from "./size.ts";
+import { clampSize, dragged, dragWidth, fallbackMaxH, heightCss, HEIGHT_LINES, isDefaultSize, normalizeSize, overflowCount, pruneSizePages, switchedSize, setSize, sizeFor, snapTo, widthSides, WIDTH_LINES } from "./size.ts";
 import { DEFAULT_APPEARANCE, normalizeAppearance } from "./appearance.ts";
 
 test("starý config: žádná velikost, normalizace pole nepřidá", () => {
@@ -100,4 +100,17 @@ test("přepnutí záložky v úpravách: nová velikost jen s perPage a jinou ve
     [undefined, "prace", "osobni", null],
   ];
   for (const [cfg, a, b, want] of table) assert.deepEqual(switchedSize(cfg, a, b), want, `${a}→${b}`);
+});
+
+test("výška hlavní stránky se nikdy neváže na výšku okna (smyčka 0.11.0: šuplík zamrzl na 219 px)", () => {
+  assert.equal(heightCss(0), undefined);
+  assert.equal(heightCss(934), "min(934px, var(--drawer-max-h, 934px))");
+  assert.ok(!heightCss(934).includes("vh"), "fallback nesmí být 100vh");
+});
+
+test("záložní strop výšky = Rust drawerfit::limits (80 %, 20 px od spodku, aspoň 240)", () => {
+  assert.equal(fallbackMaxH(1032), 825); // 1080 − hlavní panel, jako v logu šéfa
+  assert.equal(fallbackMaxH(100), 240);
+  assert.equal(fallbackMaxH(0), 240);
+  assert.equal(fallbackMaxH(Number.NaN), 240);
 });

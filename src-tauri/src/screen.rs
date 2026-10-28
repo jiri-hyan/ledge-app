@@ -99,6 +99,12 @@ fn foreground_covers(mon: &Monitor) -> bool {
         if is_shell(fg) {
             return false;
         }
+        // vlastní okno (Studio roztažené přes celý monitor) není hra — Ledge se kvůli sobě neschová
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, Some(&mut pid));
+        if pid == std::process::id() {
+            return false;
+        }
         if MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST).0 as isize != mon.handle {
             return false;
         }
