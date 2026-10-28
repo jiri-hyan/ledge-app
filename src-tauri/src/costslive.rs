@@ -163,12 +163,13 @@ fn compute() -> Result<view::Summary, String> {
     let dirs = project_dirs();
     let summary = view::build(&ix, today, WINDOW_DAYS, &|cwd| project_name(&dirs, cwd));
     log(&format!(
-        "útrata: {} ms, souborů {} (staré {}, beze změny {}, čteno {}), {} MB, odpovědí {} (+{} duplicit){}, index {} odpovědí",
+        "útrata: {} ms, souborů {} (staré {}, beze změny {}, čteno {}, doplněno {}), {} MB, odpovědí {} (+{} duplicit){}, index {} odpovědí",
         t0.elapsed().as_millis(),
         st.files,
         st.skipped_old,
         st.unchanged,
         st.opened,
+        st.filled,
         st.bytes / 1_000_000,
         st.records,
         st.duplicates,

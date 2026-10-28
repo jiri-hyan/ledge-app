@@ -42,6 +42,9 @@ const TABLES = [
   },
 ];
 const DYNAMIC = [
+  { file: "winquick/WinQuickCard.tsx", key: "NAMES[id][0]", why: PAIRS },
+  { file: "winquick/WinQuickCard.tsx", key: "DIRS[key][0]", why: PAIRS },
+  { file: "winquick/WinQuickCard.tsx", key: "key", why: PAIRS },
   { file: "actions/ActionEditor.tsx", key: "m.key", why: PAIRS },
   { file: "actions/ActionEditor.tsx", key: "e().key", why: "chyby `draftError` v actions/model.ts — " + PAIRS },
   { file: "actions/ActionEditor.tsx", key: "k.key", why: PAIRS },

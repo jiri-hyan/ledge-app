@@ -2,7 +2,8 @@
 
 use super::notes_sync::{SyncMsg, send_sync};
 use super::notes_watch::request_notes_reload;
-use crate::appearance::{geom, motion};
+use crate::appearance::{geom, motion, size};
+use crate::drawerfit;
 use crate::drawer::{self, Opener, View};
 use crate::focusreturn;
 use crate::hovermode;
@@ -13,6 +14,12 @@ use crate::state::{UiCmd, core};
 use crate::stripview::refresh_strip;
 use std::sync::mpsc;
 use tauri::Emitter;
+
+/// Po příkazu se obnoví proužek, kromě tažení velikosti (živě každý snímek by ho kreslilo zbytečně; puštění
+/// pošle `Resize(false)`).
+fn refreshes_strip(cmd: &UiCmd) -> bool {
+    !matches!(cmd, UiCmd::ResizeLive)
+}
 
 // ---------- vlákna ----------
 
@@ -32,6 +39,7 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                     (motion::anim_ms_now(&cfg.appearance.motion), geom::drawer_width_for(&cfg, mon.rect.right - mon.rect.left, mon.dpi))
                 };
                 let give_back = matches!(cmd, UiCmd::Close);
+                let strip = refreshes_strip(&cmd);
                 // herní režim: šuplík se neukazuje (vypnutí jde přes `gamemode::set(false)` dřív než Show)
                 if matches!(cmd, UiCmd::Show(..) | UiCmd::Note) && c.game_mode.load(std::sync::atomic::Ordering::SeqCst) {
                     continue;
@@ -82,10 +90,35 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                     UiCmd::Focus => c.drawer.take_focus(),
                     UiCmd::Release => c.drawer.release_focus(),
                     UiCmd::Size(view, w, h) => c.drawer.report_size(view, w, h, &mon, width),
+                    UiCmd::Resize(_) | UiCmd::ResizeLive => {
+                        let animate = matches!(cmd, UiCmd::Resize(true));
+                        // přepnutí záložky: pevnou výšku záložky zná Rust předem → šířka i výška jedním pohybem
+                        let fixed = if animate {
+                            let s = c.cfg.read().appearance.size.for_page(&size::page());
+                            size::fixed_height(s, drawerfit::limits(mon.rect, mon.work, mon.dpi).max_h)
+                        } else {
+                            None
+                        };
+                        c.drawer.resize(&mon, width, if animate { anim } else { 0 }, fixed);
+                    }
                     UiCmd::Warm => c.drawer.warm(),
                 }
-                refresh_strip();
+                if strip {
+                    refresh_strip();
+                }
             }
         })
         .ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_refresh_skipped_only_while_dragging() {
+        for (cmd, want) in [(UiCmd::ResizeLive, false), (UiCmd::Resize(false), true), (UiCmd::Resize(true), true), (UiCmd::Warm, true), (UiCmd::Hide, true)] {
+            assert_eq!(refreshes_strip(&cmd), want);
+        }
+    }
 }

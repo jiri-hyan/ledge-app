@@ -9,6 +9,7 @@ import { isWidgetId } from "../widgets/model.ts";
 // Texty jako páry klíč + čeština, přeloží se až při vykreslení. Vzhled karty (`look`) a složky dlaždic
 // (`tiles.folders`) mají vlastní moduly `look.ts` a `folders.ts`; tady se jen normalizují a klonují.
 import { normalizeCardLook, type CardLook } from "./look.ts";
+import { pruneSizePages } from "../theme/size.ts";
 import { normalizeFolders, type TileFolder } from "./folders.ts";
 
 
@@ -16,6 +17,10 @@ export const CARD_IDS = [
   "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today",
   // kolo 22 (nové widgety, `src/board/`) — jen z katalogu, výchozí rozložení beze změny
   "usage", "week", "bigclock", "toggles",
+  // kolo 23 (`src/winquick/`) — jen z katalogu
+  "winquick",
+  // kolo 23: Claude aktivita (`src/sessions/ActivityCard.tsx`) — jen z katalogu
+  "activity",
 ] as const;
 export type BuiltinCardId = (typeof CARD_IDS)[number];
 /** Dynamická karta: widget ze skriptu (`widget:<soubor>`). */
@@ -108,6 +113,8 @@ export const CARD_INFO: Record<BuiltinCardId, { name: Text; desc: Text; size: Ca
   week: { name: ["cards.layout.card.week", "Týden"], desc: ["cards.layout.desc.week", "Velký měsíc a čas, pás dnů s dneškem a dnešní události z kalendáře"], size: "m" },
   bigclock: { name: ["cards.layout.card.bigclock", "Velké hodiny"], desc: ["cards.layout.desc.bigclock", "Čas obřími číslicemi a pod ním datum"], size: "s" },
   toggles: { name: ["cards.layout.card.toggles", "Rychlé přepínače"], desc: ["cards.layout.desc.toggles", "Ztlumit zvuk a mikrofon, hlasitost − / + a baterie"], size: "s" },
+  activity: { name: ["cards.layout.card.activity", "Claude aktivita"], desc: ["cards.layout.desc.activity", "Co Claude právě dělá v každé session: fáze (odhad podle posledního nástroje), soubor, poslední zpráva a schválení"], size: "m" },
+  winquick: { name: ["cards.layout.card.winquick", "Rychlé dlaždice Windows"], desc: ["cards.layout.desc.winquick", "Dlaždice, které si vybereš sám: mikrofon, výstup zvuku, terminál ve složce projektu, složky, motiv Windows, Wi-Fi / Bluetooth, Nastavení a poslední snímek obrazovky"], size: "m" },
 };
 export const PART_INFO: Record<PartKey, Text> = {
   claudeLimits: ["cards.layout.part.claudeLimits", "Limity 5h / týden"],
@@ -509,7 +516,16 @@ export function shownCards(p: LayoutPage, f: Facts): LayoutCard[] {
 }
 
 /** Config se změnou JEDNOHO pole `layout` (vstup zůstane netknutý). */
-export const withLayout = <T extends Record<string, any>>(cfg: T, l: Layout): T => ({ ...cfg, layout: l });
+export function withLayout<T extends Record<string, any>>(cfg: T, l: Layout): T {
+  const out: Record<string, any> = { ...cfg, layout: l };
+  // velikosti smazaných záložek (`appearance.size.pages`, kolo 23) se s rozložením uklidí
+  const size = cfg.appearance?.size;
+  if (size?.pages) {
+    const pruned = pruneSizePages(size, l.pages.map((p) => p.id));
+    if (pruned !== size) out.appearance = { ...cfg.appearance, size: pruned };
+  }
+  return out as T;
+}
 
 // ---------- tažení v mřížce ----------
 

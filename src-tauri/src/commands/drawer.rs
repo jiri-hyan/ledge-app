@@ -17,7 +17,17 @@ pub(crate) fn get_state() -> Snapshot {
 pub(crate) fn set_mode(mode: String) {
     // režim = id záložky z `layout`; neznámé (smazaná záložka) = první
     let id = crate::layout::page_id(&core().cfg.read().layout, &mode);
+    // velikost pro každou záložku (`appearance.size.perPage`, kolo 23): jiná velikost = animovaně dorovnat
+    let resize = {
+        let s = &core().cfg.read().appearance.size;
+        s.per_page && s.for_page(&crate::appearance::size::page()) != s.for_page(&id)
+    };
+    crate::appearance::size::set_page(&id);
+    crate::appearance::size::set_live(None);
     *core().mode.lock() = id;
+    if resize {
+        core().send_ui(UiCmd::Resize(true));
+    }
     maybe_refresh_weather(false);
     crate::incidents::maybe_refresh(false);
     crate::calendar::live::maybe_refresh(false);
@@ -34,6 +44,46 @@ pub(crate) fn set_game_mode(on: bool) {
 #[tauri::command]
 pub(crate) fn report_size(view: View, w: f64, h: f64) {
     core().send_ui(UiCmd::Size(view, w, h));
+}
+
+/// Velikost šuplíku tažením za okraje v režimu úprav (`src/layout/drawerSize.ts`; kolo 23). `w`/`h` v
+/// logických px, 0 = výchozí (šířka z předvolby, výška podle obsahu). `done = false` = jen okno během
+/// tažení (výška se kreslí ve frontendu), `true` = oříznout a uložit do `appearance.size` (záložka
+/// `page`, s „Pamatovat pro každou záložku“). Vrací skutečnou velikost po ořezu monitorem `[w, h]`.
+#[tauri::command]
+pub(crate) fn drawer_size(page: String, w: u32, h: u32, done: bool) -> Result<[u32; 2], String> {
+    use crate::appearance::{geom, size};
+    let want = size::clamp(size::PageSize { width: w, height: h });
+    let c = core();
+    let mon = c.monitor();
+    let lim = crate::drawerfit::limits(mon.rect, mon.work, mon.dpi);
+    // v úpravách může být vidět jiná záložka než `mode` → velikost okna podle té, kterou uživatel táhne
+    let id = crate::layout::page_id(&c.cfg.read().layout, &page);
+    let prev = size::page();
+    size::set_page(&id);
+    let eff = [
+        if want.width > 0 { geom::drawer_width(want.width, mon.rect.right - mon.rect.left, mon.dpi) as u32 } else { 0 },
+        size::fixed_height(want, lim.max_h).map_or(0, |v| v as u32),
+    ];
+    if !done {
+        // přepnutí záložky uvnitř úprav (jiná velikost s `perPage`) = animovaně jako `set_mode`
+        let animates = size::switch_animates(&c.cfg.read().appearance.size, &prev, &id);
+        size::set_live(size::live_after(animates, want.width));
+        c.send_ui(if animates { UiCmd::Resize(true) } else { UiCmd::ResizeLive });
+        return Ok(eff);
+    }
+    size::set_live(None);
+    let mut cfg = c.cfg.read().clone();
+    cfg.appearance.size.set(&id, want);
+    let res = if cfg.appearance.size == c.cfg.read().appearance.size { Ok(()) } else { crate::commands::config::save_config(cfg) };
+    c.send_ui(UiCmd::Resize(false));
+    res.map(|_| eff)
+}
+
+/// Konec úprav (Hotovo / Zrušit): zahodit živou šířku z tažení, ať nezůstane viset (`endSizeEdit`).
+#[tauri::command]
+pub(crate) fn drawer_size_end() {
+    crate::appearance::size::set_live(None);
 }
 
 #[tauri::command]

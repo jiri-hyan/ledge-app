@@ -21,7 +21,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   (prázdný `name` = „Práce“ / „Osobní“ podle jazyka), vlastní záložka potřebuje `name`, `id` = `a-z0-9-`.
   Karty: `projects`, `running`, `claude`, `repos`, `notes`, `actions`, `shelf`, `clock`, `timer`, `weather`,
   `calendar`, `links`, `media` (Právě hraje + hlasitost), `github`, `system`, `mail` (Pošta — účet Microsoft;
-  ty tři jsou jen v katalogu, na žádné záložce ve výchozím rozložení nejsou — `layout::OPT_IN`) a **dynamické** `widget:<soubor>` (widget ze
+  ty tři jsou jen v katalogu, na žádné záložce ve výchozím rozložení nejsou — `layout::OPT_IN`), `activity` (Claude
+  aktivita, kolo 23 — jen v katalogu: session s fází, souborem, poslední zprávou a schválením; na záložce zapne
+  čtení posledních 64 kB přepisu session při hooku `Stop`, jinak se přepis nečte) a **dynamické** `widget:<soubor>` (widget ze
   skriptu ve složce widgetů — jen jméno souboru, bez cesty; katalog je nabízí podle složky, viz „Widgety ze
   skriptů“); stejná karta smí být na víc záložkách, na jedné
   jen jednou. `size`: `s` (1 sloupec), `m` (2), `l` (3), `xl` (celá řada) z `--deck-cols` (výchozí 4 — počet
@@ -129,7 +131,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     pravý), `ghost` (v klidu nic, jen „čeká na tebe“ / „hotovo“; najetí k hraně šuplík otevře dál), `bar` (lišta
     přes celou šířku, monospace, vpravo limit 5h a čas), `notch` (černý výřez s oušky), `progress` (text + lišta
     průběhu: limit 5h / časovač / skladba, jen z reálných dat), `ticker` (jeden řádek; víc událostí se střídá po
-    5 s, jinak žádný časovač). Kolo 22: `minimum` (baterie + čas; bez baterie jen čas), `trio` (počasí z paměti karty
+    5 s, jinak žádný časovač). Kolo 23: `custom` (vlastní, `strip.compose` níž). Kolo 22: `minimum` (baterie + čas; bez baterie jen čas), `trio` (počasí z paměti karty
     Počasí — proužek nic nestahuje, starší než 3 h = nic | čas a den | CPU a paměť jako u položky „Systém“ po 10 s,
     baterie), `rings` (stav Clauda: prstence limitů 5h a týden + čas; bez limitu jen prázdná dráha, točí se jen
     když Claude pracuje a animace jsou zapnuté, oranžově = čeká na tebe). Baterii čte Ledge z oznámení Windows
@@ -144,3 +146,17 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   - `strip.lookShape` — tvar kapsle u stylů s tělem (`island`, `icons`, `clock`, `ghost`, `progress`, `ticker`,
     `minimum`, `trio`, `rings`; kolo 22): `round` (výchozí = dnešní tvar), `sharp` (ostré rohy), `long`
     (prodloužená), `island` („jako Mac“: oblá ze všech stran, 6 px pod hranou). Ostatní styly ho ignorují.
+  - `strip.look: "custom"` + `strip.compose` — **vlastní zavřený Ledge** (kolo 23, `looks/compose.rs`; jen výslovnou
+    volbou, výchozí zůstává `classic`, starý config bez `compose` = výchozí hodnoty). `compose`: `shape` (`capsule`
+    výchozí, `notch`, `line` = linka přes celou hranu s úsekem na položku, `corner`, `drop`, `island`), `width`
+    60–620 px (výchozí 300; u `line` se nepoužije), `height` 18–52 px (`line` 2–10, výchozí 30), `round` 0–100 %
+    (výchozí 55), sloty `left` / `center` / `right` = pole `{ "item", "style" }`, dohromady 1–5 položek, každá
+    nejvýš jednou. `item`: `time`, `date`, `claude`, `limit5h`, `limitWeek`, `music`, `timer`, `cpu`, `memory`,
+    `battery`, `weather`, `servers`, `repos`, `activity` (kolo 23, „Claude aktivita“: čekající schválení s počtem,
+    jinak fáze vedoucí session + soubor — fáze je odhad podle posledního nástroje z hooku `PostToolUse`, krok
+    čtení → úpravy → testy → hotovo jako podíl prstence; bez hooků nic) (jen co má skutečný zdroj; bez dat se položka nekreslí, prstenec limitu
+    = prázdná dráha). `style`: `icon`, `badge` (ikona s číslem), `text`, `ring`, `graph` (malý graf = sloupek
+    z aktuální hodnoty), `dot`. `hideIdle` (v klidu skrytý, ukáže se při „čeká“ / „hotovo“), `rotate` (víc událostí
+    uprostřed se střídá po 5 s). Mimo rozsah / přes 5 položek se při použití ořízne (`Compose::norm`), neznámá
+    položka = chyba configu. Hudba, baterie a CPU / paměť se čtou jen, když je v `compose` ta položka. MCP
+    `strip_set` `compose` ve schématu nemá (strop `tools/list`); skládá se v Nastavení → Vzhled → Zavřený → Vlastní.

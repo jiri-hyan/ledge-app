@@ -32,6 +32,8 @@ export const FIELDS: Record<string, FieldDef> = {
   "appearance.pages": { panel: "vzhled", label: "Vzhled záložek", hint: "Jiný styl, motiv a akcent pro každou záložku šuplíku", kw: "záložka záložky tab stránka práce osobní vlastní vzhled motiv styl akcent" },
   "appearance.accent": { panel: "vzhled", label: "Akcent", hint: "Linka, záře a fokus", kw: "barva akcentu" },
   "appearance.details": { panel: "vzhled", label: "Písmo, rohy a materiál", hint: "Písmo, materiál, velikost písma, rohy — přebijí hodnoty stylu", kw: "písmo font materiál rohy zaoblení stín záře rozložení sloupce detaily pokročilé" },
+  "appearance.size": { panel: "vzhled", label: "Velikost otevřeného Ledge", hint: "Šířka a výška šuplíku v px; v úpravách tažením za okraje", kw: "velikost šířka výška px tažení okraj úchyt větší menší vyšší" },
+  "appearance.size.perPage": { panel: "vzhled", label: "Pamatovat velikost pro každou záložku", hint: "Každá záložka má vlastní šířku a výšku", kw: "velikost záložka záložky šířka výška pamatovat" },
   "drawer.width": { panel: "vzhled", label: "Vlastní šířka šuplíku", hint: "Přesně v px, když ti předvolby nesedí", kw: "šířka px velikost vlastní" },
   "drawer.glass": { panel: "vzhled", label: "Pozadí šuplíku", hint: "Krytí a rozmazání plochy za šuplíkem (akryl)", kw: "sklo akryl průhlednost rozmazání krytí glass" },
   "appearance.motion": { panel: "vzhled", label: "Animace", hint: "Jak se šuplík otevírá; „Žádná“ = ukáže se hned", kw: "animace pohyb vysunutí pružina plynulá svižná odskok rozplynutí výřez žádná rychlost" },
@@ -70,6 +72,8 @@ export const FIELDS: Record<string, FieldDef> = {
   "claude.statusLine": { panel: "claude", label: "Číst limity 5h / týden", hint: "Ledge obalí stavový řádek Claude Code a čte z něj limity 5h / týden; tvůj původní poběží dál", kw: "stavový řádek limit kvóta 5h týden statusline" },
   "claude.limitsReminder": { panel: "claude", label: "Připomenout reset limitu", hint: "Když limit 5h nebo týden dosáhne 100 %, v čase resetu krátce vyjede šuplík (ve hře nic)", kw: "limit kvóta reset připomínka" },
   "claude.costs": { panel: "claude", label: "Hodnota v cenách API", hint: "Část karty Claude: tokeny a odhad ceny v cenách API (ne účet) podle projektu a dne z lokálních transcriptů; počítá se jen po rozbalení", kw: "útrata cena tokeny dolary náklady odhad" },
+  "claude.limitsPace": { panel: "claude", label: "Tempo čerpání limitů", hint: "V pruzích 5h a týden ryska plánu (rovnoměrné čerpání); nad plánem se část výplně obarví, 5h pruh i když tempo dojde před obnovou", kw: "limit tempo plán čerpání týden 5h ryska" },
+  "claude.contextBar": { panel: "claude", label: "Pruh kontextu session", hint: "Pod každou živou session pruh s velikostí kontextu (rysky 250 k a 350 k) a „každý tah teď čte ~N k tokenů“; čte konec přepisu session jen při otevřeném šuplíku", kw: "kontext tokeny pruh velikost session předávka cache" },
   "mcp.enabled": { panel: "claude", label: "Nastavovat Ledge přes Clauda (MCP)", hint: "Claude smí číst a měnit nastavení Ledge; nic nespouští a nic neposílá ven. Výchozí vypnuto.", kw: "mcp claude server nastavit klíč nástroje" },
   "claude.enforceCommit": { panel: "claude", label: "Hlídat nedokončenou práci", hint: "Soubory, které session upravila a nezacommitovala, a její nepushnuté commity", kw: "nedokončené session commit push hlídač" },
   // Osobní

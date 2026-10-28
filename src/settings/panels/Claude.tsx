@@ -113,6 +113,9 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.limitsReminder">
           <Toggle path="claude.limitsReminder" label={fieldLabel("claude.limitsReminder")} />
         </Row>
+        <Row id="claude.limitsPace">
+          <Toggle path="claude.limitsPace" label={fieldLabel("claude.limitsPace")} />
+        </Row>
         <Row id="smart.incidents.enabled" stack>
           <Toggle path="smart.incidents.enabled" label={fieldLabel("smart.incidents.enabled")} />
           <small class="st-note">
@@ -129,6 +132,9 @@ export default function ClaudePanel(p: PanelProps) {
       <Section title={t("settings.claude.costs", "Hodnota v cenách API")}>
         <Row id="claude.costs">
           <Toggle path="claude.costs" label={fieldLabel("claude.costs")} />
+        </Row>
+        <Row id="claude.contextBar">
+          <Toggle path="claude.contextBar" label={fieldLabel("claude.contextBar")} />
         </Row>
       </Section>
       <Section title={t("settings.claude.watch", "Hlídač nedokončené práce")}>

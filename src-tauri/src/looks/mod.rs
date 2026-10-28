@@ -6,6 +6,11 @@
 //! (`without`). Tvar a místo u hrany: `frame`. Kreslí `stripdraw`.
 
 pub mod capsule;
+pub mod compose;
+#[cfg(test)]
+mod compose_tests;
+#[cfg(test)]
+mod activity_tests;
 pub mod facts;
 pub mod frame;
 #[cfg(test)]
@@ -53,6 +58,8 @@ pub enum Look {
     Trio,
     // stav Clauda: 1–2 prstence limitů (5h, týden) + čas; prstenec se točí, jen když Claude pracuje
     Rings,
+    // kolo 23: vlastní (`strip.compose`: tvar, rozměry, položky) — jen výslovnou volbou
+    Custom,
 }
 
 /// Tvar kapsle u stylů s tělem (`strip.lookShape`, kolo 22): volba tvaru, ne nový styl. Platí jen pro styly
@@ -74,7 +81,7 @@ pub enum Shape {
 impl Look {
     /// všechny styly v pořadí galerie (testy zrcadel)
     #[allow(dead_code)]
-    pub const ALL: [Look; 15] = [
+    pub const ALL: [Look; 16] = [
         Look::Classic,
         Look::Island,
         Look::Dots,
@@ -90,6 +97,7 @@ impl Look {
         Look::Minimum,
         Look::Trio,
         Look::Rings,
+        Look::Custom,
     ];
 
     #[allow(dead_code)]
@@ -110,6 +118,7 @@ impl Look {
             Look::Minimum => "minimum",
             Look::Trio => "trio",
             Look::Rings => "rings",
+            Look::Custom => "custom",
         }
     }
 
@@ -132,12 +141,13 @@ impl Look {
             Look::Minimum => tr("Minimum", "Minimal"),
             Look::Trio => tr("Trojice", "Trio"),
             Look::Rings => tr("Stav Clauda", "Claude status"),
+            Look::Custom => tr("Vlastní", "Custom"),
         }
     }
 
     /// Ukazuje styl hudbu? (vlákno `media` se pak pustí i bez položky `media` v `strip.items`)
     pub fn shows_music(self) -> bool {
-        !matches!(self, Look::Classic | Look::Ghost | Look::Minimum | Look::Trio | Look::Rings)
+        !matches!(self, Look::Classic | Look::Ghost | Look::Minimum | Look::Trio | Look::Rings | Look::Custom)
     }
 
     /// Ukazuje styl baterii? (`battery::ensure` = odběr změn napájení od Windows, žádný časovač)
@@ -256,6 +266,8 @@ pub struct Facts {
     /// CPU a paměť v % z posledního čerstvého vzorku (`sysmon`)
     pub cpu: Option<f64>,
     pub mem: Option<f64>,
+    /// živá aktivita vedoucí session (položka skládačky „Claude aktivita“; `claude/activity.rs`)
+    pub activity: Option<facts::ActivityFact>,
     /// „14:32“
     pub clock: String,
     /// „14:32 · ne 18. 10.“
@@ -287,6 +299,7 @@ impl Default for Facts {
             weather: None,
             cpu: None,
             mem: None,
+            activity: None,
             clock: String::new(),
             date: String::new(),
             mode: String::new(),
@@ -302,6 +315,7 @@ pub fn without(mut f: Facts, hide: &[StripItem]) -> Facts {
         match it {
             StripItem::Claude => {
                 f.working = 0;
+                f.activity = None;
                 f.done = 0;
             }
             StripItem::Waiting => f.waiting = 0,
@@ -381,6 +395,10 @@ pub enum Glyph {
     Sun,
     Moon,
     Cloud,
+    // kolo 23 (vlastní vzhled): čas, datum, výkon
+    Clock,
+    Calendar,
+    Cpu,
 }
 
 impl Glyph {
@@ -397,6 +415,9 @@ impl Glyph {
             Glyph::Sun => '\u{E706}',
             Glyph::Moon => '\u{E708}',
             Glyph::Cloud => '\u{E753}',
+            Glyph::Clock => '\u{E121}',
+            Glyph::Calendar => '\u{E787}',
+            Glyph::Cpu => '\u{E9D9}',
         }
     }
 
@@ -413,6 +434,9 @@ impl Glyph {
             Glyph::Sun => "☀",
             Glyph::Moon => "☾",
             Glyph::Cloud => "☁",
+            Glyph::Clock => "◷",
+            Glyph::Calendar => "▦",
+            Glyph::Cpu => "▤",
         }
     }
 }
@@ -428,6 +452,8 @@ pub enum Part {
     Battery { percent: u8, charging: bool },
     /// prstenec limitu (`rings`): podíl 0–1, `None` = jen dráha bez čísla (limit neznáme)
     Ring { fill: Option<f32>, color: Rgba },
+    /// malý graf vlastního vzhledu: vodorovný sloupek z aktuální hodnoty 0–1
+    Meter { fill: f32, color: Rgba },
 }
 
 /// Co styl právě ukáže (čistá data pro `stripdraw`).
@@ -448,6 +474,8 @@ pub struct Show {
     pub rotate: Vec<Vec<Part>>,
     /// prstence se točí (`rings`, Claude pracuje) — jen se zapnutými animacemi (`StripModel.animate`)
     pub spin: bool,
+    /// střed vlastního vzhledu (`custom`: `parts` = vlevo, `right` = vpravo; střídá se `rotate`)
+    pub center: Vec<Part>,
 }
 
 pub(crate) fn text(t: impl Into<String>, color: Rgba) -> Part {
@@ -521,7 +549,8 @@ pub fn show(look: Look, f: &Facts) -> Show {
     let idle = st == State::Idle;
     let mut s = Show { idle, ..Show::default() };
     match look {
-        Look::Classic => {}
+        // vlastní skládá `compose::show` z `strip.compose` (volá `stripview`)
+        Look::Classic | Look::Custom => {}
         Look::Minimum | Look::Trio | Look::Rings => capsule::fill(look, f, &mut s),
         Look::Island => {
             s.parts = if idle { vec![Part::Dot(IDLE)] } else { event_line(st, f) };

@@ -26,6 +26,8 @@ use windows::Win32::Foundation::{HWND, RECT};
 use windows::Win32::Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DWMWCP_ROUND, DwmSetWindowAttribute};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
+mod resize;
+
 pub const LABEL: &str = "drawer";
 
 /// Chromium bez služeb, které šuplík nepotřebuje (sync, aktualizace komponent, crash reporter…).
@@ -519,10 +521,8 @@ impl Drawer {
         let _ = w.set_focus();
     }
 
-    /// Okno na cílové místo a velikost (bez animace okna). `reveal` = zároveň ukázat.
-    fn place(&self, view: View, mon: &Monitor, width: f64, reveal: bool) -> Option<(HWND, i32, i32)> {
-        let w = self.window()?;
-        let h = hwnd_of(&w)?;
+    /// Cílové místo okna ve fyzických px (i pro `resize.rs`): `(x, y, šířka, výška)` (výška včetně přesahu nad hranou).
+    fn target(&self, view: View, mon: &Monitor, width: f64) -> (i32, i32, i32, i32) {
         let scale = mon.dpi as f64 / 96.0;
         let (lw, lh) = self.logical_size(view, width, mon);
         let pw = (lw * scale).round() as i32;
@@ -531,8 +531,14 @@ impl Drawer {
         // osa velkého šuplíku (střed / u levé / u pravé hrany) — proužek leží na stejné (`stripview`)
         let full = (width * scale).round() as i32;
         let c2 = geom::anchor_c2(mon.rect.left, mon.rect.right, full, self.st.lock().anchor, mon.dpi);
-        let x = geom::span_x(c2, pw);
-        let y = mon.rect.top - overlap;
+        (geom::span_x(c2, pw), mon.rect.top - overlap, pw, ph)
+    }
+
+    /// Okno na cílové místo a velikost (bez animace okna). `reveal` = zároveň ukázat.
+    fn place(&self, view: View, mon: &Monitor, width: f64, reveal: bool) -> Option<(HWND, i32, i32)> {
+        let w = self.window()?;
+        let h = hwnd_of(&w)?;
+        let (x, y, pw, ph) = self.target(view, mon, width);
         unsafe {
             if self.opener() != Opener::Hotkey {
                 let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);

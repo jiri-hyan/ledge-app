@@ -129,3 +129,21 @@
 .apv-sx[data-lshape="sharp"] { border-radius: 0 0 3px 3px; }
 .apv-sx[data-lshape="long"] { padding-left: calc(28px * var(--k)); padding-right: calc(28px * var(--k)); }
 .apv-sx[data-lshape="island"] { top: 5px; border-radius: var(--r-pill); }
+
+/* vlastní zavřený Ledge (kolo 23, `ComposePreview`): tělo z `strip.compose`, sloty vlevo / střed / vpravo */
+.apv-sx[data-look="custom"] { gap: calc(8px * var(--k)); padding: 0 calc(12px * var(--k)); background: #000; color: #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
+.apv-sx[data-cshape="island"] { top: 5px; }
+.apv-sx[data-cshape="corner"] { top: 8px; left: auto; right: 8px; transform: none; border: 1px solid rgba(255, 255, 255, 0.14); }
+.apv-scr[data-pos="left"] .apv-sx[data-cshape="corner"] { left: 8px; right: auto; }
+.apv-sx[data-cshape="notch"]::before, .apv-sx[data-cshape="notch"]::after { content: ""; position: absolute; top: 0; width: var(--ear); height: var(--ear);
+  background: radial-gradient(circle at 0 100%, transparent calc(var(--ear) - 0.5px), #000 var(--ear)); }
+.apv-sx[data-cshape="notch"]::before { left: calc(-1 * var(--ear)); transform: scaleX(-1); }
+.apv-sx[data-cshape="notch"]::after { right: calc(-1 * var(--ear)); }
+.apv-cs { display: inline-flex; flex: 1 1 0; align-items: center; gap: calc(6px * var(--k)); }
+.apv-cs[data-slot="center"] { flex: none; justify-content: center; }
+.apv-cs[data-slot="right"] { justify-content: flex-end; }
+.apv-sx[data-look="custom"] .apv-ring2 { width: var(--rd); height: var(--rd); }
+.apv-ct[data-c] { color: var(--c); }
+.apv-meter { display: inline-block; width: calc(22px * var(--k)); height: calc(5px * var(--k)); border-radius: 3px; overflow: hidden; flex: none;
+  background: color-mix(in srgb, var(--c, var(--t3)) 25%, transparent); }
+.apv-meter i { display: block; height: 100%; background: var(--c, var(--t2)); }

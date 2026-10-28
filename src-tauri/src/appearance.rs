@@ -13,10 +13,12 @@ pub mod geom;
 pub mod look;
 pub mod motion;
 pub mod pages;
+pub mod size;
 pub mod stripdeco;
 
 pub use look::{FontLook, Layout, Material, WidthPreset};
 pub use pages::{CustomTheme, PageLook};
+pub use size::SizeConfig;
 
 use crate::i18n::tr;
 use schemars::JsonSchema;
@@ -66,6 +68,10 @@ pub struct AppearanceConfig {
     /// Vybraný vlastní motiv (`id` z `customThemes`) pro celý vzhled; prázdné = vestavěný `theme`.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub custom_theme: String,
+    /// Velikost otevřeného šuplíku (kolo 23, `size::SizeConfig`): šířka / výška tažením v úpravách,
+    /// volitelně pro každou záložku. Chybí = šířka z `width` / `drawer.width`, výška podle obsahu.
+    #[serde(skip_serializing_if = "SizeConfig::is_default")]
+    pub size: SizeConfig,
 }
 
 impl Default for AppearanceConfig {
@@ -87,6 +93,7 @@ impl Default for AppearanceConfig {
             pages: Default::default(),
             custom_themes: Vec::new(),
             custom_theme: String::new(),
+            size: SizeConfig::default(),
         }
     }
 }
@@ -396,6 +403,7 @@ mod tests {
         assert_eq!((a.theme, a.density, a.radius, a.font_scale), (Theme::Nord, Density::Compact, Radius::Round, 1.1));
         assert_eq!((a.strip.style, a.strip.position, a.motion.style), (StripStyle::Line, StripPosition::Left, MotionStyle::Smooth));
         assert_eq!(geom::drawer_width_for(&cfg, 1920, 96), 1300.0, "šířka dál z drawer.width");
+        assert!(a.size.is_default(), "starý config = výška podle obsahu, šířka z předvolby (kolo 23)");
         assert!(crate::config::validate(&cfg).is_ok());
         // uložení a znovunačtení drží totéž (nová pole se zapíšou s výchozí hodnotou)
         let again: crate::config::Config = serde_json::from_str(&serde_json::to_string(&cfg).unwrap()).unwrap();

@@ -53,6 +53,31 @@ pub fn to_png(bytes: &[u8]) -> Option<Vec<u8>> {
     decode_largest(bytes).ok()
 }
 
+/// První snímek obrázku jako holé BGRA pixely (šířka, výška, `w*h*4` bajtů) — pro obrázek do schránky
+/// (`winquickwin.rs`). Obrázek nad `max_px` pixelů vrátí `None`.
+pub(crate) fn decode_bgra(bytes: &[u8], max_px: u64) -> Option<(u32, u32, Vec<u8>)> {
+    let _com = Com::init();
+    let run = || -> Result<(u32, u32, Vec<u8>)> {
+        let f = factory()?;
+        unsafe {
+            let stream = f.CreateStream()?;
+            stream.InitializeFromMemory(bytes)?;
+            let dec = f.CreateDecoderFromStream(&stream, std::ptr::null(), WICDecodeMetadataCacheOnDemand)?;
+            let frame: IWICBitmapSource = dec.GetFrame(0)?.cast()?;
+            let (mut w, mut h) = (0, 0);
+            frame.GetSize(&mut w, &mut h)?;
+            if w == 0 || h == 0 || w as u64 * h as u64 > max_px {
+                return Err(Error::from(E_FAIL));
+            }
+            let bgra = convert(&f, &frame, &GUID_WICPixelFormat32bppBGRA)?;
+            let mut buf = vec![0u8; w as usize * h as usize * 4];
+            bgra.CopyPixels(std::ptr::null(), w * 4, &mut buf)?;
+            Ok((w, h, buf))
+        }
+    };
+    run().ok()
+}
+
 fn decode_largest(bytes: &[u8]) -> Result<Vec<u8>> {
     let f = factory()?;
     unsafe {

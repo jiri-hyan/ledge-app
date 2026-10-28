@@ -50,6 +50,7 @@ mod costslive;
 mod configerr;
 mod configio;
 mod ctl;
+mod ctxsize;
 mod desk;
 mod drawer;
 mod drawerfit;
@@ -130,6 +131,8 @@ mod weather;
 mod webpanel;
 mod widgets;
 mod winfocus;
+mod winquick;
+mod winquickwin;
 mod winsettings;
 
 pub(crate) use state::{log, screen_glass_capable};
@@ -220,6 +223,7 @@ pub fn run() {
             claude.set_enforce(cfg.claude.enforce_commit);
             claude.set_question_hold(cfg.claude.question_hold_s);
             claude.set_question_unseen(cfg.claude.question_unseen_s);
+            claude.set_activity_tail(layout::placed(&cfg.layout, layout::ACTIVITY_CARD));
             let updater = update::Updater::start(cfg.update.clone(), actionrun::local_dir().join(updcache::DIR), Arc::new(mark_dirty));
             let core_arc = Arc::new(Core {
                 app: app.handle().clone(),
@@ -332,6 +336,8 @@ pub fn run() {
             commands::drawer::set_mode,
             commands::drawer::set_game_mode,
             commands::drawer::report_size,
+            commands::drawer::drawer_size,
+            commands::drawer::drawer_size_end,
             commands::drawer::ui_ready,
             commands::drawer::anim_ack,
             commands::drawer::anim_stats,
@@ -429,6 +435,7 @@ pub fn run() {
             commands::update::update_rollback,
             commands::sessions::session_open,
             commands::sessiongit::session_git,
+            commands::sessions::session_context,
             commands::sessiongit::session_git_diff,
             commands::sessiongit::session_git_commit,
             commands::sessiongit::session_git_push,
@@ -458,6 +465,15 @@ pub fn run() {
             commands::media::volume_mute,
             commands::media::volume_mic_mute,
             commands::media::volume_set_device,
+            commands::winquick::wq_state,
+            commands::winquick::wq_config_set,
+            commands::winquick::wq_terminal,
+            commands::winquick::wq_folder,
+            commands::winquick::wq_theme_toggle,
+            commands::winquick::wq_radio_set,
+            commands::winquick::wq_settings,
+            commands::winquick::wq_output_set,
+            commands::winquick::wq_shot,
             commands::calendar::calendar_test,
             commands::geo::geo_search,
             commands::integrations::system_view,

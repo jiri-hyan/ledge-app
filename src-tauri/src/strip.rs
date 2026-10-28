@@ -114,6 +114,8 @@ pub struct StripModel {
     pub position: crate::appearance::StripPosition,
     /// tvar kapsle (`strip.lookShape`, `looks::frame::shaped`)
     pub shape: crate::looks::Shape,
+    /// vlastní vzhled (`strip.look = custom`, už oříznutý `Compose::norm`); jinak `None`
+    pub compose: Option<crate::looks::compose::Compose>,
 }
 
 /// Jas běžícího pulsu (barva, 0–1); `None` = puls není / skončil.
@@ -144,6 +146,7 @@ impl Default for StripModel {
             animate: false,
             position: crate::appearance::StripPosition::Center,
             shape: crate::looks::Shape::Round,
+            compose: None,
         }
     }
 }

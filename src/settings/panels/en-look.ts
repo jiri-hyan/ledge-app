@@ -163,4 +163,17 @@ registerDict("en", {
   "appearance.ct.amber": "Warning",
   "appearance.ct.red": "Error",
   "appearance.ct.blue": "Info",
+  // velikost otevřeného Ledge (kolo 23, AppearanceOpen `SizeTable`)
+  "appearance.size.title": "Size of the open Ledge",
+  "appearance.size.hint": "While editing the drawer (✎) you can drag its sides (width, evenly from the centre) and its bottom (height). It snaps to the grid, hold Alt to drag freely; double-click a handle for the default. Empty = default: width from the preset, height from the content.",
+  "appearance.size.perPage": "Remember the size for each tab",
+  "appearance.size.perPageHint": "Switching tabs smoothly grows or shrinks the drawer. Off = one size for all tabs.",
+  "appearance.size.all": "All tabs",
+  "appearance.size.tab": "Tab",
+  "appearance.size.width": "Width (px)",
+  "appearance.size.height": "Height (px)",
+  "appearance.size.auto": "default",
+  "appearance.size.content": "from content",
+  "appearance.size.reset": "Default",
+  "appearance.size.range": "Width {w0}–{w1} px (at most 95 % of the monitor), height {h0}–{h1} px (1–5 rows of cards, at most 80 % of the monitor height). What doesn't fit scrolls — nothing is deleted.",
 });

@@ -6,6 +6,7 @@ import type { LimitsView, Snapshot } from "../api";
 import { dayNames, fmtClock } from "../format";
 import { t, tp } from "../i18n";
 import { bar, left, level, otherDay, pctText, resetHint, winState, type LimitWindow } from "./model";
+import { paceOf, paceTip } from "./pace";
 import { severity, shown, statusText, STATUS_URL } from "./incident";
 import { api } from "../api";
 import "./limits.css";
@@ -26,15 +27,31 @@ export function resetClock(ms: number, now: number): string {
   return otherDay(ms, now) ? `${dayNames()[d.getDay()]} ${fmtClock(d)}` : fmtClock(d);
 }
 
-function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now: number; hot?: boolean }) {
+function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now: number; hot?: boolean; kind: "5h" | "week" }) {
   const st = () => winState(p.w, p.lv.at, p.now, p.lv.staleMs);
   const pct = () => {
     const s = st();
     return s.kind === "fresh" || s.kind === "stale" ? s.pct : null;
   };
+  /** tempo (volba `claude.limitsPace`): jen s čerstvým vzorkem a `resetsAt`, jinak pruh jako dnes */
+  const pace = () => {
+    const s = st();
+    return p.lv.pace && s.kind === "fresh" ? paceOf(p.kind, s.pct, p.w?.resetsAt, p.lv.history5h, p.now) : null;
+  };
   const tip = () => {
+    const pc = pace();
+    if (pc) {
+      const txt = paceTip(p.kind, pc, (ms) => fmtClock(new Date(ms)), t);
+      if (txt) return txt;
+    }
     const r = p.w?.resetsAt;
     return r != null && st().kind !== "reset" ? t("sessions.limits.resetsTip", "Reset {when}", { when: resetClock(r, p.now) }) : undefined;
+  };
+  /** barva výplně: dnešní úroveň; 5h s odhadem „dojde před obnovou“ aspoň pozor */
+  const fillLv = () => {
+    const base = level(pct()!);
+    const f = pace()?.fillLv;
+    return f && base === "ok" ? f : base;
   };
   /** 5h okno je skoro plné a Claude právě pracuje: čas resetu výrazně (`resetHint`) */
   const hot = () => p.hot && resetHint(p.w, p.lv.at, p.now, p.lv.staleMs, true) !== null;
@@ -43,7 +60,15 @@ function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now
       <span class="lim-name">{p.label}</span>
       <span class="lim-track">
         <Show when={pct() !== null}>
-          <span class="lim-fill" classList={{ "lim-ok": level(pct()!) === "ok", "lim-warn": level(pct()!) === "warn", "lim-bad": level(pct()!) === "bad" }} style={{ width: `${bar(pct()!)}%` }} />
+          <span class="lim-fill" classList={{ "lim-ok": fillLv() === "ok", "lim-warn": fillLv() === "warn", "lim-bad": fillLv() === "bad" }} style={{ width: `${bar(pct()!)}%` }} />
+        </Show>
+        <Show when={pace()}>
+          {(pc) => (
+            <>
+              <Show when={pc().over}>{(o) => <span class="lim-over" classList={{ "lim-warn": o().lv === "warn", "lim-bad": o().lv === "bad" }} style={{ left: `${o().from}%`, width: `${o().to - o().from}%` }} />}</Show>
+              <span class="lim-plan" style={{ left: `${bar(pc().plan)}%` }} />
+            </>
+          )}
         </Show>
       </span>
       <span class="lim-pct">{pct() !== null ? `${pctText(pct()!)} %` : st().kind === "reset" ? t("sessions.limits.reset", "obnoveno") : "—"}</span>
@@ -85,7 +110,7 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
   const working = () => p.s.sessions.some((x) => x.status === "working");
   const rows = () => {
     const l = lv();
-    return l ? [{ label: "5h", w: l.fiveHour, hot: working() }, { label: t("sessions.limits.week", "týden"), w: l.sevenDay, hot: false }] : [];
+    return l ? [{ label: "5h", w: l.fiveHour, hot: working(), kind: "5h" as const }, { label: t("sessions.limits.week", "týden"), w: l.sevenDay, hot: false, kind: "week" as const }] : [];
   };
   return (
     <>
@@ -102,7 +127,7 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
           </Show>
         }>
           <div class="lim">
-            <For each={rows()}>{(r) => <LimitBar label={r.label} w={r.w} lv={l()} now={p.now} hot={r.hot} />}</For>
+            <For each={rows()}>{(r) => <LimitBar label={r.label} w={r.w} lv={l()} now={p.now} hot={r.hot} kind={r.kind} />}</For>
           </div>
         </Show>
       )}

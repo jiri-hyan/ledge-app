@@ -94,7 +94,7 @@ unsafe trait IPolicyConfig: windows::core::IUnknown {
 
 pub(crate) fn allowed(cfg: &Config) -> bool {
     // hlasitost a mikrofon ukazuje i karta Rychlé přepínače (kolo 22, `src/board/TogglesCard.tsx`)
-    cfg.modes.personal_enabled && (cfg.drawer.sections.sound || crate::layout::placed(&cfg.layout, crate::layout::TOGGLES_CARD))
+    cfg.modes.personal_enabled && (cfg.drawer.sections.sound || crate::layout::placed(&cfg.layout, crate::layout::TOGGLES_CARD) || crate::layout::placed(&cfg.layout, crate::layout::WINQUICK_CARD))
 }
 
 /// Skalár Core Audio (0.0–1.0) → procenta 0–100 (zaokrouhleno; mimo rozsah / NaN oříznuto).

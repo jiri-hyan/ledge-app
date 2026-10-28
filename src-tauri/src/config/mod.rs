@@ -100,6 +100,8 @@ pub struct Config {
     /// Chytřejší šuplík (kolo 20): klávesy Alt+1…9, přetažení na šuplík, kolečko nad záložkami, zvuk u
     /// schvalování, stav incidentů Anthropicu (`smartconf.rs`). Zvuk a síť jsou výchozí vypnuté.
     pub smart: crate::smartconf::SmartConfig,
+    /// Karta Rychlé dlaždice Windows (kolo 23, `winquick.rs`): výběr dlaždic, připnuté složky, přepínání výstupu (výchozí vypnuto).
+    pub winquick: crate::winquick::WinQuickConfig,
 }
 
 impl Default for Config {
@@ -137,6 +139,7 @@ impl Default for Config {
             mcp: Default::default(),
             desk: Default::default(),
             smart: Default::default(),
+            winquick: Default::default(),
         }
     }
 }

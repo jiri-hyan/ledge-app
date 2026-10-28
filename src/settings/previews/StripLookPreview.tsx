@@ -11,6 +11,7 @@ import { STRIP_SIZE, stripShape } from "../../theme/appearance";
 import { scopeStyle } from "../../theme/apply";
 import type { PreviewState } from "../appearanceModel";
 import { SHAPEABLE_LOOKS, type LookShape } from "../../strip/looks";
+import ComposePreview from "./ComposePreview";
 import "./previews.css";
 
 /** Barva stavu (tokeny motivu přes `data-c` v previews.css). */
@@ -153,7 +154,8 @@ function body(look: StripLookId, s: PreviewState, a: Appearance): JSX.Element {
   }
 }
 
-export default function StripLookPreview(q: { look: StripLookId; state: PreviewState; a: Appearance; opacity: number; shape?: LookShape }) {
+/** `compose` = `strip.compose` (jen u `custom`, kolo 23; `ComposePreview`). */
+export default function StripLookPreview(q: { look: StripLookId; state: PreviewState; a: Appearance; opacity: number; shape?: LookShape; compose?: unknown }) {
   const lshape = () => (SHAPEABLE_LOOKS.includes(q.look) && q.shape && q.shape !== "round" ? q.shape : undefined);
   const shape = () => stripShape(q.a.strip.style, q.a.strip.size);
   return (
@@ -165,6 +167,9 @@ export default function StripLookPreview(q: { look: StripLookId; state: PreviewS
             style={{ "--k": String(STRIP_SIZE[q.a.strip.size] * 0.78), "--so": String(q.opacity), height: `${Math.round(shape().h * 0.78)}px`, "border-radius": `0 0 ${shape().r * 0.78}px ${shape().r * 0.78}px` }}>
             {body("classic", q.state, q.a)}
           </span>
+        </Match>
+        <Match when={q.look === "custom"}>
+          <ComposePreview compose={q.compose} state={q.state} opacity={q.opacity} k={STRIP_SIZE[q.a.strip.size] * 0.78} />
         </Match>
         {/* Neviditelný do události: v klidu a při běžném dění není vidět vůbec nic */}
         <Match when={q.look !== "classic" && (q.look !== "ghost" || q.state === "wait" || q.state === "done")}>

@@ -13,6 +13,19 @@ pub(crate) fn decide(id: Option<u64>, allow: bool, extra: Option<rules::Extra>) 
     core().claude.decide_with(id, allow, &extra.unwrap_or_default())
 }
 
+/// Velikost kontextu živé session (pruh v kartě Claude): poslední `usage` v jejím transcriptu. UI se ptá jen
+/// při otevřeném šuplíku a viditelném řádku; cesta je z hooku a smí jen do `<.claude>/projects/*.jsonl`.
+/// `None` = vypnuto (`claude.contextBar`), session bez hooku, soubor nečitelný nebo bez usage.
+#[tauri::command(async)]
+pub(crate) fn session_context(id: String) -> Option<crate::ctxsize::Ctx> {
+    if !core().cfg.read().claude.context_bar {
+        return None;
+    }
+    let path = std::path::PathBuf::from(core().claude.transcript_of(&id)?);
+    let root = crate::sessionlive::claude_dir().map(|d| d.join("projects"));
+    crate::ctxsize::allowed(&path, root.as_deref()).then(|| crate::ctxsize::for_path(&path, crate::ctxsize::now_ms())).flatten()
+}
+
 /// Klik na session v kartě Claude: přepnout do jejího okna, nebo skončenou obnovit v terminálu.
 /// Rozhodnutí je čisté (`sessions::decide_open`), Win32 ve `winfocus.rs`. Chyba = česky pro `say()`.
 #[tauri::command(async)]

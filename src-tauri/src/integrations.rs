@@ -35,7 +35,9 @@ impl Want {
 /// CPU a paměť ukazuje (`looks::Look::shows_system`, kapsle „Trojice“), pokud ho uživatel v Pokročilých neskryl.
 pub fn wants(cfg: &Config) -> Want {
     let on = |i: StripItem| cfg.strip.enabled && cfg.strip.items.contains(&i);
-    let by_look = cfg.strip.enabled && cfg.strip.look.shows_system() && !cfg.strip.look_hide.contains(&StripItem::System);
+    // vlastní vzhled (kolo 23) jen s položkou CPU / paměť
+    let custom = cfg.strip.look == crate::looks::Look::Custom && crate::looks::compose::needs(&cfg.strip.compose).2;
+    let by_look = cfg.strip.enabled && (cfg.strip.look.shows_system() || custom) && !cfg.strip.look_hide.contains(&StripItem::System);
     Want { github: on(StripItem::Github) && cfg.github.enabled && cfg.github.review, system: on(StripItem::System) || by_look }
 }
 

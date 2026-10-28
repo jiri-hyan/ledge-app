@@ -219,6 +219,21 @@ ceník nezná, ukáže tokeny a cenu „—“. Config `claude.costs` (výchozí
 `drawer.sections.claudeCosts` nebo celá karta `drawer.sections.claude` = taky nic se nečte. Tauri: `costs_refresh`; stav ve
 snapshotu (`costs`). Mapa: `docs/codemap/costs.md`.
 
+**Podlaha nové relace a agenta** (kolo 23, v sekci Útrata): řádky „Start nové relace (první volání)“ podle projektu a
+„Start agenta podle typu“ — medián kontextu (vstup + zápis cache + čtení cache) PRVNÍHO volání API každého
+souboru transcriptu za posledních 7 dní, počet souborů a trend proti předchozím 7 dnům (od 3 souborů v obou
+obdobích, změna pod 5 % / 1 000 tokenů = beze změny). Typ agenta z `agent-*.meta.json` (`agentType`); subagent bez
+něj se nepočítá. První usage souboru se zapisuje do indexu při běžném čtení; soubory ze starého indexu se doplní
+jen čtením začátku souboru (žádný přepočet). Účel: nafouklý CLAUDE.md / MCP / skills je vidět hned po změně.
+
+**Pruh kontextu session** (kolo 23, `claude.contextBar`, výchozí vypnuto): pod každou živou session s hooky pruh
+velikosti kontextu = poslední `message.usage` v transcriptu (`transcript_path` z hooku; vstup + zápis cache + čtení
+cache), rysky 250 k / 350 k, text „každý tah teď čte ~N k tokenů · N× víc než na začátku“ (poměr k prvnímu volání,
+od 1,5×) a nad 250 k tip „zvaž předávku a novou relaci“ (ne `/compact`). Čte se jen konec souboru (256 kB, při
+obřím posledním řádku víc do 8 MB) a jen když je šuplík otevřený a řádek vykreslený; Rust drží výsledek podle
+mtime + délky a čte nejvýš 1× / 15 s na soubor. Session bez hooku / bez usage = pruh se nekreslí. Cesta musí být
+`<.claude>/projects/**/*.jsonl`. Tauri `session_context(id)`. Mapa: `docs/codemap/costs.md` (`ctxsize.rs`).
+
 
 **Export útrat a limitů** (kolo 20): v ⋯ karty Claude „Exportovat útratu a limity (CSV / Markdown)…“ → dialog Uložit
 jako → soubor. Jen data, která Ledge už drží v paměti (spočítaný přehled útrat v cenách API, poslední vzorek limitů 5h /

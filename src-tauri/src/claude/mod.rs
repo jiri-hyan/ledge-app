@@ -21,6 +21,7 @@
 //! `preview` + `diff` (náhled změny Edit/Write v kartě), `plan` + `planhook` (review plánu ExitPlanMode). Tady stav
 //! session a schvalování. Mapa: `docs/codemap/sessions.md`.
 
+pub mod activity;
 mod bridge;
 pub mod diff;
 mod hygiene;
@@ -31,6 +32,8 @@ pub mod preview;
 mod questions;
 pub mod rules;
 pub mod unseen;
+#[cfg(test)]
+mod activity_tests;
 #[cfg(test)]
 mod testkit;
 
@@ -45,6 +48,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -115,11 +119,16 @@ pub struct Session {
     pub ended: bool,
     /// běžící a nedávno dokončení subagenti (hooky `SubagentStart` / `SubagentStop`)
     pub subagents: Subagents,
+    /// `transcript_path` z posledního hooku (kontext session čte `ctxsize`, jen na žádost UI)
+    #[serde(skip)]
+    pub transcript: Option<String>,
+    /// živá aktivita z hooků (fáze = odhad podle posledního nástroje, soubor, poslední zpráva; `activity.rs`)
+    pub activity: Option<activity::Activity>,
 }
 
 impl Session {
     fn new(id: &str, cwd: &str, state: SessionState, now: u64) -> Self {
-        Self { id: id.to_string(), cwd: cwd.to_string(), state, title: None, updated_at: now, uncommitted: vec![], unpushed: 0, ended: false, subagents: Subagents::default() }
+        Self { id: id.to_string(), cwd: cwd.to_string(), state, title: None, updated_at: now, uncommitted: vec![], unpushed: 0, ended: false, subagents: Subagents::default(), activity: None, transcript: None }
     }
 
     /// Nedokončená práce: nezacommitované vlastní soubory nebo nepushnuté vlastní commity.
@@ -154,6 +163,8 @@ pub struct Claude {
     /// Ledge pustí do Claude; 0 = vypnuto (`questions::step`)
     question_unseen: Arc<Mutex<Duration>>,
     enforce: Arc<Mutex<EnforceCommit>>,
+    /// číst poslední zprávu z přepisu při `Stop` (karta „Claude aktivita“ je na záložce; `activity.rs`)
+    activity_tail: Arc<std::sync::atomic::AtomicBool>,
     /// testy: práce „na pozadí“ běží hned ve volajícím vlákně (deterministicky)
     inline: bool,
     /// termíny gitu hlídače (testy je prodlouží)
@@ -199,6 +210,7 @@ impl Claude {
             question_hold: Arc::new(Mutex::new(Duration::from_secs(questions::MAX_HOLD_S))),
             question_unseen: Arc::new(Mutex::new(Duration::ZERO)),
             enforce: Arc::new(Mutex::new(EnforceCommit::default())),
+            activity_tail: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             inline: false,
             budgets: Budgets::default(),
         }
@@ -239,6 +251,11 @@ impl Claude {
 
     pub fn pending(&self) -> Vec<Pending> {
         self.inner.lock().pending.iter().map(|(p, _)| p.clone()).collect()
+    }
+
+    /// Cesta k transcriptu session podle hooku (`transcript_path`); bez hooku `None`.
+    pub fn transcript_of(&self, id: &str) -> Option<String> {
+        self.inner.lock().sessions.get(id).and_then(|s| s.transcript.clone())
     }
 
     pub fn sessions(&self) -> Vec<Session> {
@@ -392,6 +409,7 @@ impl Claude {
         questions::on_event(&mut g, &ev, &sid, &s(body, "tool_name"), now);
         let mut baseline_cwd = None;
         let mut check = false;
+        let mut tail = None;
         if ev != "SessionEnd" || g.sessions.contains_key(&sid) {
             let Inner { sessions, track, .. } = &mut *g;
             let sess = sessions.entry(sid.clone()).or_insert_with(|| Session::new(&sid, &body_cwd, SessionState::Idle, now));
@@ -399,7 +417,17 @@ impl Claude {
             if !body_cwd.is_empty() {
                 sess.cwd = body_cwd;
             }
+            let tp = s(body, "transcript_path");
+            if !tp.is_empty() {
+                sess.transcript = Some(tp);
+            }
             sess.updated_at = now;
+            if let Some(a) = activity::next(sess.activity.as_ref(), &ev, body, now) {
+                sess.activity = Some(a);
+            }
+            if self.tail_wanted(&ev, body) {
+                tail = sess.transcript.clone().map(|t| (t, sess.activity.as_ref().map_or(now, |a| a.at)));
+            }
             // resume pod stejným session_id → už není ukončená
             sess.ended = ev == "SessionEnd";
             match ev.as_str() {
@@ -463,6 +491,13 @@ impl Claude {
         track.retain(|k, _| sessions.contains_key(k));
         drop(g);
         (self.on_change)();
+        if let Some((path, at)) = tail {
+            let sid = sid.clone();
+            self.background(move |c| {
+                let root = crate::sessionlive::claude_dir().map(|d| d.join("projects"));
+                c.store_message(&sid, at, activity::read_last_message(Path::new(&path), root.as_deref()));
+            });
+        }
 
         let is_stop = ev == "Stop";
         let active = body.get("stop_hook_active").and_then(Value::as_bool).unwrap_or(false);
@@ -483,7 +518,9 @@ impl Claude {
     }
 
     pub fn status_json(&self) -> Value {
-        json!({ "pending": self.pending(), "questions": self.questions(), "sessions": self.sessions() })
+        let mut sessions = json!(self.sessions());
+        activity::redact(&mut sessions);
+        json!({ "pending": self.pending(), "questions": self.questions(), "sessions": sessions })
     }
 }
 
@@ -613,5 +650,17 @@ mod tests {
         assert_eq!(s.subagents.done[0].message.as_deref(), Some("Našel jsem to."));
         c.handle_event(&json!({"hook_event_name":"Stop","session_id":"a"}));
         assert_eq!(c.sessions()[0].subagents.running.len(), 1, "Stop hlavní session subagenty na pozadí neukončí");
+    }
+
+    #[test]
+    fn transcript_path_from_hooks() {
+        let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1));
+        assert_eq!(c.transcript_of("a"), None);
+        c.handle_event(&json!({"hook_event_name":"UserPromptSubmit","session_id":"a","cwd":"C:/p","prompt":"x"}));
+        assert_eq!(c.transcript_of("a"), None, "hook bez cesty = nic");
+        c.handle_event(&json!({"hook_event_name":"PreToolUse","session_id":"a","transcript_path":"C:/u/.claude/projects/p/a.jsonl"}));
+        c.handle_event(&json!({"hook_event_name":"Stop","session_id":"a","transcript_path":""}));
+        assert_eq!(c.transcript_of("a").as_deref(), Some("C:/u/.claude/projects/p/a.jsonl"), "prázdná cesta starou nepřepíše");
+        assert_eq!(c.transcript_of("b"), None);
     }
 }

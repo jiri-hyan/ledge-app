@@ -33,6 +33,23 @@ export interface CostHourRow {
   requests: number;
   other: boolean;
 }
+/** Řádek podlahy nové relace / agenta (Rust `usage::floor::FloorRow`): medián kontextu 1. volání za 7 dní. */
+export interface FloorRow {
+  /** projekt nebo typ agenta */
+  name: string;
+  median: number;
+  /** souborů (session / agentů) za 7 dní */
+  n: number;
+  /** předchozích 7 dní; null = žádný soubor */
+  prevMedian: number | null;
+  prevN: number;
+  /** median − prevMedian; jen když je v obou obdobích aspoň 3 soubory, jinak null */
+  delta: number | null;
+}
+export interface CostFloor {
+  projects: FloorRow[];
+  agents: FloorRow[];
+}
 export interface CostsView {
   state: "off" | "idle" | "computing" | "ok" | "error";
   /** 0–1, jen při přepočtu */
@@ -41,7 +58,7 @@ export interface CostsView {
   error: string | null;
   windowDays: number;
   /** `hours` = dnešek po hodinách a projektech (kolo 22, karta Claude dnes); starý snapshot bez pole = nic */
-  summary: { ranges: CostRange[]; days: CostDay[]; hours?: CostHourRow[] } | null;
+  summary: { ranges: CostRange[]; days: CostDay[]; hours?: CostHourRow[]; floor?: CostFloor } | null;
   pricesVerified: string;
   pricesSource: string;
 }
@@ -79,4 +96,12 @@ export const progressPct = (p: number | null | undefined) => (p == null ? null :
 export function pickRange(ranges: CostRange[] | undefined, days: number): CostRange | null {
   if (!ranges?.length) return null;
   return ranges.find((r) => r.days === days) ?? ranges[0];
+}
+
+/** Trend podlahy: bez `delta` (málo souborů) nic; změna pod 5 % předchozího mediánu (nejméně 1 000 tokenů) = beze změny. */
+export function floorTrend(r: FloorRow): { dir: "up" | "down" | "flat"; abs: number } | null {
+  if (r.delta == null) return null;
+  const abs = Math.abs(r.delta);
+  if (abs < Math.max(1000, (r.prevMedian ?? 0) * 0.05)) return { dir: "flat", abs };
+  return { dir: r.delta > 0 ? "up" : "down", abs };
 }

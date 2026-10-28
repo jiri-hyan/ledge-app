@@ -2,9 +2,11 @@
 // (plain vite v prohlížeči) je obojí no-op a UI se vykreslí prázdné. Typy dat jsou v `types.ts`.
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { WqState } from "./winquick/model";
 import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
 import type { StatusLineStatus, TimerOp, TimerState } from "./types";
 import type { EditPreview, GitView } from "./types";
+import type { CtxView } from "./sessions/ctx";
 import type { CalendarTest, OutlookProbe } from "./types";
 import type { MediaAction } from "./types";
 import type { Deleted, Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
@@ -41,6 +43,9 @@ export const api = {
   /** Herní režim: zapnutí zavře šuplík; vypíná se zkratkou nebo dalším spuštěním Ledge (Rust `gamemode.rs`). */
   setGameMode: (on: boolean) => call("set_game_mode", { on }),
   reportSize: (view: View, w: number, h: number) => call("report_size", { view, w, h }),
+  /** velikost šuplíku tažením v úpravách (kolo 23): `done` = uložit; vrací [šířka, výška] po ořezu monitorem */
+  drawerSizeEnd: () => call<void>("drawer_size_end"),
+  drawerSize: (page: string, w: number, h: number, done: boolean) => call<[number, number]>("drawer_size", { page, w, h, done }),
   close: () => call("close_drawer"),
   /** Jen na výslovný klik do poznámky: okno otevřené najetím aktivuje (jinak by nešlo psát). */
   focusDrawer: () => call("focus_drawer"),
@@ -127,6 +132,8 @@ export const api = {
   updateRollback: (confirmed: string[]) => call<InstallOutcome>("update_rollback", { confirmed }),
   /** Klik na session: přepnout do jejího okna / skončenou obnovit v terminálu. Chyba = česky. */
   sessionOpen: (id: string) => call("session_open", { id }),
+  /** Velikost kontextu živé session (poslední usage v transcriptu); null = bez zdroje / vypnuto. */
+  sessionContext: (id: string) => call<CtxView | null>("session_context", { id }),
   /** Panel Git session (jen na klik; null = cwd není v gitu). Destruktivní akce Rust znovu ověří. */
   sessionGit: (id: string) => call<GitView | null>("session_git", { id }),
   sessionGitDiff: (id: string, path: string, staged: boolean) => call<EditPreview>("session_git_diff", { id, path, staged }),
@@ -160,6 +167,18 @@ export const api = {
   volumeMicMute: () => call<boolean>("volume_mic_mute"),
   /** přepnout výchozí výstup na zařízení z `VolumeView.devices` */
   volumeSetDevice: (id: string) => call("volume_set_device", { id }),
+  // --- karta Rychlé dlaždice Windows (Rust `commands/winquick.rs`, kolo 23) ---
+  wqState: () => call<WqState>("wq_state"),
+  wqConfigSet: (tiles: string[], folders: string[], outputSwitch: boolean) => call("wq_config_set", { tiles, folders, outputSwitch }),
+  wqTerminal: (id: string, kind: "wt" | "powershell" | "explorer") => call("wq_terminal", { id, kind }),
+  wqFolder: (key: string) => call("wq_folder", { key }),
+  /** přepne motiv Windows; vrací true = nyní světlý */
+  wqThemeToggle: () => call<boolean>("wq_theme_toggle"),
+  wqRadioSet: (kind: "wifi" | "bt", on: boolean) => call("wq_radio_set", { kind, on }),
+  wqSettings: (page: string) => call("wq_settings", { page }),
+  wqOutputSet: (id: string) => call("wq_output_set", { id }),
+  /** `image` | `path` | `claude` | `folder`; vrací text hlášky */
+  wqShot: (action: "image" | "path" | "claude" | "folder") => call<string>("wq_shot", { action }),
   /** Kalendář: jedno zkušební stažení odkazu ICS (nic se neukládá); chyba = lidská věta bez adresy. */
   calendarTest: (url: string) => call<CalendarTest>("calendar_test", { url }),
   /** Kalendář: Připojit ke schůzce — Rust otevře jen ověřený odkaz Teams/Meet/Zoom/Webex/Jitsi. */

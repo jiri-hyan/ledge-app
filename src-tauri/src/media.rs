@@ -102,7 +102,9 @@ pub(crate) fn allowed(cfg: &Config) -> bool {
 pub(crate) fn strip_wants(cfg: &Config) -> bool {
     let look = cfg.strip.look;
     // styl zavřeného Ledge, který hudbu ukazuje (a nemá ji v Pokročilých vypnutou), ji chce taky
-    let by_look = look.shows_music() && !cfg.strip.look_hide.contains(&crate::config::StripItem::Media);
+    // vlastní vzhled (kolo 23) jen s položkou Hudba
+    let custom = look == crate::looks::Look::Custom && crate::looks::compose::needs(&cfg.strip.compose).0;
+    let by_look = (look.shows_music() || custom) && !cfg.strip.look_hide.contains(&crate::config::StripItem::Media);
     cfg.strip.enabled && (by_look || crate::mediaconf::strip_has_item(&cfg.strip.items, &cfg.media))
 }
 

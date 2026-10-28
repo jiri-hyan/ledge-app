@@ -191,8 +191,11 @@ pub(crate) fn refresh_strip() {
     let looked = closed != crate::looks::Look::Classic && cfg.strip.enabled && !(retreat && closed.retreats());
     let show = looked.then(|| {
         let f = look_facts(&cfg, &pending, &asks, &procs, due_first.as_deref(), due_count, meeting.as_deref(), &mode_title, accent);
-        crate::looks::show(closed, &crate::looks::without(f, &cfg.strip.look_hide))
+        let f = crate::looks::without(f, &cfg.strip.look_hide);
+        if closed == crate::looks::Look::Custom { crate::looks::compose::show(&cfg.strip.compose, &f) } else { crate::looks::show(closed, &f) }
     });
+    // vlastní vzhled (kolo 23): oříznutý config pro rozměry a tvar (`stripdraw`)
+    let compose = (closed == crate::looks::Look::Custom).then(|| cfg.strip.compose.norm());
     let hidden = show.as_ref().is_some_and(|s| s.hidden);
     let line_only = !cfg.strip.enabled || (retreat && !looked);
     let visible = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some()) && !hidden;
@@ -200,9 +203,9 @@ pub(crate) fn refresh_strip() {
     let shape = cfg.strip.look_shape;
     // baterie pro kapsle `minimum` / `trio`: stejný odběr změn napájení jako záložka Osobní (událost Windows,
     // žádný časovač); volá se až bez zámku configu (`battery::ensure` ho čte sám)
-    let wants_battery = looked && closed.shows_battery();
+    let wants_battery = looked && (closed.shows_battery() || compose.as_ref().is_some_and(|c| crate::looks::compose::needs(c).1));
     // plynulá šířka ostrůvku a točení prstenců (`rings`) jen se zapnutými animacemi (Ledge i Windows „omezit pohyb“)
-    let animate = matches!(closed, crate::looks::Look::Island | crate::looks::Look::Rings)
+    let animate = matches!(closed, crate::looks::Look::Island | crate::looks::Look::Rings | crate::looks::Look::Custom)
         && cfg.appearance.motion.style != crate::appearance::MotionStyle::None
         && !attention::os_animations_off();
     let opacity = cfg.strip.opacity;
@@ -233,6 +236,7 @@ pub(crate) fn refresh_strip() {
         m.animate = animate;
         m.position = position;
         m.shape = shape;
+        m.compose = compose;
     });
 }
 
@@ -318,6 +322,7 @@ fn look_facts(
         weather,
         cpu,
         mem,
+        activity: facts::activity_fact(crate::claude::activity::lead(&sessions, now, DONE_MS), where_of),
         clock: crate::looks::hm(lt.wHour, lt.wMinute),
         date: clock_text(lt.wHour, lt.wMinute, lt.wDayOfWeek, lt.wDay, lt.wMonth),
         mode: mode_title.to_string(),

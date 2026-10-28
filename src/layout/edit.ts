@@ -17,6 +17,7 @@ import { clone, normalizeLayout, pageOf, sameLayout, withLayout, type Layout } f
 import { popUndo, pushUndo, resetLayout } from "./history";
 import { layoutProblem } from "./validate";
 import { escAction, showResume } from "./keep";
+import { endSizeEdit, rememberSize, revertSize } from "./drawerSize";
 
 const UNDO_MS = 6000;
 const [draft, setDraft] = createSignal<Layout | null>(null);
@@ -61,6 +62,7 @@ export function beginEdit(s: Src, openCatalog = false) {
   }
   const l = normalizeLayout(s.layout);
   before = l;
+  rememberSize();
   setDraft(clone(l));
   setEditPage(pageOf(l, s.mode).id);
   setCatalogOpen(openCatalog);
@@ -122,6 +124,7 @@ function end(release: boolean) {
   setUndoBar(null);
   setUndoStack([]);
   before = null;
+  endSizeEdit();
   if (release) api.releaseFocus();
 }
 
@@ -143,7 +146,8 @@ export function escEdit() {
 }
 
 /** Zrušit / Esc. `release` = false při zavření šuplíku (fokus vrací Rust sám). */
-export const cancelEdit = (release = true) => editing() && end(release);
+// Zrušit vrátí i velikost šuplíku taženou v úpravách (`drawerSize.ts`, kolo 23)
+export const cancelEdit = (release = true) => editing() && (void revertSize(), end(release));
 
 /** Hotovo: uloží `layout` a přepne Rust na záložku, na kterou se uživatel díval. */
 export async function finishEdit() {

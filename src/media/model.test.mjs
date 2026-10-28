@@ -94,3 +94,8 @@ test("throttle: první hned, při tahu nejvýš 1× za interval, poslední hodno
   t.flush();
   assert.deepEqual(sent, [10, 13, 20, 21], "prázdný flush nic neposílá");
 });
+
+import { outputPickerShown } from "./model.ts";
+test("menu výstupu v kartě Zvuk: viditelné jen s >1 zařízením", () => {
+  for (const [n, want] of [[0, false], [1, false], [2, true], [5, true]]) assert.equal(outputPickerShown(n), want, String(n));
+});

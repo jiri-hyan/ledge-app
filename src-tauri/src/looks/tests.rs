@@ -7,9 +7,9 @@ use crate::appearance::StripPosition;
 use crate::appearance::geom::{anchor_c2, span_x};
 use windows::Win32::Foundation::RECT;
 
-const ACC: Rgba = Rgba::VIOLET;
+pub(super) const ACC: Rgba = Rgba::VIOLET;
 
-fn col(c: Rgba) -> &'static str {
+pub(super) fn col(c: Rgba) -> &'static str {
     let table = [
         (RUN, "run"),
         (WAIT, "wait"),
@@ -37,10 +37,13 @@ fn glyph(g: Glyph) -> &'static str {
         Glyph::Sun => "sun",
         Glyph::Moon => "moon",
         Glyph::Cloud => "cloud",
+        Glyph::Clock => "clock",
+        Glyph::Calendar => "cal",
+        Glyph::Cpu => "cpu",
     }
 }
 
-fn parts_sig(v: &[Part]) -> String {
+pub(super) fn parts_sig(v: &[Part]) -> String {
     v.iter()
         .map(|p| match p {
             Part::Text { text, strong: true, .. } => format!("*{text}*"),
@@ -51,13 +54,14 @@ fn parts_sig(v: &[Part]) -> String {
             Part::Sep => "|".into(),
             Part::Battery { percent, .. } => format!("▭{percent}"),
             Part::Ring { fill, color } => format!("◯{}:{}", fill.map(|x| format!("{:.0}", x * 100.0)).unwrap_or_default(), col(*color)),
+            Part::Meter { fill, color } => format!("▮{:.0}:{}", fill * 100.0, col(*color)),
         })
         .collect::<Vec<_>>()
         .join(" ")
 }
 
 /// Čitelný podpis toho, co styl ukáže (tabulka níž).
-fn sig(s: &Show) -> String {
+pub(super) fn sig(s: &Show) -> String {
     if s.hidden {
         return "∅".into();
     }
@@ -65,6 +69,9 @@ fn sig(s: &Show) -> String {
         return format!("line {}", s.line.iter().map(|(w, c)| format!("{}{w:.1}", col(*c))).collect::<Vec<_>>().join(" "));
     }
     let mut out = parts_sig(&s.parts);
+    if !s.center.is_empty() {
+        out.push_str(&format!(" ‖ {}", parts_sig(&s.center)));
+    }
     if !s.right.is_empty() {
         out.push_str(&format!(" ⇥ {}", parts_sig(&s.right)));
     }
@@ -88,15 +95,15 @@ fn base() -> Facts {
     }
 }
 
-fn music() -> MusicFact {
+pub(super) fn music() -> MusicFact {
     MusicFact { text: "Midnight City · M83".into(), time: Some("1/4 min".into()), progress: Some(0.42) }
 }
-fn timer18() -> TimerFact {
+pub(super) fn timer18() -> TimerFact {
     TimerFact { text: "18 min".into(), minutes: Some(18), progress: Some(0.7), done: false }
 }
 
 /// Ukázkový stav (data jako v náhledu `ledge-w7-zavreny.html`).
-fn facts(st: State) -> Facts {
+pub(super) fn facts(st: State) -> Facts {
     let mut f = base();
     match st {
         State::Idle => {}
@@ -118,7 +125,7 @@ fn facts(st: State) -> Facts {
     f
 }
 
-const STATES: [State; 6] = [State::Idle, State::Work, State::Wait, State::Music, State::Timer, State::Done];
+pub(super) const STATES: [State; 6] = [State::Idle, State::Work, State::Wait, State::Music, State::Timer, State::Done];
 
 #[test]
 fn table_11_looks_x_6_states() {
@@ -234,7 +241,7 @@ fn table_11_looks_x_6_states() {
         ),
     ];
     // classic nic neskládá; minimum, trio a rings (kolo 22) mají vlastní tabulku v `capsule::tests`
-    assert_eq!(table.len() + 4, Look::ALL.len(), "každý styl kromě classic a kapslí kola 22 má řádek");
+    assert_eq!(table.len() + 5, Look::ALL.len(), "každý styl kromě classic, kapslí kola 22 a vlastního (`compose_tests`) má řádek");
     for (look, want) in &table {
         for (st, w) in STATES.iter().zip(want) {
             let f = facts(*st);

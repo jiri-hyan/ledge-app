@@ -164,6 +164,7 @@ mod tests {
                 Part::Battery { percent, charging } => format!("▭{percent}{}", if *charging { "+" } else { "" }),
                 Part::Ring { fill: Some(x), color } => format!("◯{:.0}:{}", x * 100.0, col(*color)),
                 Part::Ring { fill: None, color } => format!("◯-:{}", col(*color)),
+                Part::Meter { fill, color } => format!("▮{:.0}:{}", fill * 100.0, col(*color)),
             })
             .collect();
         if s.spin {

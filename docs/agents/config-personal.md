@@ -69,3 +69,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
 - **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
   ceny v cenách API podle projektu a dne (viz „Útrata Claude (odhad)“); `false` = sekce zmizí, nic se nečte.
+- **Tempo čerpání limitů** — `claude.limitsPace` (výchozí `false`): v pruzích 5h / týden v kartě Claude ryska plánu
+  (uplynulý podíl okna), část výplně nad plánem obarvená (pozor do +5 b., přes nad); 5h pruh i při tempu, které dojde před
+  obnovou (tempo z posledních 30 min, jinak průměr okna). Čísla v tooltipu; bez `resetsAt` / se starým vzorkem nic.
+- **Pruh kontextu session** — `claude.contextBar` (výchozí `false`): pod každou živou session (s hooky) pruh velikosti
+  kontextu z posledního `usage` v jejím transcriptu, rysky 250 k / 350 k (viz „Útrata Claude (odhad)“ → kontext);
+  `false` = nic se nečte.

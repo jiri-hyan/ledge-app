@@ -7,6 +7,12 @@
 .lim-fill.lim-ok { background: var(--green); }
 .lim-fill.lim-warn { background: var(--amber); }
 .lim-fill.lim-bad { background: var(--red); }
+/* Tempo (volba `claude.limitsPace`): ryska plánu a výstražný segment mezi ryskou a koncem výplně */
+.lim-track { position: relative; }
+.lim-plan { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--t1); opacity: 0.55; pointer-events: none; }
+.lim-over { position: absolute; top: 0; bottom: 0; background: var(--amber); pointer-events: none; }
+.lim-over.lim-warn { background: var(--amber); }
+.lim-over.lim-bad { background: var(--red); }
 .lim-pct { text-align: right; color: var(--t1); }
 .lim-when { color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lim-when.lim-hot { color: var(--amber); font-weight: 600; }

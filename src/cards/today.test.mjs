@@ -11,7 +11,7 @@ const at = (h, m = 0) => new Date(2026, 9, 15, h, m, 0).getTime();
 const JOIN = { provider: "teams", url: "https://teams.microsoft.com/l/meetup-join/x" };
 const item = (title, start, end, over = {}) => ({ title, start, end, allDay: false, location: "", cal: 0, ongoing: false, tzGuess: false, join: null, ...over });
 const cal = (items) => ({ status: "ok", days: [{ kind: "today", date: "2026-10-15", items }], more: 0, calendars: [], loading: false });
-const lim = (pct, resetsAt, over = {}) => ({ at: NOW - MIN, source: "statusLine", fiveHour: { pct, resetsAt }, sevenDay: null, staleMs: 15 * MIN, statusLine: "full", notice: null, ...over });
+const lim = (pct, resetsAt, over = {}) => ({ at: NOW - MIN, source: "statusLine", fiveHour: { pct, resetsAt }, sevenDay: null, staleMs: 15 * MIN, statusLine: "full", notice: null, pace: false, history5h: [], ...over });
 const note = (path, remindMs, over = {}) => ({ path, title: path, remindMs, done: false, ...over });
 const pr = (n) => ({ repo: "a/b", number: n, title: `PR ${n}`, url: `https://github.com/a/b/pull/${n}` });
 const empty = { calendar: undefined, notes: [], reminders: [], github: undefined, limits: undefined };

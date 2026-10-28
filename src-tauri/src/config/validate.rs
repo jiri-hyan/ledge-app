@@ -113,6 +113,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     crate::stripconf::validate(&cfg.strip)?;
     crate::timer::validate(&cfg.timer)?;
     crate::smartconf::validate(&cfg.smart)?;
+    crate::winquick::validate(&cfg.winquick)?;
     crate::mediaconf::validate(&cfg.media)?;
     crate::cliphist::validate(&cfg.clipboard)?;
     crate::github::conf::validate(&cfg.github)?;

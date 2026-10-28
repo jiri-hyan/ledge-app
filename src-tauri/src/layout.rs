@@ -27,18 +27,25 @@ use serde_json::Value;
 pub const WORK: &str = "prace";
 pub const PERSONAL: &str = "osobni";
 /// Karty, které jde dát na záložku (zrcadlo `CARD_IDS` v `src/layout/model.ts`).
-pub const CARDS: [&str; 21] = [
+pub const CARDS: [&str; 23] = [
     "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today",
     // kolo 22 (nové widgety, `src/board/`): Claude dnes, Týden, Velké hodiny, Rychlé přepínače — jen z katalogu
-    "usage", "week", "bigclock", "toggles",
+    "usage", "week", "bigclock", "toggles", "winquick",
+    // kolo 23: Claude aktivita (fáze, soubor, poslední zpráva, schválení) — jen z katalogu
+    "activity",
 ];
 /// Karty kola 22, které čtou kalendář (pás týdne ukazuje dnešní události) a zvuk (rychlé přepínače).
 pub const WEEK_CARD: &str = "week";
 pub const TOGGLES_CARD: &str = "toggles";
+/// Karta Rychlé dlaždice Windows (kolo 23, `winquick.rs`): jen v katalogu.
+pub const WINQUICK_CARD: &str = "winquick";
+/// Karta Claude aktivita (kolo 23, `claude/activity.rs`): jen v katalogu; na záložce zapne čtení poslední
+/// zprávy z konce přepisu při `Stop` (`Claude::set_activity_tail`).
+pub const ACTIVITY_CARD: &str = "activity";
 /// Karty, které potřebují zdroj nebo jsou nové funkce (GitHub, Systém, Pošta — přihlášený účet Microsoft; Claude dnes, Rychlé přepínače — kolo 22):
 /// uživatel je přidá z katalogu a MCP je jako „opt-in“ hlásí Claudovi. Ve výchozím rozložení nejsou
 /// (kromě nich ani Kalendář, Počasí, Claude, Repa… — viz [`clean_default`]); `Sections::default()` je má vypnuté.
-pub const OPT_IN: [&str; 5] = ["github", "system", "mail", "usage", "toggles"];
+pub const OPT_IN: [&str; 7] = ["github", "system", "mail", "usage", "toggles", "winquick", "activity"];
 /// Dynamická karta: id s prefixem (dnes jen widgety ze skriptů `widget:<soubor>`, `widgets/`).
 /// Validace hlídá jen tvar — soubor nemusí existovat (karta pak ukáže, že chybí). Katalog je nabízí
 /// podle toho, co je na disku (zrcadlo `isDynamic` v `src/layout/model.ts`).
@@ -981,7 +988,7 @@ mod tests {
         let old = r#"{"layout":{"pages":[{"id":"prace","name":"","cards":[{"id":"projects","size":"xl"},{"id":"claude","size":"m"}]},{"id":"osobni","name":"","cards":[{"id":"projects","size":"xl"},{"id":"clock","size":"s"},{"id":"media","size":"m"}]}],"hiddenParts":["sound"],"upgrades":["personalProjects"]},"drawer":{"sections":{"calendar":false}}}"#;
         std::fs::write(&path, old).unwrap();
         let cfg = crate::config::load(&path).unwrap().unwrap();
-        for id in ["usage", "week", "bigclock", "toggles"] {
+        for id in ["usage", "week", "bigclock", "toggles", "winquick", "activity"] {
             assert!(!placed(&cfg.layout, id), "{id} se nepřidá samo");
         }
         assert!(!cfg.drawer.sections.calendar && !cfg.drawer.sections.sound);

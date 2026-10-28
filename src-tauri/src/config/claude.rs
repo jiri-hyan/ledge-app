@@ -34,11 +34,17 @@ pub struct ClaudeConfig {
     /// projektu a dne z lokálních transcriptů `~/.claude/projects` (`costslive.rs`). Počítá se jen při
     /// rozbalení sekce, nejvýš 1× za minutu. `false` = sekce zmizí a nic se nečte.
     pub costs: bool,
+    /// Pruh velikosti kontextu pod každou živou session v kartě Claude (rysky 250 k / 350 k, „každý tah čte ~N k
+    /// tokenů“). Čte konec transcriptu session jen při otevřeném šuplíku (`ctxsize.rs`). `false` = nic se nečte.
+    pub context_bar: bool,
+    /// Tempo čerpání limitů: v pruzích 5h / týden ryska plánu (rovnoměrné čerpání) a výstražná barva nad plánem.
+    /// Výchozí vypnuto; zapíná sbírání vzorků 5h okna v paměti (`limitslive.rs`).
+    pub limits_pace: bool,
 }
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true, context_bar: false, limits_pace: false }
     }
 }
 

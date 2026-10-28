@@ -8,6 +8,7 @@
 //! řádky (poslední bez `\n` se přečte příště). Kratší soubor než offset = celý index se přepočítá.
 //! Žádné I/O mimo `list_files` / `update` / `load` / `save`; volá je jen vlákno `costslive`.
 
+use super::floor;
 use super::parse::{self, Tokens};
 use super::price;
 use serde::{Deserialize, Serialize};
@@ -30,6 +31,15 @@ pub struct FileEntry {
     /// poslední `cwd` viděné v souboru (záloha pro záznamy bez vlastního)
     #[serde(default)]
     pub cwd: Option<String>,
+    /// první odpověď API v souboru (podlaha nové relace, kolo 23 — `floor.rs`); starý index ji nemá
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first: Option<floor::First>,
+    /// `first` a `agent` už jsou zjištěné (jinak je doplní `floor::fill` — jen čtením začátku souboru)
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub first_done: bool,
+    /// `agentType` z `agent-*.meta.json` (jen soubory subagentů)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -112,6 +122,8 @@ pub struct Stats {
     /// beze změny — neotevřené
     pub unchanged: usize,
     pub opened: usize,
+    /// doplněno podlahou (`floor::fill`) — start souboru / typ agenta, bez přepočtu
+    pub filled: usize,
     pub bytes: u64,
     pub records: u64,
     pub duplicates: u64,
@@ -203,7 +215,7 @@ impl Index {
             .iter()
             .filter_map(|f| {
                 let e = self.files.get(&key(&f.path)).cloned().unwrap_or_default();
-                (e.len != f.len || e.mtime != f.mtime).then_some((*f, e))
+                (e.len != f.len || e.mtime != f.mtime || !e.first_done).then_some((*f, e))
             })
             .collect();
         st.unchanged = live.len() - todo.len();
@@ -227,6 +239,10 @@ impl Index {
     }
 
     fn read_file(&mut self, f: &Found, e: &mut FileEntry, w: &Window, st: &mut Stats) -> std::io::Result<()> {
+        if !e.first_done {
+            floor::fill(&f.path, e, w.day_of)?;
+            st.filled += 1;
+        }
         let mut file = std::fs::File::open(&f.path)?;
         file.seek(SeekFrom::Start(e.off))?;
         // jen do délky z výpisu: co se připsalo mezitím, přečte příští běh (mtime se změní)
@@ -243,6 +259,9 @@ impl Index {
             };
             e.off += n;
             if let Some(rec) = parse::parse_line(&line) {
+                if e.first.is_none() {
+                    e.first = Some(floor::first_of(&rec, (w.day_of)(rec.ts_ms)));
+                }
                 if rec.cwd.is_some() {
                     e.cwd.clone_from(&rec.cwd);
                 }
@@ -268,7 +287,7 @@ pub const MAX_LINE: usize = 8 * 1024 * 1024;
 
 /// Výsledek čtení jednoho řádku.
 #[derive(Debug, PartialEq, Eq)]
-enum Line {
+pub(super) enum Line {
     /// konec vstupu, nebo poslední řádek bez `\n` (příště)
     End,
     /// celý řádek (s `\n`) v bufferu; počet přečtených bajtů
@@ -279,7 +298,7 @@ enum Line {
 
 /// Přečte jeden řádek do `buf` (smaže ho předem), ale nikdy neukládá víc než `max` bajtů: delší řádek dočte po
 /// kouscích bez ukládání a vrátí `Skipped`. Paměť je tedy omezená `max` + velikostí bufferu čtečky.
-fn read_line_capped(r: &mut impl BufRead, buf: &mut Vec<u8>, max: usize) -> std::io::Result<Line> {
+pub(super) fn read_line_capped(r: &mut impl BufRead, buf: &mut Vec<u8>, max: usize) -> std::io::Result<Line> {
     buf.clear();
     let (mut total, mut skipping) = (0u64, false);
     loop {

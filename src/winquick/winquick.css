@@ -1,0 +1,22 @@
+/* Karta Rychlé dlaždice Windows (kolo 23); třídy s prefixem wq-. Barvy a rohy z tokenů stylu. */
+.wq-card h4 > button { margin-left: auto; }
+.wq-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: var(--s2); }
+.wq-tile-w { position: relative; min-width: 0; }
+.wq-tile { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--s2); border-radius: var(--r-sm); background: var(--well); color: var(--t2); text-align: left; min-width: 0; }
+.wq-tile:hover:not(:disabled) { background: var(--well-2, var(--well)); }
+.wq-tile.on, .wq-tile.sel { background: color-mix(in srgb, var(--accent) 22%, var(--well)); color: var(--t1); }
+.wq-tile.dead { opacity: 0.55; }
+.wq-ic { font-size: calc(18px * var(--fz)); line-height: 1; }
+.wq-n { font: 600 var(--fs-xs) var(--sans); }
+.wq-v { font: var(--fs-2xs) var(--mono); color: var(--t3); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wq-ed { display: flex; gap: 2px; justify-content: center; margin-top: 2px; }
+.wq-panel, .wq-edit { margin-top: var(--s2); display: flex; flex-direction: column; gap: var(--s2); }
+.wq-list { display: flex; flex-wrap: wrap; gap: var(--s1); }
+.wq-chip { padding: 3px var(--s2); border-radius: var(--r-sm); background: var(--well); color: var(--t2); font: var(--fs-xs) var(--sans); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wq-chip:hover { background: var(--well-2, var(--well)); }
+.wq-chip.on { background: color-mix(in srgb, var(--accent) 22%, var(--well)); color: var(--t1); }
+.wq-opt { display: flex; gap: var(--s2); align-items: center; font: var(--fs-xs) var(--sans); color: var(--t2); }
+.wq-shot { display: flex; gap: var(--s2); align-items: flex-start; }
+.wq-shot img { width: 96px; max-height: 72px; object-fit: contain; border-radius: var(--r-sm); background: var(--well); }
+.wq-shot-b { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.wq-shot-n { font: var(--fs-2xs) var(--mono); color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

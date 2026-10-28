@@ -43,6 +43,8 @@ import TileMenu, { openTileMenu } from "./tilelook/TileMenu";
 import { gotoSettingsPanel } from "./palette/goto";
 import { closeLook } from "./tilelook/state";
 import { setActivePage } from "./theme/apply";
+import ResizeHandles from "./layout/ResizeHandles";
+import { setSizeTab } from "./layout/drawerSize";
 import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
 import { isLink, visibleGroups } from "./actions/model";
 import { lastResult } from "./actions/api";
@@ -66,6 +68,9 @@ import UsageCard from "./board/UsageCard";
 import WeekCard from "./board/WeekCard";
 import BigClockCard from "./board/BigClockCard";
 import TogglesCard from "./board/TogglesCard";
+import WinQuickCard from "./winquick/WinQuickCard";
+import ActivityCard from "./sessions/ActivityCard";
+import { activityApproves, inboxShown } from "./sessions/activity";
 
 export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
   // stejné rozložení = stejný objekt (nový snapshot karty nepřestaví)
@@ -104,6 +109,8 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const view = (id: CardId) => viewOf(id, lookFor(page().id, id, cardOf(id)?.look));
   // vzhled záložky (`appearance.pages`, `theme/pages.ts`): platí, dokud je hlavní stránka vidět
   createEffect(() => setActivePage(page().id));
+  // velikost šuplíku podle záložky (`appearance.size`, kolo 23) — pevná výška `.content` v App
+  createEffect(() => setSizeTab(page().id));
   onCleanup(() => setActivePage(""));
   // pravý klik na prázdné místo šuplíku (mimo karty a ovládací prvky) = menu Upravit rozložení / Přidat kartu /
   // Vzhled / Nastavení; posluchač jen na událost, v klidu nic neběží
@@ -193,6 +200,10 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         return <BigClockCard now={p.now} menu={menu("bigclock")} />;
       case "toggles":
         return <TogglesCard s={p.s} menu={menu("toggles")} />;
+      case "winquick":
+        return <WinQuickCard s={p.s} menu={menu("winquick")} />;
+      case "activity":
+        return <ActivityCard s={p.s} now={p.now} approvals={activityApproves(has)} menu={menu("activity")} />;
       default:
         // widget ze skriptu (`widget:<soubor>`)
         return <WidgetCard s={p.s} id={id} now={p.now} menu={(extra) => <CardMenu card={id} page={page().id} size={cardOf(id)?.size} h={cardOf(id)?.h} outcome={outcome(id)} look={cardOf(id)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={extra} />} />;
@@ -201,11 +212,11 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
 
   return (
     <>
-      <Show when={editing()}><EditBar /></Show>
-      <Show when={!has("claude")}><ClaudeInbox s={p.s} /></Show>
+      <Show when={editing()}><EditBar /><ResizeHandles /></Show>
+      <Show when={inboxShown(has)}><ClaudeInbox s={p.s} /></Show>
       <BgLaunch s={p.s} />
       {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
-      <Show when={has("media") || has("clock") || has("toggles")}><PersonalLive /></Show>
+      <Show when={has("media") || has("clock") || has("toggles") || has("winquick")}><PersonalLive /></Show>
       {/* kontextové návrhy (max 3 chipy) — jen z reálných událostí, `src/suggest/` */}
       <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
       {/* přetažení odkazu / souboru na otevřený šuplík → editor akce s návrhem (`actions/DropNew.tsx`) */}

@@ -32,6 +32,13 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   blue`) musí mít na `bg` i `raised` kontrast ≥ 4.5:1, jinak se config neuloží. `customTheme` = `id` vybraného vlastního
   motivu pro celý vzhled (prázdné = vestavěný `theme`; ten pak slouží jen jako základ pro nativní proužek). Všechna tři
   pole se zapisují jen když nejsou prázdná; starý config je nemá.
+  **Velikost otevřeného šuplíku (kolo 23):** `size` = `{ width?, height?, perPage?, pages? }` — `width` 720–2400 px
+  (nejvýš 95 % monitoru; přebije předvolbu `width` i `drawer.width`, ne rozložení `notch`), `height` 270–940 px (1–5 řad
+  karet, nejvýš strop šuplíku 80 % pracovní plochy; obsah navíc se posouvá, nic se nemaže); 0 / chybí = výchozí (šířka
+  z předvolby, výška podle obsahu). `perPage: true` = „Pamatovat velikost pro každou záložku“ (výchozí vypnuto),
+  `pages` = `{ "<id záložky>": { width?, height? } }` (chybějící = jako celek; přepnutí záložky = plynulá změna
+  velikosti). Nastavuje se tažením za boky / spodek v režimu úprav (Alt = bez přichycení, dvojklik = výchozí) nebo
+  čísly v Nastavení → Vzhled → Otevřený. Mimo rozsah se ořízne, config se kvůli tomu neodmítne. Starý config pole nemá.
 - **Zkratky** — globální zkratky jsou ve výchozím stavu **vypnuté** (nic se neregistruje, v UI se
   nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Šuplík a karty → Otevírání a klávesy → Klávesové zkratky, nebo v configu:
   `hotkeys.enabled: true` + `hotkeys.toggle|approve|deny|note` (formát `Ctrl+Alt+Space`). Config bez
@@ -46,6 +53,10 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `hotkeys.notePin` (výchozí prázdné = vypnuto) = rychlý nový lístek na plochu (nová poznámka rovnou v lístku
   s fokusem); jako `notePassthrough` platí i s `hotkeys.enabled: false`, jen se zapnutými poznámkami, a ve hře /
   herním režimu nic neudělá.
+- **Rychlé dlaždice Windows** (`winquick`, kolo 23; karta jen v katalogu, Upravit dlaždice přímo na kartě) — `winquick.tiles` (které dlaždice a v jakém
+  pořadí: `mic`, `out`, `term`, `dir`, `theme`, `wifi`, `bt`, `set`, `shot`; výchozí všechny, neznámé se zahodí), `winquick.outputSwitch` (výchozí `false`:
+  dlaždice výstupu v Rychlých dlaždicích přepne zařízení jedním klikem (`wq_output_set`); bez volby jen otevře Nastavení zvuku. Menu výstupu v kartě Právě hraje/Zvuk je vždy a volbě nepodléhá: jde přes `volume_set_device`),
+  `winquick.folders` (připnuté složky, absolutní cesty, nejvýš 8; Stažené, Plocha a Dokumenty jsou vždy). Chybějící sekce = výchozí stav.
 - **Chytřejší šuplík** (`smart`, kolo 20; Nastavení → Šuplík a karty → Otevírání a klávesy a Claude) — všechno jsou volby, chybějící sekce
   = dnešní chování (od opravy v kole 21 jsou `quickKeys`, `dropShortcut` i `tabWheel` ve výchozím stavu VYPNUTÉ a zapíná je člověk):
   `smart.quickKeys` (výchozí `false`): má-li otevřený šuplík fokus, `Alt+1…9` spustí N-tého zástupce na záložce
@@ -135,7 +146,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   proužek ukáže skladbu i bez položky `media` v `strip.items`); `stripTime` = čas skladby v proužku po minutách
   („1/4 min“): `auto` (výchozí, jen u `strip`), `on`, `off`; `equalizer` (výchozí `true`, jen u `strip`) =
   ozdoba ekvalizéru — jen dekorace, neukazuje skutečný zvuk; `tint` (výchozí `false`, `false` se nepíše) = karta
-  se jemně podbarví převládající barvou obalu alba (spočítá se v UI jednou na obal z 8×8 zmenšeniny).
+  se jemně podbarví převládající barvou obalu alba (spočítá se v UI jednou na obal ze 32×32 zmenšeniny, kontrast proti kartě ≥ 3:1, cache 4 obalů; bez obalu zůstanou dnešní barvy).
   Starý config bez `media` = `card`, beze změny.
   `favorites` = oblíbené playlisty a stanice jako dlaždice v kartě Právě hraje (část `favorites`, jde skrýt):
   `[{ "name": "Ráno", "uri": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" }]`, nejvýš 24, název ≤ 60 znaků. `uri` =

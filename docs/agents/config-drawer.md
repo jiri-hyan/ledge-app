@@ -41,7 +41,7 @@ Zdroj: `src-tauri/src/config/claude.rs`. Schvalovat smí jen člověk — žádn
   `notify` (výchozí: štítky ●/↑ v šuplíku a proužku) | `block` (hook Stop vrátí session do práce
   s důvodem, nikdy při `stop_hook_active`).
 
-Ostatní klíče `claude` (`enabled`, `port`, `questionHoldS`, `limitsReminder`, `toast`, `costs`) viz
+Ostatní klíče `claude` (`enabled`, `port`, `questionHoldS`, `limitsReminder`, `limitsPace`, `toast`, `costs`, `contextBar`) viz
 [sessions.md](sessions.md) a [config-personal.md](config-personal.md).
 
 ## `personal.weather` — poloha počasí

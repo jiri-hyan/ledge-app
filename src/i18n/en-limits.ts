@@ -3,6 +3,17 @@
 import { registerDict } from "../i18n";
 
 registerDict("en", {
+  "sessions.limits.pace.over": "+{n} pt over pace",
+  "sessions.limits.pace.under": "{n} pt under pace",
+  "sessions.limits.pace.plan": "plan {n} %",
+  "sessions.limits.pace.todayLeft": "{n} % left today",
+  "sessions.limits.pace.todayOver": "over by {n} % today",
+  "sessions.limits.pace.idle": "no usage",
+  "sessions.limits.pace.rateRecent": "pace {n} %/h (last 30 min)",
+  "sessions.limits.pace.rateAvg": "pace {n} %/h (window average)",
+  "sessions.limits.pace.lasts": "lasts until reset {t}",
+  "sessions.limits.pace.runsOut": "runs out {a}, reset {b}",
+  "sessions.limits.pace.slow": "slow down to ≤ {n} %/h",
   "sessions.limits.inDH": "in {d} d {h} h",
   "sessions.limits.inD": "in {d} d",
   "sessions.limits.inHM": "in {h} h {m} min",

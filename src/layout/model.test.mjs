@@ -90,7 +90,7 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
 
 test("katalog: co na záložce není a kde to je", () => {
   const d = fullLayout();
-  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today", "usage", "week", "bigclock", "toggles"]);
+  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today", "usage", "week", "bigclock", "toggles", "winquick", "activity"]);
   // GitHub, Systém a Pošta jsou v katalogu, ale na žádné záložce (výchozí rozložení se nemění)
   assert.deepEqual(catalog(d, "prace").filter((x) => ["github", "system", "mail", "today"].includes(x.id)).map((x) => x.on), [[], [], [], []]);
   assert.deepEqual(catalog(d, "osobni").find((x) => x.id === "mail").on, []);
@@ -333,4 +333,15 @@ test("karta přetažená na „+“: nová záložka s kartou, jméno se přejme
   while (full.pages.length < MAX_PAGES) full = addPage(full, `Z${full.pages.length}`).layout;
   assert.equal(moveToNewPage(full, "prace", "claude", "Nová záložka"), null);
   assert.equal(moveToNewPage(l, "prace", "neexistuje", "Nová záložka"), null, "karta tam není");
+});
+
+test("withLayout uklidí velikosti smazaných záložek (appearance.size.pages)", () => {
+  const l = defaultLayout();
+  const id = l.pages[0].id;
+  const cfg = { appearance: { size: { perPage: true, pages: { [id]: { width: 1440 }, smazana: { height: 600 } } } }, x: 1 };
+  const out = withLayout(cfg, l);
+  assert.deepEqual(out.appearance.size.pages, { [id]: { width: 1440 } });
+  assert.deepEqual(cfg.appearance.size.pages.smazana, { height: 600 }, "vstup netknutý");
+  const none = { appearance: { theme: "nord" } };
+  assert.equal(withLayout(none, l).appearance, none.appearance, "bez size beze změny");
 });

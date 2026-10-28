@@ -42,7 +42,7 @@ pub struct StripConfig {
     pub items_rev: u32,
     /// Styl zavřeného Ledge: `classic` (výchozí = proužek podle `items`, tvar `appearance.strip.style`),
     /// `island`, `dots`, `line`, `icons`, `clock`, `corner`, `ghost`, `bar`, `notch`, `progress`, `ticker`,
-    /// `minimum`, `trio`, `rings`.
+    /// `minimum`, `trio`, `rings`, `custom` (vlastní: `compose`).
     /// Ostatní styly než `classic` samy určí tvar, místo i obsah podle toho, co se děje (`looks.rs`);
     /// `items`, `quiet`, `colors`, `custom` a `opacity` platí jen pro `classic`.
     pub look: crate::looks::Look,
@@ -52,6 +52,9 @@ pub struct StripConfig {
     /// Tvar kapsle stylů s tělem: round, sharp, long, island (jako Mac).
     // kolo 22; linka, lišta, tečky, roh a výřez ho nepoužijí (`Look::shapeable`)
     pub look_shape: crate::looks::Shape,
+    /// Vlastní vzhled (jen u look custom): tvar, rozměry, položky ve slotech.
+    // kolo 23; ořez rozsahů a 1–5 položek při použití (`looks::compose::Compose::norm`), starý config = výchozí
+    pub compose: crate::looks::compose::Compose,
 }
 
 impl Default for StripConfig {
@@ -70,6 +73,7 @@ impl Default for StripConfig {
             look: crate::looks::Look::Classic,
             look_hide: Vec::new(),
             look_shape: crate::looks::Shape::Round,
+            compose: crate::looks::compose::Compose::default(),
         }
     }
 }

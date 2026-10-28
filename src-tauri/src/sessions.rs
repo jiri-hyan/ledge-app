@@ -204,6 +204,8 @@ pub struct Row {
     pub job: Option<crate::agentview::Job>,
     /// na co čeká (`waitingFor`), jen když je stav „čeká“
     pub waiting_for: Option<crate::agentview::WaitFor>,
+    /// živá aktivita z hooků (karta „Claude aktivita“, `claude/activity.rs`); `None` = hooky nic neposlaly
+    pub activity: Option<crate::claude::activity::Activity>,
 }
 
 impl Row {
@@ -309,7 +311,7 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
         let background = kind.as_deref().is_some_and(|k| k.eq_ignore_ascii_case("background"));
         let waiting_for = base.waiting_for.filter(|_| status == Status::Waiting);
         let action = decide_open(entrypoint.as_deref(), kind.as_deref(), alive, pid);
-        let (uncommitted, unpushed, subagents) = h.map(|h| (h.uncommitted, h.unpushed, h.subagents)).unwrap_or_default();
+        let (uncommitted, unpushed, subagents, activity) = h.map(|h| (h.uncommitted, h.unpushed, h.subagents, h.activity)).unwrap_or_default();
         rows.push(Row {
             id: id.to_string(),
             title: title.filter(|t| *t != name),
@@ -339,6 +341,7 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
             background,
             job: base.job,
             waiting_for,
+            activity,
         });
     };
     for a in live.agents.unwrap_or_default() {
@@ -654,7 +657,7 @@ mod tests {
     }
 
     fn hook(id: &str, cwd: &str, state: SessionState, updated_at: u64) -> Session {
-        Session { id: id.into(), cwd: cwd.into(), state, title: None, updated_at, uncommitted: vec![], unpushed: 0, ended: false, subagents: Subagents::default() }
+        Session { id: id.into(), cwd: cwd.into(), state, title: None, updated_at, uncommitted: vec![], unpushed: 0, ended: false, subagents: Subagents::default(), transcript: None, activity: None }
     }
 
     #[test]

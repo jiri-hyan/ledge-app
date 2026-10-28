@@ -33,6 +33,18 @@ pub fn parse(target: &str) -> Result<WinTarget, String> {
     bad()
 }
 
+/// Odkazy dlaždice „Nastavení“ v kartě Rychlé dlaždice (kolo 23): id z UI → `ms-settings:` (UI neposílá URI).
+pub const QUICK: [(&str, &str); 4] = [
+    ("network", "ms-settings:network"),
+    ("sound", "ms-settings:sound"),
+    ("display", "ms-settings:display"),
+    ("bluetooth", "ms-settings:bluetooth"),
+];
+
+pub fn quick_uri(id: &str) -> Option<&'static str> {
+    QUICK.iter().find(|(k, _)| *k == id).map(|(_, u)| *u)
+}
+
 /// `%SystemRoot%\System32\control.exe` (absolutně — ne podle PATH).
 pub fn control_exe() -> PathBuf {
     let root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
@@ -70,6 +82,11 @@ mod tests {
         ] {
             assert!(parse(t).is_err(), "{t:?} musí být odmítnut");
         }
+        for (id, uri) in QUICK {
+            assert_eq!(quick_uri(id), Some(uri));
+            assert!(matches!(parse(uri), Ok(WinTarget::Settings(_))), "{uri}");
+        }
+        assert_eq!(quick_uri("calc"), None);
         assert!(control_exe().ends_with(r"System32\control.exe"));
     }
 }

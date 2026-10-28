@@ -1,0 +1,41 @@
+/* Editor vlastního zavřeného Ledge (`ComposeEditor.tsx`, kolo 23): tokeny Nastavení, žádná trvalá animace. */
+.cx-hero { margin-bottom: var(--s2); }
+.cx-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s2); }
+.cx-sum { font-size: var(--fs-md); color: var(--t2); }
+.cx-blk { border-top: 1px solid var(--line); padding-top: var(--s2); margin-top: var(--s2); }
+.cx-bh { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s2); margin-bottom: var(--s2); }
+.cx-bh > span:first-child { display: flex; flex-direction: column; gap: 2px; }
+.cx-bh small, .cx-trayh small { font-size: var(--fs-xs); color: var(--t3); }
+.cx-arrows { display: inline-flex; gap: 4px; }
+.cx-car { display: grid; grid-auto-flow: column; grid-auto-columns: 168px; gap: var(--s2); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
+.cx-pre { scroll-snap-align: start; }
+.cx-num { width: 100%; border-collapse: collapse; margin-top: var(--s2); font-size: var(--fs-sm); }
+.cx-num caption { text-align: left; color: var(--t3); padding-bottom: 4px; }
+.cx-num th, .cx-num td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); font-weight: 400; }
+.cx-num thead th { color: var(--t3); }
+.cx-num input { width: 72px; }
+.cx-num tr.off { opacity: 0.5; }
+.cx-styles { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.cx-rack { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); margin: var(--s2) 0; }
+.cx-well { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; min-height: 92px; padding: 22px 8px 8px; position: relative;
+  border: 1px dashed var(--line-2); border-radius: var(--r-lg); background: var(--well); transition: border-color var(--dur-1); }
+.cx-well.over { border-color: var(--accent); border-style: solid; }
+.cx-wn { position: absolute; top: 5px; left: 8px; font-size: var(--fs-xs); color: var(--t3); }
+.cx-emp { font-size: var(--fs-xs); color: var(--t3); align-self: center; }
+.cx-cw { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+.cx-cube { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 76px; padding: 6px 8px; border-radius: var(--r-md);
+  border: 1px solid var(--line); background: var(--bg-2, var(--well)); color: var(--t1); cursor: grab; transition: border-color var(--dur-1); }
+.cx-cube:hover { border-color: var(--line-2); }
+.cx-cube:focus-visible, .cx-mini:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.cx-cube:disabled { opacity: 0.5; cursor: default; }
+.cx-ci { font-weight: 700; color: var(--accent); }
+.cx-cn { font-size: var(--fs-sm); }
+.cx-cs { font-size: var(--fs-2xs); color: var(--t3); }
+.cx-cm { display: flex; justify-content: center; gap: 2px; }
+.cx-mini { min-width: 22px; padding: 0 4px; border-radius: var(--r-sm, 4px); border: 1px solid var(--line); background: transparent; color: var(--t2); }
+.cx-mini:hover:not(:disabled) { color: var(--t1); border-color: var(--line-2); }
+.cx-trayh { display: flex; align-items: baseline; gap: var(--s2); font-size: var(--fs-sm); color: var(--t2); }
+.cx-tray { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 var(--s2); }
+.cx-tile { margin-top: var(--s2); }
+.cx-shapes { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.cx-shape.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--t1); }

@@ -33,6 +33,7 @@ import { NoteEditor, NotesPage, Palette, Settings, UpdatePanel, Wizard, preloadV
 import { installQuickKeys } from "./quick/quick";
 import "./quick/quick.css";
 import { clearDrop, offerDrop } from "./actions/dropstate";
+import { mainHeight } from "./layout/drawerSize";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
@@ -279,7 +280,7 @@ export default function App() {
     <div class="shell" ref={panel}>
       <div ref={content} style={{ "padding-top": `${OVERLAP}px` }}>
         <Show when={view() === "peek" || isHoverView(view())} fallback={
-          <div class="content">
+          <div class="content" style={{ height: page() === "main" ? mainHeight() : undefined }}>
             <Show when={page() !== "welcome"}>
               <Head s={s} now={now()} page={page()} onNote={() => startNote()} onSettings={() => setPage(page() === "settings" ? "main" : "settings")} onBack={() => setPage(page() === "note" ? returnTo() : "main")} onUpdate={() => setUpdOpen(!updOpen())} onPalette={() => (palette() ? closePalette() : openPalette(true))} />
             </Show>

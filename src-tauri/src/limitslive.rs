@@ -37,6 +37,8 @@ struct Live {
     /// běžící připomínka resetu: okno a do kdy (ms)
     notice: Option<(Kind, i64)>,
     last_stat: Option<Instant>,
+    /// historie 5h okna pro tempo (`limits::push_hist`), plní se jen s volbou `claude.limitsPace`
+    hist: Vec<(i64, f64)>,
 }
 
 static LIVE: Mutex<Option<Live>> = Mutex::new(None);
@@ -102,7 +104,7 @@ fn reload(l: &mut Live) -> bool {
 /// Volá emit vlákno při každém probuzení. Levné: bez události watcheru jen porovnání času.
 pub(crate) fn tick(now: i64) {
     let c = core();
-    let (enabled, fullscreen) = (c.cfg.read().claude.limits_reminder, c.fullscreen.load(Ordering::Relaxed));
+    let (enabled, fullscreen, pace) = (c.cfg.read().claude.limits_reminder, c.fullscreen.load(Ordering::Relaxed), c.cfg.read().claude.limits_pace);
     let mut dirty = false;
     let mut show = false;
     let mut hide = false;
@@ -114,6 +116,9 @@ pub(crate) fn tick(now: i64) {
         }
         if let Some(s) = limits::fresher(l.own, l.log) {
             limits::arm(&mut l.armed, &s, now);
+            if let (true, Some(w)) = (pace, s.five_hour) {
+                dirty |= limits::push_hist(&mut l.hist, s.at, w.pct);
+            }
         }
         let fired = limits::due(&mut l.armed, now);
         // vypnuto / fullscreen = připomínka propadne (nic se neodkládá)
@@ -164,10 +169,15 @@ pub struct LimitsView {
     pub status_line: &'static str,
     /// běžící připomínka resetu (peek): které okno se obnovilo
     pub notice: Option<Kind>,
+    /// volba `claude.limitsPace`: UI kreslí rysku plánu a barví tempo
+    pub pace: bool,
+    /// vzorky 5h okna `[at, pct]` pro tempo (prázdné bez volby `limitsPace`)
+    pub history5h: Vec<[f64; 2]>,
 }
 
 /// Pro snapshot — jen paměť.
 pub fn view() -> LimitsView {
+    let pace = core().cfg.read().claude.limits_pace;
     with(|l| {
         let s = limits::fresher(l.own, l.log);
         LimitsView {
@@ -178,6 +188,8 @@ pub fn view() -> LimitsView {
             stale_ms: limits::STALE_MS,
             status_line: l.status_line,
             notice: l.notice.map(|(k, _)| k),
+            pace,
+            history5h: if pace { l.hist.iter().map(|&(t, p)| [t as f64, p]).collect() } else { Vec::new() },
         }
     })
 }

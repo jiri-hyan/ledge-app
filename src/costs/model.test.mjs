@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/costs/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bars, compact, pickRange, progressPct, share, usdDigits } from "./model.ts";
+import { bars, compact, floorTrend, pickRange, progressPct, share, usdDigits } from "./model.ts";
 
 test("zkrácení tokenů", () => {
   const cases = [
@@ -47,4 +47,18 @@ test("průběh a výběr rozsahu", () => {
   assert.equal(pickRange([r(1)], 30).days, 1);
   assert.equal(pickRange([], 7), null);
   assert.equal(pickRange(undefined, 7), null);
+});
+
+test("trend podlahy nové relace", () => {
+  const r = (median, prevMedian, delta) => ({ name: "app", median, n: 5, prevMedian, prevN: 5, delta });
+  const cases = [
+    ["málo souborů = bez trendu", r(30_000, 10_000, null), null],
+    ["nárůst", r(35_000, 10_000, 25_000), { dir: "up", abs: 25_000 }],
+    ["pokles", r(10_000, 18_000, -8_000), { dir: "down", abs: 8_000 }],
+    ["pod 1 000 tokenů = beze změny", r(10_500, 10_000, 500), { dir: "flat", abs: 500 }],
+    ["pod 5 % u velké podlahy = beze změny", r(52_000, 50_000, 2_000), { dir: "flat", abs: 2_000 }],
+    ["přes 5 % u velké podlahy", r(54_000, 50_000, 4_000), { dir: "up", abs: 4_000 }],
+    ["nula", r(10_000, 10_000, 0), { dir: "flat", abs: 0 }],
+  ];
+  for (const [name, row, want] of cases) assert.deepEqual(floorTrend(row), want, name);
 });

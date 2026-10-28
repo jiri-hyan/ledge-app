@@ -7,7 +7,7 @@ import { api, type VolumeView } from "../api";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { createMenu, PopCap, PopItem, PopMenu } from "../ui/Popover";
-import { throttle, volumeLevel } from "./model";
+import { outputPickerShown, throttle, volumeLevel } from "./model";
 
 const stroke = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 1.8, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": true } as const;
 const SPEAKER = "M4 9.5h3.5L12 5.5v13l-4.5-4H4z";
@@ -116,7 +116,7 @@ export default function VolumeBar(p: { v: VolumeView }) {
           </button>
         </Show>
       </div>
-      <Show when={(p.v.devices?.length ?? 0) > 1}>
+      <Show when={outputPickerShown(p.v.devices?.length ?? 0)}>
         <div class="med-outs">
           <Outputs v={p.v} />
         </div>

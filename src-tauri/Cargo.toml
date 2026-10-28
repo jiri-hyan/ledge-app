@@ -101,6 +101,9 @@ features = [
   # záložka Osobní (`media.rs`, `volume.rs`, `battery.rs`): právě hraje (GSMTC, WinRT + obal přes
   # Storage.Streams), hlasitost výchozího výstupu (Core Audio), baterie (stav + oznámení o změně)
   "Foundation",
+  # karta Rychlé dlaždice (`winquickwin.rs`): rádia Wi-Fi / Bluetooth (Windows.Devices.Radios)
+  "Devices_Radios",
+  "Foundation_Collections",
   "Media_Control",
   "Storage_Streams",
   "Win32_Media_Audio",

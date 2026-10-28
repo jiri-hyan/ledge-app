@@ -63,3 +63,8 @@ export function throttle<T>(
     },
   };
 }
+
+/** Menu výstupu v kartě Zvuk: jen když je z čeho vybírat (>1 zařízení) — beze změny oproti kolu 18. */
+export function outputPickerShown(devices: number): boolean {
+  return devices > 1;
+}

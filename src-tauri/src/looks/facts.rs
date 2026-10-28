@@ -22,6 +22,24 @@ pub fn timer_fact(s: &TimerState, now: i64) -> Option<TimerFact> {
     s.stopwatch.as_ref().map(|w| TimerFact { text: crate::timer::clock_text(crate::timer::elapsed_ms(w, now)), minutes: None, progress: None, done: false })
 }
 
+/// Aktivita vedoucí session pro zavřený Ledge: fáze (odhad), jméno souboru, projekt.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActivityFact {
+    pub phase: crate::claude::activity::Phase,
+    /// jen jméno souboru („main.rs“), "" = žádný
+    pub file: String,
+    /// projekt session ("" = neznámý)
+    pub project: String,
+}
+
+/// `claude::activity::lead` → fakt; `project` dodá volající (jméno projektu podle cwd).
+pub fn activity_fact(s: Option<&crate::claude::Session>, project: impl Fn(&str) -> String) -> Option<ActivityFact> {
+    let s = s?;
+    let a = s.activity.as_ref()?;
+    let file = a.file.as_deref().map(crate::claude::activity::base_name).unwrap_or("").to_string();
+    Some(ActivityFact { phase: a.phase, file, project: project(&s.cwd) })
+}
+
 /// Jen při přehrávání. Čas a průběh jen z timeline zdroje (po minutách — proužek se po sekundách
 /// nepřepočítává).
 pub fn music_fact(v: Option<&MediaView>, now: i64) -> Option<MusicFact> {

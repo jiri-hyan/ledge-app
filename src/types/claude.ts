@@ -94,6 +94,22 @@ export interface SessionView {
   job: JobView | null;
   /** na co čeká (`waitingFor`), jen ve stavu „čeká“; neznámá hodnota = null */
   waitingFor: WaitFor | null;
+  /** živá aktivita z hooků (Rust `claude/activity.rs`, karta „Claude aktivita“); null = hooky nic neposlaly */
+  activity?: SessionActivity | null;
+}
+
+/** Fáze tahu — ODHAD podle posledního nástroje (Read/Grep → čtení, Edit/Write → úpravy, Bash s testy → testy). */
+export type ActivityPhase = "reading" | "editing" | "testing" | "working" | "done" | "error";
+export interface SessionActivity {
+  phase: ActivityPhase;
+  /** poslední nástroj ("" = začátek / konec tahu) */
+  tool: string;
+  /** poslední soubor z `tool_input` (celá cesta) */
+  file: string | null;
+  /** poslední text Clauda (zkrácený) z hooku Stop nebo konce přepisu */
+  message: string | null;
+  /** kdy se fáze změnila (ms) */
+  at: number;
 }
 
 /** Agent View — session na pozadí (`claude agents --json`, Rust `agentview.rs`). */
@@ -173,6 +189,10 @@ export interface LimitsView {
   statusLine: "none" | "foreign" | "full" | "error" | "";
   /** běžící připomínka resetu (peek) */
   notice: "fiveHour" | "sevenDay" | null;
+  /** volba `claude.limitsPace` */
+  pace: boolean;
+  /** vzorky 5h okna [at ms, pct] (prázdné bez volby) */
+  history5h: [number, number][];
 }
 export interface StatusLineStatus {
   state: "none" | "foreign" | "full" | "error";

@@ -234,6 +234,27 @@ pub fn next_reset(armed: &Armed) -> Option<i64> {
     armed.iter().map(|&(_, r)| r).min()
 }
 
+/// Kolik vzorků 5h okna si pamatujeme pro tempo a jak dlouho zpět (kruhový buffer v paměti, volba `limitsPace`).
+pub const HIST_MAX: usize = 64;
+pub const HIST_SPAN_MS: i64 = 6 * 3_600_000;
+
+/// Přidá vzorek 5h okna do historie: starší / stejný čas se přeskočí, pokles procent (nové okno) historii
+/// smaže, nejstarší (> `HIST_SPAN_MS` nebo přes `HIST_MAX`) odpadnou. Vrací, zda se vzorek přidal.
+pub fn push_hist(h: &mut Vec<(i64, f64)>, at: i64, pct: f64) -> bool {
+    if h.last().is_some_and(|&(t, _)| at <= t) {
+        return false;
+    }
+    if h.last().is_some_and(|&(_, p)| pct < p - 0.5) {
+        h.clear();
+    }
+    h.push((at, pct));
+    h.retain(|&(t, _)| at - t <= HIST_SPAN_MS);
+    if h.len() > HIST_MAX {
+        h.drain(..h.len() - HIST_MAX);
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432,5 +453,25 @@ mod tests {
         let mut none = Armed::new();
         arm(&mut none, &Sample { at: NOW, five_hour: w(100.0, None), seven_day: None, source: Source::UsageLog }, NOW);
         assert!(none.is_empty());
+    }
+
+    #[test]
+    fn hist_push_dedup_reset_and_caps() {
+        let mut h = Vec::new();
+        assert!(push_hist(&mut h, 1000, 10.0));
+        assert!(!push_hist(&mut h, 1000, 11.0), "stejný čas");
+        assert!(!push_hist(&mut h, 900, 11.0), "starší");
+        assert!(push_hist(&mut h, 2000, 12.0));
+        assert_eq!(h.len(), 2);
+        assert!(push_hist(&mut h, 3000, 2.0), "pokles = nové okno");
+        assert_eq!(h, vec![(3000, 2.0)]);
+        assert!(push_hist(&mut h, 3000 + HIST_SPAN_MS + 1, 5.0));
+        assert_eq!(h.len(), 1);
+        let mut h = Vec::new();
+        for i in 0..100 {
+            push_hist(&mut h, i * 1000, 1.0 + i as f64 * 0.01);
+        }
+        assert_eq!(h.len(), HIST_MAX);
+        assert_eq!(h.last().unwrap().0, 99_000);
     }
 }

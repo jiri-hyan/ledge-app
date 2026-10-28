@@ -16,6 +16,8 @@ import { selectGates } from './brany-select.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = path.join(root, 'src-tauri')
+// relativní CARGO_TARGET_DIR by se rozbil o cwd `src-tauri` (→ src-tauri/src-tauri/…) → absolutně vůči kořeni repa
+if (process.env.CARGO_TARGET_DIR && !path.isAbsolute(process.env.CARGO_TARGET_DIR)) process.env.CARGO_TARGET_DIR = path.resolve(root, process.env.CARGO_TARGET_DIR)
 const logDir = path.join(os.tmpdir(), 'ledge-brany', path.basename(root))
 fs.mkdirSync(logDir, { recursive: true })
 const queue = path.join(os.homedir(), '.devtools', 'fronta.mjs')

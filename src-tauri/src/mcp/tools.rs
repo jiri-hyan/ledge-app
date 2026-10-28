@@ -184,16 +184,24 @@ pub const TOOLS: &[Tool] = &[
     Tool { name: "strip_get", title: "Get the closed strip", write: false, input: no_args,
         desc: "Read what the closed Ledge shows at the top edge: strip on/off, items in order, custom text, per-item colors, items hidden when idle, strip.look. The catalog lists allowed values." },
     Tool { name: "strip_set", title: "Change the closed strip", write: true,
-        input: || embed(schema::of::<StripConfig>(), None, &[], &["itemsRev"]),
+        input: || {
+            // vlastní vzhled (`compose`, kolo 23) se skládá v Nastavení — schéma by přerostlo strop `tools/list`
+            let mut s = embed(schema::of::<StripConfig>(), None, &[], &["itemsRev", "compose"]);
+            if let Some(d) = s.get_mut("$defs").and_then(Value::as_object_mut) {
+                d.retain(|k, _| !k.starts_with("Compose"));
+            }
+            s
+        },
         desc: "Change the closed strip (only the fields you send). Example: {\"items\":[\"mode\",\"clock\"],\"look\":\"classic\"}." },
     Tool { name: "appearance_get", title: "Get the appearance", write: false, input: no_args,
         desc: "Read the look (style, theme, accent, density, font, material, layout, width, radius, opacity, motion, strip, blur) and the catalog of allowed values." },
     Tool { name: "appearance_set", title: "Change the appearance", write: true,
         input: || {
-            // vzhled záložek a vlastní motivy (11 barev) jsou pro MCP moc velké — `tools/list` < 20 kB; mění se v Nastavení
-            let mut s = embed(schema::of::<AppearanceConfig>(), None, &[], &["pages", "customThemes", "customTheme"]);
+            // vzhled záložek, vlastní motivy (11 barev) a velikost šuplíku (kolo 23) jsou pro MCP moc velké —
+            // `tools/list` < 20 kB; mění se v Nastavení / tažením v úpravách
+            let mut s = embed(schema::of::<AppearanceConfig>(), None, &[], &["pages", "customThemes", "customTheme", "size"]);
             if let Some(d) = s.get_mut("$defs").and_then(Value::as_object_mut) {
-                d.retain(|k, _| !matches!(k.as_str(), "PageLook" | "CustomTheme" | "ThemeColors"));
+                d.retain(|k, _| !matches!(k.as_str(), "PageLook" | "CustomTheme" | "ThemeColors" | "SizeConfig" | "PageSize"));
             }
             s["properties"]["style"] = json!({ "type": "string", "enum": look::STYLES.iter().map(|s| s.id).collect::<Vec<_>>(), "description": "Design style package; applied first, other fields override it." });
             s["properties"]["blur"] = json!({ "type": "boolean", "description": "Blur the desktop behind the drawer (acrylic)." });

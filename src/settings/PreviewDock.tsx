@@ -79,7 +79,7 @@ export default function PreviewDock() {
         <StateSwitch />
         <div class="st-dock-grid">
           <figure>
-            <StripLookPreview look={look()} state={previewState()} a={a()} opacity={opacity()} shape={normShape(cfg.strip?.lookShape)} />
+            <StripLookPreview look={look()} state={previewState()} a={a()} opacity={opacity()} shape={normShape(cfg.strip?.lookShape)} compose={cfg.strip?.compose} />
             <figcaption>{t("settings.dock.closed", "Zavřený")}</figcaption>
           </figure>
           <figure>

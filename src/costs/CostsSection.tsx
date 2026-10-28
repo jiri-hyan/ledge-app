@@ -6,7 +6,7 @@ import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { ago, num } from "../format";
 import { t } from "../i18n";
-import { bars, compact, pickRange, progressPct, share, usdDigits, type CostLine } from "./model";
+import { bars, compact, floorTrend, pickRange, progressPct, share, usdDigits, type CostLine, type FloorRow } from "./model";
 import "./costs.css";
 
 const OPEN_KEY = "ledge.costs.open";
@@ -47,6 +47,25 @@ function Line(p: { l: CostLine; total: CostLine }) {
       <span class="cost-track"><span class="cost-fill" style={{ width: `${share(p.l, p.total) * 100}%` }} /></span>
       <span class="cost-tok">{tok(p.l.tokens)}</span>
       <span class="cost-usd">{usd(p.l.cost)}</span>
+    </div>
+  );
+}
+
+/** Řádek podlahy: název · medián kontextu 1. volání · počet souborů · trend proti předchozím 7 dnům. */
+function FloorLine(p: { r: FloorRow }) {
+  const tr = () => floorTrend(p.r);
+  const trendText = () => {
+    const x = tr();
+    if (!x) return "";
+    return x.dir === "flat" ? t("sessions.costs.floorFlat", "beze změny") : x.dir === "up" ? t("sessions.costs.floorUp", "▲ +{v}", { v: tok(x.abs) }) : t("sessions.costs.floorDown", "▼ −{v}", { v: tok(x.abs) });
+  };
+  const prev = () => (p.r.prevMedian == null ? t("sessions.costs.floorPrevNone", "žádné soubory") : t("sessions.costs.floorPrev", "medián {m} v {n} souborech", { m: tok(p.r.prevMedian), n: p.r.prevN }));
+  return (
+    <div class="cost-floor" title={t("sessions.costs.floorRowTip", "medián {m} tokenů v {n} souborech; předchozích 7 dní: {p}", { m: num(p.r.median), n: p.r.n, p: prev() })}>
+      <span class="cost-name">{p.r.name || t("sessions.costs.noDir", "bez složky")}</span>
+      <span class="cost-tok">{t("sessions.costs.floorCount", "{n}×", { n: p.r.n })}</span>
+      <span class="cost-usd">{tok(p.r.median)}</span>
+      <span class="cost-trend" classList={{ up: tr()?.dir === "up", down: tr()?.dir === "down" }}>{trendText()}</span>
     </div>
   );
 }
@@ -129,6 +148,21 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
                     <For each={r().projects}>{(l) => <Line l={l} total={r().total} />}</For>
                     <div class="cost-h">{t("sessions.costs.models", "Modely")}</div>
                     <For each={r().models}>{(l) => <Line l={l} total={r().total} />}</For>
+                  </Show>
+                  <Show when={cv()!.summary?.floor}>
+                    {(fl) => (
+                      <>
+                        <div class="cost-h" title={t("sessions.costs.floorTip", "Medián kontextu prvního volání API každé session / agenta za posledních 7 dní; trend proti 7 dnům před tím (od 3 souborů v obou). Nafouklý CLAUDE.md, MCP nebo skills je vidět tady.")}>{t("sessions.costs.floorProjects", "Start nové relace (první volání)")}</div>
+                        <For each={fl().projects}>{(r) => <FloorLine r={r} />}</For>
+                        <Show when={fl().agents.length > 0}>
+                          <div class="cost-h">{t("sessions.costs.floorAgents", "Start agenta podle typu (první volání)")}</div>
+                          <For each={fl().agents}>{(r) => <FloorLine r={r} />}</For>
+                        </Show>
+                        <Show when={fl().projects.length === 0 && fl().agents.length === 0}>
+                          <div class="cost-note">{t("sessions.costs.floorEmpty", "Za 7 dní žádná nová session ani agent.")}</div>
+                        </Show>
+                      </>
+                    )}
                   </Show>
                   <Show when={cv()!.computedAt}>
                     <div class="cost-foot">{t("sessions.costs.computed", "spočítáno {when}", { when: ago(cv()!.computedAt!, p.now) })}</div>

@@ -6,6 +6,7 @@
 //    skutečný počet sloupců mřížky (rozložení stylu, `theme/looks.ts` `LAYOUTS`) a ukázkové karty.
 import type { Appearance, LayoutId, WidthPreset } from "../types.ts";
 import { LAYOUTS, NOTCH_PX, WIDTHS } from "../theme/looks.ts";
+import { sizeFor } from "../theme/size.ts";
 
 export const STEPS = ["closed", "hover", "open", "motion"] as const;
 export type StepId = (typeof STEPS)[number];
@@ -26,6 +27,8 @@ export const ANCHOR_STEP: Record<string, StepId | null> = {
   "appearance.density": "open",
   "appearance.theme": "open",
   "appearance.pages": "open",
+  "appearance.size": "open",
+  "appearance.size.perPage": "open",
   "appearance.accent": "open",
   "appearance.details": "open",
   "drawer.width": "open",
@@ -100,14 +103,17 @@ export type MonitorModel = {
 };
 
 export function monitorModel(
-  a: Pick<Appearance, "width" | "layout"> & { strip: Pick<Appearance["strip"], "position"> },
+  a: Pick<Appearance, "width" | "layout" | "size"> & { strip: Pick<Appearance["strip"], "position"> },
   customW: number,
   screen: { w: number; h: number } | null,
 ): MonitorModel {
   const known = !!screen && screen.w > 0 && screen.h > 0;
   const mon = known ? screen! : FALLBACK_MONITOR;
   // široký notch má vlastní šířku (Rust `geom::layout_width`), předvolba se nepoužije
-  const w = a.layout === "notch" ? drawerWidth("custom", NOTCH_PX, known ? mon.w : 0) : drawerWidth(a.width, customW, known ? mon.w : 0);
+  // vlastní velikost (`appearance.size`, kolo 23; bez záložky = celek) přebije předvolbu jako Rust `geom::sized_width`
+  const own = sizeFor(a.size, "").width;
+  const w = a.layout === "notch" ? drawerWidth("custom", NOTCH_PX, known ? mon.w : 0)
+    : own > 0 ? drawerWidth("custom", own, known ? mon.w : 0) : drawerWidth(a.width, customW, known ? mon.w : 0);
   const drawerW = Math.min(w, mon.w);
   return {
     monW: mon.w, monH: mon.h, known, drawerW,

@@ -4,7 +4,7 @@
 // `t(look.desc.key, look.desc.cs)`; anglické texty jsou v `strip/en.ts` (`en` tady = totéž pro přehled).
 // Bez importů za běhu (`looks.test.mjs`).
 
-export const STRIP_LOOK_IDS = ["classic", "island", "dots", "line", "icons", "clock", "corner", "ghost", "bar", "notch", "progress", "ticker", "minimum", "trio", "rings"] as const;
+export const STRIP_LOOK_IDS = ["classic", "island", "dots", "line", "icons", "clock", "corner", "ghost", "bar", "notch", "progress", "ticker", "minimum", "trio", "rings", "custom"] as const;
 export type StripLookId = (typeof STRIP_LOOK_IDS)[number];
 
 export type StripLookDef = {
@@ -33,6 +33,7 @@ export const STRIP_LOOKS: readonly StripLookDef[] = [
   { id: "minimum", key: "appearance.look.minimum", cs: "Minimum", en: "Minimal", desc: { key: "appearance.look.minimum.desc", cs: "Malá kapsle jen s baterií a časem. Na počítači bez baterie jen čas." } },
   { id: "trio", key: "appearance.look.trio", cs: "Trojice", en: "Trio", desc: { key: "appearance.look.trio.desc", cs: "Počasí, čas s datem a vytížení počítače s baterií v jedné kapsli. Počasí jen z karty Počasí, nic se nestahuje navíc. Trojice zjišťuje vytížení systému každých 10 s." } },
   { id: "rings", key: "appearance.look.rings", cs: "Stav Clauda", en: "Claude status", desc: { key: "appearance.look.rings.desc", cs: "Prstence limitů Clauda (5 h a týden) a čas. Prstenec se točí, jen když Claude pracuje; oranžově, když na tebe čeká." } },
+  { id: "custom", key: "appearance.look.custom", cs: "Vlastní", en: "Custom", desc: { key: "appearance.look.custom.desc", cs: "Poskládej si vlastní: tvar, rozměry a 1–5 položek vlevo, uprostřed a vpravo. Začni z hotového vzhledu a dolaď." } },
 ];
 
 /** Definice stylu; neznámé id = Klasický (starší / poškozený config). */

@@ -224,4 +224,9 @@ registerDict("en", {
   "settings.dock.cards": "Cards",
   "settings.layout.bento": "Bento grid",
   "settings.layout.bentoHint": "Cards as 1 × 1, 2 × 1, 2 × 2 tiles in fixed rows; gaps fill themselves. Tile size: ⋯ on the card → Tile.",
+  // velikost šuplíku tažením v úpravách (kolo 23, ResizeHandles)
+  "cards.size.width": "Drawer width — drag, arrow keys, double-click = default",
+  "cards.size.height": "Drawer height — drag, arrow keys, double-click = default",
+  "cards.size.title": "Drag = drawer size (Alt = no grid snapping), double-click = default",
+  "cards.size.overflow": "Cards out of view: {n} — scroll down, nothing was deleted",
 });

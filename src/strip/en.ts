@@ -32,4 +32,6 @@ registerDict("en", {
   "appearance.look.trio.desc": "Weather, time with date and the computer's load with battery in one capsule. Weather only from the Weather card, nothing extra is downloaded. Trio checks the system load every 10 s.",
   "appearance.look.rings": "Claude status",
   "appearance.look.rings.desc": "Claude's limit rings (5 h and week) and the time. A ring spins only while Claude works; orange when it waits for you.",
+  "appearance.look.custom": "Custom",
+  "appearance.look.custom.desc": "Build your own: shape, size and 1–5 items on the left, centre and right. Start from a ready look and fine-tune.",
 });

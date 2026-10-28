@@ -5,7 +5,8 @@
 // od kola 21 v Základním, není to technika). V „Pokročilé“ zbyl jen tvar klasického proužku (galerie, ne řada
 // 8 tlačítek), linka dole a krytí. Najetí na dlaždici = náhled dole (`peekLookOn`), živý Ledge se nemění;
 // klik = rozpracovaný config + „Vrátit“ v liště; skutečný proužek se překreslí po Uložit. Kolo 22: pod galerií
-// „Tvar kapsle“ (`strip.lookShape`, 4 volby) jen u stylů, které tvar mají (`SHAPEABLE_LOOKS`).
+// „Tvar kapsle“ (`strip.lookShape`, 4 volby) jen u stylů, které tvar mají (`SHAPEABLE_LOOKS`). Kolo 23: pod galerií
+// dlaždice „Vlastní“ (`strip.look = custom`, jen výslovným klikem) → editor `ComposeEditor.tsx` (`strip.compose`).
 import { For, Show } from "solid-js";
 import { lang, t } from "../../i18n";
 import type { StripLookId, StripStyle } from "../../types";
@@ -15,6 +16,8 @@ import { offerUndo } from "../ctx";
 import { POSITION_STEPS, SIZE_STEPS } from "../appearanceModel";
 import StripLookPreview from "../previews/StripLookPreview";
 import StripSettings from "./StripSettings";
+import ComposeEditor from "./ComposeEditor";
+import { DEFAULT_COMPOSE, composeOf, normCompose } from "../../strip/compose";
 import { Advanced, Seg, Slider, clearPeek, lit, pct, peekLookOn, previewState, type Ap } from "./apUi";
 
 /** Výchozí krytí proužku (`strip.opacity`, config.rs `Default`). */
@@ -41,6 +44,7 @@ const LOOK_DESC: Record<StripLookId, () => string> = {
   minimum: () => t("appearance.look.minimum.short", "Jen baterie a čas v malé kapsli."),
   trio: () => t("appearance.look.trio.short", "Počasí | čas a datum | CPU, paměť a baterie."),
   rings: () => t("appearance.look.rings.short", "Prstence limitů Clauda a čas; točí se, jen když pracuje."),
+  custom: () => t("appearance.look.custom.short", "Poskládej si tvar, rozměry a položky sám."),
 };
 
 const SHAPE_NAME: Record<LookShape, () => string> = {
@@ -70,9 +74,16 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
     clearPeek();
     const prev = look();
     if (prev === id) return;
+    // Vlastní poprvé (compose nikdo neupravoval) začne z dosavadního vzhledu
+    const prevCompose = p.cfg.strip?.compose;
+    const fresh = JSON.stringify(normCompose(prevCompose)) === JSON.stringify(DEFAULT_COMPOSE);
+    if (id === "custom" && fresh && prev !== "classic") setStripCfg("compose", composeOf(prev));
     setStripCfg("look", id);
     const x = STRIP_LOOKS.find((l) => l.id === id);
-    offerUndo(t("appearance.closed.picked", "Zavřený Ledge: {name} — proužek se změní po Uložit", { name: x ? lookName(x) : id }), () => setStripCfg("look", prev));
+    offerUndo(t("appearance.closed.picked", "Zavřený Ledge: {name} — proužek se změní po Uložit", { name: x ? lookName(x) : id }), () => {
+      setStripCfg("look", prev);
+      if (prevCompose !== undefined) setStripCfg("compose", prevCompose);
+    });
   };
   const setStrip = (patch: Partial<ReturnType<typeof a>["strip"]>) => q.ap.set("strip", { ...a().strip, ...patch });
   const shape = () => normShape(p.cfg.strip?.lookShape);
@@ -90,7 +101,7 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
         <h4>{t("appearance.closed.title", "Jak vypadá zavřený Ledge")}</h4>
         <p class="ap-note">{t("appearance.closed.lead", "Vyber obrázek. V náhledu dole přepínej, co se zrovna děje — obrázky ukážou, jak na to vzhled zareaguje. Data jsou ukázková.")}</p>
         <div class="ap-looks" role="radiogroup" aria-label={t("appearance.closed.title", "Jak vypadá zavřený Ledge")}>
-          <For each={STRIP_LOOKS}>
+          <For each={STRIP_LOOKS.filter((x) => x.id !== "custom")}>
             {(x) => (
               <button class="ap-style" classList={{ on: look() === x.id }} role="radio" aria-checked={look() === x.id} title={LOOK_DESC[x.id]()} {...peekLookOn(x.id)} onClick={() => pick(x.id)}>
                 <StripLookPreview look={x.id} state={previewState()} a={a()} opacity={opacity()} shape={shape()} />
@@ -100,6 +111,11 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
             )}
           </For>
         </div>
+        <button class="ap-style cx-tile" classList={{ on: look() === "custom" }} role="radio" aria-checked={look() === "custom"} title={LOOK_DESC.custom()} {...peekLookOn("custom")} onClick={() => pick("custom")}>
+          <StripLookPreview look="custom" compose={p.cfg.strip?.compose} state={previewState()} a={a()} opacity={opacity()} />
+          <span class="ap-name">{t("appearance.compose.tile", "Vlastní — poskládat si vlastní")}</span>
+          <small class="ap-desc">{LOOK_DESC.custom()}</small>
+        </button>
         <Show when={SHAPEABLE_LOOKS.includes(look())}>
           <div class="opt" id="f-strip.lookShape" classList={{ hit: lit("strip.lookShape") }}>
             <span>{t("appearance.lookShape.title", "Tvar kapsle")}<small>{t("appearance.lookShape.hint", "„Jako Mac“ visí kousek pod hranou a je oblá ze všech stran.")}</small></span>
@@ -107,6 +123,10 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
           </div>
         </Show>
       </div>
+
+      <Show when={look() === "custom"}>
+        <ComposeEditor value={p.cfg.strip?.compose} set={(c) => setStripCfg("compose", c)} a={a()} opacity={opacity()} state={previewState()} />
+      </Show>
 
       <div class="card ap-top" id="f-appearance.strip" classList={{ hit: lit("appearance.strip") }}>
         <div class="opt">

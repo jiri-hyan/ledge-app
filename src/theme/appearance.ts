@@ -6,6 +6,7 @@ import type { Appearance, MotionStyle, StripStyle } from "../types.ts";
 import { THEME_IDS } from "./themes.ts";
 import { normalizeCustomThemes, themeOf } from "./customThemes.ts";
 import { normalizePages } from "./pages.ts";
+import { isDefaultSize, normalizeSize } from "./size.ts";
 import { CLASSIC, FONTS, LAYOUTS, MATERIALS, STYLE_IDS, WIDTHS, lookVars } from "./looks.ts";
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -66,6 +67,8 @@ export function normalizeAppearance(raw: any): Appearance {
     pages: normalizePages(r.pages, customThemes),
     customThemes,
     customTheme: customThemes.some((c) => c.id === r.customTheme) ? r.customTheme : "",
+    // velikost šuplíku (kolo 23): jen když je něco nastavené — výchozí vzhled zůstává bez pole
+    ...(isDefaultSize(normalizeSize(r.size)) ? {} : { size: normalizeSize(r.size) }),
   };
 }
 

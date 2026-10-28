@@ -27,3 +27,7 @@
 .cost-fill { display: block; height: 100%; background: var(--violet); border-radius: var(--r-pill); }
 .cost-tok { text-align: right; color: var(--t3); }
 .cost-usd { text-align: right; color: var(--t1); }
+.cost-floor { display: grid; grid-template-columns: minmax(0, 1fr) 2.6em 3.6em 5.6em; align-items: center; gap: var(--s2); font: var(--fs-xs) var(--mono); color: var(--t2); }
+.cost-trend { text-align: right; color: var(--t3); white-space: nowrap; }
+.cost-trend.up { color: var(--amber); }
+.cost-trend.down { color: var(--green); }

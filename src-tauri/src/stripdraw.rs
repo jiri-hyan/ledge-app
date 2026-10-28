@@ -103,10 +103,20 @@ unsafe fn part_w(r: &Renderer, fm: &Fmts, p: &Part, sp: &Spec, ks: f32) -> f32 {
             }
             Part::Sep => 1.0,
             Part::Battery { .. } => BATT_W * ks,
-            Part::Ring { .. } => sp.dot * ks,
+            Part::Ring { .. } => ring_d(sp) * ks,
+            Part::Meter { .. } => METER_W * ks,
         }
     }
 }
+
+/// Průměr prstence (vlastní vzhled má vlastní, ostatní styly = `dot`).
+fn ring_d(sp: &Spec) -> f32 {
+    if sp.ring > 0.0 { sp.ring } else { sp.dot }
+}
+
+/// Šířka a výška sloupku „malý graf“ vlastního vzhledu (logické px).
+const METER_W: f32 = 24.0;
+const METER_H: f32 = 5.0;
 
 /// Šířka a výška tvaru baterie (logické px, bez „čudlíku“).
 const BATT_W: f32 = 20.0;
@@ -250,7 +260,7 @@ unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[
                 Part::Ring { fill, color: c } => {
                     // dráha, výplň od vrcholu po směru hodin (jen ze skutečného limitu), při práci krátký
                     // točící se oblouk vně
-                    let d = sp.dot * ks;
+                    let d = ring_d(sp) * ks;
                     let center = Vector2 { X: x + d / 2.0, Y: mid };
                     let sw = 2.2 * ks;
                     let rad = d / 2.0 - sw / 2.0;
@@ -262,6 +272,20 @@ unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[
                     }
                     if let (Some(turn), Some(b)) = (spin, brush(t, Rgba::TEXT, 0.9)) {
                         arc(t, r, center, rad, turn, turn + 0.22, &b, sw * 0.7);
+                    }
+                }
+                Part::Meter { fill, color: c } => {
+                    // dráha + výplň podle skutečné hodnoty (vlastní vzhled, styl „malý graf“)
+                    let (mw, mh) = (METER_W * ks, METER_H * ks);
+                    let track = D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: x, top: mid - mh / 2.0, right: x + mw, bottom: mid + mh / 2.0 }, radiusX: mh / 2.0, radiusY: mh / 2.0 };
+                    if let Some(b) = brush(t, *c, 0.25) {
+                        t.FillRoundedRectangle(&track, &b);
+                    }
+                    let fw = mw * fill.clamp(0.0, 1.0);
+                    if fw > 0.5
+                        && let Some(b) = brush(t, *c, 1.0)
+                    {
+                        t.FillRoundedRectangle(&D2D1_ROUNDED_RECT { rect: D2D_RECT_F { right: x + fw.max(mh), ..track.rect }, ..track }, &b);
                     }
                 }
             }
@@ -315,11 +339,20 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
         let base = m.show.as_ref()?;
         let shelf = m.shelf != crate::shelf::Hint::None;
         let show = if shelf { shelf_show(m, base) } else { base.clone() };
-        let parts: &[Part] = match (show.rotate.is_empty(), &show.rotate) {
-            (false, v) => &v[rot % v.len()],
-            _ => &show.parts,
+        // vlastní vzhled (kolo 23): tvar a rozměry ze `strip.compose`; umístí se jako linka / roh / na ose
+        let custom = m.compose.as_ref().filter(|_| look == Look::Custom);
+        let at = custom.map(|c| c.place_look()).unwrap_or(look);
+        let rotated: Option<&[Part]> = (!show.rotate.is_empty()).then(|| show.rotate[rot % show.rotate.len()].as_slice());
+        // vlastní: `parts` = vlevo, střed se střídá; přihrádka (tah souborů) doprostřed
+        let (parts, center): (&[Part], &[Part]) = match (custom.is_some(), shelf) {
+            (true, true) => (&[], &show.parts),
+            (true, false) => (&show.parts, rotated.unwrap_or(&show.center)),
+            _ => (rotated.unwrap_or(&show.parts), &[]),
         };
-        let sp = frame::shaped(look, frame::spec(look, &show), m.shape);
+        let sp = match custom {
+            Some(c) => crate::looks::compose::spec(c),
+            None => frame::shaped(look, frame::spec(look, &show), m.shape),
+        };
         let scale = m.dpi as f32 / 96.0;
         let ks = scale * m.metrics.k;
         let fm = fmts(r, look, &sp, ks)?;
@@ -331,21 +364,28 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
 
         let left_w = row_w(r, &fm, parts, &sp, ks);
         let right_w = row_w(r, &fm, &show.right, &sp, ks);
+        let center_w = row_w(r, &fm, center, &sp, ks);
         let content = match look {
+            // střed na ose těla, boky stejně široké (širší z nich)
+            Look::Custom if center_w > 0.0 => {
+                let side = left_w.max(right_w);
+                center_w + if side > 0.0 { 2.0 * (side + sp.gap * ks) } else { 0.0 }
+            }
+            Look::Custom => left_w + right_w + if left_w > 0.0 && right_w > 0.0 { sp.gap * ks } else { 0.0 },
             Look::Progress | Look::Bar if right_w > 0.0 => left_w + 2.0 * sp.gap * ks + right_w,
             Look::Dots => parts.len() as f32 * sp.dot * ks + parts.len().saturating_sub(1) as f32 * sp.gap * ks,
             _ => left_w,
         };
-        let natural = frame::body_width(look, content, &sp, ks, mon);
+        let natural = frame::body_width(at, content, &sp, ks, mon);
         let bw = if look == Look::Island && !shelf {
             anim.step(natural as f32, m.animate, now).round() as i32
         } else {
             anim.reset();
             natural
         };
-        let line_k = if look == Look::Line { scale } else { ks };
+        let line_k = if at == Look::Line { scale } else { ks };
         let bh = ((sp.h * line_k).round() as i32).max(1);
-        let Placed { win, ox, oy, bw, bh } = frame::place(look, m.position, mon, axis2, bw, bh, &sp, ks);
+        let Placed { win, ox, oy, bw, bh } = frame::place(at, m.position, mon, axis2, bw, bh, &sp, ks);
         let (w, h) = (win.right - win.left, win.bottom - win.top);
         let (bwf, bhf) = (bw as f32, bh as f32);
 
@@ -379,12 +419,13 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
             t.SetTransform(&windows_numerics::Matrix3x2::translation(ox as f32, oy as f32));
             let radius = sp.r * ks;
             let body = if sp.pill {
-                D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: 0.5, top: 0.5, right: bwf - 0.5, bottom: bhf - 0.5 }, radiusX: bhf / 2.0, radiusY: bhf / 2.0 }
+                let pr = if sp.pill_r > 0.0 { (sp.pill_r * ks).min(bhf / 2.0) } else { bhf / 2.0 };
+                D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: 0.5, top: 0.5, right: bwf - 0.5, bottom: bhf - 0.5 }, radiusX: pr, radiusY: pr }
             } else {
                 // horní rohy „za hranou“: obdélník začíná nad obrazovkou
                 D2D1_ROUNDED_RECT { rect: D2D_RECT_F { left: 0.0, top: -radius - 1.0, right: bwf, bottom: bhf }, radiusX: radius, radiusY: radius }
             };
-            if look == Look::Line {
+            if at == Look::Line {
                 let total: f32 = show.line.iter().map(|x| x.0).sum::<f32>().max(0.001);
                 let a = if m.hot { 1.0 } else if show.idle { 0.55 } else { 0.95 };
                 let mut x = 0.0;
@@ -463,6 +504,11 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
                             }
                         }
                     }
+                    Look::Custom => {
+                        draw_parts(t, r, &fm, parts, &sp, ks, pad, 0.0, bhf, spin);
+                        draw_parts(t, r, &fm, center, &sp, ks, (bwf - center_w) / 2.0, 0.0, bhf, spin);
+                        draw_parts(t, r, &fm, &show.right, &sp, ks, bwf - pad - right_w, 0.0, bhf, spin);
+                    }
                     _ => draw_parts(t, r, &fm, parts, &sp, ks, (bwf - content) / 2.0, 0.0, bhf, spin),
                 }
                 t.PopAxisAlignedClip();
@@ -491,6 +537,6 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
         let _ = DeleteObject(HGDIOBJ(dib.0));
         let _ = DeleteDC(mem);
         ReleaseDC(None, screen);
-        Some((win, frame::morph_body(look, bw, bh + oy, scale)))
+        Some((win, frame::morph_body(at, bw, bh + oy, scale)))
     }
 }

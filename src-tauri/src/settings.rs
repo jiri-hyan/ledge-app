@@ -39,6 +39,7 @@ pub(crate) fn apply_config(mut new: Config) {
     c.claude.set_enforce(new.claude.enforce_commit);
     c.claude.set_question_hold(new.claude.question_hold_s);
     c.claude.set_question_unseen(new.claude.question_unseen_s);
+    c.claude.set_activity_tail(crate::layout::placed(&new.layout, crate::layout::ACTIVITY_CARD));
     if old.autostart != new.autostart
         && let Err(e) = autostart::apply(new.autostart)
     {

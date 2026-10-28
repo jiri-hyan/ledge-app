@@ -8,7 +8,7 @@ import { api, type MediaVariant, type MediaView, type Snapshot } from "../api";
 import { t } from "../i18n";
 import { sectionOn } from "../cards/sections";
 import VolumeBar from "./VolumeBar";
-import { coverTint } from "./tint";
+import { coverAccent } from "./tint";
 import { Controls, Cover, Equalizer, IcNote, Progress, TimeText, isPlaying, useCover } from "./Player";
 import { VariantPicker, shownVariant } from "./VariantPicker";
 import { drawerShown } from "./shown";
@@ -128,7 +128,7 @@ export default function MediaCard(p: { s: Snapshot; menu?: JSX.Element }) {
   const eq = () => p.s.personal.mediaLook?.equalizer !== false;
   const cover = useCover(() => m()?.coverKey ?? null);
   /** podbarvení barvou obalu (`media.tint`, výchozí vypnuté) — spočítá se jednou na obal */
-  const [tint] = createResource(() => (p.s.personal.mediaLook?.tint ? cover() : null) || null, coverTint);
+  const [tint] = createResource(() => (p.s.personal.mediaLook?.tint ? cover() : null) || null, coverAccent);
   /** tenký ovladač (Jen v proužku) — jen se skladbou; bez ní zůstane obyčejná karta (Zvuk / Nic nehraje) */
   const slim = () => v() === "strip" && !!m();
   const picker = () => <VariantPicker current={v()} cfgError={p.s.cfgError} push={!slim() && !m()?.app} />;

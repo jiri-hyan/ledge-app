@@ -38,6 +38,10 @@ pub struct Spec {
     pub display: bool,
     /// průměr stavové tečky
     pub dot: f32,
+    /// průměr prstence (0 = jako `dot`; vlastní vzhled má tečky i prstence)
+    pub ring: f32,
+    /// rádius těla `pill` (0 = půl výšky; vlastní vzhled podle zaoblení)
+    pub pill_r: f32,
 }
 
 const BLACK: Rgba = Rgba(0.0, 0.0, 0.0, 1.0);
@@ -60,6 +64,8 @@ pub fn spec(look: Look, show: &Show) -> Spec {
         mono: false,
         display: false,
         dot: 7.0,
+        ring: 0.0,
+        pill_r: 0.0,
     };
     match look {
         // klasický proužek kreslí `strip::draw`; tady jen rozumné rozměry pro hover zónu a morf
@@ -119,6 +125,8 @@ pub fn spec(look: Look, show: &Show) -> Spec {
         Look::Minimum => Spec { h: 24.0, r: 12.0, pad: 12.0, gap: 6.0, min_w: 64.0, font: 12.0, ..base },
         Look::Trio => Spec { h: 36.0, r: 18.0, pad: 16.0, gap: 8.0, min_w: 200.0, font: 12.5, ..base },
         Look::Rings => Spec { h: 28.0, r: 14.0, pad: 12.0, gap: 6.0, min_w: 72.0, font: 13.0, dot: 16.0, ..base },
+        // vlastní: skutečné rozměry z `strip.compose` (`compose::spec`); tady jen náhrada bez configu
+        Look::Custom => base,
     }
 }
 

@@ -25,6 +25,7 @@ const NO_EDITOR = {
   "layout.upgrades": "jednorázové úpravy rozložení po aktualizaci; zapisuje je jádro",
   "ui.tips": "odklepnuté tipy a prohlídka; zapisuje je šuplík sám (smazáním se tip ukáže znovu)",
   "onboarding.done": "průvodce prvním spuštěním ho zapíše po dokončení; znovu spustit jde tlačítkem v Jazyk a průvodce",
+  winquick: "karta Rychlé dlaždice se upravuje přímo na kartě (✎ Upravit dlaždice); volby zapisuje karta",
   "gitAlerts.read": "„přečteno“ u upozornění na neuloženou práci; zapisuje ho čip v hlavičce šuplíku",
 };
 

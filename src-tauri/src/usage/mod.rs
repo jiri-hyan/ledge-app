@@ -2,6 +2,7 @@
 //! `~/.claude/projects/<slug>/**/*.jsonl`. Čisté moduly: `parse` (řádek → záznam), `price` (ceník),
 //! `index` (inkrementální index na disku), `view` (přehled pro kartu). Běh: `costslive.rs`.
 
+pub mod floor;
 pub mod index;
 pub mod parse;
 pub mod price;

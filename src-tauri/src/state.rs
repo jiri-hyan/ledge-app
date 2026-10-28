@@ -53,6 +53,12 @@ pub(crate) enum UiCmd {
     /// oknu, odkud si ho Ledge vzal (`focusreturn`)
     Close,
     Size(View, f64, f64),
+    /// velikost z `appearance.size` se změnila (tažení v úpravách, přepnutí záložky s „Pamatovat velikost
+    /// pro každou záložku“): otevřený Full dorovnat; `true` = animovaně (`motion::anim_ms_now`)
+    Resize(bool),
+    /// totéž během tažení (`drawer_size(…, done = false)`): bez `refresh_strip` každý snímek, proužek se
+    /// obnoví až po puštění (`Resize(false)`)
+    ResizeLive,
     /// rychlá poznámka: Full s fokusem rovnou na stránce „note“
     Note,
     /// klik do šuplíku, který chce psát (stránka „note“): aktivovat okno, blur pak zavře

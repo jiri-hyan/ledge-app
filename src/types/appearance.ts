@@ -6,6 +6,8 @@ export type StripPosition = "center" | "left" | "right";
 export type StripStyle = "pill" | "line" | "dot" | "term" | "tag" | "glow" | "block" | "drop";
 /** styl zavřeného Ledge (`strip.look`); seznam s názvy je `strip/looks.ts` */
 export type { StripLookId } from "../strip/looks";
+/** vlastní zavřený Ledge (`strip.compose`, Rust `looks::compose::Compose`); seznamy a předvolby jsou `strip/compose.ts` */
+export type { StripCompose, ComposeShape, ComposeItem, ItemStyle } from "../strip/compose";
 /** složky design stylu (vlna 6, `appearance/look.rs`); tabulka stylů je `theme/styles.ts` */
 export type FontLook = "system" | "mono" | "serif" | "grotesk";
 export type Material = "solid" | "glass" | "paper" | "glow" | "hard" | "soft" | "frame" | "acrylic" | "tinted";
@@ -38,7 +40,13 @@ export interface Appearance {
   customThemes: CustomTheme[];
   /** vybraný vlastní motiv pro celý vzhled (`id`), prázdné = vestavěný `theme` */
   customTheme: string;
+  /** velikost otevřeného šuplíku (kolo 23); chybí = šířka z předvolby, výška podle obsahu */
+  size?: DrawerSize;
 }
+/** Šířka / výška v logických px, 0 / chybí = výchozí (zrcadlo `appearance::size::PageSize`). */
+export interface PageSize { width?: number; height?: number }
+/** `appearance.size` (zrcadlo `appearance::size::SizeConfig`): `perPage` = pamatovat pro každou záložku. */
+export interface DrawerSize extends PageSize { perPage?: boolean; pages?: Record<string, PageSize> }
 /** Vzhled jedné záložky: prázdné pole = jako celek (`theme` = vestavěný motiv nebo `id` vlastního). */
 export interface PageLook {
   style?: string;

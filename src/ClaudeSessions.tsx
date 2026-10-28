@@ -21,6 +21,7 @@ import PlanReview from "./sessions/PlanReview";
 import GitPanel from "./sessions/GitPanel";
 import { addonsMissing, planTitle } from "./sessions/plan";
 import CostsSection from "./costs/CostsSection";
+import ContextBar from "./sessions/ContextBar";
 import AgentActions, { BgPill } from "./sessions/AgentActions";
 import { statusPill } from "./sessions/agentview";
 import { sectionOn } from "./cards/sections";
@@ -163,6 +164,7 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
         <span class={`pill ${st()[0]}`}>{st()[1]()}</span>
         <span class="meta">{when()}</span>
       </div>
+      <ContextBar ss={p.ss} s={p.s} now={p.now} />
       <Show when={sectionOn(p.s.sections, "claudeSubagents") && agentLine()}>
         <button class="subag" onClick={() => setOpen(!open())} aria-expanded={open()}>{open() ? "▾" : "▸"} {agentLine()}</button>
         <Show when={open()}>

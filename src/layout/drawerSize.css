@@ -1,0 +1,13 @@
+/* Úchyty velikosti šuplíku v úpravách (kolo 23, `ResizeHandles.tsx`): stejné tokeny jako úchyty karet
+   `.lay-rs` v layout.css (linka akcentu 45 %, plná při najetí / zaostření), bez trvalé animace. */
+.dsz { position: fixed; z-index: 30; touch-action: none; }
+.dsz-left, .dsz-right { top: 30%; bottom: 30%; width: 10px; cursor: ew-resize; }
+.dsz-left { left: 0; }
+.dsz-right { right: 0; }
+.dsz-bottom { left: 30%; right: 30%; bottom: 0; height: 10px; cursor: ns-resize; }
+.dsz::after { content: ""; position: absolute; border-radius: 2px; background: color-mix(in srgb, var(--accent) 45%, transparent); transition: background var(--fast); }
+.dsz-left::after, .dsz-right::after { top: 0; bottom: 0; left: 3px; width: 4px; }
+.dsz-bottom::after { left: 0; right: 0; top: 3px; height: 4px; }
+.dsz:hover::after, .dsz:focus-visible::after { background: var(--accent); }
+.dsz:focus-visible { outline: none; }
+.dsz-info { position: fixed; z-index: 30; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: var(--s1); pointer-events: none; }

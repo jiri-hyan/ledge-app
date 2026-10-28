@@ -3,7 +3,7 @@
 //   node --experimental-strip-types --test src/media/tint.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canTint, pickTint } from "./tint.ts";
+import { accentKey, canTint, pickTint } from "./tint.ts";
 
 const px = (...cols) => cols.flatMap(([r, g, b, a = 255]) => [r, g, b, a]);
 
@@ -29,4 +29,28 @@ test("zdroj obalu: jen data URL z jádra (jiný původ by canvas znečistil a ti
     [null, false],
   ];
   for (const [url, want] of rows) assert.equal(canTint(url), want, String(url));
+});
+
+import { contrast, withContrast } from "./tint.ts";
+test("kontrast barvy obalu proti kartě: ≥ 3:1 a odstín zůstává, bez obalu null", () => {
+  const dark = "#1c1c20", light = "#ffffff";
+  const rows = [
+    ["černý obal", [px([0, 0, 0], [5, 5, 5])], null],
+    ["bílý obal", [px([255, 255, 255], [250, 250, 250])], null],
+    ["šedý obal", [px([128, 128, 128], [130, 130, 130])], null],
+    ["barevný obal", [px([200, 40, 40], [90, 90, 120])], "#c82828"],
+    ["žádný obal", [[]], null],
+  ];
+  for (const [why, [input], want] of rows) assert.equal(pickTint(input), want, why);
+  for (const c of ["#c82828", "#808080", "#101040", "#f0f0a0", "#0a0a0a"]) {
+    for (const bg of [dark, light]) assert.ok(contrast(withContrast(c, bg), bg) >= 3, `${c} na ${bg}`);
+  }
+  assert.equal(withContrast("#f0c040", dark), "#f0c040", "dost kontrastní zůstane");
+  assert.equal(withContrast("#0a0a0a", dark) !== "#0a0a0a", true, "tmavé na tmavém se zesvětlí");
+});
+
+test("cache obalu: klíč zahrnuje pozadí karty, po přepnutí motivu se kontrast přepočítá", () => {
+  assert.notEqual(accentKey("cover", "#1c1c20"), accentKey("cover", "#f4f4f6"));
+  assert.equal(accentKey("cover", "#1C1C20"), accentKey("cover", "#1c1c20"));
+  assert.notEqual(accentKey("a", "#1c1c20"), accentKey("b", "#1c1c20"));
 });

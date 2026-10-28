@@ -3,6 +3,7 @@
 //! Čisté: projekt podle `cwd` dodá volající (`project_of`). Cena jen z ceníku (`price::cost`);
 //! tokeny modelů bez ceny se sčítají zvlášť (`unpriced`) a cena se za ně nevymýšlí.
 
+use super::floor::{self, Floor};
 use super::index::Index;
 use super::price;
 use serde::Serialize;
@@ -84,6 +85,8 @@ pub struct Summary {
     pub days: Vec<Day>,
     /// dnešek po hodinách a projektech (nejaktivnější první, zbytek za `TOP` v řádku `other`)
     pub hours: Vec<HourRow>,
+    /// podlaha nové relace a agenta (medián kontextu 1. volání za 7 dní proti předchozím 7, kolo 23)
+    pub floor: Floor,
 }
 
 /// Dnešek z hodinové agregace indexu → řádky časové osy. Čisté.
@@ -175,7 +178,7 @@ pub fn build(ix: &Index, today: i32, window: u32, project_of: &dyn Fn(&str) -> S
             Day { date: date_of(d), tokens: l.tokens, cost: l.cost }
         })
         .collect();
-    Summary { ranges, days, hours: hour_rows(ix, today, project_of) }
+    Summary { ranges, days, hours: hour_rows(ix, today, project_of), floor: floor::build(ix, today, project_of) }
 }
 
 #[cfg(test)]

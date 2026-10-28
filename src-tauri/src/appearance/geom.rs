@@ -52,9 +52,19 @@ pub fn drawer_width(cfg_w: u32, mon_w: i32, dpi: u32) -> f64 {
 
 /// Šířka velkého šuplíku podle configu (logické px): předvolba `appearance.width` (úzký / střední /
 /// široký = pevné px, celá šířka = monitor bez stropu 95 %), jinak `drawer.width` jako dřív. Rozložení
-/// „Široký notch“ má vlastní šířku (`look::NOTCH_PX`) a předvolbu nepoužije.
+/// „Široký notch“ má vlastní šířku (`look::NOTCH_PX`) a předvolbu nepoužije. Vlastní velikost
+/// (`appearance.size`, tažení v úpravách; kolo 23) přebije předvolbu, notch ne.
 pub fn drawer_width_for(cfg: &crate::config::Config, mon_w: i32, dpi: u32) -> f64 {
-    layout_width(cfg.appearance.layout, cfg.appearance.width, cfg.drawer.width, mon_w, dpi)
+    let own = super::size::width_override(&cfg.appearance.size, &super::size::page(), super::size::live());
+    sized_width(cfg.appearance.layout, cfg.appearance.width, cfg.drawer.width, own, mon_w, dpi)
+}
+
+/// Čistá část `drawer_width_for` s vlastní šířkou `own` (tabulkový test).
+pub fn sized_width(layout: super::look::Layout, preset: WidthPreset, custom: u32, own: Option<u32>, mon_w: i32, dpi: u32) -> f64 {
+    match own {
+        Some(w) if layout != super::look::Layout::Notch => drawer_width(w, mon_w, dpi),
+        _ => layout_width(layout, preset, custom, mon_w, dpi),
+    }
 }
 
 /// Čistá část `drawer_width_for` včetně rozložení (tabulkový test).
@@ -353,6 +363,25 @@ mod tests {
         // celá šířka leží na ose u levé hrany monitoru (bez přesahu)
         let full = preset_width(Full, 1080, 1920, 96) as i32;
         assert_eq!(span_x(anchor_c2(0, 1920, full, StripPosition::Right, 96), full), 0);
+    }
+
+    #[test]
+    fn sized_width_table() {
+        use super::super::look::Layout;
+        use WidthPreset::*;
+        // (rozložení, předvolba, drawer.width, vlastní velikost, monitor, dpi, čekáno) — kolo 23
+        let cases = [
+            (Layout::Classic, Medium, 1080, None, 1920, 96, 1080.0), // nic nenastaveno = předvolba
+            (Layout::Classic, Custom, 1300, None, 1920, 96, 1300.0),
+            (Layout::Classic, Wide, 1080, Some(1200), 1920, 96, 1200.0), // tažení přebije předvolbu
+            (Layout::Classic, Full, 1080, Some(900), 1920, 96, 900.0),
+            (Layout::Classic, Medium, 1080, Some(2400), 1920, 96, 1824.0), // strop 95 % monitoru
+            (Layout::Classic, Medium, 1080, Some(300), 1920, 96, 720.0),   // spodní mez DRAWER_WIDTH
+            (Layout::Notch, Medium, 1080, Some(1500), 1920, 96, 720.0),    // notch má pevnou šířku
+        ];
+        for (l, p, custom, own, mon, dpi, want) in cases {
+            assert_eq!(sized_width(l, p, custom, own, mon, dpi), want, "{l:?} {p:?} {own:?}");
+        }
     }
 
     #[test]

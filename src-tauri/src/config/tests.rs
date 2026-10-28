@@ -593,3 +593,21 @@ fn mutated_config_files_never_panic() {
     std::fs::write(&file, b"").unwrap();
     assert!(load(&file).is_err());
 }
+
+#[test]
+fn context_bar_off_by_default_even_in_old_config() {
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800,"approvalTimeoutS":45}}"#).unwrap();
+    assert!(!cfg.claude.context_bar, "config 0.9.0 bez klíče = vypnuto");
+    assert!(!Config::default().claude.context_bar);
+    let on: Config = serde_json::from_str(r#"{"claude":{"contextBar":true}}"#).unwrap();
+    assert!(on.claude.context_bar);
+}
+
+#[test]
+fn limits_pace_off_in_old_config() {
+    assert!(!Config::default().claude.limits_pace);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800}}"#).unwrap();
+    assert!(!cfg.claude.limits_pace);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"limitsPace":true}}"#).unwrap();
+    assert!(cfg.claude.limits_pace);
+}
