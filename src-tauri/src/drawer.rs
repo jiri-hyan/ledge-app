@@ -539,6 +539,11 @@ impl Drawer {
         let w = self.window()?;
         let h = hwnd_of(&w)?;
         let (x, y, pw, ph) = self.target(view, mon, width);
+        if view == View::Full && ph < 300 {
+            // diagnostika „uříznutého šuplíku“ (0.11.x)
+            let (full_h, max_h) = (self.st.lock().full_h, drawerfit::limits(mon.rect, mon.work, mon.dpi).max_h);
+            crate::state::log(&format!("drawer: okno Full {pw}×{ph} (full_h {full_h:.0}, max_h {max_h:.0}, dpi {})", mon.dpi));
+        }
         unsafe {
             if self.opener() != Opener::Hotkey {
                 let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);

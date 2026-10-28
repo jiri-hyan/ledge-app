@@ -42,7 +42,12 @@ pub(crate) fn set_game_mode(on: bool) {
 }
 
 #[tauri::command]
-pub(crate) fn report_size(view: View, w: f64, h: f64) {
+pub(crate) fn report_size(view: View, w: f64, h: f64, diag: Option<String>) {
+    // diagnostika nízké výšky (frontend ji pošle jen pod 300 px, jednou za změnu) — jeden řádek do logu
+    if let Some(d) = diag {
+        let d: String = d.chars().filter(|c| !c.is_control()).take(400).collect();
+        crate::state::log(&format!("drawer: nízká výška {h:.0} ({view:?}): {d}"));
+    }
     core().send_ui(UiCmd::Size(view, w, h));
 }
 

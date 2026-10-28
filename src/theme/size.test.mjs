@@ -4,7 +4,7 @@
 //   node --experimental-strip-types --test src/theme/size.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clampSize, dragged, dragWidth, fallbackMaxH, heightCss, HEIGHT_LINES, isDefaultSize, normalizeSize, overflowCount, pruneSizePages, switchedSize, setSize, sizeFor, snapTo, widthSides, WIDTH_LINES } from "./size.ts";
+import { clampSize, contentHeight, dragged, dragWidth, fallbackMaxH, heightCss, HEIGHT_LINES, isDefaultSize, normalizeSize, overflowCount, pruneSizePages, switchedSize, setSize, sizeFor, snapTo, widthSides, WIDTH_LINES } from "./size.ts";
 import { DEFAULT_APPEARANCE, normalizeAppearance } from "./appearance.ts";
 
 test("starý config: žádná velikost, normalizace pole nepřidá", () => {
@@ -113,4 +113,11 @@ test("záložní strop výšky = Rust drawerfit::limits (80 %, 20 px od spodku, 
   assert.equal(fallbackMaxH(100), 240);
   assert.equal(fallbackMaxH(0), 240);
   assert.equal(fallbackMaxH(Number.NaN), 240);
+});
+
+test("výška pro Rust ignoruje transformaci otevírací animace (uříznutý šuplík 219 px)", () => {
+  assert.equal(contentHeight(825, 825), 825);
+  assert.equal(contentHeight(824.4, 824), 825, "bez transformace přesná hodnota nahoru");
+  assert.equal(contentHeight(825 * 0.28, 825), 825, "scale(0.42, 0.28) na začátku animace");
+  assert.equal(contentHeight(825 * 1.03, 825), 825, "překmit pružiny");
 });

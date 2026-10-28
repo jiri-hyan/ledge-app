@@ -34,6 +34,7 @@ import { installQuickKeys } from "./quick/quick";
 import "./quick/quick.css";
 import { clearDrop, offerDrop } from "./actions/dropstate";
 import { mainHeight } from "./layout/drawerSize";
+import { contentHeight } from "./theme/size";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
@@ -245,7 +246,18 @@ export default function App() {
   function report() {
     if (!content || view() === "hidden") return;
     const v = view();
-    api.reportSize(v, smallWidth(v) ?? wantWidth(page()), Math.ceil(content.getBoundingClientRect().height) - OVERLAP);
+    const h = contentHeight(content.getBoundingClientRect().height, content.offsetHeight) - OVERLAP;
+    api.reportSize(v, smallWidth(v) ?? wantWidth(page()), h, v === "full" && h < 300 && h !== lowLogged ? lowDiag() : undefined);
+    if (v === "full" && h < 300) lowLogged = h;
+  }
+  // diagnostika „uříznutého šuplíku“ (0.11.x): co přesně určilo nízkou výšku → řádek v ledge.log
+  let lowLogged = -1;
+  function lowDiag() {
+    const c = document.querySelector<HTMLElement>(".content");
+    const cs = c ? getComputedStyle(c) : null;
+    const deck = document.querySelector<HTMLElement>(".content > .deck");
+    const kids = c ? [...c.children].map((e) => `${(e as HTMLElement).className.toString().split(" ")[0] || e.tagName}:${Math.round(e.getBoundingClientRect().height)}`).join(",") : "";
+    return `page=${page()} style=${c?.style.height || "-"} css=${cs?.height}/${cs?.maxHeight} var=${getComputedStyle(document.documentElement).getPropertyValue("--drawer-max-h") || "-"} scroll=${c?.scrollHeight} deck=${deck ? `${deck.clientHeight}/${deck.scrollHeight}` : "-"} win=${innerHeight} avail=${screen.availHeight} dpr=${devicePixelRatio} kids=${kids}`;
   }
   // hodiny v hlavičce: sekundový časovač existuje jen, dokud je šuplík vidět (zavřený = žádné buzení WebView)
   createEffect(() => {

@@ -60,7 +60,7 @@ export const api = {
   setMode: (mode: string) => call("set_mode", { mode }),
   /** Herní režim: zapnutí zavře šuplík; vypíná se zkratkou nebo dalším spuštěním Ledge (Rust `gamemode.rs`). */
   setGameMode: (on: boolean) => call("set_game_mode", { on }),
-  reportSize: (view: View, w: number, h: number) => call("report_size", { view, w, h }),
+  reportSize: (view: View, w: number, h: number, diag?: string) => call("report_size", { view, w, h, diag: diag ?? null }),
   /** velikost šuplíku tažením v úpravách (kolo 23): `done` = uložit; vrací [šířka, výška] po ořezu monitorem */
   drawerSizeEnd: () => drawerOnly(() => call<void>("drawer_size_end")),
   drawerSize: (page: string, w: number, h: number, done: boolean) => drawerOnly(() => call<[number, number]>("drawer_size", { page, w, h, done })),

@@ -129,3 +129,11 @@ export function fallbackMaxH(availH: number): number {
 export function heightCss(h: number): string | undefined {
   return h > 0 ? `min(${h}px, var(--drawer-max-h, ${h}px))` : undefined;
 }
+
+/** Výška obsahu pro Rust (`report_size`): `rect` = `getBoundingClientRect().height` (přesná, ale počítá
+ *  s transformacemi), `layout` = `offsetHeight` (celé px, transformace ignoruje). Otevírací animace škáluje
+ *  obsah (`scale(0.42, 0.28)`, `openAnim.ts`) — měření v tu chvíli dalo ~28 % výšky, okno se na ni zmenšilo
+ *  a ResizeObserver na transformaci nereaguje → šuplík zůstal uříznutý (0.11.0/0.11.1, 219 px). */
+export function contentHeight(rect: number, layout: number): number {
+  return Math.abs(rect - layout) < 1 ? Math.ceil(rect) : layout;
+}
