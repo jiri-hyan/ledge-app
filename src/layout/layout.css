@@ -258,3 +258,8 @@ input.lay-st-name { width: 170px; font-weight: 600; }
    (`--drawer-max-h`, fit.ts), obsah pak scrolluje uvnitř karty a na kraji předá posuv šuplíku */
 .deck-item:not([data-h]) { max-height: calc(var(--drawer-max-h, 720px) * 0.7); }
 .deck-item:not([data-h]) > :not(.lay-tools, .lay-rs, .lay-target) { min-height: 0; overflow-y: auto; overscroll-behavior-y: auto; }
+
+/* rozložení Notch v úpravách (`Deck` `data-notch`): karty převzaté lištou nahoře jsou ztlumené s popiskem
+   „v liště nahoře“ — přesunout / odebrat jdou dál */
+.deck.editing .deck-item[data-notch] > :not(.lay-tools, .lay-rs, .lay-target) { opacity: 0.45; }
+.deck.editing .deck-item[data-notch]::after { content: attr(data-notch); position: absolute; left: var(--s2); bottom: var(--s2); z-index: 4; font-size: var(--fs-xs); font-weight: 600; color: var(--accent); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-pill); padding: 1px 8px; pointer-events: none; }

@@ -55,7 +55,7 @@ export const heightLabel = (h: CardHeight | undefined) =>
 /** Hrdina karty (`look.hero`): skutečné číslo ze snapshotu, nebo null = karta jako dřív. */
 export type DeckHero = { facts: (id: CardId) => HeroFacts | null; render: (id: CardId, facts: () => HeroFacts) => JSX.Element };
 
-export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boolean; shown: (id: CardId) => boolean; render: (id: CardId) => JSX.Element; begin?: () => void; hero?: DeckHero }) {
+export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boolean; shown: (id: CardId) => boolean; notched?: (id: CardId) => boolean; render: (id: CardId) => JSX.Element; begin?: () => void; hero?: DeckHero }) {
   let box!: HTMLDivElement;
   let zoneEl: HTMLDivElement | undefined;
   const [rs, setRs] = createSignal<Resize | null>(null);
@@ -378,6 +378,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
             class="deck-item"
             data-size={sizeNow(id)}
             data-card={id}
+            data-notch={p.editing && p.notched?.(id) ? t("cards.notch.inBar", "v liště nahoře") : undefined}
             data-h={hNow(id)}
             data-dim={gapDim(id)}
             data-cl-bg={cl(id).attrs["data-cl-bg"]}

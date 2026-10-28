@@ -79,6 +79,11 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const page = () => pageOf(layout(), editing() ? editPage() : p.s.mode);
   const kind = () => pageKind(page().id);
   const on = (k: Parameters<typeof sectionOn>[1]) => sectionOn(p.s.sections, k);
+  const has = (id: CardId) => pageHas(page(), id);
+  // karta Dnes se nekreslí bez řádků (schůzka, připomínky, PR, limit) — počítá se jen na záložce, kde je.
+  // MUSÍ být před `facts`/`notch`: memo `notch` se v rozložení notch vyhodnotí hned při vzniku stránky a
+  // pozdější `const` by spadl (TDZ) — návrat z rychlé poznámky pak nefungoval (0.11.x).
+  const todayRows = useTodayRows(() => p.s, () => p.now, () => has("today"));
   const facts = () => ({
     today: todayRows().length > 0,
     procs: p.s.procs.length,
@@ -90,13 +95,15 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     media: !!((on("nowPlaying") && p.s.personal.media) || (on("sound") && p.s.personal.volume) || (on("favorites") && p.s.personal.mediaLook?.favorites?.length)),
   });
   const shown = () => shownCards(page(), facts()).map((c) => c.id);
-  // široký notch (rozložení `notch`, kolo 22): lišta sekcí z karet záložky; převzaté karty se pod ní nekreslí
+  // široký notch (rozložení `notch`, kolo 22): lišta sekcí z karet záložky; převzaté karty se pod ní nekreslí.
+  // V úpravách lišta zůstane nahoře jako náhled (úpravy = to, co je vidět) a převzaté karty jsou v mřížce
+  // označené „v liště nahoře“, ať jdou přesunout nebo odebrat.
   const notch = createMemo(() => {
-    if (layoutNow() !== "notch" || editing()) return { sections: [], taken: [] as string[] };
+    if (layoutNow() !== "notch") return { sections: [], taken: [] as string[] };
     const sections = notchSections(shown(), { media: on("nowPlaying") && !!p.s.personal.media, volume: on("sound") && !!p.s.personal.volume });
     return { sections, taken: takenCards(shown(), sections) };
   });
-  const shows = (id: CardId) => shown().includes(id) && !notch().taken.includes(id);
+  const shows = (id: CardId) => shown().includes(id) && (editing() || !notch().taken.includes(id));
   const edit = (catalog = false) => beginEdit(p.s, catalog);
   const cardOf = (id: CardId) => page().cards.find((c) => c.id === id);
   /** co udělá volba velikosti v ⋯ (karty v pořadí, jak je mřížka ukazuje; `size.ts` `sizeOutcome`) */
@@ -148,9 +155,6 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     ...(on("favorites") && (on("nowPlaying") || on("sound")) ? (["favorites"] as const) : []),
   ];
   const inbox = () => p.s.pending.length + p.s.questions.length > 0;
-  const has = (id: CardId) => pageHas(page(), id);
-  // karta Dnes se nekreslí bez řádků (schůzka, připomínky, PR, limit) — počítá se jen na záložce, kde je
-  const todayRows = useTodayRows(() => p.s, () => p.now, () => has("today"));
   // názvy umístěných widgetů pro katalog a „karta odebrána“
   createEffect(() => rememberWidgets(p.s.widgets));
 
@@ -221,8 +225,12 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
       {/* přetažení odkazu / souboru na otevřený šuplík → editor akce s návrhem (`actions/DropNew.tsx`) */}
       <Show when={dropped() && !editing()}><DropNew s={p.s} page={page().id} /></Show>
-      <Show when={notch().sections.length > 0}><NotchBar s={p.s} now={p.now} sections={notch().sections} /></Show>
-      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} render={card} begin={() => edit()} hero={{ facts: (id) => heroFacts(id, p.s, p.now), render: (id, f) => <HeroCard id={id} facts={f()} menu={menu(id)} /> }} />
+      <Show when={notch().sections.length > 0}>
+        <div class="notch-wrap" classList={{ preview: editing() }} title={editing() ? t("cards.notch.editPreview", "Lišta rozvržení Notch — upravíš ji kartami označenými „v liště nahoře“") : undefined}>
+          <NotchBar s={p.s} now={p.now} sections={notch().sections} />
+        </div>
+      </Show>
+      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} notched={(id) => notch().taken.includes(id)} render={card} begin={() => edit()} hero={{ facts: (id) => heroFacts(id, p.s, p.now), render: (id, f) => <HeroCard id={id} facts={f()} menu={menu(id)} /> }} />
       <Show when={cardLookTarget()?.page === page().id}><CardLookPanel page={page().id} s={p.s} /></Show>
       <TileMenu />
       <Show when={editing() && catalogOpen()}><Catalog layout={layout()} /></Show>

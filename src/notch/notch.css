@@ -58,3 +58,6 @@
 .nb-vol { flex: 0 0 64px; align-items: center; padding: 12px 8px; }
 .nb-slider { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 104px; accent-color: var(--accent); cursor: pointer; }
 .nb-mute { color: var(--t2); }
+
+/* režim úprav: lišta zůstane jako náhled (kreslí se, neklikne se); převzaté karty viz layout.css `data-notch` */
+.notch-wrap.preview { pointer-events: none; opacity: 0.85; }

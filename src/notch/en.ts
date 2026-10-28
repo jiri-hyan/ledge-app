@@ -2,6 +2,8 @@
 import { registerDict } from "../i18n";
 
 registerDict("en", {
+  "cards.notch.inBar": "in the bar above",
+  "cards.notch.editPreview": "Notch layout bar — edit it with the cards marked “in the bar above”",
   "cards.notch.month.jan": "Jan",
   "cards.notch.month.feb": "Feb",
   "cards.notch.month.mar": "Mar",
