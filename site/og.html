@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Zdroj obrázku og.png (1280 × 640, i GitHub social preview). Vyfotit headless Edgem: viz site/META.md. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Ledge — og image</title>
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    position: relative; background: rgb(16 18 27); color: #f4f5f9;
+    font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+  .glow { position: absolute; inset: 0;
+    background: radial-gradient(520px 360px at 18% 20%, rgba(139 92 246 / 0.32), transparent 70%),
+                radial-gradient(460px 340px at 82% 10%, rgba(34 211 238 / 0.2), transparent 70%); }
+  .left { position: absolute; left: 72px; top: 0; bottom: 0; width: 560px; display: flex; flex-direction: column; justify-content: center; }
+  .brand { display: flex; align-items: center; gap: 18px; font-size: 44px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand img { width: 76px; height: 76px; }
+  h1 { margin: 34px 0 0; font-size: 60px; line-height: 1.06; font-weight: 800; letter-spacing: -0.035em; }
+  h1 span { background: linear-gradient(90deg, #a78bfa, #818cf8 55%, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  p { margin: 24px 0 0; font-size: 25px; line-height: 1.4; color: #aeb2c2; }
+  .pills { display: flex; gap: 10px; margin-top: 30px; }
+  .pills span { padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(255 255 255 / 0.16); background: rgba(255 255 255 / 0.05); font-size: 19px; color: #d6d9e3; font-weight: 600; }
+  .right { position: absolute; left: 690px; top: 0; width: 640px; height: 640px; }
+  .bar { position: absolute; left: 210px; top: 0; width: 200px; height: 12px; border-radius: 0 0 12px 12px;
+    background: linear-gradient(90deg, #8b5cf6, #6366f1 55%, #22d3ee); box-shadow: 0 6px 30px rgba(99 102 241 / 0.7); }
+  .shot { position: absolute; left: 0; top: 40px; width: 620px; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0 0 0 / 0.6), 0 0 0 1px rgba(255 255 255 / 0.12); }
+  .shot img { display: block; width: 100%; }
+</style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="left">
+    <div class="brand"><img src="img/icon.svg" alt="">Ledge</div>
+    <h1>The always-on drawer <span>for Windows</span></h1>
+    <p>Projects, dev servers, notes and every Claude Code session — one mouse move away.</p>
+    <div class="pills"><span>Free &amp; open source</span><span>Windows 10 / 11</span><span>MIT</span></div>
+  </div>
+  <div class="right">
+    <div class="bar"></div>
+    <div class="shot"><img src="img/drawer.webp" alt=""></div>
+  </div>
+</body>
+</html>

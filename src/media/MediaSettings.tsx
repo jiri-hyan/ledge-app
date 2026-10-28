@@ -1,6 +1,6 @@
 // Nastavení → Obsah karet → Přehrávač: vzhled karty Právě hraje s náhledy (`media.variant`), čas skladby
 // v proužku (`media.stripTime`), ozdoba ekvalizéru (`media.equalizer`) a podbarvení obalem (`media.tint`). Mění se jen návrh Nastavení —
-// uloží (a vrátí) ho společná lišta Uložit / Zahodit / Vrátit. Pod tím oblíbené playlisty a stanice
+// platí hned (autosave Studia, Vrátit v historii). Pod tím oblíbené playlisty a stanice
 // (`FavoritesSettings.tsx`). Totéž pole `media.variant` mění i panel
 // „Vzhled karty…“ na kartě (`layout/CardLook.tsx`) a ikonka v jejím rohu — jeden zdroj v configu.
 import { For, Show } from "solid-js";

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Šuplík (hlavní okno): poslech událostí a VŠECHNY vlastní příkazy (seznam = generate_handler! v lib.rs, hlídá ipcacl::tests). Samostatné okno Nastavení sem přidá svůj label do windows (nebo vlastní capability).",
+  "description": "Šuplík (hlavní okno): poslech událostí a VŠECHNY vlastní příkazy (seznam = generate_handler! v lib.rs, hlídá ipcacl::tests). Okno Ledge Studio má vlastní capabilities/studio.json.",
   "windows": [
     "drawer"
   ],
@@ -14,6 +14,7 @@
     "allow-restart",
     "allow-stop-all-servers",
     "allow-project-folders",
+    "allow-repos-rescan",
     "allow-port-holders",
     "allow-kill-port-holder",
     "allow-dismiss",
@@ -223,6 +224,8 @@
     "allow-mcp-state",
     "allow-mcp-set-enabled",
     "allow-mcp-rotate-key",
-    "allow-mcp-reveal-key"
+    "allow-mcp-reveal-key",
+    "allow-studio-open",
+    "allow-studio-win"
   ]
 }

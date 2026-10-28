@@ -25,7 +25,7 @@ registerDict("en", {
   "ui.keys.pinBar": "Double-click a pinned note's bar to collapse it to the bar or expand it.",
   "ui.keys.pinText": "Double-click the text of a pinned note to edit it.",
   "ui.keys.find": "Search Settings; finds an option even without diacritics.",
-  "ui.keys.save": "Saves changes in Settings.",
+  "ui.keys.undoSettings": "Undoes the last change in Settings (outside text fields).",
   "ui.keys.sortList": "In sortable lists, moves the selected item up or down.",
   "ui.keys.title": "Keys and gestures",
   "ui.keys.palette.cmd": "? Keys and gestures",

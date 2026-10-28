@@ -34,6 +34,8 @@ struct Live {
     /// none | foreign | full | error | "" (ještě nečteno)
     status_line: &'static str,
     armed: Armed,
+    /// už ohlášené prahy 80 % / 90 % (`limits::alerts_due`)
+    alerted: limits::Alerted,
     /// běžící připomínka resetu: okno a do kdy (ms)
     notice: Option<(Kind, i64)>,
     last_stat: Option<Instant>,
@@ -104,7 +106,8 @@ fn reload(l: &mut Live) -> bool {
 /// Volá emit vlákno při každém probuzení. Levné: bez události watcheru jen porovnání času.
 pub(crate) fn tick(now: i64) {
     let c = core();
-    let (enabled, fullscreen, pace) = (c.cfg.read().claude.limits_reminder, c.fullscreen.load(Ordering::Relaxed), c.cfg.read().claude.limits_pace);
+    let (enabled, fullscreen, pace, alert) = (c.cfg.read().claude.limits_reminder, c.fullscreen.load(Ordering::Relaxed), c.cfg.read().claude.limits_pace, c.cfg.read().claude.limits_alert);
+    let mut alerts: Vec<(Kind, u8, f64)> = Vec::new();
     let mut dirty = false;
     let mut show = false;
     let mut hide = false;
@@ -119,6 +122,14 @@ pub(crate) fn tick(now: i64) {
             if let (true, Some(w)) = (pace, s.five_hour) {
                 dirty |= limits::push_hist(&mut l.hist, s.at, w.pct);
             }
+        }
+        // upozornění 80 / 90 % jen z čerstvého vzorku; vypnuto = nic se nepamatuje
+        if alert {
+            if let Some(s) = limits::fresher(l.own, l.log).filter(|s| now - s.at <= limits::STALE_MS) {
+                alerts = limits::alerts_due(&mut l.alerted, &s);
+            }
+        } else {
+            l.alerted.clear();
         }
         let fired = limits::due(&mut l.armed, now);
         // vypnuto / fullscreen = připomínka propadne (nic se neodkládá)
@@ -136,6 +147,17 @@ pub(crate) fn tick(now: i64) {
             dirty = true;
         }
     });
+    if let Some(&(k, lvl, pct)) = alerts.iter().max_by_key(|a| a.1)
+        && crate::attention::signal(Rgba::AMBER, true)
+    {
+        let name = match k {
+            Kind::FiveHour => crate::i18n::tr("5h", "5h"),
+            Kind::SevenDay => crate::i18n::tr("týdenní", "weekly"),
+        };
+        let title = crate::i18n::tr("Limit Claude se blíží", "Claude limit is getting close").to_string();
+        let body = trf!("Limit {} je na {} % (práh {} %).", "The {} limit is at {}% ({}% threshold).", name, pct.round() as i64, lvl);
+        crate::toast::show(&c.app.config().identifier, title, body);
+    }
     if show {
         *c.flash.lock() = Some((Rgba::GREEN, Instant::now()));
         if c.drawer.view() == View::Hidden {

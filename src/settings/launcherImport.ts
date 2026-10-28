@@ -17,6 +17,10 @@ export interface ImportResult {
   /** id přidaných projektů (pro kontrolu příkazů) */
   addedIds: string[];
   skipped: string[];
+  /** z `skipped`: už v projektech je (stejné id, složka nebo remote) */
+  duplicates: string[];
+  /** z `skipped`: položka katalogu nemá příkaz, který by šlo spustit */
+  noCommand: string[];
 }
 
 /** Verdikt pojistky z jádra: `problem` = proč se zástupce importuje vypnutý. */
@@ -92,6 +96,14 @@ export function projectOf(item: any): Record<string, unknown> | null {
   return p;
 }
 
+/** Hláška po převzetí: přidáno · už v projektech · bez příkazu (nulové části se nepíšou). */
+export function importMessage(added: number, duplicates: number, noCommand: number): string {
+  const parts = [t("settings.proj.imp.added", "přidáno {n}", { n: added })];
+  if (duplicates) parts.push(t("settings.proj.imp.dups", "už v projektech {n}", { n: duplicates }));
+  if (noCommand) parts.push(t("settings.proj.imp.noCmd", "bez příkazu {n}", { n: noCommand }));
+  return t("settings.proj.imp.msg", "Z katalogu: {parts} — ulož lištou dole", { parts: parts.join(", ") });
+}
+
 export function importLauncherCatalog(raw: any, cfg: any): ImportResult {
   const next = structuredClone(cfg ?? {});
   next.projects = Array.isArray(next.projects) ? next.projects : [];
@@ -101,6 +113,8 @@ export function importLauncherCatalog(raw: any, cfg: any): ImportResult {
   const added: string[] = [];
   const addedIds: string[] = [];
   const skipped: string[] = [];
+  const duplicates: string[] = [];
+  const noCommand: string[] = [];
   /** rodina → id přidaných projektů (pořadí z katalogu) */
   const byFamily = new Map<string, string[]>();
   for (const item of Array.isArray(raw?.items) ? raw.items : []) {
@@ -110,6 +124,7 @@ export function importLauncherCatalog(raw: any, cfg: any): ImportResult {
     const dup = p && (ids.has(low(p.id)) || (p.path && paths.has(pathKey(p.path))) || (p.remote && remotes.has(low(p.remote))));
     if (!p || dup) {
       skipped.push(label);
+      (p ? duplicates : noCommand).push(label);
       continue;
     }
     next.projects.push(p);
@@ -122,7 +137,7 @@ export function importLauncherCatalog(raw: any, cfg: any): ImportResult {
     if (fam) byFamily.set(fam, [...(byFamily.get(fam) ?? []), String(p.id)]);
   }
   if (byFamily.size) placeFolders(next, byFamily, raw?.families);
-  return { nextCfg: next, added, addedIds, skipped };
+  return { nextCfg: next, added, addedIds, skipped, duplicates, noCommand };
 }
 
 /** Složky na záložku s kartou Projekty (jinak první záložka + karta Projekty); existující složka se doplní. */

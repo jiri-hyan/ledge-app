@@ -85,10 +85,11 @@ pub(crate) fn desk_open_drawer(window: WebviewWindow, target: String) -> Result<
     let c = core();
     match target.as_str() {
         "waiting" => c.send_ui(UiCmd::Show(View::Peek, Opener::Hotkey)),
-        "settings" => {
+        "settings" => crate::studio::open_or(None, true, || {
+            let c = core();
             c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
             let _ = c.app.emit_to(drawer::LABEL, "page", "settings");
-        }
+        }),
         _ => c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey)),
     }
     Ok(())

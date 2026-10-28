@@ -9,7 +9,7 @@ import { useSettings } from "../ctx";
 import { Confirm } from "../../ui/Confirm";
 import { Num, Seg, Slider, Toggle } from "../fields/controls";
 import { Advanced } from "../fields/Advanced";
-import { PanelHead, Row, Section } from "../fields/Row";
+import { Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
 import StatusLineSetup from "../../limits/StatusLineSetup";
 import { fieldLabel } from "../labels";
@@ -83,7 +83,9 @@ export default function ClaudePanel(p: PanelProps) {
   const c = useSettings();
   return (
     <>
-      <PanelHead title={t("settings.nav.claude", "Claude")} desc={t("settings.claude.desc", "Ledge ukazuje session Claude Code a jejich žádosti o povolení. Povolit smí vždy jen člověk.")} />
+      <Section title={t("settings.claude.connect", "Propojit s Claude Code (nutné)")}>
+        <HooksSetup />
+      </Section>
       <Section title={t("settings.claude.approve", "Schvalování")}>
         <Row id="claude.enabled">
           <Toggle path="claude.enabled" label={fieldLabel("claude.enabled")} />
@@ -102,9 +104,7 @@ export default function ClaudePanel(p: PanelProps) {
             <Slider path="smart.approvalSound.minGapS" min={5} max={600} step={5} label={fieldLabel("smart.approvalSound.minGapS")} fmt={(v) => (v >= 60 ? `${Math.floor(v / 60)} min ${v % 60 ? `${v % 60} s` : ""}` : `${v} s`)} />
           </Row>
         </Show>
-        <HooksSetup />
       </Section>
-      <McpSettings />
       <QuestionsSection s={p.s} />
       <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
         <Row id="claude.statusLine" stack live>
@@ -112,6 +112,9 @@ export default function ClaudePanel(p: PanelProps) {
         </Row>
         <Row id="claude.limitsReminder">
           <Toggle path="claude.limitsReminder" label={fieldLabel("claude.limitsReminder")} />
+        </Row>
+        <Row id="claude.limitsAlert">
+          <Toggle path="claude.limitsAlert" label={fieldLabel("claude.limitsAlert")} />
         </Row>
         <Row id="claude.limitsPace">
           <Toggle path="claude.limitsPace" label={fieldLabel("claude.limitsPace")} />
@@ -158,6 +161,7 @@ export default function ClaudePanel(p: PanelProps) {
         </Row>
       </Section>
       </div>
+      <McpSettings />
       <Advanced id="claude" hint={t("settings.claude.adv.hint", "Port pro spojení s Claude Code")}>
         <Section>
           <Row id="claude.port" dim={!c.cfg.claude.enabled}>

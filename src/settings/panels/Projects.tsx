@@ -16,9 +16,12 @@ import { PanelHead, Row, Section } from "../fields/Row";
 import { fieldLabel } from "../labels";
 import { SortList } from "../fields/SortList";
 import { inRoots, moveItem, norm } from "../model";
+import { addTarget, draftIds, draftKnown, findDuplicate } from "../projectAdd";
+import { cleanAction, labelFrom, slugId } from "../../actions/model";
 import type { PanelProps } from "../types";
 import { ProjectEditor, ProjectLogo } from "./ProjectEditor";
-import { commandLines, commandsOf, importLauncherCatalog, withVerdicts } from "../launcherImport";
+import { kindLabel } from "../../actions/ActionEditor";
+import { commandLines, commandsOf, importLauncherCatalog, importMessage, withVerdicts } from "../launcherImport";
 
 /** Pole, na kterých závisí logo — dokud se nezmění proti uloženému, platí logo z dlaždice. */
 const LOGO_FIELDS = ["path", "remote", "subdir", "logo", "exe", "appName", "kind"];
@@ -41,15 +44,36 @@ function toProject(d: DetectedProject, roots: string[]) {
   };
 }
 
-function Candidates(p: { onPick: (c: RepoCandidate) => void; onClose: () => void }) {
+function Candidates(p: { known: () => { paths: string[]; remotes: string[] }; onPick: (cs: RepoCandidate[]) => void; onClose: () => void }) {
   const [list, setList] = createSignal<RepoCandidate[] | null>(null);
   const [q, setQ] = createSignal("");
-  api.projectCandidates().then((l) => setList(l ?? []), (e) => (sayError(e), setList([])));
+  const [sel, setSel] = createSignal<string[]>([]);
+  const [found, setFound] = createSignal<number | null>(null);
+  const load = () => {
+    const k = p.known();
+    return api.projectCandidates(k.paths, k.remotes).then((l) => setList(l ?? []), (e) => (sayError(e), setList([])));
+  };
+  load();
+  /** „Prohledat znovu“: repa naklonovaná mimo Ledge (v terminálu) se do indexu dostanou až takhle */
+  async function rescan() {
+    setList(null);
+    try {
+      setFound((await api.reposRescan()) ?? 0);
+    } catch (e) {
+      sayError(e);
+    }
+    await load();
+  }
   const shown = () => (list() ?? []).filter((c) => !q() || norm(`${c.name} ${c.remote ?? ""}`).includes(norm(q())));
+  const toggle = (path: string) => setSel(sel().includes(path) ? sel().filter((x) => x !== path) : [...sel(), path]);
+  const chosen = () => (list() ?? []).filter((c) => sel().includes(c.path));
   return (
     <div class="st-cands">
       <div class="st-inline">
         <input type="text" class="st-text grow" placeholder={t("settings.proj.cands.filter", "Filtrovat…")} value={q()} onInput={(e) => setQ(e.currentTarget.value)} aria-label={t("settings.proj.cands.filter", "Filtrovat…")} />
+        <button class="mini" onClick={rescan} title={t("settings.proj.rescan.title", "Znovu projde složky z „Kde hledat repa“ — najde i repa naklonovaná v terminálu")}>{t("settings.proj.rescan", "Prohledat znovu")}</button>
+        <Show when={found() !== null}><small role="status">{t("settings.proj.rescan.found", "Nalezeno rep: {n}", { n: found()! })}</small></Show>
+        <button class="mini ok" disabled={!chosen().length} onClick={() => p.onPick(chosen())}>{t("settings.proj.cands.addSel", "Přidat vybrané ({n})", { n: chosen().length })}</button>
         <button class="mini" onClick={p.onClose}>{t("settings.ui.close", "Zavřít")}</button>
       </div>
       <Show when={list()} fallback={<For each={[1, 2, 3]}>{() => <div class="st-skel" />}</For>}>
@@ -57,7 +81,7 @@ function Candidates(p: { onPick: (c: RepoCandidate) => void; onClose: () => void
           <div class="st-cand-list">
             <For each={shown()}>
               {(c) => (
-                <button class="st-cand" onClick={() => p.onPick(c)}>
+                <button class="st-cand" classList={{ on: sel().includes(c.path) }} aria-pressed={sel().includes(c.path)} onClick={() => toggle(c.path)}>
                   <strong>{c.name}</strong>
                   <small class="mono">{c.remote ?? c.path}</small>
                 </button>
@@ -73,6 +97,15 @@ function Candidates(p: { onPick: (c: RepoCandidate) => void; onClose: () => void
 export function Roots() {
   const c = useSettings();
   const roots = (): string[] => c.cfg.roots ?? [];
+  const [found, setFound] = createSignal<number | null>(null);
+  /** hledá v ULOŽENÝCH složkách (nové přidané ulož před hledáním) */
+  async function rescan() {
+    try {
+      setFound((await api.reposRescan()) ?? 0);
+    } catch (e) {
+      sayError(e);
+    }
+  }
   async function add() {
     try {
       const got = await api.pickPath("folder", t("settings.roots.pick", "Složka s repy"));
@@ -97,7 +130,11 @@ export function Roots() {
           )}
         </SortList>
       </Show>
-      <div class="st-actions"><button class="mini" onClick={add}>+ {t("settings.roots.add", "Přidat složku…")}</button></div>
+      <div class="st-actions">
+        <button class="mini" onClick={add}>+ {t("settings.roots.add", "Přidat složku…")}</button>
+        <button class="mini" onClick={rescan} title={t("settings.proj.rescan.title", "Znovu projde složky z „Kde hledat repa“ — najde i repa naklonovaná v terminálu")}>{t("settings.proj.rescan", "Prohledat znovu")}</button>
+        <Show when={found() !== null}><small role="status">{t("settings.proj.rescan.found", "Nalezeno rep: {n}", { n: found()! })}</small></Show>
+      </div>
     </Row>
   );
 }
@@ -133,40 +170,87 @@ export default function ProjectsPanel(p: PanelProps) {
     return view ? logoSrc(view) : undefined;
   };
 
-  async function addFrom(path: string) {
-    const dup = list().findIndex((x) => x.path && x.path.toLowerCase() === path.toLowerCase());
+  /** Přidá projekt ze složky; `quiet` = bez rozbalení a hlášky o úspěchu (hromadné přidání). Vrací, zda přibyl. */
+  async function addFrom(path: string, quiet = false): Promise<boolean> {
+    const dup = findDuplicate(list(), { path });
     if (dup >= 0) {
-      setOpen(dup);
-      return say(t("settings.proj.dup", "„{n}“ už v projektech je.", { n: list()[dup].name }));
+      if (!quiet) setOpen(dup);
+      say(t("settings.proj.dup", "„{n}“ už v projektech je.", { n: list()[dup].name }));
+      return false;
     }
     setBusy(true);
     try {
-      const d = await api.projectDetect(path);
-      if (!d) return;
+      // id z rozpracovaného návrhu, ne jen z uloženého configu (dva projekty se stejným názvem složky)
+      const d = await api.projectDetect(path, draftIds(list()));
+      if (!d) return false;
+      // stejné repo v jiné složce (jiný klon) = stejný projekt
+      const same = findDuplicate(list(), { remote: d.remote });
+      if (same >= 0) {
+        if (!quiet) setOpen(same);
+        say(t("settings.proj.dup", "„{n}“ už v projektech je.", { n: list()[same].name }));
+        return false;
+      }
       const pr = toProject(d, c.cfg.roots ?? []);
       c.update("projects", (all: any[]) => [...all, pr]);
       setNotes({ ...notes(), [pr.id]: d.notes });
-      setOpen(list().length - 1);
-      setCands(false);
-      say(t("settings.proj.added", "Projekt „{n}“ přidán — zkontroluj údaje a ulož.", { n: pr.name }));
+      if (!quiet) {
+        setOpen(list().length - 1);
+        setCands(false);
+        say(t("settings.proj.added", "Projekt „{n}“ přidán — zkontroluj údaje a ulož.", { n: pr.name }));
+      }
+      return true;
     } catch (e) {
       sayError(e);
+      return false;
     } finally {
       setBusy(false);
     }
   }
-  async function fromFolder() {
+  /** Víc rep naráz z nabídky; jedna souhrnná hláška. */
+  async function addMany(picked: RepoCandidate[]) {
+    let n = 0;
+    for (const x of picked) if (await addFrom(x.path, true)) n++;
+    if (n) {
+      setCands(false);
+      setOpen(null);
+      say(t("settings.proj.addedMany", "Přidáno projektů: {n} — zkontroluj údaje a ulož.", { n }));
+    }
+  }
+
+  // jedno „+ Přidat“: vložená adresa / cesta → typ podle `guessKind` (složka = projekt, jinak odkaz nebo akce)
+  const [adding, setAdding] = createSignal(false);
+  const [addText, setAddText] = createSignal("");
+  async function addPicked(kind: "folder" | "exe") {
     try {
-      const got = await api.pickPath("folder", t("settings.proj.pick", "Složka projektu"), c.cfg.roots?.[0]);
-      if (got) await addFrom(got);
+      const got = await api.pickPath(kind, t("settings.proj.pick", "Složka projektu"), c.cfg.roots?.[0]);
+      if (got) setAddText(got);
     } catch (e) {
       sayError(e);
     }
   }
+  async function addSmart() {
+    const text = addText().trim();
+    const what = addTarget(text);
+    if (!what) return;
+    if (what.as === "project") {
+      if (await addFrom(text)) {
+        setAddText("");
+        setAdding(false);
+      }
+      return;
+    }
+    const acts: any[] = c.cfg.actions ?? [];
+    const label = labelFrom(text);
+    const a = cleanAction({ id: slugId(label, acts.map((x) => x.id)), label, kind: what.kind, target: text, showOn: "both" });
+    c.set("actions", [...acts, a]);
+    setAddText("");
+    setAdding(false);
+    say(t("actions.panel.added", "Akce „{label}“ přidána — ulož ji dole v liště.", { label: a.label }));
+  }
   /** Launcher → Ledge (zadání týden 43 bod 4): zástupci z `catalog.json`. Příkazy projdou pojistkou v jádře
    *  (`launcher_import_check`); co neprojde, je vypnuté. Před převzetím potvrzení se seznamem příkazů; pak jde vše
    *  do návrhu (Uložit / Vrátit). Ledge z katalogu nic nespouští. */
-  const [pendingImport, setPendingImport] = createSignal<{ cfg: any; lines: ReturnType<typeof commandLines>; added: number; skipped: number } | null>(null);
+  const [pendingImport, setPendingImport] = createSignal<{ cfg: any; lines: ReturnType<typeof commandLines>; added: number; duplicates: number; noCommand: number } | null>(null);
   async function importCatalog() {
     setBusy(true);
     try {
@@ -177,7 +261,7 @@ export default function ProjectsPanel(p: PanelProps) {
       if (!res.added.length) return say(t("settings.proj.importNone", "Nic nového — všechno z katalogu už v projektech je (nebo nemá příkaz)."));
       const verdicts = (await api.launcherImportCheck(commandsOf(res.nextCfg, res.addedIds))) ?? [];
       const next = withVerdicts(res.nextCfg, res.addedIds, verdicts);
-      setPendingImport({ cfg: next, lines: commandLines(next, res.addedIds, verdicts), added: res.added.length, skipped: res.skipped.length });
+      setPendingImport({ cfg: next, lines: commandLines(next, res.addedIds, verdicts), added: res.added.length, duplicates: res.duplicates.length, noCommand: res.noCommand.length });
     } catch (e) {
       sayError(e);
     } finally {
@@ -191,7 +275,7 @@ export default function ProjectsPanel(p: PanelProps) {
     const before = { projects: structuredClone(c.cfg.projects ?? []), layout: structuredClone(c.cfg.layout) };
     c.set("projects", imp.cfg.projects);
     if (imp.cfg.layout) c.set("layout", imp.cfg.layout);
-    offerUndo(t("settings.proj.imported", "Z katalogu přidáno {n} (přeskočeno {m}) — ulož lištou dole", { n: imp.added, m: imp.skipped }), () => {
+    offerUndo(importMessage(imp.added, imp.duplicates, imp.noCommand), () => {
       c.set("projects", before.projects);
       if (before.layout !== undefined) c.set("layout", before.layout);
     });
@@ -214,7 +298,7 @@ export default function ProjectsPanel(p: PanelProps) {
       <PanelHead id="projects.add" title={t("settings.nav.akce", "Projekty, odkazy a akce")} desc={t("settings.proj.desc", "Všechno, co se otevírá jedním klikem: projekty (dev server nebo aplikace), rychlé akce a odkazy na weby, složky a soubory.")}>
         <button class="mini" disabled={busy()} onClick={importCatalog} title={t("settings.proj.importTitle", "Zástupce a složky z katalogu Launcheru (catalog.json)")}>{t("settings.proj.importCatalog", "Z Launcheru…")}</button>
         <button class="mini" disabled={busy()} onClick={() => setCands(!cands())} aria-expanded={cands()}>{t("settings.proj.fromRepos", "Z naklonovaných rep")}</button>
-        <button class="mini ok" disabled={busy()} onClick={fromFolder}>+ {t("settings.proj.fromFolder", "Přidat projekt ze složky…")}</button>
+        <button class="mini ok" disabled={busy()} onClick={() => setAdding(!adding())} aria-expanded={adding()}>+ {t("settings.proj.add", "Přidat")}</button>
       </PanelHead>
       <Confirm
         when={!!pendingImport()}
@@ -235,9 +319,19 @@ export default function ProjectsPanel(p: PanelProps) {
         onYes={applyImport}
         onNo={() => setPendingImport(null)}
       />
+      <Show when={adding()}>
+        <div class="st-inline st-addrow">
+          <input type="text" class="st-text grow mono" value={addText()} placeholder={t("settings.proj.add.ph", "Cesta ke složce, souboru nebo programu, nebo adresa webu")} aria-label={t("settings.proj.add.ph", "Cesta ke složce, souboru nebo programu, nebo adresa webu")} onInput={(e) => setAddText(e.currentTarget.value)} onKeyDown={(e) => e.key === "Enter" && addSmart()} />
+          <button class="mini" onClick={() => addPicked("folder")}>{t("settings.proj.add.folder", "Vybrat složku…")}</button>
+          <button class="mini" onClick={() => addPicked("exe")}>{t("settings.proj.add.exe", "Vybrat program…")}</button>
+          <button class="mini ok" disabled={busy() || !addText().trim()} onClick={addSmart}>{t("actions.edit.add", "Přidat")}</button>
+        </div>
+        <Show when={addTarget(addText())}>{(w) => <small class="st-note" role="status">{w().as === "project" ? t("settings.proj.add.asProject", "Přidá se jako projekt (složka).") : t("settings.proj.add.asAction", "Přidá se jako odkaz nebo akce: {k}.", { k: kindLabel(w().kind) })}</small>}</Show>
+      </Show>
       <Show when={cands()}>
-        <Section title={t("settings.proj.cands", "Naklonovaná repa, která ještě nejsou v projektech")}>
-          <Candidates onPick={(x) => addFrom(x.path)} onClose={() => setCands(false)} />
+        <Section>
+          <p class="st-note">{t("settings.proj.cands", "Naklonovaná repa, která ještě nejsou v projektech — vyber jedno nebo víc.")}</p>
+          <Candidates known={() => draftKnown(list())} onPick={addMany} onClose={() => setCands(false)} />
         </Section>
       </Show>
       <Group gid="akce.projects" title={t("settings.proj.title", "Projekty")} desc={t("settings.proj.gDesc", "Dev servery a aplikace, které spustíš jedním klikem z hlavní stránky šuplíku.")} badge={list().length ? String(list().length) : undefined}>

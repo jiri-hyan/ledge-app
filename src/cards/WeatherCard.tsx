@@ -5,6 +5,7 @@ import { type Snapshot } from "../api";
 import { ago, num } from "../format";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
+import { tempIn } from "./temp";
 import "./personal.css";
 
 /** Totéž jako `weather::MAX_AGE_MS` v Rustu. */
@@ -41,11 +42,11 @@ export default function WeatherCard(p: { s: Snapshot; now: number; onSettings: (
           <>
             <div class="wx">
               <span class="wx-ico" aria-hidden="true">{d().icon}</span>
-              <span class="wx-temp">{num(d().temp)}°</span>
+              <span class="wx-temp">{num(tempIn(d().temp, w().fahrenheit))}°</span>
               <div class="grow">
                 <div class="name">{d().desc}</div>
                 <div class="sub">
-                  <Show when={d().min != null && d().max != null} fallback={t("cards.weather.noToday", "dnešek bez údajů")}>{num(d().min!)}° / {num(d().max!)}°</Show>
+                  <Show when={d().min != null && d().max != null} fallback={t("cards.weather.noToday", "dnešek bez údajů")}>{num(tempIn(d().min!, w().fahrenheit))}° / {num(tempIn(d().max!, w().fahrenheit))}°</Show>
                   <Show when={d().precipSum != null}> · {num(d().precipSum!, 1)} mm</Show>
                   <Show when={d().precipProb != null}>{t("cards.weather.precipProb", " · srážky {p} %", { p: num(d().precipProb!) })}</Show>
                 </div>

@@ -39,6 +39,8 @@ export interface Snapshot {
   /** záložky a karty na nich (`config.layout`, `layout/model.ts`) */
   layout: Layout;
   claudeEnabled: boolean;
+  /** herní režim zapnutý (chybí = starší jádro = vypnutý) */
+  gameMode?: boolean;
   projects: ProjectView[];
   /** upozornění na neuloženou práci (`config.gitAlerts`; chybí = starší jádro = vypnuto) */
   gitAlerts?: { enabled: boolean; read?: string };

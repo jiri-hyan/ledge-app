@@ -1,9 +1,9 @@
 // Panel Vzhled, krok „Po najetí“ (co se stane, když najedeš myší na proužek): 3 dlaždice `drawer.hover`
 // (data `hover/modes.ts` od J) s HTML náhledem (`previews/HoverPreview.tsx`; co se „děje“, se přepíná
-// v náhledu dole). V „Pokročilé“ prodleva, než se malý náhled sám rozbalí do celého šuplíku
+// ve scéně Studia). V „Pokročilé“ prodleva, než se malý náhled sám rozbalí do celého šuplíku
 // (`drawer.hoverExpandMs`: 0 = jen klikem, jinak 400–10 000 ms; odpočítává `hover/expand.ts`). Jak se šuplík
 // otevírá (najetí / přitlačení / podržení) je Šuplík a karty → Otevírání a klávesy. Najetí na dlaždici =
-// náhled dole (`peekHoverOn`); klik = rozpracovaný config + „Vrátit“ v liště; platí po Uložit.
+// náhled ve scéně Studia (`peekHoverOn`); klik platí hned.
 import { For, Show } from "solid-js";
 import { lang, t } from "../../i18n";
 import type { HoverModeId } from "../../types";
@@ -41,13 +41,11 @@ export default function AppearanceHover(q: { ap: Ap; adv: boolean; setAdv: (v: b
     if (prev === id) return;
     setMode(id);
     const x = HOVER_MODES.find((m) => m.id === id);
-    offerUndo(t("appearance.hover.picked", "Po najetí: {name} — platí po Uložit", { name: x ? modeName(x) : id }), () => setMode(prev));
+    offerUndo(t("appearance.hover.picked", "Po najetí: {name}", { name: x ? modeName(x) : id }), () => setMode(prev));
   };
   return (
     <>
     <div class="card ap-top" id="f-drawer.hover" classList={{ hit: lit("drawer.hover") }}>
-      <h4>{t("appearance.hover.title", "Co se stane po najetí myší")}</h4>
-      <p class="ap-note">{t("appearance.hover.lead", "Mezikrok mezi zavřeným proužkem a celým šuplíkem. Klik nebo delší najetí pak vždy otevře celý šuplík.")}</p>
       <div class="ap-hovers" role="radiogroup" aria-label={t("appearance.hover.title", "Co se stane po najetí myší")}>
         <For each={HOVER_MODES}>
           {(x) => (

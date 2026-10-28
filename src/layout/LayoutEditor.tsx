@@ -1,7 +1,7 @@
 // Editor rozložení v Nastavení (panel Šuplík a karty): přehledný přepínač záložek nahoře, živý mini-náhled
 // mřížky karet (4 sloupce podle `packSpans`), karty s přímými tlačítky pro velikost (S/M/L/XL), výšku
-// (Auto/1–4), zobrazení (Seznam/Dlaždice/Bento/Kompaktní), strop řádků a vizuální katalog karet dole.
-// Mění jen draft Nastavení (`c.set("layout")`), zapíše společná lišta Uložit.
+// (Auto/1–4), zobrazení (Seznam/Dlaždice/Bento/Kompaktní), strop řádků a vizuální katalog karet.
+// Mění jen draft Nastavení (`c.set("layout")`), platí hned (autosave Studia).
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 import { t, tp } from "../i18n";
 import { base, offerUndo, useSettings } from "../settings/ctx";
@@ -138,8 +138,6 @@ export default function LayoutEditor() {
     <>
       <Section
         id="layout"
-        title={t("settings.f.layout", "Záložky a karty")}
-        desc={t("settings.layout.desc", "Co šuplík ukazuje, na které záložce a jak velké. Karta, která není na žádné záložce, se skryje a nic nestahuje. Nejrychleji to upravíš přímo v šuplíku.")}
       >
         <div class="lay-st-cta">
           <button class="btn pri" disabled={unsaved()} onClick={askEdit}>✎ {t("settings.layout.inDrawer", "Upravit přímo v šuplíku")}</button>

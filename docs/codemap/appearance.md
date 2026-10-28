@@ -42,7 +42,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [appearance-detail.md](
 | `src/theme/apply.ts` · `label.ts` | DOM: proměnné na `<html>` (staré smaže) … | `applyAppearance` |
 | `src/motion.ts` | styl/rychlost mění jen parametry pružin a délky … | `setMotion` `motionNow` `dur` |
 | `src/App.tsx` (`prepare`/`play`/`closing`) | přehraje `openPlan`/`closePlan` na `.shell` … | `geo` `settle` |
-| `src/settings/panels/Appearance.tsx` | panel ve 4 krocích (záložky `.ap-step`): Zavřený · Po najetí · Otevřený · Pohyb … | `AppearancePanel` `lastStep` |
+| `src/settings/panels/Appearance.tsx` | jeden krok Vzhledu jako otázka Studia (`AppearanceStep step=closed|hover|open|motion`: Proužek / Otevírání / Vzhled šuplíku); rozbalené Doladit drží modul, skok (`hit`) ho rozbalí | `AppearanceStep` `AppearancePanel` |
 | `panels/AppearanceClosed.tsx` · `StripSettings.tsx` | krok Zavřený: galerie 15 vzhledů `strip.look` + dlaždice „Vlastní“ … | `AppearanceClosed` `normLook` |
 | `panels/ComposeEditor.tsx` · `compose.css` · `previews/ComposePreview.tsx` | krok Zavřený, kolo 23: dlaždice „Vlastní“ pod galerií (`AppearanceClosed` … | `ComposeEditor` |
 | `panels/AppearanceHover.tsx` | krok Po najetí: 3 dlaždice `drawer.hover` (data `src/hover/modes.ts` od J) s … | `AppearanceHover` `normHover` |

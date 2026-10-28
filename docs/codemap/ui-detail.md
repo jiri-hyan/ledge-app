@@ -28,7 +28,7 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 | `timer/*` (`timer/TimerCard.tsx`) | Osobní: karta Časovač (odpočet + stopky; stav drží Rust `timer.rs`, sekundy z tiku `now`), čistá logika `model.ts` (+ `model.test.mjs`), akce `timerDo` (karta i paleta) | `TimerCard` `timerDo` `leftMs` `elapsedMs` `fmtDuration` `parseMinutes` `parsePresets` |
 | `media/*` | Osobní: Právě hraje + hlasitost, baterie, `PersonalLive` (líný start odběrů) → [media.md](media.md) | `MediaCard` `PersonalLive` `Battery` |
 | `ClaudeSessions.tsx` | karta Claude → [sessions.md](sessions.md) | |
-| `Settings.tsx` · `settings/*` · `fit.ts` | Nastavení → [settings.md](settings.md); `fit.ts` = strop výšky (`--drawer-max-h`) | `Settings` |
+| `studio/*` · `settings/*` · `fit.ts` | Nastavení = Ledge Studio → [studio.md](studio.md), panely → [settings.md](settings.md); `fit.ts` = strop výšky (`--drawer-max-h`) | `Studio` |
 | `notes/*` | poznámky → [notes.md](notes.md) | |
 | `api.ts` | most k Rustu: `api.*` = `invoke`, `on` = `listen`; mimo Tauri no-op | `api` `on` `inTauri` `call` |
 | `types/*` (`types.ts` = re-export; po oblastech `types/{media,notes,onboarding,personal,projects,settings,timer}.ts`) | typy snapshotu a IPC po oblastech (zrcadlo serde v Rustu); `api.ts` je re-exportuje | `Snapshot` `ProjectView` `ProcView` `SessionView` `NoteView` `UpdateView` `ViewMsg` |

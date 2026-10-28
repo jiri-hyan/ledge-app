@@ -1,17 +1,15 @@
-// Stav Nastavení: rozpracovaný config (store na úrovni modulu — přežije zavření stránky i šuplíku,
-// rozdělaná práce se neztratí), uložená verze `base` (pro „Neuložené změny“ a Zahodit), poslední
-// chyba validace z Rustu, zvýrazněný řádek z hledání a lišta „Vrátit“. Pole čtou/mění config přes
+// Stav Nastavení (Ledge Studio, kolo 24): rozpracovaný config (store na úrovni modulu), uložená verze `base`,
+// poslední chyba validace z Rustu, zvýrazněný řádek z hledání a lišta „Vrátit“. Pole čtou/mění config přes
 // `useSettings()` cestou (`"drawer.trigger"`, `"projects.2.run"`).
-// **Jedno chování ukládání ve všech panelech:** panel mění jen draft; zapíše ho JEN lišta skořápky
-// (Uložit / Ctrl+S, Zahodit vrátí uložené). Žádný panel nemá vlastní „Uložit“ ani neukládá sám. Co jádro
-// přijme až pro uloženou verzi (souhlas s příkazem akce), panel odloží přes `afterSave`.
+// **Platí hned:** panel mění jen draft; ověří a zapíše ho JEN autosave Studia (`studio/autosave.ts`, ~400 ms
+// po poslední změně, textová pole až při Enter / opuštění, neplatné se neukládá). Žádný panel neukládá sám.
+// Co jádro přijme až pro uloženou verzi (souhlas s příkazem akce), panel odloží přes `afterSave`.
 import { createContext, createSignal, useContext } from "solid-js";
 import { createStore, reconcile, unwrap } from "solid-js/store";
 import { setLang } from "../i18n";
 import type { FieldError, Snapshot } from "../types";
 import { debounce } from "../util/time";
 import { getPath, pathKeys } from "./model";
-import { FIRST_PAGE } from "./structure";
 
 const [cfg, setCfgRaw] = createStore<any>({});
 /** JSON uložené verze (tak, jak ji vrací jádro) */
@@ -19,14 +17,12 @@ const [base, setBaseSig] = createSignal("");
 const [rev, setRev] = createSignal(0);
 const [fieldError, setFieldError] = createSignal<FieldError | null>(null);
 const [hit, setHit] = createSignal<string | null>(null);
-/** otevřená stránka (id panelu); výchozí = Doporučené (`structure.ts` `FIRST_PAGE`) */
-const [active, setActive] = createSignal(FIRST_PAGE);
-/** rozpracovaná verze se liší od uložené (počítá shell po každé změně, s debounce) */
+/** rozpracovaná verze se liší od uložené (počítá autosave po každé změně, s debounce) */
 const [dirty, setDirty] = createSignal(false);
 const [undoMsg, setUndoMsg] = createSignal<{ text: string; restore: () => void } | null>(null);
 const hideUndo = debounce(() => setUndoMsg(null), 8000);
 
-export { cfg, base, rev, dirty, setDirty, fieldError, setFieldError, hit, setHit, active, setActive, undoMsg };
+export { cfg, base, rev, dirty, setDirty, fieldError, setFieldError, hit, setHit, undoMsg };
 
 /** Každá změna konfigu jde tudy — `rev` spouští ověření a výpočet „neuloženo“. */
 export const touch = () => setRev((r) => r + 1);
@@ -38,7 +34,7 @@ export const setCfg: any = (...args: any[]) => {
 };
 
 /** Načtená / právě uložená verze z jádra → draft i základ. Jazyk rozhraní jde podle ULOŽENÉ verze —
- *  přepínač v Nastavení (`ui.lang`) tak platí hned po Uložit, bez restartu. */
+ *  přepínač v Nastavení (`ui.lang`) tak platí hned po zápisu, bez restartu. */
 export function loadBase(c: any) {
   // jiná verze configu (Zahodit, Načíst nové, právě uloženo) = odložené úkoly k draftu propadají
   pendingAfterSave = [];
@@ -61,6 +57,11 @@ export function adoptBase(c: any, draft: any) {
 }
 
 export const isLoaded = () => base() !== "";
+/** Celý draft nahradit (Vrátit z časové osy Studia); základ zůstane, autosave rozdíl zapíše. */
+export function replaceDraft(c: any) {
+  setCfgRaw(reconcile(structuredClone(c)));
+  touch();
+}
 export const snapshotDraft = () => structuredClone(unwrap(cfg));
 export const discard = () => base() && loadBase(JSON.parse(base()));
 

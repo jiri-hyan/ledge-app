@@ -116,9 +116,12 @@ fn run(a: Action) {
     match a {
         Action::Open => gamemode::handle(Trigger::Relaunch, || c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey))),
         Action::Settings => gamemode::handle(Trigger::Relaunch, || {
-            *c.pending_page.lock() = Some("settings");
-            c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
-            let _ = c.app.emit_to(crate::drawer::LABEL, "page", "settings");
+            crate::studio::open_or(None, true, || {
+                let c = core();
+                *c.pending_page.lock() = Some("settings");
+                c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
+                let _ = c.app.emit_to(crate::drawer::LABEL, "page", "settings");
+            })
         }),
         Action::Quit => {
             log("tray: ukončuji na přání uživatele");

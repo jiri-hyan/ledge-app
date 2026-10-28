@@ -37,8 +37,14 @@ pub(crate) fn ctl_handler() -> claude::Ctl {
                 Ok(json!({ "ok": true }))
             }
             "settings" => {
-                c.send_ui(UiCmd::Show(View::Full, Opener::Remote));
-                let _ = c.app.emit_to(drawer::LABEL, "page", "settings");
+                // jako dřívější šuplík s Opener::Remote: bez fokusu, ve hře zahozeno
+                if crate::studio::remote_may_open(c.dead()) {
+                    crate::studio::open_or(None, false, || {
+                        let c = core();
+                        c.send_ui(UiCmd::Show(View::Full, Opener::Remote));
+                        let _ = c.app.emit_to(drawer::LABEL, "page", "settings");
+                    });
+                }
                 Ok(json!({ "ok": true }))
             }
             "launch" => {

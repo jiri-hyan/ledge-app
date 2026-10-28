@@ -1,6 +1,6 @@
 // Katalog Nastavení: stránky z `registry.ts` (názvy, kw) s komponentami a seznam všeho, co jde najít
 // (stránky + volby z `labels.ts` + prefixy klíčů configu z `placement.ts`). Stránka = složení sekcí
-// z `panels/*` (jedna volba = jedno místo, hlídá `settings.test.mjs`); do sekcí je třídí `structure.ts`.
+// z `panels/*` (jedna volba = jedno místo, hlídá `settings.test.mjs`); do částí Ledge Studia je třídí `studio/parts.ts`.
 import type { Component } from "solid-js";
 import { lang, t } from "../i18n";
 import { PANEL_META, type PanelMeta } from "./registry";
@@ -9,7 +9,6 @@ import type { PanelProps } from "./types";
 import { PLACEMENT, isAdvancedField } from "./placement";
 import { isAdvanced } from "./appearanceModel";
 import { FIELDS, fieldAnchor, fieldCs, fieldHint, fieldKw, fieldLabel } from "./labels";
-import RecommendedPanel from "./panels/Recommended";
 import StartPanel from "./panels/Start";
 import DrawerPanel from "./panels/Drawer";
 import AppearancePanel from "./panels/Appearance";
@@ -22,10 +21,10 @@ import DeskPanel from "./panels/Desk";
 import StartupPanel from "./panels/Startup";
 import AppPanel from "./panels/AppPanel";
 
-export type PanelEntry = PanelMeta & { component: Component<PanelProps> };
+/** `component` chybí jen u `doporucene` — vede na domov Studia („Tvůj Ledge“). */
+export type PanelEntry = PanelMeta & { component?: Component<PanelProps> };
 
 const COMPONENTS: Record<string, Component<PanelProps>> = {
-  doporucene: RecommendedPanel,
   zaciname: StartPanel,
   suplik: DrawerPanel,
   vzhled: AppearancePanel,
@@ -39,7 +38,7 @@ const COMPONENTS: Record<string, Component<PanelProps>> = {
   aplikace: AppPanel,
 };
 
-/** Všechny stránky (pořadí v navigaci určuje `structure.ts` `SECTIONS`). */
+/** Všechny stránky (Studio je skládá do částí podle `studio/parts.ts`). */
 export const PANELS: PanelEntry[] = PANEL_META.map((m) => ({ ...m, component: COMPONENTS[m.id] }));
 
 export const panelLabel = (p: PanelMeta) => t(p.key, p.cs);

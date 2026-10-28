@@ -4,8 +4,8 @@
 //! (`AppManifest::commands`, seznam se čte z `generate_handler![…]` v `lib.rs` — jediný zdroj) a každé okno
 //! pak smí jen to, co mu povolí jeho capability (`capabilities/*.json`, oprávnění `allow-<příkaz>`):
 //!
-//! - `default.json` — šuplík (`drawer`): všechny příkazy (hlavní okno beze změny). **Okno Nastavení** (až
-//!   bude samostatné) přidá svůj label do `windows` téhož souboru, nebo dostane vlastní capability.
+//! - `default.json` — šuplík (`drawer`): všechny příkazy (hlavní okno beze změny).
+//! - `studio.json` — okno Ledge Studio (`studio`, Nastavení v okně): jen to, co Nastavení volá (`STUDIO_WINDOW`).
 //! - `pins.json` — lístky `note-*`: jen to, co lístek volá (`pin_*` svého okna + práce s poznámkou).
 //! - `desk.json` — widgety `desk-*`: jen `desk_*` svého okna, kliky a výstup widgetu, karty Běží / Agenda.
 //! - okna s webem (`web-*`), PDF (`pdf-export-*`) a cokoli jiného: nic.
@@ -99,6 +99,25 @@ mod tests {
         "widget_refresh", "widgets_list",
     ];
 
+    /// Co smí Ledge Studio: config (číst, ověřit, zapsat, výchozí, export / import), dialogy a příkazy panelů
+    /// Nastavení; okenní tlačítka `studio_win`. Ne: fokus a velikost šuplíku, spouštění projektů z karet, `pin_*`, `desk_drag`.
+    const STUDIO_WINDOW: &[&str] = &[
+        "account_cancel", "account_connect", "account_disconnect", "account_google_calendars", "accounts_status",
+        "action_check", "action_consent", "action_icon", "action_icon_refresh", "anim_stats", "app_info",
+        "calendar_outlook_load", "calendar_outlook_probe", "calendar_test", "check_config", "clip_apps", "clip_clear",
+        "clip_enable", "config_defaults", "config_export", "config_import_preview", "desk_hide_all", "desk_pin",
+        "desk_profile_apply", "desk_profile_delete", "desk_profile_save", "desk_set", "desk_unpin", "geo_search",
+        "get_config", "get_state", "hooks_install", "hooks_remove", "hooks_status", "launcher_catalog_read",
+        "launcher_import_check", "logo_preview", "look_image", "look_image_add", "mcp_reveal_key", "mcp_rotate_key",
+        "mcp_set_enabled", "mcp_state", "note_folder_check", "note_folder_clear_conflicts", "note_folder_sync_now",
+        "note_open", "note_tags", "notes_sync_now", "open_app_file", "open_config_file", "open_url", "pick_path",
+        "pick_save", "pkg_context", "project_candidates", "project_detect", "project_logo", "relaunch_outside",
+        "run_action", "run_script", "save_config", "scripts_list", "scripts_open_dir", "set_game_mode",
+        "statusline_install", "statusline_remove", "statusline_status", "studio_win", "update_check_now",
+        "update_rollback", "widget_consent", "widget_install", "widget_templates", "widgets_list", "widgets_open_dir",
+        "win_settings_open",
+    ];
+
     #[test]
     fn handler_list_parses() {
         let cmds = handler_commands(LIB);
@@ -130,6 +149,7 @@ mod tests {
         let table = |t: &[&str]| t.iter().map(|c| permission_of(c)).collect::<BTreeSet<_>>();
         assert_eq!(app_perms(by("pins.json")), table(PIN_WINDOW), "capabilities/pins.json ≠ PIN_WINDOW");
         assert_eq!(app_perms(by("desk.json")), table(DESK_WINDOW), "capabilities/desk.json ≠ DESK_WINDOW");
+        assert_eq!(app_perms(by("studio.json")), table(STUDIO_WINDOW), "capabilities/studio.json ≠ STUDIO_WINDOW");
         for (name, c) in &caps {
             for p in &c.permissions {
                 let ok = matches!(p.as_str(), "core:event:allow-listen" | "core:event:allow-unlisten") || all.contains(p);
@@ -139,9 +159,23 @@ mod tests {
         assert_eq!(drawer.windows, [crate::drawer::LABEL]);
         assert_eq!(by("pins.json").windows, [format!("{}*", crate::pins::LABEL_PREFIX)]);
         assert_eq!(by("desk.json").windows, [format!("{}*", crate::desk::LABEL_PREFIX)]);
+        assert_eq!(by("studio.json").windows, [crate::studio::LABEL]);
         // a build.rs opravdu zapíná AppManifest (bez něj by capability příkazy neomezovala)
         let build = include_str!("../build.rs");
         assert!(build.contains("AppManifest::new().commands(") && build.contains("handler_commands("), "build.rs bez AppManifest");
+    }
+
+    /// Povolit akci Clauda smí jen člověk v šuplíku: okno Studia nesmí volat `decide`, `question_*`, `agent_*`.
+    #[test]
+    fn studio_cannot_approve_claude() {
+        for c in STUDIO_WINDOW {
+            assert!(*c != "decide" && !c.starts_with("question_") && !c.starts_with("agent_"), "Studio smí {c}");
+        }
+        let caps = caps();
+        let studio = &caps.iter().find(|(n, _)| n == "studio.json").expect("studio.json").1;
+        for p in &studio.permissions {
+            assert!(!p.contains("allow-decide") && !p.contains("allow-question-") && !p.contains("allow-agent-"), "studio.json: {p}");
+        }
     }
 
     #[test]
@@ -182,6 +216,20 @@ mod tests {
             (&desk, "export_usage", false),
             (&desk, "pin_set", false),
             (&desk, "mcp_reveal_key", false),
+            ("studio", "save_config", true),
+            ("studio", "check_config", true),
+            ("studio", "studio_win", true),
+            ("studio", "action_consent", true),
+            ("studio", "focus_drawer", false),
+            ("studio", "release_focus", false),
+            ("studio", "drawer_size", false),
+            ("studio", "launch", false),
+            ("studio", "pin_set", false),
+            ("studio", "desk_drag", false),
+            ("studio", "studio_open", false),
+            ("studio2", "save_config", false),
+            (&note, "studio_win", false),
+            (&desk, "studio_open", false),
             (&web, "get_state", false),
             (&web, "open_url", false),
             ("pdf-export-1", "get_state", false),

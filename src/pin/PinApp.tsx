@@ -13,7 +13,7 @@ import { b64Of, pasteImages } from "../notes/draft";
 import { trimBody } from "../notes/editdraft";
 import { listKey } from "../notes/listkeys";
 import { fromMs } from "../notes/remind";
-import { setLang, t } from "../i18n";
+import { setLang, t, type Lang } from "../i18n";
 import { errorText, say, sayError, Toast } from "../ui/toast";
 import UndoBar from "../notes/UndoBar";
 import { archiveNote, completeNote, deleteNote, reopenNote } from "../notes/lifecycle";
@@ -432,7 +432,7 @@ export default function PinApp() {
   }
 
   onMount(() => {
-    const offs = [on<string>("pin-note", external), on<PinPrefs>("pin-prefs", setPrefs)];
+    const offs = [on<string>("pin-note", external), on<PinPrefs>("pin-prefs", setPrefs), on<Lang>("pin-lang", (l) => void setLang(l))];
     onCleanup(() => offs.forEach((o) => o.then((f) => f())));
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;

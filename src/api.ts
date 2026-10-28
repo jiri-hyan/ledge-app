@@ -18,8 +18,26 @@ export type * from "./types";
 /** Mimo Tauri (plain vite v prohlížeči) neexistuje IPC — UI se pak jen vykreslí prázdné. */
 export const inTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
+/** Okno Ledge Studio (`settings.html` má `data-studio`): příkazy šuplíku (fokus, velikost) tam nic nedělají —
+ *  Studio je běžné okno s vlastním fokusem a jeho capability je ani nepovoluje (`capabilities/studio.json`). */
+export const inStudio = typeof document !== "undefined" && document.documentElement.hasAttribute("data-studio");
+const drawerOnly = <T,>(f: () => Promise<T | undefined>) => (inStudio ? Promise.resolve(undefined) : f());
+
+/** Ukázkový hostitel JEN pro `settings.html?demo=1` mimo Tauri (`studio/demo.ts`, snímky Studia v prohlížeči).
+ *  V Tauri se nikdy nenastaví — `setDemoHost` tam nic neudělá. */
+let demoHost: ((cmd: string, args?: Record<string, unknown>) => unknown) | null = null;
+export function setDemoHost(h: (cmd: string, args?: Record<string, unknown>) => unknown) {
+  if (!inTauri) demoHost = h;
+}
+
+/** Události pro ukázkový šuplík (`index.html?demo=1`, `src/showcase/`): mimo Tauri `on` poslouchá tuhle sběrnici. */
+const demoBus = new Map<string, Set<(p: any) => void>>();
+export function emitDemo(event: string, payload?: unknown) {
+  demoBus.get(event)?.forEach((f) => f(payload));
+}
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | undefined> {
-  if (!inTauri) return undefined;
+  if (!inTauri) return demoHost ? (demoHost(cmd, args) as T | undefined) : undefined;
   return invoke<T>(cmd, args);
 }
 
@@ -44,15 +62,15 @@ export const api = {
   setGameMode: (on: boolean) => call("set_game_mode", { on }),
   reportSize: (view: View, w: number, h: number) => call("report_size", { view, w, h }),
   /** velikost šuplíku tažením v úpravách (kolo 23): `done` = uložit; vrací [šířka, výška] po ořezu monitorem */
-  drawerSizeEnd: () => call<void>("drawer_size_end"),
-  drawerSize: (page: string, w: number, h: number, done: boolean) => call<[number, number]>("drawer_size", { page, w, h, done }),
+  drawerSizeEnd: () => drawerOnly(() => call<void>("drawer_size_end")),
+  drawerSize: (page: string, w: number, h: number, done: boolean) => drawerOnly(() => call<[number, number]>("drawer_size", { page, w, h, done })),
   close: () => call("close_drawer"),
   /** Jen na výslovný klik do poznámky: okno otevřené najetím aktivuje (jinak by nešlo psát). */
-  focusDrawer: () => call("focus_drawer"),
+  focusDrawer: () => drawerOnly(() => call("focus_drawer")),
   /** Náhled po najetí (Compact / Island) → celý šuplík: klik do náhledu nebo jeho setrvání. Fokus nebere. */
   expandDrawer: () => call("expand_drawer"),
   /** Odchod ze stránky poznámky: šuplík otevřený najetím zase zavře odjetí myší. */
-  releaseFocus: () => call("release_focus"),
+  releaseFocus: () => drawerOnly(() => call("release_focus")),
   uiReady: () => call("ui_ready"),
   animAck: (kind: "prepared" | "closed") => call("anim_ack", { kind }),
   animStats: (stats: { kind: string; frames: number; avgMs: number; worstMs: number; durationMs: number }) => call("anim_stats", { stats }),
@@ -191,6 +209,10 @@ export const api = {
   /** Ověří rozpracovaný config (nic nezapisuje): první chyba s polem, `null` = v pořádku. */
   checkConfig: (cfg: any) => call<FieldError | null>("check_config", { cfg }),
   configDefaults: () => call<any>("config_defaults"),
+  /** Ledge Studio (Nastavení v okně): otevřít / zaostřit a skočit na cíl; chyba = okno nevzniklo (`studio.rs`). */
+  studioOpen: (target: string | null) => call("studio_open", { target }),
+  /** Okenní tlačítka a tažení vlastního titulku Studia; vrací, jestli je okno maximalizované. */
+  studioWin: (op: string) => call<boolean>("studio_win", { op }),
   configExport: (path: string) => call("config_export", { path }),
   configImportPreview: (path: string) => call<ImportPreview>("config_import_preview", { path }),
   /** Nativní dialog nad šuplíkem; zrušení = null. */
@@ -204,14 +226,24 @@ export const api = {
   lookImageAdd: (path: string) => call<string>("look_image_add", { path }),
   lookImage: (key: string) => call<string | null>("look_image", { key }),
   pickSave: (name: string) => call<string | null>("pick_save", { name }),
-  projectDetect: (path: string) => call<DetectedProject>("project_detect", { path }),
-  projectCandidates: () => call<RepoCandidate[]>("project_candidates"),
+  /** `draftIds` = id projektů v rozpracovaném návrhu (nové id se nesmí srazit ani s nimi) */
+  projectDetect: (path: string, draftIds?: string[]) => call<DetectedProject>("project_detect", { path, draftIds }),
+  /** `draftPaths`/`draftRemotes` = projekty z návrhu, které se nemají nabízet znovu */
+  projectCandidates: (draftPaths?: string[], draftRemotes?: string[]) => call<RepoCandidate[]>("project_candidates", { draftPaths, draftRemotes }),
+  /** „Prohledat znovu“: přestaví index rep v `roots`, vrátí počet nalezených */
+  reposRescan: () => call<number>("repos_rescan"),
   logoPreview: (project: any) => call<string | null>("logo_preview", { project }),
   appInfo: () => call<AppInfo>("app_info"),
   openAppFile: (which: "log" | "dir") => call("open_app_file", { which }),
 };
 
 export function on<T>(event: string, fn: (payload: T) => void): Promise<UnlistenFn> {
-  if (!inTauri) return Promise.resolve(() => {});
+  if (!inTauri) {
+    if (!demoHost) return Promise.resolve(() => {});
+    const set = demoBus.get(event) ?? new Set();
+    demoBus.set(event, set);
+    set.add(fn);
+    return Promise.resolve(() => void set.delete(fn));
+  }
   return listen<T>(event, (e) => fn(e.payload));
 }

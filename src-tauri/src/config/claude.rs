@@ -40,11 +40,13 @@ pub struct ClaudeConfig {
     /// Tempo čerpání limitů: v pruzích 5h / týden ryska plánu (rovnoměrné čerpání) a výstražná barva nad plánem.
     /// Výchozí vypnuto; zapíná sbírání vzorků 5h okna v paměti (`limitslive.rs`).
     pub limits_pace: bool,
+    /// Upozornění (toast), když 5h nebo týdenní limit dosáhne 80 % a 90 %; jednou za okno. Výchozí vypnuto.
+    pub limits_alert: bool,
 }
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true, context_bar: false, limits_pace: false }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true, context_bar: false, limits_pace: false, limits_alert: false }
     }
 }
 

@@ -78,6 +78,7 @@ pub fn save(path: &Path, cfg: &Config) -> Result<(), String> {
     let mut n = SAVING.lock();
     *n += 1;
     crate::configio::keep_unreadable(path)?;
+    crate::configio::rotate_backups(path);
     let res = crate::fsx::write_atomic(path, (text + "\n").as_bytes());
     res.map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))
 }

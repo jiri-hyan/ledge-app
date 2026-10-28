@@ -4,10 +4,11 @@
 import { createEffect, createResource, createSignal, For, on, Show } from "solid-js";
 import { api } from "../../api";
 import { t } from "../../i18n";
-import { useSettings } from "../ctx";
+import { base, useSettings } from "../ctx";
 import { Chips, Color, Num, PathPick, Seg, Text, Toggle } from "../fields/controls";
 import { FieldErr } from "../fields/Row";
 import { relativeTo } from "../model";
+import { idChanged, linkProblem } from "../projectAdd";
 import { useTone } from "../../ui/iconTone";
 
 /** Logo projektu: z dlaždice (snapshot), když se pole loga nezměnila; jinak náhled z jádra. */
@@ -38,6 +39,15 @@ export function ProjectEditor(p: { i: number; notes?: string[] }) {
   const c = useSettings();
   const pr = () => c.cfg.projects[p.i];
   const at = (f: string) => `projects.${p.i}.${f}`;
+  // id, se kterým se editor otevřel: změna u už uloženého projektu osiří poznámky, vzhled dlaždice a logo
+  const startId = pr().id as string;
+  const idWarn = () => {
+    try {
+      return idChanged(JSON.parse(base() || "{}").projects ?? [], startId, pr().id);
+    } catch {
+      return false;
+    }
+  };
   const L = (label: string, hint?: string) => (
     <>
       <span class="st-sub-l">{label}</span>
@@ -58,7 +68,7 @@ export function ProjectEditor(p: { i: number; notes?: string[] }) {
       </Show>
       <div class="st-form">
         <label class="st-sub">{L(t("settings.proj.name", "Název"))}<Text path={at("name")} label={t("settings.proj.name", "Název")} maxLength={60} /><FieldErr path={at("name")} /></label>
-        <label class="st-sub">{L(t("settings.proj.id", "Id"), t("settings.proj.id.hint", "Krátké a jedinečné (kebab-case). Používá ho API a poznámky."))}<Text path={at("id")} label={t("settings.proj.id", "Id")} mono maxLength={64} /><FieldErr path={at("id")} /></label>
+        <label class="st-sub">{L(t("settings.proj.id", "Id"), t("settings.proj.id.hint", "Krátké a jedinečné (kebab-case). Používá ho API a poznámky."))}<Text path={at("id")} label={t("settings.proj.id", "Id")} mono maxLength={64} /><FieldErr path={at("id")} /><Show when={idWarn()}><small class="warn" role="status">{t("settings.proj.id.warn", "Pozor: po změně id se ztratí poznámky, vzhled dlaždice a logo uložené pod starým id.")}</small></Show></label>
         <div class="st-sub wide">
           {L(t("settings.proj.kind", "Druh"))}
           <Seg
@@ -111,13 +121,16 @@ export function ProjectEditor(p: { i: number; notes?: string[] }) {
           </div>
         </div>
         <div class="st-sub wide">
-          {L(t("settings.proj.links", "Odkazy v kartě Odkazy a akce"), t("settings.proj.links.hint", "Staging, produkce, dokumentace… (jen http/https)"))}
+          {L(t("settings.proj.links", "Odkazy na dlaždici"), t("settings.proj.links.hint", "Staging, produkce, dokumentace… (jen http/https). Ukážou se jako ikony na dlaždici projektu."))}
           <For each={pr().links ?? []}>
             {(_l, j) => (
               <div class="st-inline">
                 <Text path={`${at("links")}.${j()}.label`} label={t("settings.proj.link.label", "Popisek")} placeholder={t("settings.proj.link.label", "Popisek")} maxLength={40} />
                 <Text path={`${at("links")}.${j()}.url`} label="URL" placeholder="https://…" mono grow />
                 <button class="mini" onClick={() => c.update(at("links"), (l: unknown[]) => l.filter((_, k) => k !== j()))}>{t("settings.ui.remove", "Odebrat")}</button>
+                <Show when={linkProblem(pr().links[j()] ?? {})}>{(m) => <div class="st-err" role="alert">{m().field === "label" ? t("settings.proj.link.errLabel", "Doplň popisek odkazu.") : t("settings.proj.link.errUrl", "Adresa musí začínat http:// nebo https://.")}</div>}</Show>
+                <FieldErr path={`${at("links")}.${j()}.label`} />
+                <FieldErr path={`${at("links")}.${j()}.url`} />
               </div>
             )}
           </For>

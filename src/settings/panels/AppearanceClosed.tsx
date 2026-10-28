@@ -1,10 +1,10 @@
 // Panel Vzhled, krok „Zavřený“ (jak vypadá Ledge u horní hrany, když je šuplík zavřený): galerie 15 vzhledů
 // (`strip.look`, data `strip/looks.ts`) s živými HTML náhledy na „horní hraně monitoru“
-// (`previews/StripLookPreview.tsx`; co se v nich „děje“, se přepíná v náhledu dole), pod ní pozice a velikost
+// (`previews/StripLookPreview.tsx`), pod ní pozice a velikost
 // proužku a „Co proužek ukazuje“ (`StripSettings.tsx`: položky, barvy, klid, vlastní text, časovač, monitor —
 // od kola 21 v Základním, není to technika). V „Pokročilé“ zbyl jen tvar klasického proužku (galerie, ne řada
-// 8 tlačítek), linka dole a krytí. Najetí na dlaždici = náhled dole (`peekLookOn`), živý Ledge se nemění;
-// klik = rozpracovaný config + „Vrátit“ v liště; skutečný proužek se překreslí po Uložit. Kolo 22: pod galerií
+// 8 tlačítek), linka dole a krytí. Najetí na dlaždici = náhled ve scéně Studia (`peekLookOn`);
+// klik platí hned, „Vrátit“ je v nabídce vrácení. Kolo 22: pod galerií
 // „Tvar kapsle“ (`strip.lookShape`, 4 volby) jen u stylů, které tvar mají (`SHAPEABLE_LOOKS`). Kolo 23: pod galerií
 // dlaždice „Vlastní“ (`strip.look = custom`, jen výslovným klikem) → editor `ComposeEditor.tsx` (`strip.compose`).
 import { For, Show } from "solid-js";
@@ -15,13 +15,12 @@ import { STRIP_STYLES, isHex, stripShape } from "../../theme/appearance";
 import { offerUndo } from "../ctx";
 import { POSITION_STEPS, SIZE_STEPS } from "../appearanceModel";
 import StripLookPreview from "../previews/StripLookPreview";
+import { STRIP_OPACITY } from "../strip";
 import StripSettings from "./StripSettings";
 import ComposeEditor from "./ComposeEditor";
 import { DEFAULT_COMPOSE, composeOf, normCompose } from "../../strip/compose";
 import { Advanced, Seg, Slider, clearPeek, lit, pct, peekLookOn, previewState, type Ap } from "./apUi";
 
-/** Výchozí krytí proužku (`strip.opacity`, config.rs `Default`). */
-const STRIP_OPACITY = 0.82;
 
 /** Název vzhledu z dat od I (`{ cs, en }`). */
 const lookName = (x: { cs: string; en: string }) => (lang() === "en" ? x.en : x.cs);
@@ -80,7 +79,7 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
     if (id === "custom" && fresh && prev !== "classic") setStripCfg("compose", composeOf(prev));
     setStripCfg("look", id);
     const x = STRIP_LOOKS.find((l) => l.id === id);
-    offerUndo(t("appearance.closed.picked", "Zavřený Ledge: {name} — proužek se změní po Uložit", { name: x ? lookName(x) : id }), () => {
+    offerUndo(t("appearance.closed.picked", "Zavřený Ledge: {name}", { name: x ? lookName(x) : id }), () => {
       setStripCfg("look", prev);
       if (prevCompose !== undefined) setStripCfg("compose", prevCompose);
     });
@@ -91,16 +90,14 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
     const prev = shape();
     if (prev === v) return;
     setStripCfg("lookShape", v);
-    offerUndo(t("appearance.lookShape.picked", "Tvar kapsle: {name} — proužek se změní po Uložit", { name: SHAPE_NAME[v]() }), () => setStripCfg("lookShape", prev));
+    offerUndo(t("appearance.lookShape.picked", "Tvar kapsle: {name}", { name: SHAPE_NAME[v]() }), () => setStripCfg("lookShape", prev));
   };
   const opacity = () => p.cfg.strip?.opacity ?? STRIP_OPACITY;
 
   return (
     <>
       <div class="card ap-top" id="f-strip.look" classList={{ hit: lit("strip.look") }}>
-        <h4>{t("appearance.closed.title", "Jak vypadá zavřený Ledge")}</h4>
-        <p class="ap-note">{t("appearance.closed.lead", "Vyber obrázek. V náhledu dole přepínej, co se zrovna děje — obrázky ukážou, jak na to vzhled zareaguje. Data jsou ukázková.")}</p>
-        <div class="ap-looks" role="radiogroup" aria-label={t("appearance.closed.title", "Jak vypadá zavřený Ledge")}>
+                <div class="ap-looks" role="radiogroup" aria-label={t("appearance.closed.title", "Jak vypadá zavřený Ledge")}>
           <For each={STRIP_LOOKS.filter((x) => x.id !== "custom")}>
             {(x) => (
               <button class="ap-style" classList={{ on: look() === x.id }} role="radio" aria-checked={look() === x.id} title={LOOK_DESC[x.id]()} {...peekLookOn(x.id)} onClick={() => pick(x.id)}>
@@ -172,7 +169,9 @@ export default function AppearanceClosed(q: { ap: Ap; adv: boolean; setAdv: (v: 
             </Show>
           </span>
         </div>
-        <Slider label={t("appearance.strip.opacity", "Krytí proužku")} min={0.3} max={1} step={0.05} value={opacity()} fmt={pct} set={(v) => setStripCfg("opacity", +v.toFixed(2))} />
+        <Show when={look() === "classic"}>
+          <Slider label={t("appearance.strip.opacity", "Krytí klasického proužku")} min={0.3} max={1} step={0.05} value={opacity()} fmt={pct} set={(v) => setStripCfg("opacity", +v.toFixed(2))} />
+        </Show>
       </Advanced>
     </>
   );

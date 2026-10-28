@@ -14,7 +14,7 @@ import { Advanced } from "../fields/Advanced";
 import { Group } from "../fields/Group";
 import { gotoSettingsPanel } from "../../palette/goto";
 import { Color, PathPick, Slider, Text, Toggle } from "../fields/controls";
-import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
+import { FieldErr, Row, Section } from "../fields/Row";
 import { SortList } from "../fields/SortList";
 import { moveItem } from "../model";
 import type { PanelProps } from "../types";
@@ -22,6 +22,7 @@ import StyleGallery, { colorName } from "../../pin/StyleGallery";
 import { notesApi } from "../../notes/api";
 import { colorHex, NOTE_COLORS } from "../../notes/meta";
 import FolderLinkSection from "../../notes/FolderLinkSection";
+import { kindIdLocked } from "../notesModel";
 
 const ICONS = ["bulb", "chat", "checklist", "note", "flag", "star", "bug", "heart"];
 const MAX_KINDS = 12;
@@ -73,8 +74,10 @@ function KindsEditor() {
                 <label class="st-sub">{t("settings.notes.kind.label", "Název")}<Text path={at(i(), "label")} label={t("settings.notes.kind.label", "Název")} maxLength={40} /><FieldErr path={at(i(), "label")} /></label>
                 <label class="st-sub">
                   {t("settings.notes.kind.id", "Id v souborech")}
-                  <Text path={at(i(), "id")} label={t("settings.notes.kind.id", "Id v souborech")} mono maxLength={32} />
-                  <small>{t("settings.notes.kind.id.hint", "Zapisuje se do poznámek (kind:). Změna nepřejmenuje existující poznámky.")}</small>
+                  <Show when={!kindIdLocked(k.id)} fallback={<span class="mono" title={t("settings.notes.kind.id.locked", "Id je po pojmenování zamčené, aby poznámky neosiřely.")}>{k.id} 🔒</span>}>
+                    <Text path={at(i(), "id")} label={t("settings.notes.kind.id", "Id v souborech")} mono maxLength={32} />
+                  </Show>
+                  <small>{t("settings.notes.kind.id.hint", "Zapisuje se do poznámek (kind:). Napiš ho jednou — pak se zamkne, protože změna nepřejmenuje existující poznámky.")}</small>
                   <FieldErr path={at(i(), "id")} />
                 </label>
                 <label class="st-sub wide">{t("settings.notes.kind.color", "Barva")}<Color path={at(i(), "color")} label={t("settings.notes.kind.color", "Barva")} allowEmpty empty="" /><FieldErr path={at(i(), "color")} /></label>
@@ -114,16 +117,19 @@ function PinsRows() {
   const setTagColor = (tag: string, v: string | undefined) => c.set("notes.tagColors." + tag, v);
   return (
     <>
-      <Row id="notes.pins.style" stack>
+      <Row id="notes.pins.rememberLast"><Toggle path="notes.pins.rememberLast" label={t("settings.f.notes.pins.rememberLast", "Nový lístek vypadá jako naposledy upravený")} /></Row>
+      <Show when={pins().rememberLast}>
+        <p class="st-note">{t("settings.notes.pins.dimNote", "Volby níž (styl, pozadí, text) platí jen pro první lístek, dokud žádný neupravíš. Vypni „jako naposledy upravený“ a platí pro každý nový.")}</p>
+      </Show>
+      <Row id="notes.pins.style" stack dim={pins().rememberLast}>
         <StyleGallery value={pins().style} bg={pins().bg} text={pins().text} color={null} onPick={(s) => c.set("notes.pins.style", s)} />
       </Row>
-      <Row id="notes.pins.bg">
+      <Row id="notes.pins.bg" dim={pins().rememberLast}>
         <Slider path="notes.pins.bg" min={0} max={100} step={5} label={t("settings.f.notes.pins.bg", "Pozadí nového lístku")} fmt={(v) => v + " %"} />
       </Row>
-      <Row id="notes.pins.text">
+      <Row id="notes.pins.text" dim={pins().rememberLast}>
         <Slider path="notes.pins.text" min={50} max={100} step={5} label={t("settings.f.notes.pins.text", "Text nového lístku")} fmt={(v) => v + " %"} />
       </Row>
-      <Row id="notes.pins.rememberLast"><Toggle path="notes.pins.rememberLast" label={t("settings.f.notes.pins.rememberLast", "Nový lístek jako naposledy upravený")} /></Row>
       <Row id="notes.tagColors" stack>
         <Show when={tagList().length} fallback={<p class="st-empty">{t("settings.notes.tagColors.none", "Zatím žádné štítky — přidáš je v lístku (⋯ → Štítky) nebo napíšeš #štítek do poznámky.")}</p>}>
           <For each={tagList()}>
@@ -176,9 +182,9 @@ export default function NotesPanel(_p: PanelProps) {
   const st = () => c.s.notesSync;
   return (
     <>
-      <PanelHead id="notes.enabled" title={t("settings.nav.poznamky", "Poznámky a lístky")} desc={t("settings.notes.desc", "Rychlé poznámky a připomínky jsou obyčejné Markdown soubory ve tvé složce.")}>
+      <Row id="notes.enabled" hint={t("settings.notes.desc", "Rychlé poznámky a připomínky jsou obyčejné Markdown soubory ve tvé složce.")}>
         <Toggle path="notes.enabled" label={t("settings.f.notes.enabled", "Rychlé poznámky a připomínky")} />
-      </PanelHead>
+      </Row>
       <Show when={n().enabled} fallback={<p class="st-empty">{t("settings.notes.off", "Poznámky jsou vypnuté — karta, připomínky i zkratka zmizí. Soubory na disku zůstanou.")}</p>}>
         <Group gid="poznamky.notes" title={t("settings.notes.g.notes", "Poznámky")} desc={t("settings.notes.g.notesDesc", "Kde leží soubory poznámek a jaké mají kategorie — kategorie jsou záložky karty Poznámky.")}>
           <Row id="notes.root" stack>

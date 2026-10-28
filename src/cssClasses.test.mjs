@@ -45,7 +45,6 @@ const DYNAMIC = [
   { file: "notes/NotesCard.tsx", expr: "class={`pill ${l()[0]}`}", values: ["a", "b", "n", "r"], why: "`remindLabel` (a/b/n) a `syncLabel` (a/n/r) v notes/store.ts" },
   { file: "settings/fields/SortList.tsx", expr: "class={`st-sort ${p.class ?? \"\"}`}", values: [], why: "prop `class` předává volající atributem `class=\"…\"` — ten se kontroluje staticky u něj" },
   { file: "settings/panels/Projects.tsx", expr: "class={`st-tag ${pr.kind}`}", values: ["dev", "app"], why: "`ProjectView.kind` v types.ts" },
-  { file: "Settings.tsx", expr: "class={`st-bar ${status().tone}`}", values: ["ok", "warn", "bad"], why: "`status()` v Settings.tsx" },
 ];
 
 const SRC = fileURLToPath(new URL(".", import.meta.url));

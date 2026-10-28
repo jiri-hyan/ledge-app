@@ -40,6 +40,19 @@ export function guessKind(target: string): ActionKind {
   return FILE_EXT.includes(e) ? "file" : "folder";
 }
 
+/** Přepnout typ podle toho, co uživatel do cíle napsal? `null` = nechat. Příkaz se nikdy nepřepíná; web s cestou
+ *  místo adresy → složka/soubor/aplikace, cesta s adresou `http(s)://` → web. */
+export function kindForTarget(kind: ActionKind, target: string): ActionKind | null {
+  const s = target.trim();
+  if (!s || kind === "command") return null;
+  const web = kind === "url" || kind === "web";
+  const looksUrl = /^https?:\/\//i.test(s);
+  const looksPath = /^[a-z]:[\\/]/i.test(s) || s.startsWith("\\\\") || s.startsWith("/");
+  if (web && looksPath) return guessKind(s);
+  if (!web && looksUrl) return "url";
+  return null;
+}
+
 /** Odkaz = akce, která jen něco otevře (web, okno s webem, složka, soubor) — ukazuje je karta Odkazy.
  *  Starý `personal.links` převádí na akce Rust (`linkmigrate.rs`) při načtení configu. */
 export const LINK_KINDS: readonly ActionKind[] = ["url", "web", "folder", "file"];

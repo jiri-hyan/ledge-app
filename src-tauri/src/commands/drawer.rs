@@ -75,7 +75,7 @@ pub(crate) fn drawer_size(page: String, w: u32, h: u32, done: bool) -> Result<[u
     size::set_live(None);
     let mut cfg = c.cfg.read().clone();
     cfg.appearance.size.set(&id, want);
-    let res = if cfg.appearance.size == c.cfg.read().appearance.size { Ok(()) } else { crate::commands::config::save_config(cfg) };
+    let res = if cfg.appearance.size == c.cfg.read().appearance.size { Ok(()) } else { crate::commands::config::save_config_inner(cfg) };
     c.send_ui(UiCmd::Resize(false));
     res.map(|_| eff)
 }

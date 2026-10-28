@@ -46,7 +46,7 @@ registerDict("en", {
   "actions.edit.iconCmd": "Commands get colored letters.",
   "actions.edit.iconFile": "The icon the file has in Windows.",
   "actions.edit.where": "Show on",
-  "actions.edit.both": "Work and Personal",
+  "actions.edit.both": "On the Work and Personal tabs",
   "actions.edit.work": "Work",
   "actions.edit.personal": "Personal",
   "actions.edit.group": "group (optional)",

@@ -448,7 +448,7 @@ impl Claude {
                         tr.record(abs, fp);
                     }
                 }
-                "PreToolUse" => sess.state = SessionState::Working,
+                "PreToolUse" | "PostToolUseFailure" => sess.state = SessionState::Working,
                 "SubagentStart" => {
                     sess.state = SessionState::Working;
                     sess.subagents.start(&s(body, "agent_id"), &s(body, "agent_type"), now);

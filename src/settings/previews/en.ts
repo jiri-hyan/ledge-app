@@ -4,16 +4,7 @@ import { registerDict } from "../../i18n";
 
 registerDict("en", {
   // kroky
-  "appearance.steps": "Look step by step",
-  "appearance.step.closed": "Closed",
-  "appearance.step.closedHint": "What sits on the top edge",
-  "appearance.step.hover": "On hover",
-  "appearance.step.hoverHint": "When the mouse comes",
-  "appearance.step.open": "Open",
-  "appearance.step.openHint": "The whole drawer",
-  "appearance.step.motion": "Motion",
-  "appearance.step.motionHint": "How it opens",
-  "appearance.adv.title": "Advanced",
+  "appearance.adv.title": "Fine-tune",
   // co se děje (ukázka)
   "appearance.state.title": "What's happening (sample)",
   "appearance.state.idle": "Calm",
@@ -24,7 +15,6 @@ registerDict("en", {
   "appearance.state.done": "Done",
   // zavřený Ledge
   "appearance.closed.title": "How the closed Ledge looks",
-  "appearance.closed.lead": "Pick a picture. Switch what's happening in the preview below — the pictures show how each look reacts. The data are samples.",
   "appearance.closed.picked": "Closed Ledge: {name} — the strip changes after Save",
   "appearance.closed.advHint": "Shape of the classic strip, bottom line and opacity",
   "appearance.look.classic.short": "Today's strip with items; pick its shape in Advanced.",
@@ -52,7 +42,6 @@ registerDict("en", {
   "appearance.strip.shape": "Shape of the classic strip",
   // po najetí
   "appearance.hover.title": "What happens on mouse hover",
-  "appearance.hover.lead": "A step between the closed strip and the whole drawer. A click or a longer hover always opens the whole drawer.",
   "appearance.hover.picked": "On hover: {name} — applies after Save",
   "appearance.hover.advHint": "When the small preview expands into the whole drawer by itself",
   "appearance.hover.expandAfter": "After how many seconds",
@@ -60,7 +49,7 @@ registerDict("en", {
   "appearance.hover.compact.desc": "A small panel with what matters: Claude, music, time. A click opens the whole drawer.",
   "appearance.hover.island.desc": "The strip widens and shows only what's happening, with buttons. The least distracting.",
   // otevřený
-  "appearance.open.size": "Width and density on your monitor",
+  "appearance.open.size": "Width (quick) and density on your monitor",
   "appearance.open.width": "Width",
   "appearance.open.widthHint": "How much room the drawer takes on your monitor.",
   "appearance.open.widthCustom": "Custom width {px} px right now (Advanced).",
@@ -109,7 +98,6 @@ registerDict("en", {
   "appearance.sample.left": "18:04 left",
   "appearance.sample.open": "Open",
   // Začínáme
-  "settings.start.new.closed.text": "The closed Ledge in 12 forms, what happens on mouse hover and a monitor showing the real width and density.",
   // vlastní zavřený Ledge (kolo 23, `panels/ComposeEditor.tsx`, `previews/ComposePreview.tsx`)
   "appearance.look.custom.short": "Build the shape, size and items yourself.",
   "appearance.compose.add": "Add {name}",

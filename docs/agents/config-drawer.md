@@ -49,6 +49,7 @@ Ostatní klíče `claude` (`enabled`, `port`, `questionHoldS`, `limitsReminder`,
 `personal.weather.lat` (−90 až 90) a `personal.weather.lon` (−180 až 180) jsou souřadnice místa pro kartu
 Počasí (Open-Meteo, bez klíče); `label` je jen popisek na kartě. Vyplněná jen jedna souřadnice neprojde
 validací (`config/validate.rs`), obě `null` = nenastaveno (karta jen vyzve k nastavení, žádné volání sítě).
+`personal.fahrenheit` (bool, výchozí `false`) ukáže teplotu ve °F místo °C — jen přepočet při zobrazení, síť se nemění.
 Polohu podle IP Ledge nikdy nezjišťuje. V Nastavení → Šuplík a karty → Obsah karet stačí napsat město (`src/settings/cityModel.ts`).
 
 ## `projects[].subdir`

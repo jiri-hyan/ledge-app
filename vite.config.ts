@@ -10,8 +10,9 @@ export default defineConfig(() => ({
   // relativní cesty — absolutní dávají v produkčním buildu Tauri bílou obrazovku
   base: "./",
   // tři stránky: šuplík (index.html), okno lístku na plochu (pin.html → src/pin/main.tsx, jen jeho kód)
-  // a okno widgetu na ploše (desk.html → src/desk/main.tsx)
-  build: { target: "chrome120", rolldownOptions: { input: { index: "index.html", pin: "pin.html", desk: "desk.html" } } },
+  // a okno widgetu na ploše (desk.html → src/desk/main.tsx); Ledge Studio = Nastavení v okně (settings.html →
+  // src/studio/main.tsx, kolo 24)
+  build: { target: "chrome120", rolldownOptions: { input: { index: "index.html", pin: "pin.html", desk: "desk.html", settings: "settings.html" } } },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

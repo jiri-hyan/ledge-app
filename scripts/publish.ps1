@@ -6,6 +6,8 @@
 # změn prověří proti `scripts/private/denylist.txt` (jména klientů, strojů…) — jediný nález = konec.
 # Pak lokální build (stejný tvar jako dřív) a GitHub Release vX.Y.<Z+1> (nebo -Version) ve veřejném repu s řádkem
 # `SHA256 (<instalátor>) = <hex>`, který čte Ledge (update.rs `sha_for`).
+# Poznámky vydání (kolo 24): odkaz ke stažení, „Co je nového“ (ručně z `docs/releases/<verze>.md`, jinak feat/fix/perf
+# ze seznamu změn), instalace se SmartScreen, ověření SHA256 a podpisu, „Nastav s Claudem“, sbalený seznam změn.
 #
 # Podpis (kolo 21): instalátor se podepíše soukromým klíčem MIMO repo (`-SigningKey`, proměnná LEDGE_SIGNING_KEY,
 # výchozí %USERPROFILE%\.ledge-signing\ledge-update.key; vytvoří ho jednou scripts/signing-setup.ps1) přes
@@ -241,7 +243,27 @@ try {
     '', '```', "Nainstaluj a nastav mi Ledge podle $guideUrl", '```',
     '', "Návod pro Clauda / Guide for Claude: [pro-claude.md]($guideUrl). Kontrolní součty instalátoru jsou v souboru ``SHA256SUMS.txt`` (checksums in ``SHA256SUMS.txt``)."
   )
-  $notes = @("SHA256 ($($setup.Name)) = $sha", '', 'Změny:', '') + $log + $claudeSection
+  # Lidské poznámky (kolo 24): „Co je nového“ z ručně psaného `docs/releases/<verze>.md` (je ve snapshotu → prošel
+  # denylistem), jinak feat/fix/perf ze seznamu změn bez prefixu a „(kolo N)“; celý seznam změn je sbalený na konci.
+  $mb = '{0:N1}' -f ($setup.Length / 1MB)
+  $dlUrl = "https://github.com/$Public/releases/download/v$v/$($setup.Name)"
+  $handFile = Join-Path $root "docs\releases\$v.md"
+  $whatsNew = if (Test-Path $handFile) { @(Get-Content $handFile -Encoding UTF8) } else {
+    @($log | Where-Object { $_ -match '^(feat|fix|perf)(\([^)]*\))?: ' } | ForEach-Object { '- ' + (($_ -replace '^(feat|fix|perf)(\([^)]*\))?: ', '') -replace '\s*\(kolo \d+\)\s*$', '') })
+  }
+  if ($whatsNew.Count -eq 0) { $whatsNew = @('- Drobná vylepšení a opravy. / Small improvements and fixes.') }
+  $install = @(
+    '', '## Instalace / Install', '',
+    "1. Stáhni / Download **[$($setup.Name)]($dlUrl)** ($mb MB) a spusť / and run it — instaluje se jen pro tvého uživatele do ``%LOCALAPPDATA%\Ledge``, bez práv správce / per-user, no admin rights.",
+    '2. Windows SmartScreen může hlásit neznámého vydavatele (instalátor zatím nemá podpis Authenticode) / may say the publisher is unknown (the installer is not Authenticode-signed yet): **Další informace → Přesto spustit** / **More info → Run anyway**.',
+    '3. Najeď myší k hornímu okraji obrazovky / Move the mouse to the top edge of the screen.',
+    '', 'Máš už Ledge? Aktualizaci nabídne sám, ověří SHA256 i podpis a nainstaluje až po kliknutí. / Already have Ledge? It offers this update itself, verifies the SHA256 and the signature and installs only when you click.',
+    '', '### Ověření / Verify', '',
+    "Kontrolní součet / Checksum: ``$sha`` (i v / also in ``SHA256SUMS.txt``) — ``Get-FileHash .\$($setup.Name) -Algorithm SHA256``. Podpis / Signature: ``$($setup.Name).sig`` (minisign, viz / see README)."
+  )
+  $allChanges = @('', '<details><summary>Všechny změny / All changes</summary>', '') + $log + @('', '</details>')
+  # první řádek = SHA256 pro update.rs `sha_for` (musí začínat „SHA256“); ostatní řádky „SHA256“ nezačínají
+  $notes = @("SHA256 ($($setup.Name)) = $sha", '', "**[Stáhnout / Download $($setup.Name)]($dlUrl)** · Windows 10/11 x64 · $mb MB", '', '## Co je nového / What''s new', '') + $whatsNew + $install + $claudeSection + $allChanges
   $notesFile = Join-Path $env:TEMP "ledge-release-notes-$v.md"
   [IO.File]::WriteAllLines($notesFile, [string[]]$notes, (New-Object System.Text.UTF8Encoding($false)))
   # přílohy vedle instalátoru: SHA256SUMS.txt (formát `sha256sum`: <hex>  <soubor>) a návod pro Clauda z docs/

@@ -27,7 +27,7 @@ export const EMPTY_SNAPSHOT: Snapshot = {
   notesKindCounts: {},
   notesRev: 0,
   notesArchived: 0,
-  personal: { weather: { status: "idle", label: "", data: null, fetchedMs: null, error: null, loading: false }, links: [], notes: [], notesMore: 0, media: null, volume: null, battery: null },
+  personal: { weather: { status: "idle", label: "", fahrenheit: false, data: null, fetchedMs: null, error: null, loading: false }, links: [], notes: [], notesMore: 0, media: null, volume: null, battery: null },
   notesSync: { state: "off", lastOkMs: null, message: null, files: [], root: null },
   notesFolder: { state: "off", lastMs: null, message: null, conflicts: [] },
   update: { state: "off", current: "", repo: "", checking: false, checkedMs: null, installing: false, installError: null, fetch: { state: "idle" }, whatsNew: null, rollback: null },

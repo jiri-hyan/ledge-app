@@ -6,7 +6,7 @@ import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { createStore, unwrap } from "solid-js/store";
 import type { ActionCfg, ActionKind, ActionView } from "../types";
 import { actionsApi, runAction } from "./api";
-import { cleanAction, draftError, labelFrom, WEB_SIZE } from "./model";
+import { cleanAction, draftError, kindForTarget, labelFrom, WEB_SIZE } from "./model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "./ui";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
@@ -109,7 +109,13 @@ export default function ActionEditor(p: {
         <label>{isWeb() ? t("actions.edit.url", "Adresa") : d.kind === "command" ? t("actions.edit.command", "Příkaz") : t("actions.edit.path", "Cesta")}</label>
         <div class="ctl">
           <div class="line">
-            <input type="text" value={d.target} placeholder={meta().ph()} spellcheck={false} onInput={(e) => setD("target", e.currentTarget.value)} />
+            <input type="text" value={d.target} placeholder={meta().ph()} spellcheck={false} onInput={(e) => {
+              const v = e.currentTarget.value;
+              setD("target", v);
+              // cesta ve Webu / adresa ve Složce: typ se přepne sám (místo chyby)
+              const k = kindForTarget(d.kind, v);
+              if (k) setD("kind", k);
+            }} />
             <Show when={meta().pick}>{(k) => <button class="mini" onClick={() => pick(k(), "target")}>{t("actions.edit.pick", "Vybrat…")}</button>}</Show>
           </div>
           <ErrLine f="target" />
@@ -209,7 +215,7 @@ export default function ActionEditor(p: {
         <div class="ctl">
           <div class="line">
             <div class="seg" role="group">
-              <button classList={{ on: (d.showOn ?? "both") === "both" }} onClick={() => setD("showOn", "both")}>{t("actions.edit.both", "Práce i Osobní")}</button>
+              <button classList={{ on: (d.showOn ?? "both") === "both" }} onClick={() => setD("showOn", "both")}>{t("actions.edit.both", "Na záložkách Práce a Osobní")}</button>
               <button classList={{ on: d.showOn === "work" }} onClick={() => setD("showOn", "work")}>{t("actions.edit.work", "Práce")}</button>
               <button classList={{ on: d.showOn === "personal" }} onClick={() => setD("showOn", "personal")}>{t("actions.edit.personal", "Osobní")}</button>
             </div>

@@ -13,6 +13,7 @@ import { elapsedMs, fmtDuration, leftMs } from "../timer/model";
 import { timerDo } from "../timer/TimerCard";
 import { say } from "../ui/toast";
 import { t, tp } from "../i18n";
+import { tempIn, tempUnit } from "../cards/temp";
 import { freshWeather, islandEvent } from "./model";
 import { Limit5h, sessionLabel } from "./Compact";
 import { useExpand } from "./expand";
@@ -143,7 +144,7 @@ export default function Island(p: { s: Snapshot; now: number; expandMs: number }
           <span class="isl-tx">
             <span class="isl-sub">{fmtDate(new Date(p.now))}</span>
             <Show when={freshWeather(p.s.personal.weather, p.now)}>
-              {(w) => <span class="isl-sub">{w().icon} {num(w().temp)} °C · {w().desc}</span>}
+              {(w) => <span class="isl-sub">{w().icon} {num(tempIn(w().temp, p.s.personal.weather.fahrenheit))} {tempUnit(p.s.personal.weather.fahrenheit)} · {w().desc}</span>}
             </Show>
           </span>
         </Match>

@@ -28,6 +28,7 @@ pub const EVENT: &str = "config-changed";
 
 pub fn notify_ui(source: &str) {
     let _ = core().app.emit_to(crate::drawer::LABEL, EVENT, json!({ "source": source }));
+    crate::studio::forward(EVENT, json!({ "source": source }));
 }
 
 pub struct LiveHost;
@@ -39,7 +40,7 @@ impl Host for LiveHost {
 
     fn save(&self, cfg: Config) -> Result<(), String> {
         // přesně tlačítko Uložit v Nastavení: `config::save` (validace, atomický zápis) + `apply_config`
-        crate::commands::config::save_config(cfg)?;
+        crate::commands::config::save_config_inner(cfg)?;
         notify_ui("mcp");
         Ok(())
     }

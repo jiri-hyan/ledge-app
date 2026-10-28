@@ -25,9 +25,9 @@ import { asPage, typing, type Page } from "./nav";
 import { EMPTY_SNAPSHOT } from "./snapshot";
 import { Toast, say } from "./ui/toast";
 import UndoBar from "./notes/UndoBar";
-import { gotoSettingsPanel } from "./palette/goto";
-import { checkFirstRun, wizardOpen } from "./onboarding/state";
-import { beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, escEdit, resumeEdit, setCatalogOpen, setEditPage } from "./layout/edit";
+import { gotoSettingsPanel, openSettings, setStudioFallback } from "./palette/goto";
+import { checkFirstRun, startWizard, wizardOpen } from "./onboarding/state";
+import { askEdit, beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, escEdit, resumeEdit, setCatalogOpen, setEditPage } from "./layout/edit";
 import { normalizeLayout } from "./layout/model";
 import { NoteEditor, NotesPage, Palette, Settings, UpdatePanel, Wizard, preloadViews } from "./lazyViews";
 import { installQuickKeys } from "./quick/quick";
@@ -88,10 +88,7 @@ export default function App() {
     onNote: (preset?: NotePreset) => startNote(preset ?? null),
     onOpenNote: editNote,
     onAllNotes: () => allNotes(),
-    onSettings: (id?: string) => {
-      setPage("settings");
-      if (id) gotoSettingsPanel(id);
-    },
+    onSettings: (id?: string) => (id ? gotoSettingsPanel(id) : openSettings()),
     onEditDrawer: () => {
       setPage("main");
       beginEdit(s);
@@ -171,6 +168,8 @@ export default function App() {
 
   const offs: Promise<() => void>[] = [];
   onCleanup(() => offs.forEach((p) => p.then((f) => f())));
+  // Nastavení = okno Ledge Studio; když nevznikne, stránka `settings` v šuplíku se stejným Studiem
+  setStudioFallback(() => setPage("settings"));
   onMount(() => {
     offs.push(
       on<Snapshot>("state", apply),
@@ -185,6 +184,8 @@ export default function App() {
       on<unknown>("drop-shortcut", (x) => offerDrop(x) && setPage("main")),
       // puštěný soubor, který by akce stejně odmítla (.lnk, .url, .bat, .cmd…): jedna srozumitelná věta z jádra
       on<string>("drop-refused", (why) => typeof why === "string" && why && say(why)),
+      // okno Ledge Studio chce průvodce nebo úpravy přímo v šuplíku (Rust `studio_win`)
+      on<string>("studio-ask", (x) => (x === "wizard" ? startWizard() : x === "edit" ? askEdit() : undefined)),
       initAppearance(),
     );
 
@@ -282,7 +283,7 @@ export default function App() {
         <Show when={view() === "peek" || isHoverView(view())} fallback={
           <div class="content" style={{ height: page() === "main" ? mainHeight() : undefined }}>
             <Show when={page() !== "welcome"}>
-              <Head s={s} now={now()} page={page()} onNote={() => startNote()} onSettings={() => setPage(page() === "settings" ? "main" : "settings")} onBack={() => setPage(page() === "note" ? returnTo() : "main")} onUpdate={() => setUpdOpen(!updOpen())} onPalette={() => (palette() ? closePalette() : openPalette(true))} />
+              <Head s={s} now={now()} page={page()} onNote={() => startNote()} onSettings={() => (page() === "settings" ? setPage("main") : openSettings())} onBack={() => setPage(page() === "note" ? returnTo() : "main")} onUpdate={() => setUpdOpen(!updOpen())} onPalette={() => (palette() ? closePalette() : openPalette(true))} />
             </Show>
             <Show when={palette()}>{(pl) => <Palette s={s} took={pl().took} nav={palNav} onClose={() => setPalette(null)} />}</Show>
             <Show when={s.cfgError}>
@@ -291,8 +292,8 @@ export default function App() {
             <Show when={updOpen() && page() === "main" && (s.update.state === "dostupna" || s.update.whatsNew?.unread) ? s.update : null}>
               {(u) => <UpdatePanel u={u()} onClose={() => setUpdOpen(false)} />}
             </Show>
-            <Show when={page() === "main"}><MainPage s={s} now={now()} onNote={startNote} nav={notesNav} onSettings={() => setPage("settings")} /></Show>
-            <Show when={page() === "settings"}><div data-anim><Settings update={s.update} s={s} /></div></Show>
+            <Show when={page() === "main"}><MainPage s={s} now={now()} onNote={startNote} nav={notesNav} onSettings={() => openSettings()} /></Show>
+            <Show when={page() === "settings"}><div data-anim><Settings s={s} windowed={false} /></div></Show>
             <Show when={page() === "note"}><NoteEditor s={s} view={view()} onLeave={() => setPage(returnTo())} /></Show>
             <Show when={page() === "welcome"}><Wizard onExit={() => setPage("main")} /></Show>
             <Show when={page() === "notes"}><NotesPage s={s} now={now()} onOpen={editNote} onNew={notesNav.onNew} /></Show>

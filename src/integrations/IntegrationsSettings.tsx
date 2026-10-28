@@ -1,6 +1,6 @@
 // Nastavení → Obsah karet → GitHub a Systém. GitHub je výchozí vypnutý a zapíná se jedním přepínačem s jasnou
 // větou, co Ledge čte a kam to jde; Systém nic nevypíná (vzorkuje jen viditelná karta nebo položka proužku),
-// jen volí disky a jednotky sítě. Mění se jen návrh Nastavení — uloží ho společná lišta Uložit / Vrátit.
+// jen volí disky a jednotky sítě. Mění se jen návrh Nastavení — platí hned (autosave Studia).
 import { createResource, For, Show } from "solid-js";
 import { t } from "../i18n";
 import { useSettings } from "../settings/ctx";

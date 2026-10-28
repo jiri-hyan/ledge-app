@@ -43,6 +43,8 @@ test("import: přidá nové, přeskočí duplicity a položky bez příkazu, vst
   const { nextCfg, added, skipped } = importLauncherCatalog(catalog, before);
   assert.deepEqual(added, ["Orbit Web", "Pixel Quest", "Old Tool"]);
   assert.deepEqual(skipped, ["CLI Kit", "Bez id"]);
+  const split = importLauncherCatalog(catalog, before);
+  assert.equal(split.duplicates.length + split.noCommand.length, split.skipped.length);
   assert.equal(before.projects.length, 1, "původní config beze změny");
   // znovu = nic nového (id, složka i remote se porovnají)
   const again = importLauncherCatalog(catalog, nextCfg);
@@ -84,4 +86,14 @@ test("pojistka: příkazy jdou ke kontrole, co neprojde, se vypne a v potvrzení
   const lines = commandLines(safe, addedIds, verdicts);
   assert.deepEqual(lines[1], { name: "Pixel Quest", command: "npm run build → build/pixel-quest.exe --windowed", problem: null });
   assert.equal(lines[3].problem, "příkaz neprošel");
+});
+
+test("import: přeskočené se dělí na duplicity a položky bez příkazu", () => {
+  const before = cfg();
+  const { nextCfg, skipped, noCommand, duplicates } = importLauncherCatalog(catalog, before);
+  assert.deepEqual(noCommand, skipped);
+  assert.deepEqual(duplicates, []);
+  const again = importLauncherCatalog(catalog, nextCfg);
+  assert.ok(again.duplicates.length >= 3, "co už je v projektech, je duplicita");
+  assert.equal(again.duplicates.length + again.noCommand.length, again.skipped.length);
 });

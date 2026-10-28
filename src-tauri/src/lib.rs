@@ -107,6 +107,7 @@ mod state;
 mod statusline;
 mod statuslinesetup;
 mod strip;
+mod studio;
 mod stripconf;
 mod stripdraw;
 mod stripview;
@@ -331,6 +332,7 @@ pub fn run() {
             commands::projects::restart,
             commands::projects::stop_all_servers,
             commands::projects::project_folders,
+            commands::projects::repos_rescan,
             commands::projects::port_holders,
             commands::projects::kill_port_holder,
             commands::projects::dismiss,
@@ -425,6 +427,8 @@ pub fn run() {
             commands::desk::desk_drag,
             commands::desk::desk_menu,
             commands::desk::desk_open_drawer,
+            studio::studio_open,
+            studio::studio_win,
             commands::desk::desk_profile_save,
             commands::desk::desk_profile_apply,
             commands::desk::desk_profile_delete,

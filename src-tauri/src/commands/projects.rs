@@ -130,6 +130,15 @@ pub(crate) fn project_folders(id: String) -> Result<Candidates, String> {
     Ok(Candidates { current: p.path.clone(), items: resolve::candidates_dated(&paths) })
 }
 
+/// Ruční „Prohledat složky znovu“: přestaví index repozitářů v `roots`, vrátí počet nalezených repozitářů.
+#[tauri::command(async)]
+pub(crate) fn repos_rescan() -> usize {
+    let c = core();
+    let n = c.rescan_index();
+    mark_dirty();
+    n
+}
+
 /// Port projektu drží proces, který nespustil Ledge — jen ukázat (a ukončit až po potvrzení).
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]

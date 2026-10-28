@@ -5,6 +5,7 @@
 import { left, pctText, winState, type LimitWindow } from "../limits/model.ts";
 import { usdDigits, type CostDay } from "../costs/model.ts";
 import { isToday } from "../board/model.ts";
+import { tempIn, tempUnit } from "../cards/temp.ts";
 
 export type Text = readonly [string, string];
 export type HeroFacts = {
@@ -27,7 +28,7 @@ export type HeroInput = {
   questions?: readonly unknown[];
   limits?: { at: number | null; staleMs: number; fiveHour: LimitWindow | null } | null;
   costs?: { summary: { days: CostDay[] } | null } | null;
-  personal?: { weather?: { status: string; label: string; data: { temp: number; min: number | null; max: number | null } | null } | null } | null;
+  personal?: { weather?: { status: string; label: string; fahrenheit?: boolean; data: { temp: number; min: number | null; max: number | null } | null } | null } | null;
 };
 
 /** Dny útraty pro sparkline: cena, když ji má aspoň jeden den, jinak tokeny (poslední `n` dní). */
@@ -65,8 +66,8 @@ function weather(s: HeroInput): HeroFacts | null {
   const w = s.personal?.weather;
   const d = w?.data;
   if (!w || !d || !Number.isFinite(d.temp) || (w.status !== "ok" && w.status !== "stale")) return null;
-  const range = d.min != null && d.max != null ? { text: ["cards.hero.minmax", "dnes {min}° až {max}°"] as Text, vars: { min: Math.round(d.min), max: Math.round(d.max) } } : undefined;
-  return { value: Math.round(d.temp), digits: 0, unit: "°C", label: ["cards.hero.weather", "Venku"], sub: range };
+  const range = d.min != null && d.max != null ? { text: ["cards.hero.minmax", "dnes {min}° až {max}°"] as Text, vars: { min: Math.round(tempIn(d.min, w.fahrenheit)), max: Math.round(tempIn(d.max, w.fahrenheit)) } } : undefined;
+  return { value: Math.round(tempIn(d.temp, w.fahrenheit)), digits: 0, unit: tempUnit(w.fahrenheit), label: ["cards.hero.weather", "Venku"], sub: range };
 }
 
 /** Hrdina karty `cardId` ze snapshotu; `null` = karta bez hrdiny / bez skutečného čísla (kreslí se jako dřív). */

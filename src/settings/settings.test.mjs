@@ -16,7 +16,6 @@ const read = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
 
 /** panel id → soubory, které ho vykreslují (že je panel opravdu skládá, hlídá test „složení panelů“) */
 const PANEL_FILES = {
-  doporucene: ["panels/Recommended.tsx"],
   zaciname: ["panels/Start.tsx"],
   suplik: ["panels/Drawer.tsx", "../layout/LayoutEditor.tsx"],
   naplose: ["panels/Desk.tsx", "../desk/DeskSettings.tsx"],
@@ -86,7 +85,8 @@ test("složení panelů: každý soubor z mapy panel opravdu vykresluje (importy
   const cat = read("catalog.ts");
   const imp = Object.fromEntries([...cat.matchAll(/^import (\w+) from "\.\/(panels\/\w+)";$/gm)].map((m) => [m[1], `${m[2]}.tsx`]));
   const roots = Object.fromEntries([...cat.matchAll(/^\s+(\w+): (\w+Panel),$/gm)].map((m) => [m[1], imp[m[2]]]));
-  assert.deepEqual(Object.keys(roots).sort(), PANEL_META.map((m) => m.id).sort(), "každý panel z registru má komponentu");
+  // `doporucene` nemá komponentu — vede na domov Ledge Studia (`studio/parts.ts` `PAGE_PART`)
+  assert.deepEqual(Object.keys(roots).sort(), PANEL_META.map((m) => m.id).filter((id) => id !== "doporucene").sort(), "každý panel z registru má komponentu");
   const href = (f) => new URL(f, import.meta.url).href;
   const byHref = new Map(ALL_FILES.map((f) => [href(f), f]));
   /** soubory z mapy dosažitelné importy z kořene panelu */
@@ -142,7 +142,7 @@ test("skoky odjinud: každý cíl vede na existující panel a jeho řádek je v
   const f = fields();
   const targets = gotoTargets();
   // karty, paleta, hlavička, Začínáme — ať test nezačne potichu procházet naprázdno
-  for (const want of ["f-actions.add", "akce", "f-personal.calendars", "f-personal.weather", "f-autostart", "f-clipboard.enabled", "f-claude.hooks", "f-claude.statusLine", "f-appearance.style", "f-strip.look"]) {
+  for (const want of ["f-actions.add", "akce", "f-personal.calendars", "f-personal.weather", "f-autostart", "f-clipboard.enabled", "f-claude.hooks", "f-claude.statusLine"]) {
     assert.ok(targets.some((x) => x.id === want), `cíl ${want} se v kódu najde`);
   }
   const bad = [];

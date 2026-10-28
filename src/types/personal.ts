@@ -22,6 +22,8 @@ export interface Weather {
 }
 
 export interface WeatherView {
+  /** `personal.fahrenheit`: data jsou vždy °C, zobrazení přepočítá `cards/temp.ts`; starý snapshot bez pole = °C */
+  fahrenheit?: boolean;
   /** unset = místo nenastavené (žádná síť) · stale = poslední dobrá data, poslední pokus selhal */
   status: "unset" | "loading" | "ok" | "stale" | "unavailable" | "idle";
   label: string;

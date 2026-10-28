@@ -2,7 +2,7 @@
 //!
 //! - Fáze = ODHAD podle posledního nástroje z hooku `PostToolUse` (Read/Grep/Glob → čtení, Edit/Write → úpravy,
 //!   Bash/PowerShell se spuštěním testů / buildu → testy, jiný nástroj → pracuje), `Stop` → hotovo.
-//!   Chyba se zobrazí jen při hooku `PostToolUseFailure`, který Ledge zatím neinstaluje (nebo když
+//!   Chyba se zobrazí jen při hooku `PostToolUseFailure`, který Ledge instaluje (nebo když
 //!   `PostToolUse` výjimečně nese `exit_code` / `is_error`); jinak se nic nevymýšlí. UI fázi označí
 //!   „odhad podle posledního nástroje“.
 //! - Soubor = `tool_input.file_path` / `notebook_path` posledního nástroje, který ho má.

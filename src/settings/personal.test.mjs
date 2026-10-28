@@ -1,13 +1,12 @@
 // Čistá logika panelů Osobní a Začínáme: pořadí sekcí podle rozložení (`personalModel.ts`), pole Město
-// (`cityModel.ts`, zrcadlo Rust `weather::clean_query`) a „Co je nového“ jen po přechodu z nižší verze
-// (`startModel.ts`). Bez sítě a bez DOM.
+// (`cityModel.ts`, zrcadlo Rust `weather::clean_query`) a průvodce znovu v Aplikace.
+// Bez sítě a bez DOM.
 //   node --experimental-strip-types --test src/settings/personal.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { PERSONAL_SECTIONS, layoutCardIds, splitPersonal } from "./personalModel.ts";
+import { PERSONAL_SECTIONS, layoutCardIds, setCardShown, splitPersonal } from "./personalModel.ts";
 import { GEO_DEBOUNCE_MS, GEO_MIN_CHARS, LABEL_MAX, geoQuery, placeLabel, placeToWeather } from "./cityModel.ts";
-import { cmpVersion, parseVersion, upgradedFrom } from "./startModel.ts";
 
 const page = (...ids) => ({ id: "p", name: "P", cards: ids.map((id) => ({ id, size: "M" })) });
 
@@ -62,37 +61,24 @@ test("pole Město nemá dotaz v klidu: geo_search se volá jen z časovače po p
   assert.ok(!/onMount|createEffect|createResource/.test(src), "nic se nestahuje při otevření");
 });
 
-test("verze: parseVersion a cmpVersion", () => {
-  assert.deepEqual(parseVersion("0.4.1"), [0, 4, 1]);
-  assert.deepEqual(parseVersion("v1.2"), [1, 2]);
-  for (const bad of ["", null, undefined, "abc", "1.x", "1..2", "1.2.3.4.5"]) assert.equal(parseVersion(bad), null, String(bad));
-  const cases = [["0.4.0", "0.4.1", -1], ["0.4.1", "0.4.1", 0], ["0.10.0", "0.9.9", 1], ["1.0", "1.0.0", 0], ["x", "1.0.0", null], ["1.0.0", null, null]];
-  for (const [a, b, want] of cases) assert.equal(cmpVersion(a, b), want, `${a} ? ${b}`);
-});
-
-test("upgradedFrom: „Co je nového“ jen po přechodu z nižší verze, nový uživatel ne", () => {
-  const cases = [
-    [null, "0.4.1", false], // poprvé = nový uživatel
-    ["", "0.4.1", false],
-    ["0.4.0", "0.4.1", true],
-    ["0.4.1", "0.4.1", false],
-    ["0.5.0", "0.4.1", false], // downgrade
-    ["0.4.0", undefined, false],
-    ["smetí", "0.4.1", false],
-  ];
-  for (const [seen, cur, want] of cases) assert.equal(upgradedFrom(seen, cur), want, `${seen} → ${cur}`);
-});
-
-test("Co je nového a staré názvy jen pro upgrade (Doporučené), průvodce znovu (Jazyk a průvodce), žádná duplicita", () => {
-  const rec = readFileSync(new URL("panels/Recommended.tsx", import.meta.url), "utf8");
+test("průvodce znovu (Aplikace → Jazyk a průvodce); tipy a novinky Doporučených zmizely se stránkou (kolo 24)", () => {
   const start = readFileSync(new URL("panels/Start.tsx", import.meta.url), "utf8");
-  assert.match(rec, /<Show when=\{up\}>[\s\S]*Co je nového/);
-  assert.match(rec, /old \? t\("settings\.start\.tip\.search\.text"/);
   assert.match(start, /Spustit průvodce znovu/);
   assert.match(start, /startWizard\(\)/);
-  // tipy a novinky jen na jednom místě
   for (const k of ["settings.start.tip.", "settings.start.new.", "seenVersion"]) assert.ok(!start.includes(k), `Start.tsx: ${k}`);
-  // novinka, která je dlaždicí Doporučených, se neopakuje v seznamu novinek
-  const news = rec.slice(rec.indexOf("const NEWS"), rec.indexOf("const NEW_TILES"));
-  for (const m of rec.slice(rec.indexOf("const NEW_TILES")).matchAll(/^  "(f-[\w.]+)":/gm)) assert.ok(!news.includes(`"${m[1]}"`), m[1]);
+});
+
+test("setCardShown: vypnout odebere ze všech záložek, zapnout přidá na Osobní, opakování nic nemění", () => {
+  const l = { pages: [{ id: "prace", name: "", cards: [{ id: "weather", size: "s" }] }, { id: "osobni", name: "", cards: [{ id: "weather", size: "s" }, { id: "clock", size: "m" }] }], hiddenParts: [] };
+  assert.deepEqual(layoutCardIds(setCardShown(l, "weather", false)), ["clock"]);
+  assert.deepEqual(layoutCardIds(setCardShown(l, "weather", true)), ["weather", "weather", "clock"], "už zapnutá = beze změny");
+  const off = setCardShown(l, "weather", false);
+  assert.deepEqual(layoutCardIds(setCardShown(off, "weather", false)), ["clock"]);
+  const on = setCardShown(off, "weather", true);
+  assert.deepEqual(on.pages[1].cards.map((c) => c.id), ["clock", "weather"], "přibude na konec záložky Osobní");
+  // bez záložky Osobní jde na první
+  const only = { pages: [{ id: "prace", name: "", cards: [] }], hiddenParts: [] };
+  assert.deepEqual(layoutCardIds(setCardShown(only, "timer", true)), ["timer"]);
+  // rozbitý layout se normalizuje, nespadne
+  assert.doesNotThrow(() => setCardShown(null, "weather", true));
 });

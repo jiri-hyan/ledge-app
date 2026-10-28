@@ -48,6 +48,7 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                     UiCmd::Show(view, opener) => {
                         if view == View::Full {
                             sessionlive::request(sessionlive::Wake::Open);
+                            c.rescan_index_on_open();
                             refresh_git_async();
                             refresh_logos(false);
                             request_notes_reload();

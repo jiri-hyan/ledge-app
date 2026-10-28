@@ -11,12 +11,12 @@ import { For, Show, type JSX } from "solid-js";
 import { t } from "../../i18n";
 import { gotoSettingsPanel } from "../../palette/goto";
 import { useSettings } from "../ctx";
-import { Num, Text, Toggle } from "../fields/controls";
+import { Num, Select, Text, Toggle } from "../fields/controls";
 import { Advanced } from "../fields/Advanced";
 import { Group } from "../fields/Group";
 import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
 import { fieldHint, fieldLabel } from "../labels";
-import { layoutCardIds, splitPersonal, type PersonalSectionId } from "../personalModel";
+import { PERSONAL_SECTIONS, layoutCardIds, setCardShown, splitPersonal, type PersonalSectionId } from "../personalModel";
 import type { PanelProps } from "../types";
 import { parsePresets } from "../../timer/model";
 import CalendarSettings from "../../calendar/CalendarSettings";
@@ -26,15 +26,6 @@ import SuggestSettings from "../../suggest/SuggestSettings";
 import { ClipSettings } from "../../cliphist/ClipSettings";
 import { GithubSettings, SystemSettings } from "../../integrations/IntegrationsSettings";
 import { CityPicker } from "./CityPicker";
-
-/** Pár měst pro rychlé vyplnění (souřadnice jsou veřejné, nic se nezjišťuje). */
-const PLACES: [string, number, number][] = [
-  ["Praha", 50.08, 14.42],
-  ["Brno", 49.2, 16.61],
-  ["Ostrava", 49.82, 18.26],
-  ["Plzeň", 49.75, 13.38],
-  ["Bratislava", 48.15, 17.11],
-];
 
 function WeatherRows() {
   const c = useSettings();
@@ -49,12 +40,14 @@ function WeatherRows() {
             ? t("settings.personal.place.now", "Teď: {name} ({lat}, {lon})", { name: w().label || t("settings.personal.place.unnamed", "bez názvu"), lat: w().lat, lon: w().lon })
             : t("settings.personal.place.none", "Místo není nastavené — počasí se nestahuje.")}
         </p>
-        <div class="st-quick">
-          <For each={PLACES}>{([n, la, lo]) => <button class="mini" onClick={() => c.set("personal.weather", { lat: la, lon: lo, label: n })}>{n}</button>}</For>
-          <Show when={w().lat != null || w().lon != null || w().label}>
+        <Show when={w().lat != null || w().lon != null || w().label}>
+          <div class="st-quick">
             <button class="mini" onClick={() => c.set("personal.weather", { lat: null, lon: null, label: "" })}>{t("settings.personal.clear", "Vymazat")}</button>
-          </Show>
-        </div>
+          </div>
+        </Show>
+      </Row>
+      <Row id="personal.fahrenheit" label={t("settings.personal.unit", "Teplota")} hint={t("settings.personal.unit.hint", "Ve °C, nebo ve °F. Jen přepočet při zobrazení — z internetu se stahuje totéž.")}>
+        <Select value={c.cfg.personal.fahrenheit ? "f" : "c"} onChange={(v) => c.set("personal.fahrenheit", v === "f")} options={[{ v: "c", label: "°C" }, { v: "f", label: "°F" }]} label={t("settings.personal.unit", "Teplota")} />
       </Row>
       <Advanced id="osobni.weather" inline hint={t("settings.personal.adv.hint", "Zeměpisná šířka a délka")}>
         <Row id="personal.weather.lat" label={t("settings.personal.coords", "Zeměpisná šířka a délka")} hint={t("settings.personal.coords.hint", "Doplní se výběrem města; ručně je najdeš třeba na mapy.cz (pravý klik na místo).")}>
@@ -123,10 +116,33 @@ const PARTS: Record<PersonalSectionId, Part> = {
 
 /** Skupiny jedné části stránky (`open` = výchozí rozbalení, uživatelova volba se pamatuje). */
 function Parts(p: { ids: PersonalSectionId[]; open: boolean }) {
+  const c = useSettings();
+  const cardOf = (id: PersonalSectionId) => PERSONAL_SECTIONS.find((s) => s.id === id)?.card ?? null;
+  const shown = (card: string) => layoutCardIds(c.cfg.layout).includes(card);
   return (
     <For each={p.ids}>
       {(id) => (
-        <Group gid={`osobni.${id}`} title={PARTS[id].title()} desc={PARTS[id].desc()} open={p.open}>
+        <Group
+          gid={`osobni.${id}`}
+          title={PARTS[id].title()}
+          desc={PARTS[id].desc()}
+          open={p.open}
+          aside={
+            <Show when={cardOf(id)}>
+              {(card) => (
+                <button
+                  class="st-switch"
+                  classList={{ on: shown(card()) }}
+                  role="switch"
+                  aria-checked={shown(card())}
+                  aria-label={t("settings.personal.cardShown", "Karta {name} v šuplíku", { name: PARTS[id].title() })}
+                  title={shown(card()) ? t("settings.personal.cardShown.on", "Karta je v šuplíku — klik ji odebere ze všech záložek") : t("settings.personal.cardShown.off", "Karta v šuplíku není — klik ji přidá na záložku Osobní")}
+                  onClick={() => c.set("layout", setCardShown(c.cfg.layout, card(), !shown(card())))}
+                />
+              )}
+            </Show>
+          }
+        >
           {PARTS[id].body()}
         </Group>
       )}
@@ -150,7 +166,7 @@ export default function PersonalPanel(_p: PanelProps) {
         <h3 class="st-grp-sep">{t("settings.personal.sep.more", "Další karty — teď v šuplíku nejsou")}</h3>
         <Parts ids={split().more} open={false} />
       </Show>
-      <h3 class="st-grp-sep">{t("settings.personal.sep.helpers", "Funkce bez vlastní karty")}</h3>
+      <h3 class="st-grp-sep">{t("settings.personal.sep.helpers", "Funkce mimo karty — vidíš je v pruhu nahoře a v paletě (Ctrl+K)")}</h3>
       <Parts ids={split().helpers} open={false} />
     </>
   );

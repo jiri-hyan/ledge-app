@@ -4,6 +4,7 @@
 import { createResource, createSignal, Show } from "solid-js";
 import { api, type UpdateView } from "../../api";
 import ReleaseNotes from "../../update/ReleaseNotes";
+import InstallNow from "./AboutInstall";
 import { ago } from "../../format";
 import { t, tp } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
@@ -21,8 +22,8 @@ function updateState(u: UpdateView): { text: string; tone: "ok" | "warn" | "bad"
     case "aktualni": return { text: t("settings.about.st.current", "Máš nejnovější verzi") + when, tone: "ok" };
     case "dostupna": return {
       text: (u.fetch.state === "ready"
-        ? t("settings.about.st.ready", "Verze {v} je stažená a ověřená — restartuješ ji z hlavičky šuplíku", { v: u.verze })
-        : t("settings.about.st.available", "Dostupná verze {v} — nainstaluješ ji z hlavičky šuplíku", { v: u.verze })) + when,
+        ? t("settings.about.st.ready", "Verze {v} je stažená a ověřená — restartuješ ji tlačítkem tady nebo v hlavičce šuplíku", { v: u.verze })
+        : t("settings.about.st.available", "Dostupná verze {v} — nainstaluješ ji tlačítkem tady nebo v hlavičce šuplíku", { v: u.verze })) + when,
       tone: "warn",
     };
     case "nelze_overit": return { text: t("settings.about.st.unknown", "Nelze ověřit: {why}", { why: u.duvod }) + when, tone: "bad" };
@@ -88,6 +89,7 @@ export default function AboutPanel(_p: PanelProps) {
             <span class="st-dot" classList={{ ok: st().tone === "ok", warn: st().tone === "warn", bad: st().tone === "bad" }} />
             <span>{u().checking ? t("settings.about.checking", "Kontroluji…") : st().text}</span>
             <button class="mini" disabled={u().checking || !c.cfg.update.check} onClick={() => open(api.updateCheckNow())}>{t("settings.about.checkNow", "Zkontrolovat teď")}</button>
+            <InstallNow u={u()} />
           </span>
         </Row>
       </Section>

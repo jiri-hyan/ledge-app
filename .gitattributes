@@ -6,3 +6,5 @@
 scripts/private/ export-ignore
 .github/ export-ignore
 *.bmp binary
+site/META.md export-ignore
+site/RELEASE-*.md export-ignore

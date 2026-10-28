@@ -23,12 +23,17 @@ pub const EVENTS: &[(&str, &str, u32, Option<&str>)] = &[
     ("SessionStart", "/event", 5, None),
     ("UserPromptSubmit", "/event", 5, None),
     ("PostToolUse", "/event", 5, None),
+    ("PostToolUseFailure", "/event", 5, None),
     ("Stop", "/event", 5, None),
     ("SessionEnd", "/event", 5, None),
     ("Notification", "/event", 5, None),
     ("SubagentStart", "/event", 5, None),
     ("SubagentStop", "/event", 5, None),
 ];
+
+/// Volitelné hooky (přidané později): jejich absence sama nedělá stav „zapojeno jen zčásti“,
+/// jen nabídne „k dispozici aktualizace hooků“.
+pub const OPTIONAL_EVENTS: &[&str] = &["PostToolUseFailure"];
 
 /// Hook otázek Clauda — chybí-li jen ten (Ledge starší verze), UI nabídne „Doplnit otázky Clauda“.
 pub const QUESTIONS_EVENT: &str = "PreToolUse";
@@ -296,6 +301,13 @@ pub struct HooksStatus {
 pub fn hint(missing: &[String]) -> Option<String> {
     match missing {
         [] => None,
+        [one] if OPTIONAL_EVENTS.contains(&one.as_str()) => Some(
+            crate::i18n::tr(
+                "K dispozici je aktualizace hooků (hlášení chyb nástrojů) — klikni „Zapojit“ znovu.",
+                "A hook update is available (tool error reporting) — click “Connect” again.",
+            )
+            .into(),
+        ),
         [one] if one == QUESTIONS_EVENT => {
             Some(
                 crate::i18n::tr(
@@ -330,9 +342,10 @@ pub fn status(text: &str, port: u16) -> (&'static str, Vec<String>) {
         matches!(root.get("hooks").and_then(|h| h.get(ev)), Some(J::Arr(gs)) if has_hook(gs, &want_url(port, path), m))
     };
     let missing: Vec<String> = EVENTS.iter().filter(|(ev, p, _, m)| !has(ev, p, *m)).map(|(ev, _, _, m)| label(ev, *m)).collect();
-    let state = match missing.len() {
+    let required = missing.iter().filter(|m| !OPTIONAL_EVENTS.contains(&m.as_str())).count();
+    let state = match required {
         0 => "full",
-        n if n == EVENTS.len() => "none",
+        _ if missing.len() == EVENTS.len() => "none",
         _ => "partial",
     };
     (state, missing)
@@ -475,6 +488,15 @@ mod tests {
         // jen Ledge hooky → zmizí i prázdné „hooks“
         let (only, _) = merge("{}", 47800).unwrap();
         assert_eq!(v(&remove(&only).unwrap().0), json!({}));
+    }
+
+    #[test]
+    fn missing_only_optional_hook_is_full_with_update_hint() {
+        let (full, _) = merge("{}", 47800).unwrap();
+        let old = full.replace("PostToolUseFailure", "XPostToolUseFailure");
+        let (st, missing) = status(&old, 47800);
+        assert_eq!((st, missing.clone()), ("full", vec!["PostToolUseFailure".to_string()]));
+        assert!(hint(&missing).unwrap().contains("aktualizace") || hint(&missing).unwrap().contains("update"));
     }
 
     #[test]

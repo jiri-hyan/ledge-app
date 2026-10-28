@@ -118,6 +118,11 @@ impl RepoIndex {
         idx
     }
 
+    /// Počet složek s rozpoznaným remote v indexu.
+    pub fn len(&self) -> usize {
+        self.by_repo.values().map(Vec::len).sum()
+    }
+
     /// Kolik klonů repa index zná (přesná shoda vlastník/repo, jinak podle jména repa).
     pub fn clones(&self, remote: &str) -> usize {
         let Some(or) = parse_remote(remote) else { return 0 };

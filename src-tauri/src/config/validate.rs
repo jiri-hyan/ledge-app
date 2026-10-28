@@ -7,6 +7,12 @@ use super::{MAX_LINK_TARGET, MAX_LINKS, ProjectKind, Trigger, valid_aumid, valid
 use crate::configerr::{FieldError, fe};
 use crate::i18n::tr;
 
+/// Adresa odkazu projektu: jen http(s) s neprázdným hostem, bez mezer.
+pub(super) fn valid_link_url(u: &str) -> bool {
+    let rest = u.strip_prefix("https://").or_else(|| u.strip_prefix("http://"));
+    rest.is_some_and(|r| !r.is_empty() && !r.starts_with('/') && !r.chars().any(char::is_whitespace))
+}
+
 /// Validace s textem chyby (zpětně kompatibilní tvar; pole viz `validate_field`).
 pub fn validate(cfg: &Config) -> Result<(), String> {
     validate_field(cfg).map_err(|e| e.message)
@@ -36,6 +42,14 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
             && !valid_aumid(a)
         {
             return Err(fe(at("aumid"), trf!("Projekt „{}“: aumid „{a}“ nesedí (čekám tvar Jmeno_hash!App, jen A–Z a–z 0–9 . _ ! -).", "Project “{}”: aumid “{a}” doesn't fit (expected the form Name_hash!App, only A–Z a–z 0–9 . _ ! -).", p.id)));
+        }
+        for (j, l) in p.links.iter().enumerate() {
+            if l.label.trim().is_empty() {
+                return Err(fe(at(&format!("links.{j}.label")), trf!("Projekt „{}“: odkaz č. {} nemá popisek.", "Project “{}”: link no. {} has no label.", p.id, j + 1)));
+            }
+            if !valid_link_url(&l.url) {
+                return Err(fe(at(&format!("links.{j}.url")), trf!("Projekt „{}“: odkaz „{}“ musí mít adresu http:// nebo https://.", "Project “{}”: link “{}” needs an http:// or https:// address.", p.id, l.label)));
+            }
         }
         if let Some(a) = &p.accent {
             let ok = a.len() == 7 && a.starts_with('#') && a[1..].chars().all(|c| c.is_ascii_hexdigit());

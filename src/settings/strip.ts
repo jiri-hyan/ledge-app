@@ -6,6 +6,9 @@
 export const STRIP_ITEM_IDS = ["mode", "clock", "running", "claude", "repos", "limits", "waiting", "custom", "timer", "media", "github", "system", "mail"] as const;
 export type StripItemId = (typeof STRIP_ITEM_IDS)[number];
 
+/** Výchozí krytí klasického proužku (`strip.opacity`; zrcadlo `Default` ve `stripconf.rs`, hlídá strip.test.mjs). */
+export const STRIP_OPACITY = 0.82;
+
 /** Položky, které se v klidu ukazují samy — volba „jen při dění“ má smysl jen u nich (Rust `is_event` = false
  *  nebo limity pod 70 %). Ostatní se ukážou jen, když mají co hlásit. */
 export const QUIETABLE: readonly string[] = ["mode", "clock", "custom", "limits", "system"];

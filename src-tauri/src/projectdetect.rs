@@ -120,6 +120,16 @@ fn first_exe(root: &Path) -> Option<String> {
     None
 }
 
+/// Obsazená id = uložená z configu + z rozpracovaného návrhu v Nastavení (bez duplicit).
+pub fn merge_taken(mut saved: Vec<String>, draft: Option<Vec<String>>) -> Vec<String> {
+    for id in draft.unwrap_or_default() {
+        if !saved.iter().any(|t| t.eq_ignore_ascii_case(&id)) {
+            saved.push(id);
+        }
+    }
+    saved
+}
+
 /// Návrh projektu ze složky. `taken` = id, která už config má.
 pub fn detect(dir: &Path, taken: &[String]) -> Result<Detected, String> {
     if !dir.is_dir() {
@@ -209,6 +219,14 @@ pub fn candidates(roots: &[String], known_dirs: &[PathBuf], known_remotes: &[Str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn merge_taken_draft_ids_make_next_free() {
+        let taken = merge_taken(vec!["app".into()], Some(vec!["App".into(), "app-2".into()]));
+        assert_eq!(taken.len(), 2);
+        assert_eq!(make_id("app", &taken), "app-3");
+        assert_eq!(merge_taken(vec!["app".into()], None), vec!["app".to_string()]);
+    }
 
     #[test]
     fn make_id_table() {

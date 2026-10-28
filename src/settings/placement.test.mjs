@@ -11,7 +11,6 @@ import { fileURLToPath } from "node:url";
 import { keyPaths, readSources } from "../../scripts/config-keys.mjs";
 import { ADVANCED_ANCHORS, PLACEMENT, isAdvancedField, placeOf } from "./placement.ts";
 import { PANEL_META } from "./registry.ts";
-import { SECTIONS } from "./structure.ts";
 import { ADVANCED } from "./appearanceModel.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -37,7 +36,7 @@ function noEditor(path) {
 
 test("každý klíč configu má místo v Nastavení (stránka v sekci + úroveň), nebo je v NO_EDITOR s důvodem", () => {
   assert.ok(KEYS.length > 200, `klíče configu se načetly (${KEYS.length})`);
-  const inSection = new Set(SECTIONS.flatMap((s) => s.pages));
+  const inSection = new Set(PANEL_META.map((m) => m.id));
   const pages = new Set(PANEL_META.map((p) => p.id));
   const bad = [];
   for (const k of KEYS) {

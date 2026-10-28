@@ -376,6 +376,12 @@ fn personal_defaults_and_old_config() {
     let v = serde_json::to_value(&cfg).unwrap();
     assert_eq!(v["personal"]["weather"], serde_json::json!({ "lat": null, "lon": null, "label": "" }));
     assert_eq!(v["personal"]["links"], serde_json::json!([]));
+    // °F je volba: starý config bez klíče = °C
+    assert_eq!(v["personal"]["fahrenheit"], serde_json::json!(false));
+    let cfg: Config = serde_json::from_str(r#"{"personal":{"weather":{"lat":1.0,"lon":2.0,"label":"x"}}}"#).unwrap();
+    assert!(!cfg.personal.fahrenheit);
+    let cfg: Config = serde_json::from_str(r#"{"personal":{"fahrenheit":true}}"#).unwrap();
+    assert!(cfg.personal.fahrenheit);
     // starý config s výslovným false zůstane vypnutý, bez bloku personal dostane výchozí
     let cfg: Config = serde_json::from_str(r#"{"modes":{"personalEnabled":false}}"#).unwrap();
     assert!(!cfg.modes.personal_enabled);
@@ -604,10 +610,38 @@ fn context_bar_off_by_default_even_in_old_config() {
 }
 
 #[test]
+fn limits_alert_off_in_old_config() {
+    assert!(!Config::default().claude.limits_alert);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800}}"#).unwrap();
+    assert!(!cfg.claude.limits_alert);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"limitsAlert":true}}"#).unwrap();
+    assert!(cfg.claude.limits_alert);
+}
+
+#[test]
 fn limits_pace_off_in_old_config() {
     assert!(!Config::default().claude.limits_pace);
     let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800}}"#).unwrap();
     assert!(!cfg.claude.limits_pace);
     let cfg: Config = serde_json::from_str(r#"{"claude":{"limitsPace":true}}"#).unwrap();
     assert!(cfg.claude.limits_pace);
+}
+
+#[test]
+fn project_links_validation_table() {
+    let mk = |label: &str, url: &str| {
+        let mut cfg = Config::default();
+        let mut p = cfg.projects.first().cloned().unwrap_or_else(|| serde_json::from_value(serde_json::json!({"id":"app","name":"app","kind":"dev","run":"x"})).unwrap());
+        p.links = vec![Link { label: label.into(), url: url.into() }];
+        cfg.projects = vec![p];
+        validate_field(&cfg).err().and_then(|e| e.field)
+    };
+    assert_eq!(mk("Docs", "https://example.com/a"), None);
+    assert_eq!(mk("Docs", "http://example.com"), None);
+    assert_eq!(mk("  ", "https://example.com").as_deref(), Some("projects.0.links.0.label"));
+    assert_eq!(mk("Docs", "").as_deref(), Some("projects.0.links.0.url"));
+    assert_eq!(mk("Docs", "javascript:alert(1)").as_deref(), Some("projects.0.links.0.url"));
+    assert_eq!(mk("Docs", "file:///C:/x").as_deref(), Some("projects.0.links.0.url"));
+    assert_eq!(mk("Docs", "https://").as_deref(), Some("projects.0.links.0.url"));
+    assert_eq!(mk("Docs", "https://exa mple.com").as_deref(), Some("projects.0.links.0.url"));
 }

@@ -2,7 +2,6 @@
 // `labels.ts` vlevo, ovládání vpravo, chyba validace pod ním. `id` řádku = kotva hledání (`#f-<id>`)
 // a cesta pole pro chybu z Rustu.
 import { Show, type JSX } from "solid-js";
-import { t } from "../../i18n";
 import { hit, useSettings } from "../ctx";
 import { fieldHint, fieldLabel } from "../labels";
 
@@ -37,8 +36,10 @@ export function Section(p: { title?: string; desc?: string; id?: string; childre
 
 /** Štítek „Platí hned“ vedle ovládání volby, která se NEukládá lištou Uložit (zapnutí MCP, zapojení hooků,
  *  přihlášení účtu…) — jedna komponenta pro všechny; `Row live` ji dává před ovládací prvek. */
+/** Dřív štítek „Platí hned“ u voleb mimo Uložit. Od kola 24 (Ledge Studio) platí hned VŠECHNO → nic nekreslí;
+ *  volání v panelech zůstávají kvůli vlně obsahu (smaže je spolu s `Row live`). */
 export function LiveBadge() {
-  return <span class="st-live" title={t("settings.live.title", "Tahle volba se projeví hned — nečeká na tlačítko Uložit.")}>{t("settings.live", "Platí hned")}</span>;
+  return null;
 }
 
 export function Row(p: { id: string; label?: string; hint?: string; stack?: boolean; nested?: boolean; dim?: boolean; live?: boolean; children?: JSX.Element }) {

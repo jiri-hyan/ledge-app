@@ -86,8 +86,16 @@ pub(crate) fn spawn_emit_thread() {
                     std::thread::sleep(Duration::from_millis(120) - since);
                 }
                 let dirty = std::mem::replace(&mut *c.dirty.lock(), false);
-                if dirty && c.drawer.view() != View::Hidden {
-                    let _ = c.app.emit_to(drawer::LABEL, "state", snapshot());
+                // Ledge Studio (otevřené jen na výslovný klik) dostává stav i se zavřeným šuplíkem
+                let studio = if dirty { crate::studio::window() } else { None };
+                if dirty && (c.drawer.view() != View::Hidden || studio.is_some()) {
+                    let snap = snapshot();
+                    if c.drawer.view() != View::Hidden {
+                        let _ = c.app.emit_to(drawer::LABEL, "state", &snap);
+                    }
+                    if let Some(w) = studio {
+                        let _ = w.emit_to(crate::studio::LABEL, "state", &snap);
+                    }
                     last_emit = Instant::now();
                 } else if dirty {
                     // šuplík zavřený → poslat až při otevření (UiCmd::Show posílá vždy čerstvý)

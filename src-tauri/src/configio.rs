@@ -10,12 +10,46 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
+/// Kolik předchozích verzí `config.json` se drží (`config.json.1` = nejnovější záloha).
+pub const BACKUPS: usize = 3;
+
+fn backup_path(path: &Path, n: usize) -> std::path::PathBuf {
+    let mut s = path.as_os_str().to_owned();
+    s.push(format!(".{n}"));
+    s.into()
+}
+
+/// Před zápisem posune zálohy `.1 → .2 → .3` a současný soubor uloží jako `.1` (atomicky přes `fsx`).
+/// Stejný obsah jako `.1` se neduplikuje. Chyba se jen zaloguje — uložení nikdy neblokuje.
+pub fn rotate_backups(path: &Path) {
+    let Ok(cur) = std::fs::read(path) else { return };
+    if std::fs::read(backup_path(path, 1)).is_ok_and(|b| b == cur) {
+        return;
+    }
+    for n in (1..BACKUPS).rev() {
+        if let Ok(b) = std::fs::read(backup_path(path, n))
+            && let Err(e) = crate::fsx::write_atomic(&backup_path(path, n + 1), &b)
+        {
+            crate::log(&format!("config: záloha .{} selhala: {e}", n + 1));
+        }
+    }
+    if let Err(e) = crate::fsx::write_atomic(&backup_path(path, 1), &cur) {
+        crate::log(&format!("config: záloha .1 selhala: {e}"));
+    }
+}
+
 /// Sekce, jejichž import může spouštět příkazy nebo posílat data jinam — UI je ve výchozím stavu
 /// nezaškrtne a ukáže proč.
-const RISKY: [(&str, &str, &str); 4] = [
+const RISKY: [(&str, &str, &str); 10] = [
     ("projects", "obsahuje příkazy a programy, které se spustí kliknutím na projekt", "contains commands and programs that run when you click a project"),
     ("actions", "obsahuje akce, které můžou spouštět příkazy nebo programy", "contains actions that can run commands or programs"),
     ("notes", "mění, kam se synchronizují poznámky (git repo)", "changes where notes are synced to (git repo)"),
+    ("scripts", "obsahuje skripty, které se spustí příkazem", "contains scripts that run on command"),
+    ("mcp", "mění MCP servery, které Claude spouští", "changes MCP servers that Claude launches"),
+    ("claude", "mění zapojení Clauda (hooky, schvalování, příkazy)", "changes the Claude integration (hooks, approvals, commands)"),
+    ("clipboard", "mění chování schránky a vkládání", "changes clipboard and paste behaviour"),
+    ("accounts", "mění účty, ke kterým se Ledge připojuje", "changes the accounts Ledge connects to"),
+    ("github", "mění připojení ke GitHubu a odkud se data berou", "changes the GitHub connection and where data comes from"),
     ("update", "mění, odkud se stahují nové verze Ledge", "changes where new Ledge versions are downloaded from"),
 ];
 
@@ -139,6 +173,39 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn is_rotation(p: &Path) -> bool {
+        (1..=BACKUPS).any(|n| p.file_name().is_some_and(|f| f.to_string_lossy() == format!("config.json.{n}")))
+    }
+
+    #[test]
+    fn rotate_keeps_three_latest() {
+        let d = std::env::temp_dir().join(format!("ledge-rot-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let p = d.join("config.json");
+        rotate_backups(&p); // chybí soubor = nic
+        assert!(!backup_path(&p, 1).exists());
+        for v in ["a", "b", "c", "d", "e"] {
+            std::fs::write(&p, v).unwrap();
+            rotate_backups(&p);
+        }
+        let rd = |n| std::fs::read_to_string(backup_path(&p, n)).unwrap();
+        assert_eq!((rd(1), rd(2), rd(3)), ("e".into(), "d".into(), "c".into()));
+        assert!(!backup_path(&p, 4).exists());
+        rotate_backups(&p); // beze změny se nedubluje
+        assert_eq!(rd(2), "d");
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn risky_sections_are_all_listed() {
+        for k in ["projects", "actions", "notes", "update", "scripts", "mcp", "claude", "clipboard", "accounts", "github"] {
+            assert!(RISKY.iter().any(|(r, ..)| *r == k), "{k}");
+            let d = section_diff(&json!({}), &json!({ k: { "x": 1 } }));
+            assert!(!d[0].risk.is_empty(), "{k}");
+        }
+    }
+
     #[test]
     fn section_diff_table() {
         let cur = json!({ "$schema": "a", "drawer": { "trigger": "hover", "width": 1080 }, "projects": [1, 2], "autostart": true, "roots": ["C:\\x"] });
@@ -204,13 +271,13 @@ mod tests {
             assert!(config::load(&path).is_err(), "{what}");
             config::save(&path, &Config::default()).unwrap();
             assert_eq!(config::load(&path).unwrap().unwrap(), Config::default(), "{what}");
-            let baks: Vec<_> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().path()).filter(|p| p != &path).collect();
+            let baks: Vec<_> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().path()).filter(|p| p != &path && !is_rotation(p)).collect();
             assert_eq!(baks.len(), 1, "{what}: {baks:?}");
             assert!(baks[0].file_name().unwrap().to_string_lossy().starts_with("config.json.broken-"), "{what}");
             assert_eq!(std::fs::read_to_string(&baks[0]).unwrap(), text, "{what}");
             // platný config se už nezálohuje
             config::save(&path, &Config::default()).unwrap();
-            assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2, "{what}");
+            assert_eq!(std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().path()).filter(|p| !is_rotation(p)).count(), 2, "{what}");
         }
     }
 
@@ -226,7 +293,7 @@ mod tests {
         let err = config::save(&path, &cfg).unwrap_err();
         assert!(err.contains("nejde zapsat"), "{err}");
         assert_eq!(config::load(&path).unwrap().unwrap(), Config::default(), "původní zůstal");
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "žádný tmp po chybě");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().path()).filter(|p| !is_rotation(p)).count(), 1, "žádný tmp po chybě");
         #[allow(clippy::permissions_set_readonly_false)]
         perm.set_readonly(false);
         std::fs::set_permissions(&path, perm).unwrap();
@@ -252,7 +319,7 @@ mod tests {
             h.join().unwrap();
         }
         assert!(config::load(&path).unwrap().is_some());
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1, "žádné zbytky tmp");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().path()).filter(|p| !is_rotation(p)).count(), 1, "žádné zbytky tmp");
     }
 
     #[test]

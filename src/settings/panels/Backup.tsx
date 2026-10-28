@@ -9,30 +9,9 @@ import { dirty, offerUndo, snapshotDraft, useSettings } from "../ctx";
 import { Confirm } from "../../ui/Confirm";
 import { Row, Section } from "../fields/Row";
 import type { PanelProps } from "../types";
+import { SECTION_NAMES } from "../backupModel";
 
-/** Lidské názvy sekcí configu; neznámá sekce (nová oblast) = klíč. */
-const SECTION_NAMES: Record<string, readonly [string, string]> = {
-  projects: ["settings.section.projects", "Projekty"],
-  roots: ["settings.section.roots", "Kde hledat repa"],
-  drawer: ["settings.section.drawer", "Šuplík"],
-  layout: ["settings.section.layout", "Záložky a karty"],
-  strip: ["settings.section.strip", "Proužek"],
-  modes: ["settings.section.modes", "Záložky"],
-  claude: ["settings.section.claude", "Claude Code"],
-  hotkeys: ["settings.section.hotkeys", "Zkratky"],
-  notes: ["settings.section.notes", "Poznámky"],
-  personal: ["settings.section.personal", "Osobní"],
-  github: ["settings.section.github", "GitHub"],
-  system: ["settings.section.system", "Karta Systém"],
-  autostart: ["settings.section.autostart", "Spouštění po startu Windows"],
-  update: ["settings.section.update", "Aktualizace"],
-  appearance: ["settings.section.appearance", "Vzhled a animace"],
-  actions: ["settings.section.actions", "Odkazy a akce"],
-  questions: ["settings.section.questions", "Otázky Clauda"],
-  onboarding: ["settings.section.onboarding", "Průvodce"],
-  ui: ["settings.section.ui", "Jazyk"],
-  accounts: ["settings.section.accounts", "Účty (Client ID — přihlášení se nezálohuje)"],
-};
+/** Lidské názvy sekcí configu (tabulka v `../backupModel.ts`); neznámá sekce (nová oblast) = klíč. */
 export const sectionName = (k: string) => {
   const n = SECTION_NAMES[k];
   return n ? t(n[0], n[1]) : k;

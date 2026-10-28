@@ -10,7 +10,6 @@ use crate::projectdetect::{self, Candidate, Detected};
 use crate::state::core;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -47,12 +46,10 @@ pub(crate) fn config_import_preview(path: String) -> Result<ImportPreview, Strin
 /// Nativní dialog nad šuplíkem (vlastník = okno šuplíku → blur ho nezavře, `focus_in_own_popup`).
 /// `kind`: `folder` | `file` | `exe` | `image` | `json`. Zrušení = `None`.
 #[tauri::command(async)]
-pub(crate) fn pick_path(kind: String, title: Option<String>, start: Option<String>) -> Option<String> {
+pub(crate) fn pick_path(window: tauri::WebviewWindow, kind: String, title: Option<String>, start: Option<String>) -> Option<String> {
     let c = core();
     let mut d = c.app.dialog().file();
-    if let Some(w) = c.app.get_webview_window(crate::drawer::LABEL) {
-        d = d.set_parent(&w);
-    }
+    d = d.set_parent(&window);
     if let Some(t) = title {
         d = d.set_title(t);
     }
@@ -82,28 +79,29 @@ fn take_picked(slot: &parking_lot::Mutex<Option<PathBuf>>, path: &Path) -> bool 
 
 /// Dialog „Uložit jako“ pro export zálohy.
 #[tauri::command(async)]
-pub(crate) fn pick_save(name: String) -> Option<String> {
+pub(crate) fn pick_save(window: tauri::WebviewWindow, name: String) -> Option<String> {
     let c = core();
     let mut d = c.app.dialog().file().add_filter("JSON", &["json"]).set_file_name(name);
-    if let Some(w) = c.app.get_webview_window(crate::drawer::LABEL) {
-        d = d.set_parent(&w);
-    }
+    d = d.set_parent(&window);
     d.blocking_save_file().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
 }
 
 #[tauri::command(async)]
-pub(crate) fn project_detect(path: String) -> Result<Detected, String> {
-    let taken: Vec<String> = core().cfg.read().projects.iter().map(|p| p.id.clone()).collect();
-    projectdetect::detect(Path::new(&path), &taken)
+pub(crate) fn project_detect(path: String, draft_ids: Option<Vec<String>>) -> Result<Detected, String> {
+    let saved: Vec<String> = core().cfg.read().projects.iter().map(|p| p.id.clone()).collect();
+    projectdetect::detect(Path::new(&path), &projectdetect::merge_taken(saved, draft_ids))
 }
 
 /// Naklonovaná repa v `roots`, která ještě nejsou v projektech.
 #[tauri::command(async)]
-pub(crate) fn project_candidates() -> Vec<Candidate> {
+pub(crate) fn project_candidates(draft_paths: Option<Vec<String>>, draft_remotes: Option<Vec<String>>) -> Vec<Candidate> {
     let c = core();
     let cfg = c.cfg.read().clone();
-    let dirs: Vec<PathBuf> = cfg.projects.iter().filter_map(|p| c.project_dir(&Project { subdir: None, ..p.clone() })).collect();
-    let remotes: Vec<String> = cfg.projects.iter().filter_map(|p| p.remote.clone()).collect();
+    let mut dirs: Vec<PathBuf> = cfg.projects.iter().filter_map(|p| c.project_dir(&Project { subdir: None, ..p.clone() })).collect();
+    let mut remotes: Vec<String> = cfg.projects.iter().filter_map(|p| p.remote.clone()).collect();
+    // projekty z rozpracovaného návrhu (ještě neuložené) se nenabízejí znovu
+    dirs.extend(draft_paths.unwrap_or_default().into_iter().map(PathBuf::from));
+    remotes.extend(draft_remotes.unwrap_or_default());
     projectdetect::candidates(&cfg.roots, &dirs, &remotes)
 }
 

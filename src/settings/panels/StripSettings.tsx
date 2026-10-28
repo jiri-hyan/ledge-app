@@ -8,10 +8,11 @@ import { createSignal, For, onMount, Show } from "solid-js";
 import { t } from "../../i18n";
 import { useSettings } from "../ctx";
 import { Seg, Select, Text, Toggle } from "../fields/controls";
-import { Row, Section } from "../fields/Row";
+import { Row } from "../fields/Row";
 import { SortList } from "../fields/SortList";
 import { fieldLabel } from "../labels";
 import { moveItem } from "../model";
+import { LOOK_HIDEABLE, lookOf, withLookShown } from "../../strip/looks";
 import { clipCustom, COLOR_VAR, CUSTOM_MAX, customLen, previewSegments, QUIETABLE, STRIP_COLORS, withColor, withQuiet, type StripColorId } from "../strip";
 import { isWidgetId, stripWidgetIds, widgetFile } from "../../widgets/model";
 import { loadWidgets, widgetInfo, widgetsListing } from "../../widgets/registry";
@@ -87,11 +88,30 @@ export default function StripSettings() {
   const setStrip = (all: string[], on: (id: string) => boolean) => c.set("strip.items", all.filter(on));
   const quiet = (id: string) => (c.cfg.strip.quiet ?? []).includes(id);
   const [pvMode, setPvMode] = createSignal<"calm" | "busy">("calm");
+  /** Seznam položek, barvy, časovač a krytí platí jen u Klasického stylu; ostatní styly mají vlastní skládání. */
+  const classic = () => lookOf(c.cfg.strip?.look).id === "classic";
+  const custom = () => lookOf(c.cfg.strip?.look).id === "custom";
+  const hidden = (id: string) => (c.cfg.strip?.lookHide ?? []).includes(id);
 
   return (
-    <Section title={t("settings.strip.what", "Co proužek ukazuje")} desc={t("settings.strip.whatDesc", "Proužek je tenká lišta u horního okraje — zapni, co na ní chceš vidět.")}>
+    <>
       <Row id="strip.enabled"><Toggle path="strip.enabled" label={fieldLabel("strip.enabled")} /></Row>
-      <Show when={c.cfg.strip.enabled}>
+      <Show when={c.cfg.strip.enabled && !classic() && !custom()}>
+        <Row id="strip.lookHide" stack>
+          <p class="ap-note">{t("settings.strip.lookHide.note", "Seznam položek, barvy a „Jen při dění“ platí jen pro Klasický proužek. Tenhle vzhled si skládá obsah sám — tady můžeš jednotlivé věci vypnout.")}</p>
+          <div class="st-lookhide" role="group" aria-label={t("settings.strip.lookHide", "Co tenhle vzhled ukazuje")}>
+            <For each={LOOK_HIDEABLE}>
+              {(id) => (
+                <div class="st-item">
+                  <span class="grow">{stripLabel(id)}</span>
+                  <Toggle value={!hidden(id)} onChange={(v) => c.set("strip.lookHide", withLookShown(c.cfg.strip?.lookHide, id, v))} label={stripLabel(id)} />
+                </div>
+              )}
+            </For>
+          </div>
+        </Row>
+      </Show>
+      <Show when={c.cfg.strip.enabled && classic()}>
         <Row id="strip.items" stack>
           <div class="st-strip-pv">
             <div class="st-strip-pv-head">
@@ -169,6 +189,6 @@ export default function StripSettings() {
           ]}
         />
       </Row>
-    </Section>
+    </>
   );
 }

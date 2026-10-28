@@ -16,7 +16,7 @@ function view<P extends object>(load: () => Promise<{ default: Component<P> }>):
   );
 }
 
-export const Settings = view(() => import("./Settings"));
+export const Settings = view(() => import("./studio/Studio"));
 export const Wizard = view(() => import("./onboarding/Wizard"));
 export const NotesPage = view(() => import("./notes/NotesPage"));
 export const NoteEditor = view(() => import("./notes/NoteEditor"));
@@ -32,7 +32,7 @@ export const Palette = view(async () => {
 
 /** Chunky k přednačtení (paleta bez slovníku — ten se stáhne až při jejím otevření). */
 const PRELOAD: (() => Promise<unknown>)[] = [
-  () => import("./Settings"),
+  () => import("./studio/Studio"),
   () => import("./palette/Palette"),
   () => import("./notes/NotesPage"),
   () => import("./notes/NoteEditor"),

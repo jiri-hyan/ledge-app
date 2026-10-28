@@ -72,6 +72,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
 - **Tempo čerpání limitů** — `claude.limitsPace` (výchozí `false`): v pruzích 5h / týden v kartě Claude ryska plánu
   (uplynulý podíl okna), část výplně nad plánem obarvená (pozor do +5 b., přes nad); 5h pruh i při tempu, které dojde před
   obnovou (tempo z posledních 30 min, jinak průměr okna). Čísla v tooltipu; bez `resetsAt` / se starým vzorkem nic.
+- **Upozornění na 80 % / 90 % limitu** — `claude.limitsAlert` (výchozí `false`): jeden toast (přes `attention::signal`,
+  tedy ne ve hře / herním režimu) při prvním dosažení 80 % a 90 % okna 5h nebo týden, jednou za okno
+  (`limits::alerts_due`, čerstvý vzorek ze stavového řádku); vypnuto = nic se nepamatuje.
 - **Pruh kontextu session** — `claude.contextBar` (výchozí `false`): pod každou živou session (s hooky) pruh velikosti
   kontextu z posledního `usage` v jejím transcriptu, rysky 250 k / 350 k (viz „Útrata Claude (odhad)“ → kontext);
   `false` = nic se nečte.

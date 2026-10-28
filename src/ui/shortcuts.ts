@@ -41,7 +41,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { group: "notes", keys: "", key: "ui.keys.pinBar", cs: "Dvojklik na lištu lístku ho sbalí na lištu nebo rozbalí." },
   { group: "notes", keys: "", key: "ui.keys.pinText", cs: "Dvojklik do textu lístku ho otevře k úpravě." },
   { group: "settings", keys: "Ctrl+F", key: "ui.keys.find", cs: "Hledání v Nastavení; najde volbu i bez háčků a čárek." },
-  { group: "settings", keys: "Ctrl+S", key: "ui.keys.save", cs: "Uloží změny v Nastavení." },
+  { group: "settings", keys: "Ctrl+Z", key: "ui.keys.undoSettings", cs: "Vrátí poslední změnu v Nastavení (mimo textová pole)." },
   { group: "settings", keys: "Alt+↑/↓", key: "ui.keys.sortList", cs: "V seřaditelných seznamech posune vybranou položku nahoru nebo dolů." },
 ];
 

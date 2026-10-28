@@ -1,7 +1,7 @@
 //! Herní režim: ruční „mrtvý Ledge“ jako při fullscreen hře — šuplík zavřený, proužek pryč, zkratky,
 //! peek ani připomínky nic, dokud ho šéf nevypne. Stav přežije restart (`game-mode.json` vedle configu).
 //!
-//! Zapíná se tlačítkem v Nastavení (Šuplík a proužek), položkou palety Ctrl+K nebo zkratkou
+//! Zapíná se tlačítkem v Nastavení (Spouštění a hry), položkou palety Ctrl+K nebo zkratkou
 //! `hotkeys.gameMode`. Vypíná se (šuplík je v něm nedosažitelný, proto víc cest):
 //! - zkratkou `hotkeys.gameMode` (přepíná),
 //! - hlavní zkratkou `hotkeys.toggle` (vypne a otevře šuplík),

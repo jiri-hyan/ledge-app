@@ -14,7 +14,7 @@ export const FIELDS: Record<string, FieldDef> = {
   // Šuplík a karty (widgety na ploše `desk.*` = stránka Na ploše)
   "layout": { panel: "suplik", label: "Záložky a karty", hint: "Co šuplík ukazuje, na které záložce a jak velké", kw: "karty záložky rozložení pořadí velikost skrýt zobrazit přidat katalog běží claude poznámky projekty repa akce přihrádka hodiny počasí odkazy limity útrata git subagenti osobní práce" },
   "layout.looks": { panel: "suplik", label: "Upravené karty a zástupci", hint: "Vlastní vzhled karet a zástupců — přehled a obnovení", kw: "vzhled karty akcent pozadí hlavička hustota zobrazení seznam dlaždice ikona emoji barva tvar kruh sklo popisek zástupce obnovit" },
-  "shelf.enabled": { panel: "suplik", label: "Přihrádka na soubory", hint: "Přetáhni soubory z Průzkumníka na proužek nahoře — uloží se jen odkazy (cesty) do karty Přihrádka. Kopírování cesty pro Claude Code, otevření, tah ven.", kw: "shelf přihrádka soubory přetáhnout drag drop cesta schránka claude" },
+  "shelf.enabled": { panel: "suplik", label: "Přihrádka na soubory (přetažení na proužek)", hint: "Přetáhni soubory z Průzkumníka na proužek nahoře — uloží se jen odkazy (cesty) do karty Přihrádka. Kopírování cesty pro Claude Code, otevření, tah ven.", kw: "shelf přihrádka soubory přetáhnout drag drop cesta schránka claude" },
   "desk.layer": { panel: "naplose", label: "Vrstva nového widgetu", hint: "Kam se nový widget na ploše postaví vůči oknům. Každý widget to má i zvlášť pod ⋯", kw: "widget plocha navrchu pod okny vrstva" },
   "desk.hideInGame": { panel: "naplose", label: "Schovat widgety ve hře", hint: "Ve hře přes celou obrazovku a v herním režimu nový widget zmizí a nic nepočítá", kw: "hra fullscreen herní režim schovat widget plocha" },
   "desk.opacity": { panel: "naplose", label: "Průhlednost nového widgetu", kw: "widget plocha průhlednost neprůhlednost" },
@@ -62,21 +62,25 @@ export const FIELDS: Record<string, FieldDef> = {
   "widgets.dir": { panel: "akce", label: "Složka widgetů", hint: "Prázdné = Ledge\\widgets ve tvém profilu. %PROMĚNNÉ% se rozbalí.", kw: "složka cesta widgety" },
   "widgets.gallery": { panel: "akce", label: "Galerie příkladů widgetů", hint: "Kurz ČNB, počasí jinde, Docker, GitHub CI, ping, síť a VPN, disk, uptime, odpočet — jedním klikem do složky", kw: "příklady šablony galerie widget kurz počasí docker github ping vpn disk uptime odpočet" },
   // Claude (i otázky Clauda, `Questions.tsx`)
-  "claude.enabled": { panel: "claude", label: "Schvalování z Ledge", hint: "Žádosti Clauda o povolení se objeví v šuplíku", kw: "povolit most" },
+  "claude.enabled": { panel: "claude", label: "Schvalování z Ledge", hint: "Žádosti Clauda o povolení se objeví v šuplíku. Zapnutí i vypnutí platí po restartu Ledge.", kw: "povolit most" },
   "claude.port": { panel: "claude", label: "Port pro spojení s Claude Code", hint: "Číslo, přes které se Claude Code hlásí Ledge (jen tento počítač, 127.0.0.1). Změna platí po restartu Ledge a znovu zapojených hookách.", kw: "port most" },
-  "claude.approvalTimeoutS": { panel: "claude", label: "Jak dlouho čekat na rozhodnutí", hint: "Pak se Claude zeptá v terminálu — nikdy neschválí sám", kw: "timeout sekundy" },
+  "claude.approvalTimeoutS": { panel: "claude", label: "Jak dlouho čekat na rozhodnutí", hint: "Schvalování čeká krátce (výchozí 45 s), ať terminál zbytečně nestojí; otázky Clauda čekají déle (až 9 min). Pak se Claude zeptá v terminálu — nikdy neschválí sám.", kw: "timeout sekundy" },
   "claude.toast": { panel: "claude", label: "Oznámení Windows", hint: "Když Claude čeká na schválení nebo otázku, nebo dokončí práci. Nebere fokus; ve hře, v herním režimu a při Nerušit nikdy", kw: "toast oznámení notifikace upozornění hotovo" },
   "claude.hooks": { panel: "claude", label: "Propojení s Claude Code", hint: "Aby Ledge viděl session a mohl ukázat žádosti o povolení. Změní jen nastavení Claude Code, cizí nastavení zůstane.", kw: "hooky hooks settings.json zapojit odpojit propojit" },
   "claude.questionHoldS": { panel: "claude", label: "Odpovídat na otázky z Ledge", hint: "Když se Claude Code zeptá, odpovíš kliknutím v šuplíku", kw: "otázky clauda otázka odpověď askuserquestion" },
   "claude.questionUnseenS": { panel: "claude", label: "Neviděnou otázku pustit do Claude", hint: "Když otázku v Ledge nikdo nevidí (šuplík zavřený, hra), Claude se zeptá ve svém okně", kw: "otázky clauda pojistka neviděno nikdo neviděl zavřený šuplík hra" },
+  "claude.questionHold.wait": { panel: "claude", label: "Čekat na odpověď", hint: "Pak otázka přejde do okna Claude (nejvýš 550 s)", kw: "otázky clauda čekat odpověď sekundy" },
+  "claude.questionUnseen.wait": { panel: "claude", label: "Pustit neviděnou po", hint: "Sekundy od příchodu otázky (5–550 s)", kw: "otázky clauda neviděná sekundy pojistka" },
   "claude.statusLine": { panel: "claude", label: "Číst limity 5h / týden", hint: "Ledge obalí stavový řádek Claude Code a čte z něj limity 5h / týden; tvůj původní poběží dál", kw: "stavový řádek limit kvóta 5h týden statusline" },
   "claude.limitsReminder": { panel: "claude", label: "Připomenout reset limitu", hint: "Když limit 5h nebo týden dosáhne 100 %, v čase resetu krátce vyjede šuplík (ve hře nic)", kw: "limit kvóta reset připomínka" },
+  "claude.limitsAlert": { panel: "claude", label: "Upozornit na 80 % a 90 % limitu", hint: "Jedno oznámení Windows, když limit 5h nebo týdenní dosáhne 80 % a pak 90 %; jednou za každé okno. Výchozí vypnuto.", kw: "limit kvóta upozornění práh 80 90 procent oznámení toast" },
   "claude.costs": { panel: "claude", label: "Hodnota v cenách API", hint: "Část karty Claude: tokeny a odhad ceny v cenách API (ne účet) podle projektu a dne z lokálních transcriptů; počítá se jen po rozbalení", kw: "útrata cena tokeny dolary náklady odhad" },
   "claude.limitsPace": { panel: "claude", label: "Tempo čerpání limitů", hint: "V pruzích 5h a týden ryska plánu (rovnoměrné čerpání); nad plánem se část výplně obarví, 5h pruh i když tempo dojde před obnovou", kw: "limit tempo plán čerpání týden 5h ryska" },
   "claude.contextBar": { panel: "claude", label: "Pruh kontextu session", hint: "Pod každou živou session pruh s velikostí kontextu (rysky 250 k a 350 k) a „každý tah teď čte ~N k tokenů“; čte konec přepisu session jen při otevřeném šuplíku", kw: "kontext tokeny pruh velikost session předávka cache" },
   "mcp.enabled": { panel: "claude", label: "Nastavovat Ledge přes Clauda (MCP)", hint: "Claude smí číst a měnit nastavení Ledge; nic nespouští a nic neposílá ven. Výchozí vypnuto.", kw: "mcp claude server nastavit klíč nástroje" },
   "claude.enforceCommit": { panel: "claude", label: "Hlídat nedokončenou práci", hint: "Soubory, které session upravila a nezacommitovala, a její nepushnuté commity", kw: "nedokončené session commit push hlídač" },
   // Osobní
+  "personal.fahrenheit": { panel: "osobni", label: "Teplota", hint: "Ve °C, nebo ve °F. Jen přepočet při zobrazení — z internetu se stahuje totéž.", kw: "počasí teplota fahrenheit celsius stupně jednotky °F °C" },
   "personal.weather": { panel: "osobni", label: "Místo pro počasí", hint: "Vyber město. Open-Meteo, bez klíče; prázdné = nic se nestahuje (polohu podle IP Ledge nezjišťuje).", kw: "počasí souřadnice šířka délka město zeměpisná lat lon" },
   "personal.calendars": { panel: "osobni", label: "Kalendáře", hint: "Google nebo Outlook z tajného odkazu ICS, nebo klasický Outlook v tomto PC — jen čtení, bez přihlášení. U schůzky tlačítko Připojit a připomínka pár minut předem.", kw: "kalendář google outlook ics ical webcal události schůzky teams zoom meet webex připojit připomínka" },
   "github.enabled": { panel: "osobni", label: "GitHub", hint: "Zapnuto: Ledge přes tvoje přihlášené gh (GitHub CLI) přečte PR čekající na tvoji revizi, tvoje otevřené PR a nepřečtené notifikace. Data jen zobrazí — nic neodesílá, heslo ani token nevidí. Vypnuto: žádný dotaz na GitHub.", kw: "github gh pull request pr revize review notifikace ci karta proužek" },
@@ -116,12 +120,12 @@ export const FIELDS: Record<string, FieldDef> = {
   "clipboard.clear": { panel: "osobni", label: "Vymazat historii teď", hint: "Smaže z paměti všechno kromě připnutých položek", kw: "smazat vyčistit schránka historie" },
   // Poznámky
   "notes.enabled": { panel: "poznamky", label: "Rychlé poznámky a připomínky", hint: "Karta v šuplíku, připomínky v proužku", kw: "připomínky" },
-  "notes.root": { panel: "poznamky", label: "Složka poznámek", hint: "Prázdné = Ledge\\notes ve tvém profilu (mimo repa projektů). %PROMĚNNÉ% se rozbalí.", kw: "kořen cesta" },
+  "notes.root": { panel: "poznamky", label: "Složka poznámek", hint: "Prázdné = Ledge\\notes ve tvém profilu (mimo repa projektů). %PROMĚNNÉ% se rozbalí. Změna složky poznámky nepřesune.", kw: "kořen cesta" },
   "notes.kinds": { panel: "poznamky", label: "Kategorie", hint: "Záložky karty a výběr v editoru, v tomhle pořadí", kw: "kind nápad feedback úkol barva ikona" },
   "notes.pins.style": { panel: "poznamky", label: "Styl nového lístku", hint: "Tmavé sklo, papír, sklo, barevný proužek… Každý lístek si ho změní v ⋯ → Vzhled", kw: "lístek plocha vzhled styl papír sklo proužek minimal tmavý" },
   "notes.pins.bg": { panel: "poznamky", label: "Pozadí nového lístku", hint: "Neprůhlednost pozadí — níž = víc prosvítá okno pod lístkem", kw: "lístek průhlednost ztmavení pozadí" },
   "notes.pins.text": { panel: "poznamky", label: "Text nového lístku", hint: "Neprůhlednost textu (nejníž 50 %, aby šel přečíst)", kw: "lístek průhlednost text" },
-  "notes.pins.rememberLast": { panel: "poznamky", label: "Nový lístek jako naposledy upravený", hint: "Převezme styl a průhlednost, které jsi naposledy nastavil v lístku. Vypnuto = vždy výchozí z téhle sekce", kw: "lístek pamatovat poslední vzhled" },
+  "notes.pins.rememberLast": { panel: "poznamky", label: "Nový lístek vypadá jako naposledy upravený", hint: "Převezme styl a průhlednost, které jsi naposledy nastavil v lístku. Vypnuto = vždy výchozí z téhle sekce", kw: "lístek pamatovat poslední vzhled" },
   "notes.tagColors": { panel: "poznamky", label: "Barvy štítků", hint: "Lístek bez vlastní barvy dostane barvu podle svého prvního štítku s barvou", kw: "štítek tag barva lístek" },
   "notes.sync.enabled": { panel: "poznamky", label: "Synchronizace mezi počítači", hint: "Poznámky se ukládají do soukromého repa na GitHubu a stáhnou se na druhém počítači. Repo zadáš v Pokročilé.", kw: "sync git" },
   "notes.sync.remote": { panel: "poznamky", label: "Repo pro poznámky", hint: "Soukromé repo: https://… nebo git@…. Přihlášení: gh auth setup-git", kw: "remote github" },
@@ -162,7 +166,7 @@ export const FIELDS: Record<string, FieldDef> = {
   "backup.file": { panel: "aplikace", label: "config.json v editoru", hint: "Pro pokročilé — Ledge změny v souboru hned načte", kw: "json soubor ručně" },
   "about.version": { panel: "aplikace", label: "Verze", kw: "verze ledge" },
   "update.check": { panel: "aplikace", label: "Hlídat nové verze", hint: "Jen upozorní v hlavičce, instaluje se až na klik.", kw: "aktualizace update" },
-  "update.repo": { panel: "aplikace", label: "Repo s vydáními", hint: "owner/name na GitHubu. Dotazy jdou přes přihlášené gh (GitHub CLI).", kw: "github releases" },
+  "update.repo": { panel: "aplikace", label: "Repo s vydáními", hint: "Odkud Ledge bere nové verze (GitHub owner/repo). Většina lidí to nemění.", kw: "github releases" },
   "update.intervalH": { panel: "aplikace", label: "Jak často kontrolovat", hint: "1–48 h; první kontrola minutu po startu", kw: "interval hodiny" },
   "update.prefetch": { panel: "aplikace", label: "Stahovat nové verze předem", hint: "Nová verze se tiše stáhne a ověří na pozadí — pak stačí jeden klik Restartovat a aktualizovat. Sama se nikdy nenainstaluje.", kw: "stáhnout pozadí předem restartovat" },
   "update.whatsNew": { panel: "aplikace", label: "Co je nového", hint: "Poznámky k vydání běžící verze (uložené při stažení, bez internetu)", kw: "novinky změny poznámky k vydání changelog" },
@@ -181,7 +185,3 @@ export const fieldCs = (id: string) => {
 };
 /** Řádek, na který skočit (pole bez vlastního řádku → jeho seznam). */
 export const fieldAnchor = (id: string) => FIELDS[id]?.anchor ?? id;
-/** Text z datového páru [klíč, čeština] (`structure.ts`: Doporučené, věty sekcí). */
-export const tr = (p: readonly [string, string]) => t(p[0], p[1]);
-/** Název sekce Nastavení (`structure.ts` `SECTIONS`). */
-export const sectionLabel = (s: { key: string; cs: string }) => t(s.key, s.cs);

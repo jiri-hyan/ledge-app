@@ -23,6 +23,9 @@ pub struct PersonalConfig {
     /// Místo pro počasí (Open-Meteo, bez klíče). Nenastavené = karta jen vyzve k nastavení,
     /// žádné volání sítě. Polohu podle IP Ledge nikdy nezjišťuje.
     pub weather: WeatherPlace,
+    /// Teplota na kartě Počasí, v paletě a v ostrůvku ve °F místo °C. Jen přepočet při zobrazení
+    /// (Open-Meteo se ptá stejně, žádná nová síť). Výchozí `false` = °C.
+    pub fahrenheit: bool,
     /// Rychlé odkazy (nejvýš `MAX_LINKS`): web (jen http/https), složka, dokument/obrázek/médium
     /// (allowlist přípon) nebo aplikace (.exe bez argumentů).
     pub links: Vec<PersonalLink>,

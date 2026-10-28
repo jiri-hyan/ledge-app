@@ -1,0 +1,380 @@
+{
+  "$schema": "./config.schema.json",
+  "strip": {
+    "enabled": true,
+    "items": [
+      "clock",
+      "mode",
+      "waiting"
+    ],
+    "opacity": 0.82,
+    "monitor": "primary",
+    "custom": "",
+    "colors": {},
+    "quiet": [],
+    "itemsRev": 1,
+    "look": "classic",
+    "lookHide": [],
+    "lookShape": "round",
+    "compose": {
+      "shape": "capsule",
+      "width": 300,
+      "height": 30,
+      "round": 55,
+      "left": [
+        {
+          "item": "claude",
+          "style": "icon"
+        }
+      ],
+      "center": [
+        {
+          "item": "time",
+          "style": "text"
+        }
+      ],
+      "right": [
+        {
+          "item": "limit5h",
+          "style": "ring"
+        }
+      ],
+      "hideIdle": false,
+      "rotate": false
+    }
+  },
+  "drawer": {
+    "trigger": "hover",
+    "hoverDelayMs": 140,
+    "edgeDelayMs": 120,
+    "dwellDelayMs": 450,
+    "closeDelayMs": 350,
+    "hover": "full",
+    "hoverExpandMs": 1200,
+    "width": 1080,
+    "glass": "solid",
+    "sections": {
+      "projects": true,
+      "running": false,
+      "claude": false,
+      "notes": true,
+      "repos": false,
+      "actions": false,
+      "shelf": false,
+      "clock": true,
+      "timer": false,
+      "weather": false,
+      "calendar": false,
+      "links": true,
+      "claudeLimits": false,
+      "claudeCosts": false,
+      "claudeGit": false,
+      "claudeSubagents": false,
+      "nowPlaying": true,
+      "sound": true,
+      "favorites": true,
+      "battery": true,
+      "github": false,
+      "system": false,
+      "mail": false
+    },
+    "keepWarmS": 0,
+    "barWindows": {
+      "processes": [
+        "opera.exe",
+        "chrome.exe",
+        "msedge.exe",
+        "firefox.exe",
+        "arc.exe",
+        "brave.exe",
+        "vivaldi.exe"
+      ],
+      "trigger": "push",
+      "pushDistance": 60,
+      "pushMs": 300
+    }
+  },
+  "modes": {
+    "personalEnabled": true
+  },
+  "claude": {
+    "enabled": true,
+    "port": 47800,
+    "approvalTimeoutS": 45,
+    "enforceCommit": "notify",
+    "questionHoldS": 540,
+    "questionUnseenS": 20,
+    "limitsReminder": true,
+    "toast": false,
+    "costs": true,
+    "contextBar": false,
+    "limitsPace": false,
+    "limitsAlert": false
+  },
+  "hotkeys": {
+    "enabled": false,
+    "toggle": "Ctrl+Alt+Space",
+    "approve": "Ctrl+Alt+Y",
+    "deny": "Ctrl+Alt+D",
+    "note": "Ctrl+Alt+N",
+    "gameMode": "",
+    "notePassthrough": "Ctrl+Alt+P",
+    "notePin": ""
+  },
+  "notes": {
+    "enabled": true,
+    "root": "",
+    "sync": {
+      "enabled": false,
+      "remote": "",
+      "intervalMin": 5
+    },
+    "kinds": [
+      {
+        "id": "napad",
+        "label": "Nápad",
+        "color": "#fbbf24",
+        "icon": "bulb"
+      },
+      {
+        "id": "feedback",
+        "label": "Feedback",
+        "color": "#a78bfa",
+        "icon": "chat"
+      },
+      {
+        "id": "ukol",
+        "label": "K zapracování",
+        "color": "#60a5fa",
+        "icon": "checklist"
+      },
+      {
+        "id": "info",
+        "label": "Poznámka",
+        "color": "#94a3b8",
+        "icon": "note"
+      }
+    ],
+    "pins": {
+      "style": "classic",
+      "bg": 88,
+      "text": 100,
+      "rememberLast": true
+    },
+    "tagColors": {},
+    "folderLink": {
+      "enabled": false,
+      "path": "",
+      "direction": "both",
+      "propagateDeletes": false
+    }
+  },
+  "personal": {
+    "weather": {
+      "lat": null,
+      "lon": null,
+      "label": ""
+    },
+    "links": [],
+    "calendars": []
+  },
+  "roots": [
+    "C:\\Users\\demo\\Desktop"
+  ],
+  "autostart": true,
+  "update": {
+    "check": true,
+    "repo": "jiri-hyan/ledge-app",
+    "intervalH": 6,
+    "prefetch": true
+  },
+  "appearance": {
+    "style": "classic",
+    "theme": "dark",
+    "accent": "",
+    "density": "normal",
+    "fontScale": 1.0,
+    "radius": "normal",
+    "glass": {
+      "opacity": 1.0
+    },
+    "motion": {
+      "style": "spring",
+      "speed": 1.0
+    },
+    "strip": {
+      "style": "pill",
+      "size": "normal",
+      "color": "",
+      "position": "center"
+    },
+    "font": "system",
+    "material": "solid",
+    "layout": "classic",
+    "width": "custom"
+  },
+  "projects": [],
+  "actions": [],
+  "ui": {
+    "lang": "cs"
+  },
+  "onboarding": {
+    "done": true
+  },
+  "palette": {
+    "compact": false,
+    "winSettings": true
+  },
+  "scripts": {
+    "enabled": true,
+    "inActions": false
+  },
+  "widgets": {
+    "enabled": true
+  },
+  "shelf": {
+    "enabled": true
+  },
+  "timer": {
+    "presets": [
+      5,
+      15,
+      25,
+      50
+    ],
+    "toast": true,
+    "strip": true
+  },
+  "clipboard": {
+    "enabled": false,
+    "max": 25,
+    "skipSecrets": true,
+    "excludeApps": [
+      "KeePass.exe",
+      "KeePassXC.exe",
+      "1Password.exe",
+      "Bitwarden.exe"
+    ],
+    "clearOnLock": true,
+    "savePins": true
+  },
+  "media": {
+    "variant": "card",
+    "stripTime": "auto",
+    "equalizer": true
+  },
+  "suggest": {
+    "clipboard": false,
+    "devServer": true,
+    "github": true,
+    "reminders": true,
+    "githubPulse": true
+  },
+  "github": {
+    "enabled": false,
+    "review": true,
+    "mine": true,
+    "notifications": true,
+    "refreshMin": 5
+  },
+  "system": {
+    "disks": [],
+    "netUnit": "bytes"
+  },
+  "layout": {
+    "pages": [
+      {
+        "id": "prace",
+        "name": "",
+        "cards": [
+          {
+            "id": "projects",
+            "size": "xl"
+          },
+          {
+            "id": "notes",
+            "size": "xl"
+          }
+        ]
+      },
+      {
+        "id": "osobni",
+        "name": "",
+        "cards": [
+          {
+            "id": "clock",
+            "size": "m"
+          },
+          {
+            "id": "media",
+            "size": "m"
+          },
+          {
+            "id": "notes",
+            "size": "m"
+          },
+          {
+            "id": "links",
+            "size": "m"
+          }
+        ]
+      }
+    ],
+    "hiddenParts": [],
+    "upgrades": [
+      "personalProjects"
+    ]
+  },
+  "accounts": {
+    "microsoft": {
+      "clientId": "",
+      "tenant": "common",
+      "calendar": true,
+      "mail": true,
+      "color": null
+    },
+    "google": {
+      "clientId": "",
+      "calendar": true,
+      "calendars": [],
+      "color": null
+    }
+  },
+  "mcp": {
+    "enabled": false
+  },
+  "desk": {
+    "layer": "normal",
+    "hideInGame": true,
+    "opacity": 100,
+    "snap": true
+  },
+  "smart": {
+    "quickKeys": false,
+    "dropShortcut": false,
+    "tabWheel": false,
+    "approvalSound": {
+      "enabled": false,
+      "minGapS": 30
+    },
+    "incidents": {
+      "enabled": false,
+      "everyMin": 10
+    }
+  },
+  "winquick": {
+    "tiles": [
+      "mic",
+      "out",
+      "term",
+      "dir",
+      "theme",
+      "wifi",
+      "bt",
+      "set",
+      "shot"
+    ],
+    "outputSwitch": false,
+    "folders": []
+  }
+}

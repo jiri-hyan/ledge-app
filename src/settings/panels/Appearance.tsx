@@ -1,68 +1,38 @@
-// Panel Nastavení „Vzhled“ (vlna 7): nahoře 4 kroky jako záložky — Zavřený (`AppearanceClosed.tsx`: galerie
-// vzhledů zavřeného Ledge, pozice a velikost proužku a „Co proužek ukazuje“; v Pokročilé tvar, linka, krytí),
-// Po najetí (`AppearanceHover.tsx`: 3 dlaždice `drawer.hover`; v Pokročilé prodleva rozbalení), Otevřený (`AppearanceOpen.tsx`:
-// galerie stylů, monitor ve skutečném poměru, šířka a hustota; v Pokročilé barvy, rozložení, vlastní šířka,
-// písmo, rohy, pozadí) a Pohyb (`AppearanceMotion.tsx`: 7 animací s ukázkou + rychlost).
-// Každý krok je hlavně galerie; žádný přepínač nemá víc než 4 volby. Skok z hledání (`hit`) přepne krok
-// a rozbalí jeho Pokročilé (`appearanceModel.ts` `stepOf`/`isAdvanced`).
-// Kliknutá volba (rozpracovaný vzhled) se hned aplikuje na celý šuplík (`applyAppearance`); najetí myší na
-// dlaždici (styl, motiv, vzhled zavřeného Ledge, Po najetí) živý Ledge NEMĚNÍ — ukáže se jen v náhledu dole
-// pod editorem (`settings/PreviewDock.tsx`, kolo 21); tam je i jediný přepínač „Co se zrovna děje“.
-// Odchod z Nastavení bez uložení vrátí uložený vzhled. Ukládá JEN společná lišta Nastavení (Uložit / Zahodit / Vrátit) → Rust pošle `appearance`
-// a překreslí proužek. Pozadí (`drawer.glass`), šířka (`drawer.width`), animace a celý proužek se nastavují
-// JEN tady — Otevírání a klávesy má jen chování. Kotvy hledání `f-<id>` = klíče z `labels.ts`.
-// Jazyk rozhraní (`ui.lang`) tu už není — je v Aplikace → Jazyk a průvodce úplně nahoře (přepne se po Uložit, `ctx.loadBase` → `setLang`).
-import { For, Match, Switch, createEffect, createSignal, on, onCleanup } from "solid-js";
+// Vzhled po krocích (vlna 7) — od kola 24 (Ledge Studio) každý krok žije v jiné části Studia jako vlastní
+// otázka (`studio/parts.ts`): Zavřený (`AppearanceClosed.tsx`: galerie vzhledů zavřeného Ledge, pozice, velikost,
+// „Co proužek ukazuje“) → Proužek, Po najetí (`AppearanceHover.tsx`) → Otevírání, Otevřený (`AppearanceOpen.tsx`:
+// styly, motiv, šířka, hustota; v Doladit barvy, písmo, rohy, pozadí) a Pohyb (`AppearanceMotion.tsx`) → Vzhled
+// šuplíku. `AppearanceStep` vykreslí jeden krok; rozpracovaný vzhled na dokument aplikuje Studio (`Studio.tsx`),
+// najetí na dlaždici (`apUi.tsx` `peek`) jen scéna Studia (`studio/Scene.tsx`). Skok z hledání (`hit`) rozbalí
+// Doladit svého kroku (`appearanceModel.ts` `stepOf`/`isAdvanced`). Kotvy hledání `f-<id>` = klíče z `labels.ts`.
+import { Match, Switch, createEffect, createSignal, on } from "solid-js";
 import type { PanelProps } from "../types";
 import type { Appearance } from "../../types";
-import { t } from "../../i18n";
 import { DEFAULT_APPEARANCE, normalizeAppearance } from "../../theme/appearance";
-import { applyAppearance, savedAppearance } from "../../theme/apply";
+import { savedAppearance } from "../../theme/apply";
 import { hit } from "../ctx";
-import { STEPS, isAdvanced, stepOf, type StepId } from "../appearanceModel";
+import { isAdvanced, stepOf, type StepId } from "../appearanceModel";
 import AppearanceClosed from "./AppearanceClosed";
 import AppearanceHover from "./AppearanceHover";
 import AppearanceOpen from "./AppearanceOpen";
 import AppearanceMotion from "./AppearanceMotion";
-import { withThemeDraft, type Ap } from "./apUi";
+import type { Ap } from "./apUi";
 import "./appearance.css";
 
-const STEP_LABEL: Record<StepId, () => string> = {
-  closed: () => t("appearance.step.closed", "Zavřený"),
-  hover: () => t("appearance.step.hover", "Po najetí"),
-  open: () => t("appearance.step.open", "Otevřený"),
-  motion: () => t("appearance.step.motion", "Pohyb"),
-};
-const STEP_HINT: Record<StepId, () => string> = {
-  closed: () => t("appearance.step.closedHint", "Co je vidět u horní hrany"),
-  hover: () => t("appearance.step.hoverHint", "Když najedeš myší"),
-  open: () => t("appearance.step.openHint", "Celý šuplík"),
-  motion: () => t("appearance.step.motionHint", "Jak se otevírá"),
-};
-
-/** Poslední krok a rozbalená Pokročilé přežijí přepnutí panelu (modul). */
-const [lastStep, setLastStep] = createSignal<StepId>("closed");
+/** Rozbalená Doladit každého kroku přežijí přepnutí části (modul). */
 const [advOpen, setAdvOpen] = createSignal<Partial<Record<StepId, boolean>>>({});
 
-export default function AppearancePanel(p: PanelProps) {
+/** Jeden krok Vzhledu jako otázka Studia. */
+export function AppearanceStep(p: PanelProps & { step: StepId }) {
   const a = (): Appearance => normalizeAppearance(p.cfg.appearance);
   /** Změna jednoho pole vzhledu (chybí-li sekce ve starém configu, založí ji s výchozími hodnotami). */
   function set<K extends keyof Appearance>(k: K, v: Appearance[K]) {
     if (!p.cfg.appearance) p.setCfg("appearance", structuredClone(DEFAULT_APPEARANCE));
     p.setCfg("appearance", k, structuredClone(v));
   }
-
-  // rozpracovaný vzhled (i vlastní motiv z editoru) na celém šuplíku hned; najetí (`peek`) jen v náhledu dole;
-  // odchod bez uložení → zpět uložený vzhled
-  createEffect(() => applyAppearance(withThemeDraft(a())));
-  onCleanup(() => applyAppearance(savedAppearance()));
-
-  // skok z hledání / odjinud: přepnout krok a rozbalit jeho Pokročilé
+  // skok z hledání / odjinud na volbu v Doladit tohoto kroku → rozbalit
   const follow = (h: string | null) => {
-    const s = stepOf(h);
-    if (!s) return;
-    setLastStep(s);
-    if (isAdvanced(h)) setAdvOpen((o) => ({ ...o, [s]: true }));
+    if (stepOf(h) === p.step && isAdvanced(h)) setAdvOpen((o) => ({ ...o, [p.step]: true }));
   };
   follow(hit());
   createEffect(on(hit, follow, { defer: true }));
@@ -81,37 +51,21 @@ export default function AppearancePanel(p: PanelProps) {
       if (blur() !== on) p.setCfg("drawer", (d: any) => ({ ...(d ?? {}), glass: on ? "acrylic" : "solid" }));
     },
   };
-  const adv = (s: StepId) => !!advOpen()[s];
-  const setAdv = (s: StepId) => (v: boolean) => setAdvOpen((o) => ({ ...o, [s]: v }));
-  const key = (e: KeyboardEvent, i: number) => {
-    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    if (!d) return;
-    e.preventDefault();
-    const n = (i + d + STEPS.length) % STEPS.length;
-    setLastStep(STEPS[n]);
-    ((e.currentTarget as HTMLElement).parentElement?.children[n] as HTMLElement | undefined)?.focus();
-  };
-
+  const adv = () => !!advOpen()[p.step];
+  const setAdv = (v: boolean) => setAdvOpen((o) => ({ ...o, [p.step]: v }));
   return (
     <div class="ap">
-      <div class="ap-steps" role="tablist" aria-label={t("appearance.steps", "Vzhled po krocích")}>
-        <For each={STEPS}>
-          {(s, i) => (
-            <button class="ap-step" classList={{ on: lastStep() === s }} role="tab" aria-selected={lastStep() === s} tabIndex={lastStep() === s ? 0 : -1}
-              onClick={() => setLastStep(s)} onKeyDown={(e) => key(e, i())}>
-              <b>{STEP_LABEL[s]()}</b>
-              <small>{STEP_HINT[s]()}</small>
-            </button>
-          )}
-        </For>
-      </div>
-
       <Switch>
-        <Match when={lastStep() === "closed"}><AppearanceClosed ap={ap} adv={adv("closed")} setAdv={setAdv("closed")} /></Match>
-        <Match when={lastStep() === "hover"}><AppearanceHover ap={ap} adv={adv("hover")} setAdv={setAdv("hover")} /></Match>
-        <Match when={lastStep() === "open"}><AppearanceOpen ap={ap} dirty={dirty()} adv={adv("open")} setAdv={setAdv("open")} /></Match>
-        <Match when={lastStep() === "motion"}><AppearanceMotion ap={ap} reduced={reduced} /></Match>
+        <Match when={p.step === "closed"}><AppearanceClosed ap={ap} adv={adv()} setAdv={setAdv} /></Match>
+        <Match when={p.step === "hover"}><AppearanceHover ap={ap} adv={adv()} setAdv={setAdv} /></Match>
+        <Match when={p.step === "open"}><AppearanceOpen ap={ap} dirty={dirty()} adv={adv()} setAdv={setAdv} /></Match>
+        <Match when={p.step === "motion"}><AppearanceMotion ap={ap} reduced={reduced} /></Match>
       </Switch>
     </div>
   );
+}
+
+/** Celý Vzhled (katalog stránek): krok Otevřený — ostatní kroky vykreslí Studio ve svých částech. */
+export default function AppearancePanel(p: PanelProps) {
+  return <AppearanceStep {...p} step="open" />;
 }

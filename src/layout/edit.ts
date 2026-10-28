@@ -10,7 +10,7 @@
 // nejdřív ověří rozložení stejně jako Rust (`validate.ts`) a s chybou úpravy nezavře (nic se neztratí).
 // `applyLayout` = jedna změna odkudkoli (⋯ na kartě): v úpravách do draftu, jinak rovnou do configu.
 import { createSignal } from "solid-js";
-import { api } from "../api";
+import { api, inStudio } from "../api";
 import { t } from "../i18n";
 import { say, sayError } from "../ui/toast";
 import { clone, normalizeLayout, pageOf, sameLayout, withLayout, type Layout } from "./model";
@@ -209,4 +209,5 @@ export async function applyLayout(f: (l: Layout) => Layout, cfgError: string | n
 /** „Upravit přímo v šuplíku“ z Nastavení: skořápka (`App`) přepne na hlavní stránku a spustí úpravy. */
 const [editAsk, setEditAsk] = createSignal(0);
 export { editAsk };
-export const askEdit = () => setEditAsk((n) => n + 1);
+/** Z okna Ledge Studio: úpravy jsou v šuplíku → Rust ho otevře a pošle mu `studio-ask` (`App.tsx`). */
+export const askEdit = () => (inStudio ? void api.studioWin("edit").catch(() => {}) : setEditAsk((n) => n + 1));

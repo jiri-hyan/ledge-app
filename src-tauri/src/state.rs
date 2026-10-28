@@ -206,10 +206,57 @@ impl Core {
         })
     }
 
+    /// Přestaví index repozitářů bez obnovy log; vrátí počet nalezených repozitářů.
+    pub(crate) fn rescan_index(&self) -> usize {
+        let roots = self.cfg.read().roots.clone();
+        let idx = RepoIndex::build(&roots);
+        let n = idx.len();
+        *self.index.lock() = idx;
+        *LAST_RESCAN.lock() = Some(Instant::now());
+        n
+    }
+
+    /// Při otevření šuplíku: přestavba indexu na pozadí, nejvýš 1× za `RESCAN_MIN`.
+    pub(crate) fn rescan_index_on_open(&self) {
+        if !rescan_due(*LAST_RESCAN.lock(), Instant::now(), RESCAN_MIN) {
+            return;
+        }
+        *LAST_RESCAN.lock() = Some(Instant::now());
+        let c = core();
+        std::thread::spawn(move || {
+            c.rescan_index();
+        });
+    }
+
     pub(crate) fn rebuild_index(&self) {
         let roots = self.cfg.read().roots.clone();
         *self.index.lock() = RepoIndex::build(&roots);
+        *LAST_RESCAN.lock() = Some(Instant::now());
         refresh_logos(true);
+    }
+}
+
+/// Nejkratší odstup přestaveb indexu repozitářů spouštěných otevřením šuplíku.
+pub(crate) const RESCAN_MIN: Duration = Duration::from_secs(60);
+static LAST_RESCAN: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+
+/// Je čas přestavět index? (nikdy → ano; jinak až po `min`)
+pub(crate) fn rescan_due(last: Option<Instant>, now: Instant, min: Duration) -> bool {
+    last.is_none_or(|l| now.saturating_duration_since(l) >= min)
+}
+
+#[cfg(test)]
+mod rescan_tests {
+    use super::*;
+
+    #[test]
+    fn rescan_due_table() {
+        let t0 = Instant::now();
+        let s = |n| Duration::from_secs(n);
+        assert!(rescan_due(None, t0, s(60)));
+        assert!(!rescan_due(Some(t0), t0 + s(59), s(60)));
+        assert!(rescan_due(Some(t0), t0 + s(60), s(60)));
+        assert!(!rescan_due(Some(t0 + s(5)), t0, s(60)));
     }
 }
 

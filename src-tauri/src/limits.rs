@@ -234,6 +234,33 @@ pub fn next_reset(armed: &Armed) -> Option<i64> {
     armed.iter().map(|&(_, r)| r).min()
 }
 
+// ---------- upozornění na 80 % / 90 % (volba `claude.limitsAlert`) ----------
+
+/// Prahy upozornění v procentech, vzestupně.
+pub const ALERT_LEVELS: [u8; 2] = [80, 90];
+
+/// Co už se v kterém okně ohlásilo: (okno, konec okna nebo 0, nejvyšší ohlášený práh).
+pub type Alerted = Vec<(Kind, i64, u8)>;
+
+/// Které prahy ohlásit: jednou za okno (okno = druh + `resetsAt`) a každý práh nejvýš jednou; když procenta
+/// přeskočí oba prahy najednou, ohlásí se jen vyšší. Záznamy starých oken se zahodí. Vrací (okno, práh, procenta).
+pub fn alerts_due(done: &mut Alerted, s: &Sample) -> Vec<(Kind, u8, f64)> {
+    let mut out = Vec::new();
+    let mut keep: Alerted = Vec::new();
+    for k in [Kind::FiveHour, Kind::SevenDay] {
+        let Some(w) = s.window(k) else { continue };
+        let reset = w.resets_at.unwrap_or(0);
+        let had = done.iter().find(|&&(dk, dr, _)| dk == k && dr == reset).map_or(0, |&(_, _, l)| l);
+        let level = ALERT_LEVELS.iter().rev().copied().find(|&l| w.pct >= f64::from(l)).unwrap_or(0);
+        if level > had {
+            out.push((k, level, w.pct));
+        }
+        keep.push((k, reset, level.max(had)));
+    }
+    *done = keep;
+    out
+}
+
 /// Kolik vzorků 5h okna si pamatujeme pro tempo a jak dlouho zpět (kruhový buffer v paměti, volba `limitsPace`).
 pub const HIST_MAX: usize = 64;
 pub const HIST_SPAN_MS: i64 = 6 * 3_600_000;
@@ -473,5 +500,28 @@ mod tests {
         }
         assert_eq!(h.len(), HIST_MAX);
         assert_eq!(h.last().unwrap().0, 99_000);
+    }
+
+    #[test]
+    fn alerts_once_per_window() {
+        let sample = |five: f64, seven: f64, r5: i64| Sample { at: NOW, five_hour: w(five, Some(r5)), seven_day: w(seven, Some(NOW + 9)), source: Source::StatusLine };
+        let mut done = Alerted::new();
+        // (vzorek, očekávané (okno, práh))
+        let steps: Vec<(Sample, Vec<(Kind, u8)>)> = vec![
+            (sample(10.0, 10.0, NOW + 1), vec![]),
+            (sample(79.9, 10.0, NOW + 1), vec![]),
+            (sample(80.0, 10.0, NOW + 1), vec![(Kind::FiveHour, 80)]),
+            (sample(85.0, 10.0, NOW + 1), vec![]),
+            (sample(91.0, 10.0, NOW + 1), vec![(Kind::FiveHour, 90)]),
+            (sample(99.0, 10.0, NOW + 1), vec![]),
+            (sample(20.0, 10.0, NOW + 1), vec![]),
+            (sample(95.0, 10.0, NOW + 1), vec![]),
+            // nové okno (jiný resetsAt) = znovu; přeskok obou prahů = jen vyšší
+            (sample(95.0, 85.0, NOW + 99), vec![(Kind::FiveHour, 90), (Kind::SevenDay, 80)]),
+        ];
+        for (i, (smp, want)) in steps.into_iter().enumerate() {
+            let got: Vec<_> = alerts_due(&mut done, &smp).into_iter().map(|(k, l, _)| (k, l)).collect();
+            assert_eq!(got, want, "krok {i}");
+        }
     }
 }

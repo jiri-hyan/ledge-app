@@ -40,6 +40,7 @@ import "../board/en";
 import "../winquick/en";
 import "../sessions/en-activity";
 import "../settings/en";
+import "../studio/en";
 import "../settings/panels/en";
 import "../settings/panels/en-look";
 import "../settings/previews/en";

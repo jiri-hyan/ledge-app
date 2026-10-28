@@ -76,7 +76,7 @@ pub(crate) fn mcp_set_enabled(enabled: bool) -> Result<McpState, String> {
     let mut cfg = core().cfg.read().clone();
     if cfg.mcp.enabled != enabled {
         cfg.mcp.enabled = enabled;
-        crate::commands::config::save_config(cfg)?;
+        crate::commands::config::save_config_inner(cfg)?;
         notify_ui("settings");
     }
     Ok(state())

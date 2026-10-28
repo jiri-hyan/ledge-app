@@ -19,6 +19,8 @@ const PENDING = [
   // w7: dočasné kontrakty s workery I/J (`{ id, cs, en }` — přeložené daty, ne t()); lead při merge vezme jejich verzi
   "strip/looks.ts",
   "hover/modes.ts",
+  // nástroj pro snímky (kolo 24): ukázková data a popisky scény jsou záměrně česky, do aplikace se nedostanou
+  "showcase/",
 ];
 
 // Záměrně česky i v angličtině (kontrola d): soubor, přesný text, proč.
@@ -26,7 +28,6 @@ const ALLOW_CZECH = [
   { file: "onboarding/steps/Basics.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },
   { file: "onboarding/steps/Basics.tsx", text: "Ahoj! Nastavíme si Ledge.", why: "ukázka češtiny u volby jazyka" },
   { file: "settings/panels/Start.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },
-  { file: "settings/panels/Personal.tsx", text: "Plzeň", why: "název města v nabídce polohy počasí (vlastní jméno, ukládá se do configu)" },
 ];
 
 // Volání s klíčem mimo literál: soubor, zdrojový text klíče, proč je v pořádku.
@@ -61,8 +62,9 @@ const DYNAMIC = [
   { file: "settings/labels.ts", key: "`settings.f.${id}`", why: TABLE },
   { file: "settings/labels.ts", key: "`settings.f.${id}.hint`", why: TABLE },
   { file: "settings/labels.ts", key: "`settings.f.${id}.kw`", why: TABLE },
-  { file: "settings/labels.ts", key: "p[0]", why: "Doporučené a věty sekcí (settings/structure.ts) — " + PAIRS },
-  { file: "settings/labels.ts", key: "s.key", why: "názvy sekcí Nastavení (settings/structure.ts SECTIONS) — " + PAIRS },
+  { file: "studio/Home.tsx", key: "x.key", why: "vzhledy proužku STRIP_LOOKS a režimy po najetí HOVER_MODES (Rychle) — " + PAIRS },
+  { file: "studio/Studio.tsx", key: "x[0]", why: "popisek hodnoty v časové ose (studio/named.ts: styly, motivy, rozložení, šířky, vzhled proužku, najetí) — " + PAIRS },
+  { file: "studio/Scene.tsx", key: "x.key", why: "souhrn volby pod náhledem (STRIP_LOOKS, HOVER_MODES) — " + PAIRS },
   { file: "theme/label.ts", key: "p[0]", why: "styly, písma, materiály, rozložení, šířky (theme/looks.ts) a animace (AppearanceMotion.tsx) — " + PAIRS },
   { file: "onboarding/steps/Basics.tsx", key: "THEMES[id()].key", why: "motivy v theme/themes.ts — " + PAIRS },
   { file: "layout/text.ts", key: "x[0]", why: "názvy karet, částí a záložek z layout/model.ts (CARD_INFO, PART_INFO, builtinName), volby vzhledu karty z layout/look.ts (ACCENT_NAMES, BG_NAMES, DENSITY_NAMES, VIEW_NAMES) a vzhledu zástupce z tilelook/ (SHAPE_NAMES, GLYPHS, MODES) — " + PAIRS },

@@ -48,8 +48,8 @@ export function Slider(q: { label: string; hint?: string; anchor?: string; min: 
   );
 }
 
-/** Rozbalovací „Pokročilé“ kroku: otevřené drží panel (skok z hledání na volbu uvnitř ho rozbalí). V režimu
- *  Základní (`settings/mode.ts`) je skryté, kromě oddílu, na který právě vedl skok (`forced`). */
+/** Rozbalovací „Doladit“ kroku: otevřené drží panel; v průvodci Studia skryté (`studio.css`), skok z hledání
+ *  nebo chyba ověření na volbu uvnitř ho rozbalí a ukáže (`forced`). */
 export function Advanced(q: { id?: string; open: boolean; onToggle: (open: boolean) => void; hint: string; children: JSX.Element }) {
   let box!: HTMLDetailsElement;
   const [forced, setForced] = createSignal(false);
@@ -62,7 +62,7 @@ export function Advanced(q: { id?: string; open: boolean; onToggle: (open: boole
   return (
     <details ref={box} class="card ap-details ap-top" id={q.id ? `f-${q.id}` : undefined} classList={{ hit: !!q.id && lit(q.id) }} data-adv={forced() ? "shown" : "hide"} open={q.open}
       onToggle={(e) => e.currentTarget.open !== q.open && q.onToggle(e.currentTarget.open)}>
-      <summary><h4>{t("appearance.adv.title", "Pokročilé")}</h4><small>{q.hint}</small></summary>
+      <summary><h4>{t("appearance.adv.title", "Doladit")}</h4><small>{q.hint}</small></summary>
       {q.children}
     </details>
   );

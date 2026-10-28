@@ -164,8 +164,8 @@ registerDict("en", {
   "appearance.ct.red": "Error",
   "appearance.ct.blue": "Info",
   // velikost otevřeného Ledge (kolo 23, AppearanceOpen `SizeTable`)
-  "appearance.size.title": "Size of the open Ledge",
-  "appearance.size.hint": "While editing the drawer (✎) you can drag its sides (width, evenly from the centre) and its bottom (height). It snaps to the grid, hold Alt to drag freely; double-click a handle for the default. Empty = default: width from the preset, height from the content.",
+  "appearance.size.title": "Exact size in px",
+  "appearance.size.hint": "While editing the drawer (✎) you can drag its sides (width, evenly from the centre) and its bottom (height). It snaps to the grid, hold Alt to drag freely; double-click a handle for the default. Empty = default: width from the preset, height from the content. A number entered here beats the preset above and the custom width in Fine-tune.",
   "appearance.size.perPage": "Remember the size for each tab",
   "appearance.size.perPageHint": "Switching tabs smoothly grows or shrinks the drawer. Off = one size for all tabs.",
   "appearance.size.all": "All tabs",

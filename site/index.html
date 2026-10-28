@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledge — the always-on drawer for Windows, with Claude Code built in</title>
+<meta name="description" content="Free, open-source drawer at the top edge of your Windows screen: projects, dev servers, notes, quick actions — and every Claude Code session, with approvals, questions and usage limits one mouse move away.">
+<link rel="canonical" href="https://jiri-hyan.github.io/ledge-app/">
+<meta name="theme-color" content="#10121b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f7fa" media="(prefers-color-scheme: light)">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Ledge">
+<meta property="og:title" content="Ledge — the always-on drawer for Windows, with Claude Code built in">
+<meta property="og:description" content="Projects, dev servers, notes and every Claude Code session at the top edge of your screen. Approve Claude from the drawer. Free and open source.">
+<meta property="og:url" content="https://jiri-hyan.github.io/ledge-app/">
+<meta property="og:image" content="https://jiri-hyan.github.io/ledge-app/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Ledge — a drawer that slides down from the top edge of the Windows screen">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Ledge — the always-on drawer for Windows">
+<meta name="twitter:description" content="Projects, dev servers, notes and every Claude Code session at the top edge of your screen. Free and open source.">
+<meta name="twitter:image" content="https://jiri-hyan.github.io/ledge-app/og.png">
+<script>
+  // motiv a jazyk ještě před vykreslením (bez bliknutí); ?theme= / ?lang= pro odkazy a kontrolní snímky
+  (function () {
+    var q = new URLSearchParams(location.search), r = document.documentElement, s = {};
+    try { s = localStorage; } catch (e) {}
+    var th = q.get("theme") || s.ledgeTheme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    r.dataset.theme = th === "light" ? "light" : "dark";
+    var lg = q.get("lang") || s.ledgeLang || ((navigator.language || "").match(/^(cs|sk)/i) ? "cs" : "en");
+    r.lang = lg === "cs" ? "cs" : "en";
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) r.classList.add("motion");
+  })();
+</script>
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Ledge","operatingSystem":"Windows 10, Windows 11","applicationCategory":"DeveloperApplication","description":"Always-on drawer at the top edge of the Windows screen: projects, dev servers, notes, quick actions and Claude Code sessions with approvals, questions and usage limits.","url":"https://jiri-hyan.github.io/ledge-app/","downloadUrl":"https://github.com/jiri-hyan/ledge-app/releases/latest","license":"https://opensource.org/licenses/MIT","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"image":"https://jiri-hyan.github.io/ledge-app/og.png"}
+</script>
+</head>
+<body>
+<a class="skip" href="#main" data-i18n="skip">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="img/icon.svg" alt="" width="28" height="28">Ledge</a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#claude" data-i18n="nav.claude">Claude Code</a>
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#looks" data-i18n="nav.looks">Looks</a>
+      <a href="#install" data-i18n="nav.install">Install</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-tools">
+      <button class="icon-btn" id="lang" type="button" aria-label="Čeština / English">CS</button>
+      <button class="icon-btn" id="theme" type="button" aria-label="Light / dark">
+        <svg class="theme-ico-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="theme-ico-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a class="icon-btn" href="https://github.com/jiri-hyan/ledge-app" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C17.3 4.3 18.3 4.6 18.3 4.6c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5z"/></svg>
+        <span class="gh-label">GitHub</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<!-- ================= HERO ================= -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span><span data-i18n="hero.eyebrow">Free &amp; open source · Windows 10 and 11</span></span>
+    <h1 data-i18n="hero.title">Your whole workday, <span class="grad-text">one mouse move</span> away.</h1>
+    <p class="lead" data-i18n="hero.lead">Ledge is an always-on drawer at the top edge of your Windows screen: projects and dev servers, notes, quick actions — and every Claude Code session, with approvals, questions and usage limits you can handle without hunting for the terminal.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" data-dl href="https://github.com/jiri-hyan/ledge-app/releases/latest">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.2H3zm0 13L10.5 19.6v-7.1H3zm8.4 1.2L21 21v-8.5h-9.6zm0-15.4v7.3H21V3z"/></svg>
+        <span><span data-i18n="cta.download">Download for Windows</span><span class="btn-sub" data-dl-sub data-i18n="cta.sub">Free · x64 installer · no admin rights</span></span>
+      </a>
+      <a class="btn" href="https://github.com/jiri-hyan/ledge-app" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/></svg>
+        <span data-i18n="cta.star">Star on GitHub</span>
+      </a>
+    </div>
+    <div class="facts">
+      <span data-i18n="facts.focus">Never steals focus</span>
+      <span data-i18n="facts.game">Quiet during fullscreen games</span>
+      <span data-i18n="facts.telemetry">No telemetry, no account</span>
+      <span data-i18n="facts.mit">MIT licensed</span>
+    </div>
+    <div class="stage">
+      <div class="screen">
+        <div class="ledge-bar" aria-hidden="true"><i></i></div>
+        <video class="drawer-shot" id="hero-video" autoplay muted loop playsinline preload="metadata" poster="img/open-poster.webp" width="1280" height="640" aria-label="The Ledge drawer unfolding from the closed island at the top edge of the screen">
+          <source src="media/open.webm" type="video/webm">
+        </video>
+      </div>
+      <p class="shot-note" data-i18n="hero.note">The real Ledge interface rendered with sample data (made-up projects). It slides down when you touch the top edge of the screen.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WHY ================= -->
+<section id="why">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker" data-i18n="why.kicker">Why Ledge</span>
+      <h2 data-i18n="why.title">Always there. Never in the way.</h2>
+      <p data-i18n="why.lead">Built by one developer for his own daily work on Windows with Claude Code — and shared as open source, so you can use it as it is, tune it, or fork it.</p>
+    </div>
+    <div class="why">
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16M7 4v5a5 5 0 0 0 10 0V4"/><path d="M12 14v6"/></svg></div>
+        <h3 data-i18n="why1.t">Out of your way</h3>
+        <p data-i18n="why1.p">A thin strip at the top edge until you need it. It never takes keyboard focus from what you're typing, goes quiet while a fullscreen game runs, and is built to an idle CPU budget below 0.1 %.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg></div>
+        <h3 data-i18n="why2.t">Claude Code, finally visible on Windows</h3>
+        <p data-i18n="why2.p">See every session at a glance, approve or answer Claude from the drawer, and watch your 5-hour and weekly limits — without digging through terminal windows.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+        <h3 data-i18n="why3.t">Yours, local and open</h3>
+        <p data-i18n="why3.p">No account, no cloud, no telemetry. Notes are plain Markdown files in your folder, config is one JSON file, and the source is MIT-licensed on GitHub.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CLAUDE CODE ================= -->
+<section id="claude" class="alt">
+  <div class="wrap split">
+    <div>
+      <span class="kicker" data-i18n="claude.kicker">Claude Code on Windows</span>
+      <h2 data-i18n="claude.title">Claude asks. You answer from the drawer.</h2>
+      <p class="muted" style="margin-top:14px" data-i18n="claude.lead">Ledge connects to Claude Code through its official hooks and status line. When Claude needs you, a peek slides down — without stealing focus from your editor.</p>
+      <ul class="checks">
+        <li><span data-i18n="c1"><b>Approvals.</b> Permission requests show the command or diff; Allow or Deny with a click. If you don't answer, the request goes back to the terminal — Ledge never approves on its own.</span></li>
+        <li><span data-i18n="c2"><b>Questions and plans.</b> Answer <code>AskUserQuestion</code> prompts (single, multiple choice or your own text) and review plans: approve, or send them back with a note.</span></li>
+        <li><span data-i18n="c3"><b>Every session.</b> Desktop app and CLI, with subagents: waiting for you, working, idle, unfinished work. A click switches to that window.</span></li>
+        <li><span data-i18n="c4"><b>Limits and pace.</b> 5-hour and weekly usage with a reset countdown, an optional pace marker and a reminder when a full window resets.</span></li>
+        <li><span data-i18n="c5"><b>Activity and cost.</b> What Claude is doing right now, and a cost estimate at API prices computed from your local transcripts.</span></li>
+        <li><span data-i18n="c6"><b>Set up by Claude.</b> Send Claude the setup guide; over MCP it adds your projects, links and layout — once you turn the connection on.</span></li>
+      </ul>
+      <div class="note-box" data-i18n="claude.note"><b>Only a human can approve.</b> There is deliberately no API, MCP tool or setting that lets anything approve on your behalf.</div>
+    </div>
+    <div class="shot"><img src="img/question.webp" width="1400" height="624" loading="lazy" alt="A Claude Code question in the Ledge drawer with multiple-choice answers and a Send button" data-i18n-alt="alt.question"></div>
+  </div>
+</section>
+
+<!-- ================= FEATURES ================= -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker" data-i18n="feat.kicker">Everything in one drawer</span>
+      <h2 data-i18n="feat.title">One drawer, the cards you choose.</h2>
+      <p data-i18n="feat.lead">Turn on only the cards you want. Arrange them on your own tabs, in four sizes.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><h3><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg></span><span data-i18n="f1.t">Projects &amp; dev servers</span></h3><p data-i18n="f1.p">One tile per project: start its dev server or app, see the port and log, Open or Stop. Logos are detected from the project; uncommitted and unpushed work is flagged.</p></div>
+      <div class="card"><h3><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></span><span data-i18n="f2.t">Notes &amp; tasks</span></h3><p data-i18n="f2.p">Quick Markdown notes with categories, checklists, images and reminders. Plain <code>.md</code> files, optional sync through your own private git repo.</p></div>
+      <div class="card"><h3><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span><span data-i18n="f3.t">Command palette</span></h3><p data-i18n="f3.p">Websites, folders, files, apps and commands — all searchable with <kbd>Ctrl</kbd>+<kbd>K</kbd>, plus clipboard history that skips passwords and tokens.</p></div>
+      <div class="card"><h3><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span><span data-i18n="f4.t">File shelf</span></h3><p data-i18n="f4.p">Drop files on the strip to park them, then drag them out wherever you need them.</p></div>
+      <div class="card"><h3><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span data-i18n="f5.t">Personal tab</span></h3><p data-i18n="f5.p">Clock, weather, calendar (ICS, Outlook, Microsoft or Google account), now playing with volume and microphone mute — separate from work.</p></div>
+      <div class="card"><h3><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span data-i18n="f6.t">Widgets anywhere</span></h3><p data-i18n="f6.p">Pin any card to the desktop or a second monitor, or write your own widgets as scripts, xbar-style. GitHub and system cards included.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LOOKS / NOTCH ================= -->
+<section id="looks" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker" data-i18n="looks.kicker">The notch, for Windows</span>
+      <h2 data-i18n="looks.title">A Dynamic Island–style home for your status.</h2>
+      <p data-i18n="looks.lead">NotchNook, Boring Notch and Alcove are macOS-only. Ledge brings the idea to Windows: pick how the closed Ledge looks at the top edge — and it only grows when something actually happens.</p>
+    </div>
+    <div class="looks" aria-label="Closed-state styles (illustration)">
+      <div class="look"><div class="edge"><i class="s-island"></i></div><b>Island</b><span data-i18n="l.island">Black capsule that expands on events</span></div>
+      <div class="look"><div class="edge"><i class="s-notch"></i></div><b>Notch</b><span data-i18n="l.notch">A cut-out at the top centre</span></div>
+      <div class="look"><div class="edge"><i class="s-line"></i></div><b>Line</b><span data-i18n="l.line">3 px of colour across the screen</span></div>
+      <div class="look"><div class="edge"><i class="s-dots"><i></i><i></i><i></i><i></i></i></div><b>Dots</b><span data-i18n="l.dots">Claude, servers, repos, you</span></div>
+      <div class="look"><div class="edge"><i class="s-bar"></i></div><b>Bar</b><span data-i18n="l.bar">Full-width monospace status bar</span></div>
+      <div class="look"><div class="edge"><i class="s-corner"></i></div><b>Corner</b><span data-i18n="l.corner">A small badge in the corner</span></div>
+      <div class="look"><div class="edge"><i class="s-ghost"></i></div><b>Ghost</b><span data-i18n="l.ghost">Invisible until Claude needs you</span></div>
+      <div class="look"><div class="edge"><i class="s-classic"></i></div><b>Custom</b><span data-i18n="l.custom">Compose your own from pieces</span></div>
+    </div>
+    <p class="shot-note" data-i18n="looks.note">Shapes are illustrations. Also: Icons, Clock, Progress, Ticker, Minimum and Trio.</p>
+    <div class="chips">
+      <span class="chip" data-i18n="ch1">13 design styles</span>
+      <span class="chip" data-i18n="ch2">16 colour themes + your own</span>
+      <span class="chip" data-i18n="ch3">9 opening animations, incl. a liquid capsule</span>
+      <span class="chip" data-i18n="ch4">Compact or island preview on hover</span>
+      <span class="chip" data-i18n="ch5">Czech and English UI</span>
+    </div>
+
+    <!-- skutečné UI vykreslené s ukázkovými daty (scripts/showcase), přepínač zavřený / otevřený -->
+    <div class="looks-real" id="looks-real">
+      <div class="seg" role="group" aria-label="Closed or open">
+        <button type="button" data-pane="closed" aria-pressed="true" data-i18n="lr.closed">Closed</button>
+        <button type="button" data-pane="open" aria-pressed="false" data-i18n="lr.open">Open</button>
+      </div>
+      <figure data-pane="closed"><img src="img/looks-closed.webp" width="1400" height="276" loading="lazy" alt="Eight looks of the closed Ledge" data-i18n-alt="alt.lclosed"><figcaption data-i18n="lr.cclosed">Eight looks of the closed Ledge at the top edge. Sample data.</figcaption></figure>
+      <figure data-pane="open" hidden><img src="img/looks-open.webp" width="1400" height="719" loading="lazy" alt="Six design styles of the open drawer with the same data" data-i18n-alt="alt.lopen"><figcaption data-i18n="lr.copen">Six design styles of the open drawer, same data. Sample data.</figcaption></figure>
+    </div>
+    <div class="gallery" style="margin-top:56px">
+      <figure><img src="img/studio.webp" width="1400" height="897" loading="lazy" alt="Ledge Studio: the Strip section with a live preview" data-i18n-alt="alt.settings"><figcaption data-i18n="g3">Ledge Studio: every change applies at once and can be undone. Sample data.</figcaption></figure>
+      <figure><img src="img/personal.webp" width="1400" height="1300" loading="lazy" alt="Personal tab with weather, now playing, calendar and notes" data-i18n-alt="alt.personal"><figcaption data-i18n="g4">The Personal tab: weather, now playing, calendar, links and notes. Sample data.</figcaption></figure>
+      <figure><img src="img/palette.webp" width="1400" height="799" loading="lazy" alt="The Ctrl+K command palette in the Ledge drawer" data-i18n-alt="alt.palette"><figcaption data-i18n="g5">Ctrl+K: one box for actions, projects, notes and settings. Sample data.</figcaption></figure>
+    </div>
+
+    <div class="themes" aria-label="Colour themes">
+      <div class="sw" style="--a:#a78bfa;--b:#60a5fa"><i style="background:rgb(16 18 27)"></i><span>Dark</span></div>
+      <div class="sw" style="--a:#818cf8;--b:#38bdf8"><i style="background:rgb(7 10 24)"></i><span>Midnight</span></div>
+      <div class="sw" style="--a:#a1a1aa;--b:#d4d4d8"><i style="background:rgb(24 24 26)"></i><span>Graphite</span></div>
+      <div class="sw" style="--a:#88c0d0;--b:#81a1c1"><i style="background:rgb(46 52 64)"></i><span>Nord</span></div>
+      <div class="sw" style="--a:#7c3aed;--b:#2563eb"><i style="background:rgb(246 247 250)"></i><span>Light</span></div>
+      <div class="sw" style="--a:#ffd400;--b:#00e5ff"><i style="background:#000"></i><span>Contrast</span></div>
+      <div class="sw" style="--a:#7cff8a;--b:#2dd4bf"><i style="background:rgb(3 6 4)"></i><span>Terminal</span></div>
+      <div class="sw" style="--a:#b5651d;--b:#8c6d46"><i style="background:rgb(247 242 232)"></i><span>Paper</span></div>
+      <div class="sw" style="--a:#ff3fd8;--b:#7a5cff"><i style="background:rgb(13 5 28)"></i><span>Neon</span></div>
+      <div class="sw" style="--a:#ff3d7f;--b:#ffe600"><i style="background:rgb(250 250 247)"></i><span>Brutal</span></div>
+      <div class="sw" style="--a:#8b9cff;--b:#f0a6ca"><i style="background:rgb(233 237 245)"></i><span>Pastel</span></div>
+      <div class="sw" style="--a:#3ee0c0;--b:#b480ff"><i style="background:rgb(9 14 28)"></i><span>Aurora</span></div>
+      <div class="sw" style="--a:#171717;--b:#737373"><i style="background:rgb(245 245 243)"></i><span>Mono</span></div>
+      <div class="sw" style="--a:#ffb000;--b:#ff6a00"><i style="background:rgb(22 14 6)"></i><span>Retro</span></div>
+      <div class="sw" style="--a:#38bdf8;--b:#8b5cf6"><i style="background:#000"></i><span>OLED</span></div>
+      <div class="sw" style="--a:#f59e0b;--b:#f97316"><i style="background:rgb(20 17 15)"></i><span>Warm</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MAKE IT YOURS ================= -->
+<section id="yours">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker" data-i18n="y.kicker">Make it yours</span>
+      <h2 data-i18n="y.title">Tune it. Or fork it.</h2>
+      <p data-i18n="y.lead">Ledge doesn't try to fit everyone out of the box. It has a lot of settings — and if it still isn't right for you, the code is yours to change.</p>
+    </div>
+    <div class="why">
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></div>
+        <h3 data-i18n="y1.t">Settings first</h3>
+        <p data-i18n="y1.p">Cards and tabs, the closed-state look, design styles and your own colour themes, shortcuts, quick actions and script widgets — in the app, or in one <code>config.json</code> with a JSON schema.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="12" cy="19" r="2"/><path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7M12 12v5"/></svg></div>
+        <h3 data-i18n="y2.t">Fork it with Claude Code</h3>
+        <p data-i18n="y2.p">MIT-licensed, and the repo is set up for Claude Code: <code>CLAUDE.md</code> says where to start for a new card, config key, translation or settings panel, and code maps point each area to its files. Open your fork and ask for the change. (Those docs are in Czech; Claude reads them fine.)</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg></div>
+        <h3 data-i18n="y3.t">Or let Claude configure it</h3>
+        <p data-i18n="y3.p"><code>AGENTS.md</code> documents the config, note format, local API and MCP — so Claude can set up your projects, links and layout without touching the code.</p>
+      </div>
+    </div>
+    <div class="cta-row"><a class="btn btn-sm" href="https://github.com/jiri-hyan/ledge-app/fork" rel="noopener" data-i18n="y.fork">Fork on GitHub</a></div>
+  </div>
+</section>
+
+<!-- ================= INSTALL ================= -->
+<section id="install">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker" data-i18n="inst.kicker">Install in a minute</span>
+      <h2 data-i18n="inst.title">Three steps. No admin rights.</h2>
+    </div>
+    <div class="steps">
+      <div class="card step"><h3 data-i18n="s1.t">Download</h3><p data-i18n="s1.p">Get <code>Ledge_&lt;version&gt;_x64-setup.exe</code> from the latest GitHub release. It installs for your user only, into <code>%LOCALAPPDATA%\Ledge</code>.</p><div style="margin-top:16px"><a class="btn btn-primary btn-sm" data-dl href="https://github.com/jiri-hyan/ledge-app/releases/latest" data-i18n="cta.download">Download for Windows</a></div></div>
+      <div class="card step"><h3 data-i18n="s2.t">Get past SmartScreen</h3><p data-i18n="s2.p">The installer isn't code-signed yet, so Windows says the publisher is unknown. Click <b>More info → Run anyway</b>.</p></div>
+      <div class="card step"><h3 data-i18n="s3.t">Touch the top edge</h3><p data-i18n="s3.p">Move the mouse to the top edge of the screen. A short setup guide finds your repos, apps and Claude Code on first run.</p></div>
+    </div>
+    <div class="smartscreen">
+      <div class="card">
+        <h3 data-i18n="ss.t">Why does Windows warn me?</h3>
+        <p data-i18n="ss.p1">SmartScreen warns about any installer without a paid Authenticode certificate — that's what “unknown publisher” means, not that a virus was found. Ledge doesn't have that certificate yet; it's planned.</p>
+        <p data-i18n="ss.p2">What you can check today: every release lists the installer's SHA256, and the source is public. Updates inside Ledge go further — they're verified against a signing key built into the app before anything runs.</p>
+        <pre class="cmd"><button class="icon-btn copy" type="button" data-copy data-i18n="copy">Copy</button><code>Get-FileHash .\Ledge_*_x64-setup.exe -Algorithm SHA256</code></pre>
+        <p class="small" style="margin-top:8px" data-i18n="ss.p3">Compare the result with <code>SHA256SUMS.txt</code> in the release.</p>
+      </div>
+      <div class="ss-mock" aria-hidden="true">
+        <div class="t">Windows protected your PC</div>
+        <p>Microsoft Defender SmartScreen prevented an unrecognized app from starting…</p>
+        <p><u class="hl" data-n="1">More info</u></p>
+        <div class="row"><span class="hl" data-n="2">Run anyway</span><span>Don't run</span></div>
+        <p class="small" style="color:rgba(255,255,255,.75);margin-top:12px" data-i18n="ss.mock">Illustration of the Windows dialog: click ① More info, then ② Run anyway appears.</p>
+      </div>
+    </div>
+    <p class="small" style="text-align:center;margin-top:22px" data-i18n="req">Requirements: Windows 10 or 11 (x64) with the Microsoft Edge WebView2 runtime (preinstalled on Windows 11). Claude Code is optional.</p>
+  </div>
+</section>
+
+<!-- ================= PRIVACY ================= -->
+<section id="privacy" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker" data-i18n="priv.kicker">Privacy</span>
+      <h2 data-i18n="priv.title">No telemetry. No account. No cloud.</h2>
+      <p data-i18n="priv.lead">Ledge only goes online for things you can see and switch off.</p>
+    </div>
+    <div class="two">
+      <div class="card"><h3 data-i18n="pv1.t">What goes to the network</h3><p data-i18n="pv1.p">The update check (GitHub releases of this repo, every 6 hours by default — can be turned off). Weather from Open-Meteo, only when you set a location. A one-time favicon for a website shortcut. Calendars, mail and notes sync only when you set them up. The Anthropic status check is off by default.</p></div>
+      <div class="card"><h3 data-i18n="pv2.t">What stays on your PC</h3><p data-i18n="pv2.p">Claude Code sessions, hooks, limits and cost estimates are read locally. The local API listens on 127.0.0.1 only and rejects browser requests. Account sign-in happens in your browser and tokens live in Windows Credential Manager.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head"><h2 data-i18n="faq.title">Questions</h2></div>
+    <div class="faq">
+      <details><summary data-i18n="q1">Is Ledge free?</summary><p data-i18n="a1">Yes. Ledge is free and open source under the MIT license. There is no paid tier and no account.</p></details>
+      <details><summary data-i18n="q2">Do I need Claude Code?</summary><p data-i18n="a2">No. Without Claude Code, Ledge is a project launcher, dev-server manager, notes app and quick-action drawer. With Claude Code, it also shows your sessions, approvals, questions and limits.</p></details>
+      <details><summary data-i18n="q3">Can Ledge approve things for Claude by itself?</summary><p data-i18n="a3">No — by design. Only a click from you approves a request. If you don't respond in time, the request returns to the terminal; nothing is ever auto-approved.</p></details>
+      <details><summary data-i18n="q4">Will it get in the way while I type or play?</summary><p data-i18n="a4">Ledge never takes keyboard focus when it opens on its own, and it goes quiet while a fullscreen game is running.</p></details>
+      <details><summary data-i18n="q5">Is it a Windows version of NotchNook or Dynamic Island?</summary><p data-i18n="a5">In spirit, yes: a drawer and status area at the top of the screen, with Island and Notch looks and a liquid opening animation. It's built for Windows and for developer workflows rather than as a clone.</p></details>
+      <details><summary data-i18n="q6">How do updates work?</summary><p data-i18n="a6">Ledge checks this repo's GitHub releases and shows a “New version” chip. It downloads the installer over HTTPS, verifies its SHA256 and the publisher's signature, and installs only when you click.</p></details>
+      <details><summary data-i18n="q7">macOS or Linux?</summary><p data-i18n="a7">Not today. Ledge is Windows-only (10 and 11, x64).</p></details>
+      <details><summary data-i18n="q8">How do I uninstall it?</summary><p data-i18n="a8">Windows Settings → Apps → Ledge. Your config and notes stay in your folders.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ROADMAP ================= -->
+<section id="roadmap" class="alt">
+  <div class="wrap">
+    <div class="sec-head"><span class="kicker" data-i18n="road.kicker">What's next</span><h2 data-i18n="road.title">Roadmap</h2><p data-i18n="road.lead">Work in progress — no dates promised.</p></div>
+    <ul class="road">
+      <li><span class="tag" data-i18n="rt.wip">In progress</span><span data-i18n="r1"><b>Ledge Studio</b> — rebuilt settings for looks and layout.</span></li>
+      <li><span class="tag" data-i18n="rt.wip">In progress</span><span data-i18n="r2"><b>winget and Scoop</b> — install with one command.</span></li>
+      <li><span class="tag" data-i18n="rt.plan">Planned</span><span data-i18n="r3"><b>Windows code signing</b> (Authenticode) — so SmartScreen stops warning.</span></li>
+      <li><span class="tag" data-i18n="rt.plan">Planned</span><span data-i18n="r4"><b>Claude activity</b> polish — clearer phases and errors in the live activity card.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2 data-i18n="final.title">Give your screen's top edge a job.</h2>
+    <p data-i18n="final.p">Free, open source and under 7 MB. If Ledge helps you, a star on GitHub helps others find it — and issues and ideas are very welcome.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" data-dl href="https://github.com/jiri-hyan/ledge-app/releases/latest"><span data-i18n="cta.download">Download for Windows</span></a>
+      <a class="btn" href="https://github.com/jiri-hyan/ledge-app/issues/new" rel="noopener" data-i18n="cta.issue">Suggest a feature</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="img/icon.svg" alt="" width="22" height="22">Ledge</a>
+    <a href="https://github.com/jiri-hyan/ledge-app" rel="noopener">GitHub</a>
+    <a href="https://github.com/jiri-hyan/ledge-app/releases" rel="noopener" data-i18n="ft.releases">Releases</a>
+    <a href="https://github.com/jiri-hyan/ledge-app/issues" rel="noopener" data-i18n="ft.issues">Issues</a>
+    <a href="https://github.com/jiri-hyan/ledge-app/blob/main/LICENSE" rel="noopener" data-i18n="ft.license">MIT license</a>
+    <span class="sp" data-i18n="ft.note">Not affiliated with Anthropic or Microsoft. No cookies, no analytics.</span>
+  </div>
+</footer>
+<script src="app.js" defer></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STRIP_COLORS, STRIP_ITEM_IDS, clipCustom, customLen, previewSegments, withColor, withQuiet } from "./strip.ts";
+import { STRIP_COLORS, STRIP_ITEM_IDS, STRIP_OPACITY, clipCustom, customLen, previewSegments, withColor, withQuiet } from "./strip.ts";
 
 test("položky a barvy se shodují s Rustem (stripconf.rs)", () => {
   const src = readFileSync(new URL("../../src-tauri/src/stripconf.rs", import.meta.url), "utf8");
@@ -25,6 +25,13 @@ test("barva: změna jednoho klíče, null = výchozí", () => {
   ];
   for (const [colors, id, c, want] of cases) assert.deepEqual(withColor(colors, id, c), want, `${id} ${c}`);
   assert.deepEqual(before, { clock: "teal" }, "vstup netknutý");
+});
+
+test("výchozí krytí proužku v UI = Rust (stripconf.rs)", () => {
+  const src = readFileSync(new URL("../../src-tauri/src/stripconf.rs", import.meta.url), "utf8");
+  const m = src.match(/opacity:\s*([0-9.]+),/);
+  assert.ok(m, "Default má opacity");
+  assert.equal(STRIP_OPACITY, Number(m[1]));
 });
 
 test("v klidu skryté: přidat, odebrat, bez duplicit", () => {

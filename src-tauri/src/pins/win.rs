@@ -93,6 +93,15 @@ fn windows() -> Vec<(String, WebviewWindow)> {
     app().webview_windows().into_iter().filter(|(l, _)| l.starts_with(LABEL_PREFIX)).collect()
 }
 
+/// Jazyk rozhraní se změnil: otevřené lístky ho dostanou událostí `pin-lang` (bez ní by ho znaly jen z `pin_init`).
+pub(crate) fn on_config(old: &crate::config::Config, new: &crate::config::Config) {
+    if old.ui.lang != new.ui.lang {
+        for (l, w) in windows() {
+            let _ = w.emit_to(l.as_str(), "pin-lang", new.ui.lang);
+        }
+    }
+}
+
 pub(crate) fn any_open() -> bool {
     crate::state::CORE.get().is_some_and(|c| c.app.webview_windows().keys().any(|l| l.starts_with(LABEL_PREFIX)))
 }

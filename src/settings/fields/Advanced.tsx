@@ -2,8 +2,8 @@
 // ať základ panelu zůstane srozumitelný. Jedna implementace pro všechny panely (Vzhled má vlastní kroky
 // v `apUi.tsx`). Rozbalení si pamatuje úložiště prohlížeče po `id` (try/catch — bez něj je vše sbalené);
 // skok z hledání nebo odjinud na volbu uvnitř (`hit`) oddíl rozbalí, ale do paměti nezapíše.
-// Režim Nastavení „Základní“ (`settings/mode.ts`) oddíl skryje úplně (`data-adv="hide"`, settings.css), kromě
-// oddílu, na který právě vedl skok (`forced`). Jen méně časté (ne technické) volby sem NEpatří — na ty je
+// Ledge Studio (kolo 24) ho ukazuje jako sbalené „Doladit“ pod otázkou (přepínač Základní / Pokročilé zrušen);
+// v průvodci je skryté, dokud uživatel neřekne „Ukázat vše“ (`studio.css`). Jen méně časté (ne technické) volby sem NEpatří — na ty je
 // sbalovací skupina `Group.tsx`, vidět i v Základním (kolo 21).
 import { createEffect, createSignal, on, Show, type JSX } from "solid-js";
 import { t } from "../../i18n";
@@ -57,7 +57,7 @@ export function Advanced(p: { id: string; title?: string; hint?: string; inline?
       }}
     >
       <summary>
-        <b>{p.title ?? t("settings.adv.title", "Pokročilé")}</b>
+        <b>{p.title ?? t("settings.adv.title", "Doladit")}</b>
         <Show when={p.hint}><small>{p.hint}</small></Show>
       </summary>
       <div class="st-adv-body">{p.children}</div>

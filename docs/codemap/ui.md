@@ -24,10 +24,11 @@ Detail (toky, invarianty, testy, co nečíst, historie): [ui-detail.md](ui-detai
 | `hover/*` | náhled po najetí (`drawer.hover`, Rust `View::Compact` / `View::Island`, [core.md](core.md)) … | compact |
 | `cards/ActionsCard.tsx` · `palette/*` | karta Rychlé akce · paleta příkazů (Ctrl+K, 🔍) → [actions.md](actions.md) | `ActionsCard` · `Palette` `buildItems` `rank` |
 | `cards/ClockCard.tsx` · `WeatherCard.tsx` · `LinksCard.tsx` | záložka Osobní (Čas ukazuje i baterii `media/Battery.tsx`; Odkazy = akce typu web/složka/soubor → [actions.md](actions.md)) | `observedLabel` `WX_MAX_AGE_MS` `LINK_ICON` |
+| `cards/temp.ts` | teplota °C → °F při zobrazení (`personal.fahrenheit`), čistá funkce | `tempIn` `tempUnit` |
 | `timer/*` (`timer/TimerCard.tsx`) | Osobní: karta Časovač (odpočet + stopky; stav drží Rust `timer.rs`, sekundy z tiku `now`), čistá logika `model.ts` (+ … | `TimerCard` `timerDo` `leftMs` `elapsedMs` |
 | `media/*` | Osobní: Právě hraje + hlasitost, baterie, `PersonalLive` (líný start odběrů) → [media.md](media.md) | `MediaCard` `PersonalLive` `Battery` |
 | `ClaudeSessions.tsx` | karta Claude → [sessions.md](sessions.md) |  |
-| `Settings.tsx` · `settings/*` · `fit.ts` | Nastavení → [settings.md](settings.md); `fit.ts` = strop výšky (`--drawer-max-h`) | `Settings` |
+| `studio/*` · `settings/*` · `fit.ts` | Nastavení = Ledge Studio → [studio.md](studio.md), panely → [settings.md](settings.md); `fit.ts` = strop výšky (`--drawer-max-h`) | `Studio` |
 | `notes/*` | poznámky → [notes.md](notes.md) |  |
 | `api.ts` | most k Rustu: `api.*` = `invoke`, `on` = `listen`; mimo Tauri no-op | `api` `on` `inTauri` `call` |
 | `types/*` (`types.ts` = re-export; po oblastech `types/{media,notes,onboarding,personal,projects,settings,timer}.ts`) | typy snapshotu a IPC po oblastech (zrcadlo serde v Rustu); `api.ts` je re-exportuje | `Snapshot` `ProjectView` `ProcView` `SessionView` |

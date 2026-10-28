@@ -38,7 +38,7 @@ export default function AppearanceOpen(q: { ap: Ap; dirty: boolean; adv: boolean
       <AppearancePages ap={q.ap} />
       <CardsGallery />
       <div class="card ap-top" id="f-appearance.layout" classList={{ hit: lit("appearance.layout") }}>
-        <h4>{t("appearance.open.size", "Šířka a hustota na tvém monitoru")}</h4>
+        <h4>{t("appearance.open.size", "Šířka (rychle) a hustota na tvém monitoru")}</h4>
         <MonitorPreview a={a()} customW={customW()} blur={q.ap.blur()} />
         <div class="opt">
           <span>{t("appearance.open.width", "Šířka")}<small>{a().width === "custom"
@@ -74,8 +74,8 @@ function SizeTable(q: { ap: Ap }) {
   const num = (v: string) => (v.trim() === "" ? 0 : Math.round(+v) || 0);
   return (
     <div class="card ap-top" id="f-appearance.size" classList={{ hit: lit("appearance.size") }}>
-      <h4>{t("appearance.size.title", "Velikost otevřeného Ledge")}</h4>
-      <p class="ap-note">{t("appearance.size.hint", "V úpravách šuplíku (✎) můžeš táhnout za boky (šířka, od středu na obě strany) a za spodek (výška). Přichytává se to k mřížce, s Alt volně; dvojklik na úchyt vrátí výchozí. Prázdné = výchozí: šířka podle předvolby, výška podle obsahu.")}</p>
+      <h4>{t("appearance.size.title", "Přesná velikost v px")}</h4>
+      <p class="ap-note">{t("appearance.size.hint", "V úpravách šuplíku (✎) můžeš táhnout za boky (šířka, od středu na obě strany) a za spodek (výška). Přichytává se to k mřížce, s Alt volně; dvojklik na úchyt vrátí výchozí. Prázdné = výchozí: šířka podle předvolby výše, výška podle obsahu. Zadané číslo má přednost před předvolbou i před vlastní šířkou v Doladit.")}</p>
       <div class="opt" id="f-appearance.size.perPage" classList={{ hit: lit("appearance.size.perPage") }}>
         <span>{t("appearance.size.perPage", "Pamatovat velikost pro každou záložku")}<small>{t("appearance.size.perPageHint", "Přepnutí záložky šuplík plynule zvětší nebo zmenší. Vypnuto = jedna velikost pro všechny.")}</small></span>
         <button class="switch" classList={{ on: perPage() }} role="switch" aria-checked={perPage()} aria-label={t("appearance.size.perPage", "Pamatovat velikost pro každou záložku")}

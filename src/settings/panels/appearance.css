@@ -118,13 +118,6 @@
 .ap-chips .ap-chip-on { color: var(--t1); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
 /* ---------- kroky (Appearance.tsx): Zavřený · Po najetí · Otevřený · Pohyb ---------- */
-.ap-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 4px; padding: 4px; border-radius: var(--r-lg); background: var(--well); border: 1px solid var(--line); }
-.ap-step { display: flex; flex-direction: column; gap: 1px; padding: 7px 12px; border-radius: calc(var(--r-lg) - 4px); text-align: left; color: var(--t3); transition: background var(--dur-1), color var(--dur-1); }
-.ap-step b { font-size: var(--fs-body); font-weight: 600; }
-.ap-step small { font-size: var(--fs-xs); }
-.ap-step:hover { color: var(--t2); }
-.ap-step.on { background: var(--card-3); color: var(--t1); box-shadow: inset 0 0 0 1px var(--line-2); }
-.ap-step:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 
 /* galerie vzhledů zavřeného Ledge a chování po najetí (dlaždice = `.ap-style`) */
 .ap-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s2); }
@@ -174,3 +167,7 @@
 .ap-size th { text-align: left; font-weight: 600; color: var(--t3); padding: 0 var(--s2) var(--s1) 0; }
 .ap-size td { padding: 2px var(--s2) 2px 0; color: var(--t1); }
 .ap-size input { width: 96px; font-variant-numeric: tabular-nums; }
+
+/* Ledge Studio: Doladit kroku v průvodci skryté (`studio/PartView.tsx` `data-trim`), čipy „Co se děje“ ve scéně se zalomí */
+[data-trim] .ap-details:not([data-adv="shown"]) { display: none; }
+[data-scene] .ap-states { flex-wrap: wrap; }

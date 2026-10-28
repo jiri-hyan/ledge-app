@@ -54,6 +54,8 @@ pub(crate) struct Snapshot {
     /// záložky a karty na nich (`layout.rs`); `mode` = id záložky, která je vidět
     layout: crate::layout::LayoutConfig,
     claude_enabled: bool,
+    /// herní režim zapnutý (Ledge je mrtvý, dokud se nevypne) — Nastavení → Spouštění a hry ukazuje stav
+    game_mode: bool,
     projects: Vec<ProjectView>,
     procs: Vec<procman::ProcView>,
     pending: Vec<claude::Pending>,
@@ -150,6 +152,8 @@ pub(crate) struct WeatherView {
     /// unset · loading · ok · stale · unavailable · idle (viz `weather::status`)
     status: &'static str,
     label: String,
+    /// `personal.fahrenheit` — data jsou vždy v °C, karta je přepočítá při zobrazení
+    fahrenheit: bool,
     data: Option<weather::Weather>,
     fetched_ms: Option<i64>,
     error: Option<String>,
@@ -245,6 +249,7 @@ pub(crate) fn snapshot() -> Snapshot {
         sections: cfg.drawer.sections.clone(),
         layout: cfg.layout.clone(),
         claude_enabled: cfg.claude.enabled,
+        game_mode: c.game_mode.load(std::sync::atomic::Ordering::SeqCst),
         projects,
         procs: c.procs.snapshot(),
         pending: c.claude.pending(),
@@ -311,6 +316,7 @@ pub(crate) fn personal_view(cfg: &Config, (notes, notes_more): (Vec<notes::NoteV
         WeatherView {
             status: weather::status(place.is_some(), data.is_some(), error.is_some(), live, weather::is_old(fetched_ms, now)),
             label: cfg.personal.weather.label.clone(),
+            fahrenheit: cfg.personal.fahrenheit,
             fetched_ms,
             data,
             error,

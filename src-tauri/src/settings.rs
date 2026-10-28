@@ -70,6 +70,7 @@ pub(crate) fn apply_config(mut new: Config) {
     crate::widgets::live::on_config(&old, &new);
     // widgety na ploše: motiv a jazyk do jejich oken
     crate::desk::win::on_config(&old, &new);
+    crate::pins::win::on_config(&old, &new);
     if old.drawer.sections != new.drawer.sections || old.modes != new.modes {
         // právě hraje / hlasitost / baterie: vypnutá karta = konec odběrů (`media.rs` a spol.)
         crate::media::sync(&new);

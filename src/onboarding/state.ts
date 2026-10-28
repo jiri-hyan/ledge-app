@@ -2,7 +2,7 @@
 // šuplíku, kdokoli ručně z Nastavení (`startWizard`). Config se čte jednou za život WebView — při té
 // příležitosti se nastaví i jazyk z `ui.lang`. Skořápka (App) jen sleduje `wizardOpen`.
 import { createSignal } from "solid-js";
-import { api } from "../api";
+import { api, inStudio } from "../api";
 import { setLang } from "../i18n";
 import { resetWizard } from "./store";
 import "./en";
@@ -29,6 +29,8 @@ export function checkFirstRun(): Promise<void> {
 
 /** Ruční spuštění (Nastavení → Jazyk a průvodce): vždy od začátku. */
 export function startWizard() {
+  // z okna Ledge Studio: průvodce je stránka šuplíku → Rust otevře šuplík a pošle mu `studio-ask`
+  if (inStudio) return void api.studioWin("wizard").catch(() => {});
   resetWizard();
   setOpen(true);
 }

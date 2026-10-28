@@ -221,7 +221,6 @@ registerDict("en", {
   "cards.gallery.tplDone": "Added tab “{name}” (bento) — you'll see it in the drawer after Save",
   "cards.gallery.bento": "Bento templates",
   "cards.gallery.bentoHint": "A template adds a new tab with tiles (largest = most important); your tabs stay. You can also turn bento on for an existing tab in Drawer and cards.",
-  "settings.dock.cards": "Cards",
   "settings.layout.bento": "Bento grid",
   "settings.layout.bentoHint": "Cards as 1 × 1, 2 × 1, 2 × 2 tiles in fixed rows; gaps fill themselves. Tile size: ⋯ on the card → Tile.",
   // velikost šuplíku tažením v úpravách (kolo 23, ResizeHandles)

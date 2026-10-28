@@ -16,6 +16,7 @@ Tento přehled je zkrácený; plná verze je v [README-detail.md](README-detail.
 | Nastavení: shell, panely, záloha, dialogy, strop výšky šuplíku | [settings.md](settings.md) | `src/Settings.tsx` `src/settings/*` `src/fit.ts` `configerr.rs` `configio.rs` `projectdetect.rs` |
 | Rozložení šuplíku: záložky (i vlastní), karty se šířkou a výškou (tah za okraj, ⋯), řada … | [layout.md](layout.md) | `layout.rs` `tilelook.rs` `src/layout/*` `src/cards/CardMenu.tsx` |
 | Vlastní SVG grafy: sparkline, prstenec, sloupce, pás (heat), číslo jako hrdina — bez … | [charts.md](charts.md) | `src/charts/*` |
+| Showcase | [showcase.md](showcase.md) | `src/showcase/*` |
 | Frontend (UI): skořápka, stránky, karty, náhled po najetí, morf, styly | [ui.md](ui.md) | `src/App.tsx` `src/MainPage.tsx` `src/cards/*` `src/hover/*` `src/api.ts` `src/types.ts` `src/motion.ts` |
 | Rychlé akce a odkazy (config `actions`, odkaz = akce, převod `personal.links`, spouštění … | [actions.md](actions.md) | `actions.rs` `actionrun.rs` `actionicons.rs` `actionstate.rs` `src/actions/*` `src/palette/*` |
 | Widgety na ploše („Na plochu“): karta Ledge jako okno na ploše / druhém monitoru, vrstvy … | [desk.md](desk.md) | `desk/*` `commands/desk.rs` `desk.html` `src/desk/*` |
