@@ -39,3 +39,9 @@
 .cx-tile { margin-top: var(--s2); }
 .cx-shapes { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .cx-shape.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--t1); }
+/* kolo 25: designy, výzdoba, nástroje dílu */
+.cx-designs { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+.cx-col { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cx-col input[type="color"], .cx-pt input[type="color"] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm, 4px); background: none; }
+.cx-pt { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; max-width: 150px; }
+.cx-pt select { font-size: var(--fs-2xs); max-width: 100%; }

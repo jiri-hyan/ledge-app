@@ -9,11 +9,12 @@
 import { createSignal } from "solid-js";
 import { api, on } from "../api";
 import { setMotion, setShellRadius, setStripRadius } from "../motion";
-import type { Appearance, LayoutId } from "../types";
+import type { Appearance, Backdrop, LayoutId } from "../types";
 import { DEFAULT_APPEARANCE, RADIUS, appearanceVars, effectiveMotion, normalizeAppearance, stripShape } from "./appearance";
 import { themeOf } from "./customThemes";
 import { effectiveAppearance } from "./pages";
 import { NOTCH_RADIUS } from "./looks";
+import { cardMode } from "./backdrop";
 
 const [saved, setSaved] = createSignal<Appearance>(DEFAULT_APPEARANCE);
 /** Uložený (platný) vzhled — čte ho i `MainPage` (pořadí karet). */
@@ -21,6 +22,9 @@ export const savedAppearance = saved;
 const [layoutNowSig, setLayoutNow] = createSignal<LayoutId>(DEFAULT_APPEARANCE.layout);
 /** Rozložení, které právě platí na `<html>` (i rozpracované v náhledu) — `MainPage` podle něj kreslí lištu notche. */
 export const layoutNow = layoutNowSig;
+const [backdropSig, setBackdropNow] = createSignal<Backdrop | null>(null);
+/** Pozadí, které právě platí (i rozpracované v náhledu); `null` = žádné → `BackdropLayer.tsx` nevykreslí nic. */
+export const backdropNow = backdropSig;
 
 const reducedQuery = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 const reduced = () => reducedQuery?.matches ?? false;
@@ -61,6 +65,15 @@ export function applyAppearance(raw: unknown) {
   root.dataset.layout = a.layout;
   root.dataset.material = a.material;
   root.dataset.font = a.font;
+  // pozadí šuplíku (kolo 25): jen značky pro CSS; gradient a závoj jdou přes proměnné `--bd-img` / `--bd-veil`
+  if (a.backdrop) root.dataset.backdrop = a.backdrop.live || "grad";
+  else delete root.dataset.backdrop;
+  const cm = cardMode(a.backdrop);
+  if (cm === "solid") delete root.dataset.bdCards;
+  else root.dataset.bdCards = cm;
+  if (vars["accent-grad"]) root.dataset.accentGrad = "";
+  else delete root.dataset.accentGrad;
+  setBackdropNow(a.backdrop ?? null);
   root.style.colorScheme = theme.light ? "light" : "dark";
   // pro CSS, které potřebuje tón motivu (podklad ikon opačného tónu, `ui/iconTone.ts`)
   root.dataset.scheme = theme.light ? "light" : "dark";

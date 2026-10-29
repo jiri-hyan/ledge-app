@@ -184,7 +184,7 @@ mod tests {
     }
 
     fn limits(five: Option<Window>, seven: Option<Window>) -> LimitsView {
-        LimitsView { at: Some(1_790_000_000_000), source: Some(Source::StatusLine), five_hour: five, seven_day: seven, stale_ms: 1, status_line: "full", notice: None, pace: false, history5h: Vec::new() }
+        LimitsView { at: Some(1_790_000_000_000), source: Some(Source::StatusLine), five_hour: five, seven_day: seven, stale_ms: 1, status_line: "full", notice: None, pace: false, history5h: Vec::new(), desktop: "", fetch: "" }
     }
 
     fn sample() -> (CostsView, LimitsView) {

@@ -55,6 +55,8 @@ pub(super) fn parts_sig(v: &[Part]) -> String {
             Part::Battery { percent, .. } => format!("▭{percent}"),
             Part::Ring { fill, color } => format!("◯{}:{}", fill.map(|x| format!("{:.0}", x * 100.0)).unwrap_or_default(), col(*color)),
             Part::Meter { fill, color } => format!("▮{:.0}:{}", fill * 100.0, col(*color)),
+            Part::Spark { pts, color } => format!("~{}:{}", pts.len(), col(*color)),
+            Part::Under { text, color, fill } => format!("_{text}_{:.0}:{}", fill * 100.0, col(*color)),
         })
         .collect::<Vec<_>>()
         .join(" ")

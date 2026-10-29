@@ -12,6 +12,8 @@ Fixture: jen smyšlená jména a `example.com`; v Tauri se demo nikdy nezapne (`
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
 | `src/showcase/demo.ts` | ukázkový hostitel šuplíku: URL parametry (set, style, theme, page, cards, ask, nopending, w, open), `window.__demo` pro Playwright, `report_size` → `postMessage` rodiči | `installShowcase` |
+| `src/showcase/fixtures.ts` | kolo 25, doplňková ukázková data pro přehlídku vzhledů: počasí s předpovědí (`weatherFull`, den / noc / déšť), útrata 14 dní (`costsFull`), odběr systému s historií (`systemFull`); zapíná je `?full=1` | `weatherFull` `costsFull` `systemFull` |
+| `scripts/showcase/designs.mjs` | kolo 25, kontaktní archy PNG do `shots-k25/` (necommitovat): každý vzhled karet Claude / Systém / Počasí / Týden × 3 šířky + prázdné stavy, pozadí šuplíku s kartami, float / notch; `--only cards\|empty\|backdrops` | |
 | `src/showcase/sets.ts` | tři sady dat (studio, creator, minimal): projekty, session + schválení, otázka, limity, poznámky, počasí, kalendář, skladba — čas relativně k `now`, šířka šuplíku (`drawerWidth`) — test `sets.test.mjs` | `buildSet` `askFor` `SET_IDS` `COVER` `drawerWidth` |
 | `src/showcase/stage.tsx` · `stage.css` | scéna: tapeta, proužek (`StripLookPreview`), iframe šuplíku / Studia; scény drawer · closed · open · studio · pair · strip | `Strip` `Drawer` `ClosedGallery` `OpenGallery` `PairScene` `StripScene` |
 | `scripts/showcase/stage.html` | vstup scény pro Vite (`/scripts/showcase/stage.html?scene=…`) | |

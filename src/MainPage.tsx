@@ -39,6 +39,8 @@ import Tour from "./layout/Tour";
 import HoldTip from "./layout/HoldTip";
 import { closeCardLook, lookFor, target as cardLookTarget } from "./layout/lookState";
 import { viewOf } from "./layout/look";
+import { designOf } from "./layout/designs";
+import ClaudeDesign, { isClaudeDesign } from "./cards/ClaudeDesign";
 import TileMenu, { openTileMenu } from "./tilelook/TileMenu";
 import { gotoSettingsPanel } from "./palette/goto";
 import { closeLook } from "./tilelook/state";
@@ -114,6 +116,8 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const tiles = () => tilesOf(cardOf("projects"));
   /** varianta zobrazení karty (vzhled karty; i rozpracovaný v panelu) */
   const view = (id: CardId) => viewOf(id, lookFor(page().id, id, cardOf(id)?.look));
+  /** vzhled karty z registru (`layout/designs.ts`; i rozpracovaný v panelu); výchozí = dnešní vzhled */
+  const design = (id: CardId) => designOf(id, lookFor(page().id, id, cardOf(id)?.look))?.id;
   // vzhled záložky (`appearance.pages`, `theme/pages.ts`): platí, dokud je hlavní stránka vidět
   createEffect(() => setActivePage(page().id));
   // velikost šuplíku podle záložky (`appearance.size`, kolo 23) — pevná výška `.content` v App
@@ -165,7 +169,12 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       case "running":
         return <Running s={p.s} now={p.now} menu={menu("running")} page={page().id} limit={limitOf(cardOf("running"))} />;
       case "claude":
-        return <ClaudeSessions s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("claude", CLAUDE_PARTS.filter(on))} page={page().id} limit={limitOf(cardOf("claude"))} />;
+        // jiný vzhled jen když na tebe nic nečeká (schválení a otázky mají tlačítka jen v klasické kartě)
+        return (
+          <Show when={isClaudeDesign(design("claude")) && !inbox()} fallback={<ClaudeSessions s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("claude", CLAUDE_PARTS.filter(on))} page={page().id} limit={limitOf(cardOf("claude"))} />}>
+            <ClaudeDesign s={p.s} now={p.now} design={design("claude")!} onSettings={p.onSettings} menu={menu("claude")} />
+          </Show>
+        );
       case "repos":
         return <Repos s={p.s} view={view("repos")} menu={menu("repos")} onSettings={p.onSettings} page={page().id} limit={limitOf(cardOf("repos"))} />;
       case "notes":
@@ -180,7 +189,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       case "timer":
         return <TimerCard s={p.s} now={p.now} menu={menu("timer")} />;
       case "weather":
-        return <WeatherCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("weather")} />;
+        return <WeatherCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("weather")} design={design("weather")} />;
       case "calendar":
         return <CalendarCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("calendar")} />;
       case "links":
@@ -194,12 +203,12 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       case "github":
         return <GithubCard now={p.now} cfgError={p.s.cfgError} menu={menu("github")} />;
       case "system":
-        return <SystemCard menu={menu("system")} />;
+        return <SystemCard menu={menu("system")} design={design("system")} />;
       // kolo 22 (nové widgety, `src/board/`)
       case "usage":
         return <UsageCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("usage")} />;
       case "week":
-        return <WeekCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("week")} />;
+        return <WeekCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("week")} design={design("week")} />;
       case "bigclock":
         return <BigClockCard now={p.now} menu={menu("bigclock")} />;
       case "toggles":

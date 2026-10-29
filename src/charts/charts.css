@@ -31,3 +31,30 @@
 .chart-stat-sub { font: var(--fs-xs) var(--mono); color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chart-stat-spark { display: block; margin-top: var(--s1); }
 .chart-stat-empty .chart-stat-num { color: var(--t3); }
+
+/* Budík a soustředné prstence (kolo 25, `Gauge.tsx` / `Rings.tsx`): šířka podle obalu, barva podle `data-tone`. */
+.chart-gauge, .chart-rings { position: relative; width: 100%; line-height: 1; --dial-c: var(--green); }
+.chart-gauge svg, .chart-rings svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart-rings { aspect-ratio: 1; }
+.chart-gauge { aspect-ratio: 100 / 58; }
+.chart-gauge-arc, .chart-rings-arc { fill: none; stroke: var(--dial-c); }
+.chart-rings-g { --dial-c: var(--green); }
+.chart-rings-g[data-ring="1"] { --dial-c: var(--accent); }
+.chart-rings-g[data-ring="2"] { --dial-c: var(--teal); }
+.chart-gauge[data-tone="warn"], .chart-rings-g[data-tone="warn"][data-ring] { --dial-c: var(--amber); }
+.chart-gauge[data-tone="bad"], .chart-rings-g[data-tone="bad"][data-ring] { --dial-c: var(--red); }
+.chart-gauge-plan { stroke: var(--t1); stroke-width: 1.6; opacity: 0.6; }
+.chart-gauge-needle { transition: transform 0.4s ease; }
+.chart-gauge-needle line { stroke: var(--t0); stroke-width: 2; stroke-linecap: round; }
+.chart-gauge-needle circle { fill: var(--t0); }
+.chart-gauge-in { position: absolute; left: 0; right: 0; bottom: 0; display: grid; justify-items: center; gap: 1px; pointer-events: none; }
+.chart-rings-in { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1px; pointer-events: none; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .chart-gauge-needle { transition: none; } }
+
+/* široká karta (kolo 25b): číslo + popisek vlevo, sparkline vpravo místo prázdné plochy; větší číslo */
+@container hb (min-width: 30rem) {
+  .chart-stat { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--s6, 32px); align-items: center; }
+  .chart-stat > :not(.chart-stat-spark) { grid-column: 1; }
+  .chart-stat-spark { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; align-self: center; }
+  .chart-stat-num { font-size: calc(var(--fs-body) * 3.4); }
+}

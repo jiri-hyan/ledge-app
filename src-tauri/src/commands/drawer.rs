@@ -30,6 +30,7 @@ pub(crate) fn set_mode(mode: String) {
     }
     maybe_refresh_weather(false);
     crate::incidents::maybe_refresh(false);
+    crate::limitsfetch::maybe_refresh(false);
     crate::calendar::live::maybe_refresh(false);
     crate::widgets::live::wake_if_used(&core().cfg.read());
     mark_dirty();

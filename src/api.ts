@@ -30,6 +30,9 @@ export function setDemoHost(h: (cmd: string, args?: Record<string, unknown>) => 
   if (!inTauri) demoHost = h;
 }
 
+/** Příkaz pro ukázkového hostitele (karty s vlastním `invoke`, např. Systém); mimo ukázku a v Tauri `undefined`. */
+export const demoCall = <T,>(cmd: string, args?: Record<string, unknown>): T | undefined => (!inTauri && demoHost ? (demoHost(cmd, args) as T | undefined) : undefined);
+
 /** Události pro ukázkový šuplík (`index.html?demo=1`, `src/showcase/`): mimo Tauri `on` poslouchá tuhle sběrnici. */
 const demoBus = new Map<string, Set<(p: any) => void>>();
 export function emitDemo(event: string, payload?: unknown) {

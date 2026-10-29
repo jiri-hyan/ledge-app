@@ -9,6 +9,7 @@
 //! polí níž, ta zůstávají přebitelná („Upravit detaily“). Rust z nových polí potřebuje jen šířku
 //! (`width`, `geom::drawer_width_for`) a tvar proužku (`stripdeco`). Starý config = styl `classic`.
 
+pub mod backdrop;
 pub mod geom;
 pub mod look;
 pub mod motion;
@@ -16,6 +17,7 @@ pub mod pages;
 pub mod size;
 pub mod stripdeco;
 
+pub use backdrop::BackdropConfig;
 pub use look::{FontLook, Layout, Material, WidthPreset};
 pub use pages::{CustomTheme, PageLook};
 pub use size::SizeConfig;
@@ -72,6 +74,19 @@ pub struct AppearanceConfig {
     /// volitelně pro každou záložku. Chybí = šířka z `width` / `drawer.width`, výška podle obsahu.
     #[serde(skip_serializing_if = "SizeConfig::is_default")]
     pub size: SizeConfig,
+    /// Pozadí otevřeného šuplíku (kolo 25, `backdrop::BackdropConfig`): gradient, vlastní gradienty, živé pozadí.
+    /// Ze schématu pro MCP (`appearance_set`) vynecháno: strop velikosti `tools/list`; MCP pole nemění a při zápisu je zachová.
+    #[schemars(skip)]
+    #[serde(skip_serializing_if = "BackdropConfig::is_default")]
+    pub backdrop: BackdropConfig,
+    /// Druhá barva gradientního akcentu `#rrggbb` (kolo 25); prázdné = druhá barva se odvodí z `accent`.
+    #[schemars(skip)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub accent2: String,
+    /// Akcent se bere z barev pozadí (`backdrop`), `accent`/`accent2` se pak ignorují (výchozí vypnuto).
+    #[schemars(skip)]
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub accent_from_backdrop: bool,
 }
 
 impl Default for AppearanceConfig {
@@ -94,6 +109,9 @@ impl Default for AppearanceConfig {
             custom_themes: Vec::new(),
             custom_theme: String::new(),
             size: SizeConfig::default(),
+            backdrop: BackdropConfig::default(),
+            accent2: String::new(),
+            accent_from_backdrop: false,
         }
     }
 }
@@ -311,6 +329,10 @@ pub fn validate(a: &AppearanceConfig) -> Result<(), String> {
     if !c.is_empty() && c != "accent" && !is_hex(c) {
         return Err(trf!("appearance.strip.color „{c}“ chce prázdné, „accent“ nebo #rrggbb.", "appearance.strip.color “{c}” needs empty, “accent” or #rrggbb."));
     }
+    if !a.accent2.is_empty() && !is_hex(&a.accent2) {
+        return Err(trf!("appearance.accent2 „{}“ chce tvar #rrggbb (nebo prázdné).", "appearance.accent2 “{}” needs the form #rrggbb (or empty).", a.accent2));
+    }
+    backdrop::validate(&a.backdrop)?;
     pages::validate(a)
 }
 

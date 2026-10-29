@@ -7,6 +7,7 @@ import { THEME_IDS } from "./themes.ts";
 import { normalizeCustomThemes, themeOf } from "./customThemes.ts";
 import { normalizePages } from "./pages.ts";
 import { isDefaultSize, normalizeSize } from "./size.ts";
+import { accentFromGradient, backdropVars, cardVars, fitAccent, gradientOf, isDefaultBackdrop, normalizeBackdrop } from "./backdrop.ts";
 import { CLASSIC, FONTS, LAYOUTS, MATERIALS, STYLE_IDS, WIDTHS, lookVars } from "./looks.ts";
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -69,6 +70,10 @@ export function normalizeAppearance(raw: any): Appearance {
     customTheme: customThemes.some((c) => c.id === r.customTheme) ? r.customTheme : "",
     // velikost šuplíku (kolo 23): jen když je něco nastavené — výchozí vzhled zůstává bez pole
     ...(isDefaultSize(normalizeSize(r.size)) ? {} : { size: normalizeSize(r.size) }),
+    // pozadí a gradientní akcent (kolo 25): jen když jsou nastavené — výchozí vzhled zůstává bez polí
+    ...(isDefaultBackdrop(normalizeBackdrop(r.backdrop)) ? {} : { backdrop: normalizeBackdrop(r.backdrop) }),
+    ...(isHex(r.accent2) ? { accent2: r.accent2.toLowerCase() } : {}),
+    ...(r.accentFromBackdrop === true ? { accentFromBackdrop: true } : {}),
   };
 }
 
@@ -131,12 +136,21 @@ export function widenMotion(style: MotionStyle, speed: number, reduced: boolean)
 /** Všechny CSS proměnné vzhledu (bez `--`) → hodnota. Výchozí vzhled = hodnoty ze `styles.css`. */
 export function appearanceVars(a: Appearance, reducedMotion = false): Record<string, string> {
   const out: Record<string, string> = { ...themeOf(a).vars };
-  if (isHex(a.accent)) {
+  const grad = a.backdrop ? gradientOf(a.backdrop) : null;
+  const fromBd = a.accentFromBackdrop && grad ? accentFromGradient(grad) : null;
+  if (fromBd) {
+    // akcent z barev pozadí (kolo 25), doladěný na čitelnost proti kartám motivu
+    const [c1, c2] = [fitAccent(fromBd[0], out), fitAccent(fromBd[1], out)];
+    Object.assign(out, { accent: c1, "accent-2": c2, focus: c1, "accent-grad": `linear-gradient(90deg, ${c1}, ${c2})` });
+  } else if (isHex(a.accent)) {
     const [c1, c2] = accentPair(a.accent);
     out.accent = c1;
-    out["accent-2"] = c2;
+    out["accent-2"] = isHex(a.accent2) ? a.accent2.toLowerCase() : c2;
     out.focus = c1;
+    // gradientní akcent (kolo 25): druhá barva zadaná ručně
+    if (isHex(a.accent2)) out["accent-grad"] = `linear-gradient(90deg, ${c1}, ${out["accent-2"]})`;
   }
+  if (a.backdrop) Object.assign(out, backdropVars(a.backdrop, out));
   out.fz = String(a.fontScale);
   out.dens = String(DENSITY[a.density]);
   out.rr = String(RADIUS[a.radius]);
@@ -146,7 +160,8 @@ export function appearanceVars(a: Appearance, reducedMotion = false): Record<str
   const ease = CSS_EASE[style === "none" ? "spring" : style];
   out.spring = ease.spring;
   out.ease = ease.ease;
-  return { ...out, ...lookVars(a) };
+  const all = { ...out, ...lookVars(a) };
+  return a.backdrop ? { ...all, ...cardVars(a.backdrop, all) } : all;
 }
 
 /** Výška a rádius proužku (logické px) — výchozí tvar morfu ve frontendu. */

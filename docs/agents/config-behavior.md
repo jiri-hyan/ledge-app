@@ -39,6 +39,14 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `pages` = `{ "<id záložky>": { width?, height? } }` (chybějící = jako celek; přepnutí záložky = plynulá změna
   velikosti). Nastavuje se tažením za boky / spodek v režimu úprav (Alt = bez přichycení, dvojklik = výchozí) nebo
   čísly v Nastavení → Vzhled → Otevřený. Mimo rozsah se ořízne, config se kvůli tomu neodmítne. Starý config pole nemá.
+  **Pozadí otevřeného šuplíku (kolo 25):** `backdrop` = `{ id, live, flame, intensity, speed, cards, custom }` — `id` = hotový gradient
+  (`midnight`, `sunset`, `aurora`, …) nebo vlastní (`my-…` z `custom`), prázdné = žádný gradient (dnešní vzhled); `live` =
+  živé pozadí `fire` / `aurora` / `lava` / `stars` / `rain` / `grain` (prázdné = žádné; kreslí se jen při otevřeném šuplíku, při
+  „omezit pohyb“ jeden snímek); `flame` = barva plamene `classic` / `blue` / `green` / `violet`; `intensity` 0.1–1 (výchozí 0.6),
+  `speed` 0.3–2 (výchozí 1); `cards` = karty nad pozadím `auto` (výchozí: průsvitné jen když je pozadí zvolené) / `solid` / `tint` (poloprůhledná výplň) / `glass` (+ rozmazání); `custom` ≤ 20 vlastních gradientů `{ id, name, kind (linear/radial/conic/mesh), angle 0–360,
+  stops 2–5 × { c: #rrggbb, p: 0–100 } }`. `accent2` = druhá barva gradientního akcentu `#rrggbb` (s `accent`), `accentFromBackdrop`
+  = akcent z barev vybraného gradientu (výchozí vypnuto). Pod kartami se podle kontrastu přidá ztmavovací závoj. Starý config
+  pole nemá a vypadá stejně; výchozí hodnoty se nezapisují.
 - **Zkratky** — globální zkratky jsou ve výchozím stavu **vypnuté** (nic se neregistruje, v UI se
   nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Šuplík a karty → Otevírání a klávesy → Klávesové zkratky, nebo v configu:
   `hotkeys.enabled: true` + `hotkeys.toggle|approve|deny|note` (formát `Ctrl+Alt+Space`). Config bez

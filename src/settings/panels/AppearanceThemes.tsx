@@ -27,6 +27,11 @@ const ACCENTS: [string, string, string][] = [
   ["#f59e0b", "appearance.accent.amber", "Jantarová"],
   ["#ef4444", "appearance.accent.red", "Červená"],
   ["#ec4899", "appearance.accent.pink", "Růžová"],
+  ["#38bdf8", "appearance.accent.sky", "Nebeská"],
+  ["#a3e635", "appearance.accent.lime", "Limetková"],
+  ["#f97316", "appearance.accent.orange", "Oranžová"],
+  ["#e879f9", "appearance.accent.fuchsia", "Fuchsiová"],
+  ["#f43f5e", "appearance.accent.rose", "Malinová"],
 ];
 
 const KEY_LABEL: Record<CustomKey, () => string> = {

@@ -18,6 +18,8 @@ import MonitorPreview from "../previews/MonitorPreview";
 import AppearanceStyles from "./AppearanceStyles";
 import AppearanceThemes from "./AppearanceThemes";
 import AppearancePages from "./AppearancePages";
+import AppearanceBackdrop from "./AppearanceBackdrop";
+import AppearanceAccent from "./AppearanceAccent";
 import CardsGallery from "../../layout/CardsGallery";
 import { CustomWidth, DRAWER_WIDTH, DetailsRows, LayoutPicker } from "./AppearanceLayout";
 import { Advanced, Seg, lit, type Ap } from "./apUi";
@@ -35,6 +37,8 @@ export default function AppearanceOpen(q: { ap: Ap; dirty: boolean; adv: boolean
     <>
       <AppearanceStyles ap={q.ap} dirty={q.dirty} />
       <AppearanceThemes ap={q.ap} />
+      <div id="f-appearance.accentGrad" classList={{ hit: lit("appearance.accentGrad") }}><AppearanceAccent ap={q.ap} /></div>
+      <div id="f-appearance.backdrop" classList={{ hit: lit("appearance.backdrop") }}><AppearanceBackdrop ap={q.ap} /></div>
       <AppearancePages ap={q.ap} />
       <CardsGallery />
       <div class="card ap-top" id="f-appearance.layout" classList={{ hit: lit("appearance.layout") }}>

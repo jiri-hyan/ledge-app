@@ -6,6 +6,10 @@
 //! vlákno; to volá `tick` (levný stat, čtení jen při změně mtime/délky, jinak nejvýš 1× za
 //! `STAT_EVERY` při probuzení, které stejně nastalo) a do `next_wake` přidá `next_deadline` (reset
 //! okna na 100 %, konec připomínky). `view` a `strip_segments` čtou jen paměť.
+//!
+//! Volba `claude.limitsDesktop`: třetí zdroj `plan-usage-history.json` aplikace Claude (`limitsrc.rs`) —
+//! bez watcheru, jen stat při `STAT_EVERY`; vzorek bez času resetu dostane reset z jiného zdroje jen
+//! tehdy, když tam okno ještě běží (`limitsrc::fill_resets`).
 
 use crate::drawer::{Opener, View};
 use crate::limits::{self, Armed, Kind, Sample, Source};
@@ -31,6 +35,11 @@ struct Live {
     settings_key: FileKey,
     own: Option<Sample>,
     log: Option<Sample>,
+    desk_key: FileKey,
+    /// vzorek z aplikace Claude (jen s volbou `limitsDesktop`)
+    desk: Option<Sample>,
+    /// soubor aplikace Claude nalezen (jen s volbou)
+    desk_found: bool,
     /// none | foreign | full | error | "" (ještě nečteno)
     status_line: &'static str,
     armed: Armed,
@@ -65,6 +74,36 @@ fn read_sample(p: &Option<PathBuf>, src: Source) -> Option<Sample> {
     limits::from_file(&std::fs::read_to_string(p.as_ref()?).ok()?, src)
 }
 
+/// `plan-usage-history.json` aplikace Claude: z kandidátů (`limitsrc::desktop_candidates`) existující
+/// s nejnovějším mtime. Výčet `Claude-Data\*` a `Packages\Claude_*` jen při statu (nejvýš 1× za `STAT_EVERY`).
+fn desktop_path() -> Option<PathBuf> {
+    let local = crate::dirs::localappdata();
+    let subdirs = |d: Option<PathBuf>, pick: &dyn Fn(&str) -> bool| -> Vec<PathBuf> {
+        d.and_then(|d| std::fs::read_dir(d).ok())
+            .map(|rd| rd.flatten().filter(|e| e.file_name().to_str().is_some_and(pick) && e.path().is_dir()).map(|e| e.path()).take(8).collect())
+            .unwrap_or_default()
+    };
+    let data = subdirs(local.as_ref().map(|l| l.join("Claude-Data")), &|_| true);
+    let pkgs = subdirs(local.as_ref().map(|l| l.join("Packages")), &crate::limitsrc::is_claude_package);
+    let roaming = crate::dirs::appdata()?;
+    crate::limitsrc::desktop_candidates(&roaming, &data, &pkgs)
+        .into_iter()
+        .filter_map(|p| Some((std::fs::metadata(&p).ok().filter(|m| m.is_file() && m.len() <= 4 << 20)?.modified().ok(), p)))
+        .max_by_key(|(t, _)| *t)
+        .map(|(_, p)| p)
+}
+
+/// Nejnovější vzorek s časy resetu (wrapper / dotaz na Anthropic / `latest.json`) — pro `limitsfetch::due`.
+pub(crate) fn newest_full_at() -> Option<i64> {
+    with(|l| limits::fresher(l.own, l.log).map(|s| s.at))
+}
+
+/// Nejlepší vzorek ze všech zdrojů: nejčerstvější, chybějící reset doplněný z běžícího okna jiného zdroje.
+fn best(l: &Live) -> Option<Sample> {
+    let b = limits::fresher(limits::fresher(l.own, l.log), l.desk)?;
+    Some(crate::limitsrc::fill_resets(b, &[l.own, l.log]))
+}
+
 /// Po zapojení / odpojení v Nastavení: stav přečíst hned při dalším `tick`.
 pub fn invalidate() {
     CHANGED.store(true, Ordering::Relaxed);
@@ -73,7 +112,7 @@ pub fn invalidate() {
 }
 
 /// Stat + čtení změněných souborů. Vrací „změnilo se něco pro UI?“.
-fn reload(l: &mut Live) -> bool {
+fn reload(l: &mut Live, desktop: bool) -> bool {
     let own_p = Some(crate::statusline::sample_path());
     let log_p = usage_log_path();
     let set_p = crate::hooksetup::settings_path();
@@ -88,6 +127,17 @@ fn reload(l: &mut Live) -> bool {
     if k != l.log_key {
         l.log_key = k;
         l.log = read_sample(&log_p, Source::UsageLog);
+        changed = true;
+    }
+    let desk_p = if desktop { desktop_path() } else { None };
+    let k = key(&desk_p);
+    let now = crate::state::now_ms();
+    // vzorek bez resetu, jehož okno mezitím uplynulo, se přepočítá i beze změny souboru
+    let lapsed = l.desk.is_some_and(|d| (d.five_hour.is_some() && now - d.at > crate::limitsrc::FIVE_HOUR_MS) || now - d.at > crate::limitsrc::SEVEN_DAY_MS);
+    if k != l.desk_key || l.desk_found != desk_p.is_some() || lapsed {
+        l.desk_key = k;
+        l.desk_found = desk_p.is_some();
+        l.desk = desk_p.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| crate::limitsrc::from_desktop_history(&t, now));
         changed = true;
     }
     let k = key(&set_p);
@@ -106,7 +156,10 @@ fn reload(l: &mut Live) -> bool {
 /// Volá emit vlákno při každém probuzení. Levné: bez události watcheru jen porovnání času.
 pub(crate) fn tick(now: i64) {
     let c = core();
-    let (enabled, fullscreen, pace, alert) = (c.cfg.read().claude.limits_reminder, c.fullscreen.load(Ordering::Relaxed), c.cfg.read().claude.limits_pace, c.cfg.read().claude.limits_alert);
+    let (enabled, fullscreen, pace, alert, desktop) = {
+        let cfg = c.cfg.read();
+        (cfg.claude.limits_reminder, c.fullscreen.load(Ordering::Relaxed), cfg.claude.limits_pace, cfg.claude.limits_alert, cfg.claude.limits_desktop)
+    };
     let mut alerts: Vec<(Kind, u8, f64)> = Vec::new();
     let mut dirty = false;
     let mut show = false;
@@ -115,9 +168,9 @@ pub(crate) fn tick(now: i64) {
         let forced = CHANGED.swap(false, Ordering::Relaxed);
         if forced || l.last_stat.is_none_or(|t| t.elapsed() >= STAT_EVERY) {
             l.last_stat = Some(Instant::now());
-            dirty |= reload(l);
+            dirty |= reload(l, desktop);
         }
-        if let Some(s) = limits::fresher(l.own, l.log) {
+        if let Some(s) = best(l) {
             limits::arm(&mut l.armed, &s, now);
             if let (true, Some(w)) = (pace, s.five_hour) {
                 dirty |= limits::push_hist(&mut l.hist, s.at, w.pct);
@@ -125,7 +178,7 @@ pub(crate) fn tick(now: i64) {
         }
         // upozornění 80 / 90 % jen z čerstvého vzorku; vypnuto = nic se nepamatuje
         if alert {
-            if let Some(s) = limits::fresher(l.own, l.log).filter(|s| now - s.at <= limits::STALE_MS) {
+            if let Some(s) = best(l).filter(|s| now - s.at <= limits::STALE_MS) {
                 alerts = limits::alerts_due(&mut l.alerted, &s);
             }
         } else {
@@ -195,13 +248,21 @@ pub struct LimitsView {
     pub pace: bool,
     /// vzorky 5h okna `[at, pct]` pro tempo (prázdné bez volby `limitsPace`)
     pub history5h: Vec<[f64; 2]>,
+    /// volba `claude.limitsDesktop`: "" = vypnuto, `none` = soubor aplikace Claude nenalezen, `found`
+    pub desktop: &'static str,
+    /// volba `claude.limitsFetch`: "" = vypnuto, pending | ok | noLogin | expired | error (`limitsfetch::view_key`)
+    pub fetch: &'static str,
 }
 
 /// Pro snapshot — jen paměť.
 pub fn view() -> LimitsView {
-    let pace = core().cfg.read().claude.limits_pace;
+    let (pace, desktop, fetch) = {
+        let cfg = core().cfg.read();
+        (cfg.claude.limits_pace, cfg.claude.limits_desktop, cfg.claude.limits_fetch)
+    };
+    let fetch = crate::limitsfetch::view_key(fetch);
     with(|l| {
-        let s = limits::fresher(l.own, l.log);
+        let s = best(l);
         LimitsView {
             at: s.map(|s| s.at),
             source: s.map(|s| s.source),
@@ -212,6 +273,12 @@ pub fn view() -> LimitsView {
             notice: l.notice.map(|(k, _)| k),
             pace,
             history5h: if pace { l.hist.iter().map(|&(t, p)| [t as f64, p]).collect() } else { Vec::new() },
+            desktop: match (desktop, l.desk_found) {
+                (false, _) => "",
+                (true, false) => "none",
+                (true, true) => "found",
+            },
+            fetch,
         }
     })
 }
@@ -219,7 +286,7 @@ pub fn view() -> LimitsView {
 /// Segment proužku (`strip.items` obsahuje `limits`) — jen paměť; bez čerstvých dat nic.
 pub(crate) fn strip_segments(segs: &mut Vec<Segment>) {
     let now = crate::state::now_ms();
-    let Some(s) = with(|l| limits::fresher(l.own, l.log)) else { return };
+    let Some(s) = with(|l| best(l)) else { return };
     let clock = |ms: i64| {
         use chrono::{Local, TimeZone};
         Local.timestamp_millis_opt(ms).single().map(|d| d.format("%H:%M").to_string()).unwrap_or_default()

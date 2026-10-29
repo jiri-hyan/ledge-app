@@ -23,8 +23,11 @@ pub(crate) fn maybe_refresh_weather(opening: bool) {
         // jen když je karta Počasí na právě otevřené záložce (skrytá = nic se nestahuje)
         let on_personal = crate::layout::page_has(&cfg.layout, &c.mode.lock(), "weather");
         let open = opening || c.drawer.view() == View::Full;
+        // proužek počasí používá (trio / vlastní s dílem Počasí): stahuje se i bez karty a se zavřeným šuplíkem,
+        // jen ne za fullscreen hry (`dead`); `needs_fetch` drží ≥ 30 min a backoff, volá se z existujícího tiku
+        let for_strip = weather::strip_wants_weather(&cfg) && !c.dead();
         match cfg.personal.weather.coords() {
-            Some(p) if on_personal && open => p,
+            Some(p) if (on_personal && open) || for_strip => p,
             _ => return,
         }
     };

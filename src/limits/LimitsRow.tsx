@@ -11,6 +11,7 @@ import { severity, shown, statusText, STATUS_URL } from "./incident";
 import { api } from "../api";
 import "./limits.css";
 import { gotoSettingsPanel } from "../palette/goto";
+import LimitsSources from "./LimitsSources";
 
 /** „za 2 h 10 min“ / „za 3 d 4 h“ / „za 5 min“ */
 export function leftText(resetsAt: number | null | undefined, now: number): string {
@@ -117,15 +118,16 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
     <IncidentLine s={p.s} />
     <Show when={lv()}>
       {(l) => (
-        <Show when={l().at != null} fallback={
+        <Show when={l().at != null} fallback={<>
           <Show when={l().statusLine === "none" || l().statusLine === "foreign"} fallback={
-            <Show when={l().statusLine === "full"}>
+            <Show when={l().statusLine === "full" && !l().fetch && l().desktop !== "none"}>
               <div class="lim-empty">{t("sessions.limits.waiting", "Limity se ukážou po první odpovědi Clauda.")}</div>
             </Show>
           }>
             <button class="hint-link" onClick={() => { p.onSettings(); gotoSettingsPanel("f-claude.statusLine"); }}>{t("sessions.limits.connect", "Zapojit stavový řádek pro limity 5h / týden")}</button>
           </Show>
-        }>
+          <LimitsSources l={l()} />
+        </>}>
           <div class="lim">
             <For each={rows()}>{(r) => <LimitBar label={r.label} w={r.w} lv={l()} now={p.now} hot={r.hot} kind={r.kind} />}</For>
           </div>

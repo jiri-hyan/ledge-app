@@ -35,6 +35,10 @@ pub enum Source {
     StatusLine,
     /// `~/.claude/usage-log/latest.json` (zapisuje ho cizí nástroj, pokud existuje)
     UsageLog,
+    /// `plan-usage-history.json` aplikace Claude (volba `claude.limitsDesktop`, `limitsrc.rs`) — jen procenta
+    Desktop,
+    /// dotaz Ledge na Anthropic (volba `claude.limitsFetch`, `limitsfetch.rs`), uložený v `ratelimits.json` s `"via":"api"`
+    Api,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -112,6 +116,8 @@ pub fn from_file(text: &str, source: Source) -> Option<Sample> {
     let at = v.get("at").and_then(to_ms)?;
     let five_hour = file_window(v.get("fiveHour"));
     let seven_day = file_window(v.get("sevenDay"));
+    // vzorek z dotazu na Anthropic (`limitsrc::to_file_api`) leží ve stejném souboru jako wrapper
+    let source = if v.get("via").and_then(Value::as_str) == Some("api") { Source::Api } else { source };
     (five_hour.is_some() || seven_day.is_some()).then_some(Sample { at, five_hour, seven_day, source })
 }
 

@@ -1,0 +1,9 @@
+/* Výběr vzhledu karty (kolo 25): dlaždice s mini náhledem. Šířka podle kontejneru (auto-fill), žádné pevné px šířky. */
+.dz-box { container-type: inline-size; }
+.dz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr)); gap: 0.4rem; }
+.dz-tile { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.4rem 0.3rem; border-radius: 9px; border: 1px solid var(--line-2, var(--line)); background: transparent; color: var(--dim, inherit); cursor: pointer; font: inherit; }
+.dz-tile b { font-size: 0.72rem; font-weight: 600; text-align: center; line-height: 1.15; }
+.dz-tile:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.dz-tile.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.dz-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dz-thumb { width: 100%; max-width: 3.4rem; height: auto; }

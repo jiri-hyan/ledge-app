@@ -42,15 +42,19 @@ pub struct Weather {
     pub precip_prob: Option<f64>,
     /// čas měření v místním čase místa (`current.time`, např. "2026-10-16T07:00")
     pub observed: String,
+    /// předpověď, vítr, pocitová teplota, slunce (`weather_fc`); chybějící pole = `None` / prázdné
+    #[serde(flatten)]
+    pub extra: crate::weather_fc::Extra,
 }
 
 /// URL dotazu — souřadnice na 4 desetinná místa (~11 m), časová zóna podle místa.
 pub fn url(lat: f64, lon: f64) -> String {
     format!(
         "{API}?latitude={lat:.4}&longitude={lon:.4}\
-         &current=temperature_2m,weather_code,precipitation,is_day\
-         &daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max\
-         &timezone=auto&forecast_days=1"
+         &current=temperature_2m,weather_code,precipitation,is_day,apparent_temperature,wind_speed_10m,wind_direction_10m\
+         &hourly=temperature_2m,precipitation_probability,weather_code\
+         &daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,sunrise,sunset\
+         &timezone=auto&forecast_days=6"
     )
 }
 
@@ -115,7 +119,22 @@ pub fn parse(text: &str) -> Result<Weather, String> {
         precip_sum: today("precipitation_sum"),
         precip_prob: today("precipitation_probability_max"),
         observed: cur.get("time").and_then(Value::as_str).unwrap_or("").to_string(),
+        extra: crate::weather_fc::parse_extra(&v),
     })
+}
+
+/// Chce proužek počasí? Zapnutý proužek se stylem `trio` nebo `custom` s dílem Počasí. Čistá funkce nad configem.
+pub fn strip_wants_weather(cfg: &crate::config::Config) -> bool {
+    use crate::looks::{Look, compose::PieceItem};
+    let s = &cfg.strip;
+    if !s.enabled {
+        return false;
+    }
+    match s.look {
+        Look::Trio => true,
+        Look::Custom => [&s.compose.left, &s.compose.center, &s.compose.right].iter().any(|v| v.iter().any(|p| p.item == PieceItem::Weather)),
+        _ => false,
+    }
 }
 
 /// Běží pokus doopravdy? `loading` bez odpovědi déle než 2× timeout (zaseklý / spadlý task) se
@@ -266,6 +285,27 @@ mod tests {
         assert_eq!(w.precip_sum, Some(0.0));
         assert_eq!(w.precip_prob, Some(0.0));
         assert_eq!(w.observed, "2026-10-16T07:00");
+        assert_eq!(w.extra.days.len(), 5);
+        assert_eq!(w.extra.hours.len(), 4);
+    }
+
+    #[test]
+    fn strip_wants_weather_by_look() {
+        use crate::looks::{Look, compose::{Piece, PieceItem}};
+        let mut cfg = crate::config::Config::default();
+        assert!(!strip_wants_weather(&cfg));
+        cfg.strip.look = Look::Trio;
+        assert!(strip_wants_weather(&cfg));
+        cfg.strip.enabled = false;
+        assert!(!strip_wants_weather(&cfg));
+        cfg.strip.enabled = true;
+        cfg.strip.look = Look::Custom;
+        cfg.strip.compose.left = vec![Piece { item: PieceItem::Time, ..Default::default() }];
+        assert!(!strip_wants_weather(&cfg));
+        cfg.strip.compose.right = vec![Piece { item: PieceItem::Weather, ..Default::default() }];
+        assert!(strip_wants_weather(&cfg));
+        cfg.strip.look = Look::Island;
+        assert!(!strip_wants_weather(&cfg));
     }
 
     #[test]
@@ -386,10 +426,11 @@ mod tests {
         let u = url(50.07752, 14.427236);
         assert!(u.starts_with("https://api.open-meteo.com/v1/forecast?latitude=50.0775&longitude=14.4272"));
         for p in [
-            "current=temperature_2m,weather_code,precipitation,is_day",
-            "daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max",
+            "current=temperature_2m,weather_code,precipitation,is_day,apparent_temperature,wind_speed_10m,wind_direction_10m",
+            "hourly=temperature_2m,precipitation_probability,weather_code",
+            "daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code,sunrise,sunset",
             "timezone=auto",
-            "forecast_days=1",
+            "forecast_days=6",
         ] {
             assert!(u.contains(p), "{p} v {u}");
         }

@@ -1,7 +1,7 @@
 // Typy a příkazy karet GitHub a Systém (Rust `github/`, `sysmon/`, `commands/integrations.rs`). Vlastní
 // soubor, ať se nesahá do společných `types.ts` / `api.ts`. Mimo Tauri (plain vite) vrací příkazy `undefined`.
 import { invoke } from "@tauri-apps/api/core";
-import { inTauri } from "../api";
+import { demoCall, inTauri } from "../api";
 import type { Ci, NetUnit } from "./format";
 
 export type Disk = { letter: string; total: number; free: number; system: boolean };
@@ -88,7 +88,7 @@ export interface GithubConfig {
   refreshMin: number;
 }
 
-const call = <T>(cmd: string, args?: Record<string, unknown>): Promise<T | undefined> => (inTauri ? invoke<T>(cmd, args) : Promise.resolve(undefined));
+const call = <T>(cmd: string, args?: Record<string, unknown>): Promise<T | undefined> => (inTauri ? invoke<T>(cmd, args) : Promise.resolve(demoCall<T>(cmd, args)));
 
 export const intApi = {
   /** Jeden vzorek systému (Rust ho vezme, nejvýš 1× za 1,5 s). */

@@ -77,6 +77,8 @@ pub(crate) fn spawn_emit_thread() {
                 maybe_refresh_weather(false);
                 // stav incidentů Anthropicu: jen zapnuto + karta vidět + po `everyMin` (`incidents.rs`)
                 crate::incidents::maybe_refresh(false);
+                // limity dotazem na Anthropic: jen volba `claude.limitsFetch` + karta / proužek (`limitsfetch.rs`)
+                crate::limitsfetch::maybe_refresh(false);
                 crate::calendar::live::maybe_refresh(false);
                 // účty: kalendář jen s viditelnou kartou, pošta s kartou nebo položkou proužku `mail`
                 crate::accounts::calsync::maybe_refresh(false);

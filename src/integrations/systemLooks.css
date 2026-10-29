@@ -1,0 +1,90 @@
+/* Vzhledy karty Systém (kolo 25, `SystemDesign.tsx`). Šířka podle kontejneru `.sd`, ne podle okna: úzká = podstatné,
+   široká = GB, průměr / špička, delší historie (`.sd-wide`). Žádné pevné px šířky; animace jen transform (budík). */
+.sysd { container: sd / inline-size; min-width: 0; --sd-c: var(--teal); }
+.sysd button { font: inherit; color: inherit; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; min-width: 0; }
+.sysd button:disabled { cursor: default; }
+.sysd button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.sd-wide { display: none; }
+.sd-big { font: 650 calc(var(--fs-body) * 1.6) / 1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--t0); white-space: nowrap; }
+.sd-cap, .sd-sub { font-size: var(--fs-xs); color: var(--t3); line-height: 1.3; }
+.sd-l { font-size: var(--fs-ui); color: var(--t2); }
+.sd-v { font: 650 var(--fs-ui) var(--mono); font-variant-numeric: tabular-nums; color: var(--t0); }
+[data-load="warm"] > .sd-big, [data-load="warm"].sd-big, b[data-load="warm"] { color: var(--amber); }
+[data-load="hot"] > .sd-big, [data-load="hot"].sd-big, b[data-load="hot"] { color: var(--red); }
+
+/* sparkline s tooltipem */
+.sd-spark { display: block; width: 100%; height: 2rem; color: var(--sd-c); overflow: visible; }
+.sd-spark polyline { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.sd-spark[data-load="warm"] { color: var(--amber); }
+.sd-spark[data-load="hot"] { color: var(--red); }
+.sd-spark .sd-spark-2 { color: var(--accent); stroke: var(--accent); opacity: 0.75; }
+
+/* prstence + legenda */
+.sd-rings { display: flex; flex-direction: column; align-items: center; gap: var(--s2); }
+.sd-fig { width: min(100%, 8.5rem); }
+.sd-legend { width: 100%; display: flex; flex-direction: column; gap: var(--s1); }
+.sd-lrow { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: var(--s2); width: 100%; }
+.sd-lrow .sd-sub { grid-column: 2 / 4; }
+.sd-key { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--green); }
+.sd-lrow[data-k="mem"] .sd-key { background: var(--accent); }
+.sd-lrow[data-k="disk"] .sd-key { background: var(--teal); }
+
+/* budíky */
+.sd-gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.2rem, 1fr)); gap: var(--s2); }
+.sd-gauge { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sd-gauge .sd-big { font-size: calc(var(--fs-body) * 1.1); }
+
+/* histogram CPU */
+.sd-bars { display: flex; flex-direction: column; gap: var(--s2); }
+.sd-bars-top { display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; }
+.sd-hist { display: flex; align-items: flex-end; gap: 1px; height: 3.2rem; }
+.sd-hist i { flex: 1; min-width: 1px; border-radius: 1px 1px 0 0; background: var(--green); opacity: 0.85; }
+.sd-hist i[data-load="warm"] { background: var(--amber); }
+.sd-hist i[data-load="hot"] { background: var(--red); }
+.sd-hist i:hover { opacity: 1; }
+.sd-hist .sd-old { display: none; }
+.sd-hist-empty { font-size: var(--fs-xs); color: var(--t3); padding: var(--s2) 0; }
+.sd-foot { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); font-size: var(--fs-xs); color: var(--t2); }
+.sd-foot b { color: var(--t0); font-family: var(--mono); }
+.sd-foot-b { color: var(--t2); }
+
+/* terminál */
+.sd-term { font-family: var(--mono); font-size: var(--fs-ui); display: flex; flex-direction: column; gap: 2px; }
+.sd-trow { display: flex; align-items: baseline; gap: var(--s2); width: 100%; white-space: nowrap; }
+.sd-tk { min-width: 4ch; color: var(--t2); }
+.sd-cells { color: var(--green); letter-spacing: -0.05em; }
+.sd-cells[data-load="warm"] { color: var(--amber); }
+.sd-cells[data-load="hot"] { color: var(--red); }
+.sd-trow .sd-v { margin-left: auto; }
+.sd-trow .sd-sub { overflow: hidden; text-overflow: ellipsis; }
+
+/* čísla */
+.sd-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); gap: var(--s2); }
+.sd-tile { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sd-tile .sd-big { overflow: hidden; text-overflow: ellipsis; }
+
+/* síť */
+.sd-net { display: flex; flex-direction: column; gap: var(--s2); }
+.sd-net-big { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4, 1rem); }
+.sd-net-big span { display: flex; flex-direction: column; gap: 2px; }
+.sd-net-big small { font-size: var(--fs-xs); color: var(--t3); }
+.sd-net-big .sd-big { font-size: calc(var(--fs-body) * 1.3); }
+.sd-up .sd-big { color: var(--accent); }
+
+@container sd (min-width: 24rem) {
+  .sd-wide { display: inline; }
+  .sd-narrow { display: none; }
+  .sd-rings { flex-direction: row; align-items: center; gap: var(--s4, 1rem); }
+  .sd-fig { flex: 0 0 8.5rem; }
+  .sd-legend { flex: 1; }
+  .sd-lrow .sd-sub { grid-column: 2 / 4; display: block; }
+  .sd-hist { height: 4rem; }
+  .sd-hist .sd-old { display: block; }
+  .sd-big { font-size: calc(var(--fs-body) * 2); }
+  .sd-net-big .sd-big { font-size: calc(var(--fs-body) * 1.8); }
+  .sd-tile .sd-sub.sd-wide, .sd-gauge .sd-sub.sd-wide { display: block; }
+}
+@container sd (max-width: 12rem) {
+  .sd-big { font-size: calc(var(--fs-body) * 1.25); }
+}
+@media (prefers-reduced-motion: reduce) { .sysd * { transition: none !important; animation: none !important; } }

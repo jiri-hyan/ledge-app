@@ -3,6 +3,8 @@
 
 /* kořeny karet (obsah nesmí roztáhnout mřížku) */
 .bd-usage, .bd-week, .bd-clock, .bd-toggles { min-width: 0; }
+/* Týden se řídí šířkou KARTY (container queries), ne okna — viz blok „Týden“ níž */
+.bd-week { container-type: inline-size; }
 
 /* štítek původu čísla (oficiální / odhad) */
 .bd-origin { margin-left: var(--s2); padding: 0 6px; border-radius: var(--r-pill); font: 600 var(--fs-2xs) var(--sans); color: var(--amber); background: var(--well); letter-spacing: 0.02em; }
@@ -36,12 +38,12 @@
 
 /* Týden: velký měsíc + čas, pás dnů, zbytek dneška */
 .bd-wk-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
-.bd-month { font: 650 calc(30px * var(--fz))/1 var(--display); letter-spacing: -0.01em; text-transform: capitalize; color: var(--t1); }
-.bd-wk-time { font: 600 calc(22px * var(--fz))/1 var(--display); font-variant-numeric: tabular-nums; color: var(--t2); }
+.bd-month { font: 650 calc(clamp(22px, 8.3cqi, 44px) * var(--fz))/1 var(--display); letter-spacing: -0.01em; text-transform: capitalize; color: var(--t1); }
+.bd-wk-time { font: 600 calc(clamp(16px, 6.1cqi, 30px) * var(--fz))/1 var(--display); font-variant-numeric: tabular-nums; color: var(--t2); }
 .bd-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin-top: var(--s2); }
 .bd-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0 4px; border-radius: var(--r-sm); }
-.bd-dow { font: 600 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; }
-.bd-dnum { font: 600 var(--fs-body) var(--display); font-variant-numeric: tabular-nums; color: var(--t1); }
+.bd-dow { font: 600 clamp(var(--fs-2xs), 2.2cqi, 13px) var(--sans); color: var(--t3); text-transform: uppercase; }
+.bd-dnum { font: 600 clamp(var(--fs-body), 3.4cqi, 22px) var(--display); font-variant-numeric: tabular-nums; color: var(--t1); }
 .bd-weekend .bd-dnum, .bd-weekend .bd-dow { color: var(--rose, var(--red)); }
 .bd-today { background: var(--accent); }
 .bd-today .bd-dnum, .bd-today .bd-dow { color: var(--on-accent, #fff); }
@@ -54,6 +56,56 @@
 .bd-ev-t { font-family: var(--mono); color: var(--t3); font-variant-numeric: tabular-nums; }
 .bd-ev-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bd-week .bd-note { margin-top: var(--s2); }
+/* úzká karta: pás + čas (měsíc se nevejde); střední: měsíc + čas nad pásem; široká: pás vlevo, události vpravo */
+@container (max-width: 239px) { .bd-wk-top .bd-month { display: none; } .bd-wk-top { justify-content: center; } }
+@container (max-width: 479px) { .bd-wk-side .bd-ev:nth-child(n+4) { display: none; } }
+@container (min-width: 480px) {
+  .bd-wk-body { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--s4, 16px); align-items: center; }
+  .bd-wk-side .bd-evs, .bd-wk-side .bd-note { margin-top: 0; }
+  .bd-wk-side { padding-top: 4px; }
+}
+
+/* Týden — další vzhledy (kolo 25) */
+.bd-mon, .bd-wk-main { min-width: 0; }
+.bd-mon-head { display: flex; align-items: baseline; justify-content: space-between; }
+.bd-mon-year { font: 600 clamp(14px, 4.4cqi, 22px) var(--display); color: var(--t3); font-variant-numeric: tabular-nums; }
+.bd-mon-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; margin-top: var(--s2); text-align: center; }
+.bd-mon-dow { font: 600 clamp(var(--fs-2xs), 2.2cqi, 12px) var(--sans); color: var(--t3); text-transform: uppercase; }
+.bd-mon-cell { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px 0 3px; border-radius: var(--r-sm); font: 600 clamp(var(--fs-xs), 3cqi, 17px) var(--display); font-variant-numeric: tabular-nums; color: var(--t1); }
+.bd-mon-cell.out { color: var(--t3); opacity: 0.55; }
+.bd-mon-cell.bd-weekend { color: var(--rose, var(--red)); }
+.bd-mon-cell.bd-today { color: var(--on-accent, #fff); }
+.bd-mon-cell.bd-today .bd-dot.on { background: var(--on-accent, #fff); }
+.bd-tear { text-align: center; padding: 2px 0; }
+.bd-tear-top { font: 650 clamp(12px, 3.6cqi, 18px) var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.bd-tear-day { font: 700 clamp(60px, 30cqi, 130px)/1 var(--display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; color: var(--t1); }
+.bd-tear-dow { font: 600 clamp(15px, 5cqi, 26px) var(--display); text-transform: capitalize; color: var(--t2); }
+.bd-tear-left { margin-top: var(--s2); font: var(--fs-xs) var(--sans); color: var(--t3); }
+.bd-tl-axis { position: relative; height: calc(var(--lanes, 1) * 24px + 4px); margin-top: var(--s2); border-radius: var(--r-sm); background: var(--well); overflow: hidden; }
+.bd-tl-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--card); opacity: 0.9; }
+.bd-tl-blk { position: absolute; display: flex; align-items: center; min-width: 4px; margin-top: 2px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 55%, var(--well)); color: var(--on-accent, #fff); font: 600 var(--fs-2xs) var(--sans); overflow: hidden; white-space: nowrap; }
+.bd-tl-blk.on { background: var(--accent); }
+.bd-tl-blk span { overflow: hidden; text-overflow: ellipsis; }
+.bd-tl-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--red); }
+.bd-tl-labels { position: relative; height: 14px; font: var(--fs-2xs) var(--mono); color: var(--t3); }
+.bd-tl-labels span { position: absolute; transform: translateX(-50%); }
+.bd-tl-labels span:first-child { transform: none; }
+.bd-dial { display: flex; align-items: center; gap: var(--s3, 12px); }
+.bd-dial svg { width: clamp(110px, 42cqi, 210px); height: auto; flex-shrink: 0; }
+.bd-dial-ring { fill: none; stroke: var(--well); stroke-width: 7; }
+.bd-dial-tick { stroke: var(--t3); stroke-width: 0.8; }
+.bd-dial-num { font: 600 var(--fs-2xs) var(--sans); fill: var(--t3); }
+.bd-dial-wedge { fill: color-mix(in srgb, var(--accent) 60%, transparent); }
+.bd-dial-wedge.on { fill: var(--accent); }
+.bd-dial-hand { stroke: var(--red); stroke-width: 1.6; stroke-linecap: round; }
+.bd-dial-pin { fill: var(--red); }
+.bd-dial-side { min-width: 0; }
+.bd-ag { display: flex; flex-direction: column; gap: 4px; margin-top: var(--s2); }
+.bd-ag-row { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) auto; gap: var(--s2); align-items: baseline; font: var(--fs-xs) var(--sans); color: var(--t2); }
+.bd-ag-row.on { color: var(--t1); }
+.bd-ag-cd { font-weight: 600; color: var(--accent); white-space: nowrap; }
+.bd-ag-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-ag-t { font-family: var(--mono); color: var(--t3); font-variant-numeric: tabular-nums; }
 
 /* Velké hodiny */
 .bd-digits { display: flex; align-items: baseline; gap: 0.12em; font: 650 calc(64px * var(--fz))/0.95 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--t0, var(--t1)); margin-top: 2px; }
@@ -74,3 +126,10 @@
 .bd-vol-track { display: block; height: 6px; border-radius: var(--r-pill); background: var(--well); overflow: hidden; }
 .bd-vol-track i { display: block; height: 100%; background: var(--accent); border-radius: var(--r-pill); }
 .bd-vol-track i.bd-vol-mute { background: var(--t3); }
+
+/* Časová osa: celé názvy v seznamu pod osou (v bloku se u krátkých událostí ořezávají) — kolo 25b */
+.bd-tl-list { list-style: none; margin: var(--s1) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 1px var(--s3); }
+.bd-tl-list li { display: flex; gap: var(--s2); min-width: 0; font: var(--fs-xs) var(--sans); color: var(--t2); }
+.bd-tl-list li.on { color: var(--t0); }
+.bd-tl-list time { font: var(--fs-2xs) var(--mono); color: var(--t3); flex: none; align-self: center; }
+.bd-tl-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

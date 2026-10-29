@@ -109,7 +109,9 @@
     "costs": true,
     "contextBar": false,
     "limitsPace": false,
-    "limitsAlert": false
+    "limitsAlert": false,
+    "limitsDesktop": false,
+    "limitsFetch": false
   },
   "hotkeys": {
     "enabled": false,

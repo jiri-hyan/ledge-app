@@ -37,6 +37,7 @@ Sloupců méně než 2 = nic.
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
 | `src/charts/geom.ts` | čistá geometrie: body a path sparklinu (plocha uzavřená dole), prstenec jako `stroke-dasharray`, obdélníky sloupců, buňky pásu po sloupcích s úrovní, trend; souřadnice na 2 desetiny | `finite` `extent` `sparkPoints` `sparkline` `ring` `bars` `heat` `heatLevel` `trend` |
+| `src/charts/dial.ts` · `Gauge.tsx` · `Rings.tsx` | kolo 25, budík (půlkruh s ručičkou a ryskou plánu) a soustředné prstence pro vzhledy karet Claude a Systém: čistá geometrie (`dialPath`, `needleEnd`, `ringDash`, `concentric`, `toneOf`, test `dial.test.mjs`), šířka podle obalu (viewBox), tooltip jako SVG `<title>`, kreslí jen viditelné | `Gauge` `Rings` `dialPath` `ringDash` |
 | `src/charts/visible.ts` | „kreslit jen viditelné“: IntersectionObserver obalu + otevřený šuplík; bez observeru = viditelné | `useVisible` |
 | `src/charts/Sparkline.tsx` · `Ring.tsx` · `Bars.tsx` · `Heat.tsx` | tenké komponenty nad `geom.ts` (viz API) | `Sparkline` `Ring` `Bars` `Heat` |
 | `src/charts/Stat.tsx` | číslo jako hrdina: číslo, jednotka, popisek, druhý řádek, šipka trendu a sparkline z `series`; `value` null = „—“ | `Stat` |

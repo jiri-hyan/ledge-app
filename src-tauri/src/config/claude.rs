@@ -42,11 +42,19 @@ pub struct ClaudeConfig {
     pub limits_pace: bool,
     /// Upozornění (toast), když 5h nebo týdenní limit dosáhne 80 % a 90 %; jednou za okno. Výchozí vypnuto.
     pub limits_alert: bool,
+    /// Limity 5h / týden i z aplikace Claude (desktop): Ledge čte její `plan-usage-history.json` (jen procenta,
+    /// bez času resetu; nic neposílá). Výchozí vypnuto (`limitsrc.rs`, `limitslive.rs`).
+    pub limits_desktop: bool,
+    /// Ledge se jednou za 10 min zeptá Anthropicu (`api.anthropic.com/api/oauth/usage`) na limity 5h / týden
+    /// přihlášením Claude Code z `~/.claude/.credentials.json`: token jen čte (žádný refresh, žádný zápis),
+    /// drží ho jen po dobu dotazu a nikam jinam neposílá. Jen když je karta s limity vidět nebo proužek limity
+    /// ukazuje, nikdy ve hře. Výchozí vypnuto (`limitsfetch.rs`).
+    pub limits_fetch: bool,
 }
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true, context_bar: false, limits_pace: false, limits_alert: false }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true, context_bar: false, limits_pace: false, limits_alert: false, limits_desktop: false, limits_fetch: false }
     }
 }
 

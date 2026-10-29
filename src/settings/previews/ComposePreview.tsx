@@ -2,10 +2,17 @@
 // monitoru“: tvar, rozměry a položky ve slotech vlevo / uprostřed / vpravo ve zvoleném stylu. Data jsou
 // UKÁZKOVÁ (přepínač „Co se děje“) — skutečný proužek kreslí Rust (`looks::compose`, `stripdraw`). Nic se
 // nehýbe (střídání středu = první událost, točení prstence = statická značka). Kreslí jen viditelné.
+// Kolo 25: výzdoba (`deco` linka / obrys / záře / přechod, `fill`, `sep` kapsle / ostrůvky / tečka / čárka, mono),
+// nové styly (ikona + hodnota, pruh, průběh, podklad, Claude tečka + 5h, prstenec 5h) a barva dílu.
 import { For, Show, type JSX } from "solid-js";
 import { t } from "../../i18n";
 import type { PreviewState } from "../appearanceModel";
 import { type ComposeItem, type Piece, type StripCompose, drawKind, normCompose } from "../../strip/compose";
+
+const TONE: Record<Tone, string> = { run: "var(--blue)", wait: "var(--amber)", ok: "var(--green)", acc: "var(--accent)", music: "var(--amber)", off: "var(--t3)" };
+/** Ukázková historie CPU / paměti pro „průběh“ (0–100). */
+const SPARK = [18, 26, 22, 35, 30, 44, 38, 29, 33, 23];
+const cssColor = (c: string | undefined) => (!c ? undefined : c === "accent" ? "var(--accent)" : c);
 import "./previews.css";
 
 type Tone = "run" | "wait" | "ok" | "acc" | "music" | "off";
@@ -53,6 +60,11 @@ function activitySample(s: PreviewState): Val | null {
 }
 
 const Batt = (q: { p: number }) => <i class="apv-batt" style={{ "--p": `${q.p}%` }} />;
+const Spark = () => (
+  <svg class="apv-spark" viewBox="0 0 30 12" aria-hidden="true">
+    <polyline points={SPARK.map((v, i) => `${(i * 30) / (SPARK.length - 1)},${12 - (v / 100) * 12}`).join(" ")} />
+  </svg>
+);
 
 /** Jedna položka ve zvoleném stylu (stejné náhrady jako Rust `compose::parts`). */
 export function PieceView(q: { piece: Piece; state: PreviewState }): JSX.Element {
@@ -66,11 +78,23 @@ export function PieceView(q: { piece: Piece; state: PreviewState }): JSX.Element
     <Show when={v()}>
       {(val) => {
         const x = val();
+        const claude = q.piece.item === "claude";
+        const word = <span class="apv-ct" data-c={x.c === "off" ? undefined : x.c}>{x.text}</span>;
         switch (drawKind(q.piece.item, q.piece.style, x.p !== undefined)) {
           case "badge": return icon(x, true);
+          case "iconText":
+            if (q.piece.item === "battery") return icon(x, true);
+            return x.g ? <>{icon(x, false)}{word}</> : word;
+          case "under":
+            return <span class="apv-under" data-c={x.c}>{x.text}<i style={{ width: `${x.p ?? 0}%` }} /></span>;
+          case "spark":
+            return <span class="apv-sp" data-c="acc"><Spark />{word}</span>;
+          case "dotPct":
+            return <><i class="apv-d" data-c={x.ev || x.c !== "off" ? x.c : "off"} /><span class="apv-ct">{claude ? "42 %" : x.text}</span></>;
           case "text": return x.c === "wait" ? <b class="apv-ct" data-c="wait">{x.text}</b> : <span class="apv-ct" data-c={x.c === "off" ? undefined : x.c}>{x.text}</span>;
           case "dot": return <i class="apv-d" data-c={x.ev || x.c !== "off" ? x.c : "off"} />;
           case "ring":
+            if (claude && q.piece.style === "ring5h") return <i class="apv-ring2" data-c={x.ev ? x.c : "acc"} style={{ "--p": "42%" }} />;
             return <i class="apv-ring2" data-c={x.c} classList={{ "apv-ring-spin": q.state === "work" }} style={{ "--p": `${x.p ?? 0}%` }} />;
           case "meter":
             return <span class="apv-meter" data-c={x.c}><i style={{ width: `${x.p}%` }} /></span>;
@@ -79,6 +103,35 @@ export function PieceView(q: { piece: Piece; state: PreviewState }): JSX.Element
       }}
     </Show>
   );
+}
+
+/** Díl v obálce: barevný podklad (`chip`), vlastní barva dílu (`--pcol`), kapsle / oddělovače přes CSS. */
+function PieceBox(q: { piece: Piece; state: PreviewState }) {
+  const v = () => sampleVal(q.piece.item, q.state);
+  const chip = () => (q.piece.style === "chip" ? cssColor(q.piece.color) ?? (v() && v()!.c !== "off" ? TONE[v()!.c] : "var(--accent)") : undefined);
+  return (
+    <Show when={v()}>
+      <span class="apv-pc" classList={{ pcol: !!q.piece.color }} data-chip={chip() ? "" : undefined} style={{ "--pcol": cssColor(q.piece.color), "--chip": chip() }}>
+        <PieceView piece={q.piece} state={q.state} />
+      </span>
+    </Show>
+  );
+}
+
+/** Výzdoba jako CSS proměnné: barvy linky (akcent / stav Clauda / hex), pozadí (černá, sklo, tón, přechod, nic). */
+export function decoStyle(c: StripCompose, s: PreviewState): JSX.CSSProperties {
+  const claude = s === "work" ? TONE.run : s === "wait" ? TONE.wait : s === "done" ? TONE.ok : TONE.off;
+  const e1 = c.deco.color === "claude" ? claude : cssColor(c.deco.color) ?? TONE.acc;
+  const tint = "color-mix(in srgb, var(--accent) 22%, #000)";
+  const dir = { right: "90deg", down: "180deg", diag: "135deg" }[c.fill.dir];
+  const fill = {
+    black: "#000",
+    glass: "rgba(23, 26, 33, 0.62)",
+    tint,
+    gradient: `linear-gradient(${dir}, ${c.fill.from || tint}, ${c.fill.to || "#000"})`,
+    none: "transparent",
+  }[c.fill.kind];
+  return { "--e1": e1, "--e2": c.deco.color2 || `color-mix(in srgb, ${e1} 45%, #fff)`, "--ew": `${c.deco.width}px`, "--fill": fill };
 }
 
 /** Střed se střídáním (`rotate`): ukáže první událost, jinak první položku (jako Rust bez časovače). */
@@ -120,10 +173,12 @@ export default function ComposePreview(q: { compose: unknown; state: PreviewStat
           </span>
         }
       >
-        <span class="apv-sx" data-look="custom" data-cshape={c().shape} style={bodyStyle(c(), k(), q.opacity)}>
-          <span class="apv-cs" data-slot="left"><For each={c().left}>{(p) => <PieceView piece={p} state={q.state} />}</For></span>
-          <span class="apv-cs" data-slot="center"><For each={centerOf(c(), q.state)}>{(p) => <PieceView piece={p} state={q.state} />}</For></span>
-          <span class="apv-cs" data-slot="right"><For each={c().right}>{(p) => <PieceView piece={p} state={q.state} />}</For></span>
+        <span class="apv-sx" data-look="custom" data-cshape={c().shape} data-edge={c().deco.edge} data-len={c().deco.len} data-fill={c().fill.kind} data-sep={c().sep} data-mono={c().mono ? "" : undefined}
+          style={{ ...bodyStyle(c(), k(), q.opacity), ...decoStyle(c(), q.state) }}>
+          <span class="apv-cs" data-slot="left"><For each={c().left}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
+          <span class="apv-cs" data-slot="center"><For each={centerOf(c(), q.state)}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
+          <span class="apv-cs" data-slot="right"><For each={c().right}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
+          <Show when={c().deco.edge !== "none" && c().deco.edge !== "outline"}><i class="apv-edge" aria-hidden="true" /></Show>
         </span>
       </Show>
     </Show>

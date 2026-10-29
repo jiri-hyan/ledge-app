@@ -19,6 +19,32 @@ export interface Weather {
   precipProb: number | null;
   /** čas měření v místním čase místa */
   observed: string;
+  /** pocitová teplota °C, vítr km/h, směr (°, odkud vane) — chybí = null (starý snapshot: undefined) */
+  feels?: number | null;
+  wind?: number | null;
+  windDir?: number | null;
+  /** dnešní východ / západ slunce, místní čas místa („2026-10-16T06:58“) */
+  sunrise?: string | null;
+  sunset?: string | null;
+  /** hodinová předpověď dnešek + zítřek (nejvýš 48), místní čas místa */
+  hours?: WeatherHour[];
+  /** dalších nejvýš 5 dní po dnešku */
+  days?: WeatherDay[];
+}
+
+export interface WeatherHour {
+  time: string;
+  temp: number | null;
+  /** pravděpodobnost srážek v % */
+  precipProb: number | null;
+  code: number | null;
+}
+
+export interface WeatherDay {
+  date: string;
+  min: number | null;
+  max: number | null;
+  code: number | null;
 }
 
 export interface WeatherView {

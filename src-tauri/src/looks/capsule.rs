@@ -163,6 +163,7 @@ mod tests {
                 Part::Ring { fill: Some(x), color } => format!("◯{:.0}:{}", x * 100.0, col(*color)),
                 Part::Ring { fill: None, color } => format!("◯-:{}", col(*color)),
                 Part::Meter { fill, color } => format!("▮{:.0}:{}", fill * 100.0, col(*color)),
+                Part::Spark { .. } | Part::Under { .. } => "?".into(),
             })
             .collect();
         if s.spin {

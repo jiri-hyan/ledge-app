@@ -40,7 +40,7 @@
 .med-fill { display: block; background: var(--t1); transform-origin: 0 50%; }
 .med-bar-seek { cursor: pointer; }
 .med-bar-seek:hover .med-fill,
-.med-bar-drag .med-fill { background: var(--accent); }
+.med-bar-drag .med-fill { background: var(--accent-fill, var(--accent)); }
 .med-bar:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .med-times { display: flex; justify-content: space-between; font: var(--fs-2xs) var(--mono); color: var(--t3); font-variant-numeric: tabular-nums; }
 .med-prog-thin { margin-top: 2px; }

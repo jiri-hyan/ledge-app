@@ -47,9 +47,13 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   Kolo 22 (karty 2026, vše volitelné, chybí = podle stylu): `surface` (`glass` = sklo jen na rámu a hlavičce, pod
   textem plná stabilní plocha | `layer` = plná vrstva s jemnou hloubkou), `grain` (`true` = jemné zrnění ~3,5 %,
   statický vzor bez obrázků zvenku), `hero` (`true` = „číslo jako hrdina“: velké skutečné číslo s popiskem a grafem,
-  jen karty `claude` — limit 5 h, po resetu útrata dnes; čeká-li schválení, karta zůstane normální — a `weather`
+  jen karty `claude` — limit 5 h; bez limitů prázdný stav „Limity zatím nejsou“ s důvodem, ne jiné číslo; čeká-li schválení, karta zůstane normální — a `weather`
   — teplota; bez čísla z reálného zdroje karta zůstane jako dřív). Tokeny (základ, kontrast, poloměr, mezera) dává
   materiál design stylu.
+  Kolo 25: `design` (řetězec, id vzhledu z registru `src/layout/designs.ts`; chybí = výchozí, dnešní vzhled karty; neznámé id
+  se ignoruje). `claude`: `classic` | `rings` | `pace` | `hero` | `heroWeek` | `heroSpend` | `spend` | `sessions` | `gauge`;
+  `system`: `lines` | `rings` | `gauges` | `bars` | `terminal` | `tiles` | `net`. Volí se v ⋯ → Vzhled karty… (dlaždice) i
+  v Nastavení → Šuplík a karty.
   V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu); pro celou záložku najednou
   Nastavení → Vzhled → Otevřený → „Karty 2026“ (galerie předvoleb).
   `limit` (volitelné, jen karty `claude`, `repos`, `running`; 0–50, `0` = bez stropu, chybí = 4) = kolik řádků
@@ -160,3 +164,15 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     uprostřed se střídá po 5 s). Mimo rozsah / přes 5 položek se při použití ořízne (`Compose::norm`), neznámá
     položka = chyba configu. Hudba, baterie a CPU / paměť se čtou jen, když je v `compose` ta položka. MCP
     `strip_set` `compose` ve schématu nemá (strop `tools/list`); skládá se v Nastavení → Vzhled → Zavřený → Vlastní.
+    **Kolo 25** (výchozí = dnešní vzhled, starý `compose` bez nových klíčů se kreslí beze změny): `width` až 1200 px
+    (tělo nejvýš na šířku monitoru), 1–12 položek, v jednom slotu nejvýš 5; co se na monitor nevejde, schová se od
+    konce slotu (nejdřív širší bok, střed naposled), text se neořezává. Položka má volitelné `color` (chybí = podle
+    hodnoty, `accent`, `#rrggbb`). Nové `style`: `iconText` (ikona + hodnota), `bar` (hodnota s pruhem), `spark`
+    (průběh jen `cpu` / `memory` — body jen ze vzorků, které proužek stejně čte, ~10 s, bez historie = sloupek),
+    `chip` (barevný podklad), `dotPct` a `ring5h` (jen `claude`: tečka stavu + 5h %, prstenec 5h v barvě stavu).
+    `deco`: `edge` (`none` výchozí, `underline`, `outline`, `glow`, `gradient`), `len` (`center` = 40 %, `full`),
+    `color` (`accent` výchozí, `claude` = barva podle stavu Clauda, `#rrggbb`), `color2` (#rrggbb, druhá barva
+    přechodu), `width` 1–3 px (výchozí 2). `fill`: `kind` (`black` výchozí, `glass`, `tint`, `gradient`, `none` =
+    bez těla, text se stínem), `from` / `to` (#rrggbb), `dir` (`right`, `down`, `diag`). `sep`: `none` výchozí,
+    `gap`, `dot`, `bar`, `pills` (každý díl v kapsli), `islands` (sloty jako tři ostrůvky). `mono` (písmo
+    s pevnou šířkou). Neznámá barva = výchozí, neznámý druh / oddělení = chyba configu.

@@ -166,20 +166,28 @@ pub(crate) fn inside(root: &Path, p: &Path) -> bool {
     !p.components().any(|c| matches!(c, Component::ParentDir)) && p.starts_with(root)
 }
 
-/// `canonicalize` s krátkým opakováním: atomický zápis jiného vlákna (`write_atomic`) soubor na pár ms
-/// přepisuje a Windows ho mezitím hlásí jako neexistující — poznámka by pak „nebyla poznámka Ledge“.
-/// Skutečně chybějící soubor ve skutečné složce selže po ~200 ms.
-fn canonicalize_settled(path: &Path) -> Option<PathBuf> {
-    // ~200 ms: souběžný zápis jiné poznámkové operace (atomické přejmenování, antivir na novém souboru)
-    // umí soubor na Windows „schovat“ déle než pár ms — 5 × 10 ms padalo pod zátěží (flaky test kola 24)
-    for attempt in 0..20 {
-        match path.canonicalize() {
-            Ok(p) => return Some(p),
-            Err(_) if attempt < 19 && path.parent().is_some_and(Path::is_dir) => std::thread::sleep(std::time::Duration::from_millis(10)),
-            Err(_) => return None,
-        }
+/// Skutečná cesta poznámky bez `canonicalize` samotného souboru: ten při atomickém přepisu jiným
+/// vláknem (`write_atomic` = tmp + rename) na Windows na chvíli selže (sdílení / přístup) a poznámka
+/// by pak „nebyla poznámka Ledge“. Rozbalí se proto jen rodičovská složka (ta existuje vždy) a název
+/// souboru se připojí; soubor, který je sám symlink / junction, se rozbalí celý (ten se nepřepisuje).
+fn resolve_note(path: &Path) -> Option<PathBuf> {
+    let name = path.file_name()?;
+    let direct = path.parent()?.canonicalize().ok()?.join(name);
+    match std::fs::symlink_metadata(&direct) {
+        Ok(m) if !m.file_type().is_symlink() && !is_reparse(&m) => Some(direct),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        _ => path.canonicalize().ok(),
     }
-    None
+}
+
+#[cfg(windows)]
+fn is_reparse(m: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    m.file_attributes() & 0x400 != 0
+}
+#[cfg(not(windows))]
+fn is_reparse(_: &std::fs::Metadata) -> bool {
+    false
 }
 
 /// Cesta k existující poznámce pod kořenem (i po rozbalení symlinků), jinak chyba.
@@ -188,7 +196,7 @@ pub fn check_note_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
     if !path.is_absolute() || !inside(root, path) || !path.extension().is_some_and(|e| e.eq_ignore_ascii_case("md")) {
         return Err(bad());
     }
-    let real = canonicalize_settled(path).ok_or_else(bad)?;
+    let real = resolve_note(path).ok_or_else(bad)?;
     let real_root = root.canonicalize().map_err(|_| bad())?;
     if !real.starts_with(&real_root) {
         return Err(bad());
@@ -555,5 +563,47 @@ mod tests {
         let text = crate::fsx::read_string_retry(&p).unwrap();
         assert_eq!(text.matches("done:").count(), 1);
         assert!(std::fs::read_dir(p.parent().unwrap()).unwrap().flatten().all(|e| !e.file_name().to_string_lossy().ends_with(".tmp")));
+    }
+
+    #[test]
+    fn check_refuses_dir_junction_escape_and_missing() {
+        let outer = tmp_root();
+        let root = outer.path().join("notes");
+        let out = outer.path().join("venku");
+        std::fs::create_dir_all(root.join("a")).unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(out.join("x.md"), "x").unwrap();
+        // složka-junction vedoucí ven (mklink /J) — na jiných systémech symlink
+        let link = root.join("a").join("odkaz");
+        #[cfg(windows)]
+        let made = std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(&link).arg(&out).output().is_ok_and(|o| o.status.success());
+        #[cfg(not(windows))]
+        let made = std::os::unix::fs::symlink(&out, &link).is_ok();
+        if made {
+            assert!(check_note_path(&root, &link.join("x.md")).is_err());
+        }
+        assert!(check_note_path(&root, &root.join("a").join("..").join("..").join("venku").join("x.md")).is_err());
+        assert!(check_note_path(&root, &root.join("a").join("chybi.md")).is_err());
+        std::fs::write(root.join("a").join("ok.md"), "x").unwrap();
+        assert!(check_note_path(&root, &root.join("a").join("ok.md")).is_ok());
+    }
+
+    #[test]
+    fn stress_set_done_and_check_from_many_threads() {
+        let root = tmp_root();
+        let p = create(root.path(), &NewNote { text: "x".into(), ..Default::default() }, &at("2026-10-16T14:03:22+02:00")).unwrap();
+        let hs: Vec<_> = (0..16)
+            .map(|i| {
+                let (r, p) = (root.path().to_path_buf(), p.clone());
+                std::thread::spawn(move || {
+                    for k in 0..25 {
+                        set_done(&r, &p, (i + k) % 2 == 0).unwrap();
+                        check_note_path(&r, &p).unwrap();
+                    }
+                })
+            })
+            .collect();
+        hs.into_iter().for_each(|h| h.join().unwrap());
+        assert_eq!(crate::fsx::read_string_retry(&p).unwrap().matches("done:").count(), 1);
     }
 }

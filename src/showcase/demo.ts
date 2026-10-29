@@ -10,7 +10,8 @@ import { allSectionsOn } from "../cards/sections";
 import { withStyle } from "../theme/styles";
 import { normalizeAppearance } from "../theme/appearance";
 import DEFAULTS from "../studio/demo-config.json";
-import { COVER, SET_IDS, askFor, buildSet, drawerWidth, type SetId } from "./sets";
+import { costsFull, systemFull, weatherFull, type WxKind } from "./fixtures";
+import { COVER, session, SET_IDS, askFor, buildSet, drawerWidth, type SetId } from "./sets";
 
 const clone = <T,>(v: T): T => structuredClone(v);
 export function installShowcase() {
@@ -26,6 +27,7 @@ export function installShowcase() {
   let a: any = style ? withStyle(cfg.appearance, style) : normalizeAppearance({ ...cfg.appearance, ...data.appearance });
   if (q.get("theme")) a.theme = q.get("theme");
   if (q.get("layout")) a.layout = q.get("layout");
+  if (q.get("material")) a.material = q.get("material");
   if (q.get("accent")) a.accent = "#" + q.get("accent");
   if (q.get("width")) a.width = q.get("width");
   if (q.get("w")) a.size = { ...(a.size ?? {}), width: Number(q.get("w")) };
@@ -35,7 +37,15 @@ export function installShowcase() {
   if (q.get("cards")) {
     const keep = q.get("cards")!.split(",");
     cfg.layout.pages = cfg.layout.pages.filter((p: any) => !q.get("page") || p.id === q.get("page"));
-    for (const p of cfg.layout.pages) p.cards = keep.map((k) => { const [id, size] = k.split(":"); const c = p.cards.find((x: any) => x.id === id) ?? { id, size: "l" }; return size ? { ...c, size, h: undefined } : c; });
+    for (const p of cfg.layout.pages) p.cards = keep.map((k) => { const [id, size, design] = k.split(":"); const c = p.cards.find((x: any) => x.id === id) ?? { id, size: "l" }; const o: any = size ? { ...c, size, h: undefined } : { ...c }; if (design) o.look = { ...(o.look ?? {}), design }; return o; });
+  }
+  // přehlídka vzhledů (`scripts/showcase/designs.mjs`): bohatší ukázková data a pozadí šuplíku z URL
+  //   full=1 útrata + předpověď · wx=day|night|rain · bd=<id gradientu> · live=<živé pozadí> · bdcards=auto|solid|tint|glass · empty=1 prázdné stavy
+  const empty = !!q.get("empty");
+  if (q.get("bd") || q.get("live") || q.get("bdcards")) {
+    cfg.appearance.backdrop = { id: q.get("bd") ?? "", live: q.get("live") ?? "", flame: "classic", intensity: 0.6, speed: 1, cards: q.get("bdcards") ?? "auto", custom: [] };
+    a = normalizeAppearance(cfg.appearance);
+    cfg.appearance = a;
   }
   cfg.media = { ...(cfg.media ?? {}), variant: data.mediaVariant };
 
@@ -50,6 +60,18 @@ export function installShowcase() {
   snap.personal = { ...snap.personal, mediaLook: { variant: data.mediaVariant, stripTime: "auto", equalizer: true } };
   if (q.get("nopending")) snap.pending = [];
   if (q.get("ask")) { snap.pending = []; snap.questions = [askFor(now)]; }
+  if (q.get("full") && !empty) {
+    snap.costs = costsFull(now) as any;
+    snap.sessions = [...snap.sessions,
+      session("s-orbit", "Opravy synchronizace", "Orbit", "orbit", "working", now, { activity: { phase: "running", tool: "Bash", file: null, message: "npm test", at: now - 3000 } }),
+      session("s-pixel", "Přepis dokumentace", "Pixel Docs", "pixel-docs", "idle", now, { updatedAt: now - 9 * 60_000 })] as any;
+    const wx = (q.get("wx") ?? "day") as WxKind;
+    if (snap.personal) snap.personal = { ...snap.personal, weather: weatherFull(snap.personal.weather?.label || "Praha", now, wx) } as any;
+  }
+  if (empty) {
+    snap.limits = null as any; snap.sessions = []; snap.costs = undefined;
+    if (snap.personal) snap.personal = { ...snap.personal, calendar: undefined, weather: { status: "unset", label: "", data: null, fetchedMs: null, error: null, loading: false } } as any;
+  }
   snap.view = "hidden";
 
   const push = () => emitDemo("state", clone(snap));
@@ -62,6 +84,7 @@ export function installShowcase() {
       case "get_state": return clone(snap);
       case "set_mode": snap.mode = String(args?.mode); push(); return undefined;
       case "decide": snap.pending = snap.pending.filter((p: any) => p.id !== args?.id); push(); return true;
+      case "system_view": return empty ? null : systemFull(now);
       case "media_cover": return COVER;
       case "report_size": parent.postMessage({ ledge: "size", view: args?.view, w: drawerWidth(a), h: args?.h, scheme: document.documentElement.style.colorScheme }, "*"); return undefined;
       case "ui_ready": return undefined;

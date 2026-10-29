@@ -176,7 +176,8 @@ otázce neví (stav i deník jsou jen v paměti).
 ## Limity Claude 5h / týden
 
 Karta Claude ukazuje pruh 5h a týdenního limitu (procenta, čas resetu místně + „za 2 h 10 min“),
-volitelně i proužek (`strip.items` + `limits`). **Zdroj = jen lokální soubory, žádná síť, žádné tokeny:**
+volitelně i proužek (`strip.items` + `limits`). **Výchozí zdroj = jen lokální soubory, žádná síť, žádné tokeny**
+(dva další zdroje jsou volby, výchozí vypnuto — body 4 a 5):
 
 1. **Stavový řádek Ledge** (Nastavení → Claude → „Zapojit stavový řádek“, `statuslinesetup.rs`):
    klíč `statusLine` v `~/.claude/settings.json` dostane `{"type":"command","command":"<ledge.exe> --statusline"}`
@@ -193,6 +194,16 @@ volitelně i proužek (`strip.items` + `limits`). **Zdroj = jen lokální soubor
    Bez původního příkazu nevypíše nic. Termín 5 s, Job Object (zrušený wrapper zabije i strom příkazu),
    CREATE_NO_WINDOW, chyby tiše.
 3. **Záložně** `~/.claude/usage-log/latest.json` (stejný tvar), když existuje — bere se čerstvější podle `at`.
+4. **Aplikace Claude** (`claude.limitsDesktop`, `limitsrc.rs`): aplikace Claude (desktop, i karta Code, kde stavový
+   řádek neběží) si sama ptá `claude.ai/api/organizations/<org>/usage` (à 15 min, je-li to v ní zapnuté) a připisuje
+   `plan-usage-history.json` do své datové složky (MSIX: `%LOCALAPPDATA%\Claude-Data\<balíček>\`). Jen procenta
+   bez resetu; reset se převezme z jiného zdroje jen pro okno, které v čase vzorku běželo. Ledge jen čte.
+5. **Dotaz na Anthropic** (`claude.limitsFetch`, `limitsfetch.rs`): `GET https://api.anthropic.com/api/oauth/usage`
+   (`anthropic-beta: oauth-2025-04-20`, totéž co `/usage` v Claude Code) s `accessToken` z `~/.claude/.credentials.json`;
+   1× za 10 min, jen s viditelnou kartou / limity v proužku a bez čerstvého vzorku ze stavového řádku, nikdy ve hře;
+   bez přesměrování, bez refreshe, bez zápisu credentials. Výsledek do `ratelimits.json` s `"via":"api"`.
+   Karta bez dat řekne proč (`hero.ts` `limitsWhy`: vypršelé přihlášení, chybí přihlášení, chyba, aplikace nic
+   neuložila) a nabídne obě volby jedním klikem (`LimitsSources.tsx`).
 
 Vzorek starší 15 min = „staré (před X min)“; po `resetsAt` se procenta neukazují (neznáme), jen „obnoveno“.
 **Připomínka resetu** (`claude.limitsReminder`): okno, které dosáhlo 100 %, v čase `resetsAt` krátce vysune

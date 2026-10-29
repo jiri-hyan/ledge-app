@@ -38,7 +38,7 @@
 .nb-day i { font-style: normal; font-size: var(--fs-2xs); color: var(--t3); }
 .nb-day b { font-size: 13px; font-weight: 500; color: var(--t2); }
 .nb-weekend b { color: var(--red); }
-.nb-today { background: var(--accent); }
+.nb-today { background: var(--accent-fill, var(--accent)); }
 .nb-today i, .nb-today b { color: var(--white); font-weight: 700; }
 .nb-time { font-family: var(--display); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
 
@@ -52,7 +52,7 @@
 .nb-hot { --chart-c: var(--amber); }
 .nb-row[data-load="hot"] .nb-rv { color: var(--red); }
 .nb-bar { height: 4px; border-radius: 2px; background: var(--card-3); overflow: hidden; }
-.nb-bar i { display: block; height: 100%; background: var(--accent); }
+.nb-bar i { display: block; height: 100%; background: var(--accent-fill, var(--accent)); }
 
 /* hlasitost: svislý posuvník a ztlumení */
 .nb-vol { flex: 0 0 64px; align-items: center; padding: 12px 8px; }

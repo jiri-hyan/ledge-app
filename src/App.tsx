@@ -7,6 +7,7 @@
 // panel „Nová verze“ jsou líné chunky (`lazyViews.tsx`), přednačtené v klidu po prvním otevření šuplíku.
 // loader anglických slovníků (líný chunk, jen pro jazyk ≠ cs) dřív než cokoli, co volá setLang()
 import "./i18n/load";
+import Backdrop from "./theme/BackdropLayer";
 import { createSignal, Show, onMount, onCleanup, createEffect, on as onChange } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { api, on, type Snapshot, type View, type ViewMsg, type NoteView } from "./api";
@@ -291,6 +292,7 @@ export default function App() {
 
   return (
     <div class="shell" ref={panel}>
+      <Backdrop open={() => view() === "full"} />
       <div ref={content} style={{ "padding-top": `${OVERLAP}px` }}>
         <Show when={view() === "peek" || isHoverView(view())} fallback={
           <div class="content" style={{ height: page() === "main" ? mainHeight() : undefined }}>

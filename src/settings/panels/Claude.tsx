@@ -110,6 +110,14 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.statusLine" stack live>
           <StatusLineSetup />
         </Row>
+        <Row id="claude.limitsDesktop" stack>
+          <Toggle path="claude.limitsDesktop" label={fieldLabel("claude.limitsDesktop")} />
+          <small class="st-note">{t("settings.claude.limitsDesktop.sentence", "Pracuješ v aplikaci Claude? Ta si limity ukládá sama; Ledge je jen přečte (nic neposílá).")}</small>
+        </Row>
+        <Row id="claude.limitsFetch" stack>
+          <Toggle path="claude.limitsFetch" label={fieldLabel("claude.limitsFetch")} />
+          <small class="st-note">{t("settings.claude.limitsFetch.sentence", "Ledge se jednou za 10 min zeptá Anthropicu na tvé limity tvým přihlášením Claude Code; token nikam neukládá ani neposílá jinam. Jen když je karta s limity vidět nebo je ukazuje proužek, nikdy ve hře.")}</small>
+        </Row>
         <Row id="claude.limitsReminder">
           <Toggle path="claude.limitsReminder" label={fieldLabel("claude.limitsReminder")} />
         </Row>

@@ -55,6 +55,7 @@ pub(crate) fn apply_config(mut new: Config) {
     }
     crate::calendar::live::on_config(&old, &new);
     crate::incidents::on_config(&old, &new);
+    crate::limitsfetch::on_config(&old, &new);
     crate::accounts::calsync::on_config(&old, &new);
     crate::accounts::mail::on_config(&old, &new);
     if old.personal.links != new.personal.links {

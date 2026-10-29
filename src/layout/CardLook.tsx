@@ -21,6 +21,7 @@ import {
   ACCENT_NAMES, accentCss, BG_NAMES, BGS, CARD_ACCENTS, DENSITIES, DENSITY_NAMES, heroable, patchCardLook, SURFACE_NAMES, SURFACES, VIEW_CARDS, VIEW_NAMES, viewsOf,
   type CardLook,
 } from "./look";
+import DesignPicker from "./DesignPicker";
 import { cardName, tx } from "./text";
 import type { CardId } from "./model";
 import "../tilelook/tilelook.css";
@@ -70,6 +71,7 @@ function Panel(p: { tg: Target; s?: Snapshot }) {
           <small>{t("cards.cardlook.hint", "Změny vidíš hned na kartě. Jen tahle karta na téhle záložce.")}</small>
         </div>
       </div>
+      <DesignPicker card={p.tg.card} look={look()} onPick={(id) => patch({ design: id })} />
       <div class="tl-ed-row" role="group" aria-label={t("cards.cardlook.accent", "Akcent")}>
         <span class="tl-ed-cap">{t("cards.cardlook.accent", "Akcent")}</span>
         <button class="tl-sw tl-sw-auto" classList={{ on: !accent() }} onClick={() => patch({ accent: undefined })}>{t("cards.cardlook.byStyle", "Podle stylu")}</button>

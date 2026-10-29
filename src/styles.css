@@ -329,3 +329,17 @@ html[data-motion="none"] *, html[data-motion="none"] *::before, html[data-motion
   .seg button.on { background: Highlight; color: HighlightText; }
   button:disabled { color: GrayText; }
 }
+
+/* ---------- Pozadí šuplíku a gradientní akcent (kolo 25; vrstvy `.bd` jsou v `theme/backdrop.css`) ----------
+   `.shell` dostane vlastní kontext vrstev, aby `z-index: -1` pozadí zůstal nad jeho barvou. Gradientní akcent se uplatní
+   jen s `appearance.accent2` / „akcent podle pozadí“ (pak `apply.ts` nastaví `data-accent-grad`); jinak se nic nemění. */
+html[data-backdrop] .shell { isolation: isolate; }
+html[data-accent-grad] { --accent-fill: var(--accent-grad); }
+html[data-accent-grad] .card h4 { background: linear-gradient(90deg, var(--accent), var(--accent-2)) left bottom / 26px 2px no-repeat; padding-bottom: 5px; }
+html[data-accent-grad] .seg button.on { background: var(--card-3) linear-gradient(90deg, var(--accent), var(--accent-2)) bottom / 100% 2px no-repeat; }
+
+/* Karty nad pozadím (`appearance.backdrop.cards`, `cardVars` v `backdrop.ts`): průsvitnou výplň a okraj dávají proměnné
+   (`--m-card-bg`, `--k-base`); tady jen rozmazání pro `glass` a tvar Plovoucího panelu. Bez zvoleného pozadí se nic nemění. */
+html[data-bd-cards="glass"] .card { backdrop-filter: blur(10px) saturate(1.15); }
+/* Plovoucí panel: obsah by jinak neprůhledným podkladem zakryl celé pozadí → podklad pryč, pozadí svítí i mezi kartami */
+html[data-backdrop][data-layout="float"]:not([data-glass="on"]) .content { background: none; }

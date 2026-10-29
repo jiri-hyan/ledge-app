@@ -16,6 +16,8 @@ import {
 import { heightLabel } from "./Deck";
 import { packSpans, spanOf } from "./size";
 import { setBento } from "./bento";
+import DesignPicker from "./DesignPicker";
+import { designsOf } from "./designs";
 import { patchCardLook, setCardLook, VIEW_CARDS, VIEW_NAMES, viewOf, viewsOf, type CardView } from "./look";
 import { colsNow } from "./cols";
 import { tileSizeName } from "../cards/TileOptions";
@@ -254,6 +256,7 @@ export default function LayoutEditor() {
               const hasView = () => cd.id in VIEW_CARDS;
               const curView = () => viewOf(cd.id, cd.look);
               const setView = (v: CardView) => put(setCardLook(L(), pg().id, cd.id, patchCardLook(cd.look, cd.id, { view: v === VIEW_CARDS[cd.id] ? undefined : v })));
+              const hasDesigns = () => designsOf(cd.id).length > 1;
               const hasLimit = () => LIMIT_CARDS.includes(cd.id);
               const otherTabs = () => L().pages.filter((x) => x.id !== pg().id && !pageHas(x, cd.id));
               return (
@@ -289,8 +292,11 @@ export default function LayoutEditor() {
                     <button class="mini" onClick={() => removeOne(pg().id, cd.id)}>{t("settings.layout.removeCard", "Odebrat")}</button>
                   </div>
 
-                  <Show when={hasView() || hasLimit() || otherTabs().length > 0}>
+                  <Show when={hasView() || hasLimit() || hasDesigns() || otherTabs().length > 0}>
                     <div class="lay-st-card-sub">
+                      <Show when={hasDesigns()}>
+                        <DesignPicker card={cd.id} look={cd.look} onPick={(id) => put(setCardLook(L(), pg().id, cd.id, patchCardLook(cd.look, cd.id, { design: id })))} />
+                      </Show>
                       <Show when={hasView()}>
                         <span class="lay-st-grp">
                           <span class="lay-st-grp-lbl">{t("cards.cardlook.view", "Zobrazení")}</span>

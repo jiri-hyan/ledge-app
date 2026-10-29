@@ -1,0 +1,120 @@
+/* Karta Počasí — vzhledy kola 25 (`data-wx` = klasické · sky · thermo · poster · curve · week · arc). Klasické se tu
+   nemění. Jen tokeny ze styles.css; pohyb jen transform / opacity a jen pod `.wx-live` (šuplík otevřený),
+   `html[data-motion="none"]` a prefers-reduced-motion ho vypnou. */
+.wx-card:not([data-wx="classic"]) { container-type: inline-size; position: relative; }
+.wx-card .wx-ico-lg { display: block; width: clamp(40px, 16cqi, 76px); height: clamp(40px, 16cqi, 76px); flex-shrink: 0; }
+.wx-card .wx-ico-sm { display: block; width: 26px; height: 26px; flex-shrink: 0; }
+.wx-card .wx-ico-xs { display: block; width: 20px; height: 20px; }
+.wxi { width: 100%; height: 100%; color: var(--t2); overflow: visible; }
+.wxi-sun, .wxi-moon { color: var(--amber); }
+.wxi-cloud { color: var(--t2); }
+.wxi-rain { color: var(--blue); }
+.wxi-snow { color: var(--teal, var(--blue)); }
+.wxi-bolt { color: var(--amber); }
+.wxi-fog { color: var(--t3); }
+.wx-extra { display: flex; flex-wrap: wrap; gap: 0 var(--s2); }
+
+/* ---- Živá obloha ---- */
+.wx-card[data-wx="sky"] { overflow: hidden; background: transparent; --t1: #fff; --t2: rgba(255, 255, 255, 0.86); --t3: rgba(255, 255, 255, 0.68); color: #fff; }
+.wx-card[data-wx="sky"] > *:not(.wx-skybg) { position: relative; z-index: 1; }
+/* čitelnost bílého textu na světlé obloze: jemný tmavý stín (kolo 25) */
+.wx-card[data-wx="sky"] h4, .wx-card[data-wx="sky"] .wx-sky, .wx-card[data-wx="sky"] .meta { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+.wx-card[data-wx="sky"] h4 { color: rgba(255, 255, 255, 0.9); }
+.wx-card[data-wx="sky"] .wxi, .wx-card[data-wx="sky"] .wxi-cloud { color: #fff; }
+.wx-card[data-wx="sky"] .wxi-sun, .wx-card[data-wx="sky"] .wxi-moon, .wx-card[data-wx="sky"] .wxi-bolt { color: #ffd45e; }
+.wx-skybg { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: inherit; pointer-events: none; background: linear-gradient(180deg, #2e72bd, #5d9bd0); }
+.wx-skybg[data-sky^="clear"][data-sky$="day"] { background: linear-gradient(180deg, #1f66b8, #4f94d2); }
+.wx-skybg[data-sky^="partly"][data-sky$="day"] { background: linear-gradient(180deg, #3a76b4, #6a9bc6); }
+.wx-skybg[data-sky^="cloud"][data-sky$="day"], .wx-skybg[data-sky^="fog"][data-sky$="day"] { background: linear-gradient(180deg, #5d6e80, #8795a4); }
+.wx-skybg[data-sky^="drizzle"][data-sky$="day"], .wx-skybg[data-sky^="rain"][data-sky$="day"] { background: linear-gradient(180deg, #3a4859, #5c6b7e); }
+.wx-skybg[data-sky^="snow"][data-sky$="day"] { background: linear-gradient(180deg, #667a91, #98a9bb); }
+.wx-skybg[data-sky^="storm"][data-sky$="day"] { background: linear-gradient(180deg, #2f3748, #5a6275); }
+.wx-skybg[data-sky$="night"] { background: linear-gradient(180deg, #0b1330, #1e2f5c); }
+.wx-skybg[data-sky^="partly"][data-sky$="night"] { background: linear-gradient(180deg, #0e1736, #2a3a64); }
+.wx-skybg[data-sky^="cloud"][data-sky$="night"], .wx-skybg[data-sky^="fog"][data-sky$="night"] { background: linear-gradient(180deg, #1a2030, #39414f); }
+.wx-skybg[data-sky^="drizzle"][data-sky$="night"], .wx-skybg[data-sky^="rain"][data-sky$="night"] { background: linear-gradient(180deg, #131a28, #2c3647); }
+.wx-skybg[data-sky^="snow"][data-sky$="night"] { background: linear-gradient(180deg, #1d2740, #475673); }
+.wx-skybg[data-sky^="storm"][data-sky$="night"] { background: linear-gradient(180deg, #0d1018, #272c3a); }
+.wx-skybg i { position: absolute; display: block; animation-play-state: paused; }
+.wx-live .wx-skybg i { animation-play-state: running; }
+.wx-cloud { left: -30%; top: calc(8% + var(--i) * 26%); width: 55%; height: 22%; border-radius: 999px; background: rgba(255, 255, 255, 0.22); filter: blur(6px); animation: wx-drift calc(38s + var(--i) * 17s) linear infinite alternate; }
+.wx-drop { left: calc(var(--i) * 7.3% + 2%); top: -12%; width: 1.5px; height: 14%; background: rgba(200, 225, 255, 0.7); animation: wx-fall calc(0.9s + mod(var(--i), 4) * 0.18s) linear infinite; animation-delay: calc(var(--i) * -0.23s); }
+.wx-flake { left: calc(var(--i) * 8.4% + 2%); top: -6%; width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, 0.85); animation: wx-snow calc(5s + mod(var(--i), 5) * 0.9s) linear infinite; animation-delay: calc(var(--i) * -0.7s); }
+.wx-star { left: calc(var(--i) * 9.7% + 3%); top: calc(mod(var(--i) * 37, 60) * 1% + 6%); width: 2px; height: 2px; border-radius: 50%; background: #fff; animation: wx-twinkle calc(2.4s + mod(var(--i), 3) * 0.8s) ease-in-out infinite alternate; animation-delay: calc(var(--i) * -0.4s); }
+@keyframes wx-drift { from { transform: translateX(0); } to { transform: translateX(150%); } }
+@keyframes wx-fall { from { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } to { transform: translateY(900%); opacity: 0.2; } }
+@keyframes wx-snow { from { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 50% { transform: translate(14px, 600%); } to { transform: translate(-6px, 1500%); opacity: 0.3; } }
+@keyframes wx-twinkle { from { opacity: 0.15; } to { opacity: 1; } }
+.wx-sky { display: flex; align-items: center; gap: var(--s3, 12px); padding: 4px 0; min-width: 0; }
+.wx-sky .grow { flex: 1; min-width: 0; }
+.wx-sky .wx-big { font: 600 clamp(30px, 11cqi, 52px)/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.wx-sky .name { font-weight: 600; }
+
+/* ---- Teploměr dne ---- */
+.wx-thermo { display: flex; flex-direction: column; gap: 6px; padding: 2px 0; }
+.wx-th-head, .wx-cv-head { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.wx-th-head .wx-big, .wx-cv-head .wx-big, .wx-arc-now .wx-big { font: 600 clamp(26px, 9cqi, 40px)/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.wx-th-head .name, .wx-cv-head .name, .wx-arc-now .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.wx-th-bar { position: relative; height: 34px; margin-top: 8px; }
+.wx-th-track { position: absolute; left: 0; right: 0; bottom: 4px; height: 8px; border-radius: 999px; opacity: 0.9; }
+.wx-th-mark { position: absolute; bottom: 0; width: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.wx-th-mark span { position: absolute; bottom: 18px; font: 600 var(--fs-2xs) var(--sans); color: var(--t1); white-space: nowrap; }
+.wx-th-mark i { display: block; width: 4px; height: 16px; border-radius: 2px; background: var(--t1); box-shadow: 0 0 0 2px var(--card); }
+.wx-th-ends { display: flex; justify-content: space-between; font: 600 var(--fs-xs) var(--sans); font-variant-numeric: tabular-nums; color: var(--t2); }
+
+/* ---- Plakát ---- */
+.wx-poster { padding: 0 0 2px; min-width: 0; }
+.wx-p-temp { font: 700 clamp(64px, 38cqi, 150px)/0.9 var(--display); letter-spacing: -0.05em; font-variant-numeric: tabular-nums; color: var(--t1); }
+.wx-p-temp span { font-weight: 300; color: var(--accent); }
+.wx-p-word { font: 650 clamp(20px, 9cqi, 36px)/1.05 var(--display); letter-spacing: -0.01em; text-transform: uppercase; color: var(--t1); margin: 4px 0 6px; overflow-wrap: anywhere; }
+
+/* ---- Křivka ---- */
+.wx-curve { display: flex; flex-direction: column; gap: 4px; padding: 2px 0; }
+.wx-cv-chart { position: relative; height: 88px; margin-top: 6px; touch-action: none; }
+.wx-cv-chart svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.wx-cv-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.wx-cv-area { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: none; }
+.wx-cv-bar { fill: color-mix(in srgb, var(--blue) 55%, transparent); }
+.wx-cv-cursor { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--t3); opacity: 0.6; pointer-events: none; }
+.wx-cv-dot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--card); pointer-events: none; }
+.wx-cv-tip { position: absolute; top: -22px; transform: translateX(-50%); padding: 2px 7px; border-radius: var(--r-sm); background: var(--card-3, var(--well)); color: var(--t1); font: 600 var(--fs-xs) var(--sans); white-space: nowrap; box-shadow: var(--shadow-pop); pointer-events: none; font-variant-numeric: tabular-nums; }
+.wx-cv-axis { position: relative; height: 14px; font: var(--fs-2xs) var(--mono); color: var(--t3); }
+.wx-cv-axis span { position: absolute; transform: translateX(-50%); }
+.wx-cv-axis span:first-child { transform: none; }
+
+/* ---- Pět dní ---- */
+.wx-days { display: flex; flex-direction: column; gap: 5px; padding: 2px 0; }
+.wx-day { display: grid; grid-template-columns: 2.6em 22px 2.6em minmax(0, 1fr) 2.6em; align-items: center; gap: var(--s2); font: var(--fs-xs) var(--sans); font-variant-numeric: tabular-nums; }
+.wx-day-n { font-weight: 600; color: var(--t1); }
+.wx-day.today .wx-day-n { color: var(--accent); }
+.wx-day-lo { color: var(--t3); text-align: right; }
+.wx-day-hi { color: var(--t1); font-weight: 600; }
+.wx-day-track { position: relative; height: 6px; border-radius: 999px; background: var(--well); }
+.wx-day-track i { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
+.wx-day-track b { position: absolute; top: -2px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--t1); box-shadow: 0 0 0 2px var(--card); }
+
+/* ---- Oblouk slunce ---- */
+.wx-arc { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; text-align: center; }
+.wx-arc svg { width: 100%; max-width: 420px; height: auto; display: block; }
+.wx-arc-base { fill: none; stroke: var(--well); stroke-width: 5; stroke-linecap: round; }
+.wx-arc-done { fill: none; stroke: var(--amber); stroke-width: 5; stroke-linecap: round; }
+.wx-arc-hz { stroke: var(--t3); stroke-width: 1; opacity: 0.5; }
+.wx-arc-sun { fill: var(--amber); }
+.wx-arc-sun.off { fill: var(--t3); }
+.wx-arc-glow { fill: var(--amber); opacity: 0.28; }
+.wx-arc-glow.off { opacity: 0; }
+.wx-arc-times { display: flex; justify-content: space-between; width: 100%; max-width: 420px; margin-top: -6px; font: var(--fs-xs) var(--sans); color: var(--t3); font-variant-numeric: tabular-nums; }
+.wx-arc-now { display: flex; align-items: center; justify-content: center; gap: var(--s2); min-width: 0; }
+
+/* ---- pohyb ---- */
+html[data-motion="none"] .wx-skybg i { animation: none; }
+@media (prefers-reduced-motion: reduce) { .wx-skybg i { animation: none; } }
+
+/* ---- Široká karta (kolo 25b): Plakát a Oblouk dělí místo s předpovědí dalších dní ---- */
+.wx-aside { display: none; }
+@container (min-width: 540px) {
+  .wx-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s4, 20px); align-items: center; }
+  .wx-split:has(.wx-aside) .wx-aside { display: block; }
+  .wx-split .wx-arc svg { max-width: 300px; }
+  .wx-split .wx-arc-times { max-width: 300px; }
+}

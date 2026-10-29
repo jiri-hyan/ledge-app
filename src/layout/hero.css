@@ -1,3 +1,8 @@
 /* Karta „číslo jako hrdina“ (`HeroCard.tsx`, kolo 22): velké číslo nahoře, sparkline dole, bez seznamu. */
 .hero-card { display: flex; flex-direction: column; gap: var(--s2); }
-.hero-body { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; --chart-c: var(--accent); }
+.hero-body { container: hb / inline-size; flex: 1; display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; --chart-c: var(--accent); }
+/* prázdný stav hrdiny (kolo 25): zvolené číslo není z reálného zdroje — nadpis a jedna věta proč */
+.hero-empty { display: flex; flex-direction: column; gap: var(--s1); align-items: flex-start; min-width: 0; }
+.hero-empty-label { font-size: var(--fs-ui); font-weight: 600; color: var(--t2); }
+.hero-empty b { font: 650 var(--fs-md) var(--sans); color: var(--t1); }
+.hero-empty small { font-size: var(--fs-xs); color: var(--t3); line-height: 1.35; }

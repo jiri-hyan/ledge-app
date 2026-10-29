@@ -1,7 +1,8 @@
 // Karta Systém: CPU, paměť, volné místo na discích a rychlost sítě s malými grafy za posledních 60 vzorků.
 // Čte Rust (`sysmon/`, příkaz `system_view`) a NIC nepočítá sama: každé číslo je skutečný vzorek z WinAPI.
 // Vzorkuje se po 2 s JEN když je karta vidět a šuplík otevřený (zavřený = žádný časovač, žádné čtení).
-// Kliknutí na CPU / paměť otevře Správce úloh.
+// Kliknutí na CPU / paměť otevře Správce úloh. Kolo 25: jiný vzhled (`design`, `SystemDesign.tsx`) kreslí tentýž pohled;
+// vzorkování zůstává jen tady.
 import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { num } from "../format";
 import { t } from "../i18n";
@@ -9,6 +10,7 @@ import { drawerShown } from "../media/shown";
 import { sayError } from "../ui/toast";
 import { intApi, type SystemView } from "./api";
 import { diskLoad, diskUsed, fmtPct, fmtRate, fmtSize, loadOf, sparkPoints, type Load } from "./format";
+import SystemDesign from "./SystemDesign";
 import "./integrations.css";
 
 /** Odstup vzorků karty (Rust nevezme dva vzorky blíž než 1,5 s). */
@@ -37,7 +39,7 @@ async function openTaskManager() {
   }
 }
 
-export default function SystemCard(p: { menu?: JSX.Element }) {
+export default function SystemCard(p: { menu?: JSX.Element; design?: string }) {
   createEffect(() => {
     if (!drawerShown()) return;
     let alive = true;
@@ -70,6 +72,7 @@ export default function SystemCard(p: { menu?: JSX.Element }) {
       <h4><span class="ic" style="background:var(--teal)" />{t("cards.system.title", "Systém")}{p.menu}</h4>
       <Show when={view()} fallback={<div class="empty">{t("cards.system.loading", "Měřím…")}</div>}>
         {(v) => (
+          <Show when={p.design && p.design !== "lines"} fallback={
           <>
             <button class="sys-row sys-click" onClick={openTaskManager} title={t("cards.system.taskmgr", "Otevřít Správce úloh")}>
               <span class="sys-l">{t("cards.system.cpu", "CPU")}</span>
@@ -105,6 +108,9 @@ export default function SystemCard(p: { menu?: JSX.Element }) {
               </svg>
             </div>
           </>
+          }>
+            <SystemDesign v={v()} design={p.design!} onOpen={openTaskManager} />
+          </Show>
         )}
       </Show>
     </div>

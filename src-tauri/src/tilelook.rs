@@ -146,6 +146,9 @@ pub struct CardLook {
     /// `claude`, `weather`; u jiných se ignoruje). Bez skutečného čísla karta zůstane jako dřív.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub hero: bool,
+    /// Vzhled karty z registru UI (src/layout/designs.ts; id; chybí = výchozí, dnešní vzhled). Neznámé id UI ignoruje.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub design: Option<String>,
 }
 
 /// Složka zástupců v kartě Projekty (přetažení dlaždice na jinou, jako na telefonu).
@@ -349,6 +352,11 @@ mod tests {
         let off: CardLook = serde_json::from_value(json!({"grain":false,"hero":false,"surface":"layer"})).unwrap();
         assert_eq!(serde_json::to_value(&off).unwrap(), json!({"surface":"layer"}));
         assert!(serde_json::from_value::<CardLook>(json!({"surface":"metal"})).is_err());
+        // kolo 25: vzhled karty z registru — tam a zpět; starý look bez klíče = None
+        let d: CardLook = serde_json::from_value(json!({"design":"rings"})).unwrap();
+        assert_eq!(d.design.as_deref(), Some("rings"));
+        assert_eq!(serde_json::to_value(&d).unwrap(), json!({"design":"rings"}));
+        assert_eq!(c.design, None);
     }
 
     #[test]

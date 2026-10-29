@@ -98,9 +98,74 @@ pub fn system_fact(sample: Option<(Option<f32>, Option<f32>, i64)>, now: i64) ->
     }
 }
 
+/// Kolik vzorků drží mini graf proužku (~4 min po 10 s).
+pub const SPARK_N: usize = 24;
+/// Nejkratší odstup dvou bodů grafu (vzorky karty po 2 s by osu zhustily).
+pub const SPARK_STEP_MS: i64 = 8_000;
+
+/// Historie CPU / paměti pro styl „průběh“ vlastního vzhledu — jen ze skutečných vzorků `sysmon`, které proužek
+/// stejně čte (nic nevzorkuje navíc, žádný časovač). Mezera delší než `SYSTEM_SHOW_MS` = graf od začátku.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SysHist {
+    at: Option<i64>,
+    pub cpu: Vec<f32>,
+    pub mem: Vec<f32>,
+}
+
+impl SysHist {
+    /// Zapíše vzorek `(cpu, paměť, kdy)`, pokud je nový a aspoň `SPARK_STEP_MS` po předchozím bodu.
+    pub fn push(&mut self, sample: Option<(Option<f32>, Option<f32>, i64)>, now: i64) {
+        let Some((cpu, mem, at)) = sample.filter(|s| now >= s.2 && now - s.2 < SYSTEM_SHOW_MS) else {
+            // žádný čerstvý vzorek: starý graf by lhal
+            *self = SysHist::default();
+            return;
+        };
+        if let Some(prev) = self.at {
+            if at - prev > SYSTEM_SHOW_MS || at < prev {
+                *self = SysHist::default();
+            } else if at - prev < SPARK_STEP_MS {
+                return;
+            }
+        }
+        self.at = Some(at);
+        for (v, h) in [(cpu, &mut self.cpu), (mem, &mut self.mem)] {
+            if let Some(v) = v {
+                h.push(v.clamp(0.0, 100.0));
+                if h.len() > SPARK_N {
+                    h.remove(0);
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sys_hist_real_samples_only() {
+        let mut h = SysHist::default();
+        // (vzorek, teď, čekané body CPU)
+        type Step = (Option<(Option<f32>, Option<f32>, i64)>, i64, usize);
+        let steps: [Step; 7] = [
+            (Some((Some(10.0), Some(40.0), 1_000)), 1_000, 1),
+            (Some((Some(10.0), Some(40.0), 1_000)), 5_000, 1), // stejný vzorek
+            (Some((Some(20.0), Some(41.0), 3_000)), 5_000, 1), // karta po 2 s: moc brzy
+            (Some((Some(30.0), Some(42.0), 11_000)), 11_000, 2),
+            (Some((None, Some(42.0), 21_000)), 21_000, 2),     // CPU čeká na druhý vzorek
+            (Some((Some(50.0), Some(43.0), 90_000)), 90_000, 1), // mezera = od začátku
+            (None, 91_000, 0),
+        ];
+        for (i, (s, now, want)) in steps.into_iter().enumerate() {
+            h.push(s, now);
+            assert_eq!(h.cpu.len(), want, "krok {i}");
+        }
+        for i in 0..40 {
+            h.push(Some((Some(i as f32), Some(200.0), i * 10_000)), i * 10_000);
+        }
+        assert_eq!((h.cpu.len(), h.mem.len(), h.cpu[SPARK_N - 1], h.mem[0]), (SPARK_N, SPARK_N, 39.0, 100.0));
+    }
 
     #[test]
     fn new_facts_only_fresh_real_data() {

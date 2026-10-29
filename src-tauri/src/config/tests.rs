@@ -610,6 +610,15 @@ fn context_bar_off_by_default_even_in_old_config() {
 }
 
 #[test]
+fn limits_sources_off_in_old_config() {
+    assert!(!Config::default().claude.limits_desktop && !Config::default().claude.limits_fetch);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"limitsPace":true,"limitsAlert":true}}"#).unwrap();
+    assert!(!cfg.claude.limits_desktop && !cfg.claude.limits_fetch);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"limitsDesktop":true,"limitsFetch":true}}"#).unwrap();
+    assert!(cfg.claude.limits_desktop && cfg.claude.limits_fetch);
+}
+
+#[test]
 fn limits_alert_off_in_old_config() {
     assert!(!Config::default().claude.limits_alert);
     let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800}}"#).unwrap();

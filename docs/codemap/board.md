@@ -13,6 +13,10 @@ i na plochu (`desk/**`: druhy `week`, `clock`, `usage`). Cituj symbolem, ne čí
 | `src/board/model.ts` | čistá logika (test `model.test.mjs`): místní datum, útrata (posledních n dní, součet s cenou jen když ji den má, výšky sloupců, stav karty), časová osa (řádky ze `summary.hours`, úroveň buňky 0–4, rozsah hodin, přehled ze dneška), pás týdne od pondělí (dnešek, víkend, den s událostí), stav kalendáře a zbytek dneška, krok hlasitosti | `localDate` `lastDays` `sumDays` `barHeights` `usageState` `isToday` `hourRows` `heat` `hoursMax` `hourSpan` `weekStrip` `calState` `todayLeft` `stepVolume` `Origin` |
 | `src/board/text.ts` | zkratky dnů a měsíců (i18n), text štítku původu | `dowShort` `monthShort` `originText` |
 | `src/board/UsageCard.tsx` | karta Claude dnes: hrdinské číslo útraty dnes (+ tokeny), 7 dní, sloupce 7 dní (sdílený `src/charts/Bars`), časová osa „Co Claude dnes dělal“ (projekty × hodiny), stavy vypnuto / počítám / chyba; v šuplíku při `view === "full"` `api.costsRefresh()` (Rust 1× / 60 s), na ploše nic nevolá | `UsageCard` `OriginTag` |
+| `src/board/WeekViews.tsx` · `weekModel.ts` · `weekDesigns.ts` | kolo 25 vzhledy karty Týden kromě pásu (Měsíc, Odtrhávací list, Osa dne, Ciferník, Program); čisté funkce (bloky osy, výseče, odpočet, měsíční mřížka) + seznam `WEEK_DESIGNS` pro registr vzhledů | `MonthBody` `TimelineBody` `DialBody` `AgendaBody` `timelineBlocks` `monthGrid` `nextEvents` `countdown` `WEEK_DESIGNS` `weekDesign` |
+| `src/cards/WeatherCard.tsx` · `weatherViews.tsx` · `weatherViews2.tsx` · `WxIcon.tsx` · `weather.css` | kolo 25 karta Počasí se 7 vzhledy (klasické, Živá obloha, Teploměr, Plakát, Křivka, Pět dní, Oblouk slunce), vlastní SVG ikony | `SkyBody` `ThermoBody` `PosterBody` `CurveBody` `WeekBody` `ArcBody` `WxIcon` |
+| `src/cards/weatherModel.ts` · `weatherDesigns.ts` | čisté funkce vzhledů Počasí (druh podle WMO, poloha slunce, hodiny od teď, křivka, řádky dní) + seznam `WEATHER_DESIGNS` pro registr | `wxKind` `sunPos` `hoursFrom` `curvePoints` `dayRows` `WEATHER_DESIGNS` `weatherDesign` |
+| `src-tauri/src/weather_fc.rs` | předpověď z dotazu Open-Meteo: hodiny dnešek + zítřek, 5 dní, vítr, pocitová teplota, východ / západ; obranné parsování | `parse_extra` `Extra` `Hour` `Day` |
 | `src/board/WeekCard.tsx` | karta Týden: velký měsíc + čas, pás 7 dnů, pod ním zbytek dneška z kalendáře; bez kalendáře „Bez kalendáře…“ + Připojit, s kalendářem bez událostí „Nic na dnešek“ | `WeekCard` |
 | `src/board/BigClockCard.tsx` | karta Velké hodiny: hodiny nad minutami obřími tabulkovými číslicemi, sekundy jen v šuplíku (na ploše čas po minutách), datum a ISO týden | `BigClockCard` |
 | `src/board/TogglesCard.tsx` | karta Rychlé přepínače: dlaždice Zvuk (ztlumit), Mikrofon (jen s mikrofonem), Baterie (jen stroj s baterií, jen ukazuje), hlasitost − / + po 5 % (`api.volumeSet` / `volumeMute` / `volumeMicMute`). Jas záměrně ne (bez práv správce ho Windows spolehlivě nastavit nedovolí) | `TogglesCard` |
@@ -44,7 +48,7 @@ Plocha: [desk.md](desk.md) (`Kind::Week|Clock|Usage`, `DeskData.costs`, `views.t
 - Přehrávač s obalem a barvou z obalu = karta Právě hraje (vzhledy `media.variant`, barva obalu `media/tint.ts`
   `pickTint`, volba `media.tint`; kolo 22: barva obalu je zároveň jediný akcent karty) — [media.md](media.md).
 - Spouštěč aplikací = karta Odkazy a akce (skupiny, vzhledy) a import Launcheru — [actions.md](actions.md).
-- Počasí s předpovědí: `weather.rs` stahuje jen dnešek (`forecast_days=1`); předpověď by měnila požadavek — nedělá se.
+- Počasí s předpovědí (kolo 25): `weather.rs` ji bere ze stejného dotazu (`forecast_days=6`, hodiny + dny + vítr + slunce) a parsuje `weather_fc.rs`; proužek stahuje počasí i bez karty (`weather::strip_wants_weather`, napojeno v `refresh::maybe_refresh_weather`).
 
 ## Testy
 

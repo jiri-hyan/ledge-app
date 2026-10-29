@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { STRIP_LOOK_IDS } from "./looks.ts";
 import {
-  COMPOSE_ITEMS, COMPOSE_SHAPES, DEFAULT_COMPOSE, ITEM_STYLES, MAX_PIECES, W_MAX, W_MIN,
-  composeOf, drawKind, hRange, hasItem, nextStyle, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
+  COMPOSE_ITEMS, COMPOSE_SHAPES, DEFAULT_COMPOSE, DESIGN_IDS, ITEM_STYLES, MAX_PIECES, MAX_ZONE, W_MAX, W_MIN,
+  composeOf, designOf, setPieceColor, stylesFor, drawKind, hRange, hasItem, nextStyle, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
 } from "./compose.ts";
 
 const sig = (c) => `${c.shape} ${c.width}×${c.height} r${c.round} | ${["left", "center", "right"].map((s) => c[s].map((p) => `${p.item}:${p.style}`).join(",")).join(" | ")}${c.hideIdle ? " ghost" : ""}${c.rotate ? " rotate" : ""}`;
@@ -54,8 +54,11 @@ test("normCompose = Rust Compose::norm (rozsahy, každá položka jednou, 1–5)
     [{ shape: "line", height: 30 }, "line 300×10 r55 | claude:icon | time:text | limit5h:ring"],
     [{ shape: "bubble", left: [], center: [], right: [] }, "capsule 300×30 r55 |  | claude:icon | "],
     [{ left: [{ item: "time" }, { item: "date" }, { item: "cpu" }], center: [{ item: "claude" }, { item: "time" }, { item: "music" }], right: [{ item: "timer" }, { item: "repos" }] },
-      "capsule 300×30 r55 | time:icon,date:icon,cpu:icon | claude:icon,music:icon | "],
-    [{ left: [{ item: "mic", style: "ring" }, { item: "cpu", style: "spark" }], center: [], right: [] }, "capsule 300×30 r55 | cpu:icon |  | "],
+      "capsule 300×30 r55 | time:icon,date:icon,cpu:icon | claude:icon,music:icon | timer:icon,repos:icon"],
+    [{ left: [{ item: "mic", style: "ring" }, { item: "cpu", style: "spark" }], center: [], right: [] }, "capsule 300×30 r55 | cpu:spark |  | "],
+    [{ left: [{ item: "cpu", style: "glow" }], center: [], right: [] }, "capsule 300×30 r55 | cpu:icon |  | "],
+    // zóna nejvýš 5 (starý config z kola 23 se načte celý)
+    [{ left: ["time", "date", "cpu", "memory", "battery", "weather"].map((item) => ({ item })), center: [], right: [] }, "capsule 300×30 r55 | time:icon,date:icon,cpu:icon,memory:icon,battery:icon |  | "],
   ];
   for (const [raw, want] of cases) assert.equal(sig(normCompose(raw)), want, JSON.stringify(raw));
 });
@@ -82,7 +85,10 @@ test("kostky: přidat, přesunout, odebrat, styl — vstup netknutý", () => {
   assert.equal(JSON.stringify(c), before, "vstup netknutý");
   // plno = beze změny, poslední zůstane
   let full = c;
-  for (const it of ["date", "music", "cpu"]) full = putPiece(full, it, "center");
+  for (const it of ["date", "music", "cpu", "memory"]) full = putPiece(full, it, "center");
+  assert.equal(full.center.length, MAX_ZONE);
+  assert.equal(putPiece(full, "battery", "center"), full, "plná zóna");
+  for (const it of ["battery", "timer", "servers", "repos", "limitWeek"]) full = putPiece(full, it, it === "battery" || it === "timer" ? "left" : "right");
   assert.equal(total(full), MAX_PIECES);
   assert.equal(putPiece(full, "weather", "left"), full);
   assert.ok(!hasItem(putPiece(full, "weather", "left"), "weather"));
@@ -90,7 +96,12 @@ test("kostky: přidat, přesunout, odebrat, styl — vstup netknutý", () => {
   for (const it of ["time", "limit5h", "claude"]) one = removePiece(one, it);
   assert.equal(total(one), 1);
   assert.deepEqual(whereIs(one, "claude"), ["left", 0]);
-  assert.equal(nextStyle("dot"), "icon");
+  assert.equal(nextStyle("ring5h"), "icon");
+  // klik na kostku: jen styly, které položka nabízí (čas nemá průběh ani Claude styly)
+  let st = composeOf("classic");
+  const seenStyles = [];
+  for (let i = 0; i < 12; i++) { st = setStyle(st, "time", "next"); seenStyles.push(st.center[0].style); }
+  assert.ok(!seenStyles.some((s) => s === "spark" || s === "dotPct" || s === "ring5h"), seenStyles.join());
 });
 
 test("rozsahy a seznamy = Rust looks/compose.rs", () => {
@@ -142,4 +153,54 @@ test("shiftPiece přes všechny hranice slotů", () => {
   const full = mk(["claude", "time", "date", "cpu", "weather"], [], []);
   assert.equal(at(shiftPiece(full, "weather", 1)), "claude,time,date,cpu|weather|", "konec levého slotu → střed");
   assert.equal(at(shiftPiece(base, "memory", 1)), at(base), "chybějící položka");
+});
+
+test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvolby", () => {
+  // starý compose bez výzdoby = dnešní vzhled
+  const old = normCompose({ shape: "capsule", left: [{ item: "claude", style: "icon" }], center: [{ item: "time", style: "text" }], right: [{ item: "limit5h", style: "ring" }] });
+  assert.deepEqual(old, DEFAULT_COMPOSE);
+  assert.deepEqual([old.deco.edge, old.fill.kind, old.sep, old.mono], ["none", "black", "none", false]);
+  // ořez barev jako Rust (`composedeco::norm_*`)
+  const n = normCompose({ deco: { edge: "gradient", color: "#FF8800", color2: "zelená", width: 9 }, fill: { kind: "sky", from: "#123456" }, sep: "islands", center: [{ item: "time", style: "chip", color: "nic" }, { item: "date", color: "ACCENT" }] });
+  assert.deepEqual([n.deco.color, n.deco.color2, n.deco.width, n.fill.kind, n.fill.from, n.sep], ["#ff8800", "", 3, "black", "#123456", "islands"]);
+  assert.deepEqual(n.center, [{ item: "time", style: "chip" }, { item: "date", style: "icon", color: "accent" }]);
+  assert.equal(normCompose({ deco: { color: "Claude" } }).deco.color, "claude");
+  // barva dílu: nastavit / vrátit na „podle hodnoty“ (klíč zmizí)
+  const red = setPieceColor(DEFAULT_COMPOSE, "time", "#FF0000");
+  assert.equal(red.center[0].color, "#ff0000");
+  assert.ok(!("color" in setPieceColor(red, "time", "").center[0]));
+  assert.ok(!("color" in DEFAULT_COMPOSE.center[0]), "vstup netknutý");
+  // průběh jen s historií (CPU / paměť), Claude styly jen Claude
+  for (const [item, has, not] of [["cpu", "spark", "dotPct"], ["memory", "spark", "ring5h"], ["claude", "dotPct", "spark"], ["limit5h", "bar", "spark"], ["weather", "iconText", "spark"]]) {
+    assert.ok(stylesFor(item).includes(has), `${item} ${has}`);
+    assert.ok(!stylesFor(item).includes(not), `${item} bez ${not}`);
+  }
+  // náhrady nových stylů = Rust compose::parts
+  for (const [item, style, frac, want] of [["claude", "ring5h", false, "ring"], ["time", "ring5h", false, "icon"], ["limit5h", "bar", true, "under"], ["time", "bar", false, "text"], ["cpu", "spark", true, "spark"], ["limit5h", "spark", true, "meter"], ["time", "chip", false, "iconText"], ["claude", "dotPct", false, "dotPct"]])
+    assert.equal(drawKind(item, style, frac), want, `${item}:${style}`);
+  // 6 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
+  assert.equal(DESIGN_IDS.length, 6);
+  const seen = new Set();
+  for (const id of DESIGN_IDS) {
+    const c = designOf(id);
+    assert.deepEqual(normCompose(c), c, id);
+    for (const s of ["left", "center", "right"]) for (const p of c[s]) assert.ok(stylesFor(p.item).includes(p.style), `${id} ${p.item}:${p.style}`);
+    seen.add(JSON.stringify([c.deco, c.fill, c.sep]));
+  }
+  assert.equal(seen.size, 6);
+  assert.notEqual(designOf("glass"), designOf("glass"), "vždy nová kopie");
+});
+
+test("seznamy výzdoby = Rust looks/composedeco.rs", () => {
+  const src = readFileSync(new URL("../../src-tauri/src/looks/composedeco.rs", import.meta.url), "utf8");
+  const variants = (name) => {
+    const start = src.indexOf(`pub enum ${name} {`);
+    const body = src.slice(start, src.indexOf("\n}", start));
+    return [...body.matchAll(/^\s*([A-Z][A-Za-z0-9]*),\s*$/gm)].map((m) => m[1][0].toLowerCase() + m[1].slice(1));
+  };
+  const ts = readFileSync(new URL("./compose.ts", import.meta.url), "utf8");
+  for (const [rust, list] of [["Edge", "COMPOSE_EDGES"], ["EdgeLen", "EDGE_LENS"], ["FillKind", "FILL_KINDS"], ["FillDir", "FILL_DIRS"], ["Sep", "COMPOSE_SEPS"]]) {
+    const m = ts.match(new RegExp(`${list} = \\[([^\\]]*)\\]`));
+    assert.deepEqual(JSON.parse(`[${m[1]}]`), variants(rust), rust);
+  }
 });

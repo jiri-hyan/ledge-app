@@ -14,7 +14,7 @@
 .wg-err { display: flex; align-items: center; gap: var(--s2); margin: 2px 0 6px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--well); color: var(--red); font-size: var(--fs-sm); }
 
 .wg-bar { height: 6px; border-radius: 3px; background: var(--well-2); overflow: hidden; margin: 4px 0 8px; }
-.wg-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width var(--fast); }
+.wg-bar > span { display: block; height: 100%; background: var(--accent-fill, var(--accent)); border-radius: 3px; transition: width var(--fast); }
 
 .wg-items { display: flex; flex-direction: column; }
 .wg-item { width: 100%; text-align: left; border-radius: var(--r-sm); gap: 8px; cursor: default; }

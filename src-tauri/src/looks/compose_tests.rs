@@ -9,7 +9,7 @@ use crate::appearance::geom::anchor_c2;
 use windows::Win32::Foundation::RECT;
 
 fn pc(item: PieceItem, style: PieceStyle) -> Piece {
-    Piece { item, style }
+    Piece::new(item, style)
 }
 fn cmp(shape: Form, left: &[Piece], center: &[Piece], right: &[Piece]) -> Compose {
     Compose { shape, left: left.to_vec(), center: center.to_vec(), right: right.to_vec(), ..Compose::default() }
@@ -26,12 +26,13 @@ fn norm_clamps_and_limits() {
     let table: Vec<NormRow> = vec![
         (Compose::default(), 300, 30, 55, (1, 1, 1)),
         (Compose { width: 5, height: 200, round: 250, ..Compose::default() }, 60, 52, 100, (1, 1, 1)),
-        (Compose { width: 9000, height: 0, ..Compose::default() }, 620, 18, 55, (1, 1, 1)),
+        (Compose { width: 9000, height: 0, ..Compose::default() }, 1200, 18, 55, (1, 1, 1)),
         // linka: tloušťka 2–10
         (Compose { shape: Form::Line, height: 30, ..Compose::default() }, 300, 10, 55, (1, 1, 1)),
         (Compose { shape: Form::Line, height: 0, ..Compose::default() }, 300, 2, 55, (1, 1, 1)),
-        // nejvýš 5, zleva doprava; každá položka jednou
-        (cmp(Form::Capsule, &[pc(Time, i), pc(Date, i), pc(Cpu, i)], &[pc(Claude, i), pc(Time, i), pc(Music, i)], &[pc(Timer, i), pc(Repos, i)]), 300, 30, 55, (3, 2, 0)),
+        // každá položka jednou, zóna nejvýš 5, celkem nejvýš 12 (zleva doprava)
+        (cmp(Form::Capsule, &[pc(Time, i), pc(Date, i), pc(Cpu, i)], &[pc(Claude, i), pc(Time, i), pc(Music, i)], &[pc(Timer, i), pc(Repos, i)]), 300, 30, 55, (3, 2, 2)),
+        (cmp(Form::Capsule, &[pc(Time, i), pc(Date, i), pc(Cpu, i), pc(Memory, i), pc(Battery, i), pc(Weather, i)], &[pc(Claude, i), pc(Limit5h, i), pc(LimitWeek, i), pc(Music, i), pc(Timer, i)], &[pc(Servers, i), pc(Repos, i), pc(Activity, i)]), 300, 30, 55, (5, 5, 2)),
         // prázdné = stav Clauda uprostřed (1–5 položek)
         (cmp(Form::Capsule, &[], &[], &[]), 300, 30, 55, (0, 1, 0)),
     ];
@@ -264,7 +265,21 @@ fn ts_mirror() {
         PieceItem::Cpu, PieceItem::Memory, PieceItem::Battery, PieceItem::Weather, PieceItem::Servers, PieceItem::Repos,
         PieceItem::Activity,
     ];
-    let styles = [PieceStyle::Icon, PieceStyle::Badge, PieceStyle::Text, PieceStyle::Ring, PieceStyle::Graph, PieceStyle::Dot];
+    use super::composedeco::{Edge, EdgeLen, FillDir, FillKind, Sep};
+    let styles = [
+        PieceStyle::Icon, PieceStyle::Badge, PieceStyle::Text, PieceStyle::Ring, PieceStyle::Graph, PieceStyle::Dot, PieceStyle::IconText, PieceStyle::Bar,
+        PieceStyle::Spark, PieceStyle::Chip, PieceStyle::DotPct, PieceStyle::Ring5h,
+    ];
+    let j = |v: Vec<serde_json::Value>| ids(v.into_iter().map(ser).collect());
+    for (name, list) in [
+        ("COMPOSE_EDGES", j([Edge::None, Edge::Underline, Edge::Outline, Edge::Glow, Edge::Gradient].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+        ("EDGE_LENS", j([EdgeLen::Center, EdgeLen::Full].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+        ("FILL_KINDS", j([FillKind::Black, FillKind::Glass, FillKind::Tint, FillKind::Gradient, FillKind::None].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+        ("FILL_DIRS", j([FillDir::Right, FillDir::Down, FillDir::Diag].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+        ("COMPOSE_SEPS", j([Sep::None, Sep::Gap, Sep::Dot, Sep::Bar, Sep::Pills, Sep::Islands].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+    ] {
+        assert!(ts.contains(&format!("{name} = [{list}]")), "{name}: {list}");
+    }
     let f = ids(forms.iter().map(|x| ser(serde_json::to_value(x).unwrap())).collect());
     let i = ids(items.iter().map(|x| ser(serde_json::to_value(x).unwrap())).collect());
     let s = ids(styles.iter().map(|x| ser(serde_json::to_value(x).unwrap())).collect());
@@ -273,6 +288,7 @@ fn ts_mirror() {
     assert!(ts.contains(&format!("ITEM_STYLES = [{s}]")), "styly: {s}");
     for (k, v) in [
         ("MAX_PIECES", compose::MAX_PIECES as u16),
+        ("MAX_ZONE", compose::MAX_ZONE as u16),
         ("W_MIN", compose::W_MIN),
         ("W_MAX", compose::W_MAX),
         ("H_MIN", compose::H_MIN),
@@ -284,4 +300,72 @@ fn ts_mirror() {
     }
     // výchozí compose = předvolba „Klasický“ v editoru
     assert!(ts.contains(r#"classic: mk("capsule", 300, 30, 55, ["claude:icon"], ["time:text"], ["limit5h:ring"])"#));
+}
+
+#[test]
+fn new_styles_kolo25_real_data_only() {
+    use PieceItem::*;
+    use PieceStyle::*;
+    let work = facts(State::Work);
+    let idle = facts(State::Idle);
+    let sys = Facts { cpu: Some(23.0), cpu_hist: vec![10.0, 20.0, 30.0], battery: Some(BatteryFact { percent: 80, charging: false }), weather: Some(WeatherFact { temp: 8, glyph: Glyph::Sun }), ..facts(State::Idle) };
+    let no_hist = Facts { cpu_hist: vec![], ..sys.clone() };
+    // (položka, styl, data, čekaný podpis)
+    let table: Vec<(PieceItem, PieceStyle, &Facts, &str)> = vec![
+        (Claude, IconText, &work, "[claude:run] Pracuje · 2"),
+        (Claude, DotPct, &work, "●run 42 %"),
+        (Claude, DotPct, &idle, "●idle 42 %"),
+        (Claude, Ring5h, &work, "◯42:run"),
+        (Weather, IconText, &sys, "[sun:text] 8°"),
+        (Cpu, IconText, &sys, "[cpu:text] CPU 23 %"),
+        (Cpu, Spark, &sys, "~3:acc CPU 23 %"),
+        (Cpu, Spark, &no_hist, "▮23:text"),
+        (Limit5h, Spark, &work, "▮42:acc"),
+        (Limit5h, Bar, &work, "_5h 42 %_42:acc"),
+        (Time, Bar, &work, "14:32"),
+        (Battery, IconText, &sys, "▭80 80 %"),
+        (Time, Chip, &work, "[clock:text] 14:32"),
+        (Music, IconText, &idle, ""),
+    ];
+    for (item, style, f, want) in table {
+        assert_eq!(parts_sig(&compose::parts(pc(item, style), f)), want, "{item:?} {style:?}");
+    }
+    // barva dílu: akcent / hex přebarví vše, baterie si nechá svoje; podklad = barva hodnoty, neutrální = akcent
+    let acc = Piece { color: "accent".into(), ..pc(Time, Icon) };
+    assert_eq!(parts_sig(&compose::parts(acc, &work)), "[clock:acc]");
+    assert_eq!(compose::chip_of(&pc(Time, Chip), &work), Some(work.accent));
+    assert_eq!(compose::chip_of(&pc(Claude, Chip), &work), Some(RUN));
+    assert_eq!(compose::chip_of(&Piece { color: "#ff0000".into(), ..pc(Claude, Chip) }, &work), Some(Rgba(1.0, 0.0, 0.0, 1.0)));
+    assert_eq!(compose::chip_of(&pc(Claude, Text), &work), None);
+}
+
+#[test]
+fn kolo23_config_draws_as_before() {
+    // compose z kola 23 (bez deco / fill / sep / color) = dnešní vzhled: černé tělo, bez linky, díly jen s mezerou
+    let c: Compose = serde_json::from_str(r#"{"shape":"capsule","width":300,"height":30,"round":55,"left":[{"item":"claude","style":"icon"}],"center":[{"item":"time","style":"text"}],"right":[{"item":"limit5h","style":"ring"}]}"#).unwrap();
+    assert_eq!(c, Compose::default());
+    let back = serde_json::to_value(&c).unwrap();
+    assert!(back["left"][0].get("color").is_none(), "prázdná barva dílu se nezapisuje");
+    for st in STATES {
+        let s = compose::show(&c, &facts(st));
+        assert!(s.paint.is_some_and(|p| p.plain()), "{st:?}");
+        // díly sedí na části (kreslení je dělí podle nich)
+        for (parts, segs) in [(&s.parts, &s.segs[0]), (&s.center, &s.segs[1]), (&s.right, &s.segs[2])] {
+            assert_eq!(segs.iter().map(|x| x.n).sum::<usize>(), parts.len(), "{st:?}");
+            assert!(segs.iter().all(|x| x.chip.is_none()));
+        }
+    }
+    // výzdoba se načte a ořízne
+    let c: Compose = serde_json::from_str(r##"{"deco":{"edge":"gradient","color":"#FF8800","color2":"zelená","width":7},"fill":{"kind":"glass"},"sep":"islands","center":[{"item":"time","style":"chip","color":"nic"}]}"##).unwrap();
+    let n = c.norm();
+    assert_eq!((n.deco.color.as_str(), n.deco.color2.as_str(), n.deco.width, n.center[0].color.as_str()), ("#ff8800", "", 3, ""));
+    assert!(!compose::show(&c, &facts(State::Idle)).paint.unwrap().plain());
+    // střídání středu: jeden díl na řádek
+    let t = Compose { rotate: true, ..cmp(Form::Island, &[], &[pc(PieceItem::Music, PieceStyle::Chip), pc(PieceItem::Timer, PieceStyle::Text)], &[]) };
+    let mut f = facts(State::Music);
+    f.timer = Some(super::tests::timer18());
+    let s = compose::show(&t, &f);
+    assert_eq!((s.rotate.len(), s.segs[1].len()), (2, 2));
+    assert_eq!(s.segs[1].iter().map(|x| x.n).collect::<Vec<_>>(), s.rotate.iter().map(Vec::len).collect::<Vec<_>>());
+    assert!(s.segs[1][0].chip.is_some() && s.segs[1][1].chip.is_none());
 }

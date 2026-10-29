@@ -16,7 +16,7 @@ fn act(phase: Phase, file: &str) -> Facts {
     f
 }
 fn one(shape: Form, style: PieceStyle) -> Compose {
-    Compose { shape, left: vec![], center: vec![Piece { item: PieceItem::Activity, style }], right: vec![], ..Compose::default() }
+    Compose { shape, left: vec![], center: vec![Piece::new(PieceItem::Activity, style)], right: vec![], ..Compose::default() }
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn waiting_approval_wins_with_badge() {
     f.waiting_where = "app".into();
     let v = compose::value(PieceItem::Activity, &f).unwrap();
     assert_eq!((v.color, v.num.as_deref(), v.glyph), (WAIT, Some("2"), Some(Glyph::Bell)));
-    let badge = parts_sig(&compose::parts(Piece { item: PieceItem::Activity, style: PieceStyle::Badge }, &f));
+    let badge = parts_sig(&compose::parts(Piece::new(PieceItem::Activity, PieceStyle::Badge), &f));
     assert!(badge.ends_with(" 2]"), "odznak s počtem: {badge}");
     // čeká i bez aktivity (schválení z hooku přišlo dřív než první nástroj)
     let mut f = facts(State::Wait);
@@ -68,7 +68,7 @@ fn empty_without_sessions_every_style_and_shape() {
     assert_eq!(f.activity, None);
     assert_eq!(compose::value(PieceItem::Activity, &f), None);
     for style in STYLES {
-        assert!(compose::parts(Piece { item: PieceItem::Activity, style }, &f).is_empty(), "{style:?}");
+        assert!(compose::parts(Piece::new(PieceItem::Activity, style), &f).is_empty(), "{style:?}");
     }
     for shape in FORMS {
         let s = compose::show(&one(shape, PieceStyle::Text), &f);
@@ -125,8 +125,8 @@ fn old_config_unchanged_and_existing_items_ignore_activity() {
     let plain = facts(State::Work);
     let with = act(Phase::Editing, "main.rs");
     for style in STYLES {
-        let pc = Piece { item: PieceItem::Claude, style };
-        assert_eq!(parts_sig(&compose::parts(pc, &plain)), parts_sig(&compose::parts(pc, &with)), "{style:?}");
+        let pc = Piece::new(PieceItem::Claude, style);
+        assert_eq!(parts_sig(&compose::parts(pc.clone(), &plain)), parts_sig(&compose::parts(pc, &with)), "{style:?}");
     }
     // nová položka se načte ze zápisu a přežije ořez
     std::fs::write(&p, r#"{"strip":{"look":"custom","compose":{"center":[{"item":"activity","style":"badge"}]}}}"#).unwrap();

@@ -180,7 +180,8 @@ export interface QuestionReply { labels: string[]; other: string | null }
 export interface LimitsView {
   /** kdy vznikl vzorek (ms); null = žádná data */
   at: number | null;
-  source: "statusLine" | "usageLog" | null;
+  /** desktop = aplikace Claude (`claude.limitsDesktop`), api = dotaz Ledge na Anthropic (`claude.limitsFetch`) */
+  source: "statusLine" | "usageLog" | "desktop" | "api" | null;
   fiveHour: { pct: number; resetsAt: number | null } | null;
   sevenDay: { pct: number; resetsAt: number | null } | null;
   /** starší vzorek UI ukáže jako „staré“ */
@@ -193,6 +194,10 @@ export interface LimitsView {
   pace: boolean;
   /** vzorky 5h okna [at ms, pct] (prázdné bez volby) */
   history5h: [number, number][];
+  /** volba `claude.limitsDesktop`: "" = vypnuto, none = soubor aplikace Claude nenalezen, found */
+  desktop?: "" | "none" | "found";
+  /** volba `claude.limitsFetch`: "" = vypnuto, jinak stav posledního dotazu na Anthropic */
+  fetch?: "" | "pending" | "ok" | "noLogin" | "expired" | "error";
 }
 export interface StatusLineStatus {
   state: "none" | "foreign" | "full" | "error";

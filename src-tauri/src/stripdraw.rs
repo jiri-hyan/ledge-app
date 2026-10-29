@@ -62,8 +62,8 @@ pub(crate) unsafe fn pick_fonts(dw: &IDWriteFactory) -> Fonts {
     }
 }
 
-struct Fmts {
-    text: IDWriteTextFormat,
+pub(crate) struct Fmts {
+    pub(crate) text: IDWriteTextFormat,
     strong: IDWriteTextFormat,
     icon: Option<IDWriteTextFormat>,
     /// náhradní znaky ikon, když písmo ikon chybí
@@ -105,6 +105,7 @@ unsafe fn part_w(r: &Renderer, fm: &Fmts, p: &Part, sp: &Spec, ks: f32) -> f32 {
             Part::Battery { .. } => BATT_W * ks,
             Part::Ring { .. } => ring_d(sp) * ks,
             Part::Meter { .. } => METER_W * ks,
+            Part::Spark { .. } | Part::Under { .. } => crate::stripcompose::extra_w(r, fm, p, ks),
         }
     }
 }
@@ -168,7 +169,7 @@ unsafe fn icon_w(r: &Renderer, fm: &Fmts, g: Glyph) -> f32 {
     }
 }
 
-unsafe fn row_w(r: &Renderer, fm: &Fmts, parts: &[Part], sp: &Spec, ks: f32) -> f32 {
+pub(crate) unsafe fn row_w(r: &Renderer, fm: &Fmts, parts: &[Part], sp: &Spec, ks: f32) -> f32 {
     unsafe {
         let gap = sp.gap * ks;
         let sum: f32 = parts.iter().map(|p| part_w(r, fm, p, sp, ks)).sum();
@@ -176,14 +177,14 @@ unsafe fn row_w(r: &Renderer, fm: &Fmts, parts: &[Part], sp: &Spec, ks: f32) -> 
     }
 }
 
-fn brush(t: &ID2D1DCRenderTarget, c: Rgba, a: f32) -> Option<windows::Win32::Graphics::Direct2D::ID2D1SolidColorBrush> {
+pub(crate) fn brush(t: &ID2D1DCRenderTarget, c: Rgba, a: f32) -> Option<windows::Win32::Graphics::Direct2D::ID2D1SolidColorBrush> {
     unsafe { t.CreateSolidColorBrush(&color(c, a), None).ok() }
 }
 
 /// Části vedle sebe od `x`, svisle na středu pásu `y0..y1`. `spin` = natočení točícího se oblouku
 /// prstenců (podíl otáčky), `None` = netočí se.
 #[allow(clippy::too_many_arguments)]
-unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[Part], sp: &Spec, ks: f32, mut x: f32, y0: f32, y1: f32, spin: Option<f32>) {
+pub(crate) unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[Part], sp: &Spec, ks: f32, mut x: f32, y0: f32, y1: f32, spin: Option<f32>) {
     unsafe {
         let mid = (y0 + y1) / 2.0;
         let gap = sp.gap * ks;
@@ -288,6 +289,7 @@ unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[
                         t.FillRoundedRectangle(&D2D1_ROUNDED_RECT { rect: D2D_RECT_F { right: x + fw.max(mh), ..track.rect }, ..track }, &b);
                     }
                 }
+                Part::Spark { .. } | Part::Under { .. } => crate::stripcompose::draw_extra(t, r, fm, p, sp, ks, x, y0, y1, w),
             }
             x += w + gap;
         }
@@ -295,7 +297,7 @@ unsafe fn draw_parts(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, parts: &[
 }
 
 /// Oblá „ouška“ výřezu: vyduté čtvrtkruhy u horní hrany vlevo a vpravo od těla.
-unsafe fn ears(t: &ID2D1DCRenderTarget, r: &Renderer, bw: f32, e: f32, fill: Rgba) {
+pub(crate) unsafe fn ears(t: &ID2D1DCRenderTarget, r: &Renderer, bw: f32, e: f32, fill: Rgba) {
     unsafe {
         let Ok(path) = r.d2d.CreatePathGeometry() else { return };
         let Ok(sink) = path.Open() else { return };
@@ -317,6 +319,16 @@ unsafe fn ears(t: &ID2D1DCRenderTarget, r: &Renderer, bw: f32, e: f32, fill: Rgb
         {
             t.FillGeometry(&path, &b, None);
         }
+    }
+}
+
+/// Nažhavení (myš na proužku): linka akcentu dole uprostřed — nad stálou linkou vlastního vzhledu.
+fn hot_line(t: &ID2D1DCRenderTarget, m: &StripModel, bwf: f32, bhf: f32, scale: f32) {
+    if m.hot
+        && let Some(b) = brush(t, m.line[0], 0.9)
+    {
+        let lh = 2.0 * scale;
+        unsafe { t.FillRectangle(&D2D_RECT_F { left: bwf * 0.2, top: bhf - lh, right: bwf * 0.8, bottom: bhf }, &b) };
     }
 }
 
@@ -365,7 +377,20 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
         let left_w = row_w(r, &fm, parts, &sp, ks);
         let right_w = row_w(r, &fm, &show.right, &sp, ks);
         let center_w = row_w(r, &fm, center, &sp, ks);
+        // vlastní (kolo 25): díly zón s oddělením a výzdobou; co se nevejde na monitor, schová se od konce zóny
+        let lay = match (custom.and(base.paint), at) {
+            (Some(p), at) if at != Look::Line => {
+                let seg1: &[crate::looks::Seg] = match (&show.segs[1], show.rotate.len()) {
+                    (s, n) if n > 0 && s.len() == n => std::slice::from_ref(&s[rot % n]),
+                    (s, _) => s,
+                };
+                let avail = (mon.right - mon.left) as f32 - 2.0 * sp.pad * ks;
+                Some(crate::stripcompose::layout(r, &fm, &sp, ks, p, [(parts, &show.segs[0]), (center, seg1), (&show.right, &show.segs[2])], avail))
+            }
+            _ => None,
+        };
         let content = match look {
+            Look::Custom if lay.is_some() => lay.as_ref().map(|l| l.content).unwrap_or_default(),
             // střed na ose těla, boky stejně široké (širší z nich)
             Look::Custom if center_w > 0.0 => {
                 let side = left_w.max(right_w);
@@ -377,6 +402,8 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
             _ => left_w,
         };
         let natural = frame::body_width(at, content, &sp, ks, mon);
+        // vlastní vzhled nejvýš na šířku monitoru (šířka až 1200 × velikost)
+        let natural = if custom.is_some() { natural.min((mon.right - mon.left).max(1)) } else { natural };
         let bw = if look == Look::Island && !shelf {
             anim.step(natural as f32, m.animate, now).round() as i32
         } else {
@@ -385,7 +412,11 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
         };
         let line_k = if at == Look::Line { scale } else { ks };
         let bh = ((sp.h * line_k).round() as i32).max(1);
-        let Placed { win, ox, oy, bw, bh } = frame::place(at, m.position, mon, axis2, bw, bh, &sp, ks);
+        let Placed { mut win, ox, oy, bw, bh } = frame::place(at, m.position, mon, axis2, bw, bh, &sp, ks);
+        // záře pod tělem potřebuje pár px okna navíc (jen s `deco.edge: glow`)
+        if lay.as_ref().is_some_and(|l| l.paint.edge == crate::looks::composedeco::Edge::Glow) {
+            win.bottom += (crate::stripcompose::GLOW_PX * scale).ceil() as i32;
+        }
         let (w, h) = (win.right - win.left, win.bottom - win.top);
         let (bwf, bhf) = (bw as f32, bh as f32);
 
@@ -460,6 +491,16 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
                     }
                     x += d + gap;
                 }
+            } else if let Some(l) = lay.as_ref() {
+                let bodies = crate::stripcompose::paint(t, r, &fm, &sp, ks, scale, l, body, bwf, bhf, spin);
+                if let Some((c, l)) = pulse
+                    && let Some(b) = brush(t, c, 0.35 + 0.65 * l)
+                {
+                    for x in &bodies {
+                        t.DrawRoundedRectangle(x, &b, 1.5 * scale, None);
+                    }
+                }
+                hot_line(t, m, bwf, bhf, scale);
             } else {
                 if sp.fill.3 > 0.0
                     && let Some(b) = brush(t, sp.fill, 1.0)
@@ -518,12 +559,7 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
                 {
                     t.DrawRoundedRectangle(&body, &b, 1.5 * scale, None);
                 }
-                if m.hot
-                    && let Some(b) = brush(t, m.line[0], 0.9)
-                {
-                    let lh = 2.0 * scale;
-                    t.FillRectangle(&D2D_RECT_F { left: bwf * 0.2, top: bhf - lh, right: bwf * 0.8, bottom: bhf }, &b);
-                }
+                hot_line(t, m, bwf, bhf, scale);
             }
             t.SetTransform(&windows_numerics::Matrix3x2::identity());
             let _ = t.EndDraw(None, None);

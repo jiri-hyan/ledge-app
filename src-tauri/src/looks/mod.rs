@@ -7,6 +7,7 @@
 
 pub mod capsule;
 pub mod compose;
+pub mod composedeco;
 #[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
@@ -266,6 +267,9 @@ pub struct Facts {
     /// CPU a paměť v % z posledního čerstvého vzorku (`sysmon`)
     pub cpu: Option<f64>,
     pub mem: Option<f64>,
+    /// historie CPU / paměti v % ze vzorků proužku (~10 s, nejstarší první; `facts::SysHist`)
+    pub cpu_hist: Vec<f32>,
+    pub mem_hist: Vec<f32>,
     /// živá aktivita vedoucí session (položka skládačky „Claude aktivita“; `claude/activity.rs`)
     pub activity: Option<facts::ActivityFact>,
     /// „14:32“
@@ -299,6 +303,8 @@ impl Default for Facts {
             weather: None,
             cpu: None,
             mem: None,
+            cpu_hist: Vec::new(),
+            mem_hist: Vec::new(),
             activity: None,
             clock: String::new(),
             date: String::new(),
@@ -454,6 +460,17 @@ pub enum Part {
     Ring { fill: Option<f32>, color: Rgba },
     /// malý graf vlastního vzhledu: vodorovný sloupek z aktuální hodnoty 0–1
     Meter { fill: f32, color: Rgba },
+    /// mini graf z historie (hodnoty 0–1, nejstarší první) — vlastní vzhled, styl „průběh“ (kolo 25)
+    Spark { pts: Vec<f32>, color: Rgba },
+    /// text s tenkým pruhem pod ním (podíl 0–1) — vlastní vzhled, styl „pruh“ (kolo 25)
+    Under { text: String, color: Rgba, fill: f32 },
+}
+
+/// Díl vlastního vzhledu v řadě `Part`: kolik částí mu patří a barevný podklad (styl „podklad“).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Seg {
+    pub n: usize,
+    pub chip: Option<Rgba>,
 }
 
 /// Co styl právě ukáže (čistá data pro `stripdraw`).
@@ -476,6 +493,10 @@ pub struct Show {
     pub spin: bool,
     /// střed vlastního vzhledu (`custom`: `parts` = vlevo, `right` = vpravo; střídá se `rotate`)
     pub center: Vec<Part>,
+    /// vlastní vzhled: díly zón vlevo / střed / vpravo (u střídání středu jeden na řádek `rotate`)
+    pub segs: [Vec<Seg>; 3],
+    /// vlastní vzhled: výzdoba s barvami ze stavu (kolo 25)
+    pub paint: Option<composedeco::Paint>,
 }
 
 pub(crate) fn text(t: impl Into<String>, color: Rgba) -> Part {

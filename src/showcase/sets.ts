@@ -23,7 +23,7 @@ const note = (i: number, title: string, now: number, extra: any = {}) => ({
   remind: null, remindMs: null, done: false, title, images: 0, kind: "info", updated: null, tasksDone: 0, tasksTotal: 0, ...extra,
 });
 
-const session = (id: string, name: string, project: string, projectId: string, status: "working" | "waiting" | "idle", now: number, extra: any = {}) => ({
+export const session = (id: string, name: string, project: string, projectId: string, status: "working" | "waiting" | "idle", now: number, extra: any = {}) => ({
   id, name, title: null, cwd: `C:/Users/uzivatel/dev/${projectId}`, project, projectId, status, state: status,
   since: now - 4 * MIN, updatedAt: now - 20_000, entrypoint: "cli", pid: 4100, alive: true, hooked: true, uncommitted: [], unpushed: 0,
   ended: false, subagents: { running: [], done: [] }, canOpen: true, openHint: "", background: false, job: null, waitingFor: null, ...extra,

@@ -4,6 +4,7 @@
 // nebo na náhled, klik = další styl, šipky = posun, × nebo vytažení ven = odebrat) a „Vrátit“ (zásobník
 // změn v editoru). Vzhled = dnešní tokeny Nastavení; žádná trvalá animace (žádné kývání kostek). Úpravy jdou
 // do rozpracovaného configu (živý náhled = `StripLookPreview` / PreviewDock), proužek se změní po Uložit.
+// Kolo 25: designové předvolby, rám / pozadí / oddělení a styl + barva dílu (`ComposeDeco.tsx`).
 import { For, Show, createSignal } from "solid-js";
 import { lang, t } from "../../i18n";
 import type { Appearance } from "../../types";
@@ -17,6 +18,7 @@ import StripLookPreview from "../previews/StripLookPreview";
 import { ITEM_GLYPH } from "../previews/ComposePreview";
 import type { PreviewState } from "../appearanceModel";
 import { Slider } from "./apUi";
+import { ComposeDecoBlock, ComposeDesigns, PieceTools } from "./ComposeDeco";
 import "./compose.css";
 
 const DRAG = "text/x-ledge-piece";
@@ -56,6 +58,12 @@ export const STYLE_NAME: Record<ItemStyle, () => string> = {
   ring: () => t("appearance.compose.style.ring", "Prstenec"),
   graph: () => t("appearance.compose.style.graph", "Malý graf"),
   dot: () => t("appearance.compose.style.dot", "Tečka"),
+  iconText: () => t("appearance.compose.style.iconText", "Ikona a hodnota"),
+  bar: () => t("appearance.compose.style.bar", "Hodnota s pruhem"),
+  spark: () => t("appearance.compose.style.spark", "Průběh"),
+  chip: () => t("appearance.compose.style.chip", "Barevný podklad"),
+  dotPct: () => t("appearance.compose.style.dotPct", "Tečka stavu + 5h %"),
+  ring5h: () => t("appearance.compose.style.ring5h", "Prstenec 5h"),
 };
 const SLOT_NAME: Record<Slot, () => string> = {
   left: () => t("appearance.compose.slot.left", "Vlevo"),
@@ -133,6 +141,8 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
         <button class="btn" type="button" disabled={!stack().length} onClick={undo}>{t("appearance.compose.undo", "Vrátit")}</button>
       </div>
 
+      <ComposeDesigns c={c()} commit={commit} state={q.state} a={q.a} opacity={q.opacity} />
+
       <section class="cx-blk">
         <div class="cx-bh">
           <span>{t("appearance.compose.presets", "Začít z hotového vzhledu")}<small>{t("appearance.compose.presetsHint", "Klik naplní editor tím vzhledem; pak ho dolaď.")}</small></span>
@@ -191,14 +201,16 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
         </table>
       </section>
 
+      <ComposeDecoBlock c={c()} commit={commit} />
+
       <section class="cx-blk">
         <div class="cx-bh">
-          <span>{t("appearance.compose.cubes", "Kostky: obsah a styl")}<small>{t("appearance.compose.cubesHint", "Přetáhni kostku do přihrádky nebo na náhled. 1 až 5 kostek. Klik přepne styl, tažení ven ji odebere.")}</small></span>
+          <span>{t("appearance.compose.cubes", "Kostky: obsah a styl")}<small>{t("appearance.compose.cubesHint", "Přetáhni kostku do přihrádky nebo na náhled. 1 až 12 kostek, v přihrádce nejvýš 5. Klik přepne styl, tažení ven ji odebere.")}</small></span>
         </div>
         <div class="opt">
           <span>{t("appearance.compose.allStyles", "Styl všech kostek")}</span>
           <span class="cx-styles" role="group" aria-label={t("appearance.compose.allStyles", "Styl všech kostek")}>
-            <For each={ITEM_STYLES}>{(s) => <button class="btn" type="button" onClick={() => commit(setAllStyles(c(), s))}>{STYLE_NAME[s]()}</button>}</For>
+            <For each={ITEM_STYLES.filter((s) => s !== "spark" && s !== "dotPct" && s !== "ring5h")}>{(s) => <button class="btn" type="button" onClick={() => commit(setAllStyles(c(), s))}>{STYLE_NAME[s]()}</button>}</For>
           </span>
         </div>
         <div class="cx-rack">
@@ -222,6 +234,7 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
                           <button type="button" class="cx-mini" aria-label={t("appearance.compose.moveRight", "Posunout doprava")} onClick={() => commit(shiftPiece(c(), p.item, 1))}>›</button>
                           <button type="button" class="cx-mini" disabled={total(c()) <= 1} aria-label={t("appearance.compose.remove", "Odebrat {name}", { name: ITEM_NAME[p.item]() })} onClick={() => commit(removePiece(c(), p.item))}>×</button>
                         </span>
+                        <PieceTools c={c()} commit={commit} p={p} styleName={STYLE_NAME} itemName={ITEM_NAME[p.item]()} />
                       </div>
                     )}
                   </For>

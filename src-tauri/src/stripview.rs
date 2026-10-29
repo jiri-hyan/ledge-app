@@ -302,7 +302,16 @@ fn look_facts(
         let here = w.place.is_some() && w.place == cfg.personal.weather.coords();
         facts::weather_fact(w.data.as_ref().filter(|_| here), w.fetched_ms, now_ms)
     };
-    let (cpu, mem) = facts::system_fact(crate::sysmon::last_pct(), now_ms);
+    let sample = crate::sysmon::last_pct();
+    let (cpu, mem) = facts::system_fact(sample, now_ms);
+    // mini graf vlastního vzhledu: body jen ze vzorků, které proužek stejně čte (`facts::SysHist`)
+    static HIST: parking_lot::Mutex<Option<facts::SysHist>> = parking_lot::Mutex::new(None);
+    let (cpu_hist, mem_hist) = {
+        let mut h = HIST.lock();
+        let h = h.get_or_insert_with(Default::default);
+        h.push(sample, now_ms);
+        (h.cpu.clone(), h.mem.clone())
+    };
     Facts {
         waiting,
         waiting_where,
@@ -322,6 +331,8 @@ fn look_facts(
         weather,
         cpu,
         mem,
+        cpu_hist,
+        mem_hist,
         activity: facts::activity_fact(crate::claude::activity::lead(&sessions, now, DONE_MS), where_of),
         clock: crate::looks::hm(lt.wHour, lt.wMinute),
         date: clock_text(lt.wHour, lt.wMinute, lt.wDayOfWeek, lt.wDay, lt.wMonth),

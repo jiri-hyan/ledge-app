@@ -42,6 +42,34 @@ export interface Appearance {
   customTheme: string;
   /** velikost otevřeného šuplíku (kolo 23); chybí = šířka z předvolby, výška podle obsahu */
   size?: DrawerSize;
+  /** pozadí otevřeného šuplíku (kolo 25); chybí = dnešní pozadí */
+  backdrop?: Backdrop;
+  /** druhá barva gradientního akcentu `#rrggbb` (kolo 25); chybí = odvozená z `accent` */
+  accent2?: string;
+  /** akcent z barev pozadí (kolo 25); chybí = vypnuto */
+  accentFromBackdrop?: boolean;
+}
+/** Druh gradientu (zrcadlo `appearance::backdrop::KINDS`). */
+export type GradKind = "linear" | "radial" | "conic" | "mesh";
+export interface GradStop { c: string; p: number }
+/** Vlastní gradient (zrcadlo `appearance::backdrop::CustomGradient`): 2–5 zastávek, úhel 0–360. */
+export interface CustomGradient { id: string; name: string; kind: GradKind; angle: number; stops: GradStop[] }
+export type LiveKind = "fire" | "aurora" | "lava" | "stars" | "rain" | "grain";
+export type CardsMode = "auto" | "solid" | "tint" | "glass";
+export type FlameColor = "classic" | "blue" | "green" | "violet";
+/** `appearance.backdrop` (zrcadlo `appearance::backdrop::BackdropConfig`). */
+export interface Backdrop {
+  /** hotový (`theme/backdropPresets.ts`) nebo vlastní (`my-…`) gradient; prázdné = bez gradientu */
+  id: string;
+  live: LiveKind | "";
+  flame: FlameColor;
+  /** 0.1–1 */
+  intensity: number;
+  /** 0.3–2 */
+  speed: number;
+  /** karty nad pozadím: `auto` = průsvitné, když je pozadí zvolené */
+  cards: CardsMode;
+  custom: CustomGradient[];
 }
 /** Šířka / výška v logických px, 0 / chybí = výchozí (zrcadlo `appearance::size::PageSize`). */
 export interface PageSize { width?: number; height?: number }

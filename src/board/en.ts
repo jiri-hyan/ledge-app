@@ -3,6 +3,21 @@
 import { registerDict } from "../i18n";
 
 registerDict("en", {
+  // vzhledy karty Týden (kolo 25)
+  "cards.board.week.cdNow": "now",
+  "cards.board.week.cdMin": "in {n} min",
+  "cards.board.week.cdHour": "in {n} h",
+  "cards.board.week.cdDay.one": "in {n} day", "cards.board.week.cdDay.other": "in {n} days",
+  "cards.board.week.left.one": "{n} event left", "cards.board.week.left.other": "{n} events left",
+  "cards.board.week.nothingLeft": "nothing more today",
+  "cards.board.week.outside.one": "+{n} event outside the axis", "cards.board.week.outside.other": "+{n} events outside the axis",
+  "cards.board.week.dialAria": "Day dial with events",
+  "cards.design.week.strip": "Day strip", "cards.design.week.strip.line": "Month, time, Mon–Sun strip and the rest of today.",
+  "cards.design.week.month": "Month", "cards.design.week.month.line": "Month grid with dots on days with events.",
+  "cards.design.week.tearoff": "Tear-off page", "cards.design.week.tearoff.line": "Big day number, weekday and how many events remain.",
+  "cards.design.week.timeline": "Day timeline", "cards.design.week.timeline.line": "Today 7–22 h with event blocks and a now line.",
+  "cards.design.week.dial": "Dial", "cards.design.week.dial.line": "24-hour dial with event wedges and a hand.",
+  "cards.design.week.agenda": "Agenda", "cards.design.week.agenda.line": "Nearest events with a countdown.",
   // katalog
   "cards.layout.card.usage": "Claude today",
   "cards.layout.desc.usage": "Spend and tokens today and over 7 days plus today's timeline by project (estimate from transcripts). Reads the local Claude Code logs on this computer.",
