@@ -47,7 +47,8 @@ pub fn hash_bytes(b: &[u8]) -> String {
 /// Titulek poznámky z celého textu souboru (frontmatter se přeskočí).
 pub fn title_of(bytes: &[u8]) -> String {
     let text = String::from_utf8_lossy(bytes);
-    md::title(split(&text).1)
+    let (front, body) = split(&text);
+    super::heading_of(&front.unwrap_or_default()).unwrap_or_else(|| md::title(body))
 }
 
 /// Přípona poznámky: Ledge čte jen `md`, složka i `markdown`; skryté soubory (`.x.md`) ne.

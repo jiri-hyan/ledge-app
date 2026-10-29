@@ -632,3 +632,22 @@ fn paired_folder_turned_junction_is_frozen_not_deleted() {
     std::fs::remove_dir(f.folder.join("sub")).unwrap();
 }
 
+
+#[test]
+fn custom_title_and_unknown_keys_survive_both_directions() {
+    let f = fx();
+    let text = "---\ntitle: \"Plán týdne\"\ncreated: 2026-10-24T09:00:00+02:00\ncssclasses: wide\ndone: false\n---\n\nPrvní řádek těla\n";
+    let p = f.root.join("2026-10-24-090000-prvni-radek.md");
+    put(&p, text);
+    let o = f.go(Dir::Export, false);
+    assert_eq!(o.report.exported, 1, "{}", o.message);
+    // soubor ve složce se jmenuje podle vlastního nadpisu a je bajtově stejný (title i cizí klíč zůstaly)
+    let exported = f.folder.join("Plán týdne.md");
+    assert_eq!(get(&exported), text);
+    // úprava ve složce se vrátí zpět s nadpisem i cizími klíči
+    put(&exported, &text.replace("První řádek těla", "Upraveno ve složce"));
+    let o = f.go(Dir::Both, false);
+    assert!(o.message.is_empty() || !o.message.contains("chyba"), "{}", o.message);
+    let back = get(&p);
+    assert!(back.contains("title: \"Plán týdne\"") && back.contains("cssclasses: wide") && back.contains("Upraveno ve složce"), "{back}");
+}

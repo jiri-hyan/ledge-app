@@ -68,6 +68,7 @@ pub fn list(root: &Path, a: &Value, now: &DateTime<FixedOffset>) -> Value {
         project: arg(a, "project").map(str::to_string),
         include_done: a.get("includeDone").and_then(Value::as_bool).unwrap_or(false),
         archived: false,
+        only_done: false,
         limit: Some(limit),
         tag: None,
     };
@@ -121,7 +122,7 @@ pub fn create(root: &Path, a: &Value, now: &DateTime<FixedOffset>, projects: &[S
     if let Some(k) = kind.filter(|k| !kinds.iter().any(|x| x == k)) {
         return Err(trf!("Kategorie „{k}“ není (jsou: {}).", "There's no category “{k}” (there are: {}).", kinds.join(", ")));
     }
-    let n = NewNote { text: text.into(), project: project.map(str::to_string), remind: arg(a, "remind").map(str::to_string), images: Vec::new(), kind: kind.map(str::to_string) };
+    let n = NewNote { text: text.into(), project: project.map(str::to_string), remind: arg(a, "remind").map(str::to_string), images: Vec::new(), kind: kind.map(str::to_string), title: None };
     let path = notes::create(root, &n, now)?;
     let msg = trf!("Poznámka uložena: {}", "Note saved: {}", path.display());
     Ok((path, msg))
@@ -243,6 +244,7 @@ pub fn append_to(root: &Path, a: &Value, now: &DateTime<FixedOffset>) -> Result<
         body: append(&d.body, text, style),
         project: v.project.clone(),
         kind: Some(v.kind.clone()),
+        title: None,
         remind: v.remind.clone(),
         images: Vec::new(),
     };

@@ -44,8 +44,8 @@ export const PARTS: readonly Part[] = [
     ],
   },
   {
-    id: "claude", n: 5, icon: "claude", name: ["settings.studio.p.claude", "Claude"], line: ["settings.studio.p.claude.line", "Propojení s Claude Code: schvalování, otázky, limity a hlídač."],
-    questions: [{ block: "claude", primary: true, q: ["settings.studio.q.claude", "Jak má Ledge pracovat s Claude Code?"], sub: ["settings.studio.q.claude.sub", "Žádosti o povolení, otázky Clauda a limity — propojení jedním klikem."] }],
+    id: "claude", n: 5, icon: "claude", name: ["settings.studio.p.claude", "Claude"], line: ["settings.studio.p.claude.line", "Propojení s Claude Code: schvalování, otázky, limity, oznámení a hlídač."],
+    questions: [{ block: "claude", primary: true, q: ["settings.studio.q.claude", "Jak má Ledge pracovat s Claude Code?"], sub: ["settings.studio.q.claude.sub", "Žádosti o povolení, otázky Clauda, limity a oznámení — propojení jedním klikem."] }],
   },
   {
     id: "projekty", n: 6, icon: "projects", name: ["settings.studio.p.projekty", "Projekty a akce"], line: ["settings.studio.p.projekty.line", "Projekty, odkazy a příkazy na jedno kliknutí."],

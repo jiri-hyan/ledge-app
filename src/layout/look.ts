@@ -6,6 +6,8 @@
 // Karta bez `look` = žádný atribut, přesně jako dřív. Čistá logika bez importů za běhu (test `look.test.mjs`).
 
 import { storedDesign } from "./designs.ts";
+import { GROUP_BY, GROUP_STYLES } from "../notes/group.ts";
+import { LEGACY_VIEW_DESIGN } from "../notes/noteDesigns.ts";
 
 export type CardBg = "tint" | "solid" | "clear";
 export type CardDensity = "compact" | "airy";
@@ -13,7 +15,7 @@ export type CardView = "list" | "tiles" | "bento" | "compact";
 /** Plocha karty 2026 (kolo 22): „glass“ = sklo jen na rámu a hlavičce, pod textem plná stabilní plocha;
  *  „layer“ = plná vrstva s hloubkou. Tokeny `--k-*` dává materiál stylu (`theme/looks.ts` `MATERIALS`). */
 export type CardSurface = "glass" | "layer";
-export type CardLook = { accent?: string; bg?: CardBg; hideHead?: boolean; density?: CardDensity; view?: CardView; surface?: CardSurface; grain?: boolean; hero?: boolean; design?: string };
+export type CardLook = { accent?: string; bg?: CardBg; hideHead?: boolean; density?: CardDensity; view?: CardView; surface?: CardSurface; grain?: boolean; hero?: boolean; design?: string; /** karta Poznámky: seskupení seznamu (`notes/group.ts`) */ groupBy?: string; groupStyle?: string };
 export type Text = readonly [string, string];
 
 /** Akcent karty: barvy motivu (zrcadlo `CARD_ACCENTS` v tilelook.rs) nebo vlastní `#rrggbb`. */
@@ -59,9 +61,9 @@ export const VIEW_NAMES: Record<CardView, Text> = {
   compact: ["cards.cardlook.view.compact", "Kompaktní"],
 };
 /** Karty s variantou zobrazení a jejich výchozí (= dnešní) varianta. */
-export const VIEW_CARDS: Readonly<Record<string, CardView>> = { projects: "tiles", repos: "list", notes: "list", actions: "tiles" };
+export const VIEW_CARDS: Readonly<Record<string, CardView>> = { projects: "tiles", repos: "list", actions: "tiles" };
 /** Bento (kolo 18: velká dlaždice + menší kolem) mají jen karty, které ho opravdu kreslí. */
-const BENTO_CARDS = new Set(["projects", "repos", "notes"]);
+const BENTO_CARDS = new Set(["projects", "repos"]);
 /** Varianty, které karta nabízí (prázdné = karta bez variant). */
 export const viewsOf = (cardId: string): readonly CardView[] => (cardId in VIEW_CARDS ? VIEWS.filter((v) => v !== "bento" || BENTO_CARDS.has(cardId)) : []);
 
@@ -82,8 +84,13 @@ export function normalizeCardLook(raw: unknown, cardId: string): CardLook | unde
   if (oneOf(["glass", "layer"] as const, r.surface)) out.surface = r.surface;
   if (r.grain === true) out.grain = true;
   if (r.hero === true && heroable(cardId)) out.hero = true;
-  const design = storedDesign(cardId, r.design);
+  // Poznámky: dřívější „Zobrazení“ (view) je teď vzhled karty; zvolený vzhled má přednost
+  const design = storedDesign(cardId, cardId === "notes" && r.design === undefined && typeof r.view === "string" ? LEGACY_VIEW_DESIGN[r.view] : r.design);
   if (design) out.design = design;
+  if (cardId === "notes") {
+    if (oneOf(GROUP_BY, r.groupBy) && r.groupBy !== "none") out.groupBy = r.groupBy;
+    if (oneOf(GROUP_STYLES, r.groupStyle) && r.groupStyle !== "line") out.groupStyle = r.groupStyle;
+  }
   return Object.keys(out).length ? out : undefined;
 }
 

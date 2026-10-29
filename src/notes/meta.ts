@@ -25,9 +25,12 @@ export function colorHex(c: string | null | undefined): string | null {
 }
 
 /** Barva lístku: vlastní `color:`, jinak podle prvního štítku s barvou v `notes.tagColors`. */
-export function noteColor(n: { color?: string | null; tags?: string[] } | null | undefined, tagColors?: Record<string, string> | null): string | null {
+export function noteColor(n: { color?: string | null; tags?: string[]; project?: string | null } | null | undefined, tagColors?: Record<string, string> | null, projectColors?: Record<string, string> | null): string | null {
   const own = colorHex(n?.color);
   if (own) return own;
+  // jako karta: vlastní barva → barva projektu → barva podle štítku
+  const proj = n?.project ? colorHex(projectColors?.[n.project]) : null;
+  if (proj) return proj;
   for (const t of n?.tags ?? []) {
     const c = colorHex(tagColors?.[t]);
     if (c) return c;
@@ -87,3 +90,18 @@ export function withTag(front: string[], raw: string): string[] | null {
 }
 
 export const withoutTag = (front: string[], tag: string) => front.filter((t) => t !== tag);
+
+/** Barva, kterou jádro dává projektu bez vlastní (`snapshot.rs`) — není to barva projektu, nededí se. */
+export const PROJECT_ACCENT_PLACEHOLDER = "#64748b";
+
+/** Proužek / tečka poznámky: vlastní `color:` (8 jmen z palety, nebo ručně psaný `#rrggbb`), jinak barva projektu
+ *  (jen skutečná, ne záložní šedá), jinak null = bez barvy. Neznámé jméno = žádná vlastní barva. */
+export function stripeColor(n: { color?: string | null } | null | undefined, projectAccent?: string | null): string | null {
+  const own = colorHex(n?.color);
+  if (own) return own;
+  const p = (projectAccent ?? "").trim().toLowerCase();
+  return HEX.test(p) && p !== PROJECT_ACCENT_PLACEHOLDER ? p : null;
+}
+
+/** Jméno barvy z palety pro tečku v menu (ručně psaný hex ani neznámé jméno není vybraná tečka). */
+export const paletteId = (c: string | null | undefined): string | null => NOTE_COLORS.find((x) => x.id === (c ?? "").trim().toLowerCase())?.id ?? null;

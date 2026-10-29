@@ -36,7 +36,7 @@ test("normalizace a atributy", () => {
 });
 
 test("varianty zobrazení: Projekty, Repa, Poznámky, Akce; výchozí = dnešní", () => {
-  assert.deepEqual(Object.keys(VIEW_CARDS).sort(), ["actions", "notes", "projects", "repos"]);
+  assert.deepEqual(Object.keys(VIEW_CARDS).sort(), ["actions", "projects", "repos"]);
   assert.equal(viewOf("projects", undefined), "tiles");
   assert.equal(viewOf("repos", undefined), "list");
   assert.equal(viewOf("repos", { view: "tiles" }), "tiles");
@@ -77,7 +77,7 @@ test("zrcadlo Rustu: akcenty karty jako tilelook.rs", () => {
 });
 
 test("Bento jen u karet, které ho kreslí", () => {
-  assert.deepEqual(viewsOf("notes"), ["list", "tiles", "bento", "compact"]);
+  assert.deepEqual(viewsOf("notes"), []); // Poznámky mají vzhledy karty (notes/noteDesigns.ts)
   assert.deepEqual(viewsOf("actions"), ["list", "tiles", "compact"]);
   assert.deepEqual(viewsOf("clock"), []);
   assert.deepEqual(normalizeCardLook({ view: "bento" }, "repos"), { view: "bento" });

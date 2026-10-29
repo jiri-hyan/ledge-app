@@ -149,6 +149,13 @@ pub struct CardLook {
     /// Vzhled karty z registru UI (src/layout/designs.ts; id; chybí = výchozí, dnešní vzhled). Neznámé id UI ignoruje.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub design: Option<String>,
+    // Karta Poznámky: seskupení seznamu (`project` | `kind` | `date` | `pinned`; chybí = bez seskupení). Neznámé UI ignoruje.
+    // (obyčejný komentář, ne dokumentační: schéma jde do `tools/list` MCP a ten má strop velikosti)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_by: Option<String>,
+    // Karta Poznámky: styl oddělení skupin (`tag` | `cards`; chybí = čára s nadpisem). Neznámé UI ignoruje.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_style: Option<String>,
 }
 
 /// Složka zástupců v kartě Projekty (přetažení dlaždice na jinou, jako na telefonu).
@@ -357,6 +364,11 @@ mod tests {
         assert_eq!(d.design.as_deref(), Some("rings"));
         assert_eq!(serde_json::to_value(&d).unwrap(), json!({"design":"rings"}));
         assert_eq!(c.design, None);
+        // kolo 26: seskupení Poznámek — tam a zpět; starý look bez klíčů = None
+        let g: CardLook = serde_json::from_value(json!({"design":"kanban","groupBy":"date","groupStyle":"cards"})).unwrap();
+        assert_eq!((g.group_by.as_deref(), g.group_style.as_deref()), (Some("date"), Some("cards")));
+        assert_eq!(serde_json::to_value(&g).unwrap(), json!({"design":"kanban","groupBy":"date","groupStyle":"cards"}));
+        assert_eq!((c.group_by, c.group_style), (None, None));
     }
 
     #[test]

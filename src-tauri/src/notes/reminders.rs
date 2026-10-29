@@ -81,6 +81,7 @@ mod tests {
             remind_ms: remind,
             done,
             title: title.into(),
+            heading: None,
             images: 0,
             kind: DEFAULT_KIND.into(),
             updated: None,

@@ -153,6 +153,8 @@ export const api = {
   updateRollback: (confirmed: string[]) => call<InstallOutcome>("update_rollback", { confirmed }),
   /** Klik na session: přepnout do jejího okna / skončenou obnovit v terminálu. Chyba = česky. */
   sessionOpen: (id: string) => call("session_open", { id }),
+  /** Ukázka oznámení v proužku (Notch) — Studio, tlačítko Vyzkoušet. */
+  notifyPreview: (kind: string, style?: string) => call("notify_preview", { kind, style: style ?? null }),
   /** Velikost kontextu živé session (poslední usage v transcriptu); null = bez zdroje / vypnuto. */
   sessionContext: (id: string) => call<CtxView | null>("session_context", { id }),
   /** Panel Git session (jen na klik; null = cwd není v gitu). Destruktivní akce Rust znovu ověří. */

@@ -1,7 +1,7 @@
 // Lístky 2.0 — barva a štítky (`meta.ts`) a vazby při psaní (`wiki.ts`): tabulkové testy, zrcadlo Rust testů.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { colorHex, frontTags, inlineTags, noteColor, normTag, withoutTag, withTag } from "./meta.ts";
+import { colorHex, frontTags, inlineTags, noteColor, normTag, paletteId, stripeColor, withoutTag, withTag } from "./meta.ts";
 import { applyWiki, wikiQuery } from "./wiki.ts";
 
 test("colorHex: paleta, hex, nesmysl", () => {
@@ -65,4 +65,36 @@ test("applyWiki: vloží [[titulek]] a kurzor za něj", () => {
   assert.deepEqual(applyWiki("[[Ná]]", 0, 4, "Nákup"), { text: "[[Nákup]]", caret: 9 });
   // závorky / svislítko v titulku by vazbu rozbily
   assert.deepEqual(applyWiki("[[", 0, 2, "a [b] | c"), { text: "[[a b c]]", caret: 9 });
+});
+
+test("stripeColor: vlastní barva přepíše projekt, projekt se dědí, záložní šedá a neznámé jméno nic", () => {
+  const cases = [
+    [{ color: "blue" }, "#ef6b6b", "#60a5fa"],
+    [{}, "#EF6B6B", "#ef6b6b"],
+    [{ color: "neon" }, "#ef6b6b", "#ef6b6b"], // neznámé jméno = žádná vlastní barva → dědí projekt
+    [{ color: "neon" }, undefined, null],
+    [{}, "#64748b", null], // záložní šedá není barva projektu
+    [{}, "red", null],
+    [null, null, null],
+  ];
+  for (const [n, proj, want] of cases) assert.equal(stripeColor(n, proj), want, JSON.stringify([n, proj]));
+});
+
+test("paletteId: jen jména z palety", () => {
+  assert.equal(paletteId("Teal"), "teal");
+  assert.equal(paletteId("#aabbcc"), null);
+  assert.equal(paletteId(undefined), null);
+});
+
+test("noteColor: vlastní → projekt → štítek → nic (lístek na ploše jako karta)", () => {
+  const pc = { app: "#ef6b6b" };
+  const tc = { qa: "green" };
+  const cases = [
+    [{ color: "blue", project: "app", tags: ["qa"] }, "#60a5fa"],
+    [{ project: "app", tags: ["qa"] }, "#ef6b6b"],
+    [{ project: "app-v2", tags: ["qa"] }, "#4ade80"],
+    [{ color: "neon", project: "app" }, "#ef6b6b"],
+    [{ project: null, tags: [] }, null],
+  ];
+  for (const [n, want] of cases) assert.equal(noteColor(n, tc, pc), want, JSON.stringify(n));
 });

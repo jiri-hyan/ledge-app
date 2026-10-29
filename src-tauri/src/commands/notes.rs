@@ -186,7 +186,8 @@ pub(crate) fn note_export(path: String, format: String) -> Result<Option<String>
     }
     let Some(target) = d.blocking_save_file().and_then(|p| p.into_path().ok()) else { return Ok(None) };
     let target = std::path::PathBuf::from(notes::export::with_ext(&target.to_string_lossy(), fmt));
-    let out = notes::export::render(fmt, &note.view.title, &note.body, &note.image_data);
+    let body = notes::export::with_heading(note.view.heading.as_deref(), &note.body);
+    let out = notes::export::render(fmt, &note.view.title, &body, &note.image_data);
     if fmt == notes::export::Format::Pdf {
         notes::pdf::print(&c.app, &out, &target)?;
     } else {

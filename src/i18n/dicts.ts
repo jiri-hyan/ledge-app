@@ -16,6 +16,7 @@ import "./en-quick";
 import "./en-questions";
 import "./en-limits";
 import "./en-smart";
+import "./en-notify";
 import "./en-timer";
 import "./en-costs";
 import "./en-ctx";

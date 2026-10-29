@@ -102,6 +102,9 @@ pub struct Config {
     pub smart: crate::smartconf::SmartConfig,
     /// Karta Rychlé dlaždice Windows (kolo 23, `winquick.rs`): výběr dlaždic, připnuté složky, přepínání výstupu (výchozí vypnuto).
     pub winquick: crate::winquick::WinQuickConfig,
+    /// Oznámení (kolo 26, `notify/`): KDE (Notch v proužku / toast Windows, záložní toast) a JAK (doba,
+    /// styl animace pro každou událost). ZDA rozhodují dál vypínače událostí (`claude.toast`, …).
+    pub notify: crate::notify::NotifyConfig,
 }
 
 impl Default for Config {
@@ -140,6 +143,7 @@ impl Default for Config {
             desk: Default::default(),
             smart: Default::default(),
             winquick: Default::default(),
+            notify: Default::default(),
         }
     }
 }

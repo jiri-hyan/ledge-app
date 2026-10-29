@@ -106,6 +106,7 @@ registerDict("en", {
   "appearance.compose.cubeHint": "Click changes the style, drag to move",
   "appearance.compose.cubeLabel": "{name}, style {style}. Click changes the style.",
   "appearance.compose.cubes": "Blocks: content and style",
+  "appearance.compose.allStylesPick": "Pick a style…",
   "appearance.compose.cubesHint": "Drag a block into a slot or onto the preview. 1 to 12 blocks, at most 5 per slot. Click switches the style, dragging it out removes it.",
   "appearance.compose.dropHere": "Drop a block here",
   "appearance.compose.exact": "Exact numbers",

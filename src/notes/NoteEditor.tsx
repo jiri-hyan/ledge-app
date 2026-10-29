@@ -23,8 +23,10 @@ import { actionIcon, actionText } from "./lifelabels";
 import { runAction } from "./RowMenu";
 import NoteMenu from "./NoteMenu";
 import { listKey } from "./listkeys";
+import { firstLine } from "./headline";
+import { setNoteColor } from "./colorset";
 import { useWikiFollow, useWikiSuggest, WikiList, WikiMissing } from "./WikiLinks";
-import { editPath, notePreset, openExternal, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
+import { editPath, notePreset, openExternal, projectAccent, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
 
 export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => void }) {
   let root!: HTMLDivElement;
@@ -45,6 +47,8 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   const setProj = (v: string) => (editing() ? D.setEdProj(v) : (D.setProjTouched(true), D.setDraftProj(v)));
   const kind = () => (editing() ? D.edKind() : D.draftKind());
   const setKind = (v: string) => (editing() ? D.setEdKind(v) : D.setDraftKind(v));
+  const title = () => (editing() ? D.edTitle() : D.draftTitle());
+  const setTitle = (v: string) => (editing() ? D.setEdTitle(v) : D.setDraftTitle(v));
   const remind = () => (editing() ? D.edRemind() : D.draftRemind());
   const setRemind = (v: string) => (editing() ? D.setEdRemind(v) : D.setDraftRemind(v));
   const imgs = () => (editing() ? D.edImgs() : D.draftImgs());
@@ -56,9 +60,9 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   const dirty = () => (editing() ? D.edDirty() : hasContent());
 
   // rozepsané na disk s debounce; obrázky konceptu hned (jsou vzácné)
-  createEffect(onChange([D.draft, D.draftProj, D.projTouched, D.draftRemind, D.draftKind], () => ready() && !editing() && D.scheduleDraft(), { defer: true }));
+  createEffect(onChange([D.draft, D.draftProj, D.projTouched, D.draftRemind, D.draftKind, D.draftTitle], () => ready() && !editing() && D.scheduleDraft(), { defer: true }));
   createEffect(onChange(D.draftImgs, (i) => ready() && !editing() && api.noteDraftImages(D.b64Of(i)).catch((e) => say(String(e), true)), { defer: true }));
-  createEffect(onChange([D.edText, D.edProj, D.edKind, D.edRemind], () => ready() && editing() && D.scheduleEdit(), { defer: true }));
+  createEffect(onChange([D.edText, D.edProj, D.edKind, D.edRemind, D.edTitle], () => ready() && editing() && D.scheduleEdit(), { defer: true }));
   onCleanup(D.flushDraft);
 
   // pořadí otevírání: pozdě doběhlé čtení jiné poznámky nesmí přepsat editor (a uložení pak zapsat do cizí)
@@ -167,7 +171,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   /** Uloží novou poznámku; `pin` ji rovnou připne na plochu jako lístek („Uložit a připnout“). */
   async function saveNew(pin: boolean) {
     const sent = { ...D.draftMeta(), images: D.draftImgs() };
-    const path = await api.noteCreate({ text: sent.text, project: sent.project || null, remind: sent.remind || null, images: D.b64Of(sent.images), kind: sent.kind || null });
+    const path = await api.noteCreate({ text: sent.text, project: sent.project || null, remind: sent.remind || null, images: D.b64Of(sent.images), kind: sent.kind || null, title: sent.title.trim() || undefined });
     if (pin && path) await togglePin(path);
     // mezitím dopsané (save je async) nezahodit: reset a zavření jen když se koncept nezměnil
     const same = D.draft() === sent.text && D.draftImgs() === sent.images && D.draftProj() === sent.project && D.draftRemind() === sent.remind;
@@ -182,7 +186,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     if (!b) return;
     const id = seq;
     const out = await api.noteSave(
-      { path: b.path, expectedHash: D.edHash(), body: D.edText(), project: D.edProj() || null, kind: D.edKind(), remind: D.edRemind() || null, images: D.b64Of(D.edImgs()) },
+      { path: b.path, expectedHash: D.edHash(), body: D.edText(), project: D.edProj() || null, kind: D.edKind(), title: D.edTitle().trim(), remind: D.edRemind() || null, images: D.b64Of(D.edImgs()) },
       copy,
     );
     if (id !== seq) return; // mezitím se otevřela jiná poznámka — uložená zůstává uložená, editor se nesahá
@@ -190,6 +194,15 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     D.resetEdit();
     say(copy ? t("notes.editor.savedCopy", "Uloženo jako nová poznámka vedle původní.") : t("notes.editor.saved", "Uloženo"));
     p.onLeave();
+  }
+
+  /** Barva z menu ⋯: zapíše se rovnou do frontmatteru (rozepsaná úprava se nejdřív uloží). */
+  async function pickColor(id: string) {
+    const b = D.edBase();
+    if (!b || busy()) return;
+    if (D.edDirty()) return say(t("notes.life.saveFirst", "Nejdřív ulož úpravu (Ctrl+Enter)."));
+    const n = await setNoteColor(b.path, id);
+    if (n && D.edBase()?.path === b.path && !D.edDirty()) D.loadEditFrom(n);
   }
 
   /** Splnit · Archivovat · Smazat z editoru; po akci zpět na seznam (lišta „Zpět“ zůstane). */
@@ -310,7 +323,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
           )}
         </Show>
         <Show when={editing() && D.edBase()}>
-          {(b) => <NoteMenu path={b().path} body={text} />}
+          {(b) => <NoteMenu path={b().path} body={text} color={b().color} inherited={projectAccent(p.s, b().project)} onColor={pickColor} />}
         </Show>
         <Show when={editing() && D.edBase()}>
           {(b) => (
@@ -324,6 +337,16 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
           )}
         </Show>
       </div>
+      <input
+        class="note-title-input"
+        type="text"
+        maxLength={120}
+        value={title()}
+        placeholder={firstLine(text()) || t("notes.editor.titlePlaceholder", "Nadpis (volitelný) — jinak první řádek")}
+        aria-label={t("notes.editor.title", "Nadpis")}
+        title={t("notes.editor.titleHint", "Projekt a datum se k nadpisu přidají samy.")}
+        onInput={(e) => setTitle(e.currentTarget.value)}
+      />
       <Show when={preview()} fallback={
         <textarea
           ref={(el) => (ta = el)}

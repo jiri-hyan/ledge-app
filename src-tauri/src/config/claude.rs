@@ -27,9 +27,11 @@ pub struct ClaudeConfig {
     /// Připomínka resetu kvóty: když 5h nebo týdenní limit dosáhl 100 %, v čase resetu krátký peek
     /// a bliknutí proužku (ve fullscreen nic). Data ze stavového řádku Ledge (`limitslive.rs`).
     pub limits_reminder: bool,
-    /// Oznámení Windows (toast), když Claude čeká na schválení / otázku nebo dokončí turn. Bez fokusu,
+    /// Oznámení (Notch v proužku nebo toast podle `notify`), když Claude čeká na schválení / otázku nebo dokončí turn. Bez fokusu,
     /// nikdy ve fullscreen hře, v herním režimu ani při „nerušit“; stejná session + událost max 1× za 30 s.
     pub toast: bool,
+    /// Samostatný vypínač oznámení „Hotovo“ (konec turnu). `None` = řídí se `claude.toast` (jako dřív); `Some` ho přebije.
+    pub toast_done: Option<bool>,
     /// Sekce „Útrata Claude (odhad)“ v kartě Claude: tokeny a odhad ceny v cenách API (ne účet) podle
     /// projektu a dne z lokálních transcriptů `~/.claude/projects` (`costslive.rs`). Počítá se jen při
     /// rozbalení sekce, nejvýš 1× za minutu. `false` = sekce zmizí a nic se nečte.
@@ -40,7 +42,7 @@ pub struct ClaudeConfig {
     /// Tempo čerpání limitů: v pruzích 5h / týden ryska plánu (rovnoměrné čerpání) a výstražná barva nad plánem.
     /// Výchozí vypnuto; zapíná sbírání vzorků 5h okna v paměti (`limitslive.rs`).
     pub limits_pace: bool,
-    /// Upozornění (toast), když 5h nebo týdenní limit dosáhne 80 % a 90 %; jednou za okno. Výchozí vypnuto.
+    /// Upozornění (Notch / toast podle `notify`), když 5h nebo týdenní limit dosáhne 80 % a 90 %; jednou za okno. Výchozí vypnuto.
     pub limits_alert: bool,
     /// Limity 5h / týden i z aplikace Claude (desktop): Ledge čte její `plan-usage-history.json` (jen procenta,
     /// bez času resetu; nic neposílá). Výchozí vypnuto (`limitsrc.rs`, `limitslive.rs`).
@@ -54,7 +56,7 @@ pub struct ClaudeConfig {
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, costs: true, context_bar: false, limits_pace: false, limits_alert: false, limits_desktop: false, limits_fetch: false }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, toast_done: None, costs: true, context_bar: false, limits_pace: false, limits_alert: false, limits_desktop: false, limits_fetch: false }
     }
 }
 

@@ -70,6 +70,8 @@ const DYNAMIC = [
   { file: "layout/text.ts", key: "x[0]", why: "názvy karet, částí a záložek z layout/model.ts (CARD_INFO, PART_INFO, builtinName), volby vzhledu karty z layout/look.ts (ACCENT_NAMES, BG_NAMES, DENSITY_NAMES, VIEW_NAMES) a vzhledu zástupce z tilelook/ (SHAPE_NAMES, GLYPHS, MODES) — " + PAIRS },
   { file: "settings/panels/Backup.tsx", key: "n[0]", why: "názvy sekcí SECTION_NAMES — " + PAIRS },
   { file: "settings/panels/Claude.tsx", key: "...HOOKS_TEXT[h().state]", why: PAIRS },
+  { file: "settings/panels/Notify.tsx", key: "s.key", why: PAIRS },
+  { file: "settings/panels/Notify.tsx", key: "...SOURCE[k]", why: PAIRS },
   { file: "settings/panels/StripSettings.tsx", key: "x.key", why: "položky proužku STRIP_ITEMS — " + PAIRS },
   { file: "settings/panels/Notes.tsx", key: "...(SYNC_TEXT[st().state] ?? [\"\", st().state])", why: PAIRS },
 ];

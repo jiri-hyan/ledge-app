@@ -7,6 +7,7 @@ export * from "./claude";
 export * from "./desk";
 export * from "./media";
 export * from "./notes";
+export * from "./notify";
 export * from "./onboarding";
 export * from "./personal";
 export * from "./projects";

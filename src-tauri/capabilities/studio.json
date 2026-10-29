@@ -60,6 +60,7 @@
     "allow-open-app-file",
     "allow-open-config-file",
     "allow-open-url",
+    "allow-notify-preview",
     "allow-pick-path",
     "allow-pick-save",
     "allow-pkg-context",

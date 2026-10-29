@@ -132,6 +132,9 @@ pub struct SaveNote {
     pub project: Option<String>,
     #[serde(default)]
     pub kind: Option<String>,
+    /// vlastní nadpis (`title:`): `None` = beze změny, prázdný = smazat (název je zase první řádek)
+    #[serde(default)]
+    pub title: Option<String>,
     /// lokální čas z výběru připomínky nebo ISO s offsetem; prázdné = bez připomínky
     #[serde(default)]
     pub remind: Option<String>,
@@ -170,6 +173,10 @@ pub fn apply_meta(front: &mut Vec<String>, general: bool, req: &SaveNote, now: &
         Some(k) if k == DEFAULT_KIND && get(front, "kind").is_none() => {}
         Some(k) => set(front, "kind", &k),
         None => unset(front, "kind"),
+    }
+    if let Some(t) = &req.title {
+        let t: String = t.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(120).collect();
+        if t.is_empty() { unset(front, "title") } else { set(front, "title", &yaml_value(&t)) }
     }
     match remind {
         Some(r) => set(front, "remind", &iso(&r)),
@@ -275,6 +282,8 @@ pub struct NoteQuery {
     pub project: Option<String>,
     /// i hotové (na konci, nejnovější první)
     pub include_done: bool,
+    /// jen hotové (Kanban: sloupec Hotové má vlastní strop, ne zbytek po otevřených)
+    pub only_done: bool,
     /// archivované poznámky (`_archiv`) místo aktivních
     pub archived: bool,
     pub limit: Option<usize>,
@@ -308,7 +317,11 @@ pub fn query(all: &[NoteView], q: &NoteQuery, today_end_ms: i64) -> QueryResult 
     first.sort_by_key(|n| n.remind_ms);
     let open = all.iter().filter(hit).filter(|n| !n.done && !today(n));
     let done = all.iter().filter(hit).filter(|n| n.done && q.include_done);
-    let picked: Vec<&NoteView> = first.into_iter().chain(open).chain(done).collect();
+    let picked: Vec<&NoteView> = if q.only_done {
+        all.iter().filter(hit).filter(|n| n.done).collect()
+    } else {
+        first.into_iter().chain(open).chain(done).collect()
+    };
     let total = picked.len();
     QueryResult { notes: picked.into_iter().take(q.limit.unwrap_or(usize::MAX)).cloned().collect(), total }
 }
@@ -425,6 +438,58 @@ mod tests {
         for bad in [SaveNote { kind: Some("a b".into()), ..Default::default() }, SaveNote { remind: Some("zítra".into()), ..Default::default() }] {
             assert!(apply_meta(&mut f.clone(), true, &bad, &now).is_err());
         }
+    }
+
+    #[test]
+    fn title_field_is_optional_and_keeps_unknown_keys() {
+        let now = at("2026-10-18T10:00:00+02:00");
+        let mut f: Vec<String> = ["x: 1", "done: false"].map(String::from).to_vec();
+        // None = beze změny (starý klient), text = zapíše, prázdný = smaže
+        apply_meta(&mut f, true, &SaveNote::default(), &now).unwrap();
+        assert!(get(&f, "title").is_none());
+        apply_meta(&mut f, true, &SaveNote { title: Some("  Plán: týden  ".into()), ..Default::default() }, &now).unwrap();
+        assert_eq!(get(&f, "title").as_deref(), Some("Plán: týden"));
+        assert_eq!(get(&f, "x").as_deref(), Some("1"));
+        apply_meta(&mut f, true, &SaveNote::default(), &now).unwrap();
+        assert_eq!(get(&f, "title").as_deref(), Some("Plán: týden"));
+        apply_meta(&mut f, true, &SaveNote { title: Some("   ".into()), ..Default::default() }, &now).unwrap();
+        assert!(get(&f, "title").is_none());
+        // parse: nadpis vyhrává nad prvním řádkem, bez něj dnešní chování
+        let with = parse_note(Path::new("x.md"), "---\ntitle: \"Můj nadpis\"\n---\n\nPrvní řádek\n", None, 0);
+        assert_eq!((with.title.as_str(), with.heading.as_deref()), ("Můj nadpis", Some("Můj nadpis")));
+        let without = parse_note(Path::new("x.md"), "---\ndone: false\n---\n\nPrvní řádek\n", None, 0);
+        assert_eq!((without.title.as_str(), without.heading), ("První řádek", None));
+    }
+
+    #[test]
+    fn only_done_has_its_own_cap_even_with_many_open() {
+        let mk = |i: usize, done: bool| NoteView {
+            path: format!("n{i}"),
+            project: None,
+            created: String::new(),
+            created_ms: i as i64,
+            remind: None,
+            remind_ms: None,
+            done,
+            title: format!("n{i}"),
+            heading: None,
+            images: 0,
+            kind: DEFAULT_KIND.into(),
+            updated: None,
+            tasks_done: 0,
+            tasks_total: 0,
+            color: None,
+            tags: Vec::new(),
+        };
+        let all: Vec<NoteView> = (0..35).map(|i| mk(i, i >= 30)).collect();
+        let open = query(&all, &NoteQuery { limit: Some(8), ..Default::default() }, 0);
+        assert_eq!((open.notes.len(), open.total), (8, 30));
+        let done = query(&all, &NoteQuery { only_done: true, limit: Some(8), ..Default::default() }, 0);
+        assert_eq!((done.notes.len(), done.total), (5, 5));
+        assert!(done.notes.iter().all(|n| n.done));
+        // include_done dál řadí hotové za otevřené (30 otevřených zaplní strop 24 — proto Kanban nesmí spoléhat na něj)
+        let mixed = query(&all, &NoteQuery { include_done: true, limit: Some(24), ..Default::default() }, 0);
+        assert!(mixed.notes.iter().all(|n| !n.done));
     }
 
     #[test]
@@ -578,6 +643,7 @@ mod tests {
             remind_ms: remind,
             done,
             title: t.into(),
+            heading: None,
             images: 0,
             kind: kind.into(),
             updated: None,

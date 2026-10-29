@@ -14,6 +14,7 @@ import type { PanelProps } from "../types";
 import StatusLineSetup from "../../limits/StatusLineSetup";
 import { fieldLabel } from "../labels";
 import QuestionsSection from "./Questions";
+import NotifySection from "./Notify";
 import { McpSettings } from "../../mcp/McpSettings";
 
 const HOOKS_TEXT: Record<HooksStatus["state"], [string, string]> = {
@@ -105,6 +106,7 @@ export default function ClaudePanel(p: PanelProps) {
           </Row>
         </Show>
       </Section>
+      <NotifySection />
       <QuestionsSection s={p.s} />
       <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
         <Row id="claude.statusLine" stack live>

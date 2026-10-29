@@ -17,8 +17,9 @@ test("claude a system mají sedm až devět vzhledů, výchozí první", () => {
   assert.equal(defaultDesign("system"), "lines");
   assert.deepEqual(designsOf("claude").map((d) => d.id), ["classic", "rings", "pace", "hero", "heroWeek", "heroSpend", "spend", "sessions", "gauge"]);
   assert.equal(designsOf("system").length, 7);
-  assert.deepEqual(designsOf("notes"), []);
-  assert.equal(defaultDesign("notes"), undefined);
+  assert.equal(designsOf("notes").length, 6);
+  assert.equal(defaultDesign("notes"), "list");
+  assert.deepEqual(designsOf("actions"), []);
 });
 
 test("designOf: zvolený, neznámý i chybějící", () => {
@@ -30,7 +31,9 @@ test("designOf: zvolený, neznámý i chybějící", () => {
     ["claude", {}, "classic"],
     ["system", { design: "net" }, "net"],
     ["system", { design: "rings" }, "rings"],
-    ["notes", { design: "rings" }, undefined],
+    ["notes", { design: "rings" }, "list"],
+    ["notes", { design: "kanban" }, "kanban"],
+    ["actions", { design: "rings" }, undefined],
   ];
   for (const [card, look, want] of cases) assert.equal(designOf(card, look)?.id, want, `${card} ${JSON.stringify(look)}`);
 });
@@ -40,6 +43,7 @@ test("storedDesign: výchozí a neznámé se nezapisuje", () => {
   assert.equal(storedDesign("claude", "gauge"), "gauge");
   assert.equal(storedDesign("claude", "tiles"), undefined);
   assert.equal(storedDesign("claude", 5), undefined);
+  assert.equal(storedDesign("actions", "gauge"), undefined);
   assert.equal(storedDesign("notes", "gauge"), undefined);
 });
 

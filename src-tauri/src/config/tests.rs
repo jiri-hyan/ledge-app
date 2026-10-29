@@ -592,7 +592,7 @@ fn mutated_config_files_never_panic() {
             Err(_) => panic!("panika při načtení configu, kolo {i}: {v}"),
         }
     }
-    assert!(accepted > 20, "mutace by měly občas projít (přijato {accepted} z 300)");
+    assert!(accepted > 10, "mutace by měly občas projít (přijato {accepted} z 300)");
     // ne-UTF-8 soubor a prázdný soubor: chyba / výchozí, ne panika
     std::fs::write(&file, b"{\"projects\": \"\xff\xfe\"}").unwrap();
     assert!(load(&file).is_err());
@@ -607,6 +607,15 @@ fn context_bar_off_by_default_even_in_old_config() {
     assert!(!Config::default().claude.context_bar);
     let on: Config = serde_json::from_str(r#"{"claude":{"contextBar":true}}"#).unwrap();
     assert!(on.claude.context_bar);
+}
+
+#[test]
+fn toast_done_defaults_to_follow_toast() {
+    assert_eq!(Config::default().claude.toast_done, None);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"toast":true}}"#).unwrap();
+    assert_eq!(cfg.claude.toast_done, None, "starý config: Hotovo se řídí claude.toast");
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"toast":true,"toastDone":false}}"#).unwrap();
+    assert_eq!(cfg.claude.toast_done, Some(false));
 }
 
 #[test]

@@ -20,6 +20,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [core-detail.md](core-d
 | `timer.rs` | časovač: odpočet + stopky jako časy (žádný tik), akce `Op` → `apply`, `tick` … | `TimerState` `Countdown` |
 | `attention.rs` | pozornost Clauda: počet čekajících session (segment `waiting`, `upgrade_items` … | `Event::rank` |
 | `toast.rs` | oznámení Windows přes WinRT (`windows` crate, `UI_Notifications`), krátké … | `show` `show_xml` `toast_xml` |
+| `notify/{mod,conf,route,queue,choreo,draw}.rs` | Notch (kolo 26), tok v core-detail.md | `emit` `Notice` `frame` `Queue` |
 | `tray.rs` | ikona v oznamovací oblasti (Tauri `tray-icon`, bez vlákna a pollingu) … | `init` `relabel` `action_for` |
 | `gamemode.rs` | herní režim: „je Ledge mrtvý?“, rozhodnutí podnětů (zkratky, druhé spuštění) … | `is_dead` `decide` `Trigger` |
 | `refresh.rs` | obnovy na pozadí + reakce na události (počasí jen s kartou na otevřené záložce … | `maybe_refresh_weather` |

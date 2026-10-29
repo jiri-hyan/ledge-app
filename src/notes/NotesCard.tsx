@@ -4,16 +4,18 @@
 // karty (vzhled karty, vlna 8 P): seznam / dlaždice / kompaktní (`.note-list[data-view]`). Lístky 2.0: řádek nese
 // barvu poznámky (proužek vlevo) a štítky, pod záložkami filtr podle štítku (`note_tags`, jen když nějaké jsou).
 
-import { createResource, For, Show, type JSX } from "solid-js";
+import { createMemo, createResource, For, Match, Show, Switch, type JSX } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { ago } from "../format";
 import { IconBell } from "../icons";
 import { KindBadge, kindOf, kindColor, KindIcon } from "./kinds";
-import { doneBusy, openExternal, projName, remindLabel, setDone, setPageArchive, setTab, setTagFilter, tab, tagFilter } from "./store";
-import { colorHex } from "./meta";
+import { doneBusy, openExternal, projectAccent, projName, remindLabel, setDone, setPageArchive, setTab, setTagFilter, tab, tagFilter } from "./store";
+import { stripeColor } from "./meta";
 import { notesApi } from "./api";
-import { t, tp } from "../i18n";
-import type { CardView } from "../layout/look";
+import { lang, t, tp } from "../i18n";
+import { groupByOf, groupNotes, groupStyleOf, type Group } from "./group";
+import { headlineParts, shortDate } from "./headline";
+import { kanbanSplit, notesDesign } from "./noteDesigns";
 import { IconPin } from "../pin/icons";
 import { isPinned, newPin, togglePin } from "./pins";
 import { completeNote, unarchiveNote } from "./lifecycle";
@@ -47,15 +49,18 @@ const CARD_ROWS = 8;
 
 export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: NoteView) => void; /** řádek v Archivu: bez zaškrtnutí a lístku, ⋯ nabídne Vrátit z archivu */ archived?: boolean }) {
   const n = () => p.n;
+  const stripe = () => stripeColor(n(), projectAccent(p.s, n().project));
+  // vlastní nadpis → hlavička „Projekt · Název · 26. 10.“ (projekt jen když je); bez něj dnešní první řádek
+  const head = () => (n().heading ? headlineParts(n(), n().project ? projName(p.s, n().project) : null, lang()).join(" · ") : n().title);
   return (
-    <div class="row note-row" classList={{ done: n().done && !p.archived }} style={colorHex(n().color) ? { "box-shadow": `inset 3px 0 0 ${colorHex(n().color)}` } : undefined}>
+    <div class="row note-row" classList={{ done: n().done && !p.archived }} style={stripe() ? { "box-shadow": `inset 3px 0 0 ${stripe()}`, "--note-c": stripe()! } : undefined}>
       <Show when={!p.archived}>
         <button class="check" classList={{ on: n().done }} role="checkbox" aria-checked={n().done} disabled={doneBusy().has(n().path)} title={n().done ? t("notes.row.undo", "Vrátit mezi nehotové") : t("notes.done", "Hotovo")} onClick={() => (n().done ? setDone(n(), false) : void completeNote(n()))} />
       </Show>
       <KindBadge kinds={p.s.noteKinds} id={n().kind} />
       <button class="grow note-open" title={t("notes.row.edit", "Upravit v Ledge")} onClick={() => p.onOpen(n())}>
-        <div class="name">{n().title || t("notes.imageOnly", "(jen obrázek)")}</div>
-        <div class="sub">{projName(p.s, n().project)} · {ago(n().createdMs, p.now)}{n().images ? tp("notes.row.images", n().images, " · {n}× obrázek") : ""}{n().tags?.length ? ` · ${n().tags!.slice(0, 4).map((x) => `#${x}`).join(" ")}` : ""}</div>
+        <div class="name">{head() || t("notes.imageOnly", "(jen obrázek)")}</div>
+        <div class="sub">{n().heading ? "" : `${projName(p.s, n().project)} · `}{ago(n().createdMs, p.now)}{n().images ? tp("notes.row.images", n().images, " · {n}× obrázek") : ""}{n().tags?.length ? ` · ${n().tags!.slice(0, 4).map((x) => `#${x}`).join(" ")}` : ""}</div>
       </button>
       <Show when={n().tasksTotal > 0}>
         <span class="pill" classList={{ g: n().tasksDone === n().tasksTotal, n: n().tasksDone < n().tasksTotal }} title={t("notes.row.tasks", "Splněné úkoly")}>{n().tasksDone}/{n().tasksTotal}</span>
@@ -73,7 +78,22 @@ export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: 
       <Show when={!p.archived}>
         <button class="note-pin" classList={{ on: isPinned(p.s.pins, n().path) }} aria-pressed={isPinned(p.s.pins, n().path)} title={isPinned(p.s.pins, n().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.rowPin", "Připnout na plochu — lístek přes ostatní okna")} onClick={() => togglePin(n().path)}><IconPin /></button>
       </Show>
-      <RowMenu n={n()} archived={!!p.archived} />
+      <RowMenu n={n()} archived={!!p.archived} inherited={projectAccent(p.s, n().project)} />
+    </div>
+  );
+}
+
+/** Položka časové osy: datum vytvoření vlevo, tečka v barvě poznámky na ose, název a podtitul vpravo. */
+function TimelineItem(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: NoteView) => void }) {
+  const c = () => stripeColor(p.n, projectAccent(p.s, p.n.project));
+  return (
+    <div class="note-tl-item" classList={{ done: p.n.done }} style={c() ? { "--note-c": c()! } : undefined}>
+      <span class="note-tl-date">{shortDate(p.n.createdMs, lang())}</span>
+      <span class="note-tl-dot" aria-hidden="true" />
+      <button class="note-tl-body" title={t("notes.row.edit", "Upravit v Ledge")} onClick={() => p.onOpen(p.n)}>
+        <span class="note-tl-title">{p.n.title || t("notes.imageOnly", "(jen obrázek)")}</span>
+        <span class="note-tl-sub">{p.n.project ? `${projName(p.s, p.n.project)} · ` : ""}{ago(p.n.createdMs, p.now)}</span>
+      </button>
     </div>
   );
 }
@@ -133,8 +153,13 @@ export function NotesCard(p: {
   personal?: boolean;
   /** ⋯ „Skrýt kartu“ z hlavní stránky (`cards/CardMenu.tsx`) */
   menu?: JSX.Element;
-  view?: CardView;
+  /** vzhled karty (`noteDesigns.ts`); chybí / neznámé = seznam */
+  design?: string;
+  /** seskupení a styl oddělení (volby vzhledu karty, `group.ts`) */
+  groupBy?: string;
+  groupStyle?: string;
 }) {
+  const design = () => notesDesign(p.design);
   const tabs = () => (p.personal ? [] : tabsOf(p.s));
   // uložená záložka bez nehotových poznámek → Vše (volba zůstane zapamatovaná)
   const cur = () => (tabs().length > 2 && tabs().some((tb) => tb.id === tab()) ? tab() : "all");
@@ -153,8 +178,38 @@ export function NotesCard(p: {
   const open = () => (p.personal ? items().filter((n) => !n.done).length : tabs().find((tb) => tb.id === cur())?.count ?? 0);
   const newKind = () => (cur() === "all" ? undefined : cur());
 
+  const by = () => groupByOf(p.groupBy);
+  const gstyle = () => groupStyleOf(p.groupStyle);
+  /** `.note-list[data-view]` podle vzhledu (CSS už zná list / compact / tiles / bento) */
+  const listView = () => ({ list: "list", compact: "compact", cards: "tiles", bento: "bento", kanban: "list", timeline: "list" })[design()];
+  const groups = createMemo<Group[]>(() =>
+    groupNotes(items(), by(), {
+      now: p.now,
+      project: (id) => projName(p.s, id),
+      kind: (id) => kindOf(p.s.noteKinds, id).label,
+      pinned: (n) => isPinned(p.s.pins, n.path),
+      text: { today: t("notes.group.today", "Dnes"), week: t("notes.group.week", "Tento týden"), older: t("notes.group.older", "Starší"), pinned: t("notes.group.pinned", "Připnuté"), rest: t("notes.group.rest", "Ostatní") },
+    }),
+  );
+  // Kanban: hotové poznámky karta jinak nedrží, proto vlastní dotaz s `includeDone` (jen ve vzhledu Kanban)
+  // dva dotazy, každý s vlastním stropem: mnoho otevřených nesmí vytlačit hotové
+  const [kanRes] = createResource(
+    () => (design() === "kanban" && !p.personal ? { kind: cur() === "all" ? null : cur(), tag: tag(), rev: p.s.notesRev } : null),
+    async (k) => {
+      const [open, done] = await Promise.all([
+        api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }),
+        api.noteQuery({ kind: k.kind, tag: k.tag, onlyDone: true, limit: CARD_ROWS }),
+      ]);
+      return { open: open?.notes ?? [], done: done?.notes ?? [] };
+    },
+  );
+  const kan = () => {
+    if (p.personal || !kanRes.latest) return kanbanSplit(items());
+    return kanRes.latest;
+  };
+
   // varianta Bento (`bento.ts`): velká připnutá / nejnovější poznámka + dlaždice akcí
-  const bento = () => p.view === "bento" && items().length > 0;
+  const bento = () => design() === "bento" && items().length > 0;
   const hero = () => heroOf(items(), p.s.pins);
   const [heroDetail] = createResource(
     () => (bento() && hero() ? { path: hero()!.path, rev: p.s.notesRev } : null),
@@ -230,8 +285,47 @@ export function NotesCard(p: {
           </div>
         )}
       </Show>
-      <div class="note-list" data-view={p.view ?? "list"}>
-        <For each={items()}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
+      <div class="note-wrap">
+        <Switch>
+          <Match when={design() === "kanban" && items().length > 0}>
+            <div class="note-kanban">
+              <For each={[[t("notes.kanban.open", "Otevřené"), kan().open], [t("notes.kanban.done", "Hotové"), kan().done]] as [string, NoteView[]][]}>
+                {([label, rows]) => (
+                  <section class="note-kcol">
+                    <div class="note-group-head"><span class="note-group-label">{label}</span><span class="note-group-n">{rows.length}</span></div>
+                    <div class="note-list" data-view="list">
+                      <For each={rows} fallback={<div class="note-kempty">—</div>}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
+                    </div>
+                  </section>
+                )}
+              </For>
+            </div>
+          </Match>
+          <Match when={design() === "timeline" && items().length > 0}>
+            <div class="note-tl">
+              <For each={[...items()].sort((a, b) => b.createdMs - a.createdMs)}>{(n) => <TimelineItem s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
+            </div>
+          </Match>
+          <Match when={by() !== "none" && items().length > 0}>
+            <div class="note-groups" data-gs={gstyle()}>
+              <For each={groups()}>
+                {(g) => (
+                  <section class="note-group">
+                    <div class="note-group-head"><span class="note-group-label">{g.label}</span><span class="note-group-n">{g.items.length}</span></div>
+                    <div class="note-list" data-view={listView()}>
+                      <For each={g.items}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
+                    </div>
+                  </section>
+                )}
+              </For>
+            </div>
+          </Match>
+          <Match when={true}>
+            <div class="note-list" data-view={listView()}>
+              <For each={items()}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
+            </div>
+          </Match>
+        </Switch>
       </div>
       <Show when={moreCount() > 0 || (!p.personal && items().length > 0)}>
         <button class="mini note-more-btn" onClick={() => { setPageArchive(false); p.onAll(); }}>{moreCount() > 0 ? tp("notes.card.more", moreCount(), "+{n} dalších") : t("notes.card.all", "Všechny poznámky")}</button>

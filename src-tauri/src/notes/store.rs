@@ -31,8 +31,11 @@ pub struct NoteView {
     pub remind: Option<String>,
     pub remind_ms: Option<i64>,
     pub done: bool,
-    /// první textový řádek bez Markdown značek, zkrácený
+    /// zobrazený název: `title:` z frontmatteru, jinak první textový řádek bez Markdown značek (zkrácený)
     pub title: String,
+    /// vlastní nadpis (`title:`), `None` = název je první řádek
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub heading: Option<String>,
     pub images: usize,
     /// kategorie (`kind:`), `DEFAULT_KIND` když chybí; neznámé id z druhého PC projde beze změny
     pub kind: String,
@@ -47,6 +50,18 @@ pub struct NoteView {
     /// štítky: `tags:` ze frontmatteru + `#štítek` v těle (`meta::tags_of`)
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+}
+
+/// Vlastní nadpis z frontmatteru (`title:`): oříznutý, nejvýš 120 znaků, prázdný = žádný.
+pub fn heading_of(front: &[String]) -> Option<String> {
+    let t = get(front, "title")?;
+    let t: String = t.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(120).collect();
+    (!t.is_empty()).then_some(t)
+}
+
+/// Zobrazený název poznámky: vlastní nadpis, jinak první řádek těla.
+pub fn display_title(front: &[String], body: &str) -> String {
+    heading_of(front).unwrap_or_else(|| first_line(body))
 }
 
 fn first_line(body: &str) -> String {
@@ -82,7 +97,8 @@ pub fn parse_note(path: &Path, text: &str, folder_project: Option<&str>, fallbac
         remind: remind.as_ref().map(iso),
         remind_ms: remind.map(|d| d.timestamp_millis()),
         done,
-        title: first_line(body),
+        title: display_title(&front, body),
+        heading: heading_of(&front),
         images: body.matches("![").count(),
         kind: get(&front, "kind").map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).unwrap_or_else(|| DEFAULT_KIND.into()),
         updated: get(&front, "updated").and_then(|s| parse_time(&s)).as_ref().map(iso),
@@ -233,6 +249,9 @@ pub struct NewNote {
     /// kategorie (id z `notes.kinds`); `None`/`DEFAULT_KIND` = klíč se nezapíše
     #[serde(default)]
     pub kind: Option<String>,
+    /// vlastní nadpis (`title:`); `None`/prázdné = název je první řádek
+    #[serde(default)]
+    pub title: Option<String>,
 }
 
 /// Id kategorie: 1–32 znaků `[A-Za-z0-9_-]` (jde rovnou do frontmatteru).
@@ -284,6 +303,9 @@ pub fn create(root: &Path, note: &NewNote, now: &DateTime<FixedOffset>) -> Resul
         front.push(format!("project: {}", yaml_value(id)));
     }
     front.push(format!("created: {}", iso(now)));
+    if let Some(t) = note.title.as_deref().map(|t| t.split_whitespace().collect::<Vec<_>>().join(" ")).filter(|t| !t.is_empty()) {
+        front.push(format!("title: {}", yaml_value(&t.chars().take(120).collect::<String>())));
+    }
     if let Some(k) = kind {
         front.push(format!("kind: {k}"));
     }
@@ -404,13 +426,14 @@ mod tests {
             remind: Some("2026-10-17T09:00:00+02:00".into()),
             images: vec![b64(&img), format!("data:image/png;base64,{}", b64(&img))],
             kind: None,
+            title: Some(" Plán   týdne ".into()),
         };
         let path = create(root.path(), &note, &now).unwrap();
         assert_eq!(path, root.path().join("atlas").join("2026-10-16-140322-zavolat-rehorovi.md"));
         let text = std::fs::read_to_string(&path).unwrap();
         assert_eq!(
             text,
-            "---\nproject: atlas\ncreated: 2026-10-16T14:03:22+02:00\nremind: 2026-10-17T09:00:00+02:00\ndone: false\n---\n\n\
+            "---\nproject: atlas\ncreated: 2026-10-16T14:03:22+02:00\ntitle: \"Plán týdne\"\nremind: 2026-10-17T09:00:00+02:00\ndone: false\n---\n\n\
              Zavolat Řehořovi\n\nkvůli fakturám\n\n![](./2026-10-16-140322-zavolat-rehorovi-1.png)\n\n![](./2026-10-16-140322-zavolat-rehorovi-2.png)\n"
         );
         assert_eq!(std::fs::read(root.path().join("atlas/2026-10-16-140322-zavolat-rehorovi-2.png")).unwrap(), img);

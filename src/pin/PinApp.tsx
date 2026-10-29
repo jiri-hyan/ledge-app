@@ -25,6 +25,7 @@ import { appendLine, caretFromText, pinSuggestVisible, pointLine, remindAskText,
 import { pinLook } from "./styles";
 import PinMenu from "./PinMenu";
 import { colorHex, noteColor, withoutTag } from "../notes/meta";
+import { headline } from "../notes/headline";
 import { pinMeta } from "./pinmeta";
 import { notesApi } from "../notes/api";
 import { useWikiFollow, useWikiSuggest, WikiList, WikiMissing } from "../notes/WikiLinks";
@@ -74,10 +75,10 @@ export default function PinApp() {
   const through = () => !!p()?.through;
   const dirty = () => editing() && text().trimEnd() !== trimBody(note()?.body ?? "").trimEnd();
   /** barva podle štítku (`notes.tagColors`), když poznámka nemá vlastní */
-  const tagColor = () => noteColor({ tags: note()?.tags }, init()?.tagColors);
+  const tagColor = () => noteColor({ tags: note()?.tags, project: note()?.project }, init()?.tagColors, init()?.projectColors);
   const colors = () => {
     const l = look();
-    return pinLook(p()?.style, l?.bg ?? p()?.bg ?? 88, l?.text ?? p()?.text ?? 100, noteColor(note(), init()?.tagColors));
+    return pinLook(p()?.style, l?.bg ?? p()?.bg ?? 88, l?.text ?? p()?.text ?? 100, noteColor(note(), init()?.tagColors, init()?.projectColors));
   };
   // vazby [[…]]: klik otevře poznámku jako další lístek, neexistující nabídne vytvořit
   const wiki = useWikiFollow((path) => void notesApi.pinOpen(path).catch(sayError));
@@ -470,7 +471,13 @@ export default function PinApp() {
   });
 
   const keyText = () => init()?.key || "";
-  const title = () => note()?.title || (note() ? t("notes.imageOnly", "(jen obrázek)") : "…");
+  const title = () => {
+    const n = note();
+    if (!n) return "…";
+    // vlastní nadpis → „Projekt · Název · 26. 10.“; bez něj dnešní první řádek
+    if (n.heading) return headline(n, n.project ? init()?.projects?.[n.project] ?? n.project : null, init()?.lang);
+    return n.title || t("notes.imageOnly", "(jen obrázek)");
+  };
 
   return (
     <div

@@ -19,6 +19,8 @@ pub struct DraftMeta {
     pub remind: String,
     /// kategorie (id); prázdné = výchozí
     pub kind: String,
+    /// vlastní nadpis; prázdné = první řádek
+    pub title: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
@@ -129,7 +131,7 @@ mod tests {
         assert_eq!(draft_load(root.path()), None);
         draft_save_images(root.path(), &[]).unwrap();
         assert!(!root.path().join(".draft").exists(), "prázdné obrázky složku nezakládají");
-        let meta = DraftMeta { text: "rozepsáno".into(), project: "atlas".into(), project_touched: true, remind: "2026-10-17T09:00".into(), kind: "napad".into() };
+        let meta = DraftMeta { text: "rozepsáno".into(), project: "atlas".into(), project_touched: true, remind: "2026-10-17T09:00".into(), kind: "napad".into(), title: "Plán".into() };
         draft_save_meta(root.path(), &meta).unwrap();
         let (a, b) = (png(1), png(2));
         draft_save_images(root.path(), &[b64(&a), b64(&b)]).unwrap();

@@ -213,7 +213,10 @@ pub(crate) fn refresh_strip() {
     let axis2 = geom::axis2_for(&cfg, mon.rect.left, mon.rect.right, mon.dpi);
     // puls „čeká / hotovo“ (`attention::pulse`, s termínem; animuje vlákno `strip`)
     let pulse = attention::pulse();
+    // Notch (`notify`): smí vyjet i z proužku skrytého v klidu, ne však přes šuplík, ve hře ani vypnutý
+    let stage = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some());
     drop(cfg);
+    let missed = crate::notify::stage(stage, drawer_open);
     if wants_battery {
         crate::battery::ensure();
     }
@@ -237,6 +240,7 @@ pub(crate) fn refresh_strip() {
         m.position = position;
         m.shape = shape;
         m.compose = compose;
+        m.missed = missed;
     });
 }
 

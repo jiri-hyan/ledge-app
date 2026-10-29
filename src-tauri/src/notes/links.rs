@@ -222,6 +222,7 @@ mod tests {
             remind_ms: None,
             done,
             title: title.into(),
+            heading: None,
             images: 0,
             kind: DEFAULT_KIND.into(),
             updated: None,

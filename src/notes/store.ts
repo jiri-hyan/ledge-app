@@ -5,6 +5,7 @@ import { createSignal } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { say } from "../ui/toast";
 import { t } from "../i18n";
+import { PROJECT_ACCENT_PLACEHOLDER } from "./meta";
 
 /** Předvyplnění nové poznámky (dlaždice projektu, tlačítko na záložce). */
 export type NotePreset = { project?: string; remind?: boolean; kind?: string };
@@ -41,6 +42,11 @@ export function setTab(t: string) {
 /** Filtr karty Poznámky podle štítku (bez `#`), null = všechny. Jen do zavření Ledge. */
 export const [tagFilter, setTagFilter] = createSignal<string | null>(null);
 
+/** Skutečná barva projektu pro proužek poznámky (`meta.ts` `PROJECT_ACCENT_PLACEHOLDER` = žádná). */
+export const projectAccent = (s: Snapshot, id: string | null): string | null => {
+  const a = id ? s.projects.find((x) => x.id === id)?.accent : null;
+  return a && a.toLowerCase() !== PROJECT_ACCENT_PLACEHOLDER ? a : null;
+};
 export const projName = (s: Snapshot, id: string | null) => (id ? s.projects.find((x) => x.id === id)?.name ?? id : t("notes.general", "Obecné"));
 
 const hhmmOf = (ms: number) => {

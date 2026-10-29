@@ -23,6 +23,9 @@
 .note-page { display: flex; flex-direction: column; gap: 10px; }
 .note-text { width: 100%; min-height: 120px; resize: vertical; font: calc(14px * var(--fz))/1.5 var(--sans); color: var(--t1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 10px var(--s3); outline: none; user-select: text; -webkit-user-select: text; }
 .note-text:focus { border-color: var(--focus); }
+.note-title-input { width: 100%; font: 600 calc(14px * var(--fz))/1.4 var(--sans); color: var(--t1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 7px var(--s3); outline: none; user-select: text; -webkit-user-select: text; }
+.note-title-input:focus { border-color: var(--focus); }
+.note-title-input::placeholder { font-weight: 400; color: var(--t3); }
 .note-imgs { display: flex; gap: var(--s2); flex-wrap: wrap; }
 .note-img { position: relative; width: 120px; height: 80px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--line-2); background: var(--well); }
 .note-img img { width: 100%; height: 100%; object-fit: cover; }
@@ -187,3 +190,38 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-tagchip:hover { background: var(--card-2); color: var(--t1); }
 .note-tagchip.on { border-style: solid; border-color: var(--blue); color: var(--t1); background: color-mix(in srgb, var(--blue) 14%, transparent); }
 .note-tagchip .cnt { font: 600 var(--fs-2xs) var(--mono); color: var(--t3); }
+.note-colors { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 6px; }
+.note-color { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; background: var(--c); cursor: pointer; padding: 0; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) inset; }
+.note-color.on { border-color: var(--t1); }
+.note-color-none { background: conic-gradient(from 45deg, rgba(255, 255, 255, 0.25) 0 25%, transparent 0 50%, rgba(255, 255, 255, 0.25) 0 75%, transparent 0); background-color: var(--c, transparent); }
+
+/* Kolo 26: vzhledy karty Poznámky — kontejner pro container queries (úzká / široká karta), oddělení skupin,
+   Kanban a časová osa. Výchozí seznam bez seskupení se nemění. */
+.note-wrap { container-type: inline-size; }
+.note-group-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--t3); text-transform: uppercase; letter-spacing: 0.04em; margin: 8px 0 4px; }
+.note-group-n { font-variant-numeric: tabular-nums; opacity: 0.7; }
+/* styl „čára s nadpisem“ (výchozí) */
+.note-groups[data-gs="line"] .note-group-head::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+/* styl „štítek“ */
+.note-groups[data-gs="tag"] .note-group-label { background: var(--well); border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; color: var(--t2); }
+/* styl „samostatné karty“ */
+.note-groups[data-gs="cards"] { display: flex; flex-direction: column; gap: var(--s2); }
+.note-groups[data-gs="cards"] .note-group { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--well); padding: 2px var(--s2) var(--s2); }
+/* Kanban: dva sloupce, na úzké kartě pod sebou */
+.note-kanban { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.note-kcol { min-width: 0; }
+.note-kempty { color: var(--t3); padding: 4px 8px; }
+@container (max-width: 359px) { .note-kanban { grid-template-columns: 1fr; } }
+/* Časová osa: datum | tečka na svislé ose | název */
+.note-tl { display: flex; flex-direction: column; position: relative; }
+.note-tl-item { display: grid; grid-template-columns: 3.4em 12px 1fr; align-items: start; gap: 8px; padding: 4px 0; position: relative; }
+.note-tl-item::before { content: ""; position: absolute; left: calc(3.4em + 8px + 5px); top: 0; bottom: 0; width: 2px; background: var(--line); }
+.note-tl-date { text-align: right; color: var(--t3); font-size: var(--fs-md); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.note-tl-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--note-c, var(--t3)); border: 2px solid var(--bg, #111); position: relative; z-index: 1; margin-top: 3px; }
+.note-tl-body { text-align: left; display: flex; flex-direction: column; min-width: 0; }
+.note-tl-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-tl-sub { color: var(--t3); font-size: var(--fs-md); }
+.note-tl-item.done .note-tl-title { text-decoration: line-through; opacity: 0.6; }
+@container (max-width: 259px) { .note-tl-item { grid-template-columns: 12px 1fr; } .note-tl-date { display: none; } .note-tl-item::before { left: 5px; } }
+/* Lístečky: na úzké kartě jeden sloupec, na široké víc (auto-fill už řeší mřížka) */
+@container (max-width: 259px) { .note-list[data-view="tiles"] { grid-template-columns: 1fr; } }

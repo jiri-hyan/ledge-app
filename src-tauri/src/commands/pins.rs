@@ -89,6 +89,21 @@ pub(crate) struct PinInit {
     fresh: bool,
     /// barva podle štítku (`notes.tagColors`), když poznámka nemá vlastní
     tag_colors: std::collections::BTreeMap<String, String>,
+    /// id projektu → název (hlavička lístku „Projekt · Název · datum“)
+    projects: std::collections::BTreeMap<String, String>,
+    /// id projektu → vlastní barva `#rrggbb` (jen skutečně nastavená); poznámka bez `color:` ji zdědí jako karta
+    project_colors: std::collections::BTreeMap<String, String>,
+}
+
+/// Skutečné barvy projektů pro lístek: jen platné `#rrggbb` z configu, malými písmeny (bez záložní šedé).
+pub(crate) fn project_colors(projects: &[crate::config::Project]) -> std::collections::BTreeMap<String, String> {
+    projects
+        .iter()
+        .filter_map(|p| {
+            let a = p.accent.as_deref()?.trim().to_ascii_lowercase();
+            (a.len() == 7 && a.starts_with('#') && a[1..].chars().all(|c| c.is_ascii_hexdigit())).then(|| (p.id.clone(), a))
+        })
+        .collect()
 }
 
 #[tauri::command(async)]
@@ -99,7 +114,7 @@ pub(crate) fn pin_init(window: WebviewWindow) -> Result<PinInit, String> {
     let cfg = core().cfg.read().clone();
     let key = cfg.hotkeys.note_passthrough.trim().to_string();
     let key_ok = !key.is_empty() && crate::hotkeys::is_registered(&key);
-    Ok(PinInit { path, prefs, key, key_ok, hint_seen: win::hint_seen(), lang: cfg.ui.lang, fresh: win::take_fresh(&label), tag_colors: cfg.notes.tag_colors.clone() })
+    Ok(PinInit { path, prefs, key, key_ok, hint_seen: win::hint_seen(), lang: cfg.ui.lang, fresh: win::take_fresh(&label), tag_colors: cfg.notes.tag_colors.clone(), projects: cfg.projects.iter().map(|p| (p.id.clone(), p.name.clone())).collect(), project_colors: project_colors(&cfg.projects) })
 }
 
 /// Okno lístku: změna voleb (navrchu, zámek, průchozí, průhlednosti, sbalení).
@@ -169,4 +184,22 @@ pub(crate) fn pin_hint_seen(window: WebviewWindow) -> Result<(), String> {
     pin_label(&window)?;
     win::set_hint_seen();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn project_colors_keep_only_real_hex_accents() {
+        let mk = |id: &str, accent: Option<&str>| {
+            let mut p: crate::config::Project = serde_json::from_value(serde_json::json!({"id": id, "name": id, "kind": "dev"})).unwrap();
+            p.accent = accent.map(String::from);
+            p
+        };
+        let all = [mk("app", Some("#EF6B6B")), mk("app-v2", None), mk("b", Some("červená")), mk("c", Some("#abc"))];
+        let m = project_colors(&all);
+        assert_eq!(m.len(), 1);
+        assert_eq!(m.get("app").map(String::as_str), Some("#ef6b6b"));
+    }
 }

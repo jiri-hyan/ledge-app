@@ -128,3 +128,21 @@ stopek, `tick`, termíny, texty, segmenty, tvar `Op`, config, soubor v tempdiru)
 
 Nečti: `claude/` (most, viz [sessions.md](sessions.md)), `notes*` ([notes.md](notes.md)),
 `icons.rs`/`cloning.rs` ([projects-icons-perf.md](projects-icons-perf.md)).
+
+## Oznámení — Notch (kolo 26, `notify/`)
+
+- Tok: odesílatel (`attention::on_change`, `calendar::remind::tick`, `timer::tick_live`, `limitslive::tick`) → dnešní brána
+  `attention::signal` (hra, „nerušit“, šuplík naplno = nic) → `notify::emit` → čistá `route::route` (Notch / toast / nic podle
+  `notify.surface`, `fallbackToast`, `STAGE` z `stripview::refresh_strip`, kurzor na monitoru proužku) → `queue::Queue` (priorita
+  Čeká > Schůzka > Limit > Časovač > Hotovo, slučování, zmeškané) → `StripModel.notice` (`Live`).
+- „Čeká“ s žádostí / otázkou, kterou drží Ledge (`claude.attention()`), ukáže peek šuplíku (`refresh::on_claude_change`) —
+  `route` ji pak na monitoru proužku vynechá (`Ctx.covered`); Notch „Čeká“ je pro čekání, které Ledge nedrží.
+- Vlákno `strip` kreslí `notify::draw::draw` místo obsahu proužku (i u stylu skrytého v klidu); `None` z `choreo::frame` =
+  konec → `notify::advance` (další z fronty). Snímkový časovač `PULSE_TIMER` jen během oznámení.
+- Klik: jen v klidové fázi tvaru s tlačítkem okno ztratí `WS_EX_TRANSPARENT` (`WM_NCHITTEST` = tvar), `WM_LBUTTONUP` →
+  `notify::click` (tlačítko = `session_open` / `calendar_join` na krátkém vlákně, jinde v tvaru = složit). No-activate zůstává.
+  Vlákno `hover`: `notify::owns_pointer` — kurzor na kartě s tlačítkem šuplík neotevře a kartu podrží.
+- Zmeškané: doběhlé bez kliknutí → `StripModel.missed` (tečka `draw::missed_dot` v `strip::draw` i `stripdraw::draw`),
+  smaže ji otevření šuplíku (`notify::stage(.., drawer_open)`).
+- Testy: `notify/{conf,route,queue,choreo}.rs` (tabulky), `attention::notices_open_session_never_allow`,
+  `remind::notice_has_join_only_with_link`.

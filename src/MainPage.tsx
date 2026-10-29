@@ -117,6 +117,8 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   /** varianta zobrazení karty (vzhled karty; i rozpracovaný v panelu) */
   const view = (id: CardId) => viewOf(id, lookFor(page().id, id, cardOf(id)?.look));
   /** vzhled karty z registru (`layout/designs.ts`; i rozpracovaný v panelu); výchozí = dnešní vzhled */
+  /** vzhled karty Poznámky (seskupení a styl oddělení; i rozpracovaný v panelu) */
+  const noteLook = () => lookFor(page().id, "notes", cardOf("notes")?.look);
   const design = (id: CardId) => designOf(id, lookFor(page().id, id, cardOf(id)?.look))?.id;
   // vzhled záložky (`appearance.pages`, `theme/pages.ts`): platí, dokud je hlavní stránka vidět
   createEffect(() => setActivePage(page().id));
@@ -179,7 +181,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         return <Repos s={p.s} view={view("repos")} menu={menu("repos")} onSettings={p.onSettings} page={page().id} limit={limitOf(cardOf("repos"))} />;
       case "notes":
         // Osobní = obecné poznámky; Práce a vlastní záložky = po projektech (reaktivně — karta zůstává při přepnutí záložky)
-        return <Show when={kind() === "personal"} fallback={<NotesCard s={p.s} now={p.now} view={view("notes")} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} />}><NotesCard s={p.s} now={p.now} view={view("notes")} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>;
+        return <Show when={kind() === "personal"} fallback={<NotesCard s={p.s} now={p.now} design={design("notes")} groupBy={noteLook()?.groupBy} groupStyle={noteLook()?.groupStyle} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} />}><NotesCard s={p.s} now={p.now} design={design("notes")} groupBy={noteLook()?.groupBy} groupStyle={noteLook()?.groupStyle} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>;
       case "actions":
         return <ActionsCard s={p.s} view={view("actions")} onSettings={p.onSettings} wide skipLinks={has("links")} menu={menu("actions")} />;
       case "shelf":

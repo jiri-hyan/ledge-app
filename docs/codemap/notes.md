@@ -47,6 +47,10 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src/notes/NoteMenu.tsx` · `exportActions.ts` | ⋯ editoru (Export) · Markdown / HTML / … | `exportItems` |
 | `src/notes/NotesCard.tsx` | karta se záložkami, filtr podle štítku … | `copyNote` |
 | `src/notes/bento.ts` | čistá logika Bento: která poznámka je … | `heroOf` |
+| `src/notes/headline.ts` | hlavička poznámky složená sama „Projekt · Název · 26. 10.“ … | `headline` |
+| `src/notes/group.ts` | seskupení seznamu karty (nic / projekt / kategorie / datum / připnuté) … | `groupNotes` |
+| `src/notes/noteDesigns.ts` | 6 vzhledů karty Poznámky pro registr vzhledů … | `NOTES_DESIGNS` |
+| `src/notes/ColorDots.tsx` · `colorset.ts` | tečky 8 barev v ⋯ řádku a editoru · zápis `color:` … | `setNoteColor` |
 | `src/notes/NotesPage.tsx` | stránka „notes“ (záložky, projekt, „i … | `pageArchive` |
 | `src/notes/ProjectPicker.tsx` · `RemindPicker.tsx` · `kinds.tsx` | výběry (projekt, připomínka, kategorie … |  |
 | `src/notes/RemindSuggest.tsx` · `suggest.ts` | chip „⏰ Připomenout zítra 10:00?“ pod … | `RemindSuggest` |

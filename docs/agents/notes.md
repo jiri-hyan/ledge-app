@@ -42,8 +42,11 @@ Zavolat Řehořovi kvůli fakturám
   neztratí. Vlastní kategorie: config `notes.kinds` (`id`, `label`, `color` `#rrggbb`, `icon` z
   `bulb chat checklist note flag star bug heart`).
 - `updated` = poslední úprava v Ledge (ISO s offsetem) — píše Ledge, agent ho nastavovat nemusí.
+- `title` (volitelné) = vlastní nadpis poznámky (jeden řádek, nejvýš 120 znaků; `title: "Plán týdne"`). Chybí = názvem je
+  první řádek těla jako dřív. Projekt a datum do `title` **nepiš** — Ledge je v hlavičce karty a lístku složí sám ("Projekt · Název · 26. 10.").
+  Synchronizace se složkou i export `title` zachovají (export ho dá nad tělo jako `# nadpis`). **Agent smí `title` nastavit.**
 - `color` (volitelné) = barva lístku: `yellow` `orange` `red` `pink` `purple` `blue` `teal` `green` nebo
-  `"#rrggbb"`; chybí = výchozí. `tags` (volitelné) = štítky `tags: [prace, qa]` (Ledge píše jen tenhle inline
+  `"#rrggbb"`; chybí = barva projektu (je-li), jinak žádná; neznámé jméno = žádná vlastní barva. V menu ⋯ jde zvolit jen jedna z osmi jmen. `tags` (volitelné) = štítky `tags: [prace, qa]` (Ledge píše jen tenhle inline
   tvar; čte i `tags: a, b` a blokový seznam `- a`). Štítkem je i `#štítek` v textu (ne v kódu, ne `# Nadpis`,
   ne `#1`). Štítek = písmena, číslice, `-` `_` `/`, Ledge ho bere malými písmeny. **Agent smí `color` i `tags`
   nastavit.** Barva podle štítku: config `notes.tagColors` (`{"qa": "red"}`), platí jen bez vlastní `color`.

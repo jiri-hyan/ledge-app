@@ -209,7 +209,7 @@ pub(crate) fn tick(now: i64) {
         };
         let title = crate::i18n::tr("Limit Claude se blíží", "Claude limit is getting close").to_string();
         let body = trf!("Limit {} je na {} % (práh {} %).", "The {} limit is at {}% ({}% threshold).", name, pct.round() as i64, lvl);
-        crate::toast::show(&c.app.config().identifier, title, body);
+        crate::notify::emit(crate::notify::Notice { kind: crate::notify::Kind::Limit, title, body, pct: Some(pct as f32), count: 1, ..Default::default() });
     }
     if show {
         *c.flash.lock() = Some((Rgba::GREEN, Instant::now()));

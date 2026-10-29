@@ -344,7 +344,7 @@ pub(crate) fn tick_live(now: i64) {
             _ => 0,
         };
         let (title, body) = toast_text(total);
-        crate::toast::show(&c.app.config().identifier, title, body);
+        crate::notify::emit(crate::notify::Notice { kind: crate::notify::Kind::Timer, title, body, count: 1, ..Default::default() });
     }
     crate::state::mark_dirty();
 }

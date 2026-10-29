@@ -22,6 +22,8 @@ registerDict("en", {
   "cards.cardlook.dens.compact": "Compact",
   "cards.cardlook.dens.style": "By style",
   "cards.cardlook.density": "Density",
+  "cards.cardlook.groupBy": "Group by",
+  "cards.cardlook.groupStyle": "Separator style",
   "cards.cardlook.variant": "Player look",
   "cards.cardlook.tiles": "Shortcuts",
   "cards.cardlook.tilesAria": "Edit the look of a shortcut",

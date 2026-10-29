@@ -33,6 +33,7 @@
     "allow-expand-drawer",
     "allow-release-focus",
     "allow-open-url",
+    "allow-notify-preview",
     "allow-open-in",
     "allow-git-pull",
     "allow-project-logo",

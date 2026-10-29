@@ -209,9 +209,11 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
         </div>
         <div class="opt">
           <span>{t("appearance.compose.allStyles", "Styl všech kostek")}</span>
-          <span class="cx-styles" role="group" aria-label={t("appearance.compose.allStyles", "Styl všech kostek")}>
-            <For each={ITEM_STYLES.filter((s) => s !== "spark" && s !== "dotPct" && s !== "ring5h")}>{(s) => <button class="btn" type="button" onClick={() => commit(setAllStyles(c(), s))}>{STYLE_NAME[s]()}</button>}</For>
-          </span>
+          <select value="" aria-label={t("appearance.compose.allStyles", "Styl všech kostek")}
+            onChange={(e) => { const s = e.currentTarget.value as ItemStyle; e.currentTarget.value = ""; if (s) commit(setAllStyles(c(), s)); }}>
+            <option value="">{t("appearance.compose.allStylesPick", "Vyber styl…")}</option>
+            <For each={ITEM_STYLES.filter((s) => s !== "spark" && s !== "dotPct" && s !== "ring5h")}>{(s) => <option value={s}>{STYLE_NAME[s]()}</option>}</For>
+          </select>
         </div>
         <div class="cx-rack">
           <For each={SLOTS}>

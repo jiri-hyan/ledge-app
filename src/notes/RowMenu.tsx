@@ -4,11 +4,13 @@
 import { For, Show } from "solid-js";
 import type { NoteView } from "../api";
 import { t } from "../i18n";
-import { createMenu, PopItem, PopMenu } from "../ui/Popover";
+import { createMenu, PopCap, PopItem, PopMenu } from "../ui/Popover";
 import { archiveNote, completeNote, deleteNote, reopenNote, unarchiveNote } from "./lifecycle";
 import type { LifeAction } from "./lifeactions";
 import { lifeActions } from "./lifeactions";
 import { actionIcon, actionText } from "./lifelabels";
+import ColorDots from "./ColorDots";
+import { setNoteColor } from "./colorset";
 
 /** Provede akci nad poznámkou ze šuplíku (lišta Zpět se ukáže sama). */
 export function runAction(a: LifeAction, n: NoteView): Promise<boolean> {
@@ -21,7 +23,7 @@ export function runAction(a: LifeAction, n: NoteView): Promise<boolean> {
   }
 }
 
-export default function RowMenu(p: { n: NoteView; archived: boolean }) {
+export default function RowMenu(p: { n: NoteView; archived: boolean; /** barva projektu, kterou poznámka dědí */ inherited?: string | null }) {
   const menu = createMenu();
   const label = t("notes.life.more", "Splnit, archivovat, smazat…");
   const acts = () => lifeActions(p.n.done, p.archived);
@@ -38,6 +40,10 @@ export default function RowMenu(p: { n: NoteView; archived: boolean }) {
                 </PopItem>
               )}
             </For>
+            <Show when={!p.archived}>
+              <PopCap>{t("notes.color.title", "Barva poznámky")}</PopCap>
+              <ColorDots color={p.n.color} inherited={p.inherited} onPick={(id) => { menu.close(); void setNoteColor(p.n.path, id); }} />
+            </Show>
           </PopMenu>
         )}
       </Show>

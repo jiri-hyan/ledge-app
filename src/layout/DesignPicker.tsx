@@ -48,6 +48,12 @@ const CARD_THUMBS: Record<string, () => JSX.Element> = {
   "week:timeline": () => <>{R(3, 11, 34, 1.6, 0.35)}{R(6, 5, 9, 5)}{R(18, 14, 11, 5, 0.6)}{R(31, 5, 5, 5, 0.4)}<path d="M23 3 V21" stroke="currentColor" stroke-width="1.4" /></>,
   "week:dial": () => <><circle cx="20" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3" /><path d="M20 12 L20 2.5 A9.5 9.5 0 0 1 27.4 6 Z" fill="currentColor" opacity="0.8" /><path d="M20 12 L14 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></>,
   "week:agenda": () => <>{[3, 9, 15].map((y, i) => <>{C(5, y + 1.5, 1.5, 1 - i * 0.25)}{R(10, y, 20 - i * 3, 3, 0.8 - i * 0.2)}{R(32, y, 5, 3, 0.35)}</>)}{R(3, 21, 34, 1.5, 0.3)}</>,
+  "notes:list": () => <>{[3, 9, 15].map((y, i) => <>{R(3, y, 3, 3, 0.9 - i * 0.2)}{R(9, y, 26 - i * 4, 2.2, 0.8 - i * 0.2)}{R(9, y + 3, 14, 1.4, 0.3)}</>)}</>,
+  "notes:compact": () => <>{[2, 6.5, 11, 15.5, 20].map((y, i) => R(3, y, 34 - (i % 3) * 6, 2.2, 0.8 - i * 0.1))}</>,
+  "notes:cards": () => <>{[0, 1].map((r) => [0, 1, 2].map((c) => <rect x={3 + c * 11.7} y={3 + r * 10} width="10" height="8.5" rx="1.5" fill="currentColor" opacity={0.25 + ((r + c) % 3) * 0.2} />))}</>,
+  "notes:bento": () => <>{R(3, 3, 22, 12, 0.6)}{R(27, 3, 10, 5.5, 0.3)}{R(27, 9.5, 10, 5.5, 0.3)}{R(3, 17, 34, 3.5, 0.2)}</>,
+  "notes:kanban": () => <>{R(3, 3, 16, 3, 0.7)}{R(21, 3, 16, 3, 0.35)}{[9, 14, 19].map((y) => R(3, y, 16, 3.6, 0.45))}{[9, 14].map((y) => R(21, y, 16, 3.6, 0.2))}</>,
+  "notes:timeline": () => <><path d="M9 2 V22" stroke="currentColor" stroke-width="1.4" opacity="0.4" />{[5, 12, 19].map((y, i) => <>{C(9, y, 2, 1 - i * 0.25)}{R(15, y - 1.6, 22 - i * 4, 3.2, 0.7 - i * 0.2)}</>)}</>,
 };
 
 export function DesignThumb(p: { id: string; card?: string }) {

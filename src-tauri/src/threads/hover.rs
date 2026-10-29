@@ -226,7 +226,9 @@ pub(crate) fn spawn_hover_thread() {
                         // tah na přihrádku šuplík neotevírá; skrytý / zamčený kurzor (hra v okně) taky ne —
                         // kurzor se čte jen u hrany v zóně
                         let blocked = armed.is_some() && (at_edge || on_strip) && super::pointer::blocked_now();
-                        let armed = if dropping || blocked { None } else { armed };
+                        // kurzor na oznámení s tlačítkem (Notch): šuplík se neotevře, oznámení počká
+                        let notch = crate::notify::owns_pointer(p.x, p.y);
+                        let armed = if dropping || blocked || notch { None } else { armed };
                         // při tlačení proužek (linka) „nažhaví“ už během nabíjení
                         let pushing = bar_push && trigger != Trigger::Off && push_state != edge::Push::Idle;
                         let hot = (armed.is_some() || pushing) && !peek_hover;

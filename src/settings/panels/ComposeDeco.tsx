@@ -12,7 +12,7 @@ import {
 } from "../../strip/compose";
 import StripLookPreview from "../previews/StripLookPreview";
 import type { PreviewState } from "../appearanceModel";
-import { Seg, Slider } from "./apUi";
+import { Seg, Slider, lit } from "./apUi";
 
 export const DESIGN_NAME: Record<DesignId, () => string> = {
   islands: () => t("appearance.compose.design.islands", "Ostrůvky"),
@@ -106,7 +106,7 @@ export function ComposeDecoBlock(q: Q) {
   const setFill = (patch: Partial<StripCompose["fill"]>, key = "") => q.commit({ ...q.c, fill: { ...f(), ...patch } }, key);
   const custom = t("appearance.compose.colorCustom", "Vlastní");
   return (
-    <section class="cx-blk">
+    <section class="cx-blk" id="f-strip.compose.deco" classList={{ hit: lit("strip.compose.deco") }}>
       <div class="cx-bh">
         <span>{t("appearance.compose.deco", "Rám a akcent")}<small>{t("appearance.compose.decoHint", "Stálá linka nebo záře v barvě, kterou si vybereš. Nažhavení při najetí myší se kreslí nad ní.")}</small></span>
       </div>
@@ -126,7 +126,7 @@ export function ComposeDecoBlock(q: Q) {
         <Slider label={t("appearance.compose.edgeWidth", "Tloušťka linky")} min={1} max={3} step={1} value={d().width} fmt={(v) => `${v} px`} set={(v) => setDeco({ width: v }, "edgeWidth")} />
       </Show>
 
-      <div class="opt"><span>{t("appearance.compose.fill", "Pozadí")}<small>{t("appearance.compose.fillHint", "Bez pozadí = jen obsah s jemným stínem, ať je čitelný.")}</small></span>
+      <div class="opt" id="f-strip.compose.fill" classList={{ hit: lit("strip.compose.fill") }}><span>{t("appearance.compose.fill", "Pozadí")}<small>{t("appearance.compose.fillHint", "Bez pozadí = jen obsah s jemným stínem, ať je čitelný.")}</small></span>
         <Pick label={t("appearance.compose.fill", "Pozadí")} value={f().kind} options={FILL_KINDS.map((v) => [v, FILL_NAME[v]()])} set={(v) => setFill(v === "gradient" && !f().from ? { kind: v, from: "#1e3a8a", to: "#000000" } : { kind: v })} /></div>
       <Show when={f().kind === "gradient"}>
         <div class="opt"><span>{t("appearance.compose.fillColors", "Barvy přechodu")}</span>
@@ -138,9 +138,9 @@ export function ComposeDecoBlock(q: Q) {
           <Seg label={t("appearance.compose.fillDir", "Směr")} value={f().dir} options={FILL_DIRS.map((v) => [v, DIR_NAME[v]()])} set={(v) => setFill({ dir: v })} /></div>
       </Show>
 
-      <div class="opt"><span>{t("appearance.compose.sep", "Oddělit části")}<small>{t("appearance.compose.sepHint", "Ostrůvky rozdělí tělo na tři kapsle: vlevo, uprostřed, vpravo.")}</small></span>
+      <div class="opt" id="f-strip.compose.sep" classList={{ hit: lit("strip.compose.sep") }}><span>{t("appearance.compose.sep", "Oddělit části")}<small>{t("appearance.compose.sepHint", "Ostrůvky rozdělí tělo na tři kapsle: vlevo, uprostřed, vpravo.")}</small></span>
         <Pick label={t("appearance.compose.sep", "Oddělit části")} value={q.c.sep} options={COMPOSE_SEPS.map((v) => [v, SEP_NAME[v]()])} set={(v) => q.commit({ ...q.c, sep: v })} /></div>
-      <label class="opt"><span>{t("appearance.compose.mono", "Písmo s pevnou šířkou")}<small>{t("appearance.compose.monoHint", "Jako terminál (Cascadia Mono).")}</small></span>
+      <label class="opt" id="f-strip.compose.mono" classList={{ hit: lit("strip.compose.mono") }}><span>{t("appearance.compose.mono", "Písmo s pevnou šířkou")}<small>{t("appearance.compose.monoHint", "Jako terminál (Cascadia Mono).")}</small></span>
         <input type="checkbox" checked={q.c.mono} onChange={(e) => q.commit({ ...q.c, mono: e.currentTarget.checked })} /></label>
     </section>
   );

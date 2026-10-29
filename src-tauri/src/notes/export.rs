@@ -55,6 +55,21 @@ pub fn with_ext(path: &str, f: Format) -> String {
     if has { path.to_string() } else { format!("{path}.{}", f.ext()) }
 }
 
+/// Tělo pro export s vlastním nadpisem (`title:` ve frontmatteru): nadpis se dá nad tělo jako `# …`, ledaže
+/// tělo už začíná stejným nadpisem. Bez vlastního nadpisu tělo beze změny (titulek dělá `export_md`).
+pub fn with_heading(heading: Option<&str>, body: &str) -> String {
+    let Some(h) = heading.map(str::trim).filter(|h| !h.is_empty()) else { return body.to_string() };
+    let first = body.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+    if heading_text(first).is_some_and(|t| t == h) {
+        return body.to_string();
+    }
+    format!("# {h}\n\n{}", body.trim_start_matches(['\n', '\r']))
+}
+
+fn heading_text(line: &str) -> Option<&str> {
+    heading(line).map(|(_, t)| t.trim())
+}
+
 /// Obsah souboru podle formátu (`images` se použijí jen v HTML). U PDF je to HTML, které se vytiskne.
 pub fn render(f: Format, title: &str, body: &str, images: &[NoteImage]) -> String {
     match f {
@@ -125,6 +140,22 @@ pub fn export_html(title: &str, body: &str, images: &[NoteImage]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn custom_heading_goes_above_the_body() {
+        let cases = [
+            (Some("Plán"), "první řádek\n", "# Plán\n\nprvní řádek\n"),
+            (Some("Plán"), "\n# Jiný\ntext", "# Plán\n\n# Jiný\ntext"),
+            (Some("Plán"), "# Plán\ntext", "# Plán\ntext"),
+            (None, "text", "text"),
+            (Some("  "), "text", "text"),
+        ];
+        for (h, body, want) in cases {
+            assert_eq!(with_heading(h, body), want, "{h:?} {body:?}");
+        }
+        // vlastní nadpis se stane titulkem dokumentu i bez obyčejného prvního řádku
+        assert_eq!(export_md("Plán", &with_heading(Some("Plán"), "- a")), "# Plán\n\n- a\n");
+    }
 
     #[test]
     fn markdown_gets_a_title_only_when_missing() {

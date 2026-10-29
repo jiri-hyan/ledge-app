@@ -19,14 +19,16 @@ export const [draftProj, setDraftProj] = createSignal("");
 export const [projTouched, setProjTouched] = createSignal(false);
 export const [draftRemind, setDraftRemind] = createSignal("");
 export const [draftKind, setDraftKind] = createSignal(DEFAULT_KIND);
+/** vlastní nadpis (`title:`); prázdný = název je první řádek */
+export const [draftTitle, setDraftTitle] = createSignal("");
 
-export const draftMeta = () => ({ text: draft(), project: draftProj(), projectTouched: projTouched(), remind: draftRemind(), kind: draftKind() === DEFAULT_KIND ? "" : draftKind() });
+export const draftMeta = () => ({ text: draft(), project: draftProj(), projectTouched: projTouched(), remind: draftRemind(), kind: draftKind() === DEFAULT_KIND ? "" : draftKind(), title: draftTitle() });
 export const b64Of = (urls: string[]) => urls.map((u) => u.slice(u.indexOf(",") + 1));
 
 /** Zapsat koncept na disk; prázdný koncept (nic napsáno, nic vybráno) = smazat. */
 function persistDraft() {
   const m = draftMeta();
-  const empty = !m.text.trim() && !draftImgs().length && !m.remind && !m.projectTouched && !m.kind;
+  const empty = !m.text.trim() && !draftImgs().length && !m.remind && !m.projectTouched && !m.kind && !m.title.trim();
   (empty ? api.noteDraftClear() : api.noteDraftSave(m)).catch(() => {});
 }
 
@@ -47,6 +49,7 @@ export function resetDraft() {
   setProjTouched(false);
   setDraftRemind("");
   setDraftKind(DEFAULT_KIND);
+  setDraftTitle("");
   api.noteDraftClear().catch(() => {});
 }
 
@@ -60,29 +63,31 @@ export async function restoreDraft() {
   setProjTouched(d.projectTouched);
   setDraftRemind(d.remind);
   setDraftKind(d.kind || DEFAULT_KIND);
+  setDraftTitle(d.title ?? "");
   setDraftImgs(d.images.map((b) => `data:image/png;base64,${b}`));
 }
 
 // ---------- úprava existující poznámky ----------
-type Fields = { text: string; project: string; kind: string; remind: string };
+type Fields = { text: string; project: string; kind: string; remind: string; title: string };
 export const [edBase, setEdBase] = createSignal<NoteDetail | null>(null);
 /** otisk verze, nad kterou se upravuje (z `note_read` nebo z obnovené úpravy) */
 export const [edHash, setEdHash] = createSignal("");
 export const [edText, setEdText] = createSignal("");
 export const [edProj, setEdProj] = createSignal("");
 export const [edKind, setEdKind] = createSignal(DEFAULT_KIND);
+export const [edTitle, setEdTitle] = createSignal("");
 export const [edRemind, setEdRemind] = createSignal("");
 export const [edImgs, setEdImgs] = createSignal<string[]>([]);
 const [orig, setOrig] = createSignal<Fields | null>(null);
 
 export const edDirty = () => {
   const o = orig();
-  return !!o && (edImgs().length > 0 || o.text !== edText() || o.project !== edProj() || o.kind !== edKind() || o.remind !== edRemind());
+  return !!o && (edImgs().length > 0 || o.text !== edText() || o.project !== edProj() || o.kind !== edKind() || o.remind !== edRemind() || o.title !== edTitle());
 };
 
 /** Naplní úpravu z poznámky na disku (po čtení, přepnutí úkolu). Tělo bez koncových zalomení. */
 export function loadEditFrom(n: NoteDetail) {
-  const f: Fields = { text: trimBody(n.body), project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs) };
+  const f: Fields = { text: trimBody(n.body), project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs), title: n.heading ?? "" };
   setEdBase(n);
   setEdHash(n.hash);
   setOrig(f);
@@ -90,13 +95,14 @@ export function loadEditFrom(n: NoteDetail) {
   setEdProj(f.project);
   setEdKind(f.kind);
   setEdRemind(f.remind);
+  setEdTitle(f.title);
   setEdImgs([]);
 }
 
 /** Rozepsaná úprava, která se nenechá přepsat otevřením jiné poznámky: čeká v liště editoru
  *  („Máš rozepsanou úpravu «název» — Otevřít ji · Zahodit“), dokud šéf nerozhodne. Jen v paměti
  *  (na disku drží `edit.json` tu nejnovější) — po restartu se vrátí z disku jako jedna. */
-export type ParkedEdit = { base: NoteDetail; hash: string; text: string; project: string; kind: string; remind: string; imgs: string[] };
+export type ParkedEdit = { base: NoteDetail; hash: string; text: string; project: string; kind: string; remind: string; imgs: string[]; /** chybí = nadpis z disku */ title?: string };
 export const [parked, setParked] = createSignal<ParkedEdit[]>([]);
 export const parkedTop = (): ParkedEdit | null => {
   const a = parked();
@@ -111,7 +117,7 @@ function park(x: ParkedEdit) {
 function snapshot(): ParkedEdit | null {
   const b = edBase();
   if (!b || !edDirty() || !edText().trim()) return null;
-  return { base: b, hash: edHash(), text: edText(), project: edProj(), kind: edKind(), remind: edRemind(), imgs: edImgs() };
+  return { base: b, hash: edHash(), text: edText(), project: edProj(), kind: edKind(), remind: edRemind(), imgs: edImgs(), title: edTitle() };
 }
 
 /** Co má být na disku v `edit.json`: rozepsaná otevřená úprava, jinak nejnovější odložená, jinak nic. */
@@ -206,6 +212,7 @@ export async function openEdit(path: string): Promise<string | null | undefined>
   loadEditFrom(n);
   const draft = mem ? { path: mem.base.path, hash: mem.hash, text: mem.text, project: mem.project, kind: mem.kind, remind: mem.remind } : disk;
   let plan = planSame(draft, fieldsOf(n));
+  if (plan.do === "drop" && mem && mem.title !== undefined && mem.title !== (n.heading ?? "")) plan = { do: "restore", stale: mem.hash !== n.hash }; // změněný jen nadpis
   if (plan.do === "drop" && mem?.imgs.length) plan = { do: "restore", stale: mem.hash !== n.hash }; // změněný jen obrázky
   if (plan.do === "drop") {
     if (!mem) void dropDiskEdit();
@@ -215,6 +222,7 @@ export async function openEdit(path: string): Promise<string | null | undefined>
     setEdProj(draft.project);
     setEdKind(draft.kind || DEFAULT_KIND);
     setEdRemind(draft.remind);
+    if (mem?.title !== undefined) setEdTitle(mem.title);
     setEdImgs(mem?.imgs ?? []);
     setEdStale(plan.stale);
     if (!mem) say(plan.stale ? t("notes.draft.restoredStale", "Poznámka se od rozepsané úpravy změnila (třeba lístkem na ploše) — tvoje úprava zůstala tady, „Načíst znovu“ ukáže novou verzi.") : t("notes.draft.restored", "Obnovena rozepsaná úprava."));
@@ -236,6 +244,7 @@ export function resumeParked(): string | null {
   setEdProj(pk.project);
   setEdKind(pk.kind || DEFAULT_KIND);
   setEdRemind(pk.remind);
+  if (pk.title !== undefined) setEdTitle(pk.title);
   setEdImgs(pk.imgs);
   return pk.base.path;
 }

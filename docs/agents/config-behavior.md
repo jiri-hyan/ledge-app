@@ -108,6 +108,19 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   (AppUserModelID `cz.hyan.ledge` ze zástupce ve Startu), jinak ho Windows zahodí (chyba v logu).
   Dokud otázka Clauda čeká a šuplík je zavřený, puls se opakuje po 10 s (jen po tu dobu, v klidu nic).
   Přišla-li otázka / schválení ve fullscreen hře nebo herním režimu, peek vyjede po návratu.
+- **Oznámení — Notch** (`notify`, kolo 26, modul `src-tauri/src/notify/`) — KDE a JAK se oznámení ukáže; ZDA
+  rozhodují dál vypínače událostí (`claude.toast` pro Čeká, `claude.toastDone` pro Hotovo — `null`/chybí = řídí se `claude.toast`, `claude.limitsAlert`, `timer.toast`,
+  `personal.calendars[].remindToast`) a brána hry / „nerušit“ / šuplíku naplno (`attention::signal`).
+  `notify.surface` (výchozí `notch` — VĚDOMÁ změna výchozího chování v kole 26: proužek nahoře se rozbalí a ukáže
+  obsah; `toast` = jen Windows toast jako dřív), `notify.fallbackToast` (výchozí `true`: toast, když proužek
+  vyjet nemůže — vypnutý, šuplík přes něj, kurzor na jiném monitoru), `notify.durationS` (2–30, výchozí 6;
+  „Hotovo“ trvá 2/3), `notify.style.{waiting,done,meeting,limit,timer}` = `unfold` (rozbalení do kartičky) /
+  `sides` (do stran) / `drop` (kapka pod proužek) / `ticker` (text projede) / `glow` (jen záře); výchozí
+  `waiting: unfold`, `done: sides`, `meeting: drop`, `limit: ticker`, `timer: glow`. Tlačítka jen `unfold` / `sides`
+  / `drop`: Čeká → Otevřít (okno session), Schůzka → Připojit; Povolit nikdy. Drží-li žádost / otázku Ledge
+  sám, ukáže ji peek šuplíku na místě proužku — Notch „Čeká“ se pak na tomtéž monitoru neukáže (jinde záložní toast). Fronta: Čeká > Schůzka > Limit >
+  Časovač > Hotovo, stejné se slučují (×N); doběhlé bez kliknutí = tečka v proužku do příštího otevření
+  šuplíku. Snímkový časovač jen během oznámení. Chybějící sekce = výchozí stav.
 - **Styl zavřeného Ledge Trojice** (`strip.look: "trio"`) — Trojice zjišťuje vytížení systému každých 10 s (CPU a paměť do
   kapsle; jako položka proužku `system`). Vzorek se bere jen při zapnutém proužku, ne ve fullscreen hře ani herním režimu
   a ne navíc, dokud je šuplík otevřený (vzorkuje karta Systém po 2 s). Skrytí v Pokročilých (`strip.lookHide: ["system"]`) vzorkování vypne.

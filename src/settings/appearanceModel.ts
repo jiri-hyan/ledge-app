@@ -14,6 +14,10 @@ export type StepId = (typeof STEPS)[number];
 /** Kotva → krok panelu. `null` = mimo kroky (vidět vždy, třeba jazyk). Každá volba panelu Vzhled tu musí být. */
 export const ANCHOR_STEP: Record<string, StepId | null> = {
   "strip.look": "closed",
+  "strip.compose.deco": "closed",
+  "strip.compose.fill": "closed",
+  "strip.compose.sep": "closed",
+  "strip.compose.mono": "closed",
   "appearance.strip": "closed",
   "strip.enabled": "closed",
   "strip.items": "closed",

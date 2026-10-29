@@ -82,6 +82,7 @@ mod mediaconf;
 mod mediatime;
 mod migrate;
 mod notes;
+mod notify;
 mod notesync;
 mod onboarding;
 mod outside;
@@ -481,6 +482,7 @@ pub fn run() {
             commands::winquick::wq_terminal,
             commands::winquick::wq_folder,
             commands::winquick::wq_theme_toggle,
+            notify::notify_preview,
             commands::winquick::wq_radio_set,
             commands::winquick::wq_settings,
             commands::winquick::wq_output_set,

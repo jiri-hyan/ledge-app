@@ -56,6 +56,7 @@ export const PLACEMENT: readonly (readonly [string, string, Level])[] = [
   ["claude", "claude", "basic"],
   ["claude.port", "claude", "advanced"],
   ["mcp", "claude", "basic"],
+  ["notify", "claude", "basic"],
   ["smart.approvalSound", "claude", "basic"],
   ["smart.incidents", "claude", "basic"],
   // Projekty a akce (odkazy = akce; `personal.links` jen nepřevedené)

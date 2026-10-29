@@ -133,7 +133,7 @@ fn on_circle(c: Vector2, r: f32, turn: f32) -> Vector2 {
 
 /// Oblouk od `from` do `to` (podíl otáčky, 0 = nahoře) jako tah štětcem.
 #[allow(clippy::too_many_arguments)]
-unsafe fn arc(t: &ID2D1DCRenderTarget, r: &Renderer, c: Vector2, rad: f32, from: f32, to: f32, b: &windows::Win32::Graphics::Direct2D::ID2D1SolidColorBrush, w: f32) {
+pub(crate) unsafe fn arc(t: &ID2D1DCRenderTarget, r: &Renderer, c: Vector2, rad: f32, from: f32, to: f32, b: &windows::Win32::Graphics::Direct2D::ID2D1SolidColorBrush, w: f32) {
     unsafe {
         let span = (to - from).clamp(0.0, 1.0);
         if span <= 0.001 {
@@ -501,6 +501,7 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
                     }
                 }
                 hot_line(t, m, bwf, bhf, scale);
+                crate::notify::draw::missed_dot(t, m.missed, bwf, bhf, scale);
             } else {
                 if sp.fill.3 > 0.0
                     && let Some(b) = brush(t, sp.fill, 1.0)
@@ -560,6 +561,7 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
                     t.DrawRoundedRectangle(&body, &b, 1.5 * scale, None);
                 }
                 hot_line(t, m, bwf, bhf, scale);
+                crate::notify::draw::missed_dot(t, m.missed, bwf, bhf, scale);
             }
             t.SetTransform(&windows_numerics::Matrix3x2::identity());
             let _ = t.EndDraw(None, None);

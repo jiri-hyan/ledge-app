@@ -113,6 +113,18 @@
     "limitsDesktop": false,
     "limitsFetch": false
   },
+  "notify": {
+    "surface": "notch",
+    "fallbackToast": true,
+    "durationS": 6,
+    "style": {
+      "waiting": "unfold",
+      "done": "sides",
+      "meeting": "drop",
+      "limit": "ticker",
+      "timer": "glow"
+    }
+  },
   "hotkeys": {
     "enabled": false,
     "toggle": "Ctrl+Alt+Space",

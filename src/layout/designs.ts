@@ -4,6 +4,7 @@
 // (Počasí, Týden …) přidají svůj záznam do `CARD_DESIGNS`; vykreslení vzhledu dělá komponenta karty podle `designOf`.
 import { WEATHER_DESIGNS } from "../cards/weatherDesigns.ts";
 import { WEEK_DESIGNS } from "../board/weekDesigns.ts";
+import { NOTES_DESIGNS } from "../notes/noteDesigns.ts";
 
 export type Design = { id: string; name: [string, string]; line: [string, string] };
 type LookWithDesign = { design?: string } | null | undefined;
@@ -31,6 +32,7 @@ export const CARD_DESIGNS: Record<string, readonly Design[]> = {
   ],
   weather: WEATHER_DESIGNS,
   week: WEEK_DESIGNS,
+  notes: NOTES_DESIGNS,
 };
 
 /** Vzhledy karty (prázdné = karta má jen jeden vzhled). */

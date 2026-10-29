@@ -110,7 +110,7 @@ mod tests {
         "get_config", "get_state", "hooks_install", "hooks_remove", "hooks_status", "launcher_catalog_read",
         "launcher_import_check", "logo_preview", "look_image", "look_image_add", "mcp_reveal_key", "mcp_rotate_key",
         "mcp_set_enabled", "mcp_state", "note_folder_check", "note_folder_clear_conflicts", "note_folder_sync_now",
-        "note_open", "note_tags", "notes_sync_now", "open_app_file", "open_config_file", "open_url", "pick_path",
+        "note_open", "note_tags", "notes_sync_now", "notify_preview", "open_app_file", "open_config_file", "open_url", "pick_path",
         "pick_save", "pkg_context", "project_candidates", "project_detect", "project_logo", "relaunch_outside",
         "run_action", "run_script", "save_config", "scripts_list", "scripts_open_dir", "set_game_mode",
         "statusline_install", "statusline_remove", "statusline_status", "studio_win", "update_check_now",

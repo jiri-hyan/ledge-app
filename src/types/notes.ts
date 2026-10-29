@@ -10,8 +10,10 @@ export interface NoteView {
   remind: string | null;
   remindMs: number | null;
   done: boolean;
-  /** první řádek bez Markdown značek */
+  /** zobrazený název: vlastní nadpis (`title:`), jinak první řádek bez Markdown značek */
   title: string;
+  /** vlastní nadpis z frontmatteru; chybí = název je první řádek */
+  heading?: string;
   images: number;
   /** kategorie (`kind:`), "info" když chybí; neznámé id z druhého PC projde beze změny */
   kind: string;
@@ -44,6 +46,8 @@ export interface SaveNote {
   body: string;
   project: string | null;
   kind: string | null;
+  /** vlastní nadpis: chybí = beze změny, "" = smazat */
+  title?: string;
   /** lokální čas `YYYY-MM-DDTHH:MM` — offset doplní Rust; null = bez připomínky */
   remind: string | null;
   /** nové PNG (base64 bez prefixu), připojí se na konec */
@@ -55,9 +59,9 @@ export type SaveOutcome = { outcome: "saved"; note: NoteDetail } | { outcome: "c
 export interface PinPrefs { onTop: boolean; locked: boolean; through: boolean; bg: number; text: number; collapsed: boolean; /** styl (Rust `pins::PinStyle`) */ style: "classic" | "paper" | "glass" | "stripe" | "minimal" | "dark" }
 export interface PinsView { open: { path: string; through: boolean }[]; key: string }
 /** Start okna lístku (`pin_init`): poznámka, volby, zkratka průchozího režimu (a jestli je zaregistrovaná). */
-export interface PinInit { path: string; prefs: PinPrefs; key: string; keyOk: boolean; hintSeen: boolean; lang: "cs" | "en"; fresh: boolean; /** `notes.tagColors` — barva podle štítku */ tagColors: Record<string, string> }
+export interface PinInit { path: string; prefs: PinPrefs; key: string; keyOk: boolean; hintSeen: boolean; lang: "cs" | "en"; fresh: boolean; /** `notes.tagColors` — barva podle štítku */ tagColors: Record<string, string>; /** id projektu → název */ projects?: Record<string, string>; /** id projektu → barva `#rrggbb` */ projectColors?: Record<string, string> }
 
-export interface NoteQuery { kind?: string | null; project?: string | null; includeDone?: boolean; /** archivované místo aktivních */ archived?: boolean; limit?: number; /** štítek bez `#` */ tag?: string | null }
+export interface NoteQuery { kind?: string | null; project?: string | null; includeDone?: boolean; /** jen hotové */ onlyDone?: boolean; /** archivované místo aktivních */ archived?: boolean; limit?: number; /** štítek bez `#` */ tag?: string | null }
 /** Výsledek smazání poznámky: id pro „Zpět“ a titulek pro lištu. */
 export interface Deleted { id: string; title: string }
 export interface QueryResult { notes: NoteView[]; total: number }
@@ -74,6 +78,8 @@ export interface NewNote {
   images: string[];
   /** kategorie; null = výchozí */
   kind: string | null;
+  /** vlastní nadpis; chybí / prázdný = název je první řádek */
+  title?: string;
 }
 
 /** Synchronizace poznámek přes git (`notesync/`). `off` = vypnutá; `syncing` = právě běží (i první běh). */
@@ -117,6 +123,8 @@ export interface DraftMeta {
   projectTouched: boolean;
   remind: string;
   kind: string;
+  /** vlastní nadpis; prázdný = první řádek */
+  title?: string;
 }
 export interface Draft extends DraftMeta {
   /** PNG v base64 (bez prefixu data:) */

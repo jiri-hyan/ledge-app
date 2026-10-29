@@ -116,6 +116,10 @@ pub struct StripModel {
     pub shape: crate::looks::Shape,
     /// vlastní vzhled (`strip.look = custom`, už oříznutý `Compose::norm`); jinak `None`
     pub compose: Option<crate::looks::compose::Compose>,
+    /// běžící oznámení v proužku (Notch, `notify`); kreslí ho `notify::draw` místo obsahu proužku
+    pub notice: Option<crate::notify::Live>,
+    /// tečka zmeškaného oznámení (barva události) do příštího otevření šuplíku
+    pub missed: Option<Rgba>,
 }
 
 /// Jas běžícího pulsu (barva, 0–1); `None` = puls není / skončil.
@@ -147,6 +151,8 @@ impl Default for StripModel {
             position: crate::appearance::StripPosition::Center,
             shape: crate::looks::Shape::Round,
             compose: None,
+            notice: None,
+            missed: None,
         }
     }
 }
@@ -212,7 +218,24 @@ static mut STRIP: Option<Arc<Strip>> = None;
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     unsafe {
         match msg {
-            WM_NCHITTEST => LRESULT(HTTRANSPARENT as isize),
+            // Notch s tlačítkem (jen tehdy okno není WS_EX_TRANSPARENT): tvar bere myš, zbytek propouští
+            WM_NCHITTEST => {
+                let (x, y) = ((lp.0 & 0xFFFF) as i16 as i32, ((lp.0 >> 16) & 0xFFFF) as i16 as i32);
+                let on = crate::notify::hit().shape.is_some_and(|r| x >= r.left && x < r.right && y >= r.top && y < r.bottom);
+                LRESULT(if on { HTCLIENT as isize } else { HTTRANSPARENT as isize })
+            }
+            WM_SETCURSOR if crate::notify::hit().shape.is_some() => {
+                if let Ok(c) = LoadCursorW(None, IDC_HAND) {
+                    SetCursor(Some(c));
+                }
+                LRESULT(1)
+            }
+            WM_LBUTTONUP => {
+                let mut p = POINT { x: (lp.0 & 0xFFFF) as i16 as i32, y: ((lp.0 >> 16) & 0xFFFF) as i16 as i32 };
+                let _ = windows::Win32::Graphics::Gdi::ClientToScreen(hwnd, &mut p);
+                crate::notify::click(p.x, p.y);
+                LRESULT(0)
+            }
             WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
             _ => DefWindowProcW(hwnd, msg, wp, lp),
         }
@@ -267,6 +290,8 @@ unsafe fn run(strip: Arc<Strip>) {
         let mut spinning = false;
         let mut rot: usize = 0;
         let mut anim = crate::looks::frame::WidthAnim::default();
+        // Notch s tlačítkem: okno dočasně bez WS_EX_TRANSPARENT (jen v klidové fázi tvaru)
+        let mut clickable = false;
         let t0 = Instant::now();
         let mut msg = MSG::default();
         while GetMessageW(&mut msg, None, 0, 0).as_bool() {
@@ -283,7 +308,24 @@ unsafe fn run(strip: Arc<Strip>) {
                 let mut model = strip.model.lock().clone();
                 crate::shelf::overlay(&mut model, crate::state::CORE.get().is_none_or(|c| c.dead()));
                 let looked = model.show.is_some() && !model.line_only;
-                if !model.visible {
+                // oznámení (Notch): kreslí se místo obsahu, i u proužku skrytého v klidu
+                let mut noted = None;
+                if let Some(l) = model.notice.as_ref() {
+                    noted = crate::notify::draw::draw(&renderer, hwnd, &model, l);
+                    if noted.is_none() {
+                        // doběhlo → další z fronty (pošle nové překreslení); teď obyčejný proužek
+                        crate::notify::advance(l.acked);
+                        model.notice = None;
+                    }
+                }
+                let click = noted.is_some() && crate::notify::hit().button.is_some();
+                if click != clickable {
+                    let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                    let t = WS_EX_TRANSPARENT.0 as isize;
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, if click { ex & !t } else { ex | t });
+                    clickable = click;
+                }
+                if !model.visible && noted.is_none() {
                     // skrytý proužek: žádný časovač, příště rovnou v cílové šířce
                     if pulsing {
                         let _ = KillTimer(Some(hwnd), PULSE_TIMER);
@@ -305,14 +347,18 @@ unsafe fn run(strip: Arc<Strip>) {
                     *strip.rect.lock() = RECT::default();
                     continue;
                 }
-                let drawn = if looked {
+                let drawn = if let Some(win) = noted {
+                    // `last` (tvar morfu) zůstává tělo proužku před oznámením
+                    *strip.rect.lock() = win;
+                    None
+                } else if looked {
                     crate::stripdraw::draw(&renderer, hwnd, &model, rot, &mut anim, t0.elapsed().as_millis() as u64)
                 } else {
                     anim.reset();
                     draw(&renderer, hwnd, &model)
                 };
                 // snímkový časovač jen během pulsu nebo změny šířky ostrůvku; střídání jen u víc událostí
-                let active = pulse_now(&model).is_some() || anim.running();
+                let active = pulse_now(&model).is_some() || anim.running() || noted.is_some();
                 if active != pulsing {
                     if active {
                         SetTimer(Some(hwnd), PULSE_TIMER, PULSE_FRAME_MS, None);
@@ -703,6 +749,10 @@ unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel) -> Option<(RECT, (i32, 
                 if let Some(b) = grad(t, &stops, (left, 0.0), (left + lw, 0.0)) {
                     t.FillRoundedRectangle(&line, &b);
                 }
+            }
+            // tečka zmeškaného oznámení (`notify`), jen na proužku s obsahem
+            if !m.line_only {
+                crate::notify::draw::missed_dot(t, m.missed, width, height, scale);
             }
             t.SetTransform(&windows_numerics::Matrix3x2::identity());
             let _ = t.EndDraw(None, None);

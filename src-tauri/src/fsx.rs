@@ -29,14 +29,40 @@ fn tmp_path(path: &Path) -> PathBuf {
     PathBuf::from(tmp)
 }
 
-/// Rename s opakováním (max ~1 s) na přechodné chyby Windows.
+/// Strop jednoho čekání a celkový rozpočet `rename_retry`.
+const BACKOFF_CAP_MS: u64 = 200;
+const BACKOFF_BUDGET: Duration = Duration::from_secs(3);
+
+/// Čekání před pokusem `attempt` (od 0): exponenciálně 2·2^n ms do stropu, s jitterem 50–100 % (z `seed`).
+pub(crate) fn backoff_delay(attempt: u32, seed: u64) -> Duration {
+    let base = (2u64 << attempt.min(10)).min(BACKOFF_CAP_MS);
+    let mut x = seed ^ 0x9E37_79B9_7F4A_7C15u64.wrapping_mul(attempt as u64 + 1);
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    let half = base / 2;
+    Duration::from_millis(base - half + x % (half + 1))
+}
+
+/// Semínko jitteru: nanosekundy + id vlákna (hash), bez závislosti.
+fn jitter_seed() -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    std::thread::current().id().hash(&mut h);
+    let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64);
+    (h.finish() ^ t) | 1
+}
+
+/// Rename s opakováním (exponenciální backoff s jitterem, celkem max ~3 s) na přechodné chyby Windows.
 pub fn rename_retry(from: &Path, to: &Path) -> io::Result<()> {
+    let start = std::time::Instant::now();
+    let seed = jitter_seed();
     let mut attempt = 0;
     loop {
         match std::fs::rename(from, to) {
-            Err(e) if attempt < RETRIES && (transient(&e) || (from.exists() && vanishing(&e, to))) => {
+            Err(e) if start.elapsed() < BACKOFF_BUDGET && (transient(&e) || (from.exists() && vanishing(&e, to))) => {
+                std::thread::sleep(backoff_delay(attempt, seed));
                 attempt += 1;
-                std::thread::sleep(STEP);
             }
             r => return r,
         }
@@ -106,6 +132,22 @@ pub fn save_json<T: serde::Serialize>(path: &Path, v: &T) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn backoff_delay_table() {
+        for seed in [1u64, 7, 0xDEAD_BEEF, u64::MAX] {
+            let mut prev_max = 0;
+            for attempt in 0..30u32 {
+                let base = (2u64 << attempt.min(10)).min(200);
+                let d = super::backoff_delay(attempt, seed).as_millis() as u64;
+                assert!(d >= base - base / 2 && d <= base, "attempt {attempt} seed {seed}: {d} vs {base}");
+                assert!(d <= 200);
+                assert!(base >= prev_max);
+                prev_max = base;
+            }
+        }
+        assert!(super::backoff_delay(0, 5).as_millis() <= 2);
+    }
+
     use super::*;
 
     fn leftovers(dir: &Path) -> Vec<String> {

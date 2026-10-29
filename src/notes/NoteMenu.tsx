@@ -7,8 +7,9 @@ import { t } from "../i18n";
 import { createMenu, PopCap, PopItem, PopMenu } from "../ui/Popover";
 import { IconMore } from "../pin/icons";
 import { exportItems } from "./exportActions";
+import ColorDots from "./ColorDots";
 
-export default function NoteMenu(p: { path: string; body: () => string }) {
+export default function NoteMenu(p: { path: string; body: () => string; color?: string | null; inherited?: string | null; onColor?: (id: string) => void }) {
   const menu = createMenu();
   const label = t("notes.export.more", "Export a další volby");
   return (
@@ -23,6 +24,14 @@ export default function NoteMenu(p: { path: string; body: () => string }) {
             <For each={exportItems(p.path, p.body)}>
               {(it) => <PopItem onClick={() => { menu.close(); it.run(); }}>{it.label}</PopItem>}
             </For>
+            <Show when={p.onColor}>
+              {(pick) => (
+                <>
+                  <PopCap>{t("notes.color.title", "Barva poznámky")}</PopCap>
+                  <ColorDots color={p.color} inherited={p.inherited} onPick={(id) => { menu.close(); pick()(id); }} />
+                </>
+              )}
+            </Show>
           </PopMenu>
         )}
       </Show>

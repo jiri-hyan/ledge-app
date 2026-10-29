@@ -33,5 +33,6 @@ export const SECTION_NAMES: Record<string, readonly [string, string]> = {
   mcp: ["settings.section.mcp", "MCP (Claude mění nastavení Ledge)"],
   smart: ["settings.section.smart", "Chytré funkce"],
   winquick: ["settings.section.winquick", "Rychlé přepínače Windows"],
+  notify: ["settings.section.notify", "Oznámení"],
   desk: ["settings.section.desk", "Plocha"],
 };

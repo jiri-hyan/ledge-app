@@ -11,7 +11,7 @@
 //! prezentaci / otevřeném šuplíku. Fokus nikdy.
 
 use super::live;
-use super::meeting::{self, Join};
+use super::meeting::Join;
 use super::tz::{LocalTz, SystemLocal};
 use super::{Occ, naive};
 use crate::attention::Event;
@@ -151,11 +151,25 @@ pub(crate) fn tick(now: i64) {
     if !crate::attention::signal(Event::Meeting.color(), fresh.iter().any(|(_, t)| *t)) {
         return;
     }
-    let app_id = c.app.config().identifier.clone();
     for (s, _) in fresh.iter().filter(|(_, t)| *t) {
         let (title, body) = toast_text(s, now, &SystemLocal);
-        let actions: Vec<(String, String)> = s.join.iter().map(|j| (tr("Připojit", "Join").to_string(), meeting::launch_uri(j))).collect();
-        crate::toast::show_xml(&app_id, crate::toast::toast_xml_actions(&title, &body, &actions));
+        crate::notify::emit(notice(s, title, body));
+    }
+}
+
+/// Oznámení pro `notify`: tlačítko Připojit jen s ověřeným odkazem (`meeting::classify`), začátek pro
+/// odpočet prstencem. Bez odkazu tlačítko není.
+pub fn notice(s: &Soon, title: String, body: String) -> crate::notify::Notice {
+    let join = s.join.as_ref().map(|j| j.url.clone());
+    crate::notify::Notice {
+        kind: crate::notify::Kind::Meeting,
+        title,
+        body,
+        button: join.as_ref().map(|_| tr("Připojit", "Join").to_string()),
+        action: join.map(crate::notify::Action::Join),
+        start_ms: Some(s.start),
+        count: 1,
+        ..Default::default()
     }
 }
 
@@ -181,6 +195,17 @@ mod tests {
 
     fn occ(title: &str, start: i64) -> Occ {
         Occ { start, end: start + 30 * MIN, title: title.into(), ..Occ::default() }
+    }
+
+    #[test]
+    fn notice_has_join_only_with_link() {
+        let with = Soon { cal: 0, start: T, title: "Standup".into(), join: Some(Join { provider: Provider::Zoom, url: "https://example.com/j/1".into() }) };
+        let without = Soon { join: None, ..with.clone() };
+        let n = notice(&without, "a".into(), "b".into());
+        assert_eq!((n.button, n.action, n.start_ms), (None, None, Some(T)));
+        let n = notice(&with, "a".into(), "b".into());
+        assert_eq!(n.action, Some(crate::notify::Action::Join("https://example.com/j/1".into())));
+        assert_eq!(n.button.as_deref(), Some("Připojit"));
     }
 
     #[test]

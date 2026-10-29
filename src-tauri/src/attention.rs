@@ -324,13 +324,22 @@ pub(crate) fn on_change() {
     if events.iter().any(|(_, e)| *e == Event::NeedsInput) {
         crate::approvalsound::on_needs_input();
     }
-    let toast_on = c.cfg.read().claude.toast;
+    let (wait_on, done_on) = {
+        let cl = &c.cfg.read().claude;
+        (cl.toast, done_toast_on(cl.toast, cl.toast_done))
+    };
+    let toast_on = wait_on || done_on;
     // „čeká“ má přednost (barva pulsu), pak hotovo (`Event::rank`)
     let first = events.iter().min_by_key(|(_, e)| e.rank()).cloned();
     let Some((_, ev)) = first else { return };
     if signal(ev.color(), toast_on) {
+        // oznámení (Notch / toast podle `notify`); config se pustí dřív, než `notify::emit` čte svůj
+        let mut notices = Vec::new();
         let cfg = c.cfg.read();
         for (sid, ev) in &events {
+            if !event_toast_on(*ev, wait_on, done_on) {
+                continue;
+            }
             let s = sessions.iter().find(|s| &s.id == sid);
             let cwd = s.map(|s| s.cwd.as_str()).or_else(|| pending.iter().find(|p| &p.session_id == sid).map(|p| p.cwd.as_str())).or_else(|| asks.iter().find(|a| &a.session_id == sid).map(|a| a.cwd.as_str())).unwrap_or("");
             let project = crate::stripview::project_for_cwd(&cfg, cwd).unwrap_or_else(|| claude_dir_name(cwd));
@@ -341,8 +350,43 @@ pub(crate) fn on_change() {
             };
             let is_ask = *ev == Event::NeedsInput && !pending.iter().any(|p| &p.session_id == sid);
             let (title, body) = toast_text(*ev, is_ask, &where_);
-            crate::toast::show(&c.app.config().identifier, title, body);
+            notices.push(notice_of(*ev, sid, title, body, pending.iter().find(|p| &p.session_id == sid).map(|p| p.tool.as_str())));
         }
+        drop(cfg);
+        for n in notices {
+            crate::notify::emit(n);
+        }
+    }
+}
+
+/// Efektivní vypínač oznámení „Hotovo“: vlastní `claude.toastDone`, jinak `claude.toast`.
+pub(crate) fn done_toast_on(toast: bool, toast_done: Option<bool>) -> bool {
+    toast_done.unwrap_or(toast)
+}
+
+/// Smí tato událost do oznámení? Čeká (a dotaz GitHubu apod.) řídí `claude.toast`, Hotovo svůj vypínač.
+pub(crate) fn event_toast_on(ev: Event, wait_on: bool, done_on: bool) -> bool {
+    if ev == Event::Done { done_on } else { wait_on }
+}
+
+/// Oznámení pro `notify`: čeká → tlačítko Otevřít (přivede okno session) a nástroj v textu; hotovo bez
+/// tlačítka. Povolit nikdy — to smí jen člověk v okně Claude.
+pub(crate) fn notice_of(ev: Event, sid: &str, title: String, body: String, tool: Option<&str>) -> crate::notify::Notice {
+    use crate::notify::{Action, Kind, Notice};
+    let waiting = ev == Event::NeedsInput;
+    let body = match tool.filter(|t| waiting && !t.is_empty()) {
+        Some(t) if body.is_empty() => t.to_string(),
+        Some(t) => format!("{body} · {t}"),
+        None => body,
+    };
+    Notice {
+        kind: if waiting { Kind::Waiting } else { Kind::Done },
+        title,
+        body,
+        button: waiting.then(|| tr("Otevřít", "Open").to_string()),
+        action: (waiting && !sid.is_empty()).then(|| Action::Session(sid.to_string())),
+        count: 1,
+        ..Notice::default()
     }
 }
 
@@ -591,6 +635,30 @@ mod tests {
     fn github_toast_texts() {
         assert_eq!(toast_text(Event::GithubCi, false, "").0, "Spadlo CI na tvém PR");
         assert_eq!(with_lang(Lang::En, || toast_text(Event::GithubReview, false, "").0), "A PR is waiting for your review");
+    }
+
+    #[test]
+    fn notices_open_session_never_allow() {
+        use crate::notify::{Action, Kind};
+        let n = notice_of(Event::NeedsInput, "s1", "Claude čeká na schválení".into(), "app".into(), Some("Bash"));
+        assert_eq!((n.kind, n.body.as_str()), (Kind::Waiting, "app · Bash"));
+        assert_eq!(n.action, Some(Action::Session("s1".into())));
+        assert_eq!(n.button.as_deref(), Some("Otevřít"));
+        let n = notice_of(Event::NeedsInput, "s1", "t".into(), String::new(), Some("Edit"));
+        assert_eq!(n.body, "Edit");
+        let n = notice_of(Event::Done, "s1", "Claude je hotový".into(), "app".into(), Some("Bash"));
+        assert_eq!((n.kind, n.body.as_str(), n.button, n.action), (Kind::Done, "app", None, None));
+    }
+
+    #[test]
+    fn done_switch_follows_toast_unless_set() {
+        // (toast, toastDone, Čeká, Hotovo)
+        let rows = [(false, None, false, false), (true, None, true, true), (true, Some(false), true, false), (false, Some(true), false, true)];
+        for (t, d, w, dn) in rows {
+            let done_on = done_toast_on(t, d);
+            assert_eq!(event_toast_on(Event::NeedsInput, t, done_on), w, "{t} {d:?}");
+            assert_eq!(event_toast_on(Event::Done, t, done_on), dn, "{t} {d:?}");
+        }
     }
 
     #[test]

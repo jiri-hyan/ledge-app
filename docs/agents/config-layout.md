@@ -54,6 +54,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   se ignoruje). `claude`: `classic` | `rings` | `pace` | `hero` | `heroWeek` | `heroSpend` | `spend` | `sessions` | `gauge`;
   `system`: `lines` | `rings` | `gauges` | `bars` | `terminal` | `tiles` | `net`. Volí se v ⋯ → Vzhled karty… (dlaždice) i
   v Nastavení → Šuplík a karty.
+  Kolo 26: karta `notes` má vzhledy `list` (výchozí) | `compact` | `cards` | `bento` | `kanban` | `timeline` (dřívější `view` `tiles`/`compact`/`bento`
+  se při čtení převede na `design`) a volby seskupení `groupBy` (`project` | `kind` | `date` | `pinned`; chybí = bez seskupení)
+  a `groupStyle` (`tag` | `cards`; chybí = čára s nadpisem). Neznámé hodnoty se ignorují.
   V šuplíku ⋯ na kartě → „Vzhled karty…“ (živý náhled, Obnovit podle stylu); pro celou záložku najednou
   Nastavení → Vzhled → Otevřený → „Karty 2026“ (galerie předvoleb).
   `limit` (volitelné, jen karty `claude`, `repos`, `running`; 0–50, `0` = bez stropu, chybí = 4) = kolik řádků
