@@ -50,6 +50,10 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   jen karty `claude` — limit 5 h; bez limitů prázdný stav „Limity zatím nejsou“ s důvodem, ne jiné číslo; čeká-li schválení, karta zůstane normální — a `weather`
   — teplota; bez čísla z reálného zdroje karta zůstane jako dřív). Tokeny (základ, kontrast, poloměr, mezera) dává
   materiál design stylu.
+  Kolo 28 (barevné povrchy): `surface` navíc `gradient` (sytý přechod z akcentu karty do tmavé, světlý text) | `flow`
+  (totéž, při otevřeném šuplíku se velmi pomalu přelévá; ne při `motion: none` ani reduced-motion) | `edge` (tmavá
+  karta, horní hrana svítí akcentem) | `stripes` (jemné diagonální proužky v akcentu); `palette` (`aurora` | `sunset` |
+  `ocean` | `embers`; chybí = podle akcentu karty; platí jen s těmito čtyřmi povrchy).
   Kolo 25: `design` (řetězec, id vzhledu z registru `src/layout/designs.ts`; chybí = výchozí, dnešní vzhled karty; neznámé id
   se ignoruje). `claude`: `classic` | `rings` | `pace` | `hero` | `heroWeek` | `heroSpend` | `spend` | `sessions` | `gauge`;
   `system`: `lines` | `rings` | `gauges` | `bars` | `terminal` | `tiles` | `net`. Volí se v ⋯ → Vzhled karty… (dlaždice) i
@@ -73,6 +77,22 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   vyplní hustý tok mřížky. ⋯ karty → Dlaždice 1 × 1 / 2 × 1 / 2 × 2. Šablony „Pracovní“, „Minimal“, „Hudba“
   (Nastavení → Vzhled → Otevřený → „Bento šablony“) přidají NOVOU záložku s 6–7 dlaždicemi; stávající záložky
   se nemění.
+  Záložka může mít `notchBar` (kolo 27, jen rozložení `appearance.layout = "notch"`): vlastní lišta nahoře
+  `{ "sections": [{ "id": "system", "design": "rings", "color": "load", "weight": "bold", "smooth": true,
+  "metrics": ["cpu", "net"] }, { "id": "days", "design": "analog", "seconds": true }] }`. Chybí = lišta odvozená
+  z karet záložky (Právě hraje → přehrávač + hlasitost, Čas → dny, Systém → systém; převzaté karty se pod lištou
+  nekreslí — dnešní chování). S `notchBar` lišta kreslí přesně tyto sekce (i bez dat, s prázdným stavem) a karty
+  převezme stejně jako odvozená (karta se pod lištou nekreslí, když aspoň jedna její sekce je na liště; odebraná
+  sekce = karta zpět v mřížce) a z `cards` se nikdy nemažou; `"sections": []` = nic nepřevzato, záložka bez lišty. `id`: `player`, `days`, `system`, `volume`, `limits` (limit
+  Claude), `weather`, `meeting` (příští schůzka) — nejvýš 6, každá jednou. `design` = vzhled z registru UI
+  (`src/notch/designs.ts`; chybí / neznámý = výchozí): player `cover` | `controls` | `marquee`; days `strip`
+  (opravený pás) | `sheet` | `clock` | `dots` | `analog`; system `lines` | `area` | `bars` | `rings` | `big` |
+  `htop`; volume `vslider` | `hslider` | `knob` | `eq` | `icon`; limits `bars` | `ring`; weather `now` | `range`;
+  meeting `card` | `countdown`. `color` = `accent` (výchozí) | `load` (podle zátěže) | `gradient` | `#rrggbb`;
+  `weight` = `thin` | `mid` | `bold` (čára grafů Systému); `smooth` = vyhlazené křivky; `metrics` = `cpu`, `ram`,
+  `disk`, `net` (chybí = CPU, RAM, Disk); `seconds` = vteřinová ručička analogových hodin. Lišta s `player` /
+  `volume` / `weather` / `meeting` (nebo `days` ve vzhledu `dots` / `sheet`) zapne zdroj dat jako příslušná karta;
+  limity stáhne `claude.limitsFetch` i pro sekci `limits` na viditelné záložce. Upravuje se v režimu ✎ přímo v liště.
   `upgrades` = jednorázové úpravy rozložení po aktualizaci,
   které už proběhly — neměň ručně: `personalProjects` dá kartu Projekty nahoru na Osobní, když
   tam nikdy nebyla (jen když ji uživatel používá na jiné záložce a Osobní existuje); odebereš-li ji
@@ -178,4 +198,17 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     přechodu), `width` 1–3 px (výchozí 2). `fill`: `kind` (`black` výchozí, `glass`, `tint`, `gradient`, `none` =
     bez těla, text se stínem), `from` / `to` (#rrggbb), `dir` (`right`, `down`, `diag`). `sep`: `none` výchozí,
     `gap`, `dot`, `bar`, `pills` (každý díl v kapsli), `islands` (sloty jako tři ostrůvky). `mono` (písmo
-    s pevnou šířkou). Neznámá barva = výchozí, neznámý druh / oddělení = chyba configu.
+    s pevnou šířkou). Kolo 27: `text` = `{ size, weight, spacing }` — písmo nezávislé na výšce: `size` násobek odvozené velikosti
+    0,6–1,4 (výchozí 1), `weight` `normal` (dnešní) / `semi` / `bold`, `spacing` `tight` / `normal` / `wide` (mezery mezi díly a okraje
+    ×0,7 / 1 / ×1,4). Díl navíc volitelně `size` (`small` ×0,82 / `normal` / `large` ×1,25), `bg` (kostka kolem dílu: prázdné =
+    žádná, `accent`, `#rrggbb`; průhlednost jako u stylu „podklad“) a `ink` (barva textu odděleně od `color`). Bez nich
+    (starý config) vše jako dřív. Neznámá barva = výchozí, neznámý druh / oddělení = chyba configu.
+    **Kolo 28 — živá hrana** (chybějící klíče = vzhled před kolem 28): `deco.edge` navíc `flow` (přelévání),
+    `dashes` (čárky; ve stavu limitu naplněné poměrem limitu), `comet`, `light` (rozsvícení celé římsy),
+    `breath` (dech), `outlineGradient`, `sweep` (jednorázové naplnění). `deco.len` navíc `wide` (80 %) a `custom`
+    (`deco.pct` 10–100, výchozí 40). `deco.color` navíc sady `aurora`, `sunset`, `ocean`, `embers`, `clay`;
+    `deco.color3` (#rrggbb, třetí barva). `deco.speed` 1–5 (výchozí 3), `deco.power` 1–3 (síla svitu, výchozí 2),
+    `deco.always` (hýbat se i v klidu, stojí CPU; výchozí ne). `deco.live`: `on` (výchozí vypnuto), `work`
+    (`flow`), `wait` (`breath`, jantar), `done` (`sweep`, zelená), `limit` (`dashes`, limit 5h / týden ≥ 80 %);
+    `none` = jen stálá hrana. `fill.via` (#rrggbb, prostřední barva přechodu), `fill.flow` (přechod se přelévá
+    spolu s hranou). Hýbe se jen při práci / čekání Clauda (nebo `always`); ve hře, při nerušit a bez animací nic.

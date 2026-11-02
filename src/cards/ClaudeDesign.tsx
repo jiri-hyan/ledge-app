@@ -20,6 +20,7 @@ import HeroCard from "../layout/HeroCard";
 import { heroFacts, limitsWhy, type ClaudePick } from "../layout/hero";
 import { cardName, tx } from "../layout/text";
 import { paceLine, sessionTiles, spendModel, winInfo, type PaceLine, type SpendModel, type WinInfo } from "./claudeLooks";
+import { DoneBody, WorkingBody } from "./ClaudeLiveBody";
 import "./claudeLooks.css";
 
 const HERO_PICK: Record<string, ClaudePick> = { hero: "5h", heroWeek: "week", heroSpend: "spend" };
@@ -167,6 +168,12 @@ export default function ClaudeDesign(p: P) {
       </Match>
       <Match when={p.design === "sessions"}>
         <SessionsBody s={p.s} now={p.now} five={five()} />
+      </Match>
+      <Match when={p.design === "working"}>
+        <WorkingBody s={p.s} now={p.now} />
+      </Match>
+      <Match when={p.design === "done"}>
+        <DoneBody s={p.s} now={p.now} />
       </Match>
       <Match when={!anyLimit()}>
         <LimitsEmpty s={p.s} onSettings={p.onSettings} />

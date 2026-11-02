@@ -1,13 +1,26 @@
 /* Hlavička (Head.tsx) a panel nové verze (UpdatePanel.tsx). Tokeny ze styles.css. */
-.head { display: flex; align-items: center; gap: 18px; margin-bottom: var(--s4); min-height: 52px; }
+.head { container: hl-head / inline-size; display: flex; align-items: center; gap: 6px; margin-bottom: var(--s4); min-height: 52px; }
+.head > .clock { margin-right: 12px; }
+.head > .title { margin: 0 12px; }
 .clock { display: flex; flex-direction: column; line-height: 1; }
 .clock .time { font: 600 calc(34px * var(--fz))/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .clock .date { font: 500 var(--fs-md) var(--sans); color: var(--t2); margin-top: 6px; }
 .title { font: 600 calc(18px * var(--fz)) var(--display); }
 .tools { display: flex; align-items: center; gap: 6px; }
 
+/* místo pro štítky: zabere zbytek hlavičky; štítky v něm jsou vždy v jedné řadě (ChipsRow.tsx, „+N“ pro zbytek) */
+.head-fill { flex: 1; min-width: 0; margin-right: 12px; display: flex; }
+.hl-chips-wrap { flex: 1 1 0; position: relative; display: flex; align-items: center; gap: var(--s2); min-width: 0; max-width: 100%; }
+.chips { display: flex; gap: var(--s2); flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+.chips > .hl-hide { display: none !important; }
+.hl-chips-wrap > .hl-more { display: none; cursor: pointer; padding: 0 var(--s2); min-width: 34px; justify-content: center; font-weight: 600; }
+.hl-chips-wrap > .hl-more.hl-more-on { display: inline-flex; }
+.hl-more:hover { background: var(--card-2); color: var(--t1); }
+/* rozbalené „+N“: všechny štítky v panelu pod hlavičkou (jediné místo, kde se smí zalomit) */
+.hl-chips-wrap.open .chips { position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; flex-wrap: wrap; overflow: visible; width: max-content; max-width: min(560px, 92vw); padding: var(--s2); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-md); box-shadow: var(--shadow-toast); animation: drop var(--dur-2) var(--ease); }
+.hl-chips-wrap.open .hl-more { order: -1; }
+
 /* stavové chipy */
-.chips { display: flex; gap: var(--s2); flex-wrap: wrap; flex: 1; min-width: 0; }
 .chip { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 var(--s3); border-radius: var(--r-pill); background: var(--card); border: 1px solid var(--line); font-size: var(--fs-ui); color: var(--t2); white-space: nowrap; }
 .chip b { color: var(--t1); font-weight: 600; }
 .chip .d { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
@@ -27,3 +40,53 @@
 .upd-bar { display: flex; gap: var(--s2); align-items: center; justify-content: flex-end; }
 .upd-bar .msg { margin-right: auto; font-size: var(--fs-md); color: var(--t3); }
 .upd-bar .msg.warn { color: var(--amber); }
+
+/* ---- kolo 27: styly hodin ---- */
+.clock[data-clock="line"], .clock[data-clock="analog"] { flex-direction: row; align-items: center; gap: var(--s2); }
+.clock[data-clock="line"] .time { font-size: calc(22px * var(--fz)); }
+.clock[data-clock="line"] .date { margin: 0; }
+.clock[data-clock="line"] .date::before { content: "·"; margin-right: var(--s2); color: var(--t3); }
+.clock[data-clock="seconds"] .time { font-size: calc(30px * var(--fz)); }
+.clock[data-clock="time"] .time { font-size: calc(30px * var(--fz)); }
+.clock[data-clock="analog"] .date { margin: 0; }
+.clock .clock-face { flex: none; }
+
+/* ---- styly štítků (atribut data-style na .hl-chips; štítek má .d tečku, .ic ikonku, .lbl/.cnt text a číslo) ---- */
+.chip .ic, .chip .cnt { display: none; }
+/* jedna sloučená pilulka: štítky těsně vedle sebe pod společným rámem, klik na část otevře svůj popover */
+.hl-chips[data-style="merged"] { gap: 0; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--card); height: 32px; align-items: stretch; }
+.hl-chips[data-style="merged"] > .chip { border: 0; border-radius: 0; background: transparent; height: auto; }
+.hl-chips[data-style="merged"] > .chip:not(:first-child) { box-shadow: inset 1px 0 var(--line); }
+.hl-chips[data-style="merged"] > .chip.amber { background: color-mix(in srgb, var(--amber) 12%, transparent); }
+.hl-chips[data-style="merged"] > .chip.red { background: color-mix(in srgb, var(--red) 12%, transparent); }
+/* tečky s čísly a ikonky s číslem: text pryč (úplný je v tooltipu), zůstane číslo */
+.hl-chips[data-style="dots"] > .chip, .hl-chips[data-style="icons"] > .chip { font-size: 0; gap: 5px; padding: 0 var(--s2); }
+.hl-chips[data-style="dots"] > .chip b, .hl-chips[data-style="icons"] > .chip b { font-size: var(--fs-ui); }
+.hl-chips[data-style="dots"] > .chip .lbl, .hl-chips[data-style="icons"] > .chip .lbl, .hl-chips[data-style="dots"] .hl-caret, .hl-chips[data-style="icons"] .hl-caret { display: none; }
+.hl-chips[data-style="dots"] > .chip .cnt, .hl-chips[data-style="icons"] > .chip .cnt { display: inline; }
+.hl-chips[data-style="dots"] > .chip { background: transparent; border-color: transparent; }
+.hl-chips[data-style="dots"] > .chip .d { width: 9px; height: 9px; }
+.hl-chips[data-style="icons"] > .chip .d { display: none; }
+.hl-chips[data-style="icons"] > .chip .ic { display: inline; font-size: var(--fs-md); line-height: 1; }
+.hl-chips[data-style="dots"] .chip.dim .d { background: var(--t3); }
+
+/* ---- panel „Vzhled hlavičky“ (HeadLook.tsx; základ .tl-ed z tilelook.css) ---- */
+.hl-panel .hl-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--s1) var(--s3); }
+.hl-part { display: flex; align-items: center; gap: var(--s1); }
+.hl-check { display: inline-flex; align-items: center; gap: var(--s1); font-size: var(--fs-sm); color: var(--t2); flex: 1; min-width: 0; }
+.hl-part.off .hl-check { opacity: .55; }
+.hl-seg { flex-wrap: wrap; }
+
+/* ---- styl „Auto“ a zkrácená sloučená pilulka (ChipsRow.tsx nastavuje data-style / data-shrink; krátké texty jsou .shr) ---- */
+.chip .shr { display: none; }
+.hl-chips[data-style="merged"][data-shrink="1"] .lng { display: none; }
+.hl-chips[data-style="merged"][data-shrink="1"] .shr { display: inline; }
+.hl-chips[data-style="merged"][data-shrink="2"] > .chip { font-size: 0; gap: 5px; padding: 0 var(--s2); }
+.hl-chips[data-style="merged"][data-shrink="2"] > .chip b { font-size: var(--fs-ui); }
+.hl-chips[data-style="merged"][data-shrink="2"] > .chip .lbl, .hl-chips[data-style="merged"][data-shrink="2"] .hl-caret { display: none; }
+.hl-chips[data-style="merged"][data-shrink="2"] > .chip .cnt { display: inline; }
+
+/* úzký šuplík (Výřez): „Poznámka“ jen ikonou, ať zbyde místo na štítky */
+@container hl-head (max-width: 780px) { .hl-lbl { display: none; } }
+/* v úzkém šuplíku jsou ikonky a tečky těsnější */
+.hl-chips[data-style="dots"] > .chip, .hl-chips[data-style="icons"] > .chip, .hl-chips[data-style="merged"][data-shrink="2"] > .chip { padding: 0 7px; }

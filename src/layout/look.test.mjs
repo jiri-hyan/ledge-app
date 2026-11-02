@@ -83,3 +83,16 @@ test("Bento jen u karet, které ho kreslí", () => {
   assert.deepEqual(normalizeCardLook({ view: "bento" }, "repos"), { view: "bento" });
   assert.equal(normalizeCardLook({ view: "bento" }, "actions"), undefined, "akce bento nekreslí");
 });
+
+test("kolo 28: barevné povrchy a sady, starý config beze změny", () => {
+  assert.deepEqual(normalizeCardLook({ surface: "glass", grain: true }, "clock"), { surface: "glass", grain: true });
+  assert.deepEqual(normalizeCardLook({ surface: "flow", palette: "sunset" }, "clock"), { surface: "flow", palette: "sunset" });
+  assert.deepEqual(normalizeCardLook({ surface: "stripes", palette: "card" }, "clock"), { surface: "stripes" });
+  assert.deepEqual(normalizeCardLook({ surface: "glass", palette: "ocean" }, "clock"), { surface: "glass" }, "sada jen s barevným povrchem");
+  assert.equal(normalizeCardLook({ surface: "neon" }, "clock"), undefined);
+  const a = cardLookAttrs({ surface: "gradient", palette: "ocean" });
+  assert.equal(a.attrs["data-cl-surface"], "gradient");
+  assert.equal(a.style["--sf-e"], "#38bdf8");
+  assert.deepEqual(cardLookAttrs({ surface: "gradient" }).style, {}, "výchozí sada = podle akcentu");
+  assert.deepEqual(patchCardLook({ surface: "edge", palette: "aurora" }, "clock", { surface: "style" }), undefined, "zpět na styl = sada pryč");
+});

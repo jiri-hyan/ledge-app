@@ -45,6 +45,8 @@ Rozložení šuplíku). Cituj symbolem, ne číslem řádku.
 
 ## Soubory
 
+- `src/layout/designs.ts` (kolo 25): `CARD_DESIGNS[karta]` = seznam `{ id, name, line }`, první = výchozí dnešní vzhled (id se nezapisuje), `designsOf` / `designOf` / `storedDesign`; výběr dlaždicemi s mini náhledem v panelu Vzhled karty i v Nastavení → Šuplík a karty; vykreslení dělá komponenta karty (Claude `cards/ClaudeDesign.tsx`, Systém `integrations/SystemDesign.tsx`); test `designs.test.mjs`, angličtina `i18n/en-designs.ts`.
+
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
 | `src-tauri/src/layout.rs` | struktura, výchozí rozložení nového configu (`clean_default`: Práce Projekty + Poznámky, Osobní Čas, Právě hraje, Poznámky, Odkazy; fixture `fixtures/layout-default.json` čtou Rust i TS test) a jeho doplnění průvodcem (`with_detected`: Claude / Repa), převod starého configu (`from_legacy` = původní plné rozložení, starý config bez `layout` se nemění), jednorázové úpravy, odvozená pole, validace (i `h` 1–4 a pořadí částí `parts`), záložka pro režim, název pro proužek; testy (tabulka starých configů, migrace Projekty → Osobní, tvar `h`/`tiles`, `load`/`save`) | `LayoutConfig` `LayoutPage` `LayoutCard` `CardSize` `TileOpts` `TileSize` `MAX_H` `UP_PERSONAL_PROJECTS` `CARDS` `PARTS` `BODY` `card_slots` `clean_default` `with_detected` `section_in_default` `derived_sections` `from_legacy` `apply_upgrades` `upgrade_loaded` `derive` `validate` `page` `page_id` `page_has` `title` `row_sizes` |

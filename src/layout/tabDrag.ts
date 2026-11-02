@@ -22,13 +22,18 @@ export type TabDragEnv = {
   /** změna s plynulým odsunem záložek (FLIP) */
   flip: (update: () => void) => void;
   commit: (from: number, to: number) => void;
+  /** jiné řady než záložky (kolo 27: sekce lišty notche): třída prvku, atribut s id, vzhled ducha, co z ducha odebrat */
+  sel?: { item: string; attr: string; fly: (ghost: HTMLElement) => void; strip?: string };
 };
+
+const TAB_SEL = { item: "lay-tab", attr: "data-page", fly: (g: HTMLElement) => g.classList.add("lp-tabfly"), strip: ".lay-tab-x" };
 
 export function createTabDrag(env: TabDragEnv) {
   const [drag, setDrag] = createSignal<TabDragState | null>(null, { equals: (a, b) => a === b || (!!a && !!b && a.id === b.id && a.from === b.from && a.to === b.to) });
   let abort: (() => void) | null = null;
 
-  const tabs = () => Array.from(env.box().querySelectorAll<HTMLElement>(":scope > .lay-tab[data-page]"));
+  const sel = env.sel ?? TAB_SEL;
+  const tabs = () => Array.from(env.box().querySelectorAll<HTMLElement>(`:scope > .${sel.item}[${sel.attr}]`));
   const rectOf = (el: HTMLElement) => {
     const b = env.box();
     const r = b.getBoundingClientRect();
@@ -42,7 +47,7 @@ export function createTabDrag(env: TabDragEnv) {
     const x0 = e.clientX;
     const y0 = e.clientY;
     const t0 = performance.now();
-    const r0 = (e.currentTarget as HTMLElement).closest<HTMLElement>(".lay-tab")!.getBoundingClientRect();
+    const r0 = (e.currentTarget as HTMLElement).closest<HTMLElement>(`.${sel.item}`)!.getBoundingClientRect();
     const frac = r0.width > 0 ? (x0 - r0.left) / r0.width : 0.5;
     let last = { x: x0, y: y0 };
     let timer = 0;
@@ -90,9 +95,9 @@ export function createTabDrag(env: TabDragEnv) {
       return r.left + r.width / 2;
     });
     const ghost = el.cloneNode(true) as HTMLElement;
-    ghost.querySelectorAll(".lay-tab-x").forEach((n) => n.remove());
-    ghost.classList.add("lp-tabfly");
-    ghost.removeAttribute("data-page");
+    if (sel.strip) ghost.querySelectorAll(sel.strip).forEach((n) => n.remove());
+    sel.fly(ghost);
+    ghost.removeAttribute(sel.attr);
     ghost.setAttribute("aria-hidden", "true");
     ghost.inert = true;
     Object.assign(ghost.style, { width: `${r0.width}px`, height: `${r0.height}px`, order: "", transform: `translate(${r0.left}px, ${r0.top}px)` });
@@ -143,7 +148,7 @@ export function createTabDrag(env: TabDragEnv) {
       // zrušeno: záložky se plynule vrátí; puštění: náhled už je výsledek
       if (how !== "up" || !d || d.to === d.from) env.flip(apply);
       else apply();
-      const home = box.querySelector<HTMLElement>(`:scope > .lay-tab[data-page="${CSS.escape(id)}"]`);
+      const home = box.querySelector<HTMLElement>(`:scope > .${sel.item}[${sel.attr}="${CSS.escape(id)}"]`);
       landGhost(ghost, flyPos({ dx, dy: 0 }, last.x, r0.top), home ? rectOf(home) : null);
       // po tahu nesmí z puštění vzniknout klik na záložku pod kurzorem (přepnutí záložky)
       const eat = (c: Event) => (c.stopPropagation(), c.preventDefault());

@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CARD_DESIGNS } from "../../src/layout/designs.ts";
+import { BAR_DESIGNS } from "../../src/notch/designs.ts";
 import { PRESETS, LIVE_PRESETS } from "../../src/theme/backdropPresets.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -161,6 +162,25 @@ try {
       console.log(`  varianty ${pair.map((x) => x.tag).join(", ")}`);
     }
     await sheet("backdrops-modes", "Karty nad pozadím: režimy, rozložení float / notch", rows2, [1, 1], { cell: ["", ""] });
+  }
+  // ---------- lišta notche (kolo 27): každá sekce × vzhled, s daty i prázdná ----------
+  if (only === "bar") {
+    const rows = [];
+    for (const [sec, list] of Object.entries(BAR_DESIGNS)) {
+      for (const d of list) {
+        const cells = [];
+        for (const empty of [false, true]) {
+          const bar = JSON.stringify({ sections: [{ id: sec, design: d.id }, { id: "days" }] });
+          await open(page, { cards: "notes:xl", full: 1, layout: "notch", bar, ...(empty ? { empty: 1 } : {}) }, 1200, 700);
+          const el = page.locator(".nb").first();
+          const box = await el.boundingBox();
+          cells.push({ png: await el.screenshot({ animations: "disabled" }), w: Math.round(box?.width ?? 0), h: Math.round(box?.height ?? 0), scale: 0.8 });
+        }
+        rows.push({ label: `${sec}<br>${d.id}`, cells });
+        console.log(`  lišta ${sec}/${d.id}`);
+      }
+    }
+    await sheet("bar-sections", "Lišta notche: sekce × vzhled (vlevo s daty, vpravo prázdné) + výchozí Dny", rows, [1, 1], { cell: ["s daty", "prázdné"] });
   }
 } finally {
   await browser?.close();

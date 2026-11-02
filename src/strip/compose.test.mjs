@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { STRIP_LOOK_IDS } from "./looks.ts";
 import {
-  COMPOSE_ITEMS, COMPOSE_SHAPES, DEFAULT_COMPOSE, DESIGN_IDS, ITEM_STYLES, MAX_PIECES, MAX_ZONE, W_MAX, W_MIN,
+  COMPOSE_ITEMS, COMPOSE_SHAPES, normText, setPieceLook, setText, DEFAULT_COMPOSE, DESIGN_IDS, ITEM_STYLES, MAX_PIECES, MAX_ZONE, W_MAX, W_MIN,
   composeOf, designOf, setPieceColor, stylesFor, drawKind, hRange, hasItem, nextStyle, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
 } from "./compose.ts";
 
@@ -179,15 +179,15 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
   for (const [item, style, frac, want] of [["claude", "ring5h", false, "ring"], ["time", "ring5h", false, "icon"], ["limit5h", "bar", true, "under"], ["time", "bar", false, "text"], ["cpu", "spark", true, "spark"], ["limit5h", "spark", true, "meter"], ["time", "chip", false, "iconText"], ["claude", "dotPct", false, "dotPct"]])
     assert.equal(drawKind(item, style, frac), want, `${item}:${style}`);
   // 6 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
-  assert.equal(DESIGN_IDS.length, 6);
+  assert.equal(DESIGN_IDS.length, 11);
   const seen = new Set();
   for (const id of DESIGN_IDS) {
     const c = designOf(id);
     assert.deepEqual(normCompose(c), c, id);
     for (const s of ["left", "center", "right"]) for (const p of c[s]) assert.ok(stylesFor(p.item).includes(p.style), `${id} ${p.item}:${p.style}`);
-    seen.add(JSON.stringify([c.deco, c.fill, c.sep]));
+    seen.add(JSON.stringify([c.deco, c.fill, c.sep, c.text, c.left, c.center, c.right]));
   }
-  assert.equal(seen.size, 6);
+  assert.equal(seen.size, 11);
   assert.notEqual(designOf("glass"), designOf("glass"), "vždy nová kopie");
 });
 
@@ -198,9 +198,28 @@ test("seznamy výzdoby = Rust looks/composedeco.rs", () => {
     const body = src.slice(start, src.indexOf("\n}", start));
     return [...body.matchAll(/^\s*([A-Z][A-Za-z0-9]*),\s*$/gm)].map((m) => m[1][0].toLowerCase() + m[1].slice(1));
   };
-  const ts = readFileSync(new URL("./compose.ts", import.meta.url), "utf8");
+  const ts = readFileSync(new URL("./compose.ts", import.meta.url), "utf8") + readFileSync(new URL("./edgefx.ts", import.meta.url), "utf8");
   for (const [rust, list] of [["Edge", "COMPOSE_EDGES"], ["EdgeLen", "EDGE_LENS"], ["FillKind", "FILL_KINDS"], ["FillDir", "FILL_DIRS"], ["Sep", "COMPOSE_SEPS"]]) {
     const m = ts.match(new RegExp(`${list} = \\[([^\\]]*)\\]`));
     assert.deepEqual(JSON.parse(`[${m[1]}]`), variants(rust), rust);
   }
+});
+
+test("písmo a vlastní vzhled dílu (kolo 27)", () => {
+  // starý config bez `text` a bez size/bg/ink = dnešní vzhled
+  const old = normCompose({ shape: "capsule", left: [{ item: "claude", style: "icon" }] });
+  assert.deepEqual(old.text, { size: 1, weight: "normal", spacing: "normal" });
+  assert.deepEqual(old.left[0], { item: "claude", style: "icon" });
+  // ořez velikosti a neznámých hodnot
+  for (const [raw, want] of [[0.1, 0.6], [9, 1.4], [0.756, 0.76], ["x", 1], [NaN, 1]]) assert.equal(normText({ size: raw }).size, want, String(raw));
+  assert.deepEqual(normText({ weight: "huge", spacing: "x" }), { size: 1, weight: "normal", spacing: "normal" });
+  assert.equal(setText(DEFAULT_COMPOSE, { size: 5 }).text.size, 1.4);
+  assert.equal(DEFAULT_COMPOSE.text.size, 1, "vstup netknutý");
+  // díl: velikost, pozadí, barva textu; prázdné = klíč zmizí
+  let c = setPieceLook(DEFAULT_COMPOSE, "time", { size: "large", bg: "#3B82F6", ink: "accent" });
+  assert.deepEqual(c.center[0], { item: "time", style: "text", size: "large", bg: "#3b82f6", ink: "accent" });
+  assert.deepEqual(normCompose(c).center[0], c.center[0]);
+  c = setPieceLook(c, "time", { size: "normal", bg: "nope", ink: "" });
+  assert.deepEqual(c.center[0], { item: "time", style: "text" });
+  assert.ok(!("size" in DEFAULT_COMPOSE.center[0]));
 });

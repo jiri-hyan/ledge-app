@@ -12,9 +12,9 @@ export const COMPOSE_ITEMS = ["time", "date", "claude", "limit5h", "limitWeek", 
 export type ComposeItem = (typeof COMPOSE_ITEMS)[number];
 export const ITEM_STYLES = ["icon", "badge", "text", "ring", "graph", "dot", "iconText", "bar", "spark", "chip", "dotPct", "ring5h"] as const;
 export type ItemStyle = (typeof ITEM_STYLES)[number];
-export const COMPOSE_EDGES = ["none", "underline", "outline", "glow", "gradient"] as const;
-export type ComposeEdge = (typeof COMPOSE_EDGES)[number];
-export const EDGE_LENS = ["center", "full"] as const;
+// hrana a její živé efekty (kolo 28) žijí v `edgefx.ts`
+import { DEFAULT_DECO, DEFAULT_LIVE, type ComposeDeco, normDeco } from "./edgefx.ts";
+export { COMPOSE_EDGES, EDGE_LENS, DEFAULT_DECO, edgeColor, type ComposeEdge, type ComposeDeco } from "./edgefx.ts";
 export const FILL_KINDS = ["black", "glass", "tint", "gradient", "none"] as const;
 export type FillKind = (typeof FILL_KINDS)[number];
 export const FILL_DIRS = ["right", "down", "diag"] as const;
@@ -23,11 +23,26 @@ export type ComposeSep = (typeof COMPOSE_SEPS)[number];
 export type Slot = "left" | "center" | "right";
 export const SLOTS: readonly Slot[] = ["left", "center", "right"];
 
-/** `color`: chybí = podle hodnoty (dnešní), `accent`, `#rrggbb` */
-export type Piece = { item: ComposeItem; style: ItemStyle; color?: string };
+export const PIECE_SIZES = ["small", "normal", "large"] as const;
+export type PieceSize = (typeof PIECE_SIZES)[number];
+export const TEXT_WEIGHTS = ["normal", "semi", "bold"] as const;
+export type TextWeight = (typeof TEXT_WEIGHTS)[number];
+export const TEXT_SPACINGS = ["tight", "normal", "wide"] as const;
+export type TextSpacing = (typeof TEXT_SPACINGS)[number];
+/** Písmo proužku nezávislé na výšce (kolo 27): `size` násobek 0,6–1,4 (1 = dnešní), tloušťka, proložení (mezery mezi díly). */
+export type ComposeText = { size: number; weight: TextWeight; spacing: TextSpacing };
+export const TEXT_MIN = 0.6;
+export const TEXT_MAX = 1.4;
+export const DEFAULT_TEXT: ComposeText = { size: 1, weight: "normal", spacing: "normal" };
+/** Násobky velikosti dílu a mezer (zrcadlo Rust `PieceSize::mult`, `TextLook::space`). */
+export const SIZE_MULT: Record<PieceSize, number> = { small: 0.82, normal: 1, large: 1.25 };
+export const SPACE_MULT: Record<TextSpacing, number> = { tight: 0.7, normal: 1, wide: 1.4 };
+
+/** `color`: chybí = podle hodnoty (dnešní), `accent`, `#rrggbb`. Kolo 27: `size` (chybí = normal), `bg` kostka kolem dílu
+ *  (chybí = žádná, `accent`, `#rrggbb`), `ink` barva textu (chybí = podle `color`). */
+export type Piece = { item: ComposeItem; style: ItemStyle; color?: string; size?: PieceSize; bg?: string; ink?: string };
 /** Akcent hrany: `color` = `accent` | `claude` (podle stavu Clauda) | `#rrggbb`; `color2` = druhá barva přechodu. */
-export type ComposeDeco = { edge: ComposeEdge; len: (typeof EDGE_LENS)[number]; color: string; color2: string; width: number };
-export type ComposeFill = { kind: FillKind; from: string; to: string; dir: (typeof FILL_DIRS)[number] };
+export type ComposeFill = { kind: FillKind; from: string; to: string; dir: (typeof FILL_DIRS)[number]; via: string; flow: boolean };
 export type StripCompose = {
   shape: ComposeShape;
   width: number;
@@ -44,18 +59,17 @@ export type StripCompose = {
   sep: ComposeSep;
   /** písmo s pevnou šířkou (Cascadia Mono) */
   mono: boolean;
+  /** písmo nezávislé na výšce (kolo 27) */
+  text: ComposeText;
 };
 
 export const MAX_PIECES = 12;
 export const MAX_ZONE = 5;
 export const W_MIN = 60;
 export const W_MAX = 1200;
-export const DEFAULT_DECO: ComposeDeco = { edge: "none", len: "center", color: "accent", color2: "", width: 2 };
-export const DEFAULT_FILL: ComposeFill = { kind: "black", from: "", to: "", dir: "right" };
+export const DEFAULT_FILL: ComposeFill = { kind: "black", from: "", to: "", dir: "right", via: "", flow: false };
 const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0-9a-fA-F]{6}$/.test(s.trim());
 const hex = (s: unknown) => (isHex(s) ? s.trim().toLowerCase() : "");
-/** Barva hrany jako Rust `norm_edge_color`: accent | claude | #rrggbb. */
-export const edgeColor = (s: unknown) => (typeof s === "string" && s.trim().toLowerCase() === "claude" ? "claude" : hex(s) || "accent");
 /** Barva dílu jako Rust `norm_piece_color`: "" (podle hodnoty) | accent | #rrggbb. */
 export const pieceColor = (s: unknown) => (typeof s === "string" && s.trim().toLowerCase() === "accent" ? "accent" : hex(s));
 export const H_MIN = 18;
@@ -77,7 +91,7 @@ function mkPiece(s: string): Piece {
   return p;
 }
 function mk(shape: ComposeShape, width: number, height: number, round: number, left: string[], center: string[], right: string[], extra: Partial<StripCompose> = {}): StripCompose {
-  return { shape, width, height, round, left: left.map(mkPiece), center: center.map(mkPiece), right: right.map(mkPiece), hideIdle: false, rotate: false, deco: { ...DEFAULT_DECO }, fill: { ...DEFAULT_FILL }, sep: "none", mono: false, ...extra };
+  return { shape, width, height, round, left: left.map(mkPiece), center: center.map(mkPiece), right: right.map(mkPiece), hideIdle: false, rotate: false, deco: { ...DEFAULT_DECO }, fill: { ...DEFAULT_FILL }, sep: "none", mono: false, text: { ...DEFAULT_TEXT }, ...extra };
 }
 
 /** Ekvivalent každého z 15 hotových vzhledů (jen položky se skutečným zdrojem; mikrofon, pošta apod. ne). */
@@ -99,6 +113,12 @@ const PRESETS: Record<string, StripCompose> = {
   rings: mk("capsule", 250, 36, 60, ["limit5h:ring"], ["time:text"], ["limitWeek:ring"]),
 };
 
+/** Přidá dílům vlastní vzhled (`size` / `bg` / `ink`) podle položky — jen pro zápis předvoleb. */
+function look(c: StripCompose, by: Partial<Record<ComposeItem, Pick<Piece, "size" | "bg" | "ink">>> = {}): StripCompose {
+  for (const s of SLOTS) c[s] = c[s].map((p) => ({ ...p, ...(by[p.item] ?? {}) }));
+  return c;
+}
+
 /** Designové předvolby kola 25 (výzdoba + styly dílů); jména v editoru (`DESIGN_NAME`). */
 const DESIGN: Record<string, StripCompose> = {
   islands: mk("capsule", 420, 30, 100, ["claude:dotPct"], ["time:iconText"], ["weather:iconText", "cpu:spark"], { sep: "islands", deco: { ...DEFAULT_DECO, edge: "underline", color: "claude" } }),
@@ -106,12 +126,23 @@ const DESIGN: Record<string, StripCompose> = {
   terminal: mk("capsule", 520, 26, 10, ["claude:text:#7ee787", "activity:text"], ["time:text"], ["cpu:text", "memory:text"], { sep: "bar", mono: true, deco: { ...DEFAULT_DECO, edge: "underline", len: "full", color: "#7ee787", width: 1 } }),
   chips: mk("capsule", 460, 32, 100, ["claude:chip"], ["time:chip"], ["limit5h:chip", "weather:chip:#f59e0b"], { sep: "gap" }),
   glass: mk("island", 360, 32, 100, ["claude:iconText"], ["time:text"], ["battery:iconText", "weather:iconText"], { sep: "dot", fill: { ...DEFAULT_FILL, kind: "glass" }, deco: { ...DEFAULT_DECO, edge: "outline", color: "#ffffff", width: 1 } }),
-  sunset: mk("drop", 400, 34, 80, ["claude:dotPct"], ["time:text"], ["weather:iconText"], { fill: { kind: "gradient", from: "#5b247a", to: "#e8604c", dir: "right" }, deco: { ...DEFAULT_DECO, edge: "gradient", len: "full", color: "#ffd166", color2: "#ef476f" } }),
+  sunset: mk("drop", 400, 34, 80, ["claude:dotPct"], ["time:text"], ["weather:iconText"], { fill: { ...DEFAULT_FILL, kind: "gradient", from: "#5b247a", to: "#e8604c" }, deco: { ...DEFAULT_DECO, edge: "gradient", len: "full", color: "#ffd166", color2: "#ef476f" } }),
+  tall: look(mk("capsule", 340, 46, 70, ["claude:icon"], ["time:text"], ["limit5h:ring"], { text: { size: 0.72, weight: "semi", spacing: "wide" } })),
+  cubes: look(mk("capsule", 440, 34, 100, ["claude:iconText"], ["time:text"], ["weather:text", "cpu:text"], { sep: "gap", text: { size: 0.9, weight: "semi", spacing: "normal" } }), {
+    claude: { bg: "accent", ink: "#ffffff" },
+    time: { size: "large" },
+    weather: { bg: "#3b82f6", ink: "#ffffff", size: "small" },
+    cpu: { bg: "#f59e0b", ink: "#ffffff", size: "small" },
+  }),
+  // kolo 28: živá hrana (římsa) — přelévání podle stavu, žhavá římsa s rozsvícením, kometa
+  aurora: mk("notch", 320, 32, 70, ["claude:icon"], ["time:text"], ["limit5h:ring"], { deco: { ...DEFAULT_DECO, edge: "flow", len: "wide", color: "aurora", live: { ...DEFAULT_LIVE, on: true } } }),
+  embers: mk("capsule", 380, 30, 60, ["claude:dotPct"], ["time:text"], ["cpu:spark"], { fill: { ...DEFAULT_FILL, kind: "gradient", from: "#2a0e05", via: "#160603", to: "#000000", flow: true }, deco: { ...DEFAULT_DECO, edge: "light", len: "full", color: "embers", live: { ...DEFAULT_LIVE, on: true } } }),
+  comet: mk("island", 300, 30, 100, ["claude:iconText"], [], ["time:text"], { deco: { ...DEFAULT_DECO, edge: "comet", len: "full", color: "ocean", speed: 2, live: { ...DEFAULT_LIVE, on: true, work: "comet" } } }),
 };
-export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset"] as const;
+export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset", "tall", "cubes", "aurora", "embers", "comet"] as const;
 export type DesignId = (typeof DESIGN_IDS)[number];
 
-const clone = (c: StripCompose): StripCompose => ({ ...c, left: c.left.map((p) => ({ ...p })), center: c.center.map((p) => ({ ...p })), right: c.right.map((p) => ({ ...p })), deco: { ...c.deco }, fill: { ...c.fill } });
+const clone = (c: StripCompose): StripCompose => ({ ...c, left: c.left.map((p) => ({ ...p })), center: c.center.map((p) => ({ ...p })), right: c.right.map((p) => ({ ...p })), deco: { ...c.deco, live: { ...c.deco.live } }, fill: { ...c.fill }, text: { ...c.text } });
 
 /** Výchozí compose (= Rust `Compose::default`, předvolba Klasický). */
 export const DEFAULT_COMPOSE: StripCompose = PRESETS.classic;
@@ -143,11 +174,16 @@ export function normCompose(raw: unknown): StripCompose {
       const x: Piece = { item, style: ITEM_STYLES.includes(st) ? st : "icon" };
       const col = pieceColor((p as Piece).color);
       if (col) x.color = col;
+      const sz = (p as Piece).size;
+      if (sz === "small" || sz === "large") x.size = sz;
+      const bg = pieceColor((p as Piece).bg);
+      if (bg) x.bg = bg;
+      const ink = pieceColor((p as Piece).ink);
+      if (ink) x.ink = ink;
       out.push(x);
     }
     return out;
   };
-  const rd = (r.deco && typeof r.deco === "object" ? r.deco : {}) as Record<string, unknown>;
   const rf = (r.fill && typeof r.fill === "object" ? r.fill : {}) as Record<string, unknown>;
   const pick = <T extends string>(list: readonly T[], v: unknown, dflt: T): T => (list.includes(v as T) ? (v as T) : dflt);
   const has = (k: string) => k in r;
@@ -165,17 +201,43 @@ export function normCompose(raw: unknown): StripCompose {
     right,
     hideIdle: r.hideIdle === true,
     rotate: r.rotate === true,
-    deco: {
-      edge: pick(COMPOSE_EDGES, rd.edge, "none"),
-      len: pick(EDGE_LENS, rd.len, "center"),
-      color: "color" in rd ? edgeColor(rd.color) : "accent",
-      color2: hex(rd.color2),
-      width: clamp(rd.width, 1, 3, 2),
-    },
-    fill: { kind: pick(FILL_KINDS, rf.kind, "black"), from: hex(rf.from), to: hex(rf.to), dir: pick(FILL_DIRS, rf.dir, "right") },
+    deco: normDeco(r.deco),
+    fill: { kind: pick(FILL_KINDS, rf.kind, "black"), from: hex(rf.from), to: hex(rf.to), dir: pick(FILL_DIRS, rf.dir, "right"), via: hex(rf.via), flow: rf.flow === true },
     sep: pick(COMPOSE_SEPS, r.sep, "none"),
     mono: r.mono === true,
+    text: normText(r.text),
   };
+}
+
+/** Ořez písma jako Rust `TextLook::norm`: velikost 0,6–1,4 na dvě desetinná místa, neznámé = výchozí. */
+export function normText(raw: unknown): ComposeText {
+  const t = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const n = typeof t.size === "number" && Number.isFinite(t.size) ? Math.round(Math.min(TEXT_MAX, Math.max(TEXT_MIN, t.size)) * 100) / 100 : 1;
+  return {
+    size: n,
+    weight: TEXT_WEIGHTS.includes(t.weight as TextWeight) ? (t.weight as TextWeight) : "normal",
+    spacing: TEXT_SPACINGS.includes(t.spacing as TextSpacing) ? (t.spacing as TextSpacing) : "normal",
+  };
+}
+
+/** Písmo proužku (částečná změna). */
+export function setText(c: StripCompose, patch: Partial<ComposeText>): StripCompose {
+  return { ...clone(c), text: normText({ ...c.text, ...patch }) };
+}
+
+/** Vlastní vzhled dílu (kolo 27): velikost, pozadí kostky, barva textu; prázdné / `normal` = dnešní (klíč se vynechá). */
+export function setPieceLook(c: StripCompose, item: ComposeItem, patch: { size?: PieceSize; bg?: string; ink?: string }): StripCompose {
+  const x = clone(c);
+  for (const s of SLOTS)
+    x[s] = x[s].map((p) => {
+      if (p.item !== item) return p;
+      const { size: _s, bg: _b, ink: _i, ...rest } = p;
+      const size = patch.size ?? p.size;
+      const bg = "bg" in patch ? pieceColor(patch.bg) : p.bg;
+      const ink = "ink" in patch ? pieceColor(patch.ink) : p.ink;
+      return { ...rest, ...(size === "small" || size === "large" ? { size } : {}), ...(bg ? { bg } : {}), ...(ink ? { ink } : {}) };
+    });
+  return x;
 }
 
 /** Styly, které položka nabízí: průběh jen CPU / paměť (mají historii), „tečka + 5h“ a „prstenec 5h“ jen Claude. */

@@ -25,6 +25,20 @@ pub enum Edge {
     Glow,
     // spodní linka přechodem dvou barev
     Gradient,
+    // kolo 28 (`edgefx`): přechod 2–3 barev, který teče podél hrany
+    Flow,
+    // čárky; ve stavu limitu naplněné poměrem limitu
+    Dashes,
+    // světelný bod běží po hraně
+    Comet,
+    // celá římsa se rozsvítí: měkký svit pod celým proužkem
+    Light,
+    // pomalý puls jasu
+    Breath,
+    // obrys těla přechodem barev
+    OutlineGradient,
+    // jednorázové naplnění zleva doprava (hotovo)
+    Sweep,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
@@ -34,7 +48,11 @@ pub enum EdgeLen {
     // střed 40 %
     #[default]
     Center,
+    // široká 80 %
+    Wide,
     Full,
+    // vlastní % (`pct`)
+    Custom,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
@@ -88,17 +106,41 @@ pub enum Sep {
 pub struct Deco {
     pub edge: Edge,
     pub len: EdgeLen,
-    // accent | claude (barva podle stavu Clauda) | #rrggbb
+    // accent | claude (barva podle stavu Clauda) | sada (aurora, sunset, ocean, embers, clay) | #rrggbb
     pub color: String,
     // druhá barva přechodu (#rrggbb, prázdné = světlejší první)
     pub color2: String,
     // tloušťka 1–3 px
     pub width: u8,
+    // třetí barva přechodu (#rrggbb, prázdné = jen dvě)
+    pub color3: String,
+    // délka linky v % u `len: custom` (10–100)
+    pub pct: u8,
+    // rychlost animace 1–5
+    pub speed: u8,
+    // síla svitu 1–3
+    pub power: u8,
+    // hýbat se i v klidu (stojí CPU); jinak jen když Claude pracuje / čeká
+    pub always: bool,
+    // živá hrana podle stavu Clauda
+    pub live: super::edgefx::EdgeLive,
 }
 
 impl Default for Deco {
     fn default() -> Self {
-        Self { edge: Edge::None, len: EdgeLen::Center, color: "accent".into(), color2: String::new(), width: 2 }
+        Self {
+            edge: Edge::None,
+            len: EdgeLen::Center,
+            color: "accent".into(),
+            color2: String::new(),
+            width: 2,
+            color3: String::new(),
+            pct: 40,
+            speed: 3,
+            power: 2,
+            always: false,
+            live: super::edgefx::EdgeLive::default(),
+        }
     }
 }
 
@@ -112,12 +154,16 @@ pub struct Fill {
     pub from: String,
     pub to: String,
     pub dir: FillDir,
+    // prostřední barva přechodu (#rrggbb, prázdné = jen dvě)
+    pub via: String,
+    // přechod se pomalu přelévá (jen když se hýbe hrana: Claude pracuje / čeká, nebo `deco.always`)
+    pub flow: bool,
 }
 
 /// Barva hrany: `accent`, `claude`, `#rrggbb`; jiné = `accent`.
 pub fn norm_edge_color(s: &str) -> String {
     let s = s.trim().to_ascii_lowercase();
-    if s == "claude" || parse_hex(&s).is_some() { s } else { "accent".into() }
+    if s == "claude" || parse_hex(&s).is_some() || super::edgefx::set_colors(&s).is_some() { s } else { "accent".into() }
 }
 /// Barva dílu: `""` (podle hodnoty, dnešní), `accent`, `#rrggbb`; jiné = `""`.
 pub fn norm_piece_color(s: &str) -> String {
@@ -131,12 +177,24 @@ fn norm_hex(s: &str) -> String {
 
 impl Deco {
     pub fn norm(&self) -> Deco {
-        Deco { edge: self.edge, len: self.len, color: norm_edge_color(&self.color), color2: norm_hex(&self.color2), width: self.width.clamp(1, 3) }
+        Deco {
+            edge: self.edge,
+            len: self.len,
+            color: norm_edge_color(&self.color),
+            color2: norm_hex(&self.color2),
+            width: self.width.clamp(1, 3),
+            color3: norm_hex(&self.color3),
+            pct: self.pct.clamp(10, 100),
+            speed: self.speed.clamp(1, 5),
+            power: self.power.clamp(1, 3),
+            always: self.always,
+            live: self.live,
+        }
     }
 }
 impl Fill {
     pub fn norm(&self) -> Fill {
-        Fill { kind: self.kind, from: norm_hex(&self.from), to: norm_hex(&self.to), dir: self.dir }
+        Fill { kind: self.kind, from: norm_hex(&self.from), to: norm_hex(&self.to), dir: self.dir, via: norm_hex(&self.via), flow: self.flow }
     }
 }
 
@@ -144,9 +202,12 @@ impl Fill {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Paint {
     pub edge: Edge,
-    pub full: bool,
+    /// délka linky jako díl šířky (vystředěná); `None` = celá šířka (`edgefx::span`)
+    pub span: Option<f32>,
     pub c1: Rgba,
     pub c2: Rgba,
+    /// třetí barva (sada, vlastní `color3`)
+    pub c3: Option<Rgba>,
     /// tloušťka linky (logické px)
     pub width: f32,
     pub fill: FillKind,
@@ -154,6 +215,11 @@ pub struct Paint {
     pub f2: Rgba,
     pub dir: FillDir,
     pub sep: Sep,
+    /// prostřední barva přechodu pozadí a jeho přelévání
+    pub f3: Option<Rgba>,
+    pub fill_flow: bool,
+    /// živá hrana: síla, rychlost, stav Clauda, čas snímku (`edgefx`)
+    pub fx: super::edgefx::Fx,
 }
 
 impl Paint {
@@ -189,12 +255,9 @@ pub const GLASS: Rgba = Rgba(0.09, 0.10, 0.13, 0.62);
 
 /// Výzdoba → barvy pro kreslení (čistá funkce; `Facts.accent` = akcent motivu).
 pub fn paint(d: &Deco, fill: &Fill, sep: Sep, f: &Facts) -> Paint {
-    let (d, fill) = (d.norm(), fill.norm());
-    let c1 = match d.color.as_str() {
-        "claude" => claude_color(f),
-        s => parse_hex(s).unwrap_or(f.accent),
-    };
-    let c2 = parse_hex(&d.color2).unwrap_or_else(|| light(c1));
+    let fill = fill.norm();
+    let (state, frac, busy) = super::edgefx::live_state(f);
+    let grad = fill.kind == FillKind::Gradient;
     let (f1, f2) = match fill.kind {
         FillKind::Black => (Rgba(0.0, 0.0, 0.0, 1.0), Rgba(0.0, 0.0, 0.0, 1.0)),
         FillKind::Glass => (GLASS, GLASS),
@@ -202,7 +265,21 @@ pub fn paint(d: &Deco, fill: &Fill, sep: Sep, f: &Facts) -> Paint {
         FillKind::Gradient => (parse_hex(&fill.from).unwrap_or_else(|| dark(f.accent)), parse_hex(&fill.to).unwrap_or(Rgba(0.0, 0.0, 0.0, 1.0))),
         FillKind::None => (Rgba(0.0, 0.0, 0.0, 0.0), Rgba(0.0, 0.0, 0.0, 0.0)),
     };
-    Paint { edge: d.edge, full: d.len == EdgeLen::Full, c1, c2, width: d.width as f32, fill: fill.kind, f1, f2, dir: fill.dir, sep }
+    let fx = super::edgefx::Fx { state, frac, busy, ..super::edgefx::Fx::new(f.accent) };
+    let (f3, fill_flow) = (parse_hex(&fill.via).filter(|_| grad), fill.flow && grad);
+    let mut p = Paint { edge: Edge::None, span: None, c1: f.accent, c2: f.accent, c3: None, width: 2.0, fill: fill.kind, f1, f2, dir: fill.dir, sep, f3, fill_flow, fx };
+    restyle(&mut p, d, claude_color(f));
+    p
+}
+
+/// Hrana z `deco` do barev pro kreslení (`claude` = barva podle stavu); i pro „Vyzkoušet“ s rozpracovaným `deco`.
+pub fn restyle(p: &mut Paint, d: &Deco, claude: Rgba) {
+    let d = d.norm();
+    (p.c1, p.c2, p.c3) = super::edgefx::colors(&d.color, &d.color2, &d.color3, p.fx.accent, claude);
+    p.edge = d.edge;
+    p.span = super::edgefx::span(d.len, d.pct);
+    p.width = d.width as f32;
+    (p.fx.speed, p.fx.power, p.fx.always, p.fx.live) = (d.speed, d.power, d.always, d.live);
 }
 
 /// Mezera mezi dvěma díly zóny (px) podle oddělení; `gap` = dnešní mezera mezi díly, `ks` = měřítko.
@@ -300,7 +377,7 @@ mod tests {
         assert_eq!(p.c2, light(p.c1));
         assert_eq!(p.f1, dark(Rgba::VIOLET));
         assert!(!p.plain());
-        let g = paint(&Deco::default(), &Fill { kind: FillKind::Gradient, from: "#000080".into(), to: "".into(), dir: FillDir::Diag }, Sep::None, &f(0, 0, 0));
+        let g = paint(&Deco::default(), &Fill { kind: FillKind::Gradient, from: "#000080".into(), dir: FillDir::Diag, ..Fill::default() }, Sep::None, &f(0, 0, 0));
         assert_eq!((g.f1.2 > 0.4, g.f2), (true, Rgba(0.0, 0.0, 0.0, 1.0)));
         assert_eq!(paint(&Deco::default(), &Fill { kind: FillKind::None, ..Fill::default() }, Sep::None, &f(0, 0, 0)).f1.3, 0.0);
     }
@@ -324,6 +401,27 @@ mod tests {
         ] {
             assert_eq!(content_w(z, 8.0, isl), want, "{z:?} {isl:?}");
         }
+    }
+
+    #[test]
+    fn old_config_keeps_look() {
+        // config z kola 25 (bez klíčů kola 28): záře, střed 40 %, barva podle Clauda, 1 px — stejná barva i tvar, bez pohybu
+        let d: Deco = serde_json::from_str(r#"{"edge":"glow","len":"center","color":"claude","width":1}"#).unwrap();
+        let f = Facts { working: 1, accent: Rgba::VIOLET, ..Facts::default() };
+        let p = paint(&d, &Fill::default(), Sep::None, &f);
+        assert_eq!((p.edge, p.span, p.c1, p.c2, p.c3, p.width), (Edge::Glow, Some(0.4), RUN, light(RUN), None, 1.0));
+        assert_eq!((p.fx.power, p.fx.live.on, p.fx.always, p.fill_flow, p.f3), (2, false, false, false, None));
+        assert!(!super::super::edgefx::frames(&p, false, false, true));
+        assert_eq!(super::super::edgefx::apply(&p, None), p);
+        let fl: Fill = serde_json::from_str(r##"{"kind":"gradient","from":"#112233","to":"#000000"}"##).unwrap();
+        assert_eq!((fl.via.as_str(), fl.flow), ("", false));
+        // nové klíče: ořez rozsahů, sada barev, neznámá sada = akcent
+        let n = Deco { pct: 0, speed: 9, power: 0, color: "Aurora".into(), color3: "#ABCDEF".into(), ..Deco::default() }.norm();
+        assert_eq!((n.pct, n.speed, n.power, n.color.as_str(), n.color3.as_str()), (10, 5, 1, "aurora", "#abcdef"));
+        assert_eq!(norm_edge_color("duha"), "accent");
+        // přelévaná výplň jen u přechodu
+        let g = paint(&Deco::default(), &Fill { kind: FillKind::Glass, flow: true, via: "#ffffff".into(), ..Fill::default() }, Sep::None, &f);
+        assert_eq!((g.fill_flow, g.f3), (false, None));
     }
 
     #[test]

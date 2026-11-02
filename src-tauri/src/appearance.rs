@@ -11,6 +11,7 @@
 
 pub mod backdrop;
 pub mod geom;
+pub mod head;
 pub mod look;
 pub mod motion;
 pub mod pages;
@@ -19,6 +20,7 @@ pub mod stripdeco;
 
 pub use backdrop::BackdropConfig;
 pub use look::{FontLook, Layout, Material, WidthPreset};
+pub use head::{HeadLook, TabsLook};
 pub use pages::{CustomTheme, PageLook};
 pub use size::SizeConfig;
 
@@ -87,6 +89,15 @@ pub struct AppearanceConfig {
     #[schemars(skip)]
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub accent_from_backdrop: bool,
+    /// Hlavička šuplíku (kolo 27, `head::HeadLook`): díly, jejich pořadí, styl hodin a štítků, nulové štítky.
+    /// Ze schématu pro MCP vynecháno (strop velikosti `tools/list`); MCP pole zachová.
+    #[schemars(skip)]
+    #[serde(skip_serializing_if = "HeadLook::is_default")]
+    pub head: HeadLook,
+    /// Přepínač záložek v hlavičce (kolo 27, `head::TabsLook`).
+    #[schemars(skip)]
+    #[serde(skip_serializing_if = "TabsLook::is_default")]
+    pub tabs: TabsLook,
 }
 
 impl Default for AppearanceConfig {
@@ -112,6 +123,8 @@ impl Default for AppearanceConfig {
             backdrop: BackdropConfig::default(),
             accent2: String::new(),
             accent_from_backdrop: false,
+            head: HeadLook::default(),
+            tabs: TabsLook::default(),
         }
     }
 }
@@ -333,6 +346,7 @@ pub fn validate(a: &AppearanceConfig) -> Result<(), String> {
         return Err(trf!("appearance.accent2 „{}“ chce tvar #rrggbb (nebo prázdné).", "appearance.accent2 “{}” needs the form #rrggbb (or empty).", a.accent2));
     }
     backdrop::validate(&a.backdrop)?;
+    head::validate(&a.head)?;
     pages::validate(a)
 }
 

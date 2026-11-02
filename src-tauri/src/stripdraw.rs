@@ -7,7 +7,7 @@
 
 use crate::looks::frame::{self, Placed, Spec, WidthAnim};
 use crate::looks::{Glyph, Look, Part, Show};
-use crate::strip::{Renderer, Rgba, StripModel, color, measure, text_format, wide};
+use crate::strip::{Renderer, Rgba, StripModel, color, measure, text_format_w, wide};
 use windows::Win32::Foundation::{COLORREF, HWND, POINT, RECT, SIZE};
 use windows::Win32::Graphics::Direct2D::Common::{
     D2D_RECT_F, D2D_SIZE_F, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED, D2D1_FIGURE_END_CLOSED,
@@ -71,13 +71,13 @@ pub(crate) struct Fmts {
     badge: IDWriteTextFormat,
 }
 
-unsafe fn fmts(r: &Renderer, look: Look, sp: &Spec, ks: f32) -> Option<Fmts> {
+pub(crate) unsafe fn fmts(r: &Renderer, look: Look, sp: &Spec, ks: f32) -> Option<Fmts> {
     unsafe {
         let family = if sp.mono { r.fonts.mono } else if sp.display { r.fonts.display } else { SANS };
         let size = sp.font * ks;
         let icon_size = if look == Look::Icons { sp.font * ks } else { sp.font * 1.1 * ks };
         let f = |size: f32, strong: bool, family: &str| -> Option<IDWriteTextFormat> {
-            let x = text_format(&r.dw, size, strong, family).ok()?;
+            let x = text_format_w(&r.dw, size, strong, sp.weight, family).ok()?;
             let _ = x.SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
             Some(x)
         };
@@ -413,10 +413,12 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
         let line_k = if at == Look::Line { scale } else { ks };
         let bh = ((sp.h * line_k).round() as i32).max(1);
         let Placed { mut win, ox, oy, bw, bh } = frame::place(at, m.position, mon, axis2, bw, bh, &sp, ks);
-        // záře pod tělem potřebuje pár px okna navíc (jen s `deco.edge: glow`)
-        if lay.as_ref().is_some_and(|l| l.paint.edge == crate::looks::composedeco::Edge::Glow) {
-            win.bottom += (crate::stripcompose::GLOW_PX * scale).ceil() as i32;
-        }
+        // svit pod tělem (záře, rozsvícení, živá hrana) potřebuje okno vyšší a širší, ať není uřízlý; rezerva je
+        // průhledná a click-through jako celé okno, hover zóna (`hover`) ji nebere
+        let hover = win;
+        let (rx, ry) = lay.as_ref().map(|l| crate::looks::edgefx::reserve(&l.paint, bw as f32, scale)).unwrap_or((0, 0));
+        (win.left, win.right, win.bottom) = (win.left - rx, win.right + rx, win.bottom + ry);
+        let ox = ox + rx;
         let (w, h) = (win.right - win.left, win.bottom - win.top);
         let (bwf, bhf) = (bw as f32, bh as f32);
 
@@ -575,6 +577,6 @@ pub(crate) unsafe fn draw(r: &Renderer, hwnd: HWND, m: &StripModel, rot: usize, 
         let _ = DeleteObject(HGDIOBJ(dib.0));
         let _ = DeleteDC(mem);
         ReleaseDC(None, screen);
-        Some((win, frame::morph_body(at, bw, bh + oy, scale)))
+        Some((hover, frame::morph_body(at, bw, bh + oy, scale)))
     }
 }

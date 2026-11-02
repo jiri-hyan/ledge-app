@@ -6,6 +6,7 @@
 // Karta bez `look` = žádný atribut, přesně jako dřív. Čistá logika bez importů za běhu (test `look.test.mjs`).
 
 import { storedDesign } from "./designs.ts";
+import { isColorSurface, normalizePalette, paletteStyle, SURFACE_KIND_NAMES, type CardPalette, type SurfaceKind } from "./surfaces.ts";
 import { GROUP_BY, GROUP_STYLES } from "../notes/group.ts";
 import { LEGACY_VIEW_DESIGN } from "../notes/noteDesigns.ts";
 
@@ -14,8 +15,8 @@ export type CardDensity = "compact" | "airy";
 export type CardView = "list" | "tiles" | "bento" | "compact";
 /** Plocha karty 2026 (kolo 22): „glass“ = sklo jen na rámu a hlavičce, pod textem plná stabilní plocha;
  *  „layer“ = plná vrstva s hloubkou. Tokeny `--k-*` dává materiál stylu (`theme/looks.ts` `MATERIALS`). */
-export type CardSurface = "glass" | "layer";
-export type CardLook = { accent?: string; bg?: CardBg; hideHead?: boolean; density?: CardDensity; view?: CardView; surface?: CardSurface; grain?: boolean; hero?: boolean; design?: string; /** karta Poznámky: seskupení seznamu (`notes/group.ts`) */ groupBy?: string; groupStyle?: string };
+export type CardSurface = "glass" | "layer" | SurfaceKind;
+export type CardLook = { accent?: string; bg?: CardBg; hideHead?: boolean; density?: CardDensity; view?: CardView; surface?: CardSurface; /** sada barev barevných povrchů (kolo 28, `surfaces.ts`); chybí = podle akcentu karty */ palette?: CardPalette; grain?: boolean; hero?: boolean; design?: string; /** karta Poznámky: seskupení seznamu (`notes/group.ts`) */ groupBy?: string; groupStyle?: string };
 export type Text = readonly [string, string];
 
 /** Akcent karty: barvy motivu (zrcadlo `CARD_ACCENTS` v tilelook.rs) nebo vlastní `#rrggbb`. */
@@ -44,11 +45,12 @@ export const DENSITY_NAMES: Record<(typeof DENSITIES)[number], Text> = {
   airy: ["cards.cardlook.dens.airy", "Vzdušná"],
 };
 /** Plocha karty: „style“ = podle stylu (pole chybí). 3 volby → segment. */
-export const SURFACES = ["style", "glass", "layer"] as const;
+export const SURFACES = ["style", "glass", "layer", "gradient", "flow", "edge", "stripes"] as const;
 export const SURFACE_NAMES: Record<(typeof SURFACES)[number], Text> = {
   style: ["cards.cardlook.surface.style", "Podle stylu"],
   glass: ["cards.cardlook.surface.glass", "Sklo"],
   layer: ["cards.cardlook.surface.layer", "Plné"],
+  ...SURFACE_KIND_NAMES,
 };
 /** Karty s hlavním číslem, které umí „číslo jako hrdina“ (`hero.ts` `heroFacts` — jen skutečná čísla). */
 export const HERO_CARDS: readonly string[] = ["claude", "weather"];
@@ -81,7 +83,9 @@ export function normalizeCardLook(raw: unknown, cardId: string): CardLook | unde
   if (oneOf(["compact", "airy"] as const, r.density)) out.density = r.density;
   const def = VIEW_CARDS[cardId];
   if (def && oneOf(viewsOf(cardId), r.view) && r.view !== def) out.view = r.view;
-  if (oneOf(["glass", "layer"] as const, r.surface)) out.surface = r.surface;
+  if (oneOf(["glass", "layer"] as const, r.surface) || isColorSurface(r.surface)) out.surface = r.surface;
+  const pal = normalizePalette(r.palette);
+  if (pal && isColorSurface(r.surface)) out.palette = pal;
   if (r.grain === true) out.grain = true;
   if (r.hero === true && heroable(cardId)) out.hero = true;
   // Poznámky: dřívější „Zobrazení“ (view) je teď vzhled karty; zvolený vzhled má přednost
@@ -123,6 +127,7 @@ export function cardLookAttrs(l: CardLook | undefined): { attrs: Record<string, 
   if (l.hideHead) attrs["data-cl-head"] = "off";
   if (l.density) attrs["data-cl-dens"] = l.density;
   if (l.surface) attrs["data-cl-surface"] = l.surface;
+  if (l.palette && isColorSurface(l.surface)) Object.assign(style, paletteStyle(l.surface, l.palette));
   if (l.grain) attrs["data-cl-grain"] = "";
   if (l.hero) attrs["data-cl-hero"] = "";
   return { attrs, style };
@@ -166,7 +171,7 @@ export function resetCardLooks<L extends { pages: Page[] }>(l: L): L {
 
 /** Předvolby vzhledu karet 2026 (galerie v Nastavení, kolo 22): plocha, zrnění, hrdina pro VŠECHNY karty jedné
  *  záložky najednou. Ostatní pole vzhledu (akcent, pozadí, hustota…) zůstanou. „style“ = zpět podle stylu. */
-export type LookPreset = { id: string; name: Text; desc: Text; patch: { surface?: CardSurface; grain?: boolean; hero?: boolean } };
+export type LookPreset = { id: string; name: Text; desc: Text; patch: { surface?: CardSurface; palette?: CardPalette; grain?: boolean; hero?: boolean } };
 export const LOOK_PRESETS: readonly LookPreset[] = [
   { id: "style", name: ["cards.looks.style", "Podle stylu"], desc: ["cards.looks.style.desc", "Karty přesně podle design stylu, jako dřív."], patch: {} },
   { id: "layer", name: ["cards.looks.layer", "Plné vrstvy"], desc: ["cards.looks.layer.desc", "Neprůhledné karty s jemnou hloubkou a vlasovou linkou."], patch: { surface: "layer" } },
@@ -174,6 +179,8 @@ export const LOOK_PRESETS: readonly LookPreset[] = [
   { id: "layerGrain", name: ["cards.looks.layerGrain", "Plné se zrněním"], desc: ["cards.looks.layerGrain.desc", "Plné vrstvy s jemným zrněním jako papír."], patch: { surface: "layer", grain: true } },
   { id: "glassGrain", name: ["cards.looks.glassGrain", "Sklo se zrněním"], desc: ["cards.looks.glassGrain.desc", "Sklo na rámu s jemným zrněním."], patch: { surface: "glass", grain: true } },
   { id: "hero", name: ["cards.looks.hero", "Čísla jako hrdina"], desc: ["cards.looks.hero.desc", "Plné vrstvy a u karet s hlavním číslem (limit Claude, počasí) velké číslo s grafem."], patch: { surface: "layer", hero: true } },
+  { id: "tiles", name: ["cards.looks.tiles", "Barevné dlaždice"], desc: ["cards.looks.tiles.desc", "Sytý přechod z akcentu každé karty do tmavé, velký obsah dole zůstává čitelný."], patch: { surface: "gradient", hero: true } },
+  { id: "liveGradients", name: ["cards.looks.liveGradients", "Živé přechody"], desc: ["cards.looks.liveGradients.desc", "Polární záře, která se při otevřeném šuplíku velmi pomalu přelévá (ne při omezeném pohybu)."], patch: { surface: "flow", palette: "aurora", hero: true } },
 ];
 
 /** Předvolba na všechny karty záložky `pageId` (pole předvolby se přepíšou, chybějící = pryč). */
@@ -183,7 +190,7 @@ export function applyLookPreset<L extends { pages: Page[] }>(l: L, pageId: strin
   if (!pr || !page) return l;
   let out = l;
   for (const c of page.cards) {
-    const look = patchCardLook(c.look, c.id, { surface: pr.patch.surface, grain: pr.patch.grain, hero: pr.patch.hero });
+    const look = patchCardLook(c.look, c.id, { surface: pr.patch.surface, palette: pr.patch.palette, grain: pr.patch.grain, hero: pr.patch.hero });
     out = setCardLook(out, pageId, c.id, look);
   }
   return out;
@@ -193,9 +200,9 @@ export function applyLookPreset<L extends { pages: Page[] }>(l: L, pageId: strin
 export function presetOf(l: { pages: Page[] }, pageId: string): string | null {
   const page = l.pages.find((p) => p.id === pageId);
   if (!page?.cards.length) return null;
-  const key = (lk: CardLook | undefined) => `${lk?.surface ?? ""}|${lk?.grain ? 1 : 0}`;
+  const key = (lk: CardLook | undefined) => `${lk?.surface ?? ""}|${lk?.palette ?? ""}|${lk?.grain ? 1 : 0}`;
   for (const pr of LOOK_PRESETS) {
-    const want = `${pr.patch.surface ?? ""}|${pr.patch.grain ? 1 : 0}`;
+    const want = `${pr.patch.surface ?? ""}|${pr.patch.palette ?? ""}|${pr.patch.grain ? 1 : 0}`;
     const heroOk = (c: Card) => !heroable(c.id) || !!normalizeCardLook(c.look, c.id)?.hero === !!pr.patch.hero;
     if (page.cards.every((c) => key(normalizeCardLook(c.look, c.id)) === want && heroOk(c))) return pr.id;
   }

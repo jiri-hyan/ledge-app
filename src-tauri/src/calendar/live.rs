@@ -279,7 +279,7 @@ pub async fn test(raw: &str) -> Result<TestResult, String> {
 /// Karta je na právě otevřené záložce a šuplík je vidět (nebo se právě otevírá).
 fn card_visible(cfg: &Config, opening: bool) -> bool {
     let c = core();
-    crate::layout::page_has_calendar(&cfg.layout, &c.mode.lock()) && (opening || c.drawer.view() == View::Full)
+    crate::notchbar::calendar_visible(cfg, &c.mode.lock()) && (opening || c.drawer.view() == View::Full)
 }
 
 /// Stáhne zastaralé kalendáře, když je karta vidět. Výsledek přes `mark_dirty`. Jinak nic.

@@ -61,6 +61,7 @@
     "allow-open-config-file",
     "allow-open-url",
     "allow-notify-preview",
+    "allow-edge-try",
     "allow-pick-path",
     "allow-pick-save",
     "allow-pkg-context",

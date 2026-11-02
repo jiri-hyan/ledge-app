@@ -63,8 +63,8 @@ import { t } from "./i18n";
 import WidgetCard from "./widgets/WidgetCard";
 import { rememberWidgets } from "./widgets/registry";
 import SuggestBar from "./suggest/SuggestBar";
-import NotchBar from "./notch/NotchBar";
-import { notchSections, takenCards } from "./notch/model";
+import NotchBar, { NotchBarEdit } from "./notch/NotchBar";
+import { barPlan } from "./notch/bar";
 import { layoutNow } from "./theme/apply";
 import UsageCard from "./board/UsageCard";
 import WeekCard from "./board/WeekCard";
@@ -101,9 +101,9 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   // V úpravách lišta zůstane nahoře jako náhled (úpravy = to, co je vidět) a převzaté karty jsou v mřížce
   // označené „v liště nahoře“, ať jdou přesunout nebo odebrat.
   const notch = createMemo(() => {
-    if (layoutNow() !== "notch") return { sections: [], taken: [] as string[] };
-    const sections = notchSections(shown(), { media: on("nowPlaying") && !!p.s.personal.media, volume: on("sound") && !!p.s.personal.volume });
-    return { sections, taken: takenCards(shown(), sections) };
+    // kolo 27: vlastní seznam sekcí záložky (`notchBar`) má přednost a karty nepřebírá; chybí = jako dřív
+    if (layoutNow() !== "notch") return { sections: [], taken: [] as string[], custom: false };
+    return barPlan(page().notchBar, shown(), { media: on("nowPlaying") && !!p.s.personal.media, volume: on("sound") && !!p.s.personal.volume });
   });
   const shows = (id: CardId) => shown().includes(id) && (editing() || !notch().taken.includes(id));
   const edit = (catalog = false) => beginEdit(p.s, catalog);
@@ -231,15 +231,22 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       <Show when={inboxShown(has)}><ClaudeInbox s={p.s} /></Show>
       <BgLaunch s={p.s} />
       {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
-      <Show when={has("media") || has("clock") || has("toggles") || has("winquick")}><PersonalLive /></Show>
+      <Show when={has("media") || has("clock") || has("toggles") || has("winquick") || notch().sections.some((x) => x.id === "player" || x.id === "volume")}><PersonalLive /></Show>
       {/* kontextové návrhy (max 3 chipy) — jen z reálných událostí, `src/suggest/` */}
       <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
       {/* přetažení odkazu / souboru na otevřený šuplík → editor akce s návrhem (`actions/DropNew.tsx`) */}
       <Show when={dropped() && !editing()}><DropNew s={p.s} page={page().id} /></Show>
-      <Show when={notch().sections.length > 0}>
-        <div class="notch-wrap" classList={{ preview: editing() }} title={editing() ? t("cards.notch.editPreview", "Lišta rozvržení Notch — upravíš ji kartami označenými „v liště nahoře“") : undefined}>
-          <NotchBar s={p.s} now={p.now} sections={notch().sections} />
-        </div>
+      <Show
+        when={layoutNow() === "notch" && editing()}
+        fallback={
+          <Show when={notch().sections.length > 0}>
+            <div class="notch-wrap">
+              <NotchBar s={p.s} now={p.now} sections={notch().sections} />
+            </div>
+          </Show>
+        }
+      >
+        <NotchBarEdit s={p.s} now={p.now} page={page()} />
       </Show>
       <Deck page={page()} layout={layout()} editing={editing()} shown={shows} notched={(id) => notch().taken.includes(id)} render={card} begin={() => edit()} hero={{ facts: (id) => heroFacts(id, p.s, p.now), render: (id, f) => <HeroCard id={id} facts={f()} menu={menu(id)} /> }} />
       <Show when={cardLookTarget()?.page === page().id}><CardLookPanel page={page().id} s={p.s} /></Show>

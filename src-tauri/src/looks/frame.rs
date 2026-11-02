@@ -42,6 +42,8 @@ pub struct Spec {
     pub ring: f32,
     /// rádius těla `pill` (0 = půl výšky; vlastní vzhled podle zaoblení)
     pub pill_r: f32,
+    /// tloušťka písma vlastního vzhledu: 0 dnešní, 1 polotučné, 2 tučné (kolo 27)
+    pub weight: u8,
 }
 
 const BLACK: Rgba = Rgba(0.0, 0.0, 0.0, 1.0);
@@ -66,6 +68,7 @@ pub fn spec(look: Look, show: &Show) -> Spec {
         dot: 7.0,
         ring: 0.0,
         pill_r: 0.0,
+        weight: 0,
     };
     match look {
         // klasický proužek kreslí `strip::draw`; tady jen rozumné rozměry pro hover zónu a morf

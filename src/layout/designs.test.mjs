@@ -12,10 +12,10 @@ test("každá karta má unikátní id a páry [klíč, česky]", () => {
   }
 });
 
-test("claude a system mají sedm až devět vzhledů, výchozí první", () => {
+test("claude a system mají sedm až jedenáct vzhledů, výchozí první", () => {
   assert.equal(defaultDesign("claude"), "classic");
   assert.equal(defaultDesign("system"), "lines");
-  assert.deepEqual(designsOf("claude").map((d) => d.id), ["classic", "rings", "pace", "hero", "heroWeek", "heroSpend", "spend", "sessions", "gauge"]);
+  assert.deepEqual(designsOf("claude").map((d) => d.id), ["classic", "rings", "pace", "hero", "heroWeek", "heroSpend", "spend", "sessions", "gauge", "working", "done"]);
   assert.equal(designsOf("system").length, 7);
   assert.equal(designsOf("notes").length, 6);
   assert.equal(defaultDesign("notes"), "list");

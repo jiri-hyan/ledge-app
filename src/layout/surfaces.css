@@ -1,0 +1,64 @@
+/* Barevné povrchy karet (kolo 28, `layout/surfaces.ts`): Přechod · Přelévání · Záře hrany · Proužky.
+   Obecně na položce karty s `data-cl-surface`; bez atributu se nic nemění. Barvy dává sada (`--sf-a/-b/-e` z `palette`)
+   nebo, když chybí, akcent karty (`--accent`). Přelévání = pomalý posun pozadí v krocích (≈4 snímky/s, žádný časovač
+   v JS), běží jen s `data-cl-live` (šuplík otevřený); `data-motion="none"` a prefers-reduced-motion ho vypnou. */
+[data-card]:is([data-cl-surface="gradient"], [data-cl-surface="flow"], [data-cl-surface="edge"], [data-cl-surface="stripes"]) {
+  --sf-dark: #0c0c12;
+  --sf-a: color-mix(in srgb, var(--accent) 34%, var(--sf-dark));
+  --sf-b: color-mix(in srgb, var(--accent) 20%, var(--sf-dark));
+  --sf-e: var(--accent);
+}
+/* Přechod / Přelévání: světlý text na tmavém přechodu (kontrast hlídá surfaces.test.mjs) */
+[data-card]:is([data-cl-surface="gradient"], [data-cl-surface="flow"]) > :first-child {
+  --t1: #f6f6fa; --t2: #e2e3ec; --t3: #cfd1de;
+  color: var(--t1);
+  background: linear-gradient(158deg, var(--sf-a) 0%, var(--sf-b) 52%, var(--sf-dark) 100%);
+  border: 1px solid color-mix(in srgb, #fff 14%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 2px 6px -3px rgba(0, 0, 0, 0.35), 0 14px 30px -20px rgba(0, 0, 0, 0.75);
+}
+[data-card][data-cl-surface="flow"] > :first-child {
+  background-size: 100% 260%;
+  background-position: 0 0;
+}
+[data-card][data-cl-surface="flow"][data-cl-live] > :first-child { animation: sf-flow 70s steps(280) infinite alternate; }
+@keyframes sf-flow { to { background-position: 0 100%; } }
+html[data-motion="none"] [data-card][data-cl-surface="flow"] > :first-child { animation: none; }
+@media (prefers-reduced-motion: reduce) { [data-card][data-cl-surface="flow"] > :first-child { animation: none; } }
+/* Záře hrany: tmavá plná karta, horní hrana a krátká záře pod ní v barvě akcentu */
+[data-card][data-cl-surface="edge"] > :first-child {
+  background:
+    radial-gradient(90% 46px at 50% 0, color-mix(in srgb, var(--sf-e) 26%, transparent), transparent 100%),
+    var(--k-base, var(--raised));
+  border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 9%, transparent);
+  border-top-color: color-mix(in srgb, var(--sf-e) 70%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sf-e) 45%, transparent), 0 14px 30px -20px rgba(0, 0, 0, 0.75);
+}
+/* Proužky: jemný diagonální vzor v akcentu na plné vrstvě, statický */
+[data-card][data-cl-surface="stripes"] > :first-child {
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--sf-e) 9%, transparent) 0 7px, transparent 7px 16px),
+    var(--k-base, var(--raised));
+  border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 9%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--k-contrast, var(--t1)) 7%, transparent), 0 2px 6px -3px rgba(0, 0, 0, 0.35), 0 14px 30px -20px rgba(0, 0, 0, 0.75);
+}
+
+/* ---------- výběr sady v panelu vzhledu karty (SurfacePalette.tsx) a náhledy ---------- */
+.sf-pal { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sf-pal .sf-sw {
+  width: 26px; height: 18px; border-radius: 6px; padding: 0; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--t1) 22%, transparent);
+  background: linear-gradient(135deg, var(--sf-pa), var(--sf-pb));
+}
+.sf-pal .sf-sw.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sf-pal .sf-sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Miniatury v galerii předvoleb (MiniCard v galerii): stejné povrchy ve zmenšení, bez animace */
+span:is([data-s="gradient"], [data-s="flow"], [data-s="edge"], [data-s="stripes"]) {
+  --sf-dark: #0c0c12;
+  --sf-a: color-mix(in srgb, var(--accent) 34%, var(--sf-dark));
+  --sf-b: color-mix(in srgb, var(--accent) 20%, var(--sf-dark));
+  --sf-e: var(--accent);
+}
+span:is([data-s="gradient"], [data-s="flow"]) { background: linear-gradient(158deg, var(--sf-a), var(--sf-b) 52%, var(--sf-dark)); border: 1px solid color-mix(in srgb, #fff 14%, transparent); }
+span[data-s="edge"] { background: radial-gradient(90% 8px at 50% 0, color-mix(in srgb, var(--sf-e) 30%, transparent), transparent), var(--k-base, var(--raised)); border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 9%, transparent); border-top-color: color-mix(in srgb, var(--sf-e) 70%, transparent); }
+span[data-s="stripes"] { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--sf-e) 14%, transparent) 0 3px, transparent 3px 7px), var(--k-base, var(--raised)); border: 1px solid color-mix(in srgb, var(--k-contrast, var(--t1)) 9%, transparent); }

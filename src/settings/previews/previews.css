@@ -131,7 +131,7 @@
 .apv-sx[data-lshape="island"] { top: 5px; border-radius: var(--r-pill); }
 
 /* vlastní zavřený Ledge (kolo 23, `ComposePreview`): tělo z `strip.compose`, sloty vlevo / střed / vpravo */
-.apv-sx[data-look="custom"] { gap: calc(8px * var(--k)); padding: 0 calc(12px * var(--k)); background: var(--fill, #000); color: #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
+.apv-sx[data-look="custom"] { gap: calc(8px * var(--k) * var(--sp, 1)); padding: 0 calc(12px * var(--k) * var(--sp, 1)); background: var(--fill, #000); color: #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
 .apv-sx[data-cshape="island"] { top: 5px; }
 .apv-sx[data-cshape="corner"] { top: 8px; left: auto; right: 8px; transform: none; border: 1px solid rgba(255, 255, 255, 0.14); }
 .apv-scr[data-pos="left"] .apv-sx[data-cshape="corner"] { left: 8px; right: auto; }
@@ -139,7 +139,7 @@
   background: radial-gradient(circle at 0 100%, transparent calc(var(--ear) - 0.5px), var(--fill, #000) var(--ear)); }
 .apv-sx[data-cshape="notch"]::before { left: calc(-1 * var(--ear)); transform: scaleX(-1); }
 .apv-sx[data-cshape="notch"]::after { right: calc(-1 * var(--ear)); }
-.apv-cs { display: inline-flex; flex: 1 1 0; align-items: center; gap: calc(6px * var(--k)); }
+.apv-cs { display: inline-flex; flex: 1 1 0; align-items: center; gap: calc(6px * var(--k) * var(--sp, 1)); }
 .apv-cs[data-slot="center"] { flex: none; justify-content: center; }
 .apv-cs[data-slot="right"] { justify-content: flex-end; }
 .apv-sx[data-look="custom"] .apv-ring2 { width: var(--rd); height: var(--rd); }
@@ -148,18 +148,18 @@
   background: color-mix(in srgb, var(--c, var(--t3)) 25%, transparent); }
 .apv-meter i { display: block; height: 100%; background: var(--c, var(--t2)); }
 /* Kolo 25: výzdoba vlastního vzhledu (`compose.deco` / `fill` / `sep`) a nové styly dílů */
-.apv-pc { display: inline-flex; align-items: center; gap: calc(6px * var(--k)); }
+.apv-pc { display: inline-flex; align-items: center; gap: calc(6px * var(--k) * var(--sp, 1)); }
 .apv-pc.pcol, .apv-pc.pcol * { --c: var(--pcol) !important; color: var(--pcol); }
 .apv-pc[data-chip] { background: color-mix(in srgb, var(--chip) 24%, transparent); border-radius: 999px; padding: calc(2px * var(--k)) calc(7px * var(--k)); }
 .apv-sx[data-sep="pills"] .apv-pc:not([data-chip]) { background: rgba(255, 255, 255, 0.09); border-radius: 999px; padding: calc(2px * var(--k)) calc(7px * var(--k)); }
-.apv-sx[data-sep="gap"] .apv-cs { gap: calc(16px * var(--k)); }
-.apv-sx[data-sep="dot"] .apv-cs, .apv-sx[data-sep="bar"] .apv-cs { gap: calc(12px * var(--k)); }
-.apv-sx[data-sep="dot"] .apv-pc + .apv-pc::before { content: "·"; margin-left: calc(-8px * var(--k)); color: rgba(255, 255, 255, 0.45); }
-.apv-sx[data-sep="bar"] .apv-pc + .apv-pc::before { content: ""; align-self: stretch; width: 1px; margin: 22% 0 22% calc(-7px * var(--k)); background: rgba(255, 255, 255, 0.24); }
+.apv-sx[data-sep="gap"] .apv-cs { gap: calc(16px * var(--k) * var(--sp, 1)); }
+.apv-sx[data-sep="dot"] .apv-cs, .apv-sx[data-sep="bar"] .apv-cs { gap: calc(12px * var(--k) * var(--sp, 1)); }
+.apv-sx[data-sep="dot"] .apv-pc + .apv-pc::before { content: "·"; margin-left: calc(-8px * var(--k) * var(--sp, 1)); color: rgba(255, 255, 255, 0.45); }
+.apv-sx[data-sep="bar"] .apv-pc + .apv-pc::before { content: ""; align-self: stretch; width: 1px; margin: 22% 0 22% calc(-7px * var(--k) * var(--sp, 1)); background: rgba(255, 255, 255, 0.24); }
 .apv-sx[data-sep="islands"] { background: none; box-shadow: none; gap: calc(6px * var(--k)); padding: 0; }
 .apv-sx[data-sep="islands"]::before, .apv-sx[data-sep="islands"]::after { display: none; }
 .apv-sx[data-sep="islands"] .apv-cs { flex: none; height: 100%; border-radius: inherit; }
-.apv-sx[data-sep="islands"] .apv-cs:not(:empty) { background: var(--fill, #000); padding: 0 calc(10px * var(--k)); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
+.apv-sx[data-sep="islands"] .apv-cs:not(:empty) { background: var(--fill, #000); padding: 0 calc(10px * var(--k) * var(--sp, 1)); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
 .apv-sx[data-mono] { font-family: var(--mono); }
 .apv-sx[data-fill="glass"] { border: 1px solid rgba(255, 255, 255, 0.12); }
 .apv-sx[data-fill="none"] { box-shadow: none; text-shadow: 1px 1px 2px #000; }
@@ -173,3 +173,50 @@
 .apv-sp { display: inline-flex; align-items: center; gap: calc(5px * var(--k)); }
 .apv-spark { width: calc(30px * var(--k)); height: calc(12px * var(--k)); flex: none; }
 .apv-spark polyline { fill: none; stroke: var(--c, var(--accent)); stroke-width: 1.4; stroke-linejoin: round; }
+
+/* Kolo 28: živá hrana vlastního vzhledu v náhledu (`EdgeFx.tsx`, nativ `stripfx`). Hýbe se jen `[data-run]`
+   (Claude pracuje / čeká, `always`, naplnění, „Vyzkoušet“); prefers-reduced-motion a `html[data-motion="none"]`
+   = statický snímek (naplnění rovnou plné). */
+.apv-sx[data-edge][data-len] .apv-edge { left: var(--ein, 30%); right: var(--ein, 30%); }
+.apv-edge[data-fx="gradient"] { background: linear-gradient(90deg, var(--e1), var(--e2), var(--e3)); }
+.apv-edge[data-fx="flow"] { background: linear-gradient(90deg, var(--e1), var(--e2), var(--e3), var(--e1)) 0 0 / 50% 100% repeat-x; }
+.apv-edge[data-fx="flow"][data-run] { animation: apv-flow var(--esp, 3.2s) linear infinite; }
+.apv-edge[data-fx="breath"] { background: linear-gradient(90deg, var(--e1), var(--e2), var(--e3)); opacity: 0.85; box-shadow: 0 0 calc(8px * var(--epk, 1)) var(--e1); }
+.apv-edge[data-fx="breath"][data-run] { animation: apv-breath calc(var(--esp, 3.2s) * 1.06) ease-in-out infinite; }
+.apv-edge[data-fx="dashes"] { background: transparent; }
+.apv-edge[data-fx="dashes"]::before, .apv-edge[data-fx="dashes"]::after {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: 100%;
+  background: repeating-linear-gradient(90deg, var(--e1) 0 4px, transparent 4px 7px);
+}
+.apv-edge[data-fx="dashes"]::before { opacity: 0.18; }
+.apv-edge[data-fx="dashes"]::after { width: var(--efrac, 100%); }
+.apv-edge[data-fx="dashes"][data-run]::after { animation: apv-march calc(var(--esp, 3.2s) / 4) linear infinite; }
+.apv-edge[data-fx="comet"] { background: color-mix(in srgb, var(--e1) 18%, transparent); }
+.apv-edge[data-fx="comet"]::after {
+  content: ""; position: absolute; top: 50%; left: 50%; width: 30%; height: calc(var(--ew) * 1.6); transform: translate(-100%, -50%);
+  background: linear-gradient(90deg, transparent, var(--e1) 85%, var(--e2)); border-radius: 999px; box-shadow: 0 2px 8px var(--e1);
+}
+.apv-edge[data-fx="comet"][data-run]::after { animation: apv-comet calc(var(--esp, 3.2s) * 0.69) ease-in-out infinite alternate; }
+.apv-sx[data-edge="light"] { box-shadow: 0 calc(8px * var(--epk, 1)) calc(22px * var(--epk, 1)) calc(-2px * var(--epk, 1)) var(--e1); }
+.apv-sx[data-edge="light"][data-len] .apv-edge { left: 8%; right: 8%; background: linear-gradient(90deg, var(--e1), var(--e2), var(--e3)); }
+.apv-sx[data-edge="glow"] { box-shadow: 0 calc(6px * var(--epk, 1)) calc(16px * var(--epk, 1)) -3px var(--e1); }
+.apv-edge[data-fx="sweep"] { background: var(--e1); transform-origin: left center; box-shadow: 0 2px 8px var(--e1); }
+.apv-edge[data-fx="sweep"][data-run] { animation: apv-sweep 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) 1 both; }
+.apv-sx[data-edge][data-len] .apv-edge[data-fx="outlineGradient"] {
+  inset: 0; left: 0; right: 0; height: auto; border-radius: inherit; padding: var(--ew); background: linear-gradient(90deg, var(--e1), var(--e2), var(--e3));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.apv-sx[data-fflow] { background-size: 300% 300% !important; }
+.apv-sx[data-fflow][data-run] { animation: apv-fflow calc(var(--esp, 3.2s) * 3) ease-in-out infinite alternate; }
+@keyframes apv-flow { to { background-position: 100% 0; } }
+@keyframes apv-breath { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@keyframes apv-march { to { background-position: 7px 0; } }
+@keyframes apv-comet { from { left: 0%; transform: translate(0, -50%); } to { left: 100%; transform: translate(-100%, -50%); } }
+@keyframes apv-sweep { from { transform: scaleX(0); } }
+@keyframes apv-fflow { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@media (prefers-reduced-motion: reduce) {
+  .apv-edge, .apv-edge::after, .apv-sx[data-fflow] { animation: none !important; }
+}
+html[data-motion="none"] .apv-edge, html[data-motion="none"] .apv-edge::after, html[data-motion="none"] .apv-sx[data-fflow] { animation: none !important; }
+/* sady barev v editoru (`ComposeEdge.tsx`) */
+.cx-sw { display: inline-block; width: 46px; height: 8px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }

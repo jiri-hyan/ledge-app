@@ -120,7 +120,7 @@ const PANEL_SRC = {
   zaciname: ["panels/Start.tsx"],
   suplik: ["panels/Drawer.tsx", "../layout/LayoutEditor.tsx"],
   naplose: ["../desk/DeskSettings.tsx"],
-  vzhled: ["panels/AppearanceClosed.tsx", "panels/AppearanceHover.tsx", "panels/AppearanceOpen.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceThemes.tsx", "panels/AppearancePages.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
+  vzhled: ["panels/AppearanceClosed.tsx", "panels/AppearanceHover.tsx", "panels/AppearanceOpen.tsx", "panels/AppearanceStyles.tsx", "panels/AppearanceThemes.tsx", "panels/AppearancePages.tsx", "panels/AppearanceHead.tsx", "panels/AppearanceLayout.tsx", "panels/AppearanceMotion.tsx", "panels/StripSettings.tsx"],
   akce: ["panels/Projects.tsx", "panels/Actions.tsx", "../actions/ScriptsSettings.tsx", "panels/LegacyLinks.tsx", "../widgets/WidgetsSettings.tsx"],
   claude: ["panels/Claude.tsx", "panels/Questions.tsx", "../mcp/McpSettings.tsx"],
   osobni: ["panels/Personal.tsx", "../media/MediaSettings.tsx", "../suggest/SuggestSettings.tsx", "../cliphist/ClipSettings.tsx", "../calendar/CalendarSettings.tsx", "../integrations/IntegrationsSettings.tsx", "../accounts/AccountsSettings.tsx"],

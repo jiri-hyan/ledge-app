@@ -55,8 +55,8 @@ test("šířka notche = Rust NOTCH_PX; rozložení notch zná Rust i výběr sty
   const rust = readFileSync(new URL("../../src-tauri/src/appearance/look.rs", import.meta.url), "utf8");
   const px = Number(/export const NOTCH_PX = (\d+);/.exec(looks)?.[1]);
   assert.ok(px > 0 && rust.includes(`pub const NOTCH_PX: u32 = ${px};`), `NOTCH_PX ${px}`);
-  // grafy: notch kreslí sdílený Sparkline z `src/charts`, ne vlastní křivku
-  const bar = readFileSync(new URL("./NotchBar.tsx", import.meta.url), "utf8");
-  assert.ok(bar.includes('from "../charts/Sparkline"'), "NotchBar používá src/charts/Sparkline");
-  assert.ok(!bar.includes('"./Spark"') && !existsSync(new URL("./Spark.tsx", import.meta.url)), "žádná vlastní křivka v notchi");
+  // grafy (kolo 27): body křivky ze sdíleného `src/charts/geom.ts` (tloušťka / vyhlazení / přechod jsou volby lišty)
+  const look = readFileSync(new URL("./look.ts", import.meta.url), "utf8");
+  assert.ok(look.includes('from "../charts/geom.ts"'), "lišta bere body grafu z src/charts/geom.ts");
+  assert.ok(!look.includes('"./Spark"') && !existsSync(new URL("./Spark.tsx", import.meta.url)), "žádná vlastní křivka v notchi");
 });

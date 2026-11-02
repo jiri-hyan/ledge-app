@@ -13,6 +13,23 @@ export type FontLook = "system" | "mono" | "serif" | "grotesk";
 export type Material = "solid" | "glass" | "paper" | "glow" | "hard" | "soft" | "frame" | "acrylic" | "tinted";
 export type LayoutId = "classic" | "float" | "band" | "sheet" | "panorama" | "mosaic" | "tiles" | "panel" | "notch";
 export type WidthPreset = "custom" | "narrow" | "medium" | "wide" | "full";
+/** Hlavička šuplíku (kolo 27, zrcadlo `appearance::head`); logika a výchozí hodnoty `layout/headModel.ts`. */
+export type HeadPart = "clock" | "chips" | "tabs" | "edit" | "note" | "search" | "settings" | "close";
+export type ClockStyle = "big" | "line" | "seconds" | "analog" | "time";
+export type ChipStyle = "auto" | "pills" | "merged" | "dots" | "icons";
+export type TabsStyle = "segment" | "underline" | "pills" | "icons" | "dots";
+export interface HeadLook {
+  /** pořadí dílů zleva; chybějící se přidají na konec v dnešním pořadí */
+  order?: HeadPart[];
+  hidden?: HeadPart[];
+  clock: ClockStyle;
+  /** chybí = zapnuto */
+  showDate?: boolean;
+  chips: ChipStyle;
+  /** ukazovat i štítky s nulou; chybí = ne */
+  showZero?: boolean;
+}
+export interface TabsLook { style: TabsStyle }
 export interface Appearance {
   /** design styl (`classic` = vzhled před vlnou 6); hodnoty stylu jsou v polích níž */
   style: string;
@@ -48,6 +65,9 @@ export interface Appearance {
   accent2?: string;
   /** akcent z barev pozadí (kolo 25); chybí = vypnuto */
   accentFromBackdrop?: boolean;
+  /** hlavička a přepínač záložek (kolo 27); chybí = dnešní vzhled */
+  head?: HeadLook;
+  tabs?: TabsLook;
 }
 /** Druh gradientu (zrcadlo `appearance::backdrop::KINDS`). */
 export type GradKind = "linear" | "radial" | "conic" | "mesh";

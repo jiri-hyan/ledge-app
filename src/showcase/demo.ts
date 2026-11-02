@@ -31,6 +31,8 @@ export function installShowcase() {
   if (q.get("accent")) a.accent = "#" + q.get("accent");
   if (q.get("width")) a.width = q.get("width");
   if (q.get("w")) a.size = { ...(a.size ?? {}), width: Number(q.get("w")) };
+  if (q.get("head")) a.head = JSON.parse(q.get("head")!);
+  if (q.get("tabs")) a.tabs = { style: q.get("tabs") };
   cfg.appearance = a;
   cfg.layout = clone(data.layout);
   // `cards=claude,notes` nechá na první záložce jen vyjmenované karty (soustředěné snímky)
@@ -39,6 +41,8 @@ export function installShowcase() {
     cfg.layout.pages = cfg.layout.pages.filter((p: any) => !q.get("page") || p.id === q.get("page"));
     for (const p of cfg.layout.pages) p.cards = keep.map((k) => { const [id, size, design] = k.split(":"); const c = p.cards.find((x: any) => x.id === id) ?? { id, size: "l" }; const o: any = size ? { ...c, size, h: undefined } : { ...c }; if (design) o.look = { ...(o.look ?? {}), design }; return o; });
   }
+  // `bar=<json>` = vlastní lišta notche na každé záložce (kolo 27, přehlídka sekcí lišty)
+  if (q.get("bar")) for (const p of cfg.layout.pages) p.notchBar = JSON.parse(q.get("bar")!);
   // přehlídka vzhledů (`scripts/showcase/designs.mjs`): bohatší ukázková data a pozadí šuplíku z URL
   //   full=1 útrata + předpověď · wx=day|night|rain · bd=<id gradientu> · live=<živé pozadí> · bdcards=auto|solid|tint|glass · empty=1 prázdné stavy
   const empty = !!q.get("empty");
@@ -59,6 +63,11 @@ export function installShowcase() {
   snap.smart = { quickKeys: false, dropShortcut: false, tabWheel: true };
   snap.personal = { ...snap.personal, mediaLook: { variant: data.mediaVariant, stripTime: "auto", equalizer: true } };
   if (q.get("nopending")) snap.pending = [];
+  // `morechips=1`: i pád a nedokončená session, ať má hlavička 6 štítků (přehlídka hlavičky)
+  if (q.get("morechips")) {
+    snap.procs = [...snap.procs, { id: "app-v2", phase: "failed", pid: 0, port: null, url: null, startedAt: now - 300_000, readyAt: null, exitCode: 1, message: null, lastLine: null, errors: 1 }] as any;
+    snap.sessions = [...snap.sessions, session("s-unfin", "Nedokončená práce", "Orbit", "orbit", "idle", now, { uncommitted: ["a.ts"], unpushed: 1 })] as any;
+  }
   if (q.get("ask")) { snap.pending = []; snap.questions = [askFor(now)]; }
   if (q.get("full") && !empty) {
     snap.costs = costsFull(now) as any;

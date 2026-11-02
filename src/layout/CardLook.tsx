@@ -24,6 +24,7 @@ import {
 import { GROUP_BY, GROUP_BY_NAMES, GROUP_STYLE_NAMES, GROUP_STYLES } from "../notes/group";
 import DesignPicker from "./DesignPicker";
 import { cardName, tx } from "./text";
+import SurfacePalette from "./SurfacePalette";
 import type { CardId } from "./model";
 import "../tilelook/tilelook.css";
 import "../media/media.css";
@@ -88,6 +89,7 @@ function Panel(p: { tg: Target; s?: Snapshot }) {
       </div>
       <MenuChoice label={t("cards.cardlook.bg", "Pozadí")} items={BGS.map((b) => ({ v: b, text: tx(BG_NAMES[b]) }))} value={look().bg ?? "style"} onPick={(v) => patch({ bg: v })} />
       <MenuChoice label={t("cards.cardlook.surface", "Plocha")} items={SURFACES.map((x) => ({ v: x, text: tx(SURFACE_NAMES[x]), title: x === "glass" ? t("cards.cardlook.surface.glassHint", "Průsvitný rám a hlavička, pod textem plná plocha") : undefined }))} value={look().surface ?? "style"} onPick={(v) => patch({ surface: v })} />
+      <SurfacePalette look={look()} onPick={(v) => patch({ palette: v })} />
       <MenuChoice label={t("cards.cardlook.density", "Hustota")} items={DENSITIES.map((d) => ({ v: d, text: tx(DENSITY_NAMES[d]) }))} value={look().density ?? "style"} onPick={(v) => patch({ density: v })} />
       <Show when={p.tg.card === "notes"}>
         <MenuChoice label={t("cards.cardlook.groupBy", "Seskupit podle")} items={GROUP_BY.map((g) => ({ v: g, text: tx(GROUP_BY_NAMES[g]) }))} value={look().groupBy ?? "none"} onPick={(v) => patch({ groupBy: v })} />

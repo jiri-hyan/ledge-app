@@ -1,7 +1,7 @@
 //! Vlastní zavřený Ledge (`compose`, kolo 23): ořez configu, položky × styly, předvolby × stavy, rozměry
 //! a místo každého tvaru, config z 0.9.0 beze změny a zrcadlo id v `src/strip/compose.ts`.
 
-use super::compose::{self, Compose, Form, PieceItem, Piece, PieceStyle};
+use super::compose::{self, Compose, Form, Piece, PieceItem, PieceSize, PieceStyle, Spacing, TextLook, Weight};
 use super::tests::{STATES, facts, parts_sig, sig};
 use super::*;
 use crate::appearance::StripPosition;
@@ -265,15 +265,28 @@ fn ts_mirror() {
         PieceItem::Cpu, PieceItem::Memory, PieceItem::Battery, PieceItem::Weather, PieceItem::Servers, PieceItem::Repos,
         PieceItem::Activity,
     ];
-    use super::composedeco::{Edge, EdgeLen, FillDir, FillKind, Sep};
+    // hrany a délky linky (kolo 28) hlídá `edgefx::ts_mirror` proti `src/strip/edgefx.ts`
+    use super::composedeco::{FillDir, FillKind, Sep};
     let styles = [
         PieceStyle::Icon, PieceStyle::Badge, PieceStyle::Text, PieceStyle::Ring, PieceStyle::Graph, PieceStyle::Dot, PieceStyle::IconText, PieceStyle::Bar,
         PieceStyle::Spark, PieceStyle::Chip, PieceStyle::DotPct, PieceStyle::Ring5h,
     ];
     let j = |v: Vec<serde_json::Value>| ids(v.into_iter().map(ser).collect());
+    let jv = |v: Vec<serde_json::Value>| j(v);
     for (name, list) in [
-        ("COMPOSE_EDGES", j([Edge::None, Edge::Underline, Edge::Outline, Edge::Glow, Edge::Gradient].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
-        ("EDGE_LENS", j([EdgeLen::Center, EdgeLen::Full].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+        ("PIECE_SIZES", jv([PieceSize::Small, PieceSize::Normal, PieceSize::Large].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+        ("TEXT_WEIGHTS", jv([Weight::Normal, Weight::Semi, Weight::Bold].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+        ("TEXT_SPACINGS", jv([Spacing::Tight, Spacing::Normal, Spacing::Wide].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
+    ] {
+        assert!(ts.contains(&format!("{name} = [{list}]")), "{name}: {list}");
+    }
+    for (k, v) in [("TEXT_MIN", compose::TEXT_MIN), ("TEXT_MAX", compose::TEXT_MAX)] {
+        assert!(ts.contains(&format!("{k} = {v}")), "{k}");
+    }
+    for (a, b) in [(PieceSize::Small, "small: 0.82"), (PieceSize::Normal, "normal: 1"), (PieceSize::Large, "large: 1.25")] {
+        assert!(ts.contains(b) && ts.contains(&format!("{}", a.mult())), "{b}");
+    }
+    for (name, list) in [
         ("FILL_KINDS", j([FillKind::Black, FillKind::Glass, FillKind::Tint, FillKind::Gradient, FillKind::None].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
         ("FILL_DIRS", j([FillDir::Right, FillDir::Down, FillDir::Diag].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
         ("COMPOSE_SEPS", j([Sep::None, Sep::Gap, Sep::Dot, Sep::Bar, Sep::Pills, Sep::Islands].iter().map(|x| serde_json::to_value(x).unwrap()).collect())),
@@ -368,4 +381,58 @@ fn kolo23_config_draws_as_before() {
     assert_eq!((s.rotate.len(), s.segs[1].len()), (2, 2));
     assert_eq!(s.segs[1].iter().map(|x| x.n).collect::<Vec<_>>(), s.rotate.iter().map(Vec::len).collect::<Vec<_>>());
     assert!(s.segs[1][0].chip.is_some() && s.segs[1][1].chip.is_none());
+}
+
+/// Kolo 27: starý config (bez `text`, díly bez size / bg / ink) = dnešní velikost písma a mezer, žádné nové klíče ven.
+#[test]
+fn text_look_old_config_unchanged() {
+    let old: Compose = serde_json::from_str(r#"{"shape":"capsule","height":30,"left":[{"item":"claude","style":"icon"}]}"#).unwrap();
+    assert_eq!(old.text, TextLook::default());
+    let sp = compose::spec(&old);
+    let h = 30.0_f32;
+    assert_eq!(sp.font, (h * 0.45).clamp(9.5, 20.0));
+    assert_eq!(sp.gap, (h * 0.28).clamp(4.0, 14.0));
+    assert_eq!(sp.pad, (h * 0.45).clamp(6.0, 20.0));
+    assert_eq!(sp.weight, 0);
+    let out = serde_json::to_value(&old.norm().left[0]).unwrap();
+    assert_eq!(out, serde_json::json!({"item": "claude", "style": "icon"}));
+}
+
+#[test]
+fn text_look_scales_font_independent_of_height() {
+    // (násobek, tloušťka, proložení) → (velikost písma při výšce 40, mezera, váha)
+    let h = 40.0_f32;
+    let base = (h * 0.45).clamp(9.5, 20.0);
+    let gap0 = (h * 0.28).clamp(4.0, 14.0);
+    for (size, w, sp, font, gap, wt) in [
+        (0.6, Weight::Normal, Spacing::Normal, base * 0.6, gap0, 0),
+        (1.4, Weight::Bold, Spacing::Wide, base * 1.4, gap0 * 1.4, 2),
+        (9.0, Weight::Semi, Spacing::Tight, base * 1.4, gap0 * 0.7, 1),
+        (0.0, Weight::Normal, Spacing::Normal, base * 0.6, gap0, 0),
+    ] {
+        let c = Compose { height: 40, text: TextLook { size, weight: w, spacing: sp }, ..Compose::default() };
+        let s = compose::spec(&c);
+        assert!((s.font - font).abs() < 1e-4 && (s.gap - gap).abs() < 1e-4 && s.weight == wt, "{size} {w:?} {sp:?}");
+        assert_eq!(s.h, 40.0, "výška se nemění");
+    }
+    assert_eq!(TextLook { size: f32::NAN, ..TextLook::default() }.norm().size, 1.0);
+}
+
+#[test]
+fn piece_look_bg_ink_size() {
+    use PieceItem::*;
+    let f = facts(State::Idle);
+    let plain = pc(Time, PieceStyle::Text);
+    let fancy = Piece { bg: "#3B82F6".into(), ink: "accent".into(), size: PieceSize::Large, ..plain.clone() };
+    // bg = kostka, ink jen text; norm sjednotí zápis, neznámá barva zmizí
+    let n = Compose { center: vec![fancy.clone(), Piece { bg: "zzz".into(), ..pc(Weather, PieceStyle::Text) }], ..Compose::default() }.norm();
+    assert_eq!(n.center[0].bg, "#3b82f6");
+    assert_eq!(n.center[1].bg, "");
+    assert_eq!(compose::chip_of(&plain, &f), None);
+    assert_eq!(compose::chip_of(&n.center[0], &f), Some(Rgba(0x3b as f32 / 255.0, 0x82 as f32 / 255.0, 0xf6 as f32 / 255.0, 1.0)));
+    let want = f.accent;
+    assert!(compose::parts(n.center[0].clone(), &f).iter().all(|p| !matches!(p, Part::Text { color, .. } if *color != want)));
+    let sh = compose::show(&Compose { center: vec![fancy], ..Compose::default() }, &f);
+    assert_eq!(sh.segs[1][0].size, PieceSize::Large);
+    assert_eq!(compose::show(&Compose { center: vec![plain], ..Compose::default() }, &f).segs[1][0].size, PieceSize::Normal);
 }

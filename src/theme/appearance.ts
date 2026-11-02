@@ -8,6 +8,7 @@ import { normalizeCustomThemes, themeOf } from "./customThemes.ts";
 import { normalizePages } from "./pages.ts";
 import { isDefaultSize, normalizeSize } from "./size.ts";
 import { accentFromGradient, backdropVars, cardVars, fitAccent, gradientOf, isDefaultBackdrop, normalizeBackdrop } from "./backdrop.ts";
+import { isDefaultHead, isDefaultTabs, normalizeHead, normalizeTabs } from "../layout/headModel.ts";
 import { CLASSIC, FONTS, LAYOUTS, MATERIALS, STYLE_IDS, WIDTHS, lookVars } from "./looks.ts";
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -74,6 +75,9 @@ export function normalizeAppearance(raw: any): Appearance {
     ...(isDefaultBackdrop(normalizeBackdrop(r.backdrop)) ? {} : { backdrop: normalizeBackdrop(r.backdrop) }),
     ...(isHex(r.accent2) ? { accent2: r.accent2.toLowerCase() } : {}),
     ...(r.accentFromBackdrop === true ? { accentFromBackdrop: true } : {}),
+    // hlavička a přepínač záložek (kolo 27): jen když se liší od dnešního
+    ...(isDefaultHead(normalizeHead(r.head)) ? {} : { head: normalizeHead(r.head) }),
+    ...(isDefaultTabs(r.tabs) ? {} : { tabs: normalizeTabs(r.tabs) }),
   };
 }
 

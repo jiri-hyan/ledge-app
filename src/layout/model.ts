@@ -11,6 +11,7 @@ import { isWidgetId } from "../widgets/model.ts";
 import { normalizeCardLook, type CardLook } from "./look.ts";
 import { pruneSizePages } from "../theme/size.ts";
 import { normalizeFolders, type TileFolder } from "./folders.ts";
+import { cloneBar, normalizeNotchBar, type NotchBar } from "../notch/bar.ts";
 
 
 export const CARD_IDS = [
@@ -43,7 +44,7 @@ export type TileOpts = { size: TileSize; label: boolean; git: boolean; hidden: s
 /** `limit` = kolik řádků karta ukáže, než nabídne „Zobrazit další“ (0 = bez stropu, chybí = `DEFAULT_LIMIT`). */
 export type LayoutCard = { id: CardId; size: CardSize; h?: CardHeight; tiles?: TileOpts; look?: CardLook; limit?: number; parts?: string[] };
 /** `bento` (kolo 22) = mřížka dlaždic (šířka × výška v řádcích, hustý tok; `bento.ts`); chybí = běžná mřížka. */
-export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[]; bento?: true };
+export type LayoutPage = { id: string; name: string; icon?: string; cards: LayoutCard[]; bento?: true; notchBar?: NotchBar };
 /** `upgrades` = jednorázové úpravy, které už proběhly (Rust `apply_upgrades`) — musí přežít každé uložení. */
 export type Layout = { pages: LayoutPage[]; hiddenParts: string[]; upgrades?: string[] };
 export const UP_PERSONAL_PROJECTS = "personalProjects";
@@ -194,6 +195,9 @@ export function normalizeLayout(raw: unknown): Layout {
     const page: LayoutPage = { id: x.id as string, name: typeof x.name === "string" ? x.name : "", cards };
     if (typeof x.icon === "string" && x.icon) page.icon = x.icon;
     if (x.bento === true) page.bento = true;
+    // kolo 27: vlastní lišta notche (`notch/bar.ts`); chybí = odvozená z karet
+    const bar = normalizeNotchBar(x.notchBar);
+    if (bar) page.notchBar = bar;
     pages.push(page);
   }
   if (!pages.length) return defaultLayout();
@@ -212,7 +216,7 @@ const cloneCard = (c: LayoutCard): LayoutCard => {
   return out;
 };
 export const clone = (l: Layout): Layout => {
-  const out: Layout = { pages: l.pages.map((p) => ({ ...p, cards: p.cards.map(cloneCard) })), hiddenParts: [...l.hiddenParts] };
+  const out: Layout = { pages: l.pages.map((p) => ({ ...p, cards: p.cards.map(cloneCard), ...(p.notchBar ? { notchBar: cloneBar(p.notchBar) } : {}) })), hiddenParts: [...l.hiddenParts] };
   if (l.upgrades) out.upgrades = [...l.upgrades];
   return out;
 };

@@ -99,6 +99,85 @@ pub enum PieceStyle {
     Ring5h,
 }
 
+// Velikost jednoho dílu vůči písmu proužku (kolo 27)
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(rename = "ComposePieceSize")]
+#[serde(rename_all = "camelCase")]
+pub enum PieceSize {
+    Small,
+    #[default]
+    Normal,
+    Large,
+}
+
+impl PieceSize {
+    /// Násobek velikosti dílu (části, mezery i písmo).
+    pub fn mult(self) -> f32 {
+        match self {
+            PieceSize::Small => 0.82,
+            PieceSize::Normal => 1.0,
+            PieceSize::Large => 1.25,
+        }
+    }
+}
+
+// Tloušťka písma proužku: normal = dnešní (střední / polotučné), semi, bold
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(rename = "ComposeWeight")]
+#[serde(rename_all = "camelCase")]
+pub enum Weight {
+    #[default]
+    Normal,
+    Semi,
+    Bold,
+}
+
+// Proložení: těsné / normální / široké (mezery mezi díly a okraje)
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(rename = "ComposeSpacing")]
+#[serde(rename_all = "camelCase")]
+pub enum Spacing {
+    Tight,
+    #[default]
+    Normal,
+    Wide,
+}
+
+// Písmo proužku nezávislé na výšce (kolo 27): násobek velikosti, tloušťka, proložení
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[schemars(rename = "ComposeText")]
+#[serde(default)]
+pub struct TextLook {
+    // násobek odvozené velikosti 0,6–1,4 (1 = dnešní)
+    pub size: f32,
+    pub weight: Weight,
+    pub spacing: Spacing,
+}
+
+impl Default for TextLook {
+    fn default() -> Self {
+        Self { size: 1.0, weight: Weight::Normal, spacing: Spacing::Normal }
+    }
+}
+
+pub const TEXT_MIN: f32 = 0.6;
+pub const TEXT_MAX: f32 = 1.4;
+
+impl TextLook {
+    pub fn norm(&self) -> TextLook {
+        let size = if self.size.is_finite() { (self.size.clamp(TEXT_MIN, TEXT_MAX) * 100.0).round() / 100.0 } else { 1.0 };
+        TextLook { size, ..*self }
+    }
+    /// Násobek mezer a okrajů.
+    pub fn space(&self) -> f32 {
+        match self.spacing {
+            Spacing::Tight => 0.7,
+            Spacing::Normal => 1.0,
+            Spacing::Wide => 1.4,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[schemars(rename = "ComposePiece")]
 #[serde(default)]
@@ -108,11 +187,22 @@ pub struct Piece {
     // barva dílu: prázdné = podle hodnoty (dnešní), accent, #rrggbb
     #[serde(skip_serializing_if = "String::is_empty")]
     pub color: String,
+    // kolo 27: velikost dílu, pozadí kostky (prázdné = žádné, accent, #rrggbb) a barva textu (prázdné = podle `color`)
+    #[serde(skip_serializing_if = "is_normal")]
+    pub size: PieceSize,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub bg: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub ink: String,
+}
+
+fn is_normal(s: &PieceSize) -> bool {
+    *s == PieceSize::Normal
 }
 
 impl Piece {
     pub fn new(item: PieceItem, style: PieceStyle) -> Piece {
-        Piece { item, style, color: String::new() }
+        Piece { item, style, color: String::new(), size: PieceSize::Normal, bg: String::new(), ink: String::new() }
     }
 }
 
@@ -138,6 +228,8 @@ pub struct Compose {
     pub sep: Sep,
     // písmo s pevnou šířkou (Cascadia Mono)
     pub mono: bool,
+    // kolo 27: písmo nezávislé na výšce (starý config bez `text` = dnešní)
+    pub text: TextLook,
 }
 
 impl Default for Compose {
@@ -157,6 +249,7 @@ impl Default for Compose {
             fill: Fill::default(),
             sep: Sep::None,
             mono: false,
+            text: TextLook::default(),
         }
     }
 }
@@ -178,7 +271,12 @@ impl Compose {
             for p in v {
                 if seen.len() < MAX_PIECES && out.len() < MAX_ZONE && !seen.contains(&p.item) {
                     seen.push(p.item);
-                    out.push(Piece { color: composedeco::norm_piece_color(&p.color), ..p.clone() });
+                    out.push(Piece {
+                        color: composedeco::norm_piece_color(&p.color),
+                        bg: composedeco::norm_piece_color(&p.bg),
+                        ink: composedeco::norm_piece_color(&p.ink),
+                        ..p.clone()
+                    });
                 }
             }
             out
@@ -201,6 +299,7 @@ impl Compose {
             fill: self.fill.norm(),
             sep: self.sep,
             mono: self.mono,
+            text: self.text.norm(),
         }
     }
 
@@ -352,6 +451,9 @@ pub fn recolor(v: Vec<Part>, c: Rgba) -> Vec<Part> {
 
 /// Barevný podklad dílu (styl „podklad“): barva dílu, jinak barva hodnoty, neutrální = akcent.
 pub fn chip_of(p: &Piece, f: &Facts) -> Option<Rgba> {
+    if let Some(c) = piece_color(&p.bg, f) {
+        return Some(c);
+    }
     (p.style == PieceStyle::Chip).then(|| {
         piece_color(&p.color, f).unwrap_or_else(|| value(p.item, f).map(|v| v.color).filter(|c| !neutral(*c) && *c != IDLE).unwrap_or(f.accent))
     })
@@ -361,10 +463,24 @@ pub fn chip_of(p: &Piece, f: &Facts) -> Option<Rgba> {
 /// bez podílu, ikona bez ikony, průběh bez historie), spadne na nejbližší, co umí; prázdný text = nic.
 pub fn parts(p: Piece, f: &Facts) -> Vec<Part> {
     let out = parts_raw(&p, f);
-    match piece_color(&p.color, f) {
+    let out = match piece_color(&p.color, f) {
         Some(c) => recolor(out, c),
         None => out,
+    };
+    match piece_color(&p.ink, f) {
+        Some(c) => ink(out, c),
+        None => out,
     }
+}
+
+/// Barva jen textových částí (`ink` dílu); ikona, tečka a prstenec si nechají barvu hodnoty / dílu.
+pub fn ink(v: Vec<Part>, c: Rgba) -> Vec<Part> {
+    v.into_iter()
+        .map(|p| match p {
+            Part::Text { text, strong, .. } => Part::Text { text, color: c, strong },
+            other => other,
+        })
+        .collect()
 }
 
 fn parts_raw(p: &Piece, f: &Facts) -> Vec<Part> {
@@ -464,7 +580,7 @@ fn row(v: &[Piece], f: &Facts) -> (Vec<Part>, Vec<Seg>) {
     for p in v {
         let x = parts(p.clone(), f);
         if !x.is_empty() {
-            segs.push(Seg { n: x.len(), chip: chip_of(p, f) });
+            segs.push(Seg { n: x.len(), chip: chip_of(p, f), size: p.size });
             out.extend(x);
         }
     }
@@ -495,14 +611,14 @@ pub fn show(c: &Compose, f: &Facts) -> Show {
     (s.right, s.segs[2]) = row(&c.right, f);
     if c.rotate && c.center.len() > 1 {
         // střídají se jen události (žádný časovač v klidu); bez události první položka, co něco má
-        let one = |p: &Piece| (parts(p.clone(), f), chip_of(p, f));
-        let ev: Vec<(Vec<Part>, Option<Rgba>)> = c.center.iter().filter(|p| value(p.item, f).is_some_and(|v| v.event)).map(one).filter(|v| !v.0.is_empty()).collect();
-        let pick: Vec<(Vec<Part>, Option<Rgba>)> = if ev.is_empty() { c.center.iter().map(one).find(|v| !v.0.is_empty()).into_iter().collect() } else { ev };
+        let one = |p: &Piece| (parts(p.clone(), f), chip_of(p, f), p.size);
+        let ev: Vec<(Vec<Part>, Option<Rgba>, PieceSize)> = c.center.iter().filter(|p| value(p.item, f).is_some_and(|v| v.event)).map(one).filter(|v| !v.0.is_empty()).collect();
+        let pick: Vec<(Vec<Part>, Option<Rgba>, PieceSize)> = if ev.is_empty() { c.center.iter().map(one).find(|v| !v.0.is_empty()).into_iter().collect() } else { ev };
         if pick.len() > 1 {
             s.rotate = pick.iter().map(|x| x.0.clone()).collect();
         }
         // u střídání jeden díl na řádek `rotate` (kreslí se ten aktuální)
-        s.segs[1] = pick.iter().map(|x| Seg { n: x.0.len(), chip: x.1 }).collect();
+        s.segs[1] = pick.iter().map(|x| Seg { n: x.0.len(), chip: x.1, size: x.2 }).collect();
         s.center = pick.into_iter().next().map(|x| x.0).unwrap_or_default();
     } else {
         (s.center, s.segs[1]) = row(&c.center, f);
@@ -518,13 +634,14 @@ pub fn spec(c: &Compose) -> Spec {
     let c = c.norm();
     let h = c.height as f32;
     let k = c.round as f32 / 100.0;
+    let sp = c.text.space();
     let base = Spec {
         h,
         r: k * h / 2.0,
-        pad: (h * 0.45).clamp(6.0, 20.0),
-        gap: (h * 0.28).clamp(4.0, 14.0),
+        pad: (h * 0.45).clamp(6.0, 20.0) * sp,
+        gap: (h * 0.28).clamp(4.0, 14.0) * sp,
         min_w: c.width as f32,
-        font: (h * 0.45).clamp(9.5, 20.0),
+        font: (h * 0.45).clamp(9.5, 20.0) * c.text.size,
         fill: Rgba(0.0, 0.0, 0.0, 1.0),
         edge: None,
         edge_bottom: false,
@@ -537,6 +654,7 @@ pub fn spec(c: &Compose) -> Spec {
         dot: (h * 0.27).clamp(5.0, 12.0),
         ring: (h * 0.6).clamp(10.0, 30.0),
         pill_r: 0.0,
+        weight: c.text.weight as u8,
     };
     match c.shape {
         Form::Capsule => base,

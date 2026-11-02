@@ -8,6 +8,7 @@
 pub mod capsule;
 pub mod compose;
 pub mod composedeco;
+pub mod edgefx;
 #[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
@@ -471,6 +472,8 @@ pub enum Part {
 pub struct Seg {
     pub n: usize,
     pub chip: Option<Rgba>,
+    /// velikost dílu vůči písmu proužku (kolo 27)
+    pub size: compose::PieceSize,
 }
 
 /// Co styl právě ukáže (čistá data pro `stripdraw`).

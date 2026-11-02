@@ -68,3 +68,44 @@
   .cd-track-name { display: none; }
   .cd-big { font-size: calc(var(--fs-body) * 1.4); }
 }
+
+/* „Při práci“ (kolo 28): teplý podklad dýchá jen opacitou, jen když session pracuje; omezený pohyb = statický */
+.cd[data-design="working"] .cd-body { position: relative; isolation: isolate; border-radius: 10px; overflow: hidden; }
+.cd-live { position: relative; display: flex; flex-direction: column; gap: var(--s1); padding: var(--s2); min-width: 0; }
+.cd-live[data-on]::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: linear-gradient(180deg, transparent 20%, color-mix(in srgb, var(--accent) 38%, transparent)); opacity: 0.6; animation: cd-breathe 4.5s ease-in-out infinite; }
+@keyframes cd-breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.85; } }
+@media (prefers-reduced-motion: reduce) { .cd-live[data-on]::before { animation: none; opacity: 0.6; } }
+.cd-live-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); min-width: 0; }
+.cd-live-proj { font-size: var(--fs-ui); font-weight: 650; color: var(--t0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-live-dots { display: flex; gap: 4px; }
+.cd-live-dot { width: 0.55rem; height: 0.55rem; padding: 0; border-radius: 50%; border: 0; background: var(--line-2); cursor: pointer; }
+.cd-live-dot.on { background: var(--accent); }
+.cd-live-dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cd-live-time { font: 650 calc(var(--fs-body) * 2.4) / 1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--t0); }
+.cd-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.cd-seg { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cd-seg i { display: block; height: 3px; border-radius: 2px; background: var(--line-2); }
+.cd-seg small { font-size: var(--fs-xs); color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-seg.past i { background: color-mix(in srgb, var(--t1) 55%, transparent); }
+.cd-seg.on i { background: var(--t0); }
+.cd-seg.on small { color: var(--t0); font-weight: 650; }
+.cd-live-file { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s1) var(--s2); min-width: 0; }
+.cd-live-fname { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; padding: 2px var(--s1); border-radius: 7px; background: color-mix(in srgb, var(--t0) 8%, transparent); }
+.cd-live-fname b { font: 600 var(--fs-xs) var(--mono); color: var(--t0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-live-fname small, .cd-live-tool { font-size: var(--fs-xs); color: var(--t3); }
+.cd-live-empty { padding: var(--s2); }
+
+/* „Hotovo“ */
+.cd-done { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.cd-done-head { font-size: var(--fs-xs); color: var(--green); }
+.cd-done-row { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) var(--s2); border-radius: 9px; border: 1px solid var(--line-2); min-width: 0; }
+.cd-done-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cd-done-line { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
+.cd-done-proj { font-size: var(--fs-ui); font-weight: 650; color: var(--t0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-done-when { font-size: var(--fs-xs); color: var(--t3); white-space: nowrap; }
+.cd-done-tag { font-size: var(--fs-xs); color: var(--amber); border: 1px solid currentColor; border-radius: 99px; padding: 0 6px; white-space: nowrap; }
+.cd-done-msg { font-size: var(--fs-xs); color: var(--t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-done-open { flex: none; font: 600 var(--fs-xs) var(--sans); padding: 3px var(--s2); border-radius: 7px; border: 0; background: color-mix(in srgb, var(--green) 22%, transparent); color: var(--t0); cursor: pointer; }
+.cd-done-open:disabled { opacity: 0.5; cursor: default; }
+.cd-done-open:not(:disabled):hover { background: color-mix(in srgb, var(--green) 38%, transparent); }
+.cd-done-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

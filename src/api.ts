@@ -155,6 +155,8 @@ export const api = {
   sessionOpen: (id: string) => call("session_open", { id }),
   /** Ukázka oznámení v proužku (Notch) — Studio, tlačítko Vyzkoušet. */
   notifyPreview: (kind: string, style?: string) => call("notify_preview", { kind, style: style ?? null }),
+  /** „Vyzkoušet“ živé hrany vlastního vzhledu (kolo 28): stav na pár sekund v proužku, s rozpracovanou výzdobou. */
+  edgeTry: (state: string, deco?: unknown) => call("edge_try", { state, deco: deco ?? null }),
   /** Velikost kontextu živé session (poslední usage v transcriptu); null = bez zdroje / vypnuto. */
   sessionContext: (id: string) => call<CtxView | null>("session_context", { id }),
   /** Panel Git session (jen na klik; null = cwd není v gitu). Destruktivní akce Rust znovu ověří. */

@@ -40,6 +40,8 @@ import { PartsCtx, type PartsCtl } from "./PartSlot";
 import { partKeyAction } from "./parts";
 import { cardName, pageName, sizeName, sizeNoteText, slotName } from "./text";
 import { cardLookAttrs } from "./look";
+import { drawerShown } from "../media/shown";
+import "./surfaces.css";
 import type { PartKey } from "./model";
 import { lookFor } from "./lookState";
 import type { HeroFacts } from "./hero";
@@ -392,9 +394,13 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
               "--span": String(spans().get(id) ?? 1),
               "--h": hNow(id) === undefined ? undefined : String(hNow(id)),
               "--accent": cl(id).style["--accent"],
+              "--sf-a": cl(id).style["--sf-a"],
+              "--sf-b": cl(id).style["--sf-b"],
+              "--sf-e": cl(id).style["--sf-e"],
               order: String(view().indexOf(id)),
             }}
             classList={{ lifted: drag()?.id === id && drag()?.home === p.page.id }}
+            data-cl-live={cl(id).attrs["data-cl-surface"] === "flow" && drawerShown() ? "" : undefined}
             onPointerDown={(e) => cd.down(e, id)}
           >
             <Show when={p.shown(id)} fallback={

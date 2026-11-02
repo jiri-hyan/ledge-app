@@ -263,3 +263,22 @@ input.lay-st-name { width: 170px; font-weight: 600; }
    „v liště nahoře“ — přesunout / odebrat jdou dál */
 .deck.editing .deck-item[data-notch] > :not(.lay-tools, .lay-rs, .lay-target) { opacity: 0.45; }
 .deck.editing .deck-item[data-notch]::after { content: attr(data-notch); position: absolute; left: var(--s2); bottom: var(--s2); z-index: 4; font-size: var(--fs-xs); font-weight: 600; color: var(--accent); background: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-pill); padding: 1px 8px; pointer-events: none; }
+
+/* obal přepínače záložek v hlavičce (`cards/Head.tsx`) nemění rozložení */
+.head-tabs { display: contents; }
+/* ---- vzhledy přepínače záložek (obal .head-tabs[data-tabstyle]; logika Tabs.tsx beze změny; v úpravách ✎ vždy plný segment) ---- */
+.head-tabs[data-tabstyle="underline"] .lay-tabs:not(.editing) { background: transparent; border-color: transparent; padding: 0; gap: var(--s2); }
+.head-tabs[data-tabstyle="underline"] .lay-tabs:not(.editing) button[data-tab] { border-radius: 0; padding-bottom: 4px; border-bottom: 2px solid transparent; background: transparent; }
+.head-tabs[data-tabstyle="underline"] .lay-tabs:not(.editing) button[data-tab].on { background: transparent; border-bottom-color: var(--accent); }
+.head-tabs[data-tabstyle="pills"] .lay-tabs:not(.editing) { background: transparent; border-color: transparent; padding: 0; gap: var(--s1); }
+.head-tabs[data-tabstyle="pills"] .lay-tabs:not(.editing) button[data-tab] { border: 1px solid var(--line); border-radius: var(--r-pill); padding: 4px 12px; }
+.head-tabs[data-tabstyle="pills"] .lay-tabs:not(.editing) button[data-tab].on { background: var(--card-3); border-color: var(--line-2); }
+.head-tabs[data-tabstyle="icons"] .lay-tabs:not(.editing) button[data-tab] { font-size: 0; padding: 5px 9px; }
+.head-tabs[data-tabstyle="icons"] .lay-tabs:not(.editing) button[data-tab]::first-letter, .head-tabs[data-tabstyle="icons"] .lay-tabs:not(.editing) .lay-tab-icon { font-size: var(--fs-md); }
+.head-tabs[data-tabstyle="icons"] .lay-tabs:not(.editing) .lay-tab-icon { margin: 0; }
+.head-tabs[data-tabstyle="dots"] .lay-tabs:not(.editing) { background: transparent; border-color: transparent; padding: 0; gap: var(--s1); }
+.head-tabs[data-tabstyle="dots"] .lay-tabs:not(.editing) button[data-tab] { font-size: 0; width: 11px; height: 11px; padding: 0; margin: 6px; border-radius: 50%; background: var(--t3); opacity: .55; }
+.head-tabs[data-tabstyle="dots"] .lay-tabs:not(.editing) button[data-tab].on { background: var(--accent); opacity: 1; }
+.head-tabs[data-tabstyle="dots"] .lay-tabs:not(.editing) .lay-tab-icon { display: none; }
+/* tužka v záložkách je zbytečná, když je v hlavičce ✎: neubírá místo štítkům */
+.head-tabs[data-pencil="off"] .lay-tab-pencil { display: none; }

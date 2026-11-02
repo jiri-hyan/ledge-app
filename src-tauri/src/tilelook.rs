@@ -117,6 +117,21 @@ pub enum CardSurface {
     Glass,
     /// plná vrstva s hloubkou (základ + kontrast)
     Layer,
+    // kolo 28 — barevné povrchy (popis v docs/agents/config-layout.md; bez komentářů, ať schéma pro MCP nebobtná)
+    Gradient,
+    Flow,
+    Edge,
+    Stripes,
+}
+
+// Barevná sada barevných povrchů (kolo 28); chybí = podle akcentu karty.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CardPalette {
+    Aurora,
+    Sunset,
+    Ocean,
+    Embers,
 }
 
 /// Vzhled jedné karty na záložce (`layout.pages[].cards[].look`). Prázdné = podle design stylu.
@@ -139,6 +154,9 @@ pub struct CardLook {
     /// Plocha karty: `glass` (sklo na rámu, plná plocha pod textem) / `layer` (plná vrstva). Chybí = podle stylu.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub surface: Option<CardSurface>,
+    // sada barev barevných povrchů (kolo 28), chybí = akcent karty
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub palette: Option<CardPalette>,
     /// Jemné zrnění plochy (~3 %, statický vzor bez obrázků zvenku).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub grain: bool,
@@ -359,6 +377,16 @@ mod tests {
         let off: CardLook = serde_json::from_value(json!({"grain":false,"hero":false,"surface":"layer"})).unwrap();
         assert_eq!(serde_json::to_value(&off).unwrap(), json!({"surface":"layer"}));
         assert!(serde_json::from_value::<CardLook>(json!({"surface":"metal"})).is_err());
+        // kolo 28: barevné povrchy a sady — tam a zpět, starý look bez `palette` = None
+        let k = json!({"surface":"flow","palette":"sunset"});
+        let c28: CardLook = serde_json::from_value(k.clone()).unwrap();
+        assert_eq!((c28.surface, c28.palette), (Some(CardSurface::Flow), Some(CardPalette::Sunset)));
+        assert_eq!(serde_json::to_value(&c28).unwrap(), k);
+        for sf in ["gradient", "edge", "stripes"] {
+            assert!(serde_json::from_value::<CardLook>(json!({"surface":sf})).is_ok(), "{sf}");
+        }
+        assert_eq!(c.palette, None);
+        assert!(serde_json::from_value::<CardLook>(json!({"palette":"neon"})).is_err());
         // kolo 25: vzhled karty z registru — tam a zpět; starý look bez klíče = None
         let d: CardLook = serde_json::from_value(json!({"design":"rings"})).unwrap();
         assert_eq!(d.design.as_deref(), Some("rings"));
@@ -475,7 +503,7 @@ mod tests {
     #[test]
     fn schema_mentions_looks() {
         let schema = crate::config::schema_json();
-        for needle in ["\"look\"", "\"folders\"", "\"hideLabel\"", "\"glass\"", "\"tint\"", "\"surface\"", "\"grain\"", "\"hero\""] {
+        for needle in ["\"look\"", "\"folders\"", "\"hideLabel\"", "\"glass\"", "\"tint\"", "\"surface\"", "\"palette\"", "\"stripes\"", "\"grain\"", "\"hero\""] {
             assert!(schema.contains(needle), "{needle} ve schématu");
         }
     }

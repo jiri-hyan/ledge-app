@@ -1,18 +1,19 @@
 // Výzdoba vlastního zavřeného Ledge v editoru Kostky (kolo 25, `strip.compose.deco` / `fill` / `sep` / `mono`):
-// 6 designových předvoleb (jeden klik, Vrátit přes zásobník editoru), rám a akcent hrany, pozadí těla, oddělení
-// dílů a nástroje dílu (styl jen z `stylesFor`, barva podle hodnoty / akcent / vlastní). Čisté úpravy jdou přes
-// `commit` editoru; nic se nehýbe, nic se nestahuje.
+// 11 designových předvoleb (jeden klik, Vrátit přes zásobník editoru), hrana (`ComposeEdge.tsx`, kolo 28: živé
+// efekty a „Podle stavu Clauda“), pozadí těla (přechod až 3 barvami, volitelně přelévaný), oddělení dílů
+// a nástroje dílu (styl jen z `stylesFor`, barva podle hodnoty / akcent / vlastní). Úpravy přes `commit` editoru.
 import { For, Show } from "solid-js";
 import { t } from "../../i18n";
 import type { Appearance } from "../../types";
 import {
-  COMPOSE_EDGES, COMPOSE_SEPS, DESIGN_IDS, FILL_DIRS, FILL_KINDS,
-  type ComposeEdge, type ComposeItem, type ComposeSep, type DesignId, type FillKind, type ItemStyle, type Piece, type StripCompose,
+  COMPOSE_SEPS, DESIGN_IDS, FILL_DIRS, FILL_KINDS,
+  type ComposeItem, type ComposeSep, type DesignId, type FillKind, type ItemStyle, type Piece, type StripCompose,
   designOf, setPieceColor, setStyle, stylesFor,
 } from "../../strip/compose";
 import StripLookPreview from "../previews/StripLookPreview";
 import type { PreviewState } from "../appearanceModel";
-import { Seg, Slider, lit } from "./apUi";
+import { Seg, lit } from "./apUi";
+import { EdgeBlock } from "./ComposeEdge";
 
 export const DESIGN_NAME: Record<DesignId, () => string> = {
   islands: () => t("appearance.compose.design.islands", "Ostrůvky"),
@@ -21,13 +22,11 @@ export const DESIGN_NAME: Record<DesignId, () => string> = {
   chips: () => t("appearance.compose.design.chips", "Kapsle"),
   glass: () => t("appearance.compose.design.glass", "Sklo"),
   sunset: () => t("appearance.compose.design.sunset", "Západ slunce"),
-};
-const EDGE_NAME: Record<ComposeEdge, () => string> = {
-  none: () => t("appearance.compose.edge.none", "Žádný"),
-  underline: () => t("appearance.compose.edge.underline", "Linka dole"),
-  outline: () => t("appearance.compose.edge.outline", "Obrys"),
-  glow: () => t("appearance.compose.edge.glow", "Záře"),
-  gradient: () => t("appearance.compose.edge.gradient", "Přechod"),
+  tall: () => t("appearance.compose.design.tall", "Vysoký výřez, drobné písmo"),
+  cubes: () => t("appearance.compose.design.cubes", "Barevné kostky"),
+  aurora: () => t("appearance.compose.design.aurora", "Polární záře"),
+  embers: () => t("appearance.compose.design.embers", "Žhavá římsa"),
+  comet: () => t("appearance.compose.design.comet", "Kometa"),
 };
 const FILL_NAME: Record<FillKind, () => string> = {
   black: () => t("appearance.compose.fill.black", "Černá"),
@@ -61,22 +60,6 @@ function Pick<T extends string>(q: { label: string; value: T; options: [T, strin
   );
 }
 
-/** Barva: výběr režimu + vlastní hex (`<input type=color>`). `modes` = pevné volby (accent, claude…). */
-function ColorPick(q: { label: string; value: string; modes: [string, string][]; custom: string; set: (v: string) => void }) {
-  const isHex = () => q.value.startsWith("#");
-  return (
-    <div class="opt">
-      <span>{q.label}</span>
-      <span class="cx-col">
-        <Seg label={q.label} value={isHex() ? "#" : q.value} options={[...q.modes, ["#", q.custom]]} set={(v) => q.set(v === "#" ? (isHex() ? q.value : "#ff8800") : v)} />
-        <Show when={isHex()}>
-          <input type="color" value={q.value} aria-label={q.custom} onInput={(e) => q.set(e.currentTarget.value)} />
-        </Show>
-      </span>
-    </div>
-  );
-}
-
 /** 6 designových předvoleb s náhledem; klik = celý vzhled (Vrátit vrátí předchozí). */
 export function ComposeDesigns(q: Q & { state: PreviewState; a: Appearance; opacity: number }) {
   return (
@@ -100,31 +83,14 @@ export function ComposeDesigns(q: Q & { state: PreviewState; a: Appearance; opac
 
 /** Rám a akcent, pozadí těla, oddělení dílů a písmo. */
 export function ComposeDecoBlock(q: Q) {
-  const d = () => q.c.deco;
   const f = () => q.c.fill;
-  const setDeco = (patch: Partial<StripCompose["deco"]>, key = "") => q.commit({ ...q.c, deco: { ...d(), ...patch } }, key);
   const setFill = (patch: Partial<StripCompose["fill"]>, key = "") => q.commit({ ...q.c, fill: { ...f(), ...patch } }, key);
-  const custom = t("appearance.compose.colorCustom", "Vlastní");
   return (
     <section class="cx-blk" id="f-strip.compose.deco" classList={{ hit: lit("strip.compose.deco") }}>
       <div class="cx-bh">
-        <span>{t("appearance.compose.deco", "Rám a akcent")}<small>{t("appearance.compose.decoHint", "Stálá linka nebo záře v barvě, kterou si vybereš. Nažhavení při najetí myší se kreslí nad ní.")}</small></span>
+        <span>{t("appearance.compose.deco", "Rám a akcent")}<small>{t("appearance.compose.decoHint2", "Linka, záře nebo živý efekt hrany. Nažhavení při najetí myší se kreslí nad ní.")}</small></span>
       </div>
-      <div class="opt"><span>{t("appearance.compose.edge", "Akcent hrany")}</span>
-        <Pick label={t("appearance.compose.edge", "Akcent hrany")} value={d().edge} options={COMPOSE_EDGES.map((v) => [v, EDGE_NAME[v]()])} set={(v) => setDeco({ edge: v })} /></div>
-      <Show when={d().edge !== "none"}>
-        <Show when={d().edge !== "outline"}>
-          <div class="opt"><span>{t("appearance.compose.len", "Délka linky")}</span>
-            <Seg label={t("appearance.compose.len", "Délka linky")} value={d().len} options={[["center", t("appearance.compose.len.center", "Střed 40 %")], ["full", t("appearance.compose.len.full", "Celá šířka")]]} set={(v) => setDeco({ len: v })} /></div>
-        </Show>
-        <ColorPick label={t("appearance.compose.edgeColor", "Barva")} value={d().color} custom={custom}
-          modes={[["accent", t("appearance.compose.colorAccent", "Akcent")], ["claude", t("appearance.compose.colorClaude", "Podle Clauda")]]} set={(v) => setDeco({ color: v }, "edgeColor")} />
-        <Show when={d().edge === "gradient"}>
-          <div class="opt"><span>{t("appearance.compose.edgeColor2", "Druhá barva")}</span>
-            <input type="color" value={d().color2 || "#ffffff"} aria-label={t("appearance.compose.edgeColor2", "Druhá barva")} onInput={(e) => setDeco({ color2: e.currentTarget.value }, "edgeColor2")} /></div>
-        </Show>
-        <Slider label={t("appearance.compose.edgeWidth", "Tloušťka linky")} min={1} max={3} step={1} value={d().width} fmt={(v) => `${v} px`} set={(v) => setDeco({ width: v }, "edgeWidth")} />
-      </Show>
+      <EdgeBlock c={q.c} commit={q.commit} />
 
       <div class="opt" id="f-strip.compose.fill" classList={{ hit: lit("strip.compose.fill") }}><span>{t("appearance.compose.fill", "Pozadí")}<small>{t("appearance.compose.fillHint", "Bez pozadí = jen obsah s jemným stínem, ať je čitelný.")}</small></span>
         <Pick label={t("appearance.compose.fill", "Pozadí")} value={f().kind} options={FILL_KINDS.map((v) => [v, FILL_NAME[v]()])} set={(v) => setFill(v === "gradient" && !f().from ? { kind: v, from: "#1e3a8a", to: "#000000" } : { kind: v })} /></div>
@@ -133,7 +99,13 @@ export function ComposeDecoBlock(q: Q) {
           <span class="cx-col">
             <input type="color" value={f().from || "#1e3a8a"} aria-label={t("appearance.compose.fillFrom", "První barva")} onInput={(e) => setFill({ from: e.currentTarget.value }, "fillFrom")} />
             <input type="color" value={f().to || "#000000"} aria-label={t("appearance.compose.fillTo", "Druhá barva")} onInput={(e) => setFill({ to: e.currentTarget.value }, "fillTo")} />
+            <Show when={f().via} fallback={<button type="button" class="mini" onClick={() => setFill({ via: "#3b0764" })}>{t("appearance.compose.fillViaAdd", "+ třetí barva")}</button>}>
+              <input type="color" value={f().via} aria-label={t("appearance.compose.fillVia", "Prostřední barva")} onInput={(e) => setFill({ via: e.currentTarget.value }, "fillVia")} />
+              <button type="button" class="mini" onClick={() => setFill({ via: "" })}>{t("appearance.compose.edgeColor3Off", "Jen dvě")}</button>
+            </Show>
           </span></div>
+        <label class="opt"><span>{t("appearance.compose.fillFlow", "Pomalu přelévat")}<small>{t("appearance.compose.fillFlowHint", "Přechod se hýbe spolu s hranou: když Claude pracuje nebo čeká (nebo pořád, je-li hrana zapnutá „i v klidu“).")}</small></span>
+          <input type="checkbox" checked={f().flow} onChange={(e) => setFill({ flow: e.currentTarget.checked })} /></label>
         <div class="opt"><span>{t("appearance.compose.fillDir", "Směr")}</span>
           <Seg label={t("appearance.compose.fillDir", "Směr")} value={f().dir} options={FILL_DIRS.map((v) => [v, DIR_NAME[v]()])} set={(v) => setFill({ dir: v })} /></div>
       </Show>

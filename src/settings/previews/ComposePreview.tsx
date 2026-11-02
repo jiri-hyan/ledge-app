@@ -7,7 +7,9 @@
 import { For, Show, type JSX } from "solid-js";
 import { t } from "../../i18n";
 import type { PreviewState } from "../appearanceModel";
-import { type ComposeItem, type Piece, type StripCompose, drawKind, normCompose } from "../../strip/compose";
+import { type ComposeItem, type Piece, type StripCompose, SIZE_MULT, SPACE_MULT, drawKind, normCompose } from "../../strip/compose";
+import type { LiveState } from "../../strip/edgefx";
+import { EdgeLayer, edgeLook, liveOf } from "./EdgeFx";
 
 const TONE: Record<Tone, string> = { run: "var(--blue)", wait: "var(--amber)", ok: "var(--green)", acc: "var(--accent)", music: "var(--amber)", off: "var(--t3)" };
 /** Ukázková historie CPU / paměti pro „průběh“ (0–100). */
@@ -108,30 +110,31 @@ export function PieceView(q: { piece: Piece; state: PreviewState }): JSX.Element
 /** Díl v obálce: barevný podklad (`chip`), vlastní barva dílu (`--pcol`), kapsle / oddělovače přes CSS. */
 function PieceBox(q: { piece: Piece; state: PreviewState }) {
   const v = () => sampleVal(q.piece.item, q.state);
-  const chip = () => (q.piece.style === "chip" ? cssColor(q.piece.color) ?? (v() && v()!.c !== "off" ? TONE[v()!.c] : "var(--accent)") : undefined);
+  // kostka kolem dílu: `bg` má přednost před stylem „podklad“ (jako Rust `chip_of`)
+  const chip = () => cssColor(q.piece.bg) ?? (q.piece.style === "chip" ? cssColor(q.piece.color) ?? (v() && v()!.c !== "off" ? TONE[v()!.c] : "var(--accent)") : undefined);
+  // velikost dílu = `zoom` (jako Rust: části, mezery i písmo dílu v jednom měřítku); `ink` barví jen text
+  const zoom = () => (q.piece.size && q.piece.size !== "normal" ? SIZE_MULT[q.piece.size] : undefined);
   return (
     <Show when={v()}>
-      <span class="apv-pc" classList={{ pcol: !!q.piece.color }} data-chip={chip() ? "" : undefined} style={{ "--pcol": cssColor(q.piece.color), "--chip": chip() }}>
+      <span class="apv-pc" classList={{ pcol: !!q.piece.color }} data-chip={chip() ? "" : undefined} style={{ "--pcol": cssColor(q.piece.color), "--chip": chip(), color: cssColor(q.piece.ink), zoom: zoom() }}>
         <PieceView piece={q.piece} state={q.state} />
       </span>
     </Show>
   );
 }
 
-/** Výzdoba jako CSS proměnné: barvy linky (akcent / stav Clauda / hex), pozadí (černá, sklo, tón, přechod, nic). */
-export function decoStyle(c: StripCompose, s: PreviewState): JSX.CSSProperties {
-  const claude = s === "work" ? TONE.run : s === "wait" ? TONE.wait : s === "done" ? TONE.ok : TONE.off;
-  const e1 = c.deco.color === "claude" ? claude : cssColor(c.deco.color) ?? TONE.acc;
+/** Výzdoba jako CSS proměnné: barvy hrany (kolo 28 `EdgeFx.edgeLook`), pozadí (černá, sklo, tón, přechod, nic). */
+export function decoStyle(c: StripCompose, s: PreviewState, fx?: LiveState): JSX.CSSProperties {
   const tint = "color-mix(in srgb, var(--accent) 22%, #000)";
   const dir = { right: "90deg", down: "180deg", diag: "135deg" }[c.fill.dir];
   const fill = {
     black: "#000",
     glass: "rgba(23, 26, 33, 0.62)",
     tint,
-    gradient: `linear-gradient(${dir}, ${c.fill.from || tint}, ${c.fill.to || "#000"})`,
+    gradient: `linear-gradient(${dir}, ${c.fill.from || tint}, ${c.fill.via ? `${c.fill.via}, ` : ""}${c.fill.to || "#000"})`,
     none: "transparent",
   }[c.fill.kind];
-  return { "--e1": e1, "--e2": c.deco.color2 || `color-mix(in srgb, ${e1} 45%, #fff)`, "--ew": `${c.deco.width}px`, "--fill": fill };
+  return { ...edgeLook(c.deco, fx ?? liveOf(s), !!fx).vars, "--fill": fill };
 }
 
 /** Střed se střídáním (`rotate`): ukáže první událost, jinak první položku (jako Rust bez časovače). */
@@ -154,12 +157,16 @@ export function bodyStyle(c: StripCompose, k: number, opacity: number): JSX.CSSP
     "border-radius": pill ? `${r}px` : `0 0 ${r}px ${r}px`,
     "--ear": `${Math.min(18, Math.max(6, c.height * 0.42)) * k}px`,
     "--rd": `${Math.min(30, Math.max(10, c.height * 0.6)) * k}px`,
-    "font-size": `${Math.min(20, Math.max(9.5, c.height * 0.45)) * k}px`,
+    "font-size": `${Math.min(20, Math.max(9.5, c.height * 0.45)) * c.text.size * k}px`,
+    "--sp": String(SPACE_MULT[c.text.spacing]),
+    "font-weight": c.text.weight === "bold" ? 700 : c.text.weight === "semi" ? 600 : undefined,
   };
 }
 
-export default function ComposePreview(q: { compose: unknown; state: PreviewState; opacity: number; k?: number; pos?: string }) {
+/** `fx` = „Vyzkoušet“ stavu živé hrany z editoru (i limit, který přepínač „Co se děje“ nemá). */
+export default function ComposePreview(q: { compose: unknown; state: PreviewState; opacity: number; k?: number; pos?: string; fx?: LiveState }) {
   const c = () => normCompose(q.compose);
+  const ef = () => edgeLook(c().deco, q.fx ?? liveOf(q.state), !!q.fx);
   const k = () => q.k ?? 0.78;
   const hidden = () => c().hideIdle && q.state !== "wait" && q.state !== "done";
   const all = () => [...c().left, ...c().center, ...c().right];
@@ -173,12 +180,12 @@ export default function ComposePreview(q: { compose: unknown; state: PreviewStat
           </span>
         }
       >
-        <span class="apv-sx" data-look="custom" data-cshape={c().shape} data-edge={c().deco.edge} data-len={c().deco.len} data-fill={c().fill.kind} data-sep={c().sep} data-mono={c().mono ? "" : undefined}
-          style={{ ...bodyStyle(c(), k(), q.opacity), ...decoStyle(c(), q.state) }}>
+        <span class="apv-sx" data-look="custom" data-cshape={c().shape} data-edge={ef().fx} data-len={c().deco.len} data-run={ef().run || (c().fill.flow && (q.state === "work" || q.state === "wait" || c().deco.always)) ? "" : undefined} data-fflow={c().fill.flow && c().fill.kind === "gradient" ? "" : undefined} data-fill={c().fill.kind} data-sep={c().sep} data-mono={c().mono ? "" : undefined}
+          style={{ ...bodyStyle(c(), k(), q.opacity), ...decoStyle(c(), q.state, q.fx) }}>
           <span class="apv-cs" data-slot="left"><For each={c().left}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
           <span class="apv-cs" data-slot="center"><For each={centerOf(c(), q.state)}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
           <span class="apv-cs" data-slot="right"><For each={c().right}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
-          <Show when={c().deco.edge !== "none" && c().deco.edge !== "outline"}><i class="apv-edge" aria-hidden="true" /></Show>
+          <EdgeLayer fx={ef().fx} run={ef().run} />
         </span>
       </Show>
     </Show>

@@ -30,7 +30,7 @@ use windows::Win32::Graphics::Direct2D::{
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
-    DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_MEASURING_MODE_NATURAL,
+    DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_MEASURING_MODE_NATURAL,
     DWRITE_TEXT_METRICS, DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -54,6 +54,10 @@ const ROTATE_TIMER: usize = 2;
 const SPIN_TIMER: usize = 3;
 /// snímek točení (~8 fps: plynulé dost, software D2D 28px kapsle ≈ desetiny ms)
 const SPIN_FRAME_MS: u32 = 125;
+/// id časovače živé hrany vlastního vzhledu (kolo 28; jen během animace, `stripfx::prepare` / `edgefx::frames`)
+const FX_TIMER: usize = 4;
+/// snímek živé hrany (25 fps: pomalé přelévání / dech stačí; snímek ≈ 0,55 ms software D2D, `stripfx::bench`)
+const FX_FRAME_MS: u32 = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rgba(pub f32, pub f32, pub f32, pub f32);
@@ -120,6 +124,10 @@ pub struct StripModel {
     pub notice: Option<crate::notify::Live>,
     /// tečka zmeškaného oznámení (barva události) do příštího otevření šuplíku
     pub missed: Option<Rgba>,
+    /// „Vyzkoušet“ živé hrany z editoru (`stripfx::edge_try`, dohraje za `edgefx::TRY_MS`)
+    pub fx_try: Option<crate::stripfx::Try>,
+    /// Windows nechce rušit (nerušit, prezentace): živá hrana se nehýbe (`toast::accepts_notifications`)
+    pub fx_calm: bool,
 }
 
 /// Jas běžícího pulsu (barva, 0–1); `None` = puls není / skončil.
@@ -153,6 +161,8 @@ impl Default for StripModel {
             compose: None,
             notice: None,
             missed: None,
+            fx_try: None,
+            fx_calm: false,
         }
     }
 }
@@ -288,8 +298,11 @@ unsafe fn run(strip: Arc<Strip>) {
         // styly zavřeného Ledge: střídání řádků (`ticker`, jen při víc událostech) a šířka ostrůvku
         let mut rotating = false;
         let mut spinning = false;
+        let mut fxing = false;
         let mut rot: usize = 0;
         let mut anim = crate::looks::frame::WidthAnim::default();
+        // živá hrana (kolo 28): hodiny jednorázového naplnění; snímky jen během animace (`stripfx::prepare`)
+        let mut fx_clock = crate::stripfx::Clock::default();
         // Notch s tlačítkem: okno dočasně bez WS_EX_TRANSPARENT (jen v klidové fázi tvaru)
         let mut clickable = false;
         let t0 = Instant::now();
@@ -298,16 +311,18 @@ unsafe fn run(strip: Arc<Strip>) {
             let frame = msg.message == WM_TIMER && msg.wParam.0 == PULSE_TIMER;
             let turn = msg.message == WM_TIMER && msg.wParam.0 == ROTATE_TIMER;
             let spin = msg.message == WM_TIMER && msg.wParam.0 == SPIN_TIMER;
+            let fxf = msg.message == WM_TIMER && msg.wParam.0 == FX_TIMER;
             if turn {
                 rot = rot.wrapping_add(1);
             }
-            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE || frame || turn || spin {
+            if msg.message == WM_STRIP_REDRAW || msg.message == WM_STRIP_VISIBLE || frame || turn || spin || fxf {
                 // sloučit nahromaděné požadavky na překreslení
                 let mut peek = MSG::default();
                 while PeekMessageW(&mut peek, Some(hwnd), WM_STRIP_REDRAW, WM_STRIP_VISIBLE, PM_REMOVE).as_bool() {}
                 let mut model = strip.model.lock().clone();
                 crate::shelf::overlay(&mut model, crate::state::CORE.get().is_none_or(|c| c.dead()));
                 let looked = model.show.is_some() && !model.line_only;
+                let fx_run = model.visible && crate::stripfx::prepare(&mut model, &mut fx_clock, t0.elapsed().as_millis() as u64);
                 // oznámení (Notch): kreslí se místo obsahu, i u proužku skrytého v klidu
                 let mut noted = None;
                 if let Some(l) = model.notice.as_ref() {
@@ -338,6 +353,10 @@ unsafe fn run(strip: Arc<Strip>) {
                     if spinning {
                         let _ = KillTimer(Some(hwnd), SPIN_TIMER);
                         spinning = false;
+                    }
+                    if fxing {
+                        let _ = KillTimer(Some(hwnd), FX_TIMER);
+                        fxing = false;
                     }
                     anim.reset();
                     if shown {
@@ -386,6 +405,16 @@ unsafe fn run(strip: Arc<Strip>) {
                     }
                     spinning = spins;
                 }
+                // živá hrana: vlastní časovač jen během animace (ne přes oznámení)
+                let fxs = fx_run && looked && noted.is_none();
+                if fxs != fxing {
+                    if fxs {
+                        SetTimer(Some(hwnd), FX_TIMER, FX_FRAME_MS, None);
+                    } else {
+                        let _ = KillTimer(Some(hwnd), FX_TIMER);
+                    }
+                    fxing = fxs;
+                }
                 if let Some((r, body)) = drawn {
                     *strip.rect.lock() = r;
                     // výchozí tvar morfu = tělo proužku (bez stínů a záře kolem)
@@ -395,7 +424,7 @@ unsafe fn run(strip: Arc<Strip>) {
                     let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                     shown = true;
                 }
-                if !frame && !turn && !spin {
+                if !frame && !turn && !spin && !fxf {
                     let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
                 }
                 continue;
@@ -415,12 +444,21 @@ pub(crate) fn wide(s: &str) -> Vec<u16> {
 }
 
 pub(crate) unsafe fn text_format(dw: &IDWriteFactory, size: f32, strong: bool, family: &str) -> windows::core::Result<IDWriteTextFormat> {
+    unsafe { text_format_w(dw, size, strong, 0, family) }
+}
+
+/// Jako `text_format` + tloušťka vlastního vzhledu (0 = dnešní, 1 = polotučné, 2 = tučné; kolo 27).
+pub(crate) unsafe fn text_format_w(dw: &IDWriteFactory, size: f32, strong: bool, weight: u8, family: &str) -> windows::core::Result<IDWriteTextFormat> {
     unsafe {
         let family: Vec<u16> = family.encode_utf16().chain(std::iter::once(0)).collect();
         dw.CreateTextFormat(
             PCWSTR(family.as_ptr()),
             None,
-            if strong { DWRITE_FONT_WEIGHT_SEMI_BOLD } else { DWRITE_FONT_WEIGHT_MEDIUM },
+            match (weight, strong) {
+                (0, false) => DWRITE_FONT_WEIGHT_MEDIUM,
+                (0, true) | (1, false) => DWRITE_FONT_WEIGHT_SEMI_BOLD,
+                _ => DWRITE_FONT_WEIGHT_BOLD,
+            },
             DWRITE_FONT_STYLE_NORMAL,
             DWRITE_FONT_STRETCH_NORMAL,
             size,

@@ -49,16 +49,17 @@ export default function DirtyPill(p: { s: Snapshot }) {
   return (
     <Show when={p.s.gitAlerts?.enabled !== false && sum().dirty + sum().unpushed > 0}>
       <button
+        data-prio="4"
         class={`chip pz-pill ${acked() ? "dim" : "amber"}`}
         aria-haspopup="menu"
         aria-expanded={menu.open()}
         title={t("cards.head.dirtyTitle", "Neuložené a nepushnuté změny v repech — klik = přehled, Přečteno nebo Ztišit")}
         onClick={menu.toggle}
       >
-        <span class="d" />
-        {rich(t("cards.head.dirty", "<b>{n}</b> neuloženo", { n: sum().dirty }))}
-        {sum().unpushed ? t("cards.head.unpushed", " · {n} nepushnuto", { n: sum().unpushed }) : ""}
-        <span class="pz-caret">▾</span>
+        <span class="d" /><span class="ic">✱</span>
+        <span class="lng">{rich(t("cards.head.dirty", "<b>{n}</b> neuloženo", { n: sum().dirty }))}
+        {sum().unpushed ? t("cards.head.unpushed", " · {n} nepushnuto", { n: sum().unpushed }) : ""}</span><span class="shr">{rich(t("cards.head.dirtyShort", "<b>{n}</b> neul.", { n: sum().dirty }))}</span>
+        <span class="pz-caret hl-caret">▾</span>
       </button>
       <Show when={menu.at()}>
         {(at) => (

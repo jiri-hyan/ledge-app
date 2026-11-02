@@ -19,6 +19,7 @@ import { ITEM_GLYPH } from "../previews/ComposePreview";
 import type { PreviewState } from "../appearanceModel";
 import { Slider } from "./apUi";
 import { ComposeDecoBlock, ComposeDesigns, PieceTools } from "./ComposeDeco";
+import { ComposeTextBlock, PieceLook } from "./ComposeText";
 import "./compose.css";
 
 const DRAG = "text/x-ledge-piece";
@@ -203,7 +204,9 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
 
       <ComposeDecoBlock c={c()} commit={commit} />
 
-      <section class="cx-blk">
+      <ComposeTextBlock c={c()} commit={commit} />
+
+      <section class="cx-blk" id="f-strip.compose.piece">
         <div class="cx-bh">
           <span>{t("appearance.compose.cubes", "Kostky: obsah a styl")}<small>{t("appearance.compose.cubesHint", "Přetáhni kostku do přihrádky nebo na náhled. 1 až 12 kostek, v přihrádce nejvýš 5. Klik přepne styl, tažení ven ji odebere.")}</small></span>
         </div>
@@ -237,6 +240,7 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
                           <button type="button" class="cx-mini" disabled={total(c()) <= 1} aria-label={t("appearance.compose.remove", "Odebrat {name}", { name: ITEM_NAME[p.item]() })} onClick={() => commit(removePiece(c(), p.item))}>×</button>
                         </span>
                         <PieceTools c={c()} commit={commit} p={p} styleName={STYLE_NAME} itemName={ITEM_NAME[p.item]()} />
+                        <PieceLook c={c()} commit={commit} p={p} itemName={ITEM_NAME[p.item]()} />
                       </div>
                     )}
                   </For>

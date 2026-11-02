@@ -6,9 +6,10 @@
 
 use crate::looks::composedeco::{self, Edge, FillDir, FillKind, Paint, Sep};
 use crate::looks::frame::Spec;
-use crate::looks::{Part, Seg};
+use crate::looks::compose::PieceSize;
+use crate::looks::{Look, Part, Seg};
 use crate::strip::{Renderer, Rgba, color, measure, wide};
-use crate::stripdraw::{Fmts, brush, draw_parts, row_w};
+use crate::stripdraw::{Fmts, brush, draw_parts, fmts, row_w};
 use windows::Win32::Graphics::Direct2D::Common::{D2D_RECT_F, D2D1_GRADIENT_STOP};
 use windows::Win32::Graphics::Direct2D::{
     D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE, D2D1_EXTEND_MODE_CLAMP, D2D1_GAMMA_2_2,
@@ -20,13 +21,12 @@ use windows_numerics::Vector2;
 
 /// Šířka mini grafu (logické px).
 pub(crate) const SPARK_W: f32 = 30.0;
-/// Dosah záře pod tělem (logické px) — o tolik je okno vyšší jen s `edge: glow`.
-pub(crate) const GLOW_PX: f32 = 8.0;
 
 /// Díl zóny: jeho části, barevný podklad a šířka i s vnitřním okrajem kapsle.
 pub(crate) struct Chunk<'a> {
     pub parts: &'a [Part],
     pub chip: Option<Rgba>,
+    pub size: PieceSize,
     pub w: f32,
 }
 
@@ -39,20 +39,29 @@ pub(crate) struct Layout<'a> {
     joint: f32,
     /// ostrůvky: (oba okraje zóny, mezera mezi ostrůvky) v px
     islands: Option<(f32, f32)>,
+    /// písma malých / velkých dílů (jen když je nějaký díl má; nejvýš dvě sady na snímek)
+    alt: [Option<Fmts>; 2],
+}
+
+impl Layout<'_> {
+    /// Písmo a měřítko dílu: normální = základní sada.
+    pub(crate) fn fm_of<'f>(&'f self, base: &'f Fmts, size: PieceSize, ks: f32) -> (&'f Fmts, f32) {
+        fm_pick(&self.alt, base, size, ks)
+    }
 }
 
 /// Části zóny rozdělené na díly podle `Seg` (nesedí-li počty, např. přihrádka, je celá zóna jeden díl).
-fn split<'a>(parts: &'a [Part], segs: &[Seg]) -> Vec<(&'a [Part], Option<Rgba>)> {
+fn split<'a>(parts: &'a [Part], segs: &[Seg]) -> Vec<(&'a [Part], Option<Rgba>, PieceSize)> {
     if parts.is_empty() {
         return Vec::new();
     }
     if segs.iter().map(|s| s.n).sum::<usize>() != parts.len() || segs.iter().any(|s| s.n == 0) {
-        return vec![(parts, None)];
+        return vec![(parts, None, PieceSize::Normal)];
     }
     let mut at = 0;
     segs.iter()
         .map(|s| {
-            let x = (&parts[at..at + s.n], s.chip);
+            let x = (&parts[at..at + s.n], s.chip, s.size);
             at += s.n;
             x
         })
@@ -68,12 +77,26 @@ pub(crate) unsafe fn layout<'a>(r: &Renderer, fm: &Fmts, sp: &Spec, ks: f32, pai
         let cp = composedeco::chip_pad(gap);
         let islands = (paint.sep == Sep::Islands).then(|| (2.0 * sp.pad * ks, (sp.h * 0.4 * ks).max(6.0 * ks)));
         let mut out: [Vec<Chunk<'a>>; 3] = Default::default();
+        let mut alt: [Option<Fmts>; 2] = [None, None];
+        for z in &zones {
+            for sg in z.1 {
+                let i = match sg.size {
+                    PieceSize::Normal => continue,
+                    PieceSize::Small => 0,
+                    PieceSize::Large => 1,
+                };
+                if alt[i].is_none() {
+                    alt[i] = fmts(r, Look::Custom, &Spec { font: sp.font * sg.size.mult(), ..*sp }, ks);
+                }
+            }
+        }
         for (i, (parts, segs)) in zones.into_iter().enumerate() {
             out[i] = split(parts, segs)
                 .into_iter()
-                .map(|(p, chip)| {
+                .map(|(p, chip, size)| {
                     let pad = if chip.is_some() || paint.sep == Sep::Pills { 2.0 * cp } else { 0.0 };
-                    Chunk { parts: p, chip, w: row_w(r, fm, p, sp, ks) + pad }
+                    let (f, k) = fm_pick(&alt, fm, size, ks);
+                    Chunk { parts: p, chip, size, w: row_w(r, f, p, sp, k) + pad }
                 })
                 .collect();
         }
@@ -86,11 +109,19 @@ pub(crate) unsafe fn layout<'a>(r: &Renderer, fm: &Fmts, sp: &Spec, ks: f32, pai
         let full = composedeco::content_w(zw, gap, islands);
         // u ostrůvků jsou okraje zón už v `full`; `body_width` přičte okraje těla, ty se tu odečtou
         let content = if islands.is_some() { (full - 2.0 * sp.pad * ks).max(0.0) } else { full };
-        Layout { zones: out, zw, content, paint, joint, islands }
+        Layout { zones: out, zw, content, paint, joint, islands, alt }
     }
 }
 
-fn as_brush<T: Interface>(b: Option<T>) -> Option<ID2D1Brush> {
+fn fm_pick<'f>(alt: &'f [Option<Fmts>; 2], base: &'f Fmts, size: PieceSize, ks: f32) -> (&'f Fmts, f32) {
+    match size {
+        PieceSize::Normal => (base, ks),
+        PieceSize::Small => (alt[0].as_ref().unwrap_or(base), ks * size.mult()),
+        PieceSize::Large => (alt[1].as_ref().unwrap_or(base), ks * size.mult()),
+    }
+}
+
+pub(crate) fn as_brush<T: Interface>(b: Option<T>) -> Option<ID2D1Brush> {
     b.and_then(|b| b.cast().ok())
 }
 
@@ -104,7 +135,7 @@ unsafe fn linear(t: &ID2D1DCRenderTarget, c1: Rgba, c2: Rgba, a: f32, from: Vect
 }
 
 /// Měkká záře: elipsa od barvy (`a`) do průhledna.
-unsafe fn radial(t: &ID2D1DCRenderTarget, c: Rgba, a: f32, center: Vector2, rx: f32, ry: f32) {
+pub(crate) unsafe fn radial(t: &ID2D1DCRenderTarget, c: Rgba, a: f32, center: Vector2, rx: f32, ry: f32) {
     unsafe {
         let stops = [D2D1_GRADIENT_STOP { position: 0.0, color: color(c, a) }, D2D1_GRADIENT_STOP { position: 1.0, color: color(c, 0.0) }];
         let Ok(coll) = t.CreateGradientStopCollection(&stops, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP) else { return };
@@ -158,17 +189,14 @@ pub(crate) unsafe fn paint(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, sp:
         let pad = sp.pad * ks;
         let isl = bodies(lay, body, bwf, pad);
         let lw = p.width * scale;
-        // záře pod tělem (okno je o `GLOW_PX` vyšší, záře v něm dobíhá do nuly), kreslí se první, tělo ji nahoře zakryje
-        if p.edge == Edge::Glow {
-            for (b, _) in &isl {
-                let w = b.rect.right - b.rect.left;
-                radial(t, p.c1, 0.55, Vector2 { X: b.rect.left + w / 2.0, Y: bhf }, w * 0.55, GLOW_PX * scale);
-            }
-        }
+        // svit pod tělem (záře, rozsvícení, živá hrana; okno má rezervu), kreslí se první, tělo ho nahoře zakryje
+        let rects: Vec<D2D1_ROUNDED_RECT> = isl.iter().map(|x| x.0).collect();
+        crate::stripfx::under(t, &p, &rects, bhf, scale);
         // pozadí
         let solid = |c: Rgba| as_brush(brush(t, c, 1.0));
         let fill: Option<ID2D1Brush> = match p.fill {
             FillKind::None => None,
+            FillKind::Gradient if p.f3.is_some() || p.fill_flow => crate::stripfx::fill(t, &p, bwf, bhf),
             FillKind::Gradient => {
                 let (a, b) = match p.dir {
                     FillDir::Right => (Vector2 { X: 0.0, Y: 0.0 }, Vector2 { X: bwf, Y: 0.0 }),
@@ -225,10 +253,11 @@ pub(crate) unsafe fn paint(t: &ID2D1DCRenderTarget, r: &Renderer, fm: &Fmts, sp:
                     }
                 }
                 let ix = x + if boxed { cp } else { 0.0 };
+                let (cf, ck) = lay.fm_of(fm, ch.size, ks);
                 if p.fill == FillKind::None {
-                    draw_parts(t, r, fm, &shadow(ch.parts), sp, ks, ix + ks, ks, bhf + ks, None);
+                    draw_parts(t, r, cf, &shadow(ch.parts), sp, ck, ix + ks, ks, bhf + ks, None);
                 }
-                draw_parts(t, r, fm, ch.parts, sp, ks, ix, 0.0, bhf, spin);
+                draw_parts(t, r, cf, ch.parts, sp, ck, ix, 0.0, bhf, spin);
                 x += ch.w + lay.joint;
             }
         }
@@ -264,11 +293,13 @@ unsafe fn sep(t: &ID2D1DCRenderTarget, s: Sep, cx: f32, mid: f32, bhf: f32, ks: 
 /// Spodní linka / obrys / přechod podle `Paint.edge` na jednom těle.
 unsafe fn edge(t: &ID2D1DCRenderTarget, p: &Paint, b: &D2D1_ROUNDED_RECT, lw: f32, scale: f32) {
     unsafe {
+        // efekty kola 28 (přelévání, čárky, kometa, …) a přechod třemi barvami
+        if crate::stripfx::line(t, p, b, lw, scale) {
+            return;
+        }
         let (l, rt, bot) = (b.rect.left, b.rect.right, b.rect.bottom);
-        let w = rt - l;
-        // celá šířka = mezi zaobleními rohů, střed = 40 % uprostřed
-        let inset = b.radiusX.min(w / 2.0) * 0.8;
-        let (x0, x1) = if p.full { (l + inset, rt - inset) } else { (l + w * 0.3, l + w * 0.7) };
+        // celá šířka = mezi zaobleními rohů, střed = 40 % uprostřed (30–70 %), široká 80 %, vlastní %
+        let (x0, x1) = crate::looks::edgefx::span_x(p.span, l, rt, b.radiusX);
         let line = D2D_RECT_F { left: x0, top: bot - lw, right: x1, bottom: bot };
         match p.edge {
             Edge::None => {}
@@ -295,6 +326,8 @@ unsafe fn edge(t: &ID2D1DCRenderTarget, p: &Paint, b: &D2D1_ROUNDED_RECT, lw: f3
                     t.FillRectangle(&D2D_RECT_F { top: bot - h, ..line }, &br);
                 }
             }
+            // efekty kola 28 kreslí `stripfx::line`
+            _ => {}
         }
     }
 }

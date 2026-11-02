@@ -47,6 +47,14 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   stops 2–5 × { c: #rrggbb, p: 0–100 } }`. `accent2` = druhá barva gradientního akcentu `#rrggbb` (s `accent`), `accentFromBackdrop`
   = akcent z barev vybraného gradientu (výchozí vypnuto). Pod kartami se podle kontrastu přidá ztmavovací závoj. Starý config
   pole nemá a vypadá stejně; výchozí hodnoty se nezapisují.
+  **Hlavička šuplíku (kolo 27):** `head` = `{ order, hidden, clock, showDate, chips, showZero }` — `order` = pořadí dílů zleva z `clock` /
+  `chips` / `tabs` / `edit` / `note` / `search` / `settings` / `close` (chybějící se přidají na konec v dnešním pořadí, `close` je vždy poslední,
+  prázdné = dnešní pořadí); `hidden` = vypnuté díly (`settings` a `close` vypnout nejde, config s nimi v `hidden` se odmítne; stejně tak
+  duplicita v `order`); `clock` = `big` (výchozí, čas a datum pod ním) / `line` (jedna řádka „20:02 · po 2. 11.“) / `seconds` / `analog` (SVG) /
+  `time`; `showDate` (výchozí true); `chips` = štítky `pills` (výchozí) / `merged` (jedna pilulka) / `dots` / `icons` — vždy v jedné řadě,
+  co se nevejde, je pod „+N“; `showZero` (výchozí **false** = od kola 27 se štítek s nulou, třeba „0 běží“, schová; true je vrátí).
+  `tabs` = `{ style }` přepínače záložek: `segment` (výchozí) / `underline` / `pills` / `icons` / `dots`. Upravuje se v ✎ klikem na hlavičku
+  nebo v Nastavení → Vzhled → Otevřený. Starý config pole nemá a vypadá stejně (až na schované nulové štítky).
 - **Zkratky** — globální zkratky jsou ve výchozím stavu **vypnuté** (nic se neregistruje, v UI se
   nikde neukazují); šuplík se otevírá myší, poznámka tlačítkem. Zapnout jde v Nastavení → Šuplík a karty → Otevírání a klávesy → Klávesové zkratky, nebo v configu:
   `hotkeys.enabled: true` + `hotkeys.toggle|approve|deny|note` (formát `Ctrl+Alt+Space`). Config bez

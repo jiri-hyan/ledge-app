@@ -29,7 +29,7 @@ Bez knihoven, bez CDN, bez animací a časovačů. Cituj symbolem, ne číslem �
 `<Sparkline values={hist} max={100} label="CPU za minutu" />`, `<Ring value={0.42}>42 %</Ring>`.
 
 Používají: karta Claude dnes (`src/board/UsageCard.tsx`: `<Bars values={0–1} max={1} h={32} fluid hi={…} title={(i) => …} />`;
-bez zvýraznění `hi={-99}`) a široký notch (`src/notch/NotchBar.tsx`: `<Sparkline min={0} max={100} area={false} dot={false} fluid />`).
+bez zvýraznění `hi={-99}`) a široký notch (kolo 27 vlastní mini graf `src/notch/SecSystem.tsx` z `charts/geom.ts` `sparkPoints` — tloušťka, vyhlazení, plocha, přechod).
 Sloupců méně než 2 = nic.
 
 ## Soubory

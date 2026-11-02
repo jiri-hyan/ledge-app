@@ -15,6 +15,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [ui-detail.md](ui-detai
 | `cards/sections.ts` | `drawer.sections` ze snapshotu — ODVOZENÉ z `layout` (zrcadlo `config::Sections`): klíče, čtení části karty … | `SECTION_KEYS` `sectionOn` `allSectionsOn` |
 | `cards/CardMenu.tsx` · `TileOptions.tsx` | ⋯ v hlavičce karty (vidět při najetí; seznam = společné menu `ui/Popover.tsx` `PopMenu`) → Velikost S/M/L/XL, Výška … | `CardMenu` `MenuChoice` `HiddenNotice` |
 | `cards/Head.tsx` | hlavička (✎ a 🔍 mají `data-tip` = cíle prohlídky `layout/Tour.tsx`): hodiny / Zpět + název, chipy (vč … | `Head` |
+| `cards/ChipsRow.tsx` · `HeadClock.tsx` | hlavička (kolo 27): řada štítků vždy v jednom řádku s „+N“ (ResizeObserver, bez časovače) a styly štítků; pět stylů hodin (analog SVG) | `ChipsRow` `HeadClock` |
 | `cards/DirtyPill.tsx` | chip „N neuloženo · M nepushnuto“: menu `PopMenu` s repy (Ztišit u tohoto repa = `muteDirty`, Terminál) a „Přečteno“ do další … | `DirtyPill` `dirtySummary` `isAcked` `sigHash` |
 | `cards/UpdatePanel.tsx` | panel pod hlavičkou: jednorázové „Co je nového ve verzi X“ (Rozumím → `update_notes_read`) a nová verze … | `UpdatePanel` `install` |
 | `update/model.ts` · `update/ReleaseNotes.tsx` · `update/update.css` | poznámky k vydání bezpečně: Markdown → bloky textových uzlů (nadpis, odrážka, odstavec, `kód`, tučně … | `parseNotes` `inline` `progressPct` `mb` `action` |

@@ -177,6 +177,10 @@ pub struct LayoutPage {
     /// volná místa vyplní hustý tok mřížky. Chybí = běžná mřížka (dnešní).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub bento: bool,
+    /// Vlastní lišta širokého notche (kolo 27, rozložení `notch`; `notchbar.rs`): `{ sections: [{ id, design?, … }] }`.
+    /// Chybí = lišta odvozená z karet záložky (dnešní chování); s ní lišta karty nepřebírá.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notch_bar: Option<crate::notchbar::NotchBar>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -331,29 +335,45 @@ pub fn placed(l: &LayoutConfig, id: &str) -> bool {
 /// Odvozené pole z `layout`: `drawer.sections` (karta = je na nějaké záložce; část = karta je a část
 /// není skrytá) a `modes.personalEnabled` (vždy zapnuto — záložky řídí `layout`). Idempotentní.
 pub fn derive(cfg: &mut Config) {
-    cfg.drawer.sections = derived_sections(&cfg.layout, &cfg.drawer.sections);
+    cfg.drawer.sections = derived_sections_for(&cfg.layout, &cfg.drawer.sections, crate::notchbar::notch_on(cfg));
     cfg.modes.personal_enabled = true;
 }
 
 /// Je pole `drawer.sections` (camelCase klíč) podle rozložení zapnuté? `None` = klíč není karta ani část karty.
-fn section_on(l: &LayoutConfig, key: &str) -> Option<bool> {
+/// `notch` = rozložení notch: vlastní lišta (`notchbar.rs`) zapne i zdroje svých sekcí (přehrávač, hlasitost, počasí, kalendář).
+fn section_on(l: &LayoutConfig, key: &str, notch: bool) -> Option<bool> {
+    let bar = |need: &str| crate::notchbar::any_wants(l, notch, need);
     // karta Dnes čte kalendář z paměti: i bez karty Kalendář musí být jeho zdroj zapnutý (jinak by `view` hlásil „off“)
     if key == "calendar" {
-        return Some(placed(l, "calendar") || placed(l, "today") || placed(l, WEEK_CARD));
+        return Some(placed(l, "calendar") || placed(l, "today") || placed(l, WEEK_CARD) || bar("calendar"));
+    }
+    if key == "weather" {
+        return Some(placed(l, key) || bar("weather"));
     }
     if CARDS.contains(&key) {
         Some(placed(l, key))
     } else {
-        PARTS.iter().find(|(p, _)| *p == key).map(|(_, parent)| placed(l, parent) && !l.hidden_parts.iter().any(|h| h == key))
+        let need = match key {
+            "nowPlaying" => "player",
+            "sound" => "volume",
+            _ => "",
+        };
+        PARTS.iter().find(|(p, _)| *p == key).map(|(_, parent)| (placed(l, parent) && !l.hidden_parts.iter().any(|h| h == key)) || (!need.is_empty() && bar(need)))
     }
 }
 
 /// `drawer.sections` odvozené z rozložení `l` (z `base` se berou jen pole, která `l` nezná). Čistá funkce.
+#[cfg(test)]
 pub fn derived_sections(l: &LayoutConfig, base: &crate::config::Sections) -> crate::config::Sections {
+    derived_sections_for(l, base, false)
+}
+
+/// Jako [`derived_sections`]; `notch` = rozložení notch (vlastní lišty zapnou zdroje svých sekcí).
+pub fn derived_sections_for(l: &LayoutConfig, base: &crate::config::Sections, notch: bool) -> crate::config::Sections {
     let Ok(mut v) = serde_json::to_value(base) else { return base.clone() };
     if let Some(m) = v.as_object_mut() {
         for (k, val) in m.iter_mut() {
-            if let Some(on) = section_on(l, k) {
+            if let Some(on) = section_on(l, k, notch) {
                 *val = Value::Bool(on);
             }
         }
@@ -376,7 +396,7 @@ pub fn section_in_default(field: &str) -> bool {
             key.push(ch);
         }
     }
-    section_on(&clean_default(), &key).unwrap_or(true)
+    section_on(&clean_default(), &key, false).unwrap_or(true)
 }
 
 /// Záložka pro režim `mode` (id); neznámé id (smazaná záložka) = první.
@@ -443,6 +463,9 @@ pub fn validate(l: &LayoutConfig) -> Result<(), FieldError> {
         }
         if p.icon.chars().count() > MAX_ICON {
             return Err(fe(at("icon"), tr("Ikona záložky je jeden znak nebo emoji.", "A tab icon is one character or emoji.")));
+        }
+        if let Some(b) = &p.notch_bar {
+            crate::notchbar::validate(b, i)?;
         }
         let mut seen = std::collections::HashSet::new();
         for (j, c) in p.cards.iter().enumerate() {

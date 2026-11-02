@@ -13,7 +13,7 @@ import { isLive, liveProcs } from "./model";
 import { restartProject, stopAll, stopProject } from "./state";
 import "./projpanel.css";
 
-export default function RunningPill(p: { s: Snapshot; now: number }) {
+export default function RunningPill(p: { s: Snapshot; now: number; showZero?: boolean }) {
   const [open, setOpen] = createSignal<{ x: number; y: number } | null>(null);
   const live = () => liveProcs(p.s.procs);
   const toggle = (e: MouseEvent) => {
@@ -23,14 +23,17 @@ export default function RunningPill(p: { s: Snapshot; now: number }) {
   };
   return (
     <>
+      <Show when={live().length > 0 || p.showZero || open()}>
       <button
+        data-prio="5"
         class={`chip pz-pill ${live().length ? "green" : "dim"}`}
         aria-expanded={!!open()}
         title={t("cards.proj.pill.title", "Běžící servery — klik ukáže Stop, Restart, Otevřít a log")}
         onClick={toggle}
       >
-        <span class="d" />{rich(t("cards.head.live", "<b>{n}</b> běží", { n: live().length }))} <span class="pz-caret">▾</span>
+        <span class="d" /><span class="ic">▶</span>{rich(t("cards.head.live", "<b>{n}</b> běží", { n: live().length }))} <span class="pz-caret hl-caret">▾</span>
       </button>
+      </Show>
       <Show when={open()}>{(at) => <Drop s={p.s} now={p.now} at={at()} onClose={() => setOpen(null)} />}</Show>
     </>
   );

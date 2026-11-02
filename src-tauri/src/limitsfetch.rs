@@ -63,6 +63,11 @@ pub(crate) fn view_key(enabled: bool) -> &'static str {
     STATE.lock().outcome.map_or("pending", Outcome::key)
 }
 
+/// Karta Claude s limity na záložce `mode`, nebo sekce Limit Claude ve vlastní liště notche (kolo 27).
+fn limits_visible(cfg: &crate::config::Config, mode: &str) -> bool {
+    (cfg.drawer.sections.claude_limits && crate::layout::page_has(&cfg.layout, mode, "claude")) || crate::notchbar::page_wants(cfg, mode, "limits")
+}
+
 /// Je co aktualizovat? Volba, ne ve hře, karta Claude s limity vidět nebo limity v proužku.
 fn wanted(opening: bool) -> bool {
     use crate::drawer::View;
@@ -71,7 +76,7 @@ fn wanted(opening: bool) -> bool {
     if !cfg.claude.limits_fetch || c.dead() {
         return false;
     }
-    let card = (opening || c.drawer.view() == View::Full) && cfg.drawer.sections.claude_limits && crate::layout::page_has(&cfg.layout, &c.mode.lock(), "claude");
+    let card = (opening || c.drawer.view() == View::Full) && limits_visible(&cfg, &c.mode.lock());
     let strip = cfg.strip.enabled && cfg.strip.items.contains(&crate::config::StripItem::Limits);
     card || strip
 }

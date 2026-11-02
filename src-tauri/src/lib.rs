@@ -71,6 +71,7 @@ mod icons;
 mod incidents;
 mod limits;
 mod layout;
+mod notchbar;
 mod limitslive;
 mod limitsfetch;
 mod limitsrc;
@@ -114,6 +115,7 @@ mod studio;
 mod stripconf;
 mod stripcompose;
 mod stripdraw;
+mod stripfx;
 mod stripview;
 mod subagents;
 mod suggest;
@@ -483,6 +485,7 @@ pub fn run() {
             commands::winquick::wq_folder,
             commands::winquick::wq_theme_toggle,
             notify::notify_preview,
+            stripfx::edge_try,
             commands::winquick::wq_radio_set,
             commands::winquick::wq_settings,
             commands::winquick::wq_output_set,

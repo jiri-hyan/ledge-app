@@ -29,27 +29,29 @@
 .nb-by { color: var(--t2); }
 .nb-ctl { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
 
-/* dny: velký měsíc vlevo, pás dnů a čas vpravo (dnešek = akcent, víkend = jemně barevně) */
-.nb-days { flex: 1.5 1 0; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
-.nb-month { font-family: var(--display); font-size: 34px; line-height: 1; font-weight: 600; text-transform: capitalize; }
-.nb-dright { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.nb-week { display: flex; gap: 2px; }
-.nb-day { display: flex; flex-direction: column; align-items: center; min-width: 22px; padding: 2px 0; border-radius: 8px; font-variant-numeric: tabular-nums; }
+/* dny (kolo 27 opravený pás): nahoře datum vlevo a čas vpravo v jedné řadě, pod nimi týden; dnešek decentně
+   (tónovaný akcent, ne plná výplň), víkend jen tlumeně (ne křiklavě červeně) */
+.nb-days { flex: 1.5 1 0; gap: 10px; }
+.nb-dhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.nb-date { font-size: var(--fs-body); font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-date::first-letter { text-transform: uppercase; }
+.nb-time { font-family: var(--display); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1; }
+.nb-week { display: flex; justify-content: space-between; gap: 2px; }
+.nb-day { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 22px; padding: 4px 0; border-radius: 10px; font-variant-numeric: tabular-nums; }
 .nb-day i { font-style: normal; font-size: var(--fs-2xs); color: var(--t3); }
-.nb-day b { font-size: 13px; font-weight: 500; color: var(--t2); }
-.nb-weekend b { color: var(--red); }
-.nb-today { background: var(--accent-fill, var(--accent)); }
-.nb-today i, .nb-today b { color: var(--white); font-weight: 700; }
-.nb-time { font-family: var(--display); font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
+.nb-day b { font-size: 14px; font-weight: 500; color: var(--t1); }
+.nb-weekend i, .nb-weekend b { color: var(--t3); }
+.nb-today { background: color-mix(in srgb, var(--nb-c, var(--accent)) 18%, transparent); }
+.nb-today i { color: var(--nb-c, var(--accent)); font-weight: 600; }
+.nb-today b { color: var(--nb-c, var(--accent)); font-weight: 700; }
 
 /* systém: řádek = název, mini graf, procenta */
 .nb-sys { gap: 6px; }
 .nb-row { display: grid; grid-template-columns: 34px 1fr 44px; align-items: center; gap: 8px; }
 .nb-rn { font-size: 11px; color: var(--t2); }
 .nb-rv { font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
-/* mini graf = sdílený `src/charts/Sparkline` (jen čára); přetížení = jantar přes --chart-c */
-.nb-spark { display: block; min-width: 0; height: 24px; }
-.nb-hot { --chart-c: var(--amber); }
+/* mini graf = SVG ze `SecSystem.tsx` (body z `charts/geom.ts`); přetížení bez volby barvy = jantar */
+.nb-spark { display: block; min-width: 0; width: 100%; height: 24px; }
 .nb-row[data-load="hot"] .nb-rv { color: var(--red); }
 .nb-bar { height: 4px; border-radius: 2px; background: var(--card-3); overflow: hidden; }
 .nb-bar i { display: block; height: 100%; background: var(--accent-fill, var(--accent)); }
@@ -57,7 +59,124 @@
 /* hlasitost: svislý posuvník a ztlumení */
 .nb-vol { flex: 0 0 64px; align-items: center; padding: 12px 8px; }
 .nb-slider { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 104px; accent-color: var(--accent); cursor: pointer; }
+.nb-slider.nb-hslider { writing-mode: horizontal-tb; direction: ltr; width: 100%; height: 22px; }
 .nb-mute { color: var(--t2); }
 
-/* režim úprav: lišta zůstane jako náhled (kreslí se, neklikne se); převzaté karty viz layout.css `data-notch` */
-.notch-wrap.preview { pointer-events: none; opacity: 0.85; }
+/* kolo 27 — vzhledy sekcí lišty notche (, `Sec*.tsx`) a úpravy lišty v režimu ✎ (`NotchBarEdit`, `BarPanel`).
+   Prefix `nb-`, jen tokeny ze styles.css; `--nb-c` = barva zvolená v sekci (chybí = akcent). Jediná nekonečná
+   animace je běžící text přehrávače a ta běží jen s třídou `run` (viditelný šuplík, bez omezení pohybu). */
+.nb-empty { color: var(--t3); font-size: var(--fs-sm, 12px); text-align: center; }
+.nb-emptybox { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.nb-emptybox b { font-size: var(--fs-body); }
+.nb-emptybox small { color: var(--t3); font-size: 11px; line-height: 1.3; }
+
+/* přehrávač */
+.nb-plc { align-items: center; text-align: center; width: 100%; }
+.nb-ctl-big .nb-btn { width: 38px; height: 38px; }
+.nb-ctl-big .nb-main { width: 46px; height: 46px; }
+.nb-ctl-big svg { width: 20px; height: 20px; }
+.nb-plm { width: 100%; gap: 6px; }
+.nb-marq { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; color: var(--nb-c, var(--t1)); }
+.nb-marq.run { display: flex; gap: 48px; text-overflow: clip; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.nb-marq.run > span { flex: none; animation: nb-marq 14s linear infinite; }
+@keyframes nb-marq { to { transform: translateX(calc(-100% - 48px)); } }
+@media (prefers-reduced-motion: reduce) { .nb-marq.run > span { animation: none; } }
+
+/* dny: list, velký čas, tečky, analog */
+.nb-days[data-design="sheet"] { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; }
+.nb-sheet { display: flex; flex-direction: column; min-width: 64px; }
+.nb-sheet i { font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nb-c, var(--accent)); }
+.nb-sheet b { font-family: var(--display); font-size: 44px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.nb-sheet small { color: var(--t3); font-size: 11px; }
+.nb-agenda { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.nb-ag { display: flex; flex-direction: column; padding-left: 9px; border-left: 3px solid var(--nb-cal, var(--accent)); min-width: 0; }
+.nb-ag small { color: var(--t3); font-size: 11px; }
+.nb-ag small.nb-agnow { color: var(--red); }
+.nb-days[data-design="clock"] { align-items: center; gap: 4px; }
+.nb-bigtime { font-family: var(--display); font-size: 46px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--nb-c, var(--t1)); }
+.nb-days[data-design="analog"] { flex-direction: row; align-items: center; gap: 14px; }
+.nb-analog { width: 92px; height: 92px; flex: none; }
+.nb-face { fill: var(--card-2); stroke: var(--line-soft); stroke-width: 1; }
+.nb-tick { stroke: var(--t3); stroke-width: 1.4; stroke-linecap: round; }
+.nb-hand { stroke: var(--t1); }
+.nb-dcol { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.nb-dcol small { color: var(--t3); font-size: 11px; }
+.nb-dotted { padding-bottom: 2px; }
+.nb-dots { display: flex; gap: 2px; height: 4px; }
+.nb-dots u { width: 4px; height: 4px; border-radius: 50%; background: var(--nb-c, var(--accent)); }
+.nb-days[data-design="dots"] .nb-today { background: none; }
+.nb-days[data-design="dots"] .nb-today b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--nb-c, var(--accent-fill, var(--accent))); color: var(--white); }
+
+/* příští schůzka („Nahoře“) — proužek barvou kalendáře, odpočet akcentem, Připojit jen s odkazem */
+.nb-mline { display: flex; align-items: center; gap: 10px; min-width: 0; padding-left: 10px; border-left: 3px solid var(--nb-cal, var(--accent)); }
+.nb-mline-c { padding: 6px 8px 6px 10px; border-radius: 0 10px 10px 0; background: var(--card-2); }
+.nb-mtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.nb-mcd { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--nb-c, var(--accent)); }
+.nb-mtitle { font-size: var(--fs-body); }
+.nb-join { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 5px 11px; border: 0; border-radius: var(--r-pill); background: var(--accent-fill, var(--accent)); color: var(--white); font-weight: 600; cursor: pointer; }
+.nb-join svg { width: 14px; height: 14px; }
+.nb-cd { font-family: var(--display); font-size: 32px; line-height: 1; font-weight: 600; color: var(--nb-c, var(--t1)); }
+
+/* limity: segmentové pruhy */
+.nb-limits { gap: 10px; }
+.nb-lim { display: flex; flex-direction: column; gap: 4px; }
+.nb-limhead { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.nb-limhead small { flex: 1; min-width: 0; color: var(--t3); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-limv { margin-left: auto; font-variant-numeric: tabular-nums; }
+.nb-segs { display: flex; gap: 2px; height: 10px; }
+.nb-segs i { flex: 1; border-radius: 1.5px; background: var(--card-3); }
+.nb-limring { display: flex; align-items: center; gap: 12px; }
+
+/* počasí */
+.nb-wxhead { display: flex; align-items: center; gap: 10px; }
+.nb-wxico { font-size: 30px; line-height: 1; }
+.nb-wxt { font-family: var(--display); font-size: 34px; line-height: 1; font-weight: 600; color: var(--nb-c, var(--t1)); }
+.nb-wxrange { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; color: var(--t3); }
+.nb-wxbar { position: relative; flex: 1; height: 6px; overflow: visible; background: linear-gradient(90deg, var(--accent-2), var(--amber)); opacity: 0.85; }
+.nb-wxbar u { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--t1); box-shadow: 0 0 0 2px var(--card); }
+
+/* systém: sloupky, prstence, velká čísla, htop */
+.nb-cols { display: flex; align-items: flex-end; gap: 1px; height: 24px; min-width: 0; }
+.nb-cols i { flex: 1; border-radius: 1px 1px 0 0; }
+.nb-tiles { display: flex; justify-content: space-around; align-items: center; gap: 8px; }
+.nb-tile { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.nb-tile small { color: var(--t2); font-size: 11px; }
+.nb-ring { width: 52px; height: 52px; }
+.nb-track { stroke: var(--card-3); }
+.nb-ringv { font-size: 13px; font-weight: 600; fill: var(--t1); font-variant-numeric: tabular-nums; }
+.nb-bignum b { font-family: var(--display); font-size: 30px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.nb-bignum b i { font-style: normal; font-size: 14px; color: var(--t3); margin-left: 1px; }
+.nb-net { font-size: 11px !important; font-family: inherit !important; white-space: nowrap; }
+.nb-htop { margin: 0; font-family: var(--mono, ui-monospace, monospace); font-size: 11.5px; line-height: 1.55; color: var(--t1); white-space: pre; overflow: hidden; }
+
+/* hlasitost */
+.nb-vol[data-design="hslider"], .nb-vol[data-design="eq"] { flex: 0 0 150px; flex-direction: row; }
+.nb-vol[data-design="icon"], .nb-vol[data-design="knob"] { flex: 0 0 90px; }
+.nb-vrow { flex: 1; display: flex; align-items: center; gap: 6px; }
+.nb-vnum { width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+.nb-knob { width: 60px; height: 64px; cursor: ns-resize; outline-offset: 2px; }
+.nb-knobface { fill: var(--card-2); stroke: var(--line-soft); }
+.nb-knobv { font-size: var(--fs-2xs); fill: var(--t2); font-variant-numeric: tabular-nums; }
+.nb-eq { flex: 1; display: flex; align-items: flex-end; gap: 3px; height: 72px; cursor: pointer; }
+.nb-eq i { flex: 1; border-radius: 2px; background: var(--card-3); }
+.nb-vicon { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.nb-vbig { font-family: var(--display); font-size: 30px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* režim ✎: sekce jsou náhled — klik = panel, tah = pořadí, ovládání uvnitř nereaguje */
+.nb-editwrap { margin: 0 0 16px; }
+.nb-edit { margin: 0; min-height: 120px; }
+.nb-item { position: relative; flex: 1 1 0; min-width: 0; display: flex; border-radius: 19px; cursor: grab; outline: 1px dashed var(--line); outline-offset: 2px; touch-action: none; }
+.nb-item > .nb-inert { flex: 1; min-width: 0; display: flex; pointer-events: none; }
+.nb-item > .nb-inert > .nb-sec { flex: 1; }
+.nb-item:hover, .nb-item:focus-visible { outline: 2px solid var(--accent); }
+.nb-item.on { outline: 2px solid var(--accent); }
+.nb-item.dragging { opacity: 0.25; }
+.nb-tag { position: absolute; top: -9px; left: 12px; padding: 0 6px; border-radius: var(--r-pill); background: var(--card-3); color: var(--t2); font-size: var(--fs-2xs); line-height: 16px; pointer-events: none; }
+.nb-add { flex: 0 0 44px; border: 1px dashed var(--line); border-radius: 19px; background: transparent; color: var(--t2); font-size: 22px; cursor: pointer; }
+.nb-add:hover, .nb-add[aria-expanded="true"] { color: var(--t1); border-color: var(--accent); }
+.nb-fly { position: fixed; left: 0; top: 0; z-index: 70; display: flex; margin: 0; pointer-events: none; opacity: 0.85; box-shadow: var(--shadow-pop); border-radius: 19px; will-change: transform; }
+.nb-fly > .nb-inert { flex: 1; display: flex; }
+.nb-panel { margin: 0 0 16px; }
+
+.notch-wrap { display: block; }
+.nb-meet, .nb-wx { gap: 6px; }

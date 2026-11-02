@@ -208,6 +208,8 @@ pub(crate) fn refresh_strip() {
     let animate = matches!(closed, crate::looks::Look::Island | crate::looks::Look::Rings | crate::looks::Look::Custom)
         && cfg.appearance.motion.style != crate::appearance::MotionStyle::None
         && !attention::os_animations_off();
+    // živá hrana vlastního vzhledu (kolo 28) se při „nerušit“ / prezentaci / celoobrazovkové appce nehýbe
+    let fx_calm = closed == crate::looks::Look::Custom && !crate::toast::accepts_notifications();
     let opacity = cfg.strip.opacity;
     let (style, metrics, line) = (look.strip.style, geom::strip_metrics(look.strip.style, look.strip.size), geom::line_stops(look, &palette));
     let axis2 = geom::axis2_for(&cfg, mon.rect.left, mon.rect.right, mon.dpi);
@@ -241,6 +243,7 @@ pub(crate) fn refresh_strip() {
         m.shape = shape;
         m.compose = compose;
         m.missed = missed;
+        m.fx_calm = fx_calm;
     });
 }
 

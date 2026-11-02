@@ -12,7 +12,9 @@ import { applyLookPreset, LOOK_PRESETS, presetOf, normalizeCardLook, type CardLo
 import { addTemplatePage, TEMPLATES, templateCards, type Template, type TemplateId } from "./bento";
 import { normalizeLayout, pageOf, type CardId, type LayoutCard } from "./model";
 import { cardName, pageName, tx } from "./text";
+import { paletteStyle } from "./surfaces";
 import "./gallery.css";
+import "./surfaces.css";
 
 type Peek = { preset: string } | { template: TemplateId };
 const [peekCards, setPeekCards] = createSignal<Peek | null>(null);
@@ -26,7 +28,7 @@ const peekOn = (p: Peek) => ({ onPointerEnter: () => setPeekCards(p), onPointerL
 /** Malá karta v miniatuře: plocha / zrnění / hrdina z `look` (ukázka tvaru, žádná data). */
 function MiniCard(q: { look?: CardLook; wide?: boolean; label?: string; style?: Record<string, string> }) {
   return (
-    <span class="cg-mcard" classList={{ "cg-wide": !!q.wide }} data-s={q.look?.surface ?? "style"} data-grain={q.look?.grain ? "" : undefined} style={q.style}>
+    <span class="cg-mcard" classList={{ "cg-wide": !!q.wide }} data-s={q.look?.surface ?? "style"} data-grain={q.look?.grain ? "" : undefined} style={{ ...paletteStyle(q.look?.surface, q.look?.palette), ...q.style }}>
       <Show when={q.label} fallback={<i class="cg-mh" />}>
         <b class="cg-mlabel">{q.label}</b>
       </Show>

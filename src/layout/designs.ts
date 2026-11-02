@@ -20,6 +20,8 @@ export const CARD_DESIGNS: Record<string, readonly Design[]> = {
     { id: "spend", name: ["cards.design.claude.spend", "Útrata"], line: ["cards.design.claude.spend.line", "Dnešek velký a 14 dní ve sloupcích."] },
     { id: "sessions", name: ["cards.design.claude.sessions", "Sezení"], line: ["cards.design.claude.sessions.line", "Dlaždice běžících sezení a tenký limit dole."] },
     { id: "gauge", name: ["cards.design.claude.gauge", "Palivoměr"], line: ["cards.design.claude.gauge.line", "Půlkruh s ručičkou pro limit 5 h."] },
+    { id: "working", name: ["cards.design.claude.working", "Při práci"], line: ["cards.design.claude.working.line", "Čas, fáze (odhad) a soubor právě pracující session."] },
+    { id: "done", name: ["cards.design.claude.done", "Hotovo"], line: ["cards.design.claude.done.line", "Session po dokončeném tahu s poslední zprávou a Otevřít."] },
   ],
   system: [
     { id: "lines", name: ["cards.design.system.lines", "Řádky"], line: ["cards.design.system.lines.line", "CPU, paměť, disky a síť s malými grafy."] },

@@ -3,7 +3,7 @@
 // (`LayoutEditor.tsx`). Náhled je statická kresba (žádná data, žádná animace); neznámé id dostane obecný náhled.
 import { For, Show, type JSX } from "solid-js";
 import { t } from "../i18n";
-import { designOf, designsOf } from "./designs";
+import { designOf, designsOf, type Design } from "./designs";
 import { tx } from "./text";
 import "./designs.css";
 
@@ -54,6 +54,8 @@ const CARD_THUMBS: Record<string, () => JSX.Element> = {
   "notes:bento": () => <>{R(3, 3, 22, 12, 0.6)}{R(27, 3, 10, 5.5, 0.3)}{R(27, 9.5, 10, 5.5, 0.3)}{R(3, 17, 34, 3.5, 0.2)}</>,
   "notes:kanban": () => <>{R(3, 3, 16, 3, 0.7)}{R(21, 3, 16, 3, 0.35)}{[9, 14, 19].map((y) => R(3, y, 16, 3.6, 0.45))}{[9, 14].map((y) => R(21, y, 16, 3.6, 0.2))}</>,
   "notes:timeline": () => <><path d="M9 2 V22" stroke="currentColor" stroke-width="1.4" opacity="0.4" />{[5, 12, 19].map((y, i) => <>{C(9, y, 2, 1 - i * 0.25)}{R(15, y - 1.6, 22 - i * 4, 3.2, 0.7 - i * 0.2)}</>)}</>,
+  "claude:working": () => <>{R(3, 3, 10, 2.5, 0.5)}{R(3, 7, 16, 7, 0.9)}{[0, 1, 2, 3].map((i) => R(3 + i * 8.5, 17, 7.5, 2, i === 1 ? 1 : 0.3))}{R(23, 5, 14, 6, 0.25)}</>,
+  "claude:done": () => <>{[3, 9, 15].map((y, i) => <>{C(5, y + 2, 1.6, 0.9 - i * 0.2)}{R(9, y, 18 - i * 2, 2.2, 0.8 - i * 0.2)}{R(9, y + 3.2, 14, 1.4, 0.3)}{R(31, y, 6, 4, 0.6)}</>)}</>,
 };
 
 export function DesignThumb(p: { id: string; card?: string }) {
@@ -65,18 +67,29 @@ export function DesignThumb(p: { id: string; card?: string }) {
 }
 
 /** Dlaždice vzhledů karty `card`; `look` = aktuální vzhled karty, `onPick` dostane id (výchozí také — volající ho normalizuje pryč). */
-export default function DesignPicker(p: { card: string; look: { design?: string } | undefined; onPick: (id: string) => void }) {
-  const list = () => designsOf(p.card);
-  const cur = () => designOf(p.card, p.look)?.id;
+export default function DesignPicker(p: {
+  card: string;
+  look: { design?: string } | undefined;
+  onPick: (id: string) => void;
+  /** kolo 27: jiný registr (sekce lišty notche) s vlastním nadpisem a náhledy */
+  list?: readonly Design[];
+  title?: string;
+  thumb?: (id: string) => JSX.Element;
+}) {
+  const list = () => p.list ?? designsOf(p.card);
+  const cur = () => (p.list ? (p.list.find((d) => d.id === p.look?.design) ?? p.list[0])?.id : designOf(p.card, p.look)?.id);
+  const title = () => p.title ?? t("cards.design.title", "Vzhled karty");
   return (
     <Show when={list().length > 1}>
-      <div class="tl-ed-col dz-box" role="group" aria-label={t("cards.design.title", "Vzhled karty")}>
-        <span class="tl-ed-cap">{t("cards.design.title", "Vzhled karty")}</span>
-        <div class="dz-grid" role="radiogroup" aria-label={t("cards.design.title", "Vzhled karty")}>
+      <div class="tl-ed-col dz-box" role="group" aria-label={title()}>
+        <span class="tl-ed-cap">{title()}</span>
+        <div class="dz-grid" role="radiogroup" aria-label={title()}>
           <For each={list()}>
             {(d) => (
               <button class="dz-tile" classList={{ on: cur() === d.id }} role="radio" aria-checked={cur() === d.id} title={tx(d.line)} onClick={() => p.onPick(d.id)}>
-                <DesignThumb card={p.card} id={d.id} />
+                <Show when={p.thumb} fallback={<DesignThumb card={p.card} id={d.id} />}>
+                  {(f) => <svg class="dz-thumb" viewBox="0 0 40 24" aria-hidden="true">{f()(d.id)}</svg>}
+                </Show>
                 <b>{tx(d.name)}</b>
               </button>
             )}

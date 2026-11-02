@@ -18,6 +18,7 @@ import MonitorPreview from "../previews/MonitorPreview";
 import AppearanceStyles from "./AppearanceStyles";
 import AppearanceThemes from "./AppearanceThemes";
 import AppearancePages from "./AppearancePages";
+import AppearanceHead from "./AppearanceHead";
 import AppearanceBackdrop from "./AppearanceBackdrop";
 import AppearanceAccent from "./AppearanceAccent";
 import CardsGallery from "../../layout/CardsGallery";
@@ -40,6 +41,7 @@ export default function AppearanceOpen(q: { ap: Ap; dirty: boolean; adv: boolean
       <div id="f-appearance.accentGrad" classList={{ hit: lit("appearance.accentGrad") }}><AppearanceAccent ap={q.ap} /></div>
       <div id="f-appearance.backdrop" classList={{ hit: lit("appearance.backdrop") }}><AppearanceBackdrop ap={q.ap} /></div>
       <AppearancePages ap={q.ap} />
+      <AppearanceHead ap={q.ap} />
       <CardsGallery />
       <div class="card ap-top" id="f-appearance.layout" classList={{ hit: lit("appearance.layout") }}>
         <h4>{t("appearance.open.size", "Šířka (rychle) a hustota na tvém monitoru")}</h4>

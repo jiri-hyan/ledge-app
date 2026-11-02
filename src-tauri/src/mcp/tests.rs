@@ -172,8 +172,9 @@ fn tools_list_matches_contract() {
     assert!(!names.iter().any(|n| n.contains("launch") || n.contains("run")), "MCP nic nespouští");
 }
 
-/// `tools/list` se posílá do kontextu modelu při každém připojení: strop 20,3 kB (před úpravou ~55 kB; skutečně ~20,22 kB —
-/// strop těsně nad skutečností, aby další růst schémat nešel potichu; kolo 26: +2 volby vzhledu karty Poznámky).
+/// `tools/list` se posílá do kontextu modelu při každém připojení: strop 21,05 kB (před úpravou ~55 kB; skutečně ~20,22 kB —
+/// strop těsně nad skutečností, aby další růst schémat nešel potichu; kolo 26: +2 volby vzhledu karty Poznámky;
+/// kolo 27: +`layout.pages[].notchBar` (lišta výřezu, ~0,4 kB ve schématu layout_apply); kolo 28: +4 povrchy a sada barev karty, ~+150 B → skutečně 20 855 B).
 #[test]
 fn tools_list_stays_small() {
     let srv = server();
@@ -182,7 +183,7 @@ fn tools_list_stays_small() {
     let size = serde_json::to_string(&list).unwrap().len();
     let per: Vec<String> = list.as_array().unwrap().iter().map(|t| format!("{} {}", t["name"].as_str().unwrap(), t.to_string().len())).collect();
     eprintln!("tools/list: {size} B ({})", per.join(", "));
-    assert!(size < 20_300, "tools/list má {size} B (strop 20300) — zkrať popisy nebo schémata; po nástrojích: {}", per.join(", "));
+    assert!(size < 21_050, "tools/list má {size} B (strop 21050) — zkrať popisy nebo schémata; po nástrojích: {}", per.join(", "));
 }
 
 /// Výstupy jsou kompaktní JSON na jednom řádku a čísla `f32` bez šumu (`1.05`, ne `1.0499999523162842`).

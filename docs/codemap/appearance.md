@@ -1,6 +1,6 @@
 # Codemapa: vzhled a animace (`appearance`)
 
-Styly, motivy, akcent, pozadí šuplíku (gradienty, živá pozadí, kolo 25), písmo, materiál, rozložení a šířka, animace, vzhled proužku. Config `appearance` ([config-behavior.md](../agents/config-behavior.md) → Vzhled) …
+Styly, motivy, akcent, pozadí šuplíku (kolo 25), písmo, materiál, rozložení a šířka, animace, vzhled proužku. Config `appearance` ([config-behavior.md](../agents/config-behavior.md) → Vzhled) …
 
 Detail (toky, invarianty, testy, co nečíst, historie): [appearance-detail.md](appearance-detail.md).
 
@@ -30,11 +30,11 @@ Detail (toky, invarianty, testy, co nečíst, historie): [appearance-detail.md](
 | `src-tauri/src/threads/pointer.rs` | pojistky hoveru (kolo 22): `cursor_visible` (skrytý = `flags == 0` … | `cursor_visible` |
 | `settings.rs` (`apply_config`) | změna `appearance` → událost `appearance` do šuplíku; proužek přes `mark_dirty` |  |
 | `src/theme/looks.ts` | tabulka stylů a jejich složek jako čistá data … | `STYLES` `STYLE_IDS` `styleOf` |
-| `src/notch/NotchBar.tsx` · `model.ts` · `notch.css` · `en.ts` | široký notch (rozložení `notch`, kolo 22): lišta sekcí nad kartami záložky … | `NotchBar` `notchSections` |
+| `src/notch/{NotchBar,BarPanel,barThumbs,SecMedia,SecTime,SecSystem,SecInfo}.tsx` · `src/notch/{model,bar,designs,look,barState,en}.ts` · `notch.css` · `src-tauri/src/notchbar.rs` | lišta notche (`notchBar`) … | `barPlan` |
 | `src/theme/styles.ts` | výběr stylu: hodnoty stylu do vzhledu / celého configu, které složky se od … | `withStyle` `configWithStyle` |
 | `src/theme/openAnim.ts` · `springs.ts` | plán otevření / zavření podle stylu animace (clip-path morf, „z výřezu“ přes … | `openPlan` `closePlan` `Geo` |
 | `src-tauri/src/appearance/backdrop.rs` · `src/theme/{backdrop,backdropPresets,backdropLive,backdropLoop}.ts` · `src/theme/BackdropLayer.tsx` | kolo 25, pozadí šuplíku: gradienty, závoj podle kontrastu, živá pozadí jen při otevření … | `BackdropConfig` `veilFor` `drawMode` |
-| `src/settings/panels/{AppearanceBackdrop,GradientEditor,AppearanceAccent}.tsx` · `src/settings/panels/en-backdrop.ts` | Studio: galerie pozadí, editor vlastního gradientu, gradientní akcent … | `AppearanceBackdrop` |
+| `src/settings/panels/{AppearanceBackdrop,GradientEditor,AppearanceAccent}.tsx` · `en-backdrop.ts` | Studio: galerie pozadí, editor vlastního gradientu, gradientní akcent … | `AppearanceBackdrop` |
 | `src/theme/themes.ts` | 16 motivů jako úplné sady tokenů (`COLOR_KEYS`); `dark` = `styles.css` … | `THEMES` `THEME_IDS` |
 | `src/theme/contrast.ts` | kontrast textu (WCAG) — jedna implementace pro test motivů i živou kontrolu v … | `textProblems` `contrast` |
 | `src/theme/customThemes.ts` | vlastní motivy (čistě): `resolveCustom` složí úplné tokeny (vrstvy z `base`, u … | `CUSTOM_KEYS` `resolveCustom` |
@@ -46,7 +46,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [appearance-detail.md](
 | `src/App.tsx` (`prepare`/`play`/`closing`) | přehraje `openPlan`/`closePlan` na `.shell` … | `geo` `settle` |
 | `src/settings/panels/Appearance.tsx` | jeden krok Vzhledu jako otázka Studia (`AppearanceStep step=closed|hover|open|motion`); rozbalené Doladit drží modul | `AppearanceStep` `AppearancePanel` |
 | `panels/AppearanceClosed.tsx` · `StripSettings.tsx` | krok Zavřený: galerie 15 vzhledů `strip.look` + dlaždice „Vlastní“ … | `AppearanceClosed` `normLook` |
-| `panels/ComposeEditor.tsx` · `ComposeDeco.tsx` · `compose.css` · `previews/ComposePreview.tsx` | krok Zavřený, kolo 23: dlaždice „Vlastní“ pod galerií (`AppearanceClosed` … | `ComposeEditor` |
+| `panels/ComposeEditor.tsx` · `ComposeDeco.tsx` · `ComposeText.tsx` · `compose.css` · `previews/ComposePreview.tsx` | krok Zavřený, kolo 23: dlaždice „Vlastní“ pod galerií (`AppearanceClosed` … | `ComposeEditor` |
 | `panels/AppearanceHover.tsx` | krok Po najetí: 3 dlaždice `drawer.hover` (data `src/hover/modes.ts` od J) s … | `AppearanceHover` `normHover` |
 | `panels/AppearanceOpen.tsx` · `AppearanceStyles.tsx` · `AppearanceLayout.tsx` | krok Otevřený: galerie stylů (živé miniatury, najetí = dočasný náhled přes … | `AppearanceOpen` |
 | `panels/AppearanceOpen.tsx` `SizeTable` | kolo 23, krok Otevřený (pod Šířkou a hustotou) → „Velikost otevřeného Ledge“ … | `SizeTable` |
