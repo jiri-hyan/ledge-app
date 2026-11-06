@@ -1,17 +1,7 @@
 // Lístky na plochu — čistá logika (`model.ts`): přidání bodu / textu, barvy, připnutí ze snapshotu.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anyThrough, appendLine, caretFromText, isPinned, isTaskLine, pinColors, pinSuggestVisible, pointLine, remindAskText, samePath, taskLine, TEXT_MIN } from "./model.ts";
-
-test("taskLine: bod checklistu z textu", () => {
-  const cases = [
-    ["koupit mléko", "- [ ] koupit mléko"],
-    ["  tlačítko\n nejde  ", "- [ ] tlačítko nejde"],
-    ["", ""],
-    ["   \n ", ""],
-  ];
-  for (const [inp, want] of cases) assert.equal(taskLine(inp), want, JSON.stringify(inp));
-});
+import { anyThrough, appendLine, caretFromText, isPinned, isTaskLine, pinColors, pinSuggestVisible, pointLine, remindAskText, samePath, TEXT_MIN } from "./model.ts";
 
 test("appendLine: bod pod bod, jinak nový odstavec, prázdné nic", () => {
   const cases = [

@@ -42,8 +42,6 @@ export const OPACITY_MIN = 30;
 
 export const isScriptKind = (k: string): boolean => k.startsWith(WIDGET_PREFIX) && k.length > WIDGET_PREFIX.length;
 export const isBuiltinKind = (k: string): k is BuiltinKind => (BUILTIN_KINDS as readonly string[]).includes(k);
-/** Platný druh (zrcadlo Rust `desk::Kind::parse`, bez kontroly jména souboru). */
-export const isKind = (k: unknown): k is string => typeof k === "string" && (isBuiltinKind(k) || isScriptKind(k));
 
 /** Co jde připnout na plochu z karty šuplíku (⋯ → Připnout na plochu). Ostatní karty zatím nic. */
 export function kindsOfCard(card: string): string[] {
@@ -76,12 +74,6 @@ export function widgetOf(v: DeskView | undefined, kind: string): DeskWidget | nu
   return v?.widgets.find((w) => w.kind === kind) ?? null;
 }
 
-/** Jde připnout další (není plno)? Už připnutý druh jde vždy (jen se ukáže). */
-export function canPin(v: DeskView | undefined, kind: string): boolean {
-  if (!v) return true;
-  return !!widgetOf(v, kind) || v.widgets.length < v.max;
-}
-
 /** Neprůhlednost do rozsahu 30–100 (zrcadlo Rust `sanitized`). */
 export function clampOpacity(o: number): number {
   return Number.isFinite(o) ? Math.min(100, Math.max(OPACITY_MIN, Math.round(o))) : 100;
@@ -91,8 +83,6 @@ export function clampOpacity(o: number): number {
 export function cleanProfileName(name: string): string {
   return name.split(/\s+/).filter(Boolean).join(" ").slice(0, 40);
 }
-
-export const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** Kolik minut čeká (ne záporné). */
 export function waitMinutes(since: number, now: number): number {
@@ -115,9 +105,4 @@ export function deskSnapshot(d: DeskData | null): Snapshot {
     widgets: d?.widgets ?? [],
   };
   return s as unknown as Snapshot;
-}
-
-/** Běží aspoň jeden dev server (pro hlavičku widgetu)? */
-export function liveCount(d: DeskData | null): number {
-  return (d?.procs ?? []).filter((p) => p.phase !== "exited" && p.phase !== "failed").length;
 }

@@ -7,7 +7,9 @@ import "./desk.css";
 import { setDictLoader } from "../i18n";
 import { render } from "solid-js/web";
 import DeskApp from "./DeskApp";
+import { installErrorLog } from "../uiErrors";
 
 setDictLoader(() => import("../i18n/dicts"));
+installErrorLog();
 
 render(() => <DeskApp />, document.getElementById("root") as HTMLElement);

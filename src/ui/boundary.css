@@ -1,0 +1,3 @@
+/* Záložní obsah při pádu vykreslení (ui/Boundary.tsx) — proměnné mají záložní hodnoty, okno lístku tokeny šuplíku nemá. */
+.ui-boundary { padding: var(--s3, 12px); font-size: var(--fs-ui, 13px); color: var(--t2, inherit); line-height: 1.5; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1, 6px); }
+.ui-boundary-sub { color: var(--t3, inherit); opacity: 0.8; }

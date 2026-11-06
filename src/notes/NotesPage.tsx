@@ -3,6 +3,7 @@
 
 import { createResource, createSignal, For, Show } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
+import { quiet } from "../uiErrors";
 import ProjectPicker from "./ProjectPicker";
 import { NoteRow, Tabs, tabsOf } from "./NotesCard";
 import { pageArchive, pageProject, setPageArchive, setPageProject, setTab, tab } from "./store";
@@ -21,9 +22,14 @@ export default function NotesPage(p: { s: Snapshot; now: number; onOpen: (n: Not
     return [...tb, ...extra];
   };
   const project = () => (pageProject() === "*" ? null : pageProject() === "" ? "_obecne" : pageProject());
+  const [failed, setFailed] = createSignal(false);
   const [res] = createResource(
     () => ({ kind: pageArchive() || cur() === "all" ? null : cur(), project: project(), includeDone: withDone() || pageArchive(), archived: pageArchive(), rev: p.s.notesRev }),
-    (q) => api.noteQuery({ kind: q.kind, project: q.project, includeDone: q.includeDone, archived: q.archived, limit: PAGE_LIMIT }),
+    async (q) => {
+      const r = await quiet(api.noteQuery({ kind: q.kind, project: q.project, includeDone: q.includeDone, archived: q.archived, limit: PAGE_LIMIT }), false as const, "noteQuery");
+      setFailed(r === false);
+      return r === false ? null : r;
+    },
   );
   const list = () => res.latest?.notes ?? [];
   return (
@@ -51,7 +57,7 @@ export default function NotesPage(p: { s: Snapshot; now: number; onOpen: (n: Not
         <button class="mini push" onClick={() => p.onNew(pageArchive() || cur() === "all" ? undefined : cur())}>{t("notes.card.new", "+ Nová")}</button>
       </div>
       <div class="notes-list">
-        <For each={list()} fallback={<div class="empty">{res.loading ? t("notes.page.loading", "Načítám…") : pageArchive() ? t("notes.page.archiveEmpty", "Archiv je prázdný — poznámku do něj pošleš přes ⋯ → Archivovat.") : t("notes.page.empty", "Nic tu není.")}</div>}>
+        <For each={list()} fallback={<div class="empty">{res.loading ? t("notes.page.loading", "Načítám…") : failed() ? t("notes.page.loadFailed", "Poznámky se nepodařilo načíst.") : pageArchive() ? t("notes.page.archiveEmpty", "Archiv je prázdný — poznámku do něj pošleš přes ⋯ → Archivovat.") : t("notes.page.empty", "Nic tu není.")}</div>}>
           {(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} archived={pageArchive()} />}
         </For>
       </div>

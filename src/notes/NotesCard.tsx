@@ -6,6 +6,7 @@
 
 import { createMemo, createResource, For, Match, Show, Switch, type JSX } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
+import { quiet } from "../uiErrors";
 import { ago } from "../format";
 import { IconBell } from "../icons";
 import { KindBadge, kindOf, kindColor, KindIcon } from "./kinds";
@@ -164,14 +165,14 @@ export function NotesCard(p: {
   // uložená záložka bez nehotových poznámek → Vše (volba zůstane zapamatovaná)
   const cur = () => (tabs().length > 2 && tabs().some((tb) => tb.id === tab()) ? tab() : "all");
   // štítky pro filtr: jen z paměti jádra, znovu jen při změně poznámek (notesRev)
-  const [tags] = createResource(() => (p.personal ? null : { rev: p.s.notesRev }), () => notesApi.tags().catch(() => []));
+  const [tags] = createResource(() => (p.personal ? null : { rev: p.s.notesRev }), () => quiet(notesApi.tags(), [], "noteTags"));
   const tagList = () => (tags.latest ?? []).slice(0, 8);
   // vybraný štítek, který už žádná nehotová poznámka nemá → bez filtru
   const tag = () => (tagFilter() && (tags.latest ?? []).some((x) => x.tag === tagFilter()) ? tagFilter() : null);
   const filtered = () => cur() !== "all" || !!tag();
   const [picked] = createResource(
     () => (filtered() ? { kind: cur() === "all" ? null : cur(), tag: tag(), rev: p.s.notesRev } : null),
-    (k) => api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }),
+    (k) => quiet(api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }), null, "noteQuery"),
   );
   const items = () => (p.personal ? p.s.personal.notes : !filtered() ? p.s.notes : picked.latest?.notes ?? []);
   const moreCount = () => (p.personal ? p.s.personal.notesMore : !filtered() ? p.s.notesMore : Math.max(0, (picked.latest?.total ?? 0) - items().length));
@@ -197,8 +198,8 @@ export function NotesCard(p: {
     () => (design() === "kanban" && !p.personal ? { kind: cur() === "all" ? null : cur(), tag: tag(), rev: p.s.notesRev } : null),
     async (k) => {
       const [open, done] = await Promise.all([
-        api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }),
-        api.noteQuery({ kind: k.kind, tag: k.tag, onlyDone: true, limit: CARD_ROWS }),
+        quiet(api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }), null, "noteQuery"),
+        quiet(api.noteQuery({ kind: k.kind, tag: k.tag, onlyDone: true, limit: CARD_ROWS }), null, "noteQuery"),
       ]);
       return { open: open?.notes ?? [], done: done?.notes ?? [] };
     },

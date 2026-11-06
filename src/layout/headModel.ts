@@ -11,7 +11,6 @@ export const CHIP_STYLES: readonly ChipStyle[] = ["auto", "pills", "merged", "do
 export const TABS_STYLES: readonly TabsStyle[] = ["segment", "underline", "pills", "icons", "dots"];
 
 export const DEFAULT_HEAD: HeadLook = { clock: "big", chips: "auto" };
-export const DEFAULT_TABS: TabsLook = { style: "segment" };
 
 const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
 const parts = (v: unknown): HeadPart[] => (Array.isArray(v) ? v.filter((x, i, a): x is HeadPart => DEFAULT_ORDER.includes(x) && a.indexOf(x) === i) : []);
@@ -67,21 +66,6 @@ export function withHidden(h: HeadLook, part: HeadPart, hide: boolean): HeadLook
   const { hidden: _h, ...rest } = h;
   return next.length ? { ...rest, hidden: next } : rest;
 }
-
-/**
- * Kolik štítků se vejde do JEDNÉ řady. `widths` = šířky štítků, `avail` = šířka řady, `moreW` = šířka tlačítka „+N“.
- * Vejdou-li se všechny, vrátí jejich počet; jinak největší k, pro které se vedle k štítků vejde i „+N“ (nejméně 0).
- */
-export function fitCount(widths: readonly number[], gap: number, avail: number, moreW: number): number {
-  const n = widths.length;
-  const span = (k: number) => widths.slice(0, k).reduce((a, w) => a + w, 0) + Math.max(0, k - 1) * gap;
-  if (span(n) <= avail) return n;
-  for (let k = n - 1; k > 0; k--) if (span(k) + gap + moreW <= avail) return k;
-  return 0;
-}
-
-/** Štítek s nulou se ukazuje jen s volbou `showZero`. */
-export const keepChip = (count: number, showZero: boolean | undefined) => count > 0 || !!showZero;
 
 /** Úhly ručiček ve stupních od 12:00 (hodinová, minutová, vteřinová). */
 export function handAngles(d: Date): { h: number; m: number; s: number } {

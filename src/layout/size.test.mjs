@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { deckCols, fitSize, heightPx, nextSizeFor, packSpans, resizeTo, rowsForPx, sizeForSpan, sizeOutcome, spanOf, spanPx, stepHeight, stepSize, usableSizes } from "./size.ts";
+import { deckCols, fitSize, nextSizeFor, packSpans, resizeTo, rowsForPx, sizeForSpan, sizeOutcome, spanOf, stepHeight, stepSize, usableSizes } from "./size.ts";
 
 test("rozpětí velikostí = `spans` ve vzhledu (theme/looks.ts)", () => {
   for (const cols of [1, 2, 3, 4, 5, 6]) {
@@ -68,9 +68,7 @@ test("tah za okraj: šířka se přichytí na sloupce, výška na řádky", () =
   assert.equal(sizeForSpan(5, 5), "xl");
   assert.equal(sizeForSpan(2, 2), "xl");
   assert.equal(sizeForSpan(1, 3), "s");
-  assert.deepEqual([1, 2, 3, 4].map((h) => heightPx(h, 100, 10)), [100, 210, 320, 430]);
   assert.deepEqual([0, 100, 160, 210, 9999].map((px) => rowsForPx(px, 100, 10)), [1, 1, 2, 2, 4]);
-  assert.equal(spanPx(2, 100, 10), 210);
 });
 
 // ---------- vlna 9: rozložení, které vždy poslechne (diagnóza → test → oprava) ----------

@@ -433,7 +433,7 @@ pub fn diff(cur: &[DeskWidget], target: &[DeskWidget]) -> Diff {
 
 /// Stav widgetů (chybějící / poškozený soubor = žádné; neznámé druhy, duplicity a nesmysly pryč).
 pub fn load(path: &Path) -> DeskFile {
-    let raw: DeskFile = crate::fsx::load_json_or_default(path);
+    let raw: DeskFile = crate::fsx::load_json_keep_broken(path);
     parse_clean(raw)
 }
 

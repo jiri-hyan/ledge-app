@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { PARTS, PART_IDS, PAGE_PART, blockOf, modifiedByPart, partOfBlock, resolveStudioTarget, stepPart } from "./parts.ts";
+import { PARTS, PART_IDS, PAGE_PART, blockOf, modifiedByPart, partOfBlock, resolveStudioTarget } from "./parts.ts";
 import { ADVANCED_ANCHORS, PLACEMENT } from "../settings/placement.ts";
 import { ANCHOR_STEP } from "../settings/appearanceModel.ts";
 import { PANEL_ALIASES, PANEL_META } from "../settings/registry.ts";
@@ -99,9 +99,6 @@ test("upraveno proti výchozímu podle části a pořadí částí", () => {
   assert.equal(m.projekty, 1);
   assert.equal(m.obsah, 1);
   assert.equal(m.claude, 0);
-  assert.equal(stepPart("pruzek", 1), "otevirani");
-  assert.equal(stepPart("pruzek", -1), null);
-  assert.equal(stepPart("aplikace", 1), null);
 });
 
 test("průvodce: postup z úložiště a hotové části", async () => {

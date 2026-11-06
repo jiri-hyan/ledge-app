@@ -70,21 +70,9 @@ pub(super) fn windows() -> Vec<(String, WebviewWindow)> {
     app().webview_windows().into_iter().filter(|(l, _)| l.starts_with(LABEL_PREFIX)).collect()
 }
 
-/// Monitor proužku + mezera pod proužkem (fyzicky) — sem jdou nové widgety (kopie `pins::win::fallback`).
-fn fallback() -> (Mon, i32) {
-    let c = core();
-    let mon = c.monitor();
-    let scale = mon.dpi as f64 / 96.0;
-    let r = Area::from(mon.rect);
-    let work = Area::from(mon.work);
-    let strip_h = c.strip_logical(&mon).1;
-    let gap = ((r.t + ((strip_h + 12.0) * scale).round() as i32) - work.t).max((12.0 * scale).round() as i32);
-    (Mon { work, scale }, gap)
-}
-
-pub(super) fn monitors() -> Vec<Mon> {
-    crate::screen::monitors().iter().map(|m| Mon { work: Area::from(m.work), scale: m.dpi as f64 / 96.0 }).collect()
-}
+// Monitor proužku + mezera pod ním a seznam monitorů mají widgety stejné jako lístky.
+use crate::pins::win::fallback;
+pub(super) use crate::pins::win::monitors;
 
 fn hwnd(w: &WebviewWindow) -> Option<windows::Win32::Foundation::HWND> {
     w.hwnd().ok().map(|h| windows::Win32::Foundation::HWND(h.0 as *mut _))

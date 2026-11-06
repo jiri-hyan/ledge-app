@@ -145,7 +145,7 @@ function Provider(p: { id: ProviderId; view?: AccountView; open: boolean; onChan
               <Show when={!waiting()} fallback={
                 <>
                   <span class="acc-wait">{t("settings.accounts.waiting", "Čekám na přihlášení v prohlížeči… (nejvýš 5 minut)")}</span>
-                  <button class="mini" onClick={() => void accountsApi.cancel(p.id)}>{t("settings.accounts.cancel", "Zrušit")}</button>
+                  <button class="mini" onClick={() => accountsApi.cancel(p.id).catch(sayError)}>{t("settings.accounts.cancel", "Zrušit")}</button>
                 </>
               }>
                 <LiveBadge />

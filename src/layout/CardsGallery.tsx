@@ -20,8 +20,6 @@ type Peek = { preset: string } | { template: TemplateId };
 const [peekCards, setPeekCards] = createSignal<Peek | null>(null);
 /** záložka, na kterou galerie předvolby použije (sdílí ji náhled dole) */
 const [galleryPage, setGalleryPage] = createSignal("");
-/** Ukazuje náhled dole teď dlaždici karet pod myší? */
-export const peekingCards = () => !!peekCards();
 
 const peekOn = (p: Peek) => ({ onPointerEnter: () => setPeekCards(p), onPointerLeave: () => setPeekCards(null), onFocus: () => setPeekCards(p), onBlur: () => setPeekCards(null) });
 

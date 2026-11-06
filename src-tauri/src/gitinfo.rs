@@ -1,4 +1,5 @@
-//! Větev, neuložené změny a ahead/behind — jen na vyžádání (otevřený šuplík), s cache.
+//! Běh gitu s termínem (`run`, `capture`, `capture_tail`) a `git status` (větev, neuložené změny, ahead/behind) pro
+//! sessions a hygienu, na pozadí s tvrdým stropem.
 
 use serde::Serialize;
 use std::os::windows::process::CommandExt;
@@ -47,10 +48,16 @@ pub fn status(dir: &Path) -> Option<GitInfo> {
     status_until(dir, Instant::now() + STATUS_TIMEOUT)
 }
 
+/// `git status` na pozadí: bez fsmonitoru jako ostatní volání (`git_cmd`) — globální `core.fsmonitor=true`
+/// by jinak v každém repu nastartoval daemon, kterého Job Object hned zabije.
+fn status_cmd(dir: &Path) -> Command {
+    let mut cmd = git_cmd(dir, &STATUS_ARGS);
+    cmd.env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
+    cmd
+}
+
 fn status_until(dir: &Path, deadline: Instant) -> Option<GitInfo> {
-    let mut cmd = Command::new("git");
-    cmd.args(STATUS_ARGS).current_dir(dir).env("GIT_OPTIONAL_LOCKS", "0").env("GIT_TERMINAL_PROMPT", "0");
-    let out = capture(&mut cmd, None, false, deadline).ok()?;
+    let out = capture(&mut status_cmd(dir), None, false, deadline).ok()?;
     out.success.then(|| parse_porcelain_v2(&out.stdout))
 }
 
@@ -270,6 +277,9 @@ mod tests {
     #[test]
     fn background_status_takes_no_optional_locks_and_respects_deadline() {
         assert_eq!(STATUS_ARGS[0], "--no-optional-locks", "pozadí nesmí zabrat index.lock");
+        let cmd = status_cmd(Path::new("."));
+        let args: Vec<_> = cmd.get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        assert_eq!(args[..3], ["-c", "core.fsmonitor=false", STATUS_ARGS[0]], "fsmonitor vypnutý, a to před podpříkazem");
         let dir = std::env::temp_dir().join(format!("ledge-gitinfo-status-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();

@@ -71,6 +71,8 @@ pub(crate) struct Core {
     pub(crate) app: AppHandle,
     pub(crate) cfg: RwLock<Config>,
     pub(crate) cfg_error: Mutex<Option<String>>,
+    /// Chyba mostu Clauda (`claude::serve` při startu); `apply_config` ji nepřepisuje (to dělá `cfg_error`).
+    pub(crate) bridge_error: Mutex<Option<String>>,
     pub(crate) procs: ProcMan,
     pub(crate) claude: Claude,
     pub(crate) strip: Arc<Strip>,

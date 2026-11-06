@@ -73,6 +73,7 @@ import TogglesCard from "./board/TogglesCard";
 import WinQuickCard from "./winquick/WinQuickCard";
 import ActivityCard from "./sessions/ActivityCard";
 import { activityApproves, inboxShown } from "./sessions/activity";
+import Boundary from "./ui/Boundary";
 
 export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
   // stejné rozložení = stejný objekt (nový snapshot karty nepřestaví)
@@ -164,7 +165,9 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   // názvy umístěných widgetů pro katalog a „karta odebrána“
   createEffect(() => rememberWidgets(p.s.widgets));
 
-  const card = (id: CardId): JSX.Element => {
+  /** každá karta má vlastní pojistku: pád jedné nezboří celou stránku (`Boundary` nepřidává obal, mřížka ani tah se nemění) */
+  const card = (id: CardId): JSX.Element => <Boundary>{cardBody(id)}</Boundary>;
+  const cardBody = (id: CardId): JSX.Element => {
     switch (id) {
       case "projects":
         return <Projects s={p.s} page={page().id} view={view("projects")} onNote={p.onNote} nav={p.nav} onSettings={p.onSettings} tiles={tiles()} menu={menu("projects")} onShowAll={() => void saveLayout((l) => setTiles(l, page().id, { hidden: [] }), p.s.cfgError)} />;

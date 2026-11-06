@@ -102,12 +102,6 @@ export const nearestIndex = (frac: number, count: number): number => (count < 1 
 /** Index světové strany 0–7 (S, SV, V, JV, J, JZ, Z, SZ) podle směru větru ve stupních, odkud vane. */
 export const windIndex = (deg: number): number => ((Math.round((((deg % 360) + 360) % 360) / 45) % 8) + 8) % 8;
 
-/** Den v týdnu (0 = neděle) z „YYYY-MM-DD“ bez zásahu pásma; špatný text = null. */
-export function dowOf(date: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
-  return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay() : null;
-}
-
 export interface DayRow {
   date: string;
   min: number;

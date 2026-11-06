@@ -110,7 +110,7 @@ fn over_real_bridge() {
     let (port, ()) = crate::ports::with_free_port(|port| {
         let (s2, h2) = (srv.clone(), host.clone());
         let claude = crate::claude::Claude::new(Arc::new(|| {}), std::time::Duration::from_secs(1));
-        crate::claude::serve(port, claude, Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(move |r: &HttpReq| handle_http(&s2, h2.as_ref(), r)))
+        crate::claude::serve(port, claude, Arc::new(|| json!({})), Arc::new(|_, _| Ok(json!({}))), Arc::new(move |r: &HttpReq| handle_http(&s2, h2.as_ref(), r)), Arc::new(|| None))
     });
     let post = |extra: &str, body: &str| {
         use std::io::{Read, Write};
@@ -172,9 +172,11 @@ fn tools_list_matches_contract() {
     assert!(!names.iter().any(|n| n.contains("launch") || n.contains("run")), "MCP nic nespouští");
 }
 
-/// `tools/list` se posílá do kontextu modelu při každém připojení: strop 21,05 kB (před úpravou ~55 kB; skutečně ~20,22 kB —
-/// strop těsně nad skutečností, aby další růst schémat nešel potichu; kolo 26: +2 volby vzhledu karty Poznámky;
-/// kolo 27: +`layout.pages[].notchBar` (lišta výřezu, ~0,4 kB ve schématu layout_apply); kolo 28: +4 povrchy a sada barev karty, ~+150 B → skutečně 20 855 B).
+/// `tools/list` se posílá do kontextu modelu při každém připojení (~5–6k tokenů při 21 kB): strop MAX_TOOLS_LIST_BYTES má
+/// REZERVU nad skutečností (kolo 28: 20 855 B), aby se nemusel zvedat v každé větvi — zvedání ve více větvích dělalo
+/// konflikty při slučování. Při překročení nejdřív zkrať popisy/schémata (nejtlustší nástroje tiskne hláška níže);
+/// strop zvedej JEN vědomě, v samostatném commitu: změň konstantu níže a napiš do commitu skutečnou velikost.
+const MAX_TOOLS_LIST_BYTES: usize = 22_000;
 #[test]
 fn tools_list_stays_small() {
     let srv = server();
@@ -183,7 +185,7 @@ fn tools_list_stays_small() {
     let size = serde_json::to_string(&list).unwrap().len();
     let per: Vec<String> = list.as_array().unwrap().iter().map(|t| format!("{} {}", t["name"].as_str().unwrap(), t.to_string().len())).collect();
     eprintln!("tools/list: {size} B ({})", per.join(", "));
-    assert!(size < 21_050, "tools/list má {size} B (strop 21050) — zkrať popisy nebo schémata; po nástrojích: {}", per.join(", "));
+    assert!(size < MAX_TOOLS_LIST_BYTES, "tools/list má {size} B (strop {MAX_TOOLS_LIST_BYTES}) — nejdřív zkrať popisy nebo schémata (nejtlustší nástroje: {}); strop posuň jen vědomě konstantou MAX_TOOLS_LIST_BYTES v src-tauri/src/mcp/tests.rs, v samostatném commitu", per.join(", "));
 }
 
 /// Výstupy jsou kompaktní JSON na jednom řádku a čísla `f32` bez šumu (`1.05`, ne `1.0499999523162842`).
@@ -434,4 +436,20 @@ fn old_config_without_mcp_is_off() {
     crate::config::save(&p, &c).unwrap();
     assert_eq!(crate::config::load(&p).unwrap().unwrap(), c, "load → save → load beze změny");
     assert!(crate::config::schema_json().contains("\"mcp\""), "schéma configu zná sekci mcp");
+}
+
+/// Odmítnuté vrácení záznam neztratí: po vrácení ruční změny ho `undo_last` provede, teprve pak je pryč.
+#[test]
+fn refused_undo_keeps_entry() {
+    let srv = server();
+    let host = MemHost::new(true);
+    assert!(!call(&srv, &host, "strip_set", json!({ "custom": "MCP" })).0);
+    assert_eq!(srv.undo.lock().len(), 1);
+    host.cfg.lock().strip.custom = "ruka".into();
+    assert!(call(&srv, &host, "undo_last", json!({})).0);
+    assert_eq!(srv.undo.lock().len(), 1, "odmítnutí záznam nesmí odebrat");
+    host.cfg.lock().strip.custom = "MCP".into();
+    assert!(!call(&srv, &host, "undo_last", json!({})).0);
+    assert_eq!(srv.undo.lock().len(), 0, "úspěch záznam odebere");
+    assert!(call(&srv, &host, "undo_last", json!({})).0, "prázdný zásobník = chyba");
 }

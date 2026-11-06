@@ -2,7 +2,7 @@
 // (s editorem rozložení a přehledem vzhledů), průvodce, paleta, stránka Poznámky, editor poznámky, panel „Nová verze“, katalog karet
 // a panel „Vzhled karty“. Každý je vlastní chunk i se svým CSS — Vite počká na styly dřív, než `import()` dokončí,
 // takže se nic nevykreslí bez nich. Fallback = nic (žádné blikání). `preloadViews` je přednačte v klidu po prvním
-// zobrazení šuplíku (`App.tsx`), aby první klik na Nastavení / Ctrl+K nebyl pomalý.
+// zobrazení šuplíku (`App.tsx`), aby první klik na Ctrl+K nebyl pomalý. Studio se nepřednačítá: Nastavení je samostatné okno, `Settings` je jen záloha (`setStudioFallback`).
 import { lazy, Suspense, type Component } from "solid-js";
 import { loadDict } from "./i18n";
 
@@ -33,7 +33,6 @@ export const Palette = view(async () => {
 
 /** Chunky k přednačtení (paleta bez slovníku — ten se stáhne až při jejím otevření). */
 const PRELOAD: (() => Promise<unknown>)[] = [
-  () => import("./studio/Studio"),
   () => import("./palette/Palette"),
   () => import("./notes/NotesPage"),
   () => import("./notes/NoteEditor"),

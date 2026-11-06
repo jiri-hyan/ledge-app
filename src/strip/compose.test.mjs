@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { STRIP_LOOK_IDS } from "./looks.ts";
 import {
   COMPOSE_ITEMS, COMPOSE_SHAPES, normText, setPieceLook, setText, DEFAULT_COMPOSE, DESIGN_IDS, ITEM_STYLES, MAX_PIECES, MAX_ZONE, W_MAX, W_MIN,
-  composeOf, designOf, setPieceColor, stylesFor, drawKind, hRange, hasItem, nextStyle, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
+  composeOf, designOf, setPieceColor, stylesFor, drawKind, hRange, hasItem, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
 } from "./compose.ts";
 
 const sig = (c) => `${c.shape} ${c.width}×${c.height} r${c.round} | ${["left", "center", "right"].map((s) => c[s].map((p) => `${p.item}:${p.style}`).join(",")).join(" | ")}${c.hideIdle ? " ghost" : ""}${c.rotate ? " rotate" : ""}`;
@@ -96,7 +96,6 @@ test("kostky: přidat, přesunout, odebrat, styl — vstup netknutý", () => {
   for (const it of ["time", "limit5h", "claude"]) one = removePiece(one, it);
   assert.equal(total(one), 1);
   assert.deepEqual(whereIs(one, "claude"), ["left", 0]);
-  assert.equal(nextStyle("ring5h"), "icon");
   // klik na kostku: jen styly, které položka nabízí (čas nemá průběh ani Claude styly)
   let st = composeOf("classic");
   const seenStyles = [];

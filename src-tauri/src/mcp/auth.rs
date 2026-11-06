@@ -14,27 +14,42 @@ pub const KEY_BYTES: usize = 32;
 /// Úložiště klíče + cache v paměti.
 pub struct Keys {
     vault: Box<dyn Vault>,
+    target: &'static str,
     cache: Mutex<Option<String>>,
 }
 
 impl Keys {
     pub fn new(vault: Box<dyn Vault>) -> Self {
-        Self { vault, cache: Mutex::new(None) }
+        Self::for_target(vault, TARGET)
+    }
+
+    /// Klíč pod jiným jménem pověření (`hooksetup::HOOK_TARGET`).
+    pub fn for_target(vault: Box<dyn Vault>, target: &'static str) -> Self {
+        Self { vault, target, cache: Mutex::new(None) }
     }
 
     /// Klíč, je-li (cache, jinak Správce pověření). Nečitelný záznam = žádný.
     pub fn get(&self) -> Option<String> {
         let mut c = self.cache.lock();
         if c.is_none() {
-            *c = read(self.vault.as_ref());
+            *c = read_at(self.vault.as_ref(), self.target);
         }
         c.clone()
     }
 
-    /// Klíč, a když není, vytvoří nový (první zapnutí).
+    /// Klíč, a když není, vytvoří nový (první zapnutí). Chyba čtení úložiště (přechodná, zamčené pověření)
+    /// není „klíč chybí“: vrátí se chyba a stávající klíč se nepřepíše. Nový vzniká jen při `Ok(None)`
+    /// nebo nepoužitelném záznamu.
     pub fn ensure(&self) -> Result<String, String> {
-        match self.get() {
-            Some(k) => Ok(k),
+        let cached = self.cache.lock().clone();
+        if let Some(k) = cached {
+            return Ok(k);
+        }
+        match try_read_at(self.vault.as_ref(), self.target)? {
+            Some(k) => {
+                *self.cache.lock() = Some(k.clone());
+                Ok(k)
+            }
             None => self.rotate(),
         }
     }
@@ -42,7 +57,7 @@ impl Keys {
     /// Nový klíč (starý přestane platit hned — i pro připojené klienty).
     pub fn rotate(&self) -> Result<String, String> {
         let k = fresh()?;
-        self.vault.write(TARGET, k.as_bytes())?;
+        self.vault.write(self.target, k.as_bytes())?;
         *self.cache.lock() = Some(k.clone());
         Ok(k)
     }
@@ -56,9 +71,17 @@ impl Keys {
 
 /// Přečte klíč z úložiště (jen platný tvar).
 pub fn read(v: &dyn Vault) -> Option<String> {
-    let bytes = v.read(TARGET).ok()??;
-    let k = String::from_utf8(bytes).ok()?;
-    valid(&k).then_some(k)
+    read_at(v, TARGET)
+}
+
+fn read_at(v: &dyn Vault, target: &str) -> Option<String> {
+    try_read_at(v, target).ok().flatten()
+}
+
+/// Jako `read_at`, ale chybu úložiště nezaměňuje za chybějící klíč. Záznam nepoužitelného tvaru je `Ok(None)`.
+fn try_read_at(v: &dyn Vault, target: &str) -> Result<Option<String>, String> {
+    let Some(bytes) = v.read(target)? else { return Ok(None) };
+    Ok(String::from_utf8(bytes).ok().filter(|k| valid(k)))
 }
 
 /// Tvar klíče: base64url, 43 znaků (32 B).
@@ -115,6 +138,58 @@ mod tests {
         assert_ne!(a, b);
         assert!(!k.check(Some(&format!("Bearer {a}"))), "starý klíč po výměně neplatí");
         assert!(k.check(Some(&format!("Bearer {b}"))));
+    }
+
+    /// Chyba čtení úložiště není „klíč chybí“: `ensure` selže a nic nepřepíše.
+    #[test]
+    fn ensure_does_not_rotate_on_read_error() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        struct Broken(std::sync::Arc<AtomicUsize>);
+        impl Vault for Broken {
+            fn read(&self, _: &str) -> Result<Option<Vec<u8>>, String> {
+                Err("zamčeno".into())
+            }
+            fn write(&self, _: &str, _: &[u8]) -> Result<(), String> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+            fn delete(&self, _: &str) -> Result<(), String> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+        let writes = std::sync::Arc::new(AtomicUsize::new(0));
+        let k = Keys::new(Box::new(Broken(writes.clone())));
+        assert!(k.ensure().is_err());
+        assert_eq!(writes.load(Ordering::SeqCst), 0, "úložiště se nesmí změnit");
+        assert!(k.get().is_none());
+        assert!(!k.check(Some("Bearer cokoli")), "při chybě nepustí nikoho");
+    }
+
+    #[test]
+    fn targets_do_not_share_a_key() {
+        #[derive(Clone, Default)]
+        struct Shared(std::sync::Arc<MemVault>);
+        impl Vault for Shared {
+            fn read(&self, t: &str) -> Result<Option<Vec<u8>>, String> {
+                self.0.read(t)
+            }
+            fn write(&self, t: &str, d: &[u8]) -> Result<(), String> {
+                self.0.write(t, d)
+            }
+            fn delete(&self, t: &str) -> Result<(), String> {
+                self.0.delete(t)
+            }
+        }
+        let vault = Shared::default();
+        let mcp = Keys::new(Box::new(vault.clone()));
+        let hooks = Keys::for_target(Box::new(vault.clone()), "Ledge/hooks");
+        let (a, b) = (mcp.ensure().unwrap(), hooks.ensure().unwrap());
+        assert_ne!(a, b);
+        assert!(!mcp.check(Some(&format!("Bearer {b}"))), "klíč hooků MCP neotevře");
+        // po restartu se každý přečte ze svého záznamu
+        assert_eq!(Keys::for_target(Box::new(vault.clone()), "Ledge/hooks").get(), Some(b));
+        assert_eq!(read(&vault), Some(a));
     }
 
     #[test]

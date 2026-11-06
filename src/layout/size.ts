@@ -112,9 +112,6 @@ export function sizeForSpan(span: number, cols: number): CardSize {
   return best;
 }
 
-/** Výška v px pro `h` řádků (řádek + mezery mezi nimi). */
-export const heightPx = (h: number, row: number, gap: number): number => h * row + (h - 1) * gap;
-
 /** Řádky pro výšku v px (zaokrouhleně, 1–4). */
 export function rowsForPx(px: number, row: number, gap: number): CardHeight {
   const n = Math.round((px + gap) / Math.max(1, row + gap));
@@ -137,9 +134,6 @@ export function resizeTo(m: DeckMetrics, edge: Edge, start: Dim, px: number, py:
   if (edge !== "e") h = rowsForPx(py - m.top, m.row, m.gap);
   return { size, h };
 }
-
-/** Šířka obrysu cíle v px (`span` sloupců). */
-export const spanPx = (span: number, colW: number, gap: number): number => span * colW + (span - 1) * gap;
 
 /** Výška o krok (PageUp = −1 nižší, PageDown = +1 vyšší): 1 → 2 → 3 → 4 → podle obsahu, bez kruhu. */
 export function stepHeight(h: CardHeight | undefined, dir: 1 | -1): CardHeight | undefined {

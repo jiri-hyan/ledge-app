@@ -154,8 +154,6 @@ const fieldsOf = (n: NoteDetail) => ({ path: n.path, hash: n.hash, text: trimBod
 let openSeq = 0;
 /** Zneplatní rozběhnutá čtení (odchod z editoru, otevření nové poznámky). */
 export const cancelOpen = () => void ++openSeq;
-/** Je čtení `id` už přebité novějším? (použije editor po vlastním `await`) */
-export const openSuperseded = (id: number) => id !== openSeq;
 
 /** Otevře úpravu `path`. Vrací cestu (otevřená), `null` (poznámku nejde přečíst) nebo `undefined` (čtení
  *  mezitím přebilo novější otevření — volající nedělá nic). Soubor se čte VŽDY znovu; rozepsaná úprava téže

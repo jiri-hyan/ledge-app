@@ -31,6 +31,10 @@ impl Undo {
             self.stack.remove(0);
         }
     }
+    /// Poslední záznam bez odebrání (odebere se až po úspěšném vrácení — `pop`).
+    pub fn peek(&self) -> Option<&Entry> {
+        self.stack.last()
+    }
     pub fn pop(&mut self) -> Option<Entry> {
         self.stack.pop()
     }
@@ -87,6 +91,18 @@ mod tests {
             last = Some(e.label);
         }
         assert_eq!(last.as_deref(), Some("z5"), "nejstarší vypadly");
+    }
+
+    #[test]
+    fn peek_keeps_entry_until_pop() {
+        let mut u = Undo::default();
+        assert!(u.peek().is_none());
+        u.push(entry(1));
+        u.push(entry(2));
+        assert_eq!(u.peek().unwrap().label, "z2");
+        assert_eq!((u.len(), u.peek().unwrap().label.as_str()), (2, "z2"), "peek nic neodebral");
+        assert_eq!(u.pop().unwrap().label, "z2");
+        assert_eq!(u.peek().unwrap().label, "z1");
     }
 
     #[test]

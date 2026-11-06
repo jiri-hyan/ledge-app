@@ -43,7 +43,7 @@ export function progress(c: Countdown, now: number): number {
   return Math.min(1, Math.max(0, 1 - leftMs(c, now) / c.total));
 }
 
-const p2 = (n: number) => String(n).padStart(2, "0");
+import { pad2 as p2 } from "../pad.ts";
 
 /** „m:ss“ / „h:mm:ss“. `up` = zaokrouhlit sekundy nahoru (odpočet: 0,4 s zbývá = 0:01, ne 0:00). */
 export function fmtDuration(ms: number, up = false): string {

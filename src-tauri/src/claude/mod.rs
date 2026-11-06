@@ -195,6 +195,20 @@ pub fn summarize(tool: &str, input: &Value) -> String {
     if one_line.chars().count() > 300 { one_line.chars().take(300).collect::<String>() + "…" } else { one_line }
 }
 
+/// Týká se dokončený nástroj (`PostToolUse`, `PostToolUseFailure`) téhle karty? Paralelní nástroje a subagenti
+/// sdílejí `session_id`, dokončení jiného nástroje kartu smazat nesmí. Přesně podle `tool_use_id`, když ho
+/// karta má (`PreToolUse`); `PermissionRequest` ho nenese, tam podle nástroje a toho, co karta ukazuje
+/// (`summary` odolá vedlejším polím vstupu). Plán má v `summary` titulek, ale v jedné session je jen jeden.
+fn same_request(p: &Pending, tool: &str, use_id: &str, summary: &str) -> bool {
+    if p.tool != tool {
+        return false;
+    }
+    match p.tool_use_id.as_deref() {
+        Some(id) if !use_id.is_empty() => id == use_id,
+        _ => p.plan.is_some() || p.summary == summary,
+    }
+}
+
 /// Nejdelší čekání na schválení: hook `PermissionRequest` má timeout 600 s (`hooksetup::EVENTS`),
 /// 50 s rezerva — stejně jako `questions::MAX_HOLD_S` a posuvník v Nastavení (5–550).
 pub const MAX_APPROVAL: Duration = Duration::from_secs(550);
@@ -382,7 +396,16 @@ impl Claude {
     ///
     /// Git (baseline, hygiena) nikdy pod zámkem stavu. Synchronně jen `Stop` v režimu `block`
     /// (odpověď na něm závisí); jinak běží na pozadí a výsledek přijde přes `on_change`.
+    /// Jen pro testy (zkratka za `handle_event_as(.., true)`): ostrý kód musí říct, zda měl požadavek platný klíč.
+    #[cfg(test)]
     pub fn handle_event(&self, body: &Value) -> Option<String> {
+        self.handle_event_as(body, true)
+    }
+
+    /// Jako `handle_event`; `verified` = požadavek nesl platný klíč hooků. Událost bez klíče (session spuštěná
+    /// před aktualizací) hlásí aktivitu, ale nesmí uvolnit kartu z `pending` ani z `asks`: ty vznikají jen z
+    /// požadavků s klíčem a bez klíče by je mohl zrušit kdokoli na loopbacku.
+    pub fn handle_event_as(&self, body: &Value, verified: bool) -> Option<String> {
         let ev = s(body, "hook_event_name");
         let sid = s(body, "session_id");
         if sid.is_empty() {
@@ -392,11 +415,17 @@ impl Claude {
         let body_cwd = s(body, "cwd");
         let now = now_ms();
         let mut g = self.inner.lock();
-        // Šéf odpověděl v terminálu → čekající žádost téže session je vyřízená jinde.
-        if matches!(ev.as_str(), "PostToolUse" | "UserPromptSubmit" | "Stop" | "SessionEnd") {
+        // Šéf odpověděl v terminálu → čekající žádost je vyřízená jinde: nový prompt nebo konec uklidí celou
+        // session, dokončený nástroj jen vlastní kartu (`same_request`).
+        let whole_session = matches!(ev.as_str(), "UserPromptSubmit" | "Stop" | "SessionEnd");
+        let tool_done = matches!(ev.as_str(), "PostToolUse" | "PostToolUseFailure");
+        if verified && (whole_session || tool_done) && !g.pending.is_empty() {
+            let (tool, use_id) = (s(body, "tool_name"), s(body, "tool_use_id"));
+            let summary = if tool_done { summarize(&tool, body.get("tool_input").unwrap_or(&Value::Null)) } else { String::new() };
             let mut i = 0;
             while i < g.pending.len() {
-                if g.pending[i].0.session_id == sid {
+                let p = &g.pending[i].0;
+                if p.session_id == sid && (whole_session || same_request(p, &tool, &use_id, &summary)) {
                     let (_, tx) = g.pending.remove(i);
                     let _ = tx.send(Decision::Pass);
                 } else {
@@ -404,12 +433,14 @@ impl Claude {
                 }
             }
         }
-        questions::on_event(&mut g, &ev, &sid, &s(body, "tool_name"), now);
+        if verified {
+            questions::on_event(&mut g, &ev, &sid, &s(body, "tool_name"), now);
+        }
         let mut baseline_cwd = None;
         let mut check = false;
         let mut tail = None;
         if ev != "SessionEnd" || g.sessions.contains_key(&sid) {
-            let Inner { sessions, track, .. } = &mut *g;
+            let Inner { sessions, track, pending, .. } = &mut *g;
             let sess = sessions.entry(sid.clone()).or_insert_with(|| Session::new(&sid, &body_cwd, SessionState::Idle, now));
             let tr = track.entry(sid.clone()).or_default();
             if !body_cwd.is_empty() {
@@ -462,6 +493,10 @@ impl Claude {
                 "Notification" if s(body, "notification_type") == "idle_prompt" => sess.state = SessionState::Idle,
                 "SessionStart" => sess.state = SessionState::Idle,
                 _ => {}
+            }
+            // jiný nástroj doběhl, ale karta téže session dál čeká na člověka
+            if tool_done && pending.iter().any(|(p, _)| p.session_id == sid) {
+                sess.state = SessionState::Waiting;
             }
             if mode == EnforceCommit::Off {
                 if matches!(ev.as_str(), "Stop" | "SessionEnd") {
@@ -525,6 +560,30 @@ impl Claude {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn same_request_table() {
+        let card = |tool: &str, summary: &str, use_id: Option<&str>, plan: Option<plan::Plan>| Pending { id: 1, session_id: "s".into(), cwd: "C:/x".into(), tool: tool.into(), summary: summary.into(), created_at: 0, expires_at: 0, always: None, preview: None, plan, via: plan::Via::Permission, tool_use_id: use_id.map(str::to_string) };
+        let a_plan = || plan::for_request(&json!({"plan": "# Plán A"}), "C:/x");
+        assert!(a_plan().is_some());
+        // (karta, nástroj události, tool_use_id události, shrnutí události, shoda)
+        for (p, tool, use_id, summary, want) in [
+            // `PermissionRequest` bez id: nástroj + shrnutí
+            (card("Bash", "npm test", None, None), "Bash", "toolu_1", "npm test", true),
+            (card("Bash", "npm test", None, None), "Bash", "toolu_1", "git status", false),
+            (card("Bash", "npm test", None, None), "Read", "toolu_1", "npm test", false),
+            (card("Bash", "npm test", None, None), "", "", "", false),
+            // `PreToolUse` s id: rozhoduje id, shrnutí ne
+            (card("ExitPlanMode", "Plán A", Some("toolu_1"), a_plan()), "ExitPlanMode", "toolu_1", "cokoli", true),
+            (card("ExitPlanMode", "Plán A", Some("toolu_1"), a_plan()), "ExitPlanMode", "toolu_2", "Plán A", false),
+            // událost bez id, plán: titulek v `summary` se shrnutím události sedět nebude
+            (card("ExitPlanMode", "Plán A", Some("toolu_1"), a_plan()), "ExitPlanMode", "", "{}", true),
+            (card("ExitPlanMode", "Plán A", None, a_plan()), "ExitPlanMode", "toolu_1", "{}", true),
+            (card("ExitPlanMode", "Plán A", None, a_plan()), "Bash", "toolu_1", "{}", false),
+        ] {
+            assert_eq!(same_request(&p, tool, use_id, summary), want, "{} {tool} {use_id} {summary}", p.tool);
+        }
+    }
 
     #[test]
     fn session_lifecycle() {

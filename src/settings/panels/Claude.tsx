@@ -3,6 +3,7 @@
 // `~/.claude/settings.json` (`HooksSetup` → Rust `hooksetup.rs`), MCP server pro Clauda (`mcp/McpSettings.tsx`).
 import { createSignal, onMount, Show } from "solid-js";
 import { api, type HooksStatus } from "../../api";
+import { quiet } from "../../uiErrors";
 import { t } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
 import { useSettings } from "../ctx";
@@ -29,7 +30,12 @@ function HooksSetup() {
   const [st, setSt] = createSignal<HooksStatus | null>(null);
   const [ask, setAsk] = createSignal<"install" | "remove" | null>(null);
   const [busy, setBusy] = createSignal(false);
-  onMount(async () => setSt((await api.hooksStatus()) ?? null));
+  const [failed, setFailed] = createSignal(false);
+  onMount(async () => {
+    const r = await quiet(api.hooksStatus(), false as const, "hooksStatus");
+    if (r === false) setFailed(true);
+    else setSt(r ?? null);
+  });
   async function run(what: "install" | "remove") {
     setAsk(null);
     setBusy(true);
@@ -45,7 +51,7 @@ function HooksSetup() {
   const detail = (h: HooksStatus) => (h.error ? h.error : h.state === "partial" ? t("settings.hooks.missing", "Chybí: {m}", { m: h.missing.join(", ") }) : h.path);
   return (
     <Row id="claude.hooks" stack live>
-      <Show when={st()} fallback={<div class="st-skel" style={{ width: "60%" }} />}>
+      <Show when={st()} fallback={failed() ? <div class="st-status"><span class="st-dot bad" /><span class="grow">{t("settings.hooks.loadFailed", "Stav hooků se nepodařilo zjistit.")}</span></div> : <div class="st-skel" style={{ width: "60%" }} />}>
         {(h) => (
           <>
             <div class="st-status">

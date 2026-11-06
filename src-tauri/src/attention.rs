@@ -408,7 +408,7 @@ fn asking_now() -> (bool, bool, Option<u64>) {
     (asking, shown, ago)
 }
 
-/// Vlákno `emit` (po každém probuzení): peek po hře (`revive_peek`) a opakovaný puls čekající otázky
+/// Vlákno `emit` (po každém probuzení): zkratky schvalování při přechodu hry, peek po hře (`revive_peek`) a opakovaný puls čekající otázky
 /// (`repulse_due`). Bez otázky a bez přechodu ze hry nic.
 pub(crate) fn catch_up() {
     use crate::drawer::View;
@@ -416,6 +416,10 @@ pub(crate) fn catch_up() {
     let c = crate::state::core();
     let dead = c.dead();
     let was = WAS_DEAD.swap(dead, Ordering::Relaxed);
+    // do hry zkratky Schválit / Zamítnout odregistrovat, po hře vrátit
+    if was != dead {
+        crate::hotkeys::sync_approve_keys();
+    }
     if revive_peek(was, dead, c.drawer.view() == View::Hidden, c.claude.attention()) {
         c.send_ui(crate::state::UiCmd::Show(View::Peek, crate::drawer::Opener::Hover));
     }

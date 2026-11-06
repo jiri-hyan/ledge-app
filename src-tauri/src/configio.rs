@@ -133,19 +133,27 @@ pub fn preview(current: &Config, path: &Path) -> Result<ImportPreview, String> {
     Ok(ImportPreview { cfg, sections })
 }
 
-/// Export: ověřený config jako čitelný JSON (atomicky, `config::save`). Nikdy nepřepíše živý config.
+/// Export: ověřený config jako čitelný JSON (atomicky). Nikdy nepřepíše živý config a nemění jeho stav
+/// (banner, kopie `.broken-*`): proto `save_with`, ne `save`.
 pub fn export(cfg: &Config, path: &Path) -> Result<(), String> {
     let live = config::config_path();
     if same_file(path, &live) {
         return Err(tr("Zálohu ulož jinam než do živého config.json.", "Save the backup somewhere other than the live config.json.").into());
     }
-    config::save(path, cfg)
+    config::save_with(path, cfg, &|from, to| std::fs::copy(from, to).map(|_| ())).map(|_| ())
 }
 
 /// Před přepsáním: cíl, který jde přečíst jen s chybou (rozbitý JSON, neplatná hodnota — Ledge pak
 /// běží na výchozích hodnotách), zkopíruje vedle jako `<jméno>.broken-<unix s>` a vrátí cestu kopie.
 /// Neexistující nebo platný cíl = `None`. Když kopie nejde, zápis se odmítne (nic se neztratí).
+#[cfg(test)]
 pub fn keep_unreadable(path: &Path) -> Result<Option<std::path::PathBuf>, String> {
+    keep_unreadable_with(path, &|from, to| std::fs::copy(from, to).map(|_| ()))
+}
+
+/// `keep_unreadable` s injektovatelným kopírováním (test selhání zálohy). Po úspěšném vytvoření nové
+/// kopie se staré promazávají (`recovery::KEEP_BROKEN` nejnovějších, nová a poslední nikdy).
+pub fn keep_unreadable_with(path: &Path, copier: &dyn Fn(&Path, &Path) -> std::io::Result<()>) -> Result<Option<std::path::PathBuf>, String> {
     if !path.exists() || config::load(path).is_ok() {
         return Ok(None);
     }
@@ -155,9 +163,10 @@ pub fn keep_unreadable(path: &Path) -> Result<Option<std::path::PathBuf>, String
         .map(|i| path.with_file_name(if i == 1 { format!("{name}.broken-{secs}") } else { format!("{name}.broken-{secs}-{i}") }))
         .find(|p| !p.exists())
         .expect("nekonečná řada");
-    std::fs::copy(path, &bak).map_err(|e| {
+    copier(path, &bak).map_err(|e| {
         crate::errors::io(&trf!("{} nejde zazálohovat, nepřepisuji ho", "{} can't be backed up, not overwriting it", path.display()), &e)
     })?;
+    config::recovery::prune_broken(path, &bak);
     Ok(Some(bak))
 }
 
@@ -333,5 +342,27 @@ mod tests {
         cfg.strip.opacity = 3.0;
         assert!(export(&cfg, &dir.path().join("x.json")).is_err());
         assert!(!dir.path().join("x.json").exists());
+    }
+
+    /// Export na cizí cíl, který neprojde přísným načtením (zazálohuje se), nesmí sáhnout na stav živého
+    /// configu: kopie k Obnovit i chyba v banneru zůstanou. (Stav je v testech na vlákno, viz `recovery`.)
+    #[test]
+    fn export_does_not_touch_live_config_state() {
+        let _sb = crate::dirs::testing::sandbox();
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("cizi.json");
+        std::fs::write(&out, "{ cizí rozbité").unwrap();
+        assert!(config::load(&out).is_err());
+        let live_bak = dir.path().join("config.json.broken-1");
+        config::recovery::set_backup(Some(live_bak.clone()));
+        config::recovery::set_load(Some("živá chyba".into()), Vec::new(), Vec::new());
+        export(&Config::default(), &out).unwrap();
+        assert_eq!(config::recovery::backup(), Some(live_bak));
+        assert_eq!(config::recovery::error().as_deref(), Some("živá chyba"));
+        assert_eq!(config::load(&out).unwrap().unwrap(), Config::default());
+        // původní obsah cíle zůstal v kopii vedle něj
+        assert!(std::fs::read_dir(dir.path()).unwrap().any(|e| e.unwrap().file_name().to_string_lossy().starts_with("cizi.json.broken-")));
+        config::recovery::set_backup(None);
+        config::recovery::set_load(None, Vec::new(), Vec::new());
     }
 }

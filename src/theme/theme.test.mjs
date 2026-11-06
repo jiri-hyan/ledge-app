@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { THEMES, THEME_IDS, COLOR_KEYS } from "./themes.ts";
 import { textProblems } from "./contrast.ts";
 import {
-  DEFAULT_APPEARANCE, accentPair, appearanceVars, effectiveMotion, hexToHsl, normalizeAppearance, springPreset, stripShape, widenMotion,
+  DEFAULT_APPEARANCE, accentPair, appearanceVars, effectiveMotion, hexToHsl, normalizeAppearance, springPreset, stripShape,
 } from "./appearance.ts";
 
 const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
@@ -84,31 +84,6 @@ test("presety pružin", () => {
   assert.ok(snappy.stiffness > 240);
   assert.equal(effectiveMotion("spring", true), "none");
   assert.equal(effectiveMotion("snappy", false), "snappy");
-});
-
-test("přechod rozšíření Nastavení podle stylu pohybu", () => {
-  const ease = (style) => appearanceVars({ ...DEFAULT_APPEARANCE, motion: { style, speed: 1 } }).ease;
-  // [styl, rychlost, omezit pohyb, očekávání: null = okamžitě | [zúžení, zmizení, návrat] ms]
-  const cases = [
-    ["spring", 1, false, [210, 120, 160]],
-    ["smooth", 1, false, [210, 120, 160]],
-    ["snappy", 2, false, [105, 60, 80]],
-    ["spring", 0.5, false, [420, 240, 320]],
-    ["spring", 0, false, [210, 120, 160]], // nesmyslná rychlost → 1
-    ["none", 1, false, null],
-    ["none", 2, true, null],
-    ["spring", 1, true, null], // systémové „omezit pohyb“
-    ["snappy", 1.5, true, null],
-  ];
-  for (const [style, speed, reduced, want] of cases) {
-    const m = widenMotion(style, speed, reduced);
-    if (want === null) {
-      assert.equal(m, null, `${style} ${speed} ${reduced}`);
-      continue;
-    }
-    assert.deepEqual([m.shrinkMs, m.fadeMs, m.restoreMs], want, `${style} ${speed}`);
-    assert.equal(m.easing, ease(style), `křivka ${style} = --ease stylu`);
-  }
 });
 
 // ---------- design styly (vlna 6) ----------

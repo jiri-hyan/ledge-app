@@ -3,10 +3,10 @@
    Ledge Studio (`studio/studio.css`, kolo 24). */
 
 /* přepínač — používá ho i NotesPage („i hotové“) */
-.switch, .st-switch { width: 34px; height: 20px; border-radius: var(--r-pill); background: var(--switch-off); position: relative; flex-shrink: 0; transition: background var(--dur-2); }
-.switch::after, .st-switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--white); transition: transform var(--dur-3) var(--spring); }
-.switch.on, .st-switch.on { background: linear-gradient(90deg, var(--violet), var(--blue)); }
-.switch.on::after, .st-switch.on::after { transform: translateX(14px); }
+.st-switch { width: 34px; height: 20px; border-radius: var(--r-pill); background: var(--switch-off); position: relative; flex-shrink: 0; transition: background var(--dur-2); }
+.st-switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--white); transition: transform var(--dur-3) var(--spring); }
+.st-switch.on { background: linear-gradient(90deg, var(--violet), var(--blue)); }
+.st-switch.on::after { transform: translateX(14px); }
 .st-switch:disabled { opacity: 0.45; }
 
 /* `.st` = obor stylů panelů Nastavení (kořen Ledge Studia `studio/Studio.tsx` ho nese; rozvržení je ve `studio/studio.css`) */

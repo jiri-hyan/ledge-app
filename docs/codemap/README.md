@@ -51,20 +51,19 @@ Mapy hlídají testy v `test:ui` (`node scripts/codemap-lint.mjs` vypíše všec
   `x/index.ts`), identifikátory ve „klíčových symbolech“ musí být v kódu (mapa nelže).
 - `scripts/codemap-coverage.test.mjs` — každý modul (první úroveň `src-tauri/src` a `src`) i každý produkční
   zdroj (`.rs .ts .tsx .mjs`) musí být v některé mapě **jmenován** (holé `složka/*` na soubor nestačí;
-  zkrácený zápis `oauth.rs` platí jen v mapě, která modul jmenuje celou cestou). Nový soubor tedy bez řádku
-  v mapě neprojde. Výjimky s důvodem: `COVERAGE_ALLOW` v `scripts/codemap-coverage.mjs` (teď žádné).
+  zkrácený zápis `oauth.rs` platí jen v mapě, která modul jmenuje celou cestou).
 - `scripts/config-keys.test.mjs` — každý klíč `config.json` (z Rust struktur) musí být v `docs/agents/*.md`.
 
 ## Ověření
 
 ```
-node scripts/brany.mjs            # test, clippy, tsc, ui, build — jeden řádek na bránu, log jen při selhání
-node scripts/brany.mjs test ui    # jen vybrané
+node scripts/brany.mjs            # test, clippy, tsc, ui, build — řádek na bránu; razítko `.brany-ok` (--force), padlý test 1× znovu = FLAKY
 node scripts/brany.mjs --changed  # jen to, co změněné soubory vyžadují (src → tsc ui; src-tauri → test clippy; docs → ui)
+node scripts/wt.mjs new|rm|prune  # worktree stavitele (junction, dist, rerere), úklid, stará incremental cache
+node scripts/codemap-lint.mjs --fix  # u mapy nad 8 KB navrhne řádky k přesunu do -detail
 ```
 
-Ručně postaru: `cd src-tauri && cargo test` (+ `cargo clippy --all-targets`), `npx tsc --noEmit`,
-`corepack pnpm test:ui`, `corepack pnpm build`. Soubory čti přes Read/Grep s rozsahem, ne `cat` celého souboru.
+Pomocníci: `scripts/brany-lib.mjs` (razítko, flaky), `scripts/codemap-suggest.mjs` (návrh přesunu). Ručně: `cargo test`, `pnpm test:ui`.
 
 Těžké běhy na sdíleném stroji přes frontu (`node %USERPROFILE%\.devtools\fronta.mjs --auto -- …`),
 paralelní workeři se sdíleným `CARGO_TARGET_DIR=…/src-tauri/target-agents`.

@@ -25,11 +25,9 @@ export const IconHome = () => <S><path d="M3.5 9.2 10 3.8l6.5 5.4" /><path d="M5
 export const IconFind = () => <S size={16}><circle cx="8.8" cy="8.8" r="5" /><path d="m12.6 12.6 4 4" /></S>;
 export const IconGuide = () => <S size={16}><path d="M4 16.5V3.5" /><path d="M4 4h9.5l-2 3 2 3H4" /></S>;
 export const IconHistory = () => <S size={16}><path d="M3.5 10a6.5 6.5 0 1 0 1.9-4.6" /><path d="M3.5 3.8v2.8h2.8" /><path d="M10 6.5V10l2.4 1.6" /></S>;
-export const IconUndo = () => <S size={14}><path d="M7 5 3.5 8.5 7 12" /><path d="M3.5 8.5H12a4.5 4.5 0 0 1 0 9h-1.5" /></S>;
 export const IconCheck = () => <S size={14}><path d="m4 10.5 4 4 8-9" /></S>;
 export const IconMin = () => <S size={14}><path d="M4.5 10h11" /></S>;
 export const IconMax = () => <S size={14}><rect x="4.5" y="4.5" width="11" height="11" rx="1.5" /></S>;
 export const IconRestore = () => <S size={14}><rect x="4" y="7" width="9" height="9" rx="1.5" /><path d="M7 7V5.5A1.5 1.5 0 0 1 8.5 4H14.5A1.5 1.5 0 0 1 16 5.5v6a1.5 1.5 0 0 1-1.5 1.5H13" /></S>;
 export const IconClose = () => <S size={14}><path d="m5 5 10 10M15 5 5 15" /></S>;
 export const IconScene = () => <S size={16}><rect x="2.5" y="4" width="15" height="11" rx="2" /><path d="M12 4v11" /></S>;
-export const IconChevron = () => <S size={14}><path d="m8 5 5 5-5 5" /></S>;

@@ -354,7 +354,7 @@ impl PinsFile {
 
 /// Stav lístků (chybějící / poškozený soubor = žádné; hodnoty mimo rozsah se srovnají, duplicity pryč).
 pub fn load(path: &Path) -> PinsFile {
-    let mut f: PinsFile = crate::fsx::load_json_or_default(path);
+    let mut f: PinsFile = crate::fsx::load_json_keep_broken(path);
     let mut seen: Vec<String> = Vec::new();
     f.pins = f
         .pins

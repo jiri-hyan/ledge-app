@@ -7,7 +7,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
 | volání | co dělá |
 |---|---|
 | `GET /status` | čekající schválení, sessions, běžící procesy, cesta ke configu |
-| `POST /ctl/open` `{"view":"full"\|"peek"\|"compact"\|"island"}` | otevře šuplík / peek / náhled po najetí (bez fokusu, nezavírá se sám) |
+| `POST /ctl/open` `{"view":"full"\|"peek"\|"compact"\|"island"}` | otevře šuplík / peek / náhled po najetí (bez fokusu, nezavírá se sám); ve hře / herním režimu 400 a nic |
 | `POST /ctl/close` | zavře šuplík |
 | `POST /ctl/settings` | otevře Nastavení |
 | `POST /ctl/launch` `{"id":"atlas"}` | spustí projekt jako klik na logo |
@@ -16,8 +16,13 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
 | `POST /permission` | **jen pro hook `PermissionRequest`** |
 | `POST /question` | **jen pro hook `PreToolUse` s matcherem `AskUserQuestion`** (otázky Clauda) |
 | `POST /plan` | **jen pro hook `PreToolUse` s matcherem `ExitPlanMode`** (review plánu) |
-| `POST /event` | hooky SessionStart/UserPromptSubmit/PostToolUse/Stop/SessionEnd/Notification/SubagentStart/SubagentStop |
+| `POST /event` | hooky SessionStart/UserPromptSubmit/PostToolUse/Stop/SessionEnd/Notification/SubagentStart/SubagentStop/PostToolUseFailure; bez platného klíče jen hlásí aktivitu a nikdy neuvolní kartu (`handle_event_as`) |
 | `POST /mcp` | MCP server pro Clauda (JSON-RPC, `Authorization: Bearer <klíč>`; vypnuto = 404) — viz níže |
+
+Hooky nesou `Authorization: Bearer <klíč hooků>` (`Ledge/hooks` ve Správci pověření, jiný než klíč MCP). `/permission`,
+`/question` a `/plan` bez platného klíče vrací prázdnou 200 bez karty, terminál se zeptá sám. `/event` bez hlavičky projde
+(session spuštěná před aktualizací), se špatnou se zahodí. Klíč doplní hookům ze starší verze start Ledge
+(`hooksetup::migrate_on_start`), jen když už zapojené jsou.
 
 Požadavky s hlavičkou `Origin` (prohlížeč) se odmítají.
 

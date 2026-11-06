@@ -28,7 +28,8 @@ const monthsGen = () => [
   t("format.month.dec", "prosince"),
 ];
 
-export const pad2 = (n: number) => String(n).padStart(2, "0");
+import { pad2 } from "./pad.ts";
+export { pad2 };
 /** „7:05“ → „07:05“ (24 h). */
 export const fmtClock = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 /** „pátek 16. října“ / „Friday, October 16“ */

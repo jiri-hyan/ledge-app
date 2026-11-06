@@ -21,12 +21,6 @@ export const isTaskLine = (l: string) => TASK.test(l) || NUMBERED.test(l);
 
 const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 
-/** Bod checklistu z napsaného textu (víc řádků = jeden bod). Prázdný text = "". */
-export function taskLine(text: string): string {
-  const t = flat(text);
-  return t ? `- [ ] ${t}` : "";
-}
-
 /** Řádek pro „+ bod“ za konec `body`: končí-li tělo číslovanou položkou, pokračuje číslováním (`N+1. text`,
  *  stejné odsazení a oddělovač) — šéf píše čísla; jinak bod checklistu. Prázdný text = "". */
 export function pointLine(body: string, text: string): string {

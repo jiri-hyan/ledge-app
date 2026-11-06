@@ -35,6 +35,8 @@ export interface Snapshot {
   personalEnabled: boolean;
   view: View;
   cfgError: string | null;
+  /** kopie rozbitého configu z posledního zápisu (Obnovit) a varování o hodnotách mimo rozsah; chybí = nic */
+  configNotice?: { warnings: string[]; backup: string | null; restorable?: boolean };
   sections: Sections;
   /** záložky a karty na nich (`config.layout`, `layout/model.ts`) */
   layout: Layout;

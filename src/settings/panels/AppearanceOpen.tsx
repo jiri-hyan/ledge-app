@@ -22,6 +22,7 @@ import AppearanceHead from "./AppearanceHead";
 import AppearanceBackdrop from "./AppearanceBackdrop";
 import AppearanceAccent from "./AppearanceAccent";
 import CardsGallery from "../../layout/CardsGallery";
+import { clearDragWidth, widthOverride } from "../widthOverride";
 import { CustomWidth, DRAWER_WIDTH, DetailsRows, LayoutPicker } from "./AppearanceLayout";
 import { Advanced, Seg, lit, type Ap } from "./apUi";
 
@@ -53,6 +54,16 @@ export default function AppearanceOpen(q: { ap: Ap; dirty: boolean; adv: boolean
           <Seg<WidthPreset> label={t("appearance.open.width", "Šířka")} value={a().width} set={(v) => q.ap.set("width", v)}
             options={WIDTH_STEPS.map((w) => [w, lbl(WIDTHS[w].name)])} />
         </div>
+        <Show when={widthOverride(a())}>{(o) => (
+          <div class="opt" id="f-appearance.widthOverride">
+            <span>{o().kind === "notch"
+              ? t("appearance.open.overNotch", "Přebito rozložením Notch: šířka je pevná, předvolba výše se teď nepoužije.")
+              : t("appearance.open.overDrag", "Přebito tažením v ✎: {px} px, předvolba výše se teď nepoužije.", { px: (o() as { px: number }).px })}</span>
+            {o().kind === "drag"
+              ? <button class="mini" onClick={() => q.ap.set("size", clearDragWidth(a().size))}>{t("appearance.open.overClear", "Zrušit přebití")}</button>
+              : null}
+          </div>
+        )}</Show>
         <div class="opt" id="f-appearance.density" classList={{ hit: lit("appearance.density") }}>
           <span>{t("appearance.density", "Hustota")}<small>{t("appearance.density.hint", "Víc karet na obrazovce, nebo víc vzduchu.")}</small></span>
           <Seg label={t("appearance.density", "Hustota")} value={a().density} set={(v) => q.ap.set("density", v)}

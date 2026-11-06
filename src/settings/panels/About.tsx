@@ -3,6 +3,7 @@
 // (s potvrzením), odkaz na repo, diagnostický log a cesta ke configu.
 import { createResource, createSignal, Show } from "solid-js";
 import { api, type UpdateView } from "../../api";
+import { quiet } from "../../uiErrors";
 import ReleaseNotes from "../../update/ReleaseNotes";
 import InstallNow from "./AboutInstall";
 import { ago } from "../../format";
@@ -75,7 +76,7 @@ function Rollback(p: { u: UpdateView }) {
 
 export default function AboutPanel(_p: PanelProps) {
   const c = useSettings();
-  const [info] = createResource(() => api.appInfo());
+  const [info] = createResource(() => quiet(api.appInfo(), undefined, "appInfo"));
   const u = () => c.s.update;
   const st = () => updateState(u());
   return (
@@ -117,7 +118,7 @@ export default function AboutPanel(_p: PanelProps) {
 /** Technické volby aplikace (v „Pokročilé“ panelu `AppPanel.tsx`): repo s vydáními, soubory a log. */
 export function AboutAdvanced() {
   const c = useSettings();
-  const [info] = createResource(() => api.appInfo());
+  const [info] = createResource(() => quiet(api.appInfo(), undefined, "appInfo"));
   const repoUrl = () => (/^[\w.-]+\/[\w.-]+$/.test(c.cfg.update.repo ?? "") ? `https://github.com/${c.cfg.update.repo}` : null);
   return (
     <>

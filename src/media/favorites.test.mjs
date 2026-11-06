@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/media/favorites.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_FAVORITES, favoriteError, favoriteSource, musicLinkFrom, renamedFavorite, suggestedName, withFavorite, withoutFavorite } from "./favorites.ts";
+import { MAX_FAVORITES, favoriteError, favoriteSource, musicLinkFrom, suggestedName, withFavorite, withoutFavorite } from "./favorites.ts";
 
 // Stejné řádky jako `SOURCE_TABLE` v Rust `mediaconf.rs` (zrcadlo `source_of`): [odkaz, zdroj nebo null]
 const SOURCE_TABLE = [
@@ -59,8 +59,6 @@ test("přidat, přejmenovat, odebrat", () => {
   l = withFavorite(l, b);
   assert.deepEqual(l, [a, b]);
   assert.deepEqual(withFavorite(l, { name: "", uri: a.uri }), l, "neplatná = beze změny");
-  assert.deepEqual(renamedFavorite(l, 1, " Rádio "), [a, { ...b, name: "Rádio" }]);
-  assert.deepEqual(renamedFavorite(l, 1, "  "), l, "prázdný název se nepřijme");
   assert.deepEqual(withoutFavorite(l, 0), [b]);
   assert.deepEqual(withoutFavorite(l, 5), l);
 });

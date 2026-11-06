@@ -5,8 +5,11 @@ import "./fit";
 import { render } from "solid-js/web";
 import App from "./App";
 import { inTauri } from "./api";
+import { installErrorLog } from "./uiErrors";
 
 // Ukázkový šuplík pro snímky a GIFy (`index.html?demo=1`, jen mimo Tauri; `src/showcase/`)
+installErrorLog();
+
 async function start() {
   if (!inTauri && new URLSearchParams(location.search).get("demo") === "1") (await import("./showcase/demo")).installShowcase();
   render(() => <App />, document.getElementById("root") as HTMLElement);

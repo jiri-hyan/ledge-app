@@ -12,7 +12,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [sessions-detail.md](se
 | `src-tauri/src/sessionlive.rs` | I/O: vlákno `sessions` (spawn `claude agents`), watcher registru, cache | `start` `request` `Wake` `with_cache` `Cache` `unseen` `claude_dir` |
 | `src-tauri/src/winfocus.rs` | Win32: strom procesů, okna, přepnutí, `claude --resume` | `switch_to` `launch` `ancestors` `pick_window` `pid_alive` |
 | `src-tauri/src/subagents.rs` | subagenti jedné session (čistá) | `Subagents::{start, stop, clear_running}` `shorten` `DONE_KEEP` |
-| `src-tauri/src/hooksetup.rs` | merge/remove/status hooků nad textem + atomický zápis | `EVENTS` `OPTIONAL_EVENTS` (PostToolUseFailure) `QUESTIONS_EVENT` `PLAN_EVENT` `label` `merge` `remove` |
+| `src-tauri/src/hooksetup.rs` | merge/remove/status hooků nad textem + atomický zápis | `EVENTS` `OPTIONAL_EVENTS` (PostToolUseFailure) `QUESTIONS_EVENT` `PLAN_EVENT` `label` `merge` `remove` `migrate` `migrate_on_start` `hook_key` |
 | `src-tauri/src/claude/mod.rs` | stav session a schvalování; `handle_event` plní `Session::subagents` | `Claude` `Session.subagents` `SubagentStart` `SubagentStop` |
 | `src-tauri/src/claude/rules.rs` | „Vždy povolit“ + důvod zamítnutí (čisté): výběr pravidla, tělo odpovědi `/permission` | `propose` `fallback` `Rule` `Always` `Destination` `Grant` `Extra` |
 | `src-tauri/src/claude/diff.rs` | řádkový diff (čistý): Myers s limitem editací, řádky karty s kontextem a stropem | `ops` `render` `Op` `Kind` `Line` `Rendered` `CONTEXT` `MAX_LINES` |

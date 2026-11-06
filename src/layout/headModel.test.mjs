@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/layout/headModel.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fitCount, fullOrder, handAngles, isDefaultHead, keepChip, movePart, normalizeHead, normalizeTabs, shortDate, visibleParts, withHidden, withOrder, withSeconds } from "./headModel.ts";
+import { fullOrder, handAngles, isDefaultHead, movePart, normalizeHead, normalizeTabs, shortDate, visibleParts, withHidden, withOrder, withSeconds } from "./headModel.ts";
 
 test("starý config = dnešní hlavička", () => {
   assert.deepEqual(normalizeHead(undefined), { clock: "big", chips: "auto" });
@@ -32,26 +32,7 @@ test("přesun dílu: ✕ zůstává vpravo, výchozí pořadí se nezapisuje", (
   assert.equal(withHidden(withHidden({ clock: "big", chips: "auto" }, "note", true), "note", false).hidden, undefined);
 });
 
-test("štítky v jedné řadě: kolik se vejde a zbytek jde do +N", () => {
-  // [šířky, mezera, místo, šířka +N, výsledek]
-  const cases = [
-    [[], 8, 100, 30, 0],
-    [[50, 50], 8, 108, 30, 2],
-    [[50, 50], 8, 107, 30, 1],
-    [[50, 50, 50], 8, 200, 30, 3],
-    [[50, 50, 50], 8, 150, 30, 2],
-    [[50, 50, 50], 8, 20, 30, 0],
-    [[50, 50, 50], 8, 96, 30, 1],
-    [[60, 40, 40], 8, 150, 30, 2],
-  ];
-  for (const [w, g, a, m, want] of cases) assert.equal(fitCount(w, g, a, m), want, JSON.stringify([w, a]));
-});
-
-test("nulové štítky a hodiny", () => {
-  assert.equal(keepChip(0, false), false);
-  assert.equal(keepChip(0, undefined), false);
-  assert.equal(keepChip(0, true), true);
-  assert.equal(keepChip(3, false), true);
+test("hodiny a datum", () => {
   assert.deepEqual(handAngles(new Date(2026, 10, 2, 3, 30, 0)), { h: 105, m: 180, s: 0 });
   assert.equal(shortDate("po", new Date(2026, 10, 2)), "po 2. 11.");
   assert.equal(withSeconds("20:02", new Date(2026, 10, 2, 20, 2, 5)), "20:02:05");

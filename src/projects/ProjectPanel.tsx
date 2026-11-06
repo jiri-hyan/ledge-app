@@ -6,6 +6,7 @@
 // `FailBox` = selhání startu přímo v kartě (krátká chyba, poslední řádky logu, Zobrazit log, Změnit složku…).
 import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api, type ProcView, type ProjectView, type Snapshot } from "../api";
+import { quiet } from "../uiErrors";
 import { t } from "../i18n";
 import { gotoSettingsPanel } from "../palette/goto";
 import { commitText, failInfo, freshest, isLive, notesHidden, placeOf, placeProblem, preselect, projectNotesQuery, samePath, whatOf, whereOf } from "./model";
@@ -147,7 +148,7 @@ function Edit(p: { s: Snapshot; pr: ProjectView; proc: ProcView | undefined; onS
 
 /** Až 3 otevřené poznámky projektu (jedno `note_query` při otevření panelu) a „Nová poznámka k projektu“. */
 function ProjectNotes(p: { pr: ProjectView; nav: NotesNav; onNote: (preset: NotePreset) => void }) {
-  const [data] = createResource(() => p.pr.id, (id) => api.noteQuery(projectNotesQuery(id)));
+  const [data] = createResource(() => p.pr.id, (id) => quiet(api.noteQuery(projectNotesQuery(id)), null, "projectNotes"));
   const list = () => data()?.notes ?? [];
   const more = () => notesHidden(data()?.total, list().length);
   return (
@@ -176,7 +177,7 @@ function ProjectNotes(p: { pr: ProjectView; nav: NotesNav; onNote: (preset: Note
 /** Log běžícího / skončeného serveru (posledních 60 řádků, načte se až na rozbalení). */
 function LogView(p: { id: string; open: boolean }) {
   const [lines, setLines] = createSignal<string[] | null>(null);
-  const load = async () => setLines(((await api.logs(p.id)) ?? []).slice(-60));
+  const load = async () => setLines(((await quiet(api.logs(p.id), [], "logs")) ?? []).slice(-60));
   onMount(() => p.open && void load());
   return (
     <div class="pz-row pz-btns">
@@ -188,7 +189,7 @@ function LogView(p: { id: string; open: boolean }) {
 }
 
 function Choose(p: { pr: ProjectView; now: number }) {
-  const [data] = createResource(() => p.pr.id, (id) => api.projectFolders(id));
+  const [data] = createResource(() => p.pr.id, (id) => quiet(api.projectFolders(id), null, "projectFolders"));
   const [pick, setPick] = createSignal<string | null>(null);
   createEffect(() => {
     const d = data();
@@ -247,7 +248,7 @@ export function FailBox(p: { s: Snapshot; pr: ProjectView; proc: ProcView; inPan
   const [log, setLog] = createSignal<string[] | null>(null);
   const toggleLog = async () => {
     if (log()) return setLog(null);
-    setLog(((await api.logs(p.proc.id)) ?? []).slice(-60));
+    setLog(((await quiet(api.logs(p.proc.id), [], "logs")) ?? []).slice(-60));
   };
   return (
     <Show when={info()}>

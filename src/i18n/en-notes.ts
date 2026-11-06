@@ -55,6 +55,7 @@ registerDict("en", {
   // stránka Poznámky
   "notes.page.withDone": "include done",
   "notes.page.loading": "Loading…",
+  "notes.page.loadFailed": "Couldn't load the notes.",
   "notes.page.empty": "Nothing here.",
   "notes.page.limited": "Showing {shown} of {total} — narrow it down with a tab or project.",
   // editor

@@ -9,7 +9,7 @@ import { api, on as onEvent } from "../api";
 import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import {
-  adoptBase, base, fieldError, isLoaded, loadBase, replaceDraft, rev, runAfterSave, setDirty, setFieldError, snapshotDraft,
+  adoptBase, base, isLoaded, loadBase, replaceDraft, rev, runAfterSave, setDirty, setFieldError, snapshotDraft,
 } from "../settings/ctx";
 import { canon, cleanDraft } from "../settings/model";
 import { external } from "../mcp/merge";
@@ -192,5 +192,3 @@ export async function adoptExternal() {
   else if (r.action === "conflict") (setConflict(true), setState("conflict"));
 }
 
-/** Chyba ověření (pro titulek). */
-export const saveError = () => fieldError();

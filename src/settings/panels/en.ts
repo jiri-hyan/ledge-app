@@ -239,6 +239,7 @@ registerDict("en", {
   "settings.hooks.installed": "Hooks connected — they apply to newly started sessions",
   "settings.hooks.removed": "Ledge hooks disconnected",
   "settings.hooks.missing": "Missing: {m}",
+  "settings.hooks.loadFailed": "Couldn't read the hooks status.",
   "settings.hooks.install": "Connect hooks",
   "settings.hooks.remove": "Disconnect",
   "settings.hooks.ask.install": "Connect Ledge hooks to settings.json?",

@@ -3,7 +3,7 @@
 // Čisté funkce bez DOM (test `sets.test.mjs`).
 const MIN = 60_000;
 const DAY = 86_400_000;
-const pad = (n: number) => String(n).padStart(2, "0");
+import { pad2 as pad } from "../pad.ts";
 /** Místní čas jako „2026-10-16T06:58“ (tak ho posílá počasí). */
 export const localIso = (t: number): string => {
   const d = new Date(t);

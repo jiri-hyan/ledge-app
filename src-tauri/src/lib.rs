@@ -137,6 +137,7 @@ mod updseen;
 mod updsign;
 #[cfg(test)]
 mod ipcacl;
+mod uilog;
 mod weather;
 mod weather_fc;
 mod webpanel;
@@ -219,7 +220,7 @@ pub fn run() {
             for line in migrate::at_startup() {
                 log(&line);
             }
-            let (cfg, cfg_err) = load_or_seed();
+            let cfg = load_or_seed();
             i18n::set_lang(cfg.ui.lang);
             // bublina MSIX (Ledge spuštěný z Claude desktop): zalogovat; zbylé jednorázové úlohy uklidit
             log(&pkgctx::startup_line(pkgctx::ctx()));
@@ -239,7 +240,8 @@ pub fn run() {
             let core_arc = Arc::new(Core {
                 app: app.handle().clone(),
                 cfg: RwLock::new(cfg.clone()),
-                cfg_error: Mutex::new(cfg_err.or_else(|| notes_root_error(&cfg))),
+                cfg_error: Mutex::new(notes_root_error(&cfg)),
+                bridge_error: Mutex::new(None),
                 procs,
                 claude: claude.clone(),
                 strip: Strip::start(),
@@ -288,10 +290,11 @@ pub fn run() {
             tray::init(app.handle());
             // nový uživatel: šuplík se jednou otevře sám s Vítej (bez fokusu, ne ve hře) — `onboarding/first_run.rs`
             onboarding::first_run::schedule();
-            if cfg.claude.enabled
-                && let Err(e) = claude::serve(cfg.claude.port, claude, ctl::status_extra(), ctl::ctl_handler(), mcp::host::endpoint())
-            {
-                *core_arc.cfg_error.lock() = Some(trf!("Most pro Claude neběží: {e}", "The Claude bridge isn't running: {e}"));
+            if cfg.claude.enabled {
+                match claude::serve(cfg.claude.port, claude, ctl::status_extra(), ctl::ctl_handler(), mcp::host::endpoint(), Arc::new(hooksetup::hook_key)) {
+                    Ok(()) => hooksetup::migrate_on_start(cfg.claude.port),
+                    Err(e) => *core_arc.bridge_error.lock() = Some(trf!("Most pro Claude neběží: {e}", "The Claude bridge isn't running: {e}")),
+                }
             }
             sessionlive::start(Arc::new(mark_dirty), Arc::new(|| core().drawer.view() == View::Full));
             spawn_ui_thread(rx);
@@ -353,6 +356,7 @@ pub fn run() {
             commands::drawer::ui_ready,
             commands::drawer::anim_ack,
             commands::drawer::anim_stats,
+            commands::settings::ui_log,
             commands::drawer::close_drawer,
             commands::drawer::focus_drawer,
             commands::drawer::expand_drawer,
@@ -365,6 +369,9 @@ pub fn run() {
             commands::config::get_config,
             commands::config::save_config,
             commands::config::open_config_file,
+            commands::config::config_restore_backup,
+            commands::config::config_backup_dismiss,
+            commands::config::config_backup_reveal,
             commands::settings::check_config,
             commands::settings::config_defaults,
             commands::settings::config_export,

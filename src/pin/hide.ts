@@ -1,7 +1,7 @@
 // „Schovat do…“ (Lístky 2.0) — čistá logika rychlých voleb (testy `hide.test.mjs`): lístek zmizí a v daný čas
 // se sám vrátí (Rust `pins::win::hide`, jeden termín ve vlákně `emit`). Hodnota = lokální `YYYY-MM-DDTHH:MM`.
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
+import { pad2 } from "../pad.ts";
 export const localValue = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 const at = (d: Date, days: number, h: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + days, h, 0);
 

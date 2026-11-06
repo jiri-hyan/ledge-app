@@ -14,6 +14,12 @@ use tauri::Emitter;
 
 /// Git stav pro proužek: co 3 minuty (8 projektů ≈ desítky ms).
 const GIT_EVERY: Duration = Duration::from_secs(180);
+/// Kolo gitu pro proužek: `None` = ještě ne; `Some(spustit)` = termín prošel a má se posunout i ve hře
+/// (jinak by se `emit` budil pořád dokola), `git status` ale jen mimo hru. Po hře doběhne v dalším kole.
+fn git_round(elapsed: Duration, dead: bool) -> Option<bool> {
+    (elapsed >= GIT_EVERY).then_some(!dead)
+}
+
 /// Rezerva za začátkem minuty, aby hodiny v proužku už ukázaly novou minutu.
 const MINUTE_MARGIN_MS: i64 = 50;
 
@@ -104,9 +110,11 @@ pub(crate) fn spawn_emit_thread() {
                 }
                 // widgety na ploše: data jen viditelným a jen při změně (`desk::live`), jinak nic
                 crate::desk::live::tick();
-                if last_git.elapsed() >= GIT_EVERY {
+                if let Some(run) = git_round(last_git.elapsed(), c.dead()) {
                     last_git = Instant::now();
-                    refresh_git_async();
+                    if run {
+                        refresh_git_async();
+                    }
                 }
                 refresh_strip();
             }
@@ -119,6 +127,14 @@ mod tests {
     use super::*;
 
     const T: i64 = 1_759_999_980_000; // celá minuta (T % 60 000 == 0)
+
+    #[test]
+    fn git_round_table() {
+        let early = GIT_EVERY - Duration::from_secs(1);
+        for (elapsed, dead, want) in [(early, false, None), (early, true, None), (GIT_EVERY, false, Some(true)), (GIT_EVERY, true, Some(false))] {
+            assert_eq!(git_round(elapsed, dead), want, "{elapsed:?} {dead}");
+        }
+    }
 
     #[test]
     fn next_wake_picks_earliest_future_deadline() {

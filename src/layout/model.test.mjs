@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   CARD_IDS, CARD_INFO, DEFAULT_TILES, MAX_PAGES, PARTS, PART_INFO, QUICK_HEIGHTS, UP_PERSONAL_PROJECTS, addCard, addPage, catalog, clone, defaultLayout,
-  gridDropIndex, keyMove, pageMoveBlock, moveCard, movePage, moveToPage, nextHeight, nextSize, normalizeLayout, normalizeTiles, pageIdFor, pageKind, pageNameError, pageOf,
+  gridDropIndex, pageMoveBlock, moveCard, movePage, moveToPage, nextHeight, nextSize, normalizeLayout, normalizeTiles, pageIdFor, pageKind, pageNameError, pageOf,
   removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, shownCards, tilesOf,
   visibleProjects, withLayout, BODY, CARD_SLOTS, movePart, moveToNewPage, orderParts, partsOf, setParts, slotsOf,
 } from "./model.ts";
@@ -179,14 +179,6 @@ test("tažení v mřížce: nejbližší střed; Alt+šipky", () => {
   ];
   for (const [from, x, y, want] of cases) assert.equal(gridDropIndex(r, from, x, y), want, `${x},${y}`);
   assert.equal(gridDropIndex([], 3, 0, 0), 3);
-  const keys = [
-    ["ArrowLeft", 1, 3, 0],
-    ["ArrowUp", 0, 3, null],
-    ["ArrowRight", 1, 3, 2],
-    ["ArrowDown", 2, 3, null],
-    ["Enter", 1, 3, null],
-  ];
-  for (const [k, i, n, want] of keys) assert.equal(keyMove(k, i, n), want, `${k} ${i}`);
 });
 
 test("dynamické karty: widget ze skriptu na libovolné záložce, neplatné id pryč, katalog jen vestavěné", () => {

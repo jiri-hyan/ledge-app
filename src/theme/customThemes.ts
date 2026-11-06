@@ -133,17 +133,6 @@ export function addCustomTheme(list: readonly CustomTheme[], name: string, base:
   return { list: [...list, { id, name: clean, base, colors: { ...colors } }], id };
 }
 
-/** Změna jednoho motivu v seznamu (barvy se čistí na malá písmena, vadné hodnoty se ignorují). */
-export function updateCustomTheme(list: readonly CustomTheme[], id: string, patch: { name?: string; colors?: Partial<Colors> }): CustomTheme[] {
-  return list.map((c) => {
-    if (c.id !== id) return c;
-    const name = patch.name === undefined ? c.name : patch.name.trim().slice(0, MAX_NAME) || c.name;
-    const colors = { ...c.colors };
-    for (const [k, v] of Object.entries(patch.colors ?? {})) if ((CUSTOM_KEYS as readonly string[]).includes(k) && isHex6(v)) colors[k as CustomKey] = v.toLowerCase();
-    return { ...c, name, colors };
-  });
-}
-
 // ---------- export / import (schránka) ----------
 export const THEME_FILE_TAG = "ledgeTheme";
 

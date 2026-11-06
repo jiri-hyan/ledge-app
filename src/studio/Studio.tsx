@@ -27,6 +27,7 @@ import Home from "./Home";
 import PartView from "./PartView";
 import Scene, { SCENE_PARTS } from "./Scene";
 import { IconCheck, IconClose, IconFind, IconGuide, IconHistory, IconHome, IconMax, IconMin, IconRestore, IconScene, PartIcon } from "./icons";
+import Boundary from "../ui/Boundary";
 import "../settings.css";
 import "./studio.css";
 
@@ -352,8 +353,10 @@ export default function Studio(p: { s: Snapshot; windowed: boolean; initial?: st
             <For each={visited()}>
               {(id) => (
                 <div class="sp-wrap" hidden={view() !== id}>
+                  <Boundary resetOn={() => view() === id}>
                   <PartView part={id} s={p.s} guide={guide()} showAll={showAll()} onShowAll={() => setShowAll(true)} modified={modified()[id]}
                     scene={<Show when={narrow() && sceneOn() && SCENE_PARTS.includes(id)}><div class="stu-scene-inline"><Scene part={id} onHide={toggleScene} /></div></Show>} />
+                  </Boundary>
                 </div>
               )}
             </For>

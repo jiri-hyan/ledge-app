@@ -25,7 +25,7 @@ export function setMotion(style: MotionStyle, speed: number) {
   cache.clear();
 }
 
-/** Aktuální (už efektivní) styl a rychlost — pro přechody mimo pružiny (`settings/widen.ts`). */
+/** Aktuální (už efektivní) styl a rychlost — pro přechody mimo pružiny. */
 export const motionNow = (): { style: MotionStyle; speed: number } => ({ style: motionStyle, speed: motionSpeed });
 
 /** Délka (ms) podle rychlosti; styl `none` = 0. Pro pevné délky mimo pružiny (zavírání, zmizení). */
@@ -83,7 +83,7 @@ export function measure(kind: string, ms: number) {
       const body = deltas.slice(1);
       if (!body.length) return;
       const avg = body.reduce((a, b) => a + b, 0) / body.length;
-      api.animStats({ kind, frames: body.length, avgMs: +avg.toFixed(2), worstMs: +Math.max(...body).toFixed(2), durationMs: Math.round(now - start) });
+      api.animStats({ kind, frames: body.length, avgMs: +avg.toFixed(2), worstMs: +Math.max(...body).toFixed(2), durationMs: Math.round(now - start) }).catch(() => {});
     }
   };
   requestAnimationFrame(tick);

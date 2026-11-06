@@ -82,7 +82,7 @@ pub enum Shape {
 
 impl Look {
     /// všechny styly v pořadí galerie (testy zrcadel)
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub const ALL: [Look; 16] = [
         Look::Classic,
         Look::Island,
@@ -102,7 +102,7 @@ impl Look {
         Look::Custom,
     ];
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn id(self) -> &'static str {
         match self {
             Look::Classic => "classic",
@@ -125,7 +125,7 @@ impl Look {
     }
 
     /// Lidský název (zrcadlo `cs`/`en` v `src/strip/looks.ts`).
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn name(self) -> &'static str {
         match self {
             Look::Classic => tr("Klasický", "Classic"),

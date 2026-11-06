@@ -48,7 +48,7 @@ export const provider = (raw: string): "google" | "outlook" | "other" => {
   return "other";
 };
 
-const pad = (n: number) => String(n).padStart(2, "0");
+import { pad2 as pad } from "../pad.ts";
 /** „09:15“ v místním čase. */
 export const hm = (ms: number) => {
   const d = new Date(ms);

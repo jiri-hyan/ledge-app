@@ -36,11 +36,13 @@ Detail (toky, invarianty, testy, co nečíst, historie): [ui-detail.md](ui-detai
 | `motion.ts` | pružiny → CSS `linear()` (simulace `theme/springs.ts`), clip-path morf, naskakování `[data-anim]`, měření … | `spring` `collapsedClip` `bandClip` `FULL_CLIP` |
 | `theme/*` | motivy a vzhled (→ [appearance.md](appearance.md)): `themes.ts` sady tokenů, `appearance.ts` čistá logika, `apply.ts` DOM | `THEMES` `appearanceVars` `applyAppearance` |
 | `format.ts` | formátování času a čísel podle jazyka (`t`, `locale()`; čas 24h v obou) | `ago` `uptime` `fmtClock` `fmtDate` `dayNames` |
+| `pad.ts` | dvoumístné číslo s nulou (jediná kopie `pad2`, bez importů za běhu; `format.ts` ji re-exportuje) | `pad2` |
 | `ui/shortcuts.ts` | zdroj pravdy klávesy a gesta (`SHORTCUTS`, skupiny; test `shortcuts.test.mjs`: každý záznam cs+en) … | `SHORTCUTS` `shortcutsOf` `shortcutText` |
 | `idleTimers.test.mjs` | hlídač „v klidu nic netikne“: `setInterval` jen na seznamu povolených míst, hodiny v `App.tsx` až uvnitř efektu pro viditelný … | — |
 | `util/path.ts` · `util/time.ts` | jediné `normPath` / `samePath` (Windows cesty; re-exportují `pin/model.ts` a `projects/model.ts`) · sdílený `debounce` (`flush` / … | `samePath` `normPath` `debounce` |
 | `ui/Confirm.tsx` | jediné potvrzení nevratné akce (inline panel, Esc = Zrušit; fokus jen v okně, které ho má): Přihrádka … | `Confirm` |
 | `ui/toast.tsx` · `ui/toast.css` · `ui/rich.tsx` | hlášky dole (`toast.css` je společné pro šuplík i lístek — ten ho přizpůsobí proměnnými `--toast-*` v `pin.css`) … | `say` `sayError` `errorText` `Toast` · `rich` |
+| `uiErrors.ts` · `ui/errorline.ts` · `ui/Boundary.tsx` · `ui/boundary.css` | chyby UI: `window.onerror` / `unhandledrejection` / pád vykreslení → `ui_log`; `ErrorBoundary` s „Zkusit znovu“ … | `installErrorLog` `logUiError` `errorLine` `Boundary` |
 | `i18n.ts` · `i18n/*` · `i18n/en-*.ts` · `i18nScan.ts` | překlady (viz sekce i18n) · anglické slovníky: `dicts.ts` (všechny `en-*` v jednom líném chunku), `load.ts` (registruje loader) · … | `t` `tp` `plural` `pluralForm` `lang` `setLang` |
 | `logos.ts` · `icons.tsx` · `pkgctx/pkgctx.ts` (stav bubliny MSIX, jednou za proces; viz [core.md](core.md) `pkgctx.rs`) | cache log podle `logoKey` (jednou na klíč) · inline SVG ikony | `logoSrc` · `Icon*` |
 | `tilelook/*` | vzhled jednotlivých zástupců (projekt, akce, odkaz) — ikona, barva, tvar, popisek … | `TileIcon` `LookEditor` `openTileMenu` `lookOf` |

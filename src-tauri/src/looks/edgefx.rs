@@ -497,6 +497,6 @@ mod tests {
         let l = EdgeLive::default();
         let want = "DEFAULT_LIVE: ComposeLive = { on: false, work: \"flow\", wait: \"breath\", done: \"sweep\", limit: \"dashes\" }";
         assert!(ts.contains(want) && l == EdgeLive { on: false, work: Edge::Flow, wait: Edge::Breath, done: Edge::Sweep, limit: Edge::Dashes }, "{want}");
-        assert!(ts.contains(&format!("SWEEP_MS = {SWEEP_MS};")) && ts.contains(&format!("TRY_MS = {TRY_MS};")));
+        assert!(ts.contains(&format!("TRY_MS = {TRY_MS};")));
     }
 }

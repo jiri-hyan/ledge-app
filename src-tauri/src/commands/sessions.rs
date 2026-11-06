@@ -76,7 +76,8 @@ pub(crate) fn hooks_status() -> hooksetup::HooksStatus {
 pub(crate) fn hooks_install() -> Result<hooksetup::HooksStatus, String> {
     let port = core().cfg.read().claude.port;
     let path = hooksetup::settings_path().ok_or_else(|| crate::i18n::tr("Nevím, kde je složka .claude.", "I don't know where the .claude folder is."))?;
-    hooksetup::apply(&path, |t| hooksetup::merge(t, port))?;
+    let key = hooksetup::ensure_hook_key()?;
+    hooksetup::apply(&path, |t| hooksetup::merge(t, port, &key))?;
     log(&format!("hooky Ledge zapojeny do {}", path.display()));
     mark_dirty();
     Ok(hooksetup::status_cached(port))

@@ -38,7 +38,20 @@ use windows::core::PCWSTR;
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const LOG_LINES: usize = 400;
+/// Strop jednoho řádku logu (bajty): proces bez `\n` (minifikovaný výpis, JSON) nesmí nafouknout RAM ani snapshot.
+const LINE_CAP: usize = 4096;
 
+/// Začátek adresy tohoto serveru (Vite, Next, CRA…). Jiné řádky můžou jmenovat cizí port (`Proxy → …:3001`).
+static LOCAL_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(?:^|[^\p{L}\p{N}_])local:").unwrap());
+/// Jak dlouho musí být záložní port znám, než se začne sondovat vedle přiděleného.
+const HINT_DELAY: Duration = Duration::from_secs(3);
+/// Slovo o naslouchání tohoto serveru + hned za ním adresa (`http://localhost:N`) nebo `port N`.
+static LISTEN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(?:^|[^\p{L}\p{N}_])(?:listening|running|ready|started|serving)\s+(?:server\s+)?(?:on|at)\s+(?:https?://(?:localhost|127\.0\.0\.1|\[::1\]):(\d{1,5})|port\s+(\d{1,5}))(?:[^\d]|$)",
+    )
+    .unwrap()
+});
 static URL_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)https?://(?:localhost|127\.0\.0\.1|\[::1\]):(\d{2,5})").unwrap());
 static ANSI_RE: LazyLock<Regex> =
@@ -241,6 +254,10 @@ struct Entry {
     view: ProcView,
     log: VecDeque<String>,
     job: Option<Job>,
+    /// Záložní port z řádku o naslouchání (`listen_port`) a kdy se poprvé objevil; nikdy se nezapisuje do `view.port`.
+    hint: Option<(u16, Instant)>,
+    /// Už přišel řádek `Local:` (má přednost, záložní port se pak neřeší).
+    local_seen: bool,
 }
 
 #[derive(Clone)]
@@ -274,8 +291,62 @@ pub fn clean_line(raw: &str) -> String {
     ANSI_RE.replace_all(raw, "").trim_end().to_string()
 }
 
+/// Port z řádku `Local: http://localhost:NNNN`; z ostatních řádků žádný (záložní port řeší `listen_port`).
 pub fn url_port(line: &str) -> Option<u16> {
-    URL_RE.captures(line).and_then(|c| c[1].parse().ok())
+    let after = LOCAL_RE.find(line)?.end();
+    URL_RE.captures(&line[after..]).and_then(|c| c[1].parse().ok())
+}
+
+/// Záložní port z řádku „server naslouchá“ (`listening on http://localhost:3000`, `Server running at …`,
+/// `listening on port 3000`). Adresa musí přímo následovat po slovu o naslouchání; `Proxy → …`, logy požadavků
+/// a cizí hosty se ignorují. Port 0 a mimo rozsah = `None`.
+pub fn listen_port(line: &str) -> Option<u16> {
+    let c = LISTEN_RE.captures(line)?;
+    c.get(1).or_else(|| c.get(2))?.as_str().parse::<u16>().ok().filter(|p| *p != 0)
+}
+
+/// Které porty navíc sondovat vedle přiděleného: záložní z `listen_port`, až je znám aspoň `HINT_DELAY`
+/// (u `concurrently` přijde `[api] listening on …` dřív, než naběhne server na přiděleném portu).
+fn extra_probe_port(target: u16, hint: Option<(u16, Instant)>, now: Instant) -> Option<u16> {
+    let (p, since) = hint?;
+    (p != target && now.saturating_duration_since(since) >= HINT_DELAY).then_some(p)
+}
+
+/// Zařadí `chunk` do řádku a drží ho do `cap` bajtů. Při přetečení platí z progress baru přepisovaného
+/// přes `\r` jen poslední stav (jako v `pump`), jinak se ořeže konec.
+fn push_capped(buf: &mut Vec<u8>, chunk: &[u8], cap: usize) {
+    buf.extend_from_slice(chunk);
+    if buf.len() > cap {
+        let end = buf.iter().rposition(|b| !matches!(b, b'\r' | b'\n')).map_or(0, |i| i + 1);
+        if let Some(i) = buf[..end].iter().rposition(|b| *b == b'\r') {
+            buf.drain(..=i);
+        }
+        buf.truncate(cap);
+    }
+}
+
+/// Jako `read_until(b'\n')`, ale v `buf` zůstane nejvýš `cap` bajtů; zbytek řádku se přečte a zahodí.
+/// Vrací počet přečtených bajtů, 0 = konec.
+fn read_line_capped(reader: &mut impl BufRead, buf: &mut Vec<u8>, cap: usize) -> std::io::Result<usize> {
+    let mut total = 0;
+    loop {
+        let avail = match reader.fill_buf() {
+            Ok(b) => b,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        if avail.is_empty() {
+            return Ok(total);
+        }
+        let newline = avail.iter().position(|b| *b == b'\n');
+        let used = newline.map_or(avail.len(), |i| i + 1);
+        push_capped(buf, &avail[..used], cap);
+        reader.consume(used);
+        total += used;
+        if newline.is_some() {
+            return Ok(total);
+        }
+    }
 }
 
 fn looks_like_error(line: &str) -> bool {
@@ -364,6 +435,8 @@ impl ProcMan {
                 },
                 log: VecDeque::new(),
                 job: None,
+                hint: None,
+                local_seen: false,
             },
         );
         Err(generation)
@@ -437,7 +510,7 @@ impl ProcMan {
                 let mut buf = Vec::with_capacity(512);
                 loop {
                     buf.clear();
-                    match reader.read_until(b'\n', &mut buf) {
+                    match read_line_capped(&mut reader, &mut buf, LINE_CAP) {
                         Ok(0) | Err(_) => break,
                         Ok(_) => {}
                     }
@@ -450,10 +523,17 @@ impl ProcMan {
                     }
                     let alive = me
                         .update(&id, generation, |e| {
-                            if e.view.url.is_none()
-                                && let Some(p) = url_port(&line)
-                            {
-                                e.view.port = Some(p);
+                            if e.view.url.is_none() {
+                                if let Some(p) = url_port(&line) {
+                                    e.view.port = Some(p);
+                                    e.local_seen = true;
+                                    e.hint = None;
+                                } else if !e.local_seen
+                                    && let Some(p) = listen_port(&line)
+                                {
+                                    let since = e.hint.map_or_else(Instant::now, |(_, t)| t);
+                                    e.hint = Some((p, since));
+                                }
                             }
                             if looks_like_error(&line) {
                                 e.view.errors += 1;
@@ -541,11 +621,17 @@ impl ProcMan {
                         me.fail(&id, generation, msg);
                         return;
                     }
-                    let Some(target) = me.update(&id, generation, |e| e.view.port).flatten() else { return };
-                    if ports::probe(target) {
+                    let Some((target, hint)) = me.update(&id, generation, |e| (e.view.port, e.hint)).and_then(|(p, h)| p.map(|p| (p, h))) else { return };
+                    let up = if ports::probe(target) {
+                        Some(target)
+                    } else {
+                        extra_probe_port(target, hint, Instant::now()).filter(|p| ports::probe(*p))
+                    };
+                    if let Some(target) = up {
                         let url = format!("http://localhost:{target}/");
                         me.update(&id, generation, |e| {
                             e.view.phase = Phase::Ready;
+                            e.view.port = Some(target);
                             e.view.url = Some(url.clone());
                             e.view.ready_at = Some(now_ms());
                         });
@@ -709,7 +795,71 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
     fn url_found_after_ansi_strip() {
         let l = clean_line("\x1b[32m  ➜  Local:   \x1b[1mhttp://localhost:\x1b[22m5210\x1b[0m/");
         assert_eq!(url_port(&l), Some(5210));
-        assert_eq!(url_port("Network: http://192.168.1.5:5173/"), None);
+    }
+
+    #[test]
+    fn port_only_from_local_line() {
+        for (line, want) in [
+            ("  ➜  Local:   http://localhost:5173/", Some(5173)),
+            ("- Local:        http://localhost:3000", Some(3000)),
+            ("Local: http://127.0.0.1:8080", Some(8080)),
+            ("local: http://[::1]:5000/", Some(5000)),
+            ("Local: http://localhost:5173/ (proxy http://localhost:3001)", Some(5173)),
+            ("Proxy → http://localhost:3001", None),
+            ("Network: http://192.168.1.5:5173/", None),
+            ("listening on http://localhost:3000", None),
+            ("Nonlocal: http://localhost:1234", None),
+            ("http://localhost:3001 Local: nic", None),
+            ("Local: http://example.com:8080/", None),
+            ("Local: http://localhost:99999/", None),
+            ("", None),
+        ] {
+            assert_eq!(url_port(line), want, "{line}");
+        }
+    }
+
+    /// Čte vše z `input` po řádcích a vrací je (bez ořezu konců), s malým stropem pro přehlednost.
+    fn capped_lines(input: &[u8], cap: usize) -> Vec<String> {
+        // malý vnitřní buffer: delší řádek přijde po víc kusech
+        let mut r = BufReader::with_capacity(4, input);
+        let (mut out, mut buf) = (vec![], vec![]);
+        loop {
+            buf.clear();
+            if read_line_capped(&mut r, &mut buf, cap).unwrap() == 0 {
+                return out;
+            }
+            assert!(buf.len() <= cap, "{}", buf.len());
+            out.push(String::from_utf8_lossy(&buf).into_owned());
+        }
+    }
+
+    #[test]
+    fn line_cap_table() {
+        let long = "x".repeat(50);
+        let cases: [(String, Vec<&str>); 7] = [
+            (String::new(), vec![]),
+            ("a\nb\n".into(), vec!["a\n", "b\n"]),
+            ("a\r\nb".into(), vec!["a\r\n", "b"]),
+            // přes strop bez `\r`: začátek řádku, další řádek nedotčený
+            (format!("{long}\nb\n"), vec!["xxxxxxxxxx", "b\n"]),
+            // bez konce řádku
+            (long.clone(), vec!["xxxxxxxxxx"]),
+            // progress bar přes strop: poslední stav, ne první
+            (format!("{0}\r10 %\r{0}\rhotovo\n", long), vec!["hotovo\n"]),
+            // `\r\n` na konci přetečeného řádku se nebere za přepsání
+            (format!("{long}\r\nb\n"), vec!["xxxxxxxxxx", "b\n"]),
+        ];
+        for (input, want) in cases {
+            assert_eq!(capped_lines(input.as_bytes(), 10), want, "{input}");
+        }
+    }
+
+    /// Pravý strop: řádek daleko přes něj se do logu ani snapshotu nedostane celý.
+    #[test]
+    fn huge_line_is_capped_at_line_cap() {
+        let input = "x".repeat(1 << 16) + "\nb\n";
+        let lines = capped_lines(input.as_bytes(), LINE_CAP);
+        assert_eq!((lines[0].len(), lines[1].as_str()), (LINE_CAP, "b\n"));
     }
 
     #[test]
@@ -787,6 +937,71 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
         assert_eq!(v.tail, ["Error: boom"]);
         assert_eq!(v.cwd.as_deref(), Some(dir.path().to_string_lossy().as_ref()));
         assert!(v.cmd.unwrap().starts_with("node -e"));
+    }
+
+    #[test]
+    fn listen_port_table() {
+        for (line, want) in [
+            ("listening on http://localhost:3000", Some(3000)),
+            ("Server running at http://127.0.0.1:8080/", Some(8080)),
+            ("ready on http://localhost:3000", Some(3000)),
+            ("[api] Server listening on port 3000", Some(3000)),
+            ("started server on http://[::1]:4000", Some(4000)),
+            ("Proxy → http://localhost:3001", None),
+            ("proxying http://localhost:3001", None),
+            ("GET http://localhost:3000/ 200", None),
+            ("connected to postgres at localhost:5432", None),
+            ("listening on http://example.com:8080", None),
+            ("listening on port 99999", None),
+            ("listening on port 0", None),
+            ("", None),
+        ] {
+            assert_eq!(listen_port(line), want, "{line}");
+        }
+    }
+
+    #[test]
+    fn extra_probe_port_table() {
+        let t = Instant::now();
+        let s = Duration::from_secs;
+        for (hint, now, want) in [
+            (None, t, None),
+            (Some((4000, t)), t + s(1), None),
+            (Some((4000, t)), t + s(3), Some(4000)),
+            (Some((4000, t)), t + s(10), Some(4000)),
+            (Some((3000, t)), t + s(10), None),
+        ] {
+            assert_eq!(extra_probe_port(3000, hint, now), want);
+        }
+    }
+
+    #[test]
+    fn server_ignoring_port_is_found_via_listen_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("srv.js");
+        std::fs::write(
+            &p,
+            "const http=require('http');
+const s=http.createServer((q,r)=>r.end('ok'));
+             s.listen(0,'127.0.0.1',()=>console.log(`listening on http://localhost:${s.address().port}`));",
+        )
+        .unwrap();
+        let (pm, _) = quiet();
+        pm.launch_dev(DevSpec {
+            id: "l".into(),
+            cwd: dir.path().into(),
+            run: format!("node \"{}\"", p.display()),
+            port: None,
+            pass_port: false,
+            open_browser: false,
+            timeout: Duration::from_secs(20),
+        })
+        .unwrap();
+        let v = wait_for(&pm, "l", Phase::Ready, 20);
+        let port = v.port.unwrap();
+        assert_eq!(v.url, Some(format!("http://localhost:{port}/")));
+        assert!(ports::probe(port));
+        pm.stop("l");
     }
 
     #[test]

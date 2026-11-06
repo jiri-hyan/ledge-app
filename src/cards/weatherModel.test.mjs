@@ -1,7 +1,7 @@
 //   node --experimental-strip-types --test src/cards/weatherModel.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { wxKind, minutesOf, clockOf, sunPos, hoursFrom, rangePos, curvePoints, nearestIndex, windIndex, dowOf, dayRows, skyId, tempColor } from "./weatherModel.ts";
+import { wxKind, minutesOf, clockOf, sunPos, hoursFrom, rangePos, curvePoints, nearestIndex, windIndex, dayRows, skyId, tempColor } from "./weatherModel.ts";
 import { WEATHER_DESIGNS, weatherDesign } from "./weatherDesigns.ts";
 
 test("wxKind: tabulka kódů, neznámé = null", () => {
@@ -51,9 +51,7 @@ test("rangePos, curvePoints, nearestIndex, windIndex, tempColor", () => {
   assert.match(tempColor(99), /^hsl\(0 /);
 });
 
-test("dowOf a dayRows", () => {
-  assert.equal(dowOf("2026-10-29"), 4);
-  assert.equal(dowOf("bad"), null);
+test("dayRows", () => {
   const w = { code: 3, observed: "2026-10-16T07:00", min: 1, max: 9, days: [{ date: "2026-10-17", min: 2, max: null, code: 1 }, { date: "2026-10-18", min: 3, max: 8, code: 61 }] };
   assert.deepEqual(dayRows(w).map((r) => [r.date, r.today]), [["2026-10-16", true], ["2026-10-18", false]]);
   assert.deepEqual(dayRows({ ...w, min: null, days: undefined }), []);

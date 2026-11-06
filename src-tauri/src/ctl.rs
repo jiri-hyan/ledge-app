@@ -4,7 +4,7 @@
 
 use crate::commands::projects::launch;
 use crate::drawer::{self, Opener, View};
-use crate::settings::{apply_config, load_or_seed};
+use crate::settings::{apply_config, reload_from_disk};
 use crate::state::{UiCmd, core};
 use crate::{claude, config};
 use serde_json::{Value, json};
@@ -27,6 +27,10 @@ pub(crate) fn ctl_handler() -> claude::Ctl {
         let c = core();
         match cmd {
             "open" => {
+                // ve hře nic, a volající se to dozví (jako `open_drawer` v MCP)
+                if !crate::studio::remote_may_open(c.dead()) {
+                    return Err(crate::i18n::tr("Ledge je teď schovaný (hra na celé obrazovce nebo herní režim) — šuplík se neotevře.", "Ledge is hidden right now (a fullscreen game or game mode) — the drawer won't open.").into());
+                }
                 // "peek" / "compact" / "island" (náhledy po najetí — i k živému ověření bez myši), jinak celý
                 let view = crate::hovermode::view_by_name(body.get("view").and_then(Value::as_str));
                 c.send_ui(UiCmd::Show(view, Opener::Remote));
@@ -57,14 +61,9 @@ pub(crate) fn ctl_handler() -> claude::Ctl {
                 Ok(json!({ "ok": true }))
             }
             "reload" => {
-                let (cfg, err) = load_or_seed();
-                match err {
-                    Some(e) => Err(e),
-                    None => {
-                        apply_config(cfg);
-                        Ok(json!({ "ok": true }))
-                    }
-                }
+                let cfg = reload_from_disk()?;
+                apply_config(cfg);
+                Ok(json!({ "ok": true }))
             }
             _ => Err(format!("neznámý příkaz {cmd}")),
         }

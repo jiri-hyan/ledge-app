@@ -14,6 +14,7 @@ import { deskApi, type DeskPatch } from "./api";
 import { clampOpacity, kindName, LAYERS, OPACITY_MIN } from "./model";
 import { tx } from "../layout/text";
 import DeskBody from "./views";
+import Boundary from "../ui/Boundary";
 
 /** Název widgetu v liště: vestavěný přeložený, skript = titulek z dat nebo jméno souboru. */
 function title(w: DeskWidget, d: DeskData | null): string {
@@ -84,7 +85,7 @@ export default function DeskApp() {
         {(wd) => (
           <>
             <div class="dk-body">
-              <DeskBody w={wd()} d={data()} title={title(wd(), data())} />
+              <Boundary><DeskBody w={wd()} d={data()} title={title(wd(), data())} /></Boundary>
             </div>
             <div class="dk-bar" onPointerDown={drag} aria-label={title(wd(), data())} title={wd().locked ? t("cards.desk.lockedTip", "Zamčeno — posun vypneš v ⋯") : t("cards.desk.dragTip", "Táhni = posunout")}>
               <Show when={wd().locked}><span class="dk-lock" aria-label={t("cards.desk.locked", "Zamčeno")}>🔒</span></Show>

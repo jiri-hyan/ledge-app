@@ -7,8 +7,8 @@ edition = "2024"
 
 [lib]
 name = "ledge_lib"
-# staticlib + cdylib NECHÁNO: šablona Tauri 2 je má kvůli mobilním cílům; že je desktopový `tauri build` nevyžaduje, jsme neověřili (build se nesmí spouštět)
-crate-type = ["staticlib", "cdylib", "rlib"]
+# jen rlib: aplikace je desktop (bin `ledge` + testy linkují rlib); staticlib (354 MB) a cdylib (prázdná skořápka) z šablony Tauri pro mobil se zbytečně sestavovaly při každém vydání
+crate-type = ["rlib"]
 # bez doctestů: knihovna je jen vnitřek aplikace, žádná veřejná API s příklady (každý doctest = zbytečný překlad + linkování)
 doctest = false
 

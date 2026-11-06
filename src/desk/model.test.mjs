@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BUILTIN_KINDS, canPin, clampOpacity, cleanProfileName, deskSnapshot, isKind, kindName, kindsOfCard, LAYERS, liveCount, sameName, waitMinutes, widgetOf } from "./model.ts";
+import { BUILTIN_KINDS, clampOpacity, cleanProfileName, deskSnapshot, kindName, kindsOfCard, LAYERS, waitMinutes, widgetOf } from "./model.ts";
 
 const w = (id, kind, x = {}) => ({ id, kind, x: null, y: null, w: 300, h: 120, cw: 200, ch: 70, compact: false, layer: "normal", locked: false, through: false, opacity: 100, hideInGame: true, ...x });
 
@@ -22,8 +22,6 @@ test("co jde připnout z které karty", () => {
     ["", []],
   ];
   for (const [card, want] of cases) assert.deepEqual(kindsOfCard(card), want, card);
-  for (const k of [...BUILTIN_KINDS, "widget:a.cmd"]) assert.ok(isKind(k), k);
-  for (const k of ["widget:", "claude", "", 3, null]) assert.ok(!isKind(k), String(k));
   assert.deepEqual(kindName("limits"), ["cards.desk.kind.limits", "Limity Clauda"]);
   assert.equal(kindName("widget:kurz.py"), "kurz.py");
 });
@@ -41,10 +39,6 @@ test("stav připnutí ze snapshotu a strop", () => {
   assert.equal(widgetOf(v, "limits")?.id, "lim1");
   assert.equal(widgetOf(v, "agenda"), null);
   assert.equal(widgetOf(undefined, "limits"), null);
-  assert.ok(canPin(v, "limits"), "připnutý jde vždy (jen se ukáže)");
-  assert.ok(!canPin(v, "agenda"), "plno");
-  assert.ok(canPin({ ...v, max: 6 }, "agenda"));
-  assert.ok(canPin(undefined, "agenda"), "staré jádro bez `desk` = zkusit");
 });
 
 test("průhlednost, jméno profilu, minuty čekání", () => {
@@ -52,8 +46,6 @@ test("průhlednost, jméno profilu, minuty čekání", () => {
   assert.equal(cleanProfileName("  Práce   doma  "), "Práce doma");
   assert.equal(cleanProfileName("   "), "");
   assert.equal(cleanProfileName("x".repeat(60)).length, 40);
-  assert.ok(sameName("PRÁCE", " práce "));
-  assert.ok(!sameName("Práce", "Hraní"));
   assert.equal(waitMinutes(0, 125_000), 2);
   assert.equal(waitMinutes(10_000, 0), 0, "hodiny napřed → nikdy záporné");
 });
@@ -68,8 +60,6 @@ test("data widgetu ve tvaru snapshotu: co chybí, je prázdné", () => {
   assert.equal(s.sessions[0].status, "working");
   assert.equal(s.projects[0].name, "App");
   assert.equal(s.cfgError, "x");
-  assert.equal(liveCount(d), 1);
-  assert.equal(liveCount(null), 0);
 });
 
 test("okno widgetu nikdy neschvaluje: žádné decide v kódu desk/", () => {

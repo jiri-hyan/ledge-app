@@ -240,29 +240,10 @@ fn widget(name: &str, path: &Path, kind: Kind, size: u64) -> Option<Widget> {
 /// Projde složku: jeden výpis, čte jen změněné soubory (proti `prev`). Bez rekurze a skrytých.
 pub fn scan_dir(dir: &Path, prev: Option<&Scan>) -> Scan {
     let mut out = Scan { dir: dir.to_path_buf(), ..Default::default() };
-    let rd = match std::fs::read_dir(dir) {
-        Ok(rd) => rd,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return out,
-        Err(e) => {
-            out.exists = dir.is_dir();
-            out.error = Some(e.to_string());
-            return out;
-        }
-    };
-    out.exists = true;
+    let l = crate::fsx::list_files(dir, Kind::from_ext, MAX_WIDGETS);
+    (out.exists, out.error, out.skipped) = (l.exists, l.error, l.skipped);
     let prev = prev.filter(|p| p.dir == dir);
-    let mut found: Vec<(String, PathBuf, Kind, std::fs::Metadata)> = rd
-        .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().to_string_lossy().into_owned();
-            let kind = Kind::from_ext(Path::new(&name).extension()?.to_str()?)?;
-            let md = e.metadata().ok().filter(|m| m.is_file())?;
-            (!name.starts_with('.')).then(|| (name, e.path(), kind, md))
-        })
-        .collect();
-    found.sort_by_key(|(n, ..)| n.to_lowercase());
-    out.skipped = found.len().saturating_sub(MAX_WIDGETS);
-    found.truncate(MAX_WIDGETS);
+    let found = l.files;
     for (name, path, kind, md) in found {
         let st = stamp_of(&path, &md, kind);
         let cached = prev.and_then(|p| p.stamps.get(&name)).filter(|(s, _)| *s == st && st.0.is_some());

@@ -11,7 +11,7 @@ import { STYLES } from "./looks.ts";
 import { withStyle } from "./styles.ts";
 import {
   CUSTOM_KEYS, CUSTOM_TEXT_KEYS, LIGHT_LUM, MAX_CUSTOM_THEMES, addCustomTheme, colorsOf, customIdOk, customProblems, exportTheme, importTheme,
-  isLightBg, newThemeId, normalizeCustomThemes, resolveCustom, themeOf, updateCustomTheme,
+  isLightBg, newThemeId, normalizeCustomThemes, resolveCustom, themeOf,
 } from "./customThemes.ts";
 import { dropThemeRefs, effectiveAppearance, normalizePages, setPageLook } from "./pages.ts";
 import { textProblems } from "./contrast.ts";
@@ -85,11 +85,6 @@ test("jména motivů: tvar, volné id, přidání, úprava", () => {
   const a = addCustomTheme([], "  Ráno ", "light", colorsOf("light"));
   assert.equal(a.list[0].name, "Ráno");
   assert.equal(a.id, "my-rano");
-  let list = updateCustomTheme(a.list, a.id, { name: "Večer", colors: { accent: "#FF0000", bg: "špatně", t9: "#000000" } });
-  assert.equal(list[0].name, "Večer");
-  assert.equal(list[0].colors.accent, "#ff0000");
-  assert.equal(list[0].colors.bg, colorsOf("light").bg, "vadná barva se ignoruje");
-  assert.deepEqual(Object.keys(list[0].colors).sort(), [...CUSTOM_KEYS].sort(), "cizí klíč se nepřidá");
   assert.equal(addCustomTheme(Array.from({ length: 20 }, (_, i) => mine("my-" + i)), "x", "dark", colorsOf("dark")), null);
 });
 

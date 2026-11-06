@@ -46,5 +46,6 @@ Historie kol a backlog nejsou v repu (interní předávka mimo strom).
 - Lead merguje non-ff: `merge: <popis> (kolo N)`. Worker na konci aktualizuje codemapu své oblasti
   (`scripts/codemap.test.mjs` hlídá, že neodkazuje na neexistující soubory ani symboly, `scripts/codemap-coverage.test.mjs`, že každý modul a zdroj má řádek; `node scripts/codemap-lint.mjs` vypíše obojí).
 - Sdílený `CARGO_TARGET_DIR=src-tauri/target-agents`. Orientace: `node scripts/kde.mjs <symbol>`.
-- Worktree past: `node_modules` je junction — před `git worktree remove` nejdřív
-  `cmd //c rmdir <wt>\node_modules`, jinak se smaže i obsah cíle.
+- Worktree: `node scripts/wt.mjs new <oblast> <kolo>` (větev, junction `node_modules`, kopie `dist`, rerere) a
+  `rm <oblast>` (nejdřív odpojí junction, jinak by se smazal i obsah cíle; bez `--force`); `prune` čistí starou
+  incremental cache (dry-run, mazání jen s `--apply`). Plné brány se při nezměněném stromu nespustí znovu (`.brany-ok`, `--force`).

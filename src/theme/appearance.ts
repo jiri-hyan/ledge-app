@@ -124,19 +124,6 @@ const CSS_EASE: Record<Exclude<MotionStyle, "none">, { spring: string; ease: str
   liquid: { spring: "cubic-bezier(0.32, 1.65, 0.54, 1)", ease: "cubic-bezier(0.18, 0.92, 0.24, 1.06)" },
 };
 
-export type WidenMotion = { shrinkMs: number; fadeMs: number; restoreMs: number; easing: string };
-
-/** Přechod rozšíření/zúžení Nastavení (`settings/widen.ts`) podle stylu pohybu. `null` = okamžitě, bez
- *  přechodu (styl `none` nebo systémové „omezit pohyb“). Délky = základ / rychlost (jako `dur` v
- *  motion.ts a `--dur-*` v CSS), křivka zúžení = `--ease` stylu. Rozšíření jde pružinou `spring()`. */
-export function widenMotion(style: MotionStyle, speed: number, reduced: boolean): WidenMotion | null {
-  const s = effectiveMotion(style, reduced);
-  if (s === "none") return null;
-  const k = Number.isFinite(speed) && speed > 0 ? speed : 1;
-  const ms = (base: number) => Math.round(base / k);
-  return { shrinkMs: ms(210), fadeMs: ms(120), restoreMs: ms(160), easing: CSS_EASE[s].ease };
-}
-
 /** Všechny CSS proměnné vzhledu (bez `--`) → hodnota. Výchozí vzhled = hodnoty ze `styles.css`. */
 export function appearanceVars(a: Appearance, reducedMotion = false): Record<string, string> {
   const out: Record<string, string> = { ...themeOf(a).vars };

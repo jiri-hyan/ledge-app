@@ -1,0 +1,24 @@
+{
+  "strip": { "enabled": true, "items": ["mode", "clock", "running", "claude", "repos"], "opacity": 0.8, "monitor": "primary" },
+  "drawer": {
+    "trigger": "hover", "hoverDelayMs": 180, "edgeDelayMs": 120, "dwellDelayMs": 400, "closeDelayMs": 300,
+    "width": 1000, "glass": "acrylic", "animationMs": 220,
+    "sections": { "projects": true, "running": true, "claude": true, "notes": true },
+    "keepWarmS": 0
+  },
+  "modes": { "personalEnabled": true },
+  "claude": { "enabled": true, "port": 47800, "approvalTimeoutS": 45, "enforceCommit": "notify" },
+  "hotkeys": { "enabled": false, "toggle": "Ctrl+Alt+L", "approve": "Ctrl+Alt+Y", "deny": "Ctrl+Alt+N", "note": "Ctrl+Alt+M" },
+  "notes": { "enabled": true, "root": "", "sync": { "enabled": false, "remote": "", "intervalMin": 5 } },
+  "personal": {
+    "weather": { "lat": 50.08, "lon": 14.43, "label": "Praha" },
+    "links": [{ "name": "Mapa", "target": "https://example.com/mapa" }]
+  },
+  "roots": ["C:\\Users\\uzivatel\\Desktop"],
+  "autostart": true,
+  "update": { "check": true, "repo": "example/app", "intervalH": 6 },
+  "projects": [
+    { "id": "app", "name": "App", "enabled": true, "kind": "dev", "remote": "example/app", "run": "npm run dev", "port": 5210, "passPort": true, "openBrowser": true, "args": [] },
+    { "id": "app-v2", "name": "App v2", "enabled": true, "kind": "dev", "remote": "example/app-v2", "run": "npm run dev", "port": 5211, "passPort": false, "openBrowser": false, "args": [] }
+  ]
+}

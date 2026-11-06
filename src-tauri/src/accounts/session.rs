@@ -32,6 +32,12 @@ static ACC: LazyLock<Mutex<[Acc; 2]>> = LazyLock::new(|| Mutex::new([Acc::defaul
 static CANCEL: [AtomicBool; 2] = [AtomicBool::new(false), AtomicBool::new(false)];
 static REFRESH: LazyLock<[tauri::async_runtime::Mutex<()>; 2]> = LazyLock::new(|| [tauri::async_runtime::Mutex::new(()), tauri::async_runtime::Mutex::new(())]);
 
+/// Smí obnova tokenu zapsat výsledek? Jen když účet drží pořád tentýž refresh token, s kterým obnova
+/// začala (mezitím nikdo nepřihlásil jiný účet ani neodhlásil — jinak by se vrátil starý / přepsal nový).
+fn refresh_may_commit(current: Option<&str>, started_with: &str) -> bool {
+    current == Some(started_with)
+}
+
 fn ix(p: Provider) -> usize {
     match p {
         Provider::Microsoft => 0,
@@ -158,6 +164,14 @@ pub async fn connect(p: Provider, client_id: String, secret: String, tenant: Str
     CANCEL[ix(p)].store(false, Ordering::SeqCst);
     mark_dirty();
     let res = connect_inner(p, &client_id, &secret, &tenant).await;
+    // konečný zápis (Správce pověření + paměť) je pod `REFRESH`: souběžná obnova tokenu ani odhlášení
+    // se nevklíní mezi kontrolu a zápis
+    let commit = REFRESH[ix(p)].lock().await;
+    let res = res.and_then(|s| {
+        vault::save(&WinCred, p, &s.0)?;
+        log(&format!("účty: {} přihlášen", p.id()));
+        Ok(s)
+    });
     with(p, |a| {
         a.connecting = false;
         match &res {
@@ -169,6 +183,7 @@ pub async fn connect(p: Provider, client_id: String, secret: String, tenant: Str
             Err(e) => a.error = Some(e.clone()),
         }
     });
+    drop(commit);
     mark_dirty();
     super::calsync::forget(p);
     if p == Provider::Microsoft {
@@ -221,8 +236,7 @@ async fn connect_inner(p: Provider, client_id: &str, secret: &str, tenant: &str)
         tenant: if p == Provider::Microsoft { tenant.into() } else { String::new() },
         saved_ms: now,
     };
-    vault::save(&WinCred, p, &stored)?;
-    log(&format!("účty: {} přihlášen", p.id()));
+    // do Správce pověření zapisuje až `connect` pod zámkem `REFRESH` (přihlášení trvá minuty, zámek se nedrží)
     Ok((stored, (t.access_token, exp)))
 }
 
@@ -249,12 +263,15 @@ pub fn cancel(p: Provider) {
 
 /// Odhlásí: smaže záznam ze Správce pověření a z paměti, u Google refresh token i odvolá.
 pub async fn disconnect(p: Provider) -> Result<(), String> {
+    // pod `REFRESH`: rozběhnutá obnova tokenu nejdřív doběhne a po odhlášení už nic nevrátí
+    let guard = REFRESH[ix(p)].lock().await;
     let stored = with(p, |a| {
         let s = a.stored.take();
         (a.access, a.expired, a.error, a.retry_at) = (None, false, None, None);
         s
     });
     let removed = vault::remove(&WinCred, p);
+    drop(guard);
     super::calsync::forget(p);
     if p == Provider::Microsoft {
         super::mail::forget();
@@ -308,6 +325,9 @@ pub async fn access_token(p: Provider) -> Result<String, String> {
         let (f, code) = oauth::classify(r.status, &r.body);
         let msg = fail(p, f, &code);
         with(p, |a| {
+            if !refresh_may_commit(a.stored.as_ref().map(|s| s.refresh_token.as_str()), &s.refresh_token) {
+                return;
+            }
             a.retry_at = oauth::retry_after(f, now_ms());
             if a.retry_at.is_none() {
                 a.expired = true;
@@ -319,6 +339,9 @@ pub async fn access_token(p: Provider) -> Result<String, String> {
         return Err(msg);
     }
     let (t, exp) = oauth::parse_token(&r.body, now_ms())?;
+    if !with(p, |a| refresh_may_commit(a.stored.as_ref().map(|s| s.refresh_token.as_str()), &s.refresh_token)) {
+        return Err(trf!("Účet {} se mezitím změnil — zkus to znovu.", "The {} account changed in the meantime — try again.", p.label()));
+    }
     let next = oauth::next_refresh(&s.refresh_token, t.refresh_token.as_deref());
     if next != s.refresh_token {
         let mut s2 = s.clone();
@@ -378,6 +401,20 @@ mod tests {
         }
         assert_eq!(parse_google_primary(br#"{"id":"jana@example.com","summary":"Jana"}"#), Some(("jana@example.com".into(), "Jana".into())));
         assert_eq!(parse_google_primary(br#"{"id":""}"#), None);
+    }
+
+    #[test]
+    fn refresh_commit_only_for_same_token() {
+        // (aktuální refresh token, s kterým obnova začala, smí zapsat?)
+        let cases: &[(Option<&str>, &str, bool)] = &[
+            (Some("r1"), "r1", true),
+            (None, "r1", false),
+            (Some("r2"), "r1", false),
+            (Some(""), "r1", false),
+        ];
+        for (cur, started, want) in cases {
+            assert_eq!(refresh_may_commit(*cur, started), *want, "{cur:?} {started}");
+        }
     }
 
     #[test]

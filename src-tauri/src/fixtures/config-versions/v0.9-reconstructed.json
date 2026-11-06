@@ -1,0 +1,23 @@
+{
+  "$schema": "./config.schema.json",
+  "strip": { "enabled": true, "items": ["mode", "clock", "claude", "waiting"], "opacity": 0.85, "monitor": "primary" },
+  "drawer": { "trigger": "hover", "width": 1080, "glass": "solid", "sections": { "projects": true, "claude": true, "notes": true, "actions": true } },
+  "claude": { "enabled": true, "port": 47800, "approvalTimeoutS": 45, "enforceCommit": "block", "toast": true },
+  "notes": { "enabled": true, "root": "", "sync": { "enabled": false, "remote": "", "intervalMin": 5 } },
+  "roots": ["C:\\Users\\uzivatel\\Desktop"],
+  "autostart": false,
+  "update": { "check": true, "repo": "example/app", "intervalH": 12 },
+  "appearance": { "theme": "dark", "width": "wide" },
+  "projects": [
+    { "id": "app", "name": "App", "enabled": true, "kind": "dev", "remote": "example/app", "run": "npm run dev", "port": 5210, "passPort": true, "openBrowser": true, "args": [] }
+  ],
+  "gitAlerts": { "enabled": true },
+  "actions": [{ "id": "mapy", "label": "Mapy", "target": "https://example.com/mapy", "showOn": "personal" }],
+  "ui": { "lang": "cs" },
+  "layout": {
+    "pages": [
+      { "id": "prace", "cards": [{ "id": "projects", "size": "xl" }, { "id": "notes", "size": "xl" }] },
+      { "id": "osobni", "cards": [{ "id": "clock", "size": "m" }, { "id": "links", "size": "m" }] }
+    ]
+  }
+}

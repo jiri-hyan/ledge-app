@@ -89,13 +89,13 @@ mod tests {
         "note_edit_draft_load", "note_edit_draft_save", "note_export", "note_link_create", "note_link_resolve", "note_link_suggest",
         "note_open", "note_open_with", "note_open_with_apps", "note_read", "note_render", "note_save", "note_set_meta",
         "note_suggest_remind", "note_toggle_task", "note_unarchive", "open_url", "pin_drag", "pin_edit_in_ledge", "pin_hide",
-        "pin_hint_seen", "pin_init", "pin_look_all", "pin_open", "pin_set", "pin_unpin",
+        "pin_hint_seen", "pin_init", "pin_look_all", "pin_open", "pin_set", "pin_unpin", "ui_log",
     ];
     /// Co smí widget na ploše: `desk_*` svého okna, kliky / výstup / obnovení widgetu (bez souhlasu — ten jen
     /// v šuplíku), karta Běží (stop, logy, zavřít hlášku), Agenda (připojit se, Outlook), vzhled (čtení configu).
     const DESK_WINDOW: &[&str] = &[
         "anim_stats", "calendar_join", "calendar_outlook_load", "desk_drag", "desk_init", "desk_menu", "desk_open_drawer", "desk_set",
-        "desk_unpin", "dismiss", "get_config", "logs", "open_url", "stop", "widget_click", "widget_edit", "widget_output",
+        "desk_unpin", "dismiss", "get_config", "logs", "open_url", "stop", "ui_log", "widget_click", "widget_edit", "widget_output",
         "widget_refresh", "widgets_list",
     ];
 
@@ -111,10 +111,11 @@ mod tests {
         "launcher_import_check", "logo_preview", "look_image", "look_image_add", "mcp_reveal_key", "mcp_rotate_key",
         "mcp_set_enabled", "mcp_state", "note_folder_check", "note_folder_clear_conflicts", "note_folder_sync_now",
         "note_open", "note_tags", "notes_sync_now", "notify_preview", "open_app_file", "open_config_file", "open_url", "pick_path",
-        "pick_save", "pkg_context", "project_candidates", "project_detect", "project_logo", "relaunch_outside",
+        "pick_save", "pkg_context", "project_candidates", "project_detect", "project_logo", "relaunch_outside", "repos_rescan",
         "run_action", "run_script", "save_config", "scripts_list", "scripts_open_dir", "set_game_mode",
-        "statusline_install", "statusline_remove", "statusline_status", "studio_win", "update_check_now",
-        "update_rollback", "widget_consent", "widget_install", "widget_templates", "widgets_list", "widgets_open_dir",
+        "statusline_install", "statusline_remove", "statusline_status", "studio_win", "system_view",
+        "ui_log", "update_check_now", "update_install", "update_rollback", "widget_consent", "widget_edit", "widget_install", "widget_refresh",
+        "widget_templates", "widgets_list", "widgets_open_dir",
         "win_settings_open",
     ];
 
@@ -191,6 +192,11 @@ mod tests {
             ("drawer", "pin_toggle", true),
             ("drawer", "desk_pin", true),
             ("drawer", "update_install", true),
+            ("drawer", "ui_log", true),
+            (&note, "ui_log", true),
+            (&desk, "ui_log", true),
+            ("studio", "ui_log", true),
+            (&web, "ui_log", false),
             (&note, "pin_set", true),
             (&note, "note_save", true),
             (&note, "note_read", true),
@@ -220,6 +226,11 @@ mod tests {
             ("studio", "check_config", true),
             ("studio", "studio_win", true),
             ("studio", "action_consent", true),
+            ("studio", "update_install", true),
+            ("studio", "repos_rescan", true),
+            ("studio", "system_view", true),
+            ("studio", "widget_edit", true),
+            ("studio", "widget_refresh", true),
             ("studio", "focus_drawer", false),
             ("studio", "release_focus", false),
             ("studio", "drawer_size", false),

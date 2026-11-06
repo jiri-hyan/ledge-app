@@ -8,6 +8,7 @@ import { Seg, Select, Toggle } from "../settings/fields/controls";
 import { Row } from "../settings/fields/Row";
 import { fieldLabel } from "../settings/labels";
 import { intApi, type GithubConfig, type SystemConfig } from "./api";
+import { quiet } from "../uiErrors";
 import { diskOn, toggleDisk } from "./format";
 import "./integrations.css";
 
@@ -40,7 +41,7 @@ export function SystemSettings() {
   const c = useSettings();
   const s = (): SystemConfig => c.cfg.system ?? { disks: [], netUnit: "bytes" };
   // jeden vzorek při otevření panelu: odtud písmena disků, které ve stroji jsou (karta je ukazuje podle uloženého configu)
-  const [probe] = createResource(async () => (await intApi.systemView()) ?? null);
+  const [probe] = createResource(async () => (await quiet(intApi.systemView(), null, "systemView")) ?? null);
   const letters = () => probe()?.allDisks ?? [];
   return (
     <>

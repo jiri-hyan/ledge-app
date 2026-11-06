@@ -17,7 +17,7 @@ import "./notes/notes.css";
 import { OVERLAP, spring, collapsedClip, bandClip, FULL_CLIP, measure, motionNow, preHide, revealContent, concealContent } from "./motion";
 import { closePlan, openPlan, type Geo, type Plan } from "./theme/openAnim";
 import { initAppearance } from "./theme/apply";
-import { holdWide, wantWidth } from "./settings/widen";
+import { wantWidth } from "./settings/widen";
 import MainPage from "./MainPage";
 import Head from "./cards/Head";
 import SmallView from "./hover/SmallView";
@@ -25,6 +25,7 @@ import { isHoverView, smallWidth } from "./hover/model";
 import { asPage, typing, type Page } from "./nav";
 import { EMPTY_SNAPSHOT } from "./snapshot";
 import { Toast, say } from "./ui/toast";
+import { ConfigNotice } from "./ConfigNotice";
 import UndoBar from "./notes/UndoBar";
 import { gotoSettingsPanel, openSettings, setStudioFallback } from "./palette/goto";
 import { checkFirstRun, startWizard, wizardOpen } from "./onboarding/state";
@@ -36,6 +37,7 @@ import "./quick/quick.css";
 import { clearDrop, offerDrop } from "./actions/dropstate";
 import { mainHeight } from "./layout/drawerSize";
 import { contentHeight } from "./theme/size";
+import Boundary from "./ui/Boundary";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
@@ -267,7 +269,7 @@ export default function App() {
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
     onCleanup(() => clearInterval(tick));
   });
-  createEffect(onChange([view, page, holdWide], () => queueMicrotask(report)));
+  createEffect(onChange([view, page], () => queueMicrotask(report)));
   createEffect(onChange(view, (v) => v === "hidden" && setPalette(null), { defer: true }));
   // zavřený šuplík rozpracované úpravy rozložení NEzahodí (draft i Zpět žijí v `edit.ts`); po znovuotevření
   // fokus zpět + připomínka. Výslovný odchod na jinou stránku je zahodí.
@@ -303,14 +305,17 @@ export default function App() {
             <Show when={s.cfgError}>
               <div class="banner" data-anim><IconShield /> <span>{s.cfgError}</span></div>
             </Show>
+            <Show when={s.configNotice}>{(n) => <ConfigNotice n={n()} />}</Show>
             <Show when={updOpen() && page() === "main" && (s.update.state === "dostupna" || s.update.whatsNew?.unread) ? s.update : null}>
               {(u) => <UpdatePanel u={u()} onClose={() => setUpdOpen(false)} />}
             </Show>
+            <Boundary resetOn={page}>
             <Show when={page() === "main"}><MainPage s={s} now={now()} onNote={startNote} nav={notesNav} onSettings={() => openSettings()} /></Show>
             <Show when={page() === "settings"}><div data-anim><Settings s={s} windowed={false} /></div></Show>
             <Show when={page() === "note"}><NoteEditor s={s} view={view()} onLeave={() => setPage(returnTo())} /></Show>
             <Show when={page() === "welcome"}><Wizard onExit={() => setPage("main")} /></Show>
             <Show when={page() === "notes"}><NotesPage s={s} now={now()} onOpen={editNote} onNew={notesNav.onNew} /></Show>
+            </Boundary>
           </div>
         }>
           <SmallView view={view()} s={s} now={now()} expandMs={expandMs()} />

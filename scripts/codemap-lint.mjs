@@ -3,6 +3,7 @@
 // Čisté funkce (bez I/O) + `loadTree` jako jediné I/O; test: scripts/codemap.test.mjs.
 // Pokrytí (každý modul má mapu) je v codemap-coverage.mjs, test: scripts/codemap-coverage.test.mjs.
 //   node scripts/codemap-lint.mjs      → vypíše nálezy (exit 1, je-li nějaký)
+//   node scripts/codemap-lint.mjs --fix → k mapám nad stropem navíc NAVRHNE řádky k přesunu do -detail.md (nic nepřepisuje)
 //
 // Pravidla:
 //  (a) sloupec „soubor…“: backtickové cesty (obsahují `/` nebo končí .rs/.ts/.tsx/.css/.mjs) musí existovat.
@@ -15,6 +16,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { coverageGaps } from './codemap-coverage.mjs'
+import { suggestMoves, formatSuggestion } from './codemap-suggest.mjs'
 
 const SKIP_DIRS = new Set(['node_modules', 'target', 'target-agents', 'dist', '.git'])
 const CODE_ROOTS = ['src', 'src-tauri/src', 'scripts']
@@ -188,6 +190,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const found = lintCodemaps(root)
   for (const f of found) console.log(`${f.file}:${f.line}  ${{ file: 'soubor neexistuje', symbol: 'symbol v kódu není', size: 'jádro mapy je dlouhé', line: 'řádek je dlouhý', 'detail-link': 'chybí odkaz na detail' }[f.kind]}: ${f.value}`)
+  if (process.argv.includes('--fix')) {
+    const dir = path.join(root, 'docs', 'codemap')
+    for (const f of found.filter((x) => x.kind === 'size')) {
+      const n = path.basename(f.file)
+      for (const l of formatSuggestion(n, suggestMoves(fs.readFileSync(path.join(dir, n), 'utf8'), MAX_CORE_BYTES))) console.log(l)
+    }
+  }
   const cov = lintCoverage(root)
   for (const u of cov.missing) console.log(`bez mapy: ${u}  (jmenuj ho v docs/codemap/*.md, nebo výjimka v COVERAGE_ALLOW s důvodem)`)
   for (const f of cov.unnamed) console.log(`soubor bez řádku v mapě: ${f}  (jmenuj ho výslovně v tabulce některé docs/codemap/*.md)`)

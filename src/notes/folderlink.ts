@@ -34,10 +34,6 @@ export function directionHint(id: LinkDirection): string {
   }
 }
 
-export function directionOptions(): { v: LinkDirection; label: string; hint: string }[] {
-  return DIRECTION_IDS.map((id) => ({ v: id, label: directionLabel(id), hint: directionHint(id) }));
-}
-
 /** Jasná věta, co se kam zapisuje (podle zvoleného směru). */
 export function writeSentence(dir: LinkDirection): string {
   switch (dir) {

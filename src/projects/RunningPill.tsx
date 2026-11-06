@@ -5,6 +5,7 @@
 import { createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { Portal } from "solid-js/web";
 import { api, type PortHolder, type ProcView, type Snapshot } from "../api";
+import { quiet } from "../uiErrors";
 import { uptime } from "../format";
 import { t } from "../i18n";
 import { rich } from "../ui/rich";
@@ -44,7 +45,7 @@ function Drop(p: { s: Snapshot; now: number; at: { x: number; y: number }; onClo
   const [logOf, setLogOf] = createSignal<string | null>(null);
   const [lines, setLines] = createSignal<string[]>([]);
   const [ask, setAsk] = createSignal<PortHolder | null>(null);
-  const [holders, { refetch }] = createResource(() => api.portHolders().then((x) => x ?? []));
+  const [holders, { refetch }] = createResource(() => quiet(api.portHolders().then((x) => x ?? []), [], "portHolders"));
   const name = (id: string) => p.s.projects.find((x) => x.id === id)?.name ?? id;
   onMount(() => {
     const down = (e: PointerEvent) => {
@@ -62,7 +63,7 @@ function Drop(p: { s: Snapshot; now: number; at: { x: number; y: number }; onClo
   const showLog = async (id: string) => {
     if (logOf() === id) return setLogOf(null);
     setLogOf(id);
-    setLines(((await api.logs(id)) ?? []).slice(-60));
+    setLines(((await quiet(api.logs(id), [], "logs")) ?? []).slice(-60));
   };
   const kill = async (h: PortHolder) => {
     setAsk(null);

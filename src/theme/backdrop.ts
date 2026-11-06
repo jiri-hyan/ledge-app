@@ -303,8 +303,6 @@ export function addGradient(list: readonly CustomGradient[], name: string, g: Gr
   return n ? { list: [...list, n], id } : null;
 }
 
-/** Nový gradient pro editor: výchozí = půlnoc → modrá. */
-export const blankGradient = (): Gradient => ({ kind: "linear", angle: 160, stops: [{ c: "#1b2a5a", p: 0 }, { c: "#0a0e1c", p: 100 }] });
 
 /** Přidá zastávku doprostřed největší mezery (barva = interpolace v tom místě); max 5. */
 export function addStop(stops: readonly GradStop[]): GradStop[] {

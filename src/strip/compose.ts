@@ -320,10 +320,6 @@ export function drawKind(item: ComposeItem, style: ItemStyle, hasFrac: boolean):
   return style;
 }
 
-/** Další styl položky (klik na kostku). */
-export function nextStyle(s: ItemStyle): ItemStyle {
-  return ITEM_STYLES[(ITEM_STYLES.indexOf(s) + 1) % ITEM_STYLES.length];
-}
 export function setStyle(c: StripCompose, item: ComposeItem, style: ItemStyle | "next"): StripCompose {
   const x = clone(c);
   const next = (p: Piece) => {

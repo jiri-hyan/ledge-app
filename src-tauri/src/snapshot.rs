@@ -50,6 +50,9 @@ pub(crate) struct Snapshot {
     personal_enabled: bool,
     view: View,
     cfg_error: Option<String>,
+    /// kopie rozbitého configu (Obnovit) a varování o hodnotách mimo rozsah; chybí = nic
+    #[serde(skip_serializing_if = "Option::is_none")]
+    config_notice: Option<crate::config::recovery::NoticeView>,
     sections: config::Sections,
     /// záložky a karty na nich (`layout.rs`); `mode` = id záložky, která je vidět
     layout: crate::layout::LayoutConfig,
@@ -245,7 +248,8 @@ pub(crate) fn snapshot() -> Snapshot {
         mode: crate::layout::page_id(&cfg.layout, &mode),
         personal_enabled: cfg.modes.personal_enabled,
         view: c.drawer.view(),
-        cfg_error: c.cfg_error.lock().clone(),
+        cfg_error: crate::config::recovery::shown_error(c.cfg_error.lock().clone(), c.bridge_error.lock().clone()),
+        config_notice: crate::config::recovery::view(),
         sections: cfg.drawer.sections.clone(),
         layout: cfg.layout.clone(),
         claude_enabled: cfg.claude.enabled,

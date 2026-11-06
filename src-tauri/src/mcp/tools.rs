@@ -389,11 +389,14 @@ impl Handler<'_> {
 
     fn undo(&self) -> Result<String, String> {
         let _one = self.srv.write.lock();
-        let e = self.srv.undo.lock().pop().ok_or_else(|| tr("Není co vrátit — přes MCP se od spuštění Ledge nic nezměnilo.", "Nothing to undo — nothing was changed over MCP since Ledge started."))?;
+        // záznam se odebere až po úspěšném uložení; zápisy (i `push`) běží pod `write`, který tu držíme,
+        // takže mezi `peek` a `pop` nic nepřibude
+        let e = self.srv.undo.lock().peek().cloned().ok_or_else(|| tr("Není co vrátit — přes MCP se od spuštění Ledge nic nezměnilo.", "Nothing to undo — nothing was changed over MCP since Ledge started."))?;
         let cur = self.host.config();
         let next = undo::revert(&cur, &e)?;
         crate::config::validate_field(&next).map_err(|e| e.message)?;
         self.host.save(next)?;
+        self.srv.undo.lock().pop();
         Ok(trf!("Vráceno: {}", "Reverted: {}", e.label))
     }
 }

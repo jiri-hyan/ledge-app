@@ -105,19 +105,78 @@ pub(crate) fn apply_config(mut new: Config) {
     mark_dirty();
 }
 
-pub(crate) fn load_or_seed() -> (Config, Option<String>) {
+/// Výsledek čtení configu z disku (čisté rozhodnutí bez zápisu stavu).
+pub(crate) enum Load {
+    /// soubor se dal přečíst (případně po sekcích)
+    Use(Box<config::Partial>),
+    /// soubor neexistuje: nový uživatel
+    Fresh,
+    /// nejde přečíst vůbec (rozbitý JSON): nic k aplikaci
+    Unreadable(String),
+}
+
+pub(crate) fn decide(r: Result<Option<config::Partial>, String>) -> Load {
+    match r {
+        Ok(Some(p)) => Load::Use(Box::new(p)),
+        Ok(None) => Load::Fresh,
+        Err(e) => Load::Unreadable(e),
+    }
+}
+
+/// Přečte config z disku. `Err` = soubor nejde přečíst a nic se neaplikuje (stav banneru se nemění).
+fn read_disk() -> Result<Config, String> {
     let path = config::config_path();
     config::write_schema(&config::config_dir());
-    match config::load(&path) {
-        Ok(Some(cfg)) => (cfg, None),
-        Ok(None) => {
+    match decide(config::load_lenient(&path)) {
+        Load::Use(p) => {
+            // vadná sekce nezahodí zbytek: běží na výchozích a banner řekne které (soubor se nemění)
+            let warnings = config::recovery::range_warnings(&p.cfg);
+            config::recovery::set_load(None, p.bad, warnings);
+            Ok(p.cfg)
+        }
+        Load::Fresh => {
             // nový uživatel: žádné projekty, průvodce při prvním otevření šuplíku
             let cfg = onboarding::fresh_config();
             let _ = config::save(&path, &cfg);
-            (cfg, None)
+            Ok(cfg)
         }
-        Err(e) => (Config::default(), Some(e)),
+        Load::Unreadable(e) => Err(e),
     }
+}
+
+/// Start appky: nečitelný soubor = výchozí hodnoty a chyba v banneru (`recovery::error`).
+pub(crate) fn load_or_seed() -> Config {
+    read_disk().unwrap_or_else(|e| {
+        config::recovery::set_load(Some(e), Vec::new(), Vec::new());
+        Config::default()
+    })
+}
+
+/// `/ctl/reload`: čte přísně jako hlídač (`watch_config`). Nečitelný soubor i vadná sekce = chyba, nic se
+/// neaplikuje a v paměti zůstává poslední dobrá verze. Chybějící soubor = nový uživatel (jako start).
+pub(crate) fn reload_from_disk() -> Result<Config, String> {
+    let path = config::config_path();
+    match config::load(&path) {
+        Ok(Some(cfg)) => {
+            // jako v hlídači: na disku je platný config, zastaralý banner pryč
+            config::recovery::set_applied(&cfg);
+            Ok(cfg)
+        }
+        Ok(None) => read_disk().map_err(|e| reload_failed(&path, &e)),
+        Err(e) => Err(reload_failed(&path, &e)),
+    }
+}
+
+/// Vadný ruční zápis / reload: v paměti zůstává poslední dobrá verze, banner to říká pravdivě
+/// (ne „vadné běží na výchozích“). Vrací text banneru.
+fn reload_failed(path: &std::path::Path, e: &str) -> String {
+    let bad = match config::load_lenient(path) {
+        Ok(Some(p)) => p.bad,
+        _ => Vec::new(),
+    };
+    let msg = config::recovery::kept_message(&bad, e);
+    config::recovery::set_load(Some(msg.clone()), Vec::new(), Vec::new());
+    msg
 }
 
 pub(crate) fn watch_config() {
@@ -141,13 +200,18 @@ pub(crate) fn watch_config() {
                 while rx.try_recv().is_ok() {}
                 match config::load(&path) {
                     Ok(Some(cfg)) => {
+                        // soubor na disku je platný (i vrácený Ctrl+Z přesně do běžícího stavu): zastaralý banner pryč
+                        config::recovery::set_applied(&cfg);
                         if cfg != *core().cfg.read() {
                             apply_config(cfg);
+                        } else {
+                            mark_dirty();
                         }
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        *core().cfg_error.lock() = Some(e);
+                        // v paměti zůstává poslední dobrá verze; banner řekne, které sekce jsou vadné
+                        reload_failed(&path, &e);
                         mark_dirty();
                     }
                 }
@@ -155,4 +219,43 @@ pub(crate) fn watch_config() {
             drop(w);
         })
         .ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Nečitelný soubor: chyba a nic k aplikaci (`/ctl/reload` nesmí aplikovat výchozí); chybějící = nový uživatel.
+    #[test]
+    fn unreadable_file_is_error_nothing_to_apply() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("config.json");
+        assert!(matches!(decide(config::load_lenient(&p)), Load::Fresh));
+        std::fs::write(&p, "{rozbité").unwrap();
+        assert!(matches!(decide(config::load_lenient(&p)), Load::Unreadable(e) if !e.is_empty()));
+        std::fs::write(&p, "[1]").unwrap();
+        assert!(matches!(decide(config::load_lenient(&p)), Load::Unreadable(_)));
+        std::fs::write(&p, "{}").unwrap();
+        assert!(matches!(decide(config::load_lenient(&p)), Load::Use(_)));
+    }
+
+    /// `/ctl/reload` na skutečné cestě (sandbox): vadná sekce i rozbitý JSON = `Err`, platný soubor = `Ok`.
+    #[test]
+    fn reload_from_disk_rejects_bad_section() {
+        let (tmp, _g) = crate::dirs::testing::sandbox();
+        let path = config::config_path();
+        assert!(path.starts_with(tmp.path()), "sandbox nepřesměroval config_path: {path:?}");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, r#"{"strip":{"opacity":7}}"#).unwrap();
+        let e = reload_from_disk().unwrap_err();
+        assert!(e.contains("strip") && e.contains("poslední platná verze"), "{e}");
+        assert!(config::recovery::error().is_some_and(|b| b.contains("poslední platná verze")));
+        std::fs::write(&path, "{rozbité").unwrap();
+        assert!(reload_from_disk().is_err());
+        std::fs::write(&path, r#"{"autostart":false}"#).unwrap();
+        let cfg = reload_from_disk().unwrap();
+        assert!(!cfg.autostart);
+        assert_eq!(config::recovery::error(), None);
+        config::recovery::set_load(None, Vec::new(), Vec::new());
+    }
 }

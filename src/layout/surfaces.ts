@@ -9,8 +9,6 @@ type Text = readonly [string, string];
 
 export const COLOR_SURFACES: readonly SurfaceKind[] = ["gradient", "flow", "edge", "stripes"];
 export const isColorSurface = (s: unknown): s is SurfaceKind => typeof s === "string" && (COLOR_SURFACES as readonly string[]).includes(s);
-/** Povrchy s tmavým přechodem a světlým textem (u „Záře“ a „Proužků“ zůstává text podle stylu). */
-export const isGradientSurface = (s: unknown): boolean => s === "gradient" || s === "flow";
 
 export const SURFACE_KIND_NAMES: Record<SurfaceKind, Text> = {
   gradient: ["cards.cardlook.surface.gradient", "Přechod"],

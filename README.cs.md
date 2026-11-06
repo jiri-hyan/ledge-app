@@ -195,12 +195,10 @@ s vygenerovaným `config.schema.json` vedle. Neplatný soubor se nikdy nepoužij
 
 ## Plán
 
-Rozpracované, bez slibovaných termínů:
+V plánu, bez slibovaných termínů:
 
-- **Ledge Studio** — přestavěné nastavení vzhledu a rozložení (rozpracováno).
-- Balíčky **winget a Scoop** — instalace jedním příkazem (rozpracováno).
+- Balíček **winget** — instalace jedním příkazem (v plánu).
 - **Podpis kódu Windows** (Authenticode) — aby SmartScreen přestal varovat (v plánu).
-- **Aktivita Clauda** — jasnější fáze a chyby v živé kartě aktivity (v plánu).
 
 Máš nápad? [Založ issue](https://github.com/jiri-hyan/ledge-app/issues/new).
 

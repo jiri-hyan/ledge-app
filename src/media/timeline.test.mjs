@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/media/timeline.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fmtDuration, fraction, live, nextRepeat, nextTickIn, nextVariant, positionAt, seekKey, seekTarget, shownPosition, variantOf, VARIANTS } from "./timeline.ts";
+import { fmtDuration, fraction, live, nextRepeat, nextTickIn, positionAt, seekKey, seekTarget, shownPosition, variantOf, VARIANTS } from "./timeline.ts";
 
 const NOW = 1_760_000_000_000;
 const tl = (positionMs, durationMs, updatedMs, rate = 1) => ({ positionMs, durationMs, updatedMs, rate, canSeek: true });
@@ -102,6 +102,5 @@ test("vzhledy: výchozí karta, neznámý = výchozí, přepínání dokola; opa
     [{ variant: 3 }, "card"],
   ];
   for (const [look, want] of cases) assert.equal(variantOf(look), want, JSON.stringify(look));
-  assert.deepEqual(VARIANTS.map(nextVariant), ["card", "cover", "vinyl", "strip", "compact"]);
   assert.deepEqual(["none", "list", "track"].map(nextRepeat), ["list", "track", "none"]);
 });

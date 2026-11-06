@@ -64,3 +64,11 @@ Ručně postaru: `cd src-tauri && cargo test` (+ `cargo clippy --all-targets`), 
 
 Těžké běhy na sdíleném stroji přes frontu (`node %USERPROFILE%\.devtools\fronta.mjs --auto -- …`),
 paralelní workeři se sdíleným `CARGO_TARGET_DIR=…/src-tauri/target-agents`.
+
+## Skripty procesu (kolo 29)
+
+- `scripts/wt.mjs` — `new <oblast> <kolo>` (větev `k<kolo>/<oblast>`, `../ledge-wt-<oblast>`, junction `node_modules` přes `fs.symlinkSync(…,'junction')`, kopie `dist`, `git config rerere.enabled true`), `rm <oblast>` (čistý strom, nejdřív odpojí odkazy v kořeni worktree, `git worktree remove` bez `--force`, větev jen `-d`), `prune [--days N] [--dir] [--apply]` (`**/incremental/<crate>-*` starší než N dní, výchozí 3, dry-run se součtem MB). Test v dočasném repu dokazuje, že `rm` nesmaže cíl junctionu.
+- `scripts/brany-lib.mjs` — čisté funkce `brany.mjs`: `.brany-ok` (hash stromu přes dočasný index; plný PASS bez flaky; `--force` přeskočí kontrolu), opakování jen padlých testů (`cargo test --no-fail-fast -- --exact …`, výsledek `FLAKY`, exit 0 ale hláška „nečistý průchod“, `--bez-opakovani`), `build` bez zdvojeného `tsc`.
+- `scripts/codemap-suggest.mjs` — `codemap-lint.mjs --fix` vypíše řádky k přesunu do `-detail.md` (nejdřív historie „(kolo N)“, pak nejdelší); nepřepisuje.
+- `.gitattributes`: `merge=union` jen pro `src/settings/labels.ts`, `src/i18n/en-*.ts`, `docs/codemap/*.md`. NE pro `lib.rs` (`generate_handler!`). Když obě větve upraví tentýž řádek, zůstanou obě verze — chytí to `tsc`/testy.
+- MCP: strop `tools/list` je konstanta `MAX_TOOLS_LIST_BYTES` v `src-tauri/src/mcp/tests.rs` (22 000 B, skutečně 20 855 B).

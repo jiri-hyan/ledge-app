@@ -25,8 +25,6 @@ export function normalizePages(raw: unknown, customs: readonly CustomTheme[]): R
   return out;
 }
 
-/** Má záložka vlastní vzhled? */
-export const pageHasLook = (a: Pick<Appearance, "pages">, id: string): boolean => !!a.pages[id];
 
 /** Vzhled platný na záložce `pageId`: celkový s přepisem záložky (bez přepisu vrací `a` samo). */
 export function effectiveAppearance(a: Appearance, pageId: string): Appearance {

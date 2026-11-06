@@ -1,5 +1,5 @@
 //! Globální zkratky: registrace podle configu (`sync_hotkeys`, plán v `config::rebind_plan`),
-//! approve/deny jen při čekající žádosti (`sync_approve_keys`), průchozí režim lístků jen s lístkem na
+//! approve/deny jen při čekající žádosti a mimo hru (`sync_approve_keys`), průchozí režim lístků jen s lístkem na
 //! ploše (`config::active_hotkeys_pins`) a obsluha stisku (`on_shortcut`).
 
 use crate::claude::Decision;
@@ -16,10 +16,26 @@ pub(crate) fn parse_shortcut(s: &str) -> Option<Shortcut> {
     s.parse::<Shortcut>().ok()
 }
 
-/// approve/deny jen když čeká žádost Claude.
+/// Mají být approve/deny zaregistrované? Jen s čekající žádostí a mimo hru: `RegisterHotKey` by kombinaci
+/// hře sebral a stisk naslepo by rozhodl žádost, kterou člověk nevidí.
+fn approve_keys_wanted(pending: bool, dead: bool) -> bool {
+    pending && !dead
+}
+
+/// Rozhodnutí podle stisknuté zkratky; v mrtvém Ledge žádné (klávesa mohla přijít těsně před odregistrací).
+fn key_decision(approve: bool, deny: bool, dead: bool) -> Option<Decision> {
+    match (approve, deny, dead) {
+        (_, _, true) => None,
+        (true, _, false) => Some(Decision::Allow),
+        (false, true, false) => Some(Decision::Deny),
+        (false, false, false) => None,
+    }
+}
+
+/// Srovná approve/deny se stavem; volá se při změně žádostí a při přechodu do hry a z ní (`attention::catch_up`).
 pub(crate) fn sync_approve_keys() {
     let c = core();
-    let want = !c.claude.pending().is_empty();
+    let want = approve_keys_wanted(!c.claude.pending().is_empty(), c.dead());
     if c.approve_keys.swap(want, Ordering::SeqCst) == want {
         return;
     }
@@ -95,9 +111,33 @@ pub(crate) fn on_shortcut(sc: &Shortcut) {
             return;
         }
         gamemode::handle(Trigger::NoteKey, || c.send_ui(UiCmd::Note));
-    } else if parse_shortcut(&hk.approve).as_ref() == Some(sc) {
-        c.claude.decide(None, Decision::Allow);
-    } else if parse_shortcut(&hk.deny).as_ref() == Some(sc) {
-        c.claude.decide(None, Decision::Deny);
+    } else if let Some(d) = key_decision(parse_shortcut(&hk.approve).as_ref() == Some(sc), parse_shortcut(&hk.deny).as_ref() == Some(sc), c.dead()) {
+        c.claude.decide(None, d);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn approve_keys_only_with_request_and_outside_game() {
+        for (pending, dead, want) in [(true, false, true), (true, true, false), (false, false, false), (false, true, false)] {
+            assert_eq!(approve_keys_wanted(pending, dead), want, "{pending} {dead}");
+        }
+    }
+
+    #[test]
+    fn key_decides_only_outside_game() {
+        for (approve, deny, dead, want) in [
+            (true, false, false, Some(Decision::Allow)),
+            (false, true, false, Some(Decision::Deny)),
+            (true, false, true, None),
+            (false, true, true, None),
+            (false, false, false, None),
+            (false, false, true, None),
+        ] {
+            assert_eq!(key_decision(approve, deny, dead), want, "{approve} {deny} {dead}");
+        }
     }
 }

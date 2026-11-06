@@ -198,12 +198,10 @@ generated `config.schema.json` next to it. An invalid file is never applied and 
 
 ## Roadmap
 
-Work in progress, no dates promised:
+Planned, no dates promised:
 
-- **Ledge Studio** — rebuilt settings for looks and layout (in progress).
-- **winget and Scoop** packages — install with one command (in progress).
+- **winget** package — install with one command (planned).
 - **Windows code signing** (Authenticode) — so SmartScreen stops warning (planned).
-- **Claude activity** — clearer phases and errors in the live activity card (planned).
 
 Have an idea? [Open an issue](https://github.com/jiri-hyan/ledge-app/issues/new).
 

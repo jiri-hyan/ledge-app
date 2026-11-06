@@ -47,6 +47,3 @@ export const HOVER_MODES: readonly HoverMode[] = [
 
 /** Výchozí režim (starý config bez `drawer.hover`). */
 export const DEFAULT_HOVER_MODE: HoverModeId = "full";
-
-/** Režim z configu; neznámá hodnota = výchozí. */
-export const hoverModeOf = (v: unknown): HoverModeId => (HOVER_MODES.some((m) => m.id === v) ? (v as HoverModeId) : DEFAULT_HOVER_MODE);

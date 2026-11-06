@@ -1,7 +1,7 @@
 // Registr vzhledů karet (kolo 25): výchozí je první, neznámé id nespadne, výchozí se nezapisuje.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CARD_DESIGNS, defaultDesign, designOf, designsOf, storedDesign } from "./designs.ts";
+import { CARD_DESIGNS, designOf, designsOf, storedDesign } from "./designs.ts";
 import { normalizeCardLook, patchCardLook } from "./look.ts";
 
 test("každá karta má unikátní id a páry [klíč, česky]", () => {
@@ -13,12 +13,12 @@ test("každá karta má unikátní id a páry [klíč, česky]", () => {
 });
 
 test("claude a system mají sedm až jedenáct vzhledů, výchozí první", () => {
-  assert.equal(defaultDesign("claude"), "classic");
-  assert.equal(defaultDesign("system"), "lines");
+  assert.equal(designsOf("claude")[0].id, "classic");
+  assert.equal(designsOf("system")[0].id, "lines");
   assert.deepEqual(designsOf("claude").map((d) => d.id), ["classic", "rings", "pace", "hero", "heroWeek", "heroSpend", "spend", "sessions", "gauge", "working", "done"]);
   assert.equal(designsOf("system").length, 7);
   assert.equal(designsOf("notes").length, 6);
-  assert.equal(defaultDesign("notes"), "list");
+  assert.equal(designsOf("notes")[0].id, "list");
   assert.deepEqual(designsOf("actions"), []);
 });
 

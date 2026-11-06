@@ -5,7 +5,7 @@
 //! Čisté funkce (`color_of`, `tags_of`, `with_meta`) + jeden zápis s otiskem (`set_meta`) — ostatní klíče,
 //! pořadí i tělo zůstávají beze změny.
 
-use super::edit::{SaveOutcome, detail, hash, read_bytes, resolve};
+use super::edit::{SaveOutcome, detail, hash, read_bytes, resolve, utf8_text};
 use super::{iso, path_lock, render, set, split, unset, write_atomic};
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
@@ -161,8 +161,8 @@ pub fn set_meta(root: &Path, path: &Path, expected_hash: &str, p: &MetaPatch, no
     if hash(&bytes) != expected_hash {
         return Ok(SaveOutcome::Changed);
     }
-    let text = String::from_utf8_lossy(&bytes);
-    let out = with_meta(&text, p, now)?;
+    let text = utf8_text(&bytes)?;
+    let out = with_meta(text, p, now)?;
     if out != text {
         write_atomic(&real, out.as_bytes())?;
     }

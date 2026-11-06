@@ -230,6 +230,14 @@ fn read_catalog(p: &Path) -> Result<serde_json::Value, String> {
     serde_json::from_str(data.trim_start_matches('\u{feff}')).map_err(|_| tr("Soubor není platný JSON katalogu Launcheru.", "The file isn't a valid Launcher catalog JSON.").into())
 }
 
+/// Chyba z UI (`window.onerror`, `unhandledrejection`, pád vykreslení) → `ledge.log`. Zpráva se zkrátí, cesty zahladí
+/// a frekvence má strop (`uilog.rs`); nic jiného než text chyby a okno se nezapisuje.
+#[tauri::command]
+pub(crate) fn ui_log(window: tauri::Window, kind: String, msg: String) {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64);
+    crate::uilog::record(window.label(), &kind, &msg, now);
+}
+
 #[cfg(test)]
 mod launcher_tests {
     use super::*;

@@ -4,7 +4,6 @@
 
 /** Všechny položky v pořadí editoru (Rust `StripItem`, camelCase). */
 export const STRIP_ITEM_IDS = ["mode", "clock", "running", "claude", "repos", "limits", "waiting", "custom", "timer", "media", "github", "system", "mail"] as const;
-export type StripItemId = (typeof STRIP_ITEM_IDS)[number];
 
 /** Výchozí krytí klasického proužku (`strip.opacity`; zrcadlo `Default` ve `stripconf.rs`, hlídá strip.test.mjs). */
 export const STRIP_OPACITY = 0.82;

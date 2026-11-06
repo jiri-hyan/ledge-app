@@ -22,6 +22,7 @@
     "allow-logs",
     "allow-open-url",
     "allow-stop",
+    "allow-ui-log",
     "allow-widget-click",
     "allow-widget-edit",
     "allow-widget-output",

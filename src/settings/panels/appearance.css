@@ -21,12 +21,6 @@
 .ap-tile:hover { border-color: var(--line-2); }
 .ap-tile:active { transform: scale(0.97); }
 .ap-tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.ap-swatch { position: relative; display: block; height: 54px; border-radius: var(--r-md); background: var(--tint-solid); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
-.ap-swatch i { position: absolute; left: 10px; height: 5px; border-radius: 3px; }
-.ap-swatch .l1 { top: 11px; width: 46%; background: var(--t1); }
-.ap-swatch .l2 { top: 22px; width: 62%; background: var(--t2); }
-.ap-swatch .l3 { top: 33px; width: 36%; background: var(--t3); }
-.ap-swatch .acc { left: 22%; right: 22%; bottom: 0; top: auto; height: 3px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); }
 .ap-name { font-size: var(--fs-md); font-weight: 600; color: var(--t2); padding: 0 2px; }
 .ap-tile.on .ap-name { color: var(--t1); }
 

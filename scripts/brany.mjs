@@ -6,6 +6,8 @@
 // Použití: node scripts/brany.mjs                 → test, clippy, tsc, ui, build
 //          node scripts/brany.mjs test ui         → jen vybrané (test | clippy | tsc | ui | build)
 //          node scripts/brany.mjs --changed       → brány podle změněných souborů (výběr: scripts/brany-select.mjs)
+//          node scripts/brany.mjs --force         → plný běh i když razítko `.brany-ok` říká „strom se nezměnil od posledního PASS“
+//          node scripts/brany.mjs --bez-opakovani → padlý test se nezkouší podruhé (jinak: jen padlé testy 1× znovu, výsledek FLAKY)
 //          tsc a ui běží souběžně s cargo bránami (test → clippy za sebou), výstup a exit kód beze změny.
 // CARGO_TARGET_DIR se bere z prostředí (workeři: sdílený src-tauri\target-agents). Exit 0 = vše prošlo.
 import { execFileSync, spawn } from 'node:child_process'
@@ -14,6 +16,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { selectGates } from './brany-select.mjs'
+import { parseFailedTests, canRetry, retryArgs, flakyLine, stampText, stampMatches, isFullRun, buildCommand } from './brany-lib.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tauri = path.join(root, 'src-tauri')
@@ -29,7 +32,7 @@ const pick = (re, text, n = 25) => text.split(/\r?\n/).filter((l) => re.test(l))
 
 const GATES = {
   test: {
-    cwd: tauri, cmd: viaQueue('cargo test'),
+    cwd: tauri, cmd: viaQueue('cargo test --no-fail-fast'),
     sum: (t) => `${num(/(\d+) passed/g, t)} ok, ${num(/(\d+) failed/g, t)} fail`,
     ok: (t, code) => code === 0 && num(/(\d+) failed/g, t) === 0,
     bad: (t) => pick(/FAILED|panicked|^error|^---- /, t)
@@ -66,29 +69,60 @@ const GATES = {
   }
 }
 
-function run(name) {
-  const g = GATES[name]
-  const started = Date.now()
+function exec(cmd, cwd) {
   return new Promise((resolve) => {
-    const child = spawn(g.cmd, { cwd: g.cwd, shell: true, windowsHide: true, env: process.env })
+    const child = spawn(cmd, { cwd, shell: true, windowsHide: true, env: process.env })
     let out = ''
     child.stdout.on('data', (d) => (out += d))
     child.stderr.on('data', (d) => (out += d))
-    child.on('close', (code) => {
-      // eslint-disable-next-line no-control-regex
-      const text = out.replace(/\x1b\[[0-9;]*m/g, '')
-      const log = path.join(logDir, `${name}.log`)
-      fs.writeFileSync(log, text)
-      const ok = g.ok(text, code)
-      const secs = Math.round((Date.now() - started) / 1000)
-      const lines = [`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(6)} ${g.sum(text)} (${secs} s)`]
-      if (!ok) {
-        for (const l of g.bad(text)) lines.push(`      ${l}`)
-        lines.push(`      plný log: ${log}`)
-      }
-      resolve({ ok, lines })
-    })
+    child.on('close', (code) => resolve({ // eslint-disable-next-line no-control-regex
+      text: out.replace(/\x1b\[[0-9;]*m/g, ''), code }))
   })
+}
+
+async function run(name) {
+  const g = GATES[name]
+  const started = Date.now()
+  const first = await exec(g.cmd, g.cwd)
+  const text = first.text
+  const log = path.join(logDir, `${name}.log`)
+  fs.writeFileSync(log, text)
+  let ok = g.ok(text, first.code)
+  let flaky = null // jména testů, které prošly až na 2. pokus
+  let retryLine = null
+  if (!ok && name === 'test' && retryOn) {
+    const failed = parseFailedTests(text)
+    const ra = canRetry(text, failed) ? retryArgs(failed) : null
+    if (ra) {
+      const t2 = Date.now()
+      const second = await exec(viaQueue(`cargo test --no-fail-fast -- ${ra.join(' ')}`), g.cwd)
+      fs.writeFileSync(path.join(logDir, 'test-retry.log'), second.text)
+      // prošlo = brána OK a filtr opravdu spustil všechny padlé (jinak by prázdný běh vypadal jako úspěch)
+      const ran = num(/(\d+) passed/g, second.text)
+      const passed = g.ok(second.text, second.code) && ran >= failed.length
+      retryLine = flakyLine(failed, passed, Math.round((Date.now() - t2) / 1000))
+      if (passed) { ok = true; flaky = failed }
+    }
+  }
+  const secs = Math.round((Date.now() - started) / 1000)
+  const lines = [`${ok ? (flaky ? 'FLAKY' : 'PASS') : 'FAIL'}  ${name.padEnd(6)} ${g.sum(text)} (${secs} s)`]
+  if (retryLine) lines.push(`      ${retryLine}`)
+  if (!ok) {
+    for (const l of g.bad(text)) lines.push(`      ${l}`)
+    lines.push(`      plný log: ${log}`)
+  } else if (flaky) lines.push(`      logy: ${log}, ${path.join(logDir, 'test-retry.log')}`)
+  return { ok, flaky, lines }
+}
+
+// Hash celého pracovního stromu (sledované i nové neignorované soubory) přes dočasný index — skutečný index se nemění.
+function treeHash() {
+  const git = (args, env) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true, env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const tmpIdx = path.join(os.tmpdir(), `ledge-brany-idx-${process.pid}`)
+  try {
+    fs.copyFileSync(path.resolve(root, git(['rev-parse', '--git-path', 'index'])), tmpIdx)
+    git(['add', '-A'], { GIT_INDEX_FILE: tmpIdx })
+    return git(['write-tree'], { GIT_INDEX_FILE: tmpIdx })
+  } catch { return null } finally { fs.rmSync(tmpIdx, { force: true }) }
 }
 
 // --changed: brány podle `git diff --name-only main...HEAD` + necommitnutých a nových souborů (viz brany-select.mjs).
@@ -100,6 +134,8 @@ function changedFiles() {
 }
 
 const args = process.argv.slice(2)
+const retryOn = !args.includes('--bez-opakovani')
+const stampFile = path.join(root, '.brany-ok')
 let names
 if (args.includes('--changed')) {
   const { gates, why } = selectGates(changedFiles())
@@ -108,6 +144,13 @@ if (args.includes('--changed')) {
 } else {
   const wanted = args.filter((a) => a in GATES)
   names = wanted.length ? wanted : Object.keys(GATES)
+}
+GATES.build.cmd = buildCommand(names, viaQueue) // tsc už v tomtéž běhu proběhl → build je jen `vite build`
+const full = isFullRun(names, Object.keys(GATES))
+const hash = full ? treeHash() : null
+if (full && hash && !args.includes('--force') && stampMatches(fs.existsSync(stampFile) ? fs.readFileSync(stampFile, 'utf8') : '', hash)) {
+  console.log(`BRÁNY: strom ${hash.slice(0, 10)} beze změny od posledního plného PASS (${fs.readFileSync(stampFile, 'utf8').split(/\r?\n/)[1]}) — přeskočeno; --force vynutí`)
+  process.exit(0)
 }
 // Souběh: tsc + ui běží vedle cargo řetězce (test → clippy za sebou — sdílený zámek target), build až po všem.
 // Výstup (pořadí řádků, exit kód) je stejný jako při běhu za sebou: řádky se tisknou v pořadí `names` po dokončení.
@@ -118,9 +161,13 @@ const freeLanes = names.filter((n) => n === 'tsc' || n === 'ui').map((n) => [n])
 await Promise.all([lane(cargoLane), ...freeLanes.map(lane)])
 await lane(names.filter((n) => n === 'build'))
 let allOk = true
+const flakies = []
 for (const n of names) {
   for (const l of results[n].lines) console.log(l)
   allOk = results[n].ok && allOk
+  if (results[n].flaky) flakies.push(...results[n].flaky)
 }
-console.log(allOk ? 'BRÁNY: vše prošlo' : 'BRÁNY: SELHALO — viz výše')
+if (allOk && full && hash && !flakies.length) fs.writeFileSync(stampFile, stampText(hash))
+else if (fs.existsSync(stampFile)) fs.rmSync(stampFile, { force: true }) // neúspěch/flaky nesmí nechat starou „čistou“ pečeť
+console.log(!allOk ? 'BRÁNY: SELHALO — viz výše' : flakies.length ? `BRÁNY: prošlo S OPAKOVÁNÍM (flaky: ${flakies.join(', ')}) — nečistý průchod, razítko nezapsáno` : 'BRÁNY: vše prošlo')
 process.exit(allOk ? 0 : 1)

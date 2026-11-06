@@ -77,7 +77,7 @@ export default function DirtyPill(p: { s: Snapshot }) {
                   >
                     {t("cards.head.dirtyMute", "Ztišit u tohoto repa")}
                   </PopItem>
-                  <PopItem onClick={() => { menu.close(); void api.openIn(pr.id, "terminal"); }}>{t("cards.repos.terminal", "Terminál")}</PopItem>
+                  <PopItem onClick={() => { menu.close(); api.openIn(pr.id, "terminal").catch(sayError); }}>{t("cards.repos.terminal", "Terminál")}</PopItem>
                 </>
               )}
             </For>

@@ -82,8 +82,6 @@ export const PEEK_DELAY_MS = 160;
 const [peekLook, setPeekLook] = createSignal<StripLookId | null>(null);
 const [peekHover, setPeekHover] = createSignal<HoverModeId | null>(null);
 export { peekLook, peekHover };
-/** Ukazuje náhled dole teď něco pod myší (ne rozpracovaný vzhled)? */
-export const peeking = () => !!peek() || !!peekLook() || !!peekHover();
 
 /** Společná obsluha najetí / fokusu dlaždice: po `PEEK_DELAY_MS` nastaví `set(next())`, odjetí = zpět `null`.
  *  Jediný časovač je jednorázový a jen při pohybu myši (v klidu nic neběží). */

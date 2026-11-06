@@ -3,7 +3,6 @@
 // kalendářů Google, popisky pošty.
 
 export type ProviderId = "microsoft" | "google";
-export const PROVIDERS: readonly ProviderId[] = ["microsoft", "google"];
 
 /** Nejvíc vybraných kalendářů Google (Rust `MAX_GOOGLE_CALENDARS`). */
 export const MAX_GOOGLE_CALENDARS = 10;

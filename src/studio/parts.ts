@@ -172,12 +172,6 @@ export function modifiedByPart(paths: readonly string[], fieldPanel: (id: string
   return out;
 }
 
-/** Další / předchozí část v pořadí (průvodce, klávesy); mimo okraj = null. */
-export function stepPart(id: PartId, d: 1 | -1): PartId | null {
-  const i = PART_IDS.indexOf(id);
-  return PART_IDS[i + d] ?? null;
-}
-
 /** Průvodce: klíč paměti postupu (úložiště prohlížeče, try/catch u volajícího). */
 export const GUIDE_KEY = "ledge.studio.guide";
 /** Uložený postup → hotové části (jen známé, bez duplicit, v pořadí částí); cokoli rozbitého = nic. */

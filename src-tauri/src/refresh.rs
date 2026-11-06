@@ -184,11 +184,18 @@ pub(crate) fn refresh_logos(force: bool) {
 pub(crate) fn refresh_git_async() {
     std::thread::spawn(|| {
         let c = core();
+        // ve hře žádný git (ani kolo, které běželo, když hra začala); data zůstanou z minula
+        if c.dead() {
+            return;
+        }
         // ukončené nedokončené Claude session: šéf mohl mezitím commitnout ručně
         c.claude.recheck_ended();
         let projects = c.cfg.read().projects.clone();
         let mut changed = false;
         for p in projects.iter().filter(|p| p.enabled) {
+            if c.dead() {
+                break;
+            }
             let fresh = c.git.lock().get(&p.id).is_some_and(|(t, _)| t.elapsed() < Duration::from_secs(30));
             if fresh {
                 continue;

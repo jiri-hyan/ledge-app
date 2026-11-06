@@ -565,9 +565,3 @@ export function gridDropIndex(rects: readonly Rect[], from: number, px: number, 
   });
   return best;
 }
-
-/** Index po Alt+šipce: ← ↑ = dřív, → ↓ = později; mimo rozsah = null. */
-export function keyMove(key: string, i: number, n: number): number | null {
-  const to = key === "ArrowLeft" || key === "ArrowUp" ? i - 1 : key === "ArrowRight" || key === "ArrowDown" ? i + 1 : null;
-  return to === null || to < 0 || to >= n ? null : to;
-}

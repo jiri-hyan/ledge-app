@@ -21,6 +21,17 @@ fn refreshes_strip(cmd: &UiCmd) -> bool {
     !matches!(cmd, UiCmd::ResizeLive)
 }
 
+/// Zahodit příkaz v mrtvém Ledge? Herní režim zahazuje vše, co ukazuje šuplík (vypnutí jde přes
+/// `gamemode::set(false)` dřív než Show). Detekovaná fullscreen hra zahazuje totéž kromě výslovné akce
+/// člověka (`Opener::Hotkey`: tray, další spuštění Ledge, klik do widgetu; zkratky hlídá `gamemode::decide`).
+fn dropped_in_dead(cmd: &UiCmd, fullscreen: bool, game_mode: bool) -> bool {
+    match cmd {
+        UiCmd::Show(_, Opener::Hotkey) => game_mode,
+        UiCmd::Show(..) | UiCmd::Note => fullscreen || game_mode,
+        _ => false,
+    }
+}
+
 // ---------- vlákna ----------
 
 pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
@@ -40,8 +51,7 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
                 };
                 let give_back = matches!(cmd, UiCmd::Close);
                 let strip = refreshes_strip(&cmd);
-                // herní režim: šuplík se neukazuje (vypnutí jde přes `gamemode::set(false)` dřív než Show)
-                if matches!(cmd, UiCmd::Show(..) | UiCmd::Note) && c.game_mode.load(std::sync::atomic::Ordering::SeqCst) {
+                if dropped_in_dead(&cmd, c.fullscreen.load(std::sync::atomic::Ordering::Relaxed), c.game_mode.load(std::sync::atomic::Ordering::SeqCst)) {
                     continue;
                 }
                 match cmd {
@@ -116,6 +126,33 @@ pub(crate) fn spawn_ui_thread(rx: mpsc::Receiver<UiCmd>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dead_ledge_drops_show_table() {
+        let remote = UiCmd::Show(View::Full, Opener::Remote);
+        let hover = UiCmd::Show(View::Peek, Opener::Hover);
+        let human = UiCmd::Show(View::Full, Opener::Hotkey);
+        // (příkaz, fullscreen, herní režim, zahodit)
+        for (cmd, fs, gm, want) in [
+            (&remote, false, false, false),
+            (&remote, true, false, true),
+            (&remote, false, true, true),
+            (&hover, false, false, false),
+            (&hover, true, false, true),
+            (&hover, false, true, true),
+            (&human, false, false, false),
+            (&human, true, false, false),
+            (&human, false, true, true),
+            (&human, true, true, true),
+            (&UiCmd::Note, false, false, false),
+            (&UiCmd::Note, true, false, true),
+            (&UiCmd::Note, false, true, true),
+            (&UiCmd::Hide, true, true, false),
+            (&UiCmd::Close, true, true, false),
+        ] {
+            assert_eq!(dropped_in_dead(cmd, fs, gm), want, "{fs} {gm}");
+        }
+    }
 
     #[test]
     fn strip_refresh_skipped_only_while_dragging() {

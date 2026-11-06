@@ -109,7 +109,7 @@ fn build(kinds: &[Kind]) -> DeskData {
     let cfg = c.cfg.read().clone();
     let has = |k: &Kind| kinds.contains(k);
     let now = now_ms();
-    let mut d = DeskData { now: now - now.rem_euclid(60_000), cfg_error: c.cfg_error.lock().clone(), claude_enabled: cfg.claude.enabled, ..Default::default() };
+    let mut d = DeskData { now: now - now.rem_euclid(60_000), cfg_error: crate::config::recovery::shown_error(c.cfg_error.lock().clone(), c.bridge_error.lock().clone()), claude_enabled: cfg.claude.enabled, ..Default::default() };
     if has(&Kind::Limits) {
         d.limits = Some(crate::limitslive::view());
         d.working = c.claude.sessions().iter().any(|s| s.state == crate::claude::SessionState::Working);

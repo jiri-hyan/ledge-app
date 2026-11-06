@@ -259,6 +259,10 @@ pub fn valid_kind(k: &str) -> bool {
     (1..=32).contains(&k.len()) && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+/// Jeden zámek na „vyber volné jméno + zapiš“ (`create`, `edit::save_copy`): jinak dvě tvorby
+/// ve stejné sekundě vyberou totéž jméno a `rename` první poznámku tiše přepíše.
+pub(crate) static NAME_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
 /// Volný základ jména v `dir`: `stem`, jinak `stem-2`, `stem-3`… (ani `.md`, ani první obrázek nesmí existovat).
 pub(crate) fn unique_base(dir: &Path, stem: &str) -> String {
     let mut base = stem.to_string();
@@ -295,6 +299,7 @@ pub fn create(root: &Path, note: &NewNote, now: &DateTime<FixedOffset>) -> Resul
     }
     std::fs::create_dir_all(&dir).map_err(|e| crate::errors::io(&trf!("Složku {} nejde založit", "Can't create the folder {}", dir.display()), &e))?;
 
+    let _name_guard = NAME_LOCK.lock();
     let base = unique_base(&dir, &format!("{}-{}", now.format("%Y-%m-%d-%H%M%S"), slug(text)));
 
     // do frontmatteru PŮVODNÍ id z configu (sanitizace je jen pro jméno složky)
@@ -365,7 +370,7 @@ pub fn scan(root: &Path) -> Vec<NoteView> {
 
 /// Nejnovějších `limit` poznámek napříč projekty přímo z disku. Ledge sám čte z paměti
 /// (`note_list` nad výsledkem `scan`), tohle je pro nástroje a testy.
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn list(root: &Path, limit: usize) -> Vec<NoteView> {
     let mut v = scan(root);
     v.truncate(limit);
@@ -380,7 +385,7 @@ pub fn set_done(root: &Path, path: &Path, done: bool) -> Result<(), String> {
     let lock = path_lock(&real);
     let _g = lock.lock();
     let bytes = crate::fsx::read_retry(&real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))?;
-    write_atomic(&real, with_done(&String::from_utf8_lossy(&bytes), done).as_bytes())
+    write_atomic(&real, with_done(edit::utf8_text(&bytes)?, done).as_bytes())
 }
 
 #[cfg(test)]
@@ -413,6 +418,21 @@ mod tests {
         assert_eq!(project_dir_name(Some("CON")), "p-con");
         assert_eq!(project_dir_name(Some("com1")), "p-com1");
         assert_eq!(project_dir_name(Some("computer")), "computer");
+    }
+
+    #[test]
+    fn concurrent_create_same_second_keeps_both() {
+        let root = tmp_root();
+        let now = at("2026-10-17T09:00:00+02:00");
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let r = root.path().to_path_buf();
+                std::thread::spawn(move || create(&r, &NewNote { text: "stejný text".into(), ..Default::default() }, &now).unwrap())
+            })
+            .collect();
+        let paths: Vec<PathBuf> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        assert_ne!(paths[0], paths[1]);
+        assert!(paths.iter().all(|p| p.exists()));
     }
 
     #[test]

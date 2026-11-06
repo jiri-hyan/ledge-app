@@ -343,3 +343,15 @@ html[data-accent-grad] .seg button.on { background: var(--card-3) linear-gradien
 html[data-bd-cards="glass"] .card { backdrop-filter: blur(10px) saturate(1.15); }
 /* Plovoucí panel: obsah by jinak neprůhledným podkladem zakryl celé pozadí → podklad pryč, pozadí svítí i mezi kartami */
 html[data-backdrop][data-layout="float"]:not([data-glass="on"]) .content { background: none; }
+
+/* Sdílené mimo Studio: přepínač `.switch` (Poznámky) a náhled motivu `.ap-swatch` (průvodce, Vzhled) — šuplík nenačítá settings.css */
+.switch { width: 34px; height: 20px; border-radius: var(--r-pill); background: var(--switch-off); position: relative; flex-shrink: 0; transition: background var(--dur-2); }
+.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--white); transition: transform var(--dur-3) var(--spring); }
+.switch.on { background: linear-gradient(90deg, var(--violet), var(--blue)); }
+.switch.on::after { transform: translateX(14px); }
+.ap-swatch { position: relative; display: block; height: 54px; border-radius: var(--r-md); background: var(--tint-solid); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.ap-swatch i { position: absolute; left: 10px; height: 5px; border-radius: 3px; }
+.ap-swatch .l1 { top: 11px; width: 46%; background: var(--t1); }
+.ap-swatch .l2 { top: 22px; width: 62%; background: var(--t2); }
+.ap-swatch .l3 { top: 33px; width: 36%; background: var(--t3); }
+.ap-swatch .acc { left: 22%; right: 22%; bottom: 0; top: auto; height: 3px; background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent); }

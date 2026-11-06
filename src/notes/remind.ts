@@ -3,7 +3,8 @@
 import { t } from "../i18n";
 import { dayNames } from "../format";
 
-export const pad2 = (n: number) => String(n).padStart(2, "0");
+import { pad2 } from "../pad.ts";
+export { pad2 };
 /** Zkratky dnů od pondělí (hlavička kalendáře). */
 export const dnyKr = () => [
   t("notes.remind.dow.mon", "Po"),

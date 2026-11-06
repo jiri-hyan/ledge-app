@@ -18,8 +18,7 @@ export const SET_COLORS: Record<EdgeSet, [string, string, string]> = {
   embers: ["#fbbf24", "#f97316", "#dc2626"],
   clay: ["#d97757", "#f0b38f", "#b85a3a"],
 };
-/** Jednorázové naplnění „hotovo“ a délka „Vyzkoušet“ (ms). */
-export const SWEEP_MS = 1200;
+/** Délka „Vyzkoušet“ (ms). */
 export const TRY_MS = 4000;
 /** Efekty, které se hýbou (jen když Claude pracuje / čeká, nebo `always`). */
 export const MOVING: readonly ComposeEdge[] = ["flow", "dashes", "comet", "breath"];

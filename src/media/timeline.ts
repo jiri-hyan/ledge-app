@@ -36,9 +36,6 @@ export function variantOf(look: { variant?: unknown } | null | undefined): Media
   return VARIANTS.includes(v as MediaVariant) ? (v as MediaVariant) : DEFAULT_VARIANT;
 }
 
-/** Další vzhled v pořadí `VARIANTS` (dokola). */
-export const nextVariant = (v: MediaVariant): MediaVariant => VARIANTS[(VARIANTS.indexOf(v) + 1) % VARIANTS.length];
-
 /** Opakování dokola: vypnuto → celý seznam → jedna skladba → vypnuto. */
 export const nextRepeat = (r: MediaRepeat): MediaRepeat => (r === "none" ? "list" : r === "list" ? "track" : "none");
 

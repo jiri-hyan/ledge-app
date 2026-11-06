@@ -3,6 +3,7 @@
 // do ROZPRACOVANÝCH změn (Vrátit / Zahodit) — zapíše je až Uložit, po ověření v Rustu.
 import { createResource, createSignal, For, Show } from "solid-js";
 import { api, type ImportPreview } from "../../api";
+import { quiet } from "../../uiErrors";
 import { t } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
 import { dirty, offerUndo, snapshotDraft, useSettings } from "../ctx";
@@ -97,7 +98,7 @@ function ImportBox() {
 
 function ResetBox() {
   const c = useSettings();
-  const [defaults] = createResource(() => api.configDefaults());
+  const [defaults] = createResource(() => quiet(api.configDefaults(), undefined, "configDefaults"));
   const [ask, setAsk] = createSignal<string | null>(null);
   const keys = () => Object.keys(defaults() ?? {}).filter((k) => !NO_RESET.has(k));
   const same = (k: string) => JSON.stringify(c.cfg[k]) === JSON.stringify(defaults()?.[k]);

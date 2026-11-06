@@ -5,7 +5,11 @@
 //! Clauda, review plánu) se porovnává i podle `matcher`. Víc hooků Ledge pod jednou událostí (PreToolUse:
 //! `/question` + `/plan`) se navzájem neodebírá — `merge` odebere jen náš hook, který žádnému řádku
 //! `EVENTS` té události nesedí (jiný port, jiný matcher, neznámá cesta). Zápis: záloha `settings.json.bak-pred-ledge`
-//! (jen jednou), atomicky (tmp + rename), odsazení 2 mezery. Testy jen nad řetězci a dočasnými soubory.
+//! (jen jednou), atomicky a po jednom (`fsx::write_atomic` pod zámkem), odsazení 2 mezery. Testy jen nad řetězci a dočasnými soubory.
+//!
+//! Klíč hooků (`Ledge/hooks` ve Správci pověření, jiný než klíč MCP): hook ho nese v `Authorization`, most bez něj
+//! nikomu nedá rozhodnutí (`claude::bridge`). V `settings.json` je doslovně, proměnné prostředí by Ledge musel
+//! nastavovat cizímu procesu. Hooky ze starší verze doplní `migrate_on_start`: jen naše, jen už zapojené.
 
 use serde::de::{Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq, Serializer};
@@ -49,6 +53,25 @@ fn label(ev: &str, m: Option<&str>) -> String {
 }
 
 const BACKUP: &str = "settings.json.bak-pred-ledge";
+
+/// Jméno klíče hooků ve Správci pověření. Vlastní, ne klíč MCP: hook ho pošle komukoli, kdo na portu
+/// poslouchá, když Ledge neběží, a klíč MCP by otevřel nástroje nad poznámkami a configem.
+pub const HOOK_TARGET: &str = "Ledge/hooks";
+
+fn keys() -> &'static crate::mcp::auth::Keys {
+    static KEYS: std::sync::OnceLock<crate::mcp::auth::Keys> = std::sync::OnceLock::new();
+    KEYS.get_or_init(|| crate::mcp::auth::Keys::for_target(Box::new(crate::accounts::vault::WinCred), HOOK_TARGET))
+}
+
+/// Klíč hooků, je-li (most, `status_cached`). Nikdy do logu ani odpovědi.
+pub fn hook_key() -> Option<String> {
+    keys().get()
+}
+
+/// Klíč hooků, a když není, vytvoří nový (zapojení hooků, migrace).
+pub fn ensure_hook_key() -> Result<String, String> {
+    keys().ensure()
+}
 
 // ---------- JSON se zachovaným pořadím klíčů ----------
 
@@ -180,6 +203,67 @@ fn want_url(port: u16, path: &str) -> String {
     format!("http://127.0.0.1:{port}{path}")
 }
 
+fn want_auth(key: &str) -> String {
+    format!("Bearer {key}")
+}
+
+/// Pole `headers` našeho hooku.
+fn want_headers(key: &str) -> J {
+    J::obj(vec![("Authorization", J::Str(want_auth(key)))])
+}
+
+/// Nese hook platný klíč?
+fn has_key(hook: &J, key: &str) -> bool {
+    !key.is_empty() && hook.get("headers").and_then(|h| h.str("Authorization")) == Some(want_auth(key).as_str())
+}
+
+/// Projde všechny hooky ve skupinách všech událostí.
+fn each_hook(root: &J) -> impl Iterator<Item = &J> {
+    let events = match root.get("hooks") {
+        Some(J::Obj(h)) => h.as_slice(),
+        _ => &[],
+    };
+    events
+        .iter()
+        .filter_map(|(_, v)| if let J::Arr(groups) = v { Some(groups) } else { None })
+        .flatten()
+        .filter_map(|g| if let Some(J::Arr(hs)) = g.get("hooks") { Some(hs) } else { None })
+        .flatten()
+}
+
+/// Je v `settings.json` aspoň jeden náš hook na tomhle portu bez platného klíče?
+fn key_stale(root: &J, port: u16, key: &str) -> bool {
+    each_hook(root).any(|h| ours(h).is_some_and(|(p, _)| p == port) && !has_key(h, key))
+}
+
+/// Jsou v textu naše hooky na tomhle portu? Bez nich se klíč ani nezakládá (`migrate_on_start`).
+fn any_ours(text: &str, port: u16) -> bool {
+    parse(text).is_ok_and(|root| each_hook(&root).any(|h| ours(h).is_some_and(|(p, _)| p == port)))
+}
+
+/// Doplní klíč našim hookům na tomhle portu, přímo na místě. Nic nepřidává: kdo hooky nezapojil nebo část
+/// odebral, tomu je aktualizace nezapojí. Vrací (nový text, změněno?).
+pub fn migrate(text: &str, port: u16, key: &str) -> Result<(String, bool), String> {
+    let old = parse(text)?;
+    let mut root = old.clone();
+    if let Some(hooks) = hooks_obj(&mut root, false)? {
+        for (_, v) in hooks.iter_mut() {
+            let J::Arr(groups) = v else { continue };
+            for g in groups.iter_mut() {
+                let Some(J::Arr(hs)) = g.get_mut("hooks") else { continue };
+                for h in hs.iter_mut().filter(|h| ours(h).is_some_and(|(p, _)| p == port) && !has_key(h, key)) {
+                    if let J::Obj(m) = h {
+                        m.retain(|(k, _)| k != "headers");
+                        m.push(("headers".into(), want_headers(key)));
+                    }
+                }
+            }
+        }
+    }
+    let changed = root != old;
+    Ok((if changed { render(&root, text) } else { text.to_string() }, changed))
+}
+
 pub(crate) fn parse(text: &str) -> Result<J, String> {
     let t = text.trim_start_matches('\u{feff}');
     if t.trim().is_empty() {
@@ -236,8 +320,8 @@ fn hooks_obj(root: &mut J, create: bool) -> Result<Option<&mut Vec<(String, J)>>
     }
 }
 
-/// Přidá chybějící hooky Ledge (staré s jiným portem nahradí). Vrací (nový text, změněno?).
-pub fn merge(text: &str, port: u16) -> Result<(String, bool), String> {
+/// Přidá chybějící hooky Ledge (staré s jiným portem nebo bez platného klíče nahradí). Vrací (nový text, změněno?).
+pub fn merge(text: &str, port: u16, key: &str) -> Result<(String, bool), String> {
     let old = parse(text)?;
     let mut root = old.clone();
     let hooks = hooks_obj(&mut root, true)?.expect("vytvořeno");
@@ -249,11 +333,11 @@ pub fn merge(text: &str, port: u16) -> Result<(String, bool), String> {
         let Some((_, J::Arr(groups))) = hooks.iter_mut().rev().find(|(k, _)| k == ev) else {
             return Err(trf!("hooks.{ev} v settings.json není pole — uprav ho ručně.", "hooks.{ev} in settings.json isn't an array — fix it by hand."));
         };
-        // náš hook, který nesedí žádnému řádku téhle události (jiný port / matcher / cesta) → pryč
+        // náš hook, který nesedí žádnému řádku téhle události (jiný port / matcher / cesta / klíč) → pryč
         let wanted: Vec<(String, Option<&str>)> = EVENTS.iter().filter(|(e, ..)| e == ev).map(|(_, p, _, wm)| (want_url(port, p), *wm)).collect();
-        strip(groups, &|gm, h| ours(h).is_some() && !wanted.iter().any(|(u, wm)| h.str("url") == Some(u.as_str()) && gm == *wm));
+        strip(groups, &|gm, h| ours(h).is_some() && !(has_key(h, key) && wanted.iter().any(|(u, wm)| h.str("url") == Some(u.as_str()) && gm == *wm)));
         if !has_hook(groups, &url, *m) {
-            let hook = J::obj(vec![("type", J::Str("http".into())), ("url", J::Str(url)), ("timeout", J::Num((*timeout).into()))]);
+            let hook = J::obj(vec![("type", J::Str("http".into())), ("url", J::Str(url)), ("timeout", J::Num((*timeout).into())), ("headers", want_headers(key))]);
             let mut group = m.map(|m| vec![("matcher", J::Str(m.into()))]).unwrap_or_default();
             group.push(("hooks", J::Arr(vec![hook])));
             groups.push(J::obj(group));
@@ -336,7 +420,17 @@ pub fn hint(missing: &[String]) -> Option<String> {
     }
 }
 
-pub fn status(text: &str, port: u16) -> (&'static str, Vec<String>) {
+/// Hláška k hookům bez platného klíče.
+fn stale_hint() -> String {
+    crate::i18n::tr(
+        "Hooky Ledge nemají platný klíč, schvaluje se v terminálu — klikni „Zapojit“ znovu a restartuj Claude.",
+        "Ledge's hooks don't have a valid key, so approvals happen in the terminal — click “Connect” again and restart Claude.",
+    )
+    .into()
+}
+
+/// Stav zapojení. Hook bez platného klíče je zapojený, ale schvalovat přes něj nejde → `partial`.
+pub fn status(text: &str, port: u16, key: &str) -> (&'static str, Vec<String>) {
     let Ok(root) = parse(text) else { return ("error", vec![]) };
     let has = |ev: &str, path: &str, m: Option<&str>| {
         matches!(root.get("hooks").and_then(|h| h.get(ev)), Some(J::Arr(gs)) if has_hook(gs, &want_url(port, path), m))
@@ -344,6 +438,7 @@ pub fn status(text: &str, port: u16) -> (&'static str, Vec<String>) {
     let missing: Vec<String> = EVENTS.iter().filter(|(ev, p, _, m)| !has(ev, p, *m)).map(|(ev, _, _, m)| label(ev, *m)).collect();
     let required = missing.iter().filter(|m| !OPTIONAL_EVENTS.contains(&m.as_str())).count();
     let state = match required {
+        0 if key_stale(&root, port, key) => "partial",
         0 => "full",
         _ if missing.len() == EVENTS.len() => "none",
         _ => "partial",
@@ -365,13 +460,20 @@ pub(crate) fn read(path: &Path) -> Result<String, String> {
     }
 }
 
-pub fn status_at(path: &Path, port: u16) -> HooksStatus {
+pub fn status_at(path: &Path, port: u16, key: &str) -> HooksStatus {
     let p = path.display().to_string();
     match read(path) {
         Ok(t) => match parse(&t) {
-            Ok(_) => {
-                let (state, missing) = status(&t, port);
-                HooksStatus { state, hint: hint(&missing), missing, error: None, path: p }
+            Ok(root) => {
+                let (state, mut missing) = status(&t, port, key);
+                // UI píše „Chybí: …“ a nabídne „Zapojit“; v `missing` až tady, stav počítá jen události
+                let hint = if key_stale(&root, port, key) {
+                    missing.push(crate::i18n::tr("klíč hooků", "hooks key").to_string());
+                    Some(stale_hint())
+                } else {
+                    hint(&missing)
+                };
+                HooksStatus { state, hint, missing, error: None, path: p }
             }
             Err(e) => HooksStatus { state: "error", missing: vec![], error: Some(e), path: p, hint: None },
         },
@@ -383,26 +485,60 @@ pub fn status_at(path: &Path, port: u16) -> HooksStatus {
 pub fn status_cached(port: u16) -> HooksStatus {
     use parking_lot::Mutex;
     // jazyk v klíči: hláška (`hint`, chyby) je v jazyce UI
-    type Key = (Option<std::time::SystemTime>, u64, u16, crate::uiconf::Lang);
+    type Key = (Option<std::time::SystemTime>, u64, u16, crate::uiconf::Lang, String);
     static CACHE: Mutex<Option<(Key, HooksStatus)>> = Mutex::new(None);
     let Some(path) = settings_path() else {
         return HooksStatus { state: "error", missing: vec![], error: Some(crate::i18n::tr("Nevím, kde je složka .claude.", "I don't know where the .claude folder is.").into()), path: String::new(), hint: None };
     };
     let meta = std::fs::metadata(&path).ok();
-    let key = (meta.as_ref().and_then(|m| m.modified().ok()), meta.map_or(0, |m| m.len()), port, crate::i18n::lang());
+    let hook_key = hook_key().unwrap_or_default();
+    let key = (meta.as_ref().and_then(|m| m.modified().ok()), meta.map_or(0, |m| m.len()), port, crate::i18n::lang(), hook_key.clone());
     let mut c = CACHE.lock();
     if let Some((k, st)) = c.as_ref()
         && *k == key
     {
         return st.clone();
     }
-    let st = status_at(&path, port);
+    let st = status_at(&path, port, &hook_key);
     *c = Some((key, st.clone()));
     st
 }
 
+/// Po startu mostu: hookům zapojeným starší verzí doplní klíč, ať po aktualizaci schvalování funguje bez kliku.
+/// Soubor bez našich hooků se nemění a klíč nevzniká. Selhání jen do logu: aktivita běží dál a o schválení
+/// se postará terminál (`claude::bridge`), Nastavení nabídne „Zapojit“ (`stale_hint`).
+pub fn migrate_on_start(port: u16) {
+    use crate::state::{log, mark_dirty};
+    std::thread::Builder::new()
+        .name("hooks-migrate".into())
+        .spawn(move || {
+            let Some(path) = settings_path() else { return };
+            if !read(&path).is_ok_and(|t| any_ours(&t, port)) {
+                return;
+            }
+            let key = match ensure_hook_key() {
+                Ok(k) => k,
+                Err(e) => return log(&format!("hooky Ledge: klíč nejde založit: {e}")),
+            };
+            match apply(&path, |t| migrate(t, port, &key)) {
+                Ok(true) => {
+                    log("hooky Ledge: doplněn klíč (běžící session Claude rozhodují v terminálu do restartu)");
+                    mark_dirty();
+                }
+                Ok(false) => {}
+                Err(e) => log(&format!("hooky Ledge: klíč nejde doplnit: {e}")),
+            }
+        })
+        .ok();
+}
+
+/// Jeden zápis `settings.json` najednou: čtení + `f` + záloha + zápis. Dvě vlákna (Nastavení a migrace při
+/// startu) jinak čtou stejný text a druhý zápis přepíše první.
+static APPLY_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
 /// Zapíše výsledek `f` (merge/remove) atomicky; před první změnou existujícího souboru záloha.
 pub fn apply(path: &Path, f: impl FnOnce(&str) -> Result<(String, bool), String>) -> Result<bool, String> {
+    let _guard = APPLY_LOCK.lock();
     let text = read(path)?;
     let (new, changed) = f(&text)?;
     if !changed {
@@ -414,12 +550,7 @@ pub fn apply(path: &Path, f: impl FnOnce(&str) -> Result<(String, bool), String>
     if path.exists() && !backup.exists() {
         std::fs::copy(path, &backup).map_err(|e| crate::errors::io(&trf!("Zálohu {} nejde vytvořit", "Can't create the backup {}", backup.display()), &e))?;
     }
-    let tmp = dir.join("settings.json.ledge-tmp");
-    std::fs::write(&tmp, new.as_bytes()).map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))?;
-    std::fs::rename(&tmp, path).map_err(|e| {
-        let _ = std::fs::remove_file(&tmp);
-        crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e)
-    })?;
+    crate::fsx::write_atomic(path, new.as_bytes()).map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))?;
     Ok(true)
 }
 
@@ -427,6 +558,22 @@ pub fn apply(path: &Path, f: impl FnOnce(&str) -> Result<(String, bool), String>
 mod tests {
     use super::*;
     use serde_json::{Value, json};
+
+    const KEY: &str = "testovaci-klic";
+
+    // testy níž řeší tvar hooků; klíč má vlastní testy dole
+    fn merge(t: &str, port: u16) -> Result<(String, bool), String> {
+        super::merge(t, port, KEY)
+    }
+    fn status(t: &str, port: u16) -> (&'static str, Vec<String>) {
+        super::status(t, port, KEY)
+    }
+    fn status_at(p: &Path, port: u16) -> HooksStatus {
+        super::status_at(p, port, KEY)
+    }
+    fn auth() -> Value {
+        json!({ "Authorization": format!("Bearer {KEY}") })
+    }
 
     fn v(t: &str) -> Value {
         serde_json::from_str(t).unwrap()
@@ -459,7 +606,7 @@ mod tests {
         assert_eq!(j["hooks"]["PostToolUse"][0]["hooks"][0]["command"], "npx prettier --write");
         // starý port Ledge nahrazen, cizí command ve stejné skupině zůstal
         assert_eq!(j["hooks"]["Stop"][0]["hooks"], json!([{ "type": "command", "command": "echo hotovo" }]));
-        assert_eq!(j["hooks"]["Stop"][1]["hooks"][0], json!({ "type": "http", "url": "http://127.0.0.1:47800/event", "timeout": 5 }));
+        assert_eq!(j["hooks"]["Stop"][1]["hooks"][0], json!({ "type": "http", "url": "http://127.0.0.1:47800/event", "timeout": 5, "headers": auth() }));
         assert_eq!(j["hooks"]["PermissionRequest"][0]["hooks"][0]["url"], "http://127.0.0.1:47800/permission");
         assert_eq!(j["hooks"]["PermissionRequest"][0]["hooks"][0]["timeout"], 600);
         for (ev, ..) in EVENTS {
@@ -522,8 +669,8 @@ mod tests {
         assert!(changed);
         let j = v(&out);
         assert_eq!(j["hooks"]["PreToolUse"][0], json!({"matcher":"Bash","hooks":[{"type":"command","command":"guard.sh"}]}), "cizí PreToolUse zůstane");
-        assert_eq!(j["hooks"]["PreToolUse"][1], json!({"matcher":"AskUserQuestion","hooks":[{"type":"http","url":"http://127.0.0.1:47800/question","timeout":600}]}));
-        assert_eq!(j["hooks"]["PreToolUse"][2], json!({"matcher":"ExitPlanMode","hooks":[{"type":"http","url":"http://127.0.0.1:47800/plan","timeout":600}]}));
+        assert_eq!(j["hooks"]["PreToolUse"][1], json!({"matcher":"AskUserQuestion","hooks":[{"type":"http","url":"http://127.0.0.1:47800/question","timeout":600,"headers":auth()}]}));
+        assert_eq!(j["hooks"]["PreToolUse"][2], json!({"matcher":"ExitPlanMode","hooks":[{"type":"http","url":"http://127.0.0.1:47800/plan","timeout":600,"headers":auth()}]}));
         assert_eq!(j["hooks"]["PreToolUse"].as_array().unwrap().len(), 3, "otázky a plán se navzájem neodebraly");
         assert!(out.find("\"AskUserQuestion\"").unwrap() < out.find("/question").unwrap(), "matcher před hooks");
         assert_eq!(status(&out, 47800), ("full", vec![]));
@@ -584,8 +731,8 @@ mod tests {
         assert!(changed);
         let pre = v(&out)["hooks"]["PreToolUse"].clone();
         assert_eq!(pre[0], v(v4)["hooks"]["PreToolUse"][0], "cizí hook netknutý");
-        assert_eq!(pre[1], v(v4)["hooks"]["PreToolUse"][1], "otázky netknuté");
-        assert_eq!(pre[2], json!({"matcher":"ExitPlanMode","hooks":[{"type":"http","url":"http://127.0.0.1:47800/plan","timeout":600}]}));
+        assert_eq!(pre[1], json!({"matcher":"AskUserQuestion","hooks":[{"type":"http","url":"http://127.0.0.1:47800/question","timeout":600,"headers":auth()}]}), "otázky s klíčem");
+        assert_eq!(pre[2], json!({"matcher":"ExitPlanMode","hooks":[{"type":"http","url":"http://127.0.0.1:47800/plan","timeout":600,"headers":auth()}]}));
         assert_eq!(status(&out, 47800), ("full", vec![]));
         assert!(!merge(&out, 47800).unwrap().1, "idempotentní");
         // jiný port: obě naše skupiny přepsané na nový port, žádná navíc
@@ -602,6 +749,93 @@ mod tests {
         // hlášky ke chybějícím doplňkům PreToolUse
         let both = vec![QUESTIONS_EVENT.to_string(), PLAN_EVENT.to_string()];
         assert!(hint(&both).unwrap().contains("otázky a review plánu"));
+    }
+
+    fn without_headers(mut j: Value) -> Value {
+        for groups in j["hooks"].as_object_mut().unwrap().values_mut() {
+            for g in groups.as_array_mut().unwrap() {
+                for h in g["hooks"].as_array_mut().unwrap() {
+                    h.as_object_mut().unwrap().remove("headers");
+                }
+            }
+        }
+        j
+    }
+
+    /// `settings.json` tak, jak ho zapsala verze před klíčem: všechny naše hooky a k nim cizí.
+    fn legacy() -> String {
+        serde_json::to_string_pretty(&without_headers(v(&merge(FOREIGN, 47800).unwrap().0))).unwrap() + "\n"
+    }
+
+    #[test]
+    fn migrate_adds_key_in_place_and_only_to_ours() {
+        let old = legacy();
+        assert_eq!(status(&old, 47800).0, "partial", "bez klíče nejde schvalovat");
+        let (out, changed) = migrate(&old, 47800, KEY).unwrap();
+        assert!(changed);
+        assert_eq!(status(&out, 47800), ("full", vec![]));
+        // jinak nic: bez `headers` zase totéž, tedy skupiny na místě a cizí hooky netknuté
+        assert_eq!(without_headers(v(&out)), v(&old));
+        assert_eq!(v(&out)["hooks"]["PostToolUse"][0]["hooks"][0], json!({ "type": "command", "command": "npx prettier --write" }));
+        assert!(!migrate(&out, 47800, KEY).unwrap().1, "podruhé nic");
+        // jiný klíč (záznam ve Správci pověření se ztratil) se opraví
+        let (fixed, changed) = migrate(&out, 47800, "novy-klic").unwrap();
+        assert!(changed && !fixed.contains(KEY));
+        assert_eq!(super::status(&fixed, 47800, "novy-klic").0, "full");
+    }
+
+    #[test]
+    fn migrate_never_installs() {
+        for (text, port, has_ours) in [
+            ("", 47800, false),
+            ("{}", 47800, false),
+            (r#"{"model":"opus"}"#, 47800, false),
+            (r#"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo"}]}]}}"#, 47800, false),
+            (r#"{"hooks":{"Stop":[{"hooks":[{"type":"http","url":"http://example.com:47800/event"}]}]}}"#, 47800, false),
+            (r#"{"hooks":{"Stop":[{"hooks":[{"type":"http","url":"http://127.0.0.1:47801/event"}]}]}}"#, 47800, false),
+            (r#"{"hooks":{"Stop":[{"hooks":[{"type":"http","url":"http://127.0.0.1:47800/event"}]}]}}"#, 47800, true),
+        ] {
+            assert_eq!(any_ours(text, port), has_ours, "{text}");
+            let (out, changed) = migrate(text, port, KEY).unwrap();
+            assert_eq!(changed, has_ours, "{text}");
+            assert_eq!(out.contains(KEY), has_ours, "{text}");
+            // migrace nepřidává chybějící události
+            assert_eq!(v(if out.is_empty() { "{}" } else { &out })["hooks"].as_object().map_or(0, |h| h.len()), v(if text.is_empty() { "{}" } else { text })["hooks"].as_object().map_or(0, |h| h.len()), "{text}");
+        }
+        assert!(migrate("{nejson", 47800, KEY).is_err());
+        assert!(!any_ours("{nejson", 47800));
+    }
+
+    #[test]
+    fn status_and_merge_with_bad_key() {
+        let (full, _) = merge("{}", 47800).unwrap();
+        // (klíč v Ledge, stav)
+        for (key, want) in [(KEY, "full"), ("jiny", "partial"), ("", "partial")] {
+            assert_eq!(super::status(&full, 47800, key).0, want, "{key}");
+        }
+        // „Zapojit“ opraví i hook se starým klíčem, počet hooků se nemění
+        let (fixed, changed) = super::merge(&full, 47800, "jiny").unwrap();
+        assert!(changed && !fixed.contains(KEY));
+        assert_eq!(super::status(&fixed, 47800, "jiny").0, "full");
+        assert_eq!(v(&fixed)["hooks"]["Stop"].as_array().unwrap().len(), 1);
+        assert_eq!(v(&remove(&fixed).unwrap().0), json!({}), "odpojení bere hooky i s klíčem");
+    }
+
+    #[test]
+    fn key_stays_out_of_status_and_hint_says_what_to_do() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, legacy()).unwrap();
+        let st = status_at(&path, 47800);
+        assert_eq!(st.state, "partial");
+        assert_eq!(st.missing.len(), 1, "UI má co ukázat za „Chybí:“");
+        assert!(st.hint.as_deref().is_some_and(|h| h.contains("klíč") || h.contains("key")), "{:?}", st.hint);
+        assert!(apply(&path, |t| migrate(t, 47800, KEY)).unwrap());
+        assert_eq!(std::fs::read_to_string(dir.path().join(BACKUP)).unwrap(), legacy(), "záloha před změnou");
+        let st = status_at(&path, 47800);
+        assert_eq!((st.state, st.missing.len()), ("full", 0));
+        assert_eq!(st.hint, None);
+        assert!(!serde_json::to_string(&st).unwrap().contains(KEY), "klíč není ve stavu pro UI");
     }
 
     #[test]
@@ -649,11 +883,39 @@ mod tests {
         assert!(apply(&path, remove).unwrap());
         assert_eq!(std::fs::read_to_string(dir.path().join(BACKUP)).unwrap(), FOREIGN);
         assert!(!apply(&path, remove).unwrap(), "beze změny se nezapisuje");
-        assert!(!dir.path().join("settings.json.ledge-tmp").exists());
+        // vedle souboru nezůstal žádný dočasný soubor
+        let mut names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        names.sort();
+        assert_eq!(names, ["settings.json", BACKUP]);
         // nevalidní soubor zůstane netknutý
         std::fs::write(&path, "{rozbité").unwrap();
         assert!(apply(&path, |t| merge(t, 47800)).is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "{rozbité");
         assert_eq!(status_at(&path, 47800).state, "error");
+    }
+
+    #[test]
+    fn concurrent_apply_keeps_both_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{}").unwrap();
+        let set = |key: &'static str| {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                for _ in 0..20 {
+                    apply(&path, |t| {
+                        let mut v: Value = serde_json::from_str(t).map_err(|e| e.to_string())?;
+                        v[key] = json!(true);
+                        Ok((v.to_string(), true))
+                    })
+                    .unwrap();
+                }
+            })
+        };
+        let (a, b) = (set("a"), set("b"));
+        a.join().unwrap();
+        b.join().unwrap();
+        let v: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!((v["a"].as_bool(), v["b"].as_bool()), (Some(true), Some(true)));
     }
 }

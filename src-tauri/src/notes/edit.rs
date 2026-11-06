@@ -96,6 +96,14 @@ pub(super) fn read_bytes(real: &Path) -> Result<Vec<u8>, String> {
     std::fs::read(real).map_err(|e| crate::errors::io(tr("Poznámku nejde přečíst", "Can't read the note"), &e))
 }
 
+/// Text poznámky pro ZÁPIS zpět: neplatné UTF-8 (soubor z cizího editoru v CP1250…) se nesmí `lossy`
+/// převést a uložit — diakritika by se natrvalo změnila na `�`. Chyba = soubor zůstane beze změny.
+pub(super) fn utf8_text(bytes: &[u8]) -> Result<&str, String> {
+    std::str::from_utf8(bytes).map_err(|_| {
+        tr("Poznámka není v UTF-8, Ledge ji nezměnil — soubor zůstal beze změny.", "The note is not UTF-8, Ledge did not change it — the file is untouched.").to_string()
+    })
+}
+
 /// Složka poznámky je obecná (kořen nebo `_obecne`) — bez projektu stačí klíč vynechat.
 fn general_folder(real_root: &Path, real: &Path) -> bool {
     let parent = real.parent().unwrap_or(real_root);
@@ -222,8 +230,8 @@ pub fn save(root: &Path, req: &SaveNote, now: &DateTime<FixedOffset>) -> Result<
         return Ok(SaveOutcome::Changed);
     }
     let pngs = check_content(req)?;
-    let text = String::from_utf8_lossy(&bytes);
-    let mut front = split(&text).0.unwrap_or_default();
+    let text = utf8_text(&bytes)?;
+    let mut front = split(text).0.unwrap_or_default();
     apply_meta(&mut front, general_folder(&real_root, &real), req, now)?;
     let dir = real.parent().ok_or_else(|| tr("Poznámka bez složky.", "Note without a folder."))?;
     let base = real.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
@@ -243,6 +251,7 @@ pub fn save_copy(root: &Path, req: &SaveNote, now: &DateTime<FixedOffset>) -> Re
     unset(&mut front, "updated");
     front.push("done: false".into());
     let dir = real.parent().ok_or_else(|| tr("Poznámka bez složky.", "Note without a folder."))?;
+    let _name_guard = NAME_LOCK.lock();
     let base = unique_base(dir, &format!("{}-{}", now.format("%Y-%m-%d-%H%M%S"), slug(&req.body)));
     let body = compose_body(dir, &base, &req.body, &pngs)?;
     let name = format!("{base}.md");
@@ -260,8 +269,8 @@ pub fn toggle_task(root: &Path, path: &Path, line: usize, checked: bool, expecte
     if hash(&bytes) != expected_hash {
         return Ok(SaveOutcome::Changed);
     }
-    let text = String::from_utf8_lossy(&bytes);
-    let (front, body) = split(&text);
+    let text = utf8_text(&bytes)?;
+    let (front, body) = split(text);
     let mut front = front.unwrap_or_default();
     let (lead, rest) = body_view(body);
     let new_rest = md::toggle_line(rest, line, checked)?;
@@ -409,6 +418,29 @@ mod tests {
     }
 
     const NOTE: &str = "---\nproject: a\nautor: claude\ntags:\n  - x\ncreated: 2026-10-16T14:03:22+02:00\nremind: 2026-10-17T09:00:00+02:00\ndone: false\nzz: 1\n---\n\nText\n\n- [ ] úkol\n\n![](./n-1.png)\n";
+
+    #[test]
+    fn non_utf8_note_is_refused_and_untouched() {
+        let root = tmp_root();
+        let p = root.path().join("n.md");
+        // CP1250: „Řehoř“ jako bajty 0xD8 0xE8 0xF8 — neplatné UTF-8
+        let mut raw = b"---\ncreated: 2026-10-16T14:03:22+02:00\ndone: false\n---\n\n- [ ] ".to_vec();
+        raw.extend_from_slice(&[0xD8, 0xE8, 0xF8]);
+        raw.push(b'\n');
+        std::fs::write(&p, &raw).unwrap();
+        let now = at("2026-10-18T10:00:00+02:00");
+        let h = hash(&raw);
+        assert!(save(root.path(), &req(&p, &h, "nový"), &now).is_err());
+        assert_eq!(std::fs::read(&p).unwrap(), raw);
+        assert!(toggle_task(root.path(), &p, 0, true, &h, &now).is_err());
+        assert_eq!(std::fs::read(&p).unwrap(), raw);
+        assert!(super::super::meta::set_meta(root.path(), &p, &h, &super::super::meta::MetaPatch { color: Some("#aabbcc".into()), ..Default::default() }, &now).is_err());
+        assert_eq!(std::fs::read(&p).unwrap(), raw);
+        assert!(super::super::set_done(root.path(), &p, true).is_err());
+        assert_eq!(std::fs::read(&p).unwrap(), raw);
+        // zobrazení zůstává lossy
+        assert!(read(root.path(), &p).is_ok());
+    }
 
     #[test]
     fn apply_meta_table() {

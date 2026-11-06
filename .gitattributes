@@ -8,3 +8,9 @@ scripts/private/ export-ignore
 *.bmp binary
 site/META.md export-ignore
 site/RELEASE-*.md export-ignore
+# slučování: čistě seznamové soubory (jeden záznam = jeden řádek) → union (obě strany přidají řádky, bez konfliktu).
+# Riziko: když obě větve upraví TENTÝŽ řádek, zůstanou obě verze → duplicitní klíč chytí `tsc`/testy, ne tichý rozpad syntaxe.
+# NEPŘIDÁVAT: src-tauri/src/lib.rs (generate_handler! — zdvojený řádek rozbije kompilaci), types.ts, *.tsx.
+src/settings/labels.ts merge=union
+src/i18n/en-*.ts merge=union
+docs/codemap/*.md merge=union

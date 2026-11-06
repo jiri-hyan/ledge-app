@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compactPlan, compactSessions, doneSession, expandAfter, freshWeather, isHoverView, islandEvent, smallWidth, timerActive, DONE_FRESH_MS, SESSION_ROWS, WX_MAX_AGE_MS } from "./model.ts";
-import { HOVER_MODES, hoverModeOf } from "./modes.ts";
+import { HOVER_MODES } from "./modes.ts";
 import { tIn } from "../i18n.ts";
 
 const NOW = 1_792_250_979_530;
@@ -116,9 +116,6 @@ test("režimy pro Nastavení: id jsou kontrakt, názvy v obou jazycích", () => 
     assert.ok(m.cs && m.en && m.key === `cards.hover.mode.${m.id}`, m.id);
     assert.ok(m.desc.length > 10, `${m.id}: popis`);
   }
-  assert.equal(hoverModeOf("island"), "island");
-  assert.equal(hoverModeOf("expand"), "full");
-  assert.equal(hoverModeOf(undefined), "full");
 });
 
 test("anglický název režimu = slovník (ať Nastavení i t() říkají totéž)", async () => {

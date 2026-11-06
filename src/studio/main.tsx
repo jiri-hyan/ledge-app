@@ -7,8 +7,10 @@ import { setDictLoader } from "../i18n";
 import { inTauri } from "../api";
 import { render } from "solid-js/web";
 import StudioWindow from "./StudioWindow";
+import { installErrorLog } from "../uiErrors";
 
 setDictLoader(() => import("../i18n/dicts"));
+installErrorLog();
 
 async function start() {
   if (!inTauri && new URLSearchParams(location.search).get("demo") === "1") (await import("./demo")).installDemo();

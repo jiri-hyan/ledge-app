@@ -16,6 +16,7 @@ import { fromMs } from "../notes/remind";
 import { setLang, t, type Lang } from "../i18n";
 import { errorText, say, sayError, Toast } from "../ui/toast";
 import UndoBar from "../notes/UndoBar";
+import Boundary from "../ui/Boundary";
 import { archiveNote, completeNote, deleteNote, reopenNote } from "../notes/lifecycle";
 import type { LifeAction } from "../notes/lifeactions";
 import { IconX } from "../icons";
@@ -450,7 +451,7 @@ export default function PinApp() {
       window.removeEventListener("keydown", key);
       window.removeEventListener("blur", blur);
       document.removeEventListener("paste", paste);
-      autosave.cancel();
+      void flush(); // pád mimo .pin-body (vnější Boundary v main.tsx) nesmí zahodit rozepsaný text
       clearTimeout(savedTimer);
     });
     void api.pinInit().then(
@@ -497,6 +498,7 @@ export default function PinApp() {
       </div>
 
       <Show when={!p()?.collapsed}>
+        <Boundary>
         <div class="pin-body">
           <Show when={gone()}>
             {(g) => (
@@ -597,6 +599,7 @@ export default function PinApp() {
             </div>
           </Show>
         </Show>
+        </Boundary>
       </Show>
 
       <Show when={menu() && !through() && p()}>

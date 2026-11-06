@@ -11,7 +11,10 @@ mod io;
 mod notes;
 mod personal;
 mod project;
+pub mod recovery;
 mod sections;
+#[cfg(test)]
+mod lenient_tests;
 #[cfg(test)]
 mod tests;
 mod validate;

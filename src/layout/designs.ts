@@ -40,9 +40,6 @@ export const CARD_DESIGNS: Record<string, readonly Design[]> = {
 /** Vzhledy karty (prázdné = karta má jen jeden vzhled). */
 export const designsOf = (cardId: string): readonly Design[] => CARD_DESIGNS[cardId] ?? [];
 
-/** Výchozí (dnešní) vzhled karty, nebo undefined. */
-export const defaultDesign = (cardId: string): string | undefined => designsOf(cardId)[0]?.id;
-
 /** Platné id vzhledu, který se má do configu zapsat: neznámé i výchozí = undefined (pole pryč). */
 export function storedDesign(cardId: string, id: unknown): string | undefined {
   const list = designsOf(cardId);

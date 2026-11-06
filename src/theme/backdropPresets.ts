@@ -5,7 +5,6 @@
 import type { CustomGradient, FlameColor, GradKind, LiveKind } from "../types.ts";
 import type { Pair } from "./looks.ts";
 
-export type BackdropGroup = "calm" | "gradient" | "live";
 
 export type Preset = {
   id: string;

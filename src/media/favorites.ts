@@ -63,12 +63,6 @@ export function withoutFavorite(list: readonly Favorite[], index: number): Favor
   return list.filter((_, i) => i !== index);
 }
 
-/** Seznam s přejmenovanou položkou; prázdný název = beze změny. */
-export function renamedFavorite(list: readonly Favorite[], index: number, name: string): Favorite[] {
-  const n = name.trim().slice(0, MAX_FAVORITE_NAME);
-  return list.map((f, i) => (i === index && n ? { ...f, name: n } : f));
-}
-
 /** Kolikátou ze schránky (historie `clip_list`) nabídnout jako odkaz: nejnovější položka, která je odkazem
  *  na hudbu (Spotify / YouTube Music) a není zkrácený náhled. Bez historie (vypnutá) = "". */
 export function musicLinkFrom(items: readonly { preview: string; atMs: number }[] | null | undefined): string {

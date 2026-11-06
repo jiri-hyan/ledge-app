@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/notes/folderlink.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_LINK, deleteSentence, directionOptions, dirtyLink, linkCfg, openablePath, stateText, stateTone, writeSentence } from "./folderlink.ts";
+import { DEFAULT_LINK, deleteSentence, dirtyLink, linkCfg, openablePath, stateText, stateTone, writeSentence } from "./folderlink.ts";
 
 test("starý config bez notes.folderLink = vypnuto, oba směry, mazání se nepřenáší", () => {
   for (const notes of [undefined, {}, { folderLink: {} }, { folderLink: { direction: "nesmysl", path: 5 } }]) assert.deepEqual(linkCfg(notes), DEFAULT_LINK);
@@ -10,8 +10,7 @@ test("starý config bez notes.folderLink = vypnuto, oba směry, mazání se nep�
 });
 
 test("věta o zápisu říká, co se kam zapisuje, pro každý směr jinak", () => {
-  const dirs = directionOptions().map((o) => o.v);
-  assert.deepEqual([...dirs].sort(), ["both", "export", "import"]);
+  const dirs = ["both", "export", "import"];
   const s = Object.fromEntries(dirs.map((d) => [d, writeSentence(d)]));
   assert.equal(new Set(Object.values(s)).size, 3);
   assert.match(s.import, /Do složky se nezapíše nic/);
@@ -19,7 +18,6 @@ test("věta o zápisu říká, co se kam zapisuje, pro každý směr jinak", () 
   assert.match(s.both, /oběma směry/);
   assert.match(deleteSentence(false), /nepřenáší/);
   assert.match(deleteSentence(true), /Archivu/);
-  for (const o of directionOptions()) assert.ok(o.label && o.hint);
 });
 
 test("stav: tečka a věta; bez snapshotu = vypnuto", () => {
