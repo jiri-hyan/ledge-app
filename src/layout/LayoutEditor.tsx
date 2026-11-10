@@ -33,6 +33,8 @@ export default function LayoutEditor() {
   const c = useSettings();
   const L = createMemo(() => normalizeLayout(c.cfg.layout));
   const [activeId, setActiveId] = createSignal<string>("");
+  const [catQuery, setCatQuery] = createSignal("");
+  let catEl: HTMLDivElement | undefined;
   const pg = createMemo(() => pageOf(L(), activeId() || L().pages[0]?.id || "prace"));
   const pgIdx = createMemo(() => L().pages.findIndex((x) => x.id === pg().id));
   const put = (l: Layout) => c.set("layout", l);
@@ -49,6 +51,11 @@ export default function LayoutEditor() {
       hidden: !x.on.length,
     })),
   ];
+  const filteredAddable = (pageId: string) => {
+    const q = catQuery().trim().toLowerCase();
+    const all = addable(pageId);
+    return q ? all.filter((x) => x.name.toLowerCase().includes(q) || x.desc.toLowerCase().includes(q) || x.id.toLowerCase().includes(q)) : all;
+  };
 
   /** draft rozložení se liší od uloženého → režim úprav v šuplíku by ho neviděl */
   const unsaved = () => {
@@ -205,6 +212,11 @@ export default function LayoutEditor() {
               {t("settings.layout.bento", "Bento mřížka")}
             </label>
             <span class="grow" />
+            <Show when={addable(pg().id).length > 0}>
+              <button class="mini" onClick={() => catEl?.scrollIntoView({ behavior: "smooth", block: "nearest" })}>
+                {t("cards.layout.add", "+ Přidat kartu")}
+              </button>
+            </Show>
             <Show when={L().pages.length > 1}>
               <button
                 class="mini"
@@ -258,6 +270,7 @@ export default function LayoutEditor() {
               const setView = (v: CardView) => put(setCardLook(L(), pg().id, cd.id, patchCardLook(cd.look, cd.id, { view: v === VIEW_CARDS[cd.id] ? undefined : v })));
               const hasDesigns = () => designsOf(cd.id).length > 1;
               const hasLimit = () => LIMIT_CARDS.includes(cd.id);
+              const cardParts = () => PART_KEYS.filter((k) => PARTS[k] === cd.id);
               const otherTabs = () => L().pages.filter((x) => x.id !== pg().id && !pageHas(x, cd.id));
               return (
                 <div class="lay-st-card">
@@ -292,10 +305,25 @@ export default function LayoutEditor() {
                     <button class="mini" onClick={() => removeOne(pg().id, cd.id)}>{t("settings.layout.removeCard", "Odebrat")}</button>
                   </div>
 
-                  <Show when={hasView() || hasLimit() || hasDesigns() || otherTabs().length > 0}>
+                  <Show when={hasView() || hasLimit() || hasDesigns() || cardParts().length > 0 || otherTabs().length > 0}>
                     <div class="lay-st-card-sub">
                       <Show when={hasDesigns()}>
                         <DesignPicker card={cd.id} look={cd.look} onPick={(id) => put(setCardLook(L(), pg().id, cd.id, patchCardLook(cd.look, cd.id, { design: id })))} />
+                      </Show>
+                      <Show when={cardParts().length > 0}>
+                        <div class="lay-st-parts" role="group" aria-label={t("settings.layout.cardParts", "Zobrazené části")}>
+                          <span class="lay-st-grp-lbl">{t("settings.layout.cardParts", "Zobrazené části")}:</span>
+                          <For each={cardParts()}>
+                            {(k) => {
+                              const shown = () => !partHidden(L(), k);
+                              return (
+                                <button class="lay-st-pchip" classList={{ on: shown() }} aria-pressed={shown()} onClick={() => put(setPartHidden(L(), k, shown()))}>
+                                  {partName(k)}
+                                </button>
+                              );
+                            }}
+                          </For>
+                        </div>
                       </Show>
                       <Show when={hasView()}>
                         <span class="lay-st-grp">
@@ -348,10 +376,22 @@ export default function LayoutEditor() {
 
           {/* Katalog karet pro rychlé přidání */}
           <Show when={addable(pg().id).length > 0}>
-            <div class="lay-st-cat">
-              <div class="lay-st-cat-head">{t("cards.layout.add", "+ Přidat kartu")}</div>
+            <div class="lay-st-cat" ref={catEl}>
+              <div class="lay-st-cat-head">
+                <span>{t("cards.layout.add", "+ Přidat kartu")}</span>
+                <Show when={addable(pg().id).length > 4}>
+                  <input
+                    type="search"
+                    class="lay-st-cat-q"
+                    value={catQuery()}
+                    placeholder={t("settings.layout.filterCards", "Hledat kartu…")}
+                    aria-label={t("settings.layout.filterCards", "Hledat kartu…")}
+                    onInput={(e) => setCatQuery(e.currentTarget.value)}
+                  />
+                </Show>
+              </div>
               <div class="lay-st-cat-grid">
-                <For each={addable(pg().id)}>
+                <For each={filteredAddable(pg().id)}>
                   {(x) => (
                     <button
                       class="lay-st-cat-item"

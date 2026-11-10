@@ -27,6 +27,12 @@ function remember(id: string, open: boolean, def: boolean) {
   }
 }
 
+/** Otevře sbalovací skupinu podle `gid` a plynule na ni odscrolluje. */
+export function openGroup(gid: string, def = true) {
+  remember(gid, true, def);
+  document.getElementById(`grp-${gid.replace(/[^\w-]/g, "-")}`)?.closest(".st-grp")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
 /** `gid` = klíč paměti, `anchor` = kotva hledání `f-<anchor>` celé skupiny, `open` = výchozí stav,
  *  `badge` = krátký údaj vedle nadpisu (počet), `aside` = tlačítko v hlavičce (nesbalí skupinu). */
 export function Group(p: { gid: string; title: string; desc?: string; anchor?: string; open?: boolean; badge?: string; aside?: JSX.Element; children: JSX.Element }) {

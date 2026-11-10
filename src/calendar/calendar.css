@@ -1,5 +1,10 @@
 /* Karta Kalendář (CalendarCard) a editor kalendářů v Nastavení (CalendarSettings). Tokeny ze styles.css;
    jen vlastní třídy `cal-*` (globální CSS — cizí třídy se tu nezmiňují, viz cssClasses.test.mjs). */
+.cal-days { display: flex; flex-direction: column; }
+[data-card="calendar"][data-size="l"] .cal-days,
+[data-card="calendar"][data-size="xl"] .cal-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s2) var(--s3); align-items: start; }
+[data-card="calendar"][data-size="l"] .cal-day + .cal-day,
+[data-card="calendar"][data-size="xl"] .cal-day + .cal-day { margin-top: 0; }
 .cal-day + .cal-day { margin-top: var(--s2); }
 .cal-day-h { font: 600 var(--fs-xs) var(--display); color: var(--t3); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
 .cal-lead { font-size: var(--fs-sm); color: var(--t3); margin-bottom: 2px; }

@@ -205,21 +205,23 @@ export default function GithubCard(p: { now: number; cfgError: string | null; me
                 <div class="empty gh-empty">{d().error ?? t("cards.github.failed", "GitHub se nepodařilo načíst.")}</div>
               </Show>
               <Show when={d().fetchedMs || status() === "ok"}>
-                <Show when={d().reviewOn}>
-                  <Group title={t("cards.github.review", "Čeká na tvoji revizi")} count={d().reviewCount} more={d().reviewMore} none={d().review.length === 0} empty={t("cards.github.reviewNone", "Nikdo od tebe revizi nečeká.")}>
-                    <For each={d().review}>{(pr) => <PrRow pr={pr} now={p.now} showAuthor />}</For>
-                  </Group>
-                </Show>
-                <Show when={d().mineOn}>
-                  <Group title={t("cards.github.mine", "Tvoje otevřená PR")} count={d().mineCount} more={false} none={d().mine.length === 0} empty={t("cards.github.mineNone", "Žádné otevřené PR.")}>
-                    <For each={d().mine}>{(pr) => <PrRow pr={pr} now={p.now} ci />}</For>
-                  </Group>
-                </Show>
-                <Show when={d().notifsOn}>
-                  <Group title={t("cards.github.notifs", "Nepřečtené notifikace")} count={d().notifCount} more={d().notifMore} none={d().notifs.length === 0} empty={t("cards.github.notifsNone", "Vše přečteno.")}>
-                    <For each={d().notifs}>{(n) => <NotifRow n={n} now={p.now} />}</For>
-                  </Group>
-                </Show>
+                <div class="gh-groups">
+                  <Show when={d().reviewOn}>
+                    <Group title={t("cards.github.review", "Čeká na tvoji revizi")} count={d().reviewCount} more={d().reviewMore} none={d().review.length === 0} empty={t("cards.github.reviewNone", "Nikdo od tebe revizi nečeká.")}>
+                      <For each={d().review}>{(pr) => <PrRow pr={pr} now={p.now} showAuthor />}</For>
+                    </Group>
+                  </Show>
+                  <Show when={d().mineOn}>
+                    <Group title={t("cards.github.mine", "Tvoje otevřená PR")} count={d().mineCount} more={false} none={d().mine.length === 0} empty={t("cards.github.mineNone", "Žádné otevřené PR.")}>
+                      <For each={d().mine}>{(pr) => <PrRow pr={pr} now={p.now} ci />}</For>
+                    </Group>
+                  </Show>
+                  <Show when={d().notifsOn}>
+                    <Group title={t("cards.github.notifs", "Nepřečtené notifikace")} count={d().notifCount} more={d().notifMore} none={d().notifs.length === 0} empty={t("cards.github.notifsNone", "Vše přečteno.")}>
+                      <For each={d().notifs}>{(n) => <NotifRow n={n} now={p.now} />}</For>
+                    </Group>
+                  </Show>
+                </div>
               </Show>
               <Show when={d().error && (d().fetchedMs || status() === "ok")}>
                 <div class="sub err">{d().error}</div>

@@ -3,6 +3,11 @@
    viz cssClasses.test.mjs). */
 
 /* ---------- Systém ---------- */
+.sys-rows { display: flex; flex-direction: column; }
+[data-card="system"][data-size="l"] .sys-rows,
+[data-card="system"][data-size="xl"] .sys-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 2px var(--s3); align-items: center; }
+[data-card="system"][data-size="l"] .sys-row + .sys-row,
+[data-card="system"][data-size="xl"] .sys-row + .sys-row { border-top: 0; }
 .sys-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 0; min-width: 0; text-align: left; color: inherit; font-size: var(--fs-body); }
 .sys-row + .sys-row { border-top: 1px solid var(--line-soft); }
 .sys-click { border-radius: var(--r-sm); transition: background var(--fast); }
@@ -29,6 +34,11 @@
 .sys-up { color: var(--violet); }
 
 /* ---------- GitHub ---------- */
+.gh-groups { display: flex; flex-direction: column; }
+[data-card="github"][data-size="l"] .gh-groups,
+[data-card="github"][data-size="xl"] .gh-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s2) var(--s3); align-items: start; }
+[data-card="github"][data-size="l"] .gh-group + .gh-group,
+[data-card="github"][data-size="xl"] .gh-group + .gh-group { margin-top: 0; }
 .gh-group + .gh-group { margin-top: var(--s2); }
 .gh-h { display: flex; align-items: baseline; gap: 6px; font: 600 var(--fs-xs) var(--display); color: var(--t3); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
 .gh-n { font: 600 var(--fs-xs) var(--mono); color: var(--t2); letter-spacing: 0; }

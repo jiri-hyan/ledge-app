@@ -165,3 +165,6 @@
 /* Ledge Studio: Doladit kroku v průvodci skryté (`studio/PartView.tsx` `data-trim`), čipy „Co se děje“ ve scéně se zalomí */
 [data-trim] .ap-details:not([data-adv="shown"]) { display: none; }
 [data-scene] .ap-states { flex-wrap: wrap; }
+.ap-jump { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--s2); }
+.ap-jump-chip { padding: 4px 11px; font-size: var(--fs-xs); font-weight: 500; color: var(--t2); background: var(--well); border: 1px solid var(--line); border-radius: var(--r-pill); transition: background var(--fast), color var(--fast), border-color var(--fast); }
+.ap-jump-chip:hover { color: var(--t0); background: var(--card-2); border-color: var(--accent); }

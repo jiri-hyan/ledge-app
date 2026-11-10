@@ -35,8 +35,17 @@ const DENSITY_LABEL = {
 export default function AppearanceOpen(q: { ap: Ap; dirty: boolean; adv: boolean; setAdv: (v: boolean) => void }) {
   const a = () => q.ap.a();
   const customW = () => q.ap.p.cfg.drawer?.width ?? DRAWER_WIDTH;
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   return (
     <>
+      <nav class="ap-jump" aria-label={t("appearance.open.sections", "Sekce vzhledu")}>
+        <button type="button" class="ap-jump-chip" onClick={() => jump("f-appearance.style")}>{t("appearance.open.jump.style", "Styl a motiv")}</button>
+        <button type="button" class="ap-jump-chip" onClick={() => jump("f-appearance.backdrop")}>{t("appearance.open.jump.backdrop", "Pozadí")}</button>
+        <button type="button" class="ap-jump-chip" onClick={() => jump("f-appearance.pages")}>{t("appearance.open.jump.pages", "Záložky a hlavička")}</button>
+        <button type="button" class="ap-jump-chip" onClick={() => jump("f-appearance.cardLook")}>{t("appearance.open.jump.cards", "Karty")}</button>
+        <button type="button" class="ap-jump-chip" onClick={() => jump("f-appearance.layout")}>{t("appearance.open.jump.layout", "Šířka a hustota")}</button>
+        <button type="button" class="ap-jump-chip" onClick={() => jump("f-appearance.size")}>{t("appearance.open.jump.size", "Přesná velikost")}</button>
+      </nav>
       <AppearanceStyles ap={q.ap} dirty={q.dirty} />
       <AppearanceThemes ap={q.ap} />
       <div id="f-appearance.accentGrad" classList={{ hit: lit("appearance.accentGrad") }}><AppearanceAccent ap={q.ap} /></div>

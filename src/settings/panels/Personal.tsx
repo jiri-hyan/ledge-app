@@ -13,7 +13,7 @@ import { gotoSettingsPanel } from "../../palette/goto";
 import { useSettings } from "../ctx";
 import { Num, Select, Text, Toggle } from "../fields/controls";
 import { Advanced } from "../fields/Advanced";
-import { Group } from "../fields/Group";
+import { Group, openGroup } from "../fields/Group";
 import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
 import { fieldHint, fieldLabel } from "../labels";
 import { PERSONAL_SECTIONS, layoutCardIds, setCardShown, splitPersonal, type PersonalSectionId } from "../personalModel";
@@ -153,11 +153,22 @@ function Parts(p: { ids: PersonalSectionId[]; open: boolean }) {
 export default function PersonalPanel(_p: PanelProps) {
   const c = useSettings();
   const split = () => splitPersonal(layoutCardIds(c.cfg.layout));
+  const allIds = () => [...split().shown, ...split().more, ...split().helpers];
+  const isShown = (id: PersonalSectionId) => split().shown.includes(id);
   return (
     <>
       <PanelHead title={t("settings.nav.osobni", "Obsah karet")} desc={t("settings.personal.desc", "Co ukazují jednotlivé karty šuplíku — u každé karty všechny její volby pohromadě. Nahoře karty, které v šuplíku máš.")}>
         <button class="mini" onClick={() => gotoSettingsPanel("suplik")}>{t("settings.personal.toLayout", "Které karty šuplík ukazuje…")}</button>
       </PanelHead>
+      <nav class="st-jump" aria-label={t("settings.nav.osobni", "Obsah karet")}>
+        <For each={allIds()}>
+          {(id) => (
+            <button type="button" class="st-jump-chip" classList={{ on: isShown(id) }} onClick={() => openGroup(`osobni.${id}`, isShown(id))}>
+              {PARTS[id].title()}
+            </button>
+          )}
+        </For>
+      </nav>
       <Show when={split().shown.length}>
         <h3 class="st-grp-sep">{t("settings.personal.sep.shown", "Karty v šuplíku")}</h3>
         <Parts ids={split().shown} open />

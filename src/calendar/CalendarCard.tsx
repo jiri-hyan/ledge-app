@@ -132,14 +132,18 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
           </div>
         }>
           <Show when={lead()}>{(l) => <div class="cal-lead">{l()}</div>}</Show>
-          <For each={days()} fallback={<div class="empty">{t("cards.calendar.nothing", "Dnes ani v příštích dvou týdnech nic.")}</div>}>
-            {(d) => (
-              <div class="cal-day">
-                <div class="cal-day-h">{dayTitle(d)}</div>
-                <For each={d.items}>{(it) => <Row it={it} day={d.date} color={color(it.cal)} now={p.now} />}</For>
-              </div>
-            )}
-          </For>
+          <Show when={days().length > 0} fallback={<div class="empty">{t("cards.calendar.nothing", "Dnes ani v příštích dvou týdnech nic.")}</div>}>
+            <div class="cal-days">
+              <For each={days()}>
+                {(d) => (
+                  <div class="cal-day">
+                    <div class="cal-day-h">{dayTitle(d)}</div>
+                    <For each={d.items}>{(it) => <Row it={it} day={d.date} color={color(it.cal)} now={p.now} />}</For>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
           <Show when={(v()?.more ?? 0) > 0}><div class="cal-more">{t("cards.calendar.more", "+ další {n}", { n: v()!.more })}</div></Show>
         </Show>
         <For each={problems()}>

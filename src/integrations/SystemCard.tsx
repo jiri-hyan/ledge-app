@@ -74,7 +74,7 @@ export default function SystemCard(p: { menu?: JSX.Element; design?: string }) {
       <Show when={view()} fallback={<div class="empty">{t("cards.system.loading", "Měřím…")}</div>}>
         {(v) => (
           <Show when={p.design && p.design !== "lines"} fallback={
-          <>
+          <div class="sys-rows">
             <button class="sys-row sys-click" onClick={openTaskManager} title={t("cards.system.taskmgr", "Otevřít Správce úloh")}>
               <span class="sys-l">{t("cards.system.cpu", "CPU")}</span>
               <b class="sys-v" classList={{ "sys-warm": cpuLoad() === "warm", "sys-hot": cpuLoad() === "hot" }}>{fmtPct(v().cpu, num)}</b>
@@ -115,7 +115,7 @@ export default function SystemCard(p: { menu?: JSX.Element; design?: string }) {
                 <polyline class="sys-line-tx" points={sparkPoints(v().txHist, W, H, netMax())} />
               </svg>
             </div>
-          </>
+          </div>
           }>
             <SystemDesign v={v()} design={p.design!} onOpen={openTaskManager} />
           </Show>

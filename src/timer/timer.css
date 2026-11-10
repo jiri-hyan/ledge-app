@@ -1,4 +1,10 @@
 /* Osobní: karta Časovač (TimerCard). Prefix `tm-`, tokeny ze styles.css. */
+.tm-body { display: flex; flex-direction: column; }
+.tm-main { display: flex; flex-direction: column; min-width: 0; }
+[data-card="timer"][data-size="l"] .tm-body,
+[data-card="timer"][data-size="xl"] .tm-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s2) var(--s3); align-items: center; }
+[data-card="timer"][data-size="l"] .tm-sw,
+[data-card="timer"][data-size="xl"] .tm-sw { margin-top: 0; padding-top: 0; border-top: 0; padding-left: var(--s3); border-left: 1px solid var(--line); }
 .tm-cd { margin-top: 2px; }
 .tm-big { font: 600 calc(40px * var(--fz))/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 2px; display: flex; align-items: baseline; gap: 8px; }
 .tm-done .tm-big { color: var(--blue); font-size: calc(26px * var(--fz)); }

@@ -226,12 +226,14 @@ input.lay-st-name { width: 170px; font-weight: 600; }
 .lay-st-tiles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px var(--s3); padding-top: 8px; border-top: 1px solid var(--line-soft); font-size: var(--fs-xs); color: var(--t2); }
 .lay-st-which { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; padding-top: 2px; }
 .lay-st-which small { color: var(--t3); margin-right: 4px; }
+.lay-st-parts { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 2px; }
 .lay-st-pchip { padding: 3px 9px; font-size: var(--fs-xs); font-weight: 500; color: var(--t3); background: var(--well); border: 1px solid var(--line); border-radius: var(--r-pill); transition: background var(--fast), color var(--fast), border-color var(--fast); }
 .lay-st-pchip:hover { color: var(--t1); }
 .lay-st-pchip.on { color: var(--t1); background: color-mix(in srgb, var(--accent) 16%, var(--card-2)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line-2)); }
 /* katalog karet pro rychlé přidání na záložku */
 .lay-st-cat { display: flex; flex-direction: column; gap: 6px; padding-top: var(--s2); border-top: 1px solid var(--line-soft); }
-.lay-st-cat-head { font-size: var(--fs-xs); font-weight: 600; color: var(--t2); }
+.lay-st-cat-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2); font-size: var(--fs-xs); font-weight: 600; color: var(--t2); }
+input.lay-st-cat-q { width: 190px; padding: 4px 8px; font-size: var(--fs-xs); }
 .lay-st-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 6px; }
 .lay-st-cat-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; text-align: left; background: var(--card); border: 1px dashed var(--line-2); border-radius: var(--r-md); transition: background var(--fast), border-color var(--fast); }
 .lay-st-cat-item:hover { background: var(--card-2); border-color: var(--accent); border-style: solid; }

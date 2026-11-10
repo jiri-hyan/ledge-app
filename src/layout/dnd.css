@@ -21,16 +21,24 @@
 .lp-box, .lp-slot { display: contents; }
 .lp-box[data-flex] { display: flex; flex-direction: column; position: relative; gap: var(--s1); }
 .lp-box[data-flex] > .lp-slot { display: block; min-width: 0; }
-/* široká karta Claude (L / XL): viditelné části (limity, session, útrata) se naskládají vedle sebe místo pod sebe */
+/* široké karty (L / XL): viditelné části v PartsBox (Claude, Právě hraje, Čas) se naskládají vedle sebe místo pod sebe */
 [data-card="claude"][data-size="l"] .lp-box:not(:has(.lp-edit)),
-[data-card="claude"][data-size="xl"] .lp-box:not(:has(.lp-edit)) {
+[data-card="claude"][data-size="xl"] .lp-box:not(:has(.lp-edit)),
+[data-card="media"][data-size="l"] .lp-box:not(:has(.lp-edit)),
+[data-card="media"][data-size="xl"] .lp-box:not(:has(.lp-edit)),
+[data-card="clock"][data-size="l"] .lp-box:not(:has(.lp-edit)),
+[data-card="clock"][data-size="xl"] .lp-box:not(:has(.lp-edit)) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--s2) var(--s3);
   align-items: start;
 }
 [data-card="claude"][data-size="l"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty),
-[data-card="claude"][data-size="xl"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty) {
+[data-card="claude"][data-size="xl"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty),
+[data-card="media"][data-size="l"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty),
+[data-card="media"][data-size="xl"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty),
+[data-card="clock"][data-size="l"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty),
+[data-card="clock"][data-size="xl"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty) {
   display: block;
   min-width: 0;
 }

@@ -2,13 +2,13 @@
 // 11 designových předvoleb (jeden klik, Vrátit přes zásobník editoru), hrana (`ComposeEdge.tsx`, kolo 28: živé
 // efekty a „Podle stavu Clauda“), pozadí těla (přechod až 3 barvami, volitelně přelévaný), oddělení dílů
 // a nástroje dílu (styl jen z `stylesFor`, barva podle hodnoty / akcent / vlastní). Úpravy přes `commit` editoru.
-import { For, Show } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { t } from "../../i18n";
 import type { Appearance } from "../../types";
 import {
   COMPOSE_SEPS, DESIGN_IDS, FILL_DIRS, FILL_KINDS,
   type ComposeItem, type ComposeSep, type DesignId, type FillKind, type ItemStyle, type Piece, type StripCompose,
-  designOf, setPieceColor, setStyle, stylesFor,
+  designOf, sameCompose, setPieceColor, setStyle, stylesFor,
 } from "../../strip/compose";
 import StripLookPreview from "../previews/StripLookPreview";
 import type { PreviewState } from "../appearanceModel";
@@ -30,6 +30,28 @@ export const DESIGN_NAME: Record<DesignId, () => string> = {
   hardware: () => t("appearance.compose.design.hardware", "Výkon: CPU · RAM · GPU"),
   hwbar: () => t("appearance.compose.design.hwbar", "Výřez: Claude + CPU · RAM · GPU"),
   cyber: () => t("appearance.compose.design.cyber", "Cyber HUD"),
+  hwrings: () => t("appearance.compose.design.hwrings", "Prstence: CPU · RAM · GPU"),
+  devtools: () => t("appearance.compose.design.devtools", "Vývojářský kokpit"),
+  groove: () => t("appearance.compose.design.groove", "Hudba a výkon"),
+  claudefocus: () => t("appearance.compose.design.claudefocus", "Claude Focus"),
+  matrix: () => t("appearance.compose.design.matrix", "Matrix HUD"),
+  zen: () => t("appearance.compose.design.zen", "Čistý zen"),
+};
+
+type DesignCat = "all" | "hw" | "claude" | "fx" | "clean";
+const DESIGN_CATS: readonly DesignCat[] = ["all", "hw", "claude", "fx", "clean"];
+const CAT_NAME: Record<DesignCat, () => string> = {
+  all: () => t("appearance.compose.cat.all", "Vše"),
+  hw: () => t("appearance.compose.cat.hw", "CPU · RAM · GPU"),
+  claude: () => t("appearance.compose.cat.claude", "Claude a vývoj"),
+  fx: () => t("appearance.compose.cat.fx", "Živé efekty"),
+  clean: () => t("appearance.compose.cat.clean", "Čisté a klidné"),
+};
+const CAT_IDS: Record<Exclude<DesignCat, "all">, readonly DesignId[]> = {
+  hw: ["hardware", "hwbar", "hwrings", "cyber", "devtools", "matrix", "groove"],
+  claude: ["claudefocus", "devtools", "terminal", "islands", "hwbar", "cyber"],
+  fx: ["aurora", "embers", "comet", "neon", "sunset", "matrix"],
+  clean: ["glass", "chips", "tall", "cubes", "zen", "groove"],
 };
 const FILL_NAME: Record<FillKind, () => string> = {
   black: () => t("appearance.compose.fill.black", "Černá"),
@@ -63,21 +85,38 @@ function Pick<T extends string>(q: { label: string; value: T; options: [T, strin
   );
 }
 
-/** 6 designových předvoleb s náhledem; klik = celý vzhled (Vrátit vrátí předchozí). */
+/** 20 designových předvoleb s náhledem a filtrem kategorií; klik = celý vzhled (Vrátit vrátí předchozí). */
 export function ComposeDesigns(q: Q & { state: PreviewState; a: Appearance; opacity: number }) {
+  const [cat, setCat] = createSignal<DesignCat>("all");
+  const list = () => {
+    const k = cat();
+    return k === "all" ? DESIGN_IDS : CAT_IDS[k];
+  };
   return (
     <section class="cx-blk">
       <div class="cx-bh">
         <span>{t("appearance.compose.designs", "Hotové designy")}<small>{t("appearance.compose.designsHint", "Jeden klik přepíše celý vlastní vzhled; Vrátit ho vrátí.")}</small></span>
+        <span class="cx-cats" role="tablist" aria-label={t("appearance.compose.designs", "Hotové designy")}>
+          <For each={DESIGN_CATS}>
+            {(k) => (
+              <button type="button" role="tab" aria-selected={cat() === k} class="cx-cat" classList={{ on: cat() === k }} onClick={() => setCat(k)}>
+                {CAT_NAME[k]()}
+              </button>
+            )}
+          </For>
+        </span>
       </div>
       <div class="cx-designs" role="list" aria-label={t("appearance.compose.designs", "Hotové designy")}>
-        <For each={DESIGN_IDS}>
-          {(id) => (
-            <button class="ap-style cx-pre" type="button" role="listitem" onClick={() => q.commit(designOf(id))}>
-              <StripLookPreview look="custom" compose={designOf(id)} state={q.state} a={q.a} opacity={q.opacity} fitWidth={232} />
-              <span class="ap-name">{DESIGN_NAME[id]()}</span>
-            </button>
-          )}
+        <For each={list()}>
+          {(id) => {
+            const active = () => sameCompose(q.c, designOf(id));
+            return (
+              <button class="ap-style cx-pre" classList={{ on: active() }} type="button" role="listitem" aria-pressed={active()} onClick={() => q.commit(designOf(id))}>
+                <StripLookPreview look="custom" compose={designOf(id)} state={q.state} a={q.a} opacity={q.opacity} fitWidth={232} />
+                <span class="ap-name">{DESIGN_NAME[id]()}</span>
+              </button>
+            );
+          }}
         </For>
       </div>
     </section>

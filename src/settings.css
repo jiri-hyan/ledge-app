@@ -270,4 +270,8 @@
 .st-tips .st-kbd-mouse { opacity: 0.7; }
 .st-keys-group { margin: var(--s3) 0 0; font-size: var(--fs-sm); font-weight: 600; color: var(--t3); }
 .act-add { display: inline-flex; border-radius: var(--r-md); }
+.st-jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 var(--s2); }
+.st-jump-chip { padding: 4px 11px; font-size: var(--fs-xs); font-weight: 500; color: var(--t2); background: var(--well); border: 1px solid var(--line); border-radius: var(--r-pill); transition: background var(--fast), color var(--fast), border-color var(--fast); }
+.st-jump-chip:hover { color: var(--t0); background: var(--card-2); border-color: var(--accent); }
+.st-jump-chip.on { color: var(--t1); background: color-mix(in srgb, var(--accent) 14%, var(--card-2)); border-color: color-mix(in srgb, var(--accent) 42%, var(--line-2)); }
 

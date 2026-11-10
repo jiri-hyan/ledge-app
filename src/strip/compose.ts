@@ -141,8 +141,14 @@ const DESIGN: Record<string, StripCompose> = {
   hardware: mk("notch", 420, 32, 70, ["cpu:spark", "memory:spark"], ["time:text"], ["gpu:spark"], { deco: { ...DEFAULT_DECO, edge: "underline", len: "wide", color: "#22d3ee" } }),
   hwbar: mk("notch", 380, 30, 65, ["claude:dotPct"], ["time:text"], ["cpu:bar", "memory:bar", "gpu:bar"], { sep: "gap", deco: { ...DEFAULT_DECO, edge: "glow", len: "center", color: "claude" } }),
   cyber: mk("capsule", 460, 30, 40, ["claude:iconText", "limit5h:ring"], ["time:text"], ["cpu:text", "memory:text", "gpu:text"], { sep: "pills", mono: true, fill: { ...DEFAULT_FILL, kind: "gradient", from: "#0f172a", to: "#020617" }, deco: { ...DEFAULT_DECO, edge: "gradient", len: "full", color: "#38bdf8", color2: "#a855f7" } }),
+  hwrings: mk("notch", 380, 32, 70, ["cpu:ring:#22d3ee", "memory:ring:#a855f7"], ["time:text"], ["gpu:ring:#10b981", "battery:ring"], { deco: { ...DEFAULT_DECO, edge: "glow", len: "wide", color: "#22d3ee" } }),
+  devtools: mk("notch", 480, 30, 45, ["repos:iconText", "servers:badge", "claude:dotPct"], ["time:text"], ["cpu:bar", "memory:bar", "gpu:bar"], { sep: "bar", mono: true, deco: { ...DEFAULT_DECO, edge: "underline", len: "full", color: "#38bdf8", width: 1 } }),
+  groove: mk("island", 390, 32, 100, ["music:iconText:#ec4899"], ["time:text"], ["cpu:spark", "gpu:spark"], { sep: "dot", fill: { ...DEFAULT_FILL, kind: "glass" }, deco: { ...DEFAULT_DECO, edge: "glow", len: "center", color: "#ec4899" } }),
+  claudefocus: mk("capsule", 440, 32, 75, ["claude:iconText", "activity:text"], ["time:text"], ["limit5h:ring", "limitWeek:ring"], { sep: "gap", deco: { ...DEFAULT_DECO, edge: "flow", len: "full", color: "claude", live: { ...DEFAULT_LIVE, on: true } } }),
+  matrix: mk("capsule", 460, 26, 15, ["claude:text:#22c55e", "servers:text:#22c55e"], ["time:text:#4ade80"], ["cpu:spark:#22c55e", "memory:spark:#22c55e", "gpu:spark:#22c55e"], { sep: "bar", mono: true, fill: { ...DEFAULT_FILL, kind: "black" }, deco: { ...DEFAULT_DECO, edge: "glow", len: "full", color: "#22c55e", width: 1 } }),
+  zen: mk("island", 220, 26, 100, ["claude:dot"], ["time:text"], ["battery:icon"], { sep: "none", fill: { ...DEFAULT_FILL, kind: "glass" }, deco: { ...DEFAULT_DECO, edge: "outline", color: "#ffffff", width: 1 } }),
 };
-export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset", "tall", "cubes", "aurora", "embers", "comet", "hardware", "hwbar", "cyber"] as const;
+export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset", "tall", "cubes", "aurora", "embers", "comet", "hardware", "hwbar", "cyber", "hwrings", "devtools", "groove", "claudefocus", "matrix", "zen"] as const;
 export type DesignId = (typeof DESIGN_IDS)[number];
 
 const clone = (c: StripCompose): StripCompose => ({ ...c, left: c.left.map((p) => ({ ...p })), center: c.center.map((p) => ({ ...p })), right: c.right.map((p) => ({ ...p })), deco: { ...c.deco, live: { ...c.deco.live } }, fill: { ...c.fill }, text: { ...c.text } });
@@ -342,4 +348,16 @@ export function setAllStyles(c: StripCompose, style: ItemStyle): StripCompose {
 export function withShape(c: StripCompose, shape: ComposeShape): StripCompose {
   const [h0, h1] = hRange(shape);
   return { ...clone(c), shape, height: Math.min(h1, Math.max(h0, c.height)) };
+}
+
+/** Prohodí levou a pravou přihrádku (střed zůstane). */
+export function mirrorSlots(c: StripCompose): StripCompose {
+  const x = clone(c);
+  [x.left, x.right] = [x.right, x.left];
+  return x;
+}
+
+/** Shoda dvou vlastních vzhledů (pro zvýraznění aktivní předvolby v editoru). */
+export function sameCompose(a: StripCompose, b: StripCompose): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }

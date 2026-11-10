@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { STRIP_LOOK_IDS } from "./looks.ts";
 import {
   COMPOSE_ITEMS, COMPOSE_SHAPES, normText, setPieceLook, setText, DEFAULT_COMPOSE, DESIGN_IDS, ITEM_STYLES, MAX_PIECES, MAX_ZONE, W_MAX, W_MIN,
-  composeOf, designOf, setPieceColor, stylesFor, drawKind, hRange, hasItem, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
+  composeOf, designOf, mirrorSlots, sameCompose, setPieceColor, stylesFor, drawKind, hRange, hasItem, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
 } from "./compose.ts";
 
 const sig = (c) => `${c.shape} ${c.width}×${c.height} r${c.round} | ${["left", "center", "right"].map((s) => c[s].map((p) => `${p.item}:${p.style}`).join(",")).join(" | ")}${c.hideIdle ? " ghost" : ""}${c.rotate ? " rotate" : ""}`;
@@ -177,8 +177,8 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
   // náhrady nových stylů = Rust compose::parts
   for (const [item, style, frac, want] of [["claude", "ring5h", false, "ring"], ["time", "ring5h", false, "icon"], ["limit5h", "bar", true, "under"], ["time", "bar", false, "text"], ["cpu", "spark", true, "spark"], ["limit5h", "spark", true, "meter"], ["time", "chip", false, "iconText"], ["claude", "dotPct", false, "dotPct"]])
     assert.equal(drawKind(item, style, frac), want, `${item}:${style}`);
-  // 14 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
-  assert.equal(DESIGN_IDS.length, 14);
+  // 20 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
+  assert.equal(DESIGN_IDS.length, 20);
   const seen = new Set();
   for (const id of DESIGN_IDS) {
     const c = designOf(id);
@@ -186,8 +186,12 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
     for (const s of ["left", "center", "right"]) for (const p of c[s]) assert.ok(stylesFor(p.item).includes(p.style), `${id} ${p.item}:${p.style}`);
     seen.add(JSON.stringify([c.deco, c.fill, c.sep, c.text, c.left, c.center, c.right]));
   }
-  assert.equal(seen.size, 14);
+  assert.equal(seen.size, 20);
   assert.notEqual(designOf("glass"), designOf("glass"), "vždy nová kopie");
+  assert.ok(sameCompose(designOf("hardware"), designOf("hardware")));
+  assert.ok(!sameCompose(designOf("hardware"), designOf("cyber")));
+  const m = mirrorSlots(designOf("classic"));
+  assert.deepEqual([m.left[0].item, m.right[0].item], ["limit5h", "claude"]);
 });
 
 test("seznamy výzdoby = Rust looks/composedeco.rs", () => {

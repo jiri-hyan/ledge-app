@@ -10,9 +10,9 @@ import { lang, t } from "../../i18n";
 import type { Appearance } from "../../types";
 import { STRIP_LOOKS } from "../../strip/looks";
 import {
-  COMPOSE_ITEMS, COMPOSE_SHAPES, ITEM_STYLES, MAX_PIECES, SLOTS, W_MAX, W_MIN,
+  COMPOSE_ITEMS, COMPOSE_SHAPES, ITEM_STYLES, MAX_PIECES, MAX_ZONE, SLOTS, W_MAX, W_MIN,
   type ComposeItem, type ComposeShape, type ItemStyle, type Slot, type StripCompose,
-  composeOf, hRange, hasItem, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, withShape,
+  composeOf, hRange, hasItem, mirrorSlots, normCompose, putPiece, removePiece, sameCompose, setAllStyles, setStyle, shiftPiece, total, withShape,
 } from "../../strip/compose";
 import StripLookPreview from "../previews/StripLookPreview";
 import { ITEM_GLYPH } from "../previews/ComposePreview";
@@ -102,6 +102,13 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
 
   // přetahování: data = id položky; puštění na přihrádku = přidat / přesunout, mimo přihrádky = odebrat
   const [over, setOver] = createSignal<Slot | null>(null);
+  const [targetSlot, setTargetSlot] = createSignal<Slot>("center");
+  const addFromTray = (item: ComposeItem) => {
+    const cur = c();
+    const pref = targetSlot();
+    const slot = cur[pref].length < MAX_ZONE ? pref : (SLOTS.find((s) => cur[s].length < MAX_ZONE) ?? pref);
+    commit(putPiece(cur, item, slot));
+  };
   const dragStart = (e: DragEvent, item: ComposeItem) => {
     e.dataTransfer?.setData(DRAG, item);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
@@ -140,7 +147,10 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
       </div>
       <div class="cx-bar">
         <span class="cx-sum">{SHAPE_NAME[c().shape]()} · {line() ? t("appearance.compose.fullEdge", "celá hrana") : `${c().width} × ${c().height} px`} · {t("appearance.compose.count", "{n} z {max} položek", { n: total(c()), max: MAX_PIECES })}</span>
-        <button class="btn" type="button" disabled={!stack().length} onClick={undo}>{t("appearance.compose.undo", "Vrátit")}</button>
+        <span class="cx-bar-acts">
+          <button class="btn" type="button" disabled={!c().left.length && !c().right.length} onClick={() => commit(mirrorSlots(c()))}>{t("appearance.compose.swapLR", "⇄ Prohodit L ⇄ P")}</button>
+          <button class="btn" type="button" disabled={!stack().length} onClick={undo}>{t("appearance.compose.undo", "Vrátit")}</button>
+        </span>
       </div>
 
       <ComposeDesigns c={c()} commit={commit} state={q.state} a={q.a} opacity={q.opacity} />
@@ -155,12 +165,15 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
         </div>
         <div class="cx-car" ref={car} role="list" aria-label={t("appearance.compose.presets", "Začít z hotového vzhledu")}>
           <For each={STRIP_LOOKS.filter((x) => x.id !== "custom")}>
-            {(x) => (
-              <button class="ap-style cx-pre" type="button" role="listitem" onClick={() => commit(composeOf(x.id))}>
-                <StripLookPreview look={x.id} state={q.state} a={q.a} opacity={q.opacity} />
-                <span class="ap-name">{lang() === "en" ? x.en : x.cs}</span>
-              </button>
-            )}
+            {(x) => {
+              const active = () => sameCompose(c(), composeOf(x.id));
+              return (
+                <button class="ap-style cx-pre" classList={{ on: active() }} type="button" role="listitem" aria-pressed={active()} onClick={() => commit(composeOf(x.id))}>
+                  <StripLookPreview look={x.id} state={q.state} a={q.a} opacity={q.opacity} />
+                  <span class="ap-name">{lang() === "en" ? x.en : x.cs}</span>
+                </button>
+              );
+            }}
           </For>
         </div>
       </section>
@@ -250,7 +263,19 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
             )}
           </For>
         </div>
-        <div class="cx-trayh">{t("appearance.compose.tray", "Kostkárna")}<small>{full() ? t("appearance.compose.full", "Plno, nejdřív něco odeber.") : t("appearance.compose.trayHint", "Táhni, nebo klikni (přidá doprostřed).")}</small></div>
+        <div class="cx-trayh">
+          <span>{t("appearance.compose.tray", "Kostkárna")} <small>{full() ? t("appearance.compose.full", "Plno, nejdřív něco odeber.") : t("appearance.compose.trayHint", "Táhni, nebo klikni (přidá doprostřed).")}</small></span>
+          <span class="cx-target" role="group" aria-label={t("appearance.compose.targetSlot", "Kam přidat kliknutím")}>
+            <small>{t("appearance.compose.targetSlot", "Kam přidat kliknutím")}:</small>
+            <For each={SLOTS}>
+              {(s) => (
+                <button type="button" class="cx-tbtn" classList={{ on: targetSlot() === s }} aria-pressed={targetSlot() === s} onClick={() => setTargetSlot(s)}>
+                  {SLOT_NAME[s]()}
+                </button>
+              )}
+            </For>
+          </span>
+        </div>
         <div class="cx-tray" onDragOver={(e) => allow(e, null)} onDrop={(e) => {
           // kostka z přihrádky puštěná zpět do kostkárny = odebrat
           e.preventDefault();
@@ -260,7 +285,7 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
         }}>
           <For each={COMPOSE_ITEMS.filter((i) => !hasItem(c(), i))}>
             {(item) => (
-              <button class="cx-cube" type="button" draggable={!full()} disabled={full()} onDragStart={(e) => dragStart(e, item)} onClick={() => commit(putPiece(c(), item, "center"))}
+              <button class="cx-cube" type="button" draggable={!full()} disabled={full()} onDragStart={(e) => dragStart(e, item)} onClick={() => addFromTray(item)}
                 aria-label={t("appearance.compose.add", "Přidat {name}", { name: ITEM_NAME[item]() })} title={ITEM_HINT[item]?.()}>
                 <span class="cx-ci" aria-hidden="true">{ITEM_GLYPH[item]}</span>
                 <span class="cx-cn">{ITEM_NAME[item]()}</span>
