@@ -69,7 +69,7 @@ test("šířka od osy a boky podle pozice", () => {
   for (const [w, dx, side, pos, want] of cases) assert.equal(dragWidth(w, dx, side, pos), want, `${side} ${pos}`);
   assert.deepEqual(widthSides("center", "classic"), ["left", "right"]);
   assert.deepEqual(widthSides("left", "classic"), ["right"]);
-  assert.deepEqual(widthSides("center", "notch"), [], "notch má pevnou šířku");
+  assert.deepEqual(widthSides("center", "notch"), ["left", "right"], "i široký notch jde v ✎ roztáhnout do šířky");
 });
 
 test("nevejde se N karet", () => {

@@ -6,6 +6,7 @@
 // Žádný časovač: jen pointer události a jeden requestAnimationFrame během tažení.
 import { createSignal } from "solid-js";
 import { api } from "../api";
+import { composeOf, normCompose, W_MIN, W_MAX, H_MIN, H_MAX } from "../strip/compose";
 import { savedAppearance } from "../theme/apply";
 import { dragWidth, dragged, heightCss, HEIGHT_LINES, overflowCount, sizeFor, snapTo, switchedSize, WIDTH_LINES, type Side } from "../theme/size";
 import type { DrawerSize, PageSize } from "../types";
@@ -16,7 +17,8 @@ let editingSize = false;
 const [tab, setTab] = createSignal("");
 const [dim, setDim] = createSignal("");
 const [overflow, setOverflow] = createSignal(0);
-export { dim, overflow };
+const [stripDim, setStripDim] = createSignal<{ width: number; height: number }>({ width: 300, height: 30 });
+export { dim, overflow, stripDim, tab };
 
 /** MainPage hlásí záložku, která je vidět. */
 export function setSizeTab(id: string) {
@@ -88,6 +90,68 @@ async function commit(page: string, v: Required<PageSize>) {
     setLive(null);
   }
   queueMicrotask(measureOverflow);
+}
+
+/** Výchozí rozměry otevřeného šuplíku (šířka i výška na 0 = výchozí). */
+export function resetDrawerSize() {
+  void commit(tab(), { width: 0, height: 0 });
+}
+
+/** Textový rozměr otevřeného šuplíku pro panel úprav. */
+export function openDimText(): string {
+  const s = sizeNow(tab());
+  return `${s.width || window.innerWidth} × ${s.height || "auto"} px`;
+}
+
+/** Uložit rozměr zavřeného notche (`strip.compose.width` / `height`). */
+export async function saveStripDim(width: number, height: number) {
+  const w = Math.min(W_MAX, Math.max(W_MIN, Math.round(width)));
+  const h = Math.min(H_MAX, Math.max(H_MIN, Math.round(height)));
+  setStripDim({ width: w, height: h });
+  setDim(`${w} × ${h} px`);
+  try {
+    const c = await api.getConfig();
+    if (!c) return;
+    const look = c.strip?.look ?? "classic";
+    const base = look === "custom" ? normCompose(c.strip?.compose) : composeOf(String(look));
+    const compose = normCompose({ ...base, width: w, height: h });
+    await api.saveConfig({ ...c, strip: { ...(c.strip ?? {}), look: "custom", compose } });
+  } catch { /* chybu řeší config */ }
+}
+
+/** Tah za okraj zavřeného notche v panelu úprav: šířka symetricky od středu, výška dolů. */
+export function startStripResize(e: PointerEvent, axis: "width" | "height" | "both") {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const el = e.currentTarget as HTMLElement;
+  el.setPointerCapture(e.pointerId);
+  const w0 = stripDim().width;
+  const h0 = stripDim().height;
+  const [x0, y0] = [e.screenX, e.screenY];
+  let last = { width: w0, height: h0 };
+  const move = (m: PointerEvent) => {
+    const w = axis === "height" ? w0 : Math.min(W_MAX, Math.max(W_MIN, Math.round(w0 + 2 * (m.screenX - x0))));
+    const h = axis === "width" ? h0 : Math.min(H_MAX, Math.max(H_MIN, Math.round(h0 + m.screenY - y0)));
+    last = { width: w, height: h };
+    setStripDim(last);
+    setDim(`${w} × ${h} px`);
+  };
+  const up = () => {
+    el.removeEventListener("pointermove", move);
+    el.removeEventListener("pointerup", up);
+    el.removeEventListener("pointercancel", up);
+    if (last.width !== w0 || last.height !== h0) {
+      void saveStripDim(last.width, last.height);
+    }
+  };
+  el.addEventListener("pointermove", move);
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+}
+
+/** Výchozí rozměry zavřeného notche (300 × 30 px). */
+export function resetStripSize() {
+  void saveStripDim(300, 30);
 }
 
 export type Edge = Side | "bottom";
@@ -166,6 +230,12 @@ export function rememberSize() {
   before = structuredClone(savedAppearance().size);
   origin = tab();
   editingSize = true;
+  void api.getConfig().then((c) => {
+    if (!c) return;
+    const look = c.strip?.look ?? "classic";
+    const comp = look === "custom" ? normCompose(c.strip?.compose) : composeOf(String(look));
+    setStripDim({ width: comp.width, height: comp.height });
+  }).catch(() => {});
 }
 
 /** konec úprav (`end` v edit.ts) */

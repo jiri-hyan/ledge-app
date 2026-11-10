@@ -19,7 +19,7 @@
 .cg-mh { display: block; height: 3px; width: 40%; border-radius: 2px; background: var(--t3); opacity: 0.7; }
 .cg-ml { display: block; height: 3px; width: 80%; border-radius: 2px; background: var(--t2); opacity: 0.45; }
 .cg-ml.cg-short { width: 50%; }
-.cg-mnum { display: block; height: 9px; width: 46%; border-radius: 2px; background: var(--t0); }
-.cg-mlabel { font-size: var(--fs-2xs); font-weight: 600; line-height: 1.05; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cg-mnum { display: block; flex: none; height: 6px; width: 34%; border-radius: 3px; background: color-mix(in srgb, var(--accent) 55%, var(--t2)); }
+.cg-mlabel { flex: none; font-size: var(--fs-2xs); font-weight: 600; line-height: 1.2; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* náhled dole (`CardsMini` v PreviewDock): stejná miniatura, vyšší */
 .cg-mini.cg-tall { height: 132px; }

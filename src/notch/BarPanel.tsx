@@ -22,6 +22,7 @@ const WEIGHT_NAMES: Record<string, readonly [string, string]> = {
 const METRIC_NAMES: Record<string, readonly [string, string]> = {
   cpu: ["cards.notch.m.cpu", "CPU"],
   ram: ["cards.notch.m.ram", "RAM"],
+  gpu: ["cards.notch.m.gpu", "GPU"],
   disk: ["cards.notch.m.disk", "Disk"],
   net: ["cards.notch.m.net", "Síť"],
 };

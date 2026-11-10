@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Sekce lišty (zrcadlo `BAR_IDS` v `src/notch/bar.ts`).
 pub const SECTIONS: [&str; 7] = ["player", "days", "system", "volume", "limits", "weather", "meeting"];
 /// Metriky sekce Systém (zrcadlo `METRICS`).
-pub const METRICS: [&str; 4] = ["cpu", "ram", "disk", "net"];
+pub const METRICS: [&str; 5] = ["cpu", "ram", "gpu", "disk", "net"];
 /// Nejvýš sekcí na liště (víc se do šířky výřezu nevejde).
 pub const MAX_SECTIONS: usize = 6;
 const COLORS: [&str; 3] = ["accent", "load", "gradient"];
@@ -44,7 +44,7 @@ pub struct BarSection {
     /// Vyhlazené křivky grafů (Systém). Chybí = lomená čára (dnešní).
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub smooth: bool,
-    /// Metriky sekce Systém v pořadí: `cpu`, `ram`, `disk`, `net`. Prázdné = CPU, RAM, Disk (dnešní).
+    /// Metriky sekce Systém v pořadí: `cpu`, `ram`, `gpu`, `disk`, `net`. Prázdné = CPU, RAM, Disk (dnešní).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub metrics: Vec<String>,
     /// Vteřinová ručička analogových hodin (Dny a čas, vzhled `analog`; jen s otevřeným šuplíkem).
@@ -150,7 +150,8 @@ mod tests {
             (json!({"sections":[{"id":"system","color":"#12ab9F"}]}), None),
             (json!({"sections":[{"id":"system","color":"modra"}]}), Some("layout.pages.1.notchBar.sections.0.color")),
             (json!({"sections":[{"id":"system","color":"#12ab9"}]}), Some("layout.pages.1.notchBar.sections.0.color")),
-            (json!({"sections":[{"id":"system","metrics":["cpu","gpu"]}]}), Some("layout.pages.1.notchBar.sections.0.metrics.1")),
+            (json!({"sections":[{"id":"system","metrics":["cpu","gpu"]}]}), None),
+            (json!({"sections":[{"id":"system","metrics":["cpu","fan"]}]}), Some("layout.pages.1.notchBar.sections.0.metrics.1")),
             (json!({"sections":[{"id":"system","metrics":["cpu","cpu"]}]}), Some("layout.pages.1.notchBar.sections.0.metrics.1")),
             (json!({"sections":[{"id":"player"},{"id":"days"},{"id":"system"},{"id":"volume"},{"id":"limits"},{"id":"weather"},{"id":"meeting"}]}), Some("layout.pages.1.notchBar.sections")),
         ];

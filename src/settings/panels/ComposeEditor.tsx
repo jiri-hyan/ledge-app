@@ -6,13 +6,13 @@
 // do rozpracovaného configu (živý náhled = `StripLookPreview` / PreviewDock), proužek se změní po Uložit.
 // Kolo 25: designové předvolby, rám / pozadí / oddělení a styl + barva dílu (`ComposeDeco.tsx`).
 import { For, Show, createSignal } from "solid-js";
-import { lang, t } from "../../i18n";
+import { lang, t, tp } from "../../i18n";
 import type { Appearance } from "../../types";
 import { STRIP_LOOKS } from "../../strip/looks";
 import {
   COMPOSE_ITEMS, COMPOSE_SHAPES, ITEM_STYLES, MAX_PIECES, MAX_ZONE, SLOTS, W_MAX, W_MIN,
   type ComposeItem, type ComposeShape, type ItemStyle, type Slot, type StripCompose,
-  composeOf, hRange, hasItem, mirrorSlots, normCompose, putPiece, removePiece, sameCompose, setAllStyles, setStyle, shiftPiece, total, withShape,
+  composeOf, hRange, hasItem, mirrorSlots, normCompose, putPiece, removePiece, sameCompose, setAllStyles, setStyle, shiftPiece, stylesFor, total, withShape,
 } from "../../strip/compose";
 import StripLookPreview from "../previews/StripLookPreview";
 import { ITEM_GLYPH } from "../previews/ComposePreview";
@@ -48,6 +48,24 @@ export const ITEM_NAME: Record<ComposeItem, () => string> = {
   servers: () => t("appearance.compose.item.servers", "Servery"),
   repos: () => t("appearance.compose.item.repos", "Repa"),
   activity: () => t("appearance.compose.item.activity", "Claude aktivita"),
+};
+/** Krátká ukázka hodnoty kostky pro náhled v Kostkárně. */
+export const ITEM_SAMPLE: Record<ComposeItem, () => string> = {
+  time: () => "14:32",
+  date: () => t("appearance.compose.sample.date", "ne 18. 10."),
+  claude: () => t("appearance.compose.sample.claude", "Pracuje · 2"),
+  limit5h: () => "5h 42 %",
+  limitWeek: () => t("appearance.compose.sample.limitWeek", "Týden 64 %"),
+  music: () => t("appearance.compose.sample.music", "♪ Skladba"),
+  timer: () => "⏱ 18 min",
+  cpu: () => "CPU 23 %",
+  memory: () => "RAM 46 %",
+  gpu: () => "GPU 14 %",
+  battery: () => "82 %",
+  weather: () => "☀ 21°",
+  servers: () => t("appearance.compose.sample.servers", "3 běží"),
+  repos: () => t("appearance.compose.sample.repos", "2 změny"),
+  activity: () => t("appearance.compose.sample.activity", "Úpravy · main.rs"),
 };
 /** Vysvětlivka u kostky (jen položky, kde je co říct). */
 export const ITEM_HINT: Partial<Record<ComposeItem, () => string>> = {
@@ -286,9 +304,11 @@ export default function ComposeEditor(q: { value: unknown; set: (c: StripCompose
           <For each={COMPOSE_ITEMS.filter((i) => !hasItem(c(), i))}>
             {(item) => (
               <button class="cx-cube" type="button" draggable={!full()} disabled={full()} onDragStart={(e) => dragStart(e, item)} onClick={() => addFromTray(item)}
-                aria-label={t("appearance.compose.add", "Přidat {name}", { name: ITEM_NAME[item]() })} title={ITEM_HINT[item]?.()}>
+                aria-label={t("appearance.compose.add", "Přidat {name}", { name: ITEM_NAME[item]() })} title={ITEM_HINT[item]?.() ?? `${ITEM_SAMPLE[item]()} · ${tp("appearance.compose.stylesCount", stylesFor(item).length, ["{n} styl", "{n} styly", "{n} stylů"])}`}>
                 <span class="cx-ci" aria-hidden="true">{ITEM_GLYPH[item]}</span>
                 <span class="cx-cn">{ITEM_NAME[item]()}</span>
+                <span class="cx-cs">{ITEM_SAMPLE[item]()}</span>
+                <span class="cx-cstyles">{tp("appearance.compose.stylesCount", stylesFor(item).length, ["{n} styl", "{n} styly", "{n} stylů"])}</span>
               </button>
             )}
           </For>

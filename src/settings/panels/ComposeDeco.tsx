@@ -36,6 +36,12 @@ export const DESIGN_NAME: Record<DesignId, () => string> = {
   claudefocus: () => t("appearance.compose.design.claudefocus", "Claude Focus"),
   matrix: () => t("appearance.compose.design.matrix", "Matrix HUD"),
   zen: () => t("appearance.compose.design.zen", "Čistý zen"),
+  weatherstation: () => t("appearance.compose.design.weatherstation", "Počasí a den"),
+  fullhud: () => t("appearance.compose.design.fullhud", "Plný přehled (Vše v jednom)"),
+  pomodoro: () => t("appearance.compose.design.pomodoro", "Fokus a časovač"),
+  cornerhud: () => t("appearance.compose.design.cornerhud", "Rohový štítek: Výkon a čas"),
+  devops: () => t("appearance.compose.design.devops", "Servery a repa živě"),
+  dropglass: () => t("appearance.compose.design.dropglass", "Skleněná kapka: Počasí a hudba"),
 };
 
 type DesignCat = "all" | "hw" | "claude" | "fx" | "clean";
@@ -48,10 +54,10 @@ const CAT_NAME: Record<DesignCat, () => string> = {
   clean: () => t("appearance.compose.cat.clean", "Čisté a klidné"),
 };
 const CAT_IDS: Record<Exclude<DesignCat, "all">, readonly DesignId[]> = {
-  hw: ["hardware", "hwbar", "hwrings", "cyber", "devtools", "matrix", "groove"],
-  claude: ["claudefocus", "devtools", "terminal", "islands", "hwbar", "cyber"],
-  fx: ["aurora", "embers", "comet", "neon", "sunset", "matrix"],
-  clean: ["glass", "chips", "tall", "cubes", "zen", "groove"],
+  hw: ["hardware", "hwbar", "hwrings", "cyber", "devtools", "matrix", "groove", "fullhud", "cornerhud", "devops"],
+  claude: ["claudefocus", "devtools", "terminal", "islands", "hwbar", "cyber", "fullhud", "pomodoro", "cornerhud", "devops"],
+  fx: ["aurora", "embers", "comet", "neon", "sunset", "matrix", "fullhud", "dropglass"],
+  clean: ["glass", "chips", "tall", "cubes", "zen", "groove", "weatherstation", "pomodoro", "dropglass"],
 };
 const FILL_NAME: Record<FillKind, () => string> = {
   black: () => t("appearance.compose.fill.black", "Černá"),

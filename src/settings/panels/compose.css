@@ -51,6 +51,11 @@
 .cx-tbtn:hover { color: var(--t0); }
 .cx-tbtn.on { background: var(--accent); color: #fff; font-weight: 600; }
 .cx-tray { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 var(--s2); padding: 10px; background: var(--well); border: 1px dashed var(--line-2); border-radius: var(--r-lg); }
+.cx-tray .cx-cube { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; row-gap: 1px; align-items: center; text-align: left; padding: 6px 10px; border-radius: var(--r-md); }
+.cx-tray .cx-cube .cx-ci { grid-row: 1 / 3; width: 26px; height: 26px; border-radius: var(--r-xs); background: color-mix(in srgb, var(--accent) 15%, var(--card-2)); font-size: var(--fs-md); }
+.cx-tray .cx-cube .cx-cn { grid-column: 2 / 3; }
+.cx-tray .cx-cube .cx-cs { grid-column: 2 / 3; color: var(--t2); font-weight: 500; }
+.cx-cstyles { grid-column: 3 / 4; grid-row: 1 / 3; font-size: var(--fs-2xs); color: var(--t3); padding: 2px 7px; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-pill); white-space: nowrap; }
 .cx-tile { margin-top: var(--s2); }
 .cx-shapes { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .cx-shape.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); color: var(--t1); }

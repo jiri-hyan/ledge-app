@@ -206,7 +206,8 @@ html[data-motion="none"] .studio * { transition: none !important; animation: non
 .sd-sum dt { color: var(--t3); }
 .sd-sum dd { margin: 0; color: var(--t1); font-weight: 600; }
 .sd-stack { display: grid; gap: 12px; }
-.sd-mini { display: block; height: 190px; }
+.sd-mini { display: flex; flex-direction: column; align-items: center; height: 210px; padding-bottom: 10px; }
+.sd-mtitle { flex: none; font-size: var(--fs-2xs); line-height: 1.2; font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sd-map { display: grid; gap: 10px; }
 .sd-map-page { padding: 10px 12px; background: var(--well); border: 1px solid var(--line-soft); border-radius: var(--r-md); }
 .sd-map-page > b { display: block; margin-bottom: 7px; font-size: 12.5px; }
@@ -263,17 +264,17 @@ html[data-motion="none"] .studio * { transition: none !important; animation: non
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   pointer-events: none;
 }
-.sh-strip { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; min-width: 34%; padding: 0 6px 6px; border-radius: 0 0 14px 14px; }
-.sh-strip .sh-badge { top: 4px; right: -14px; }
-.sh-strip > :first-child { flex: 1 1 auto; background: none !important; }
+.sh-strip { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; width: 58%; max-width: 68%; min-width: 38%; padding: 0 6px 6px; border-radius: 0 0 14px 14px; }
+.sh-strip .sh-badge { top: 4px; right: 4px; }
+.sh-strip > :first-child { flex: 1 1 auto; background: none !important; overflow: visible; box-shadow: none; }
 .sh-strip > :first-child > :first-child { display: none; }
 .sh-edge { position: absolute; top: 2%; left: 19%; width: 9%; aspect-ratio: 1; border-radius: 12px; }
 .sh-edge svg { width: 100%; height: 100%; }
 .sh-trail { fill: none; stroke: var(--t3); stroke-width: 1.6; stroke-dasharray: 3 4; }
 .sh-cursor { fill: var(--t1); stroke: #000; stroke-width: 1; }
 .sh-drawer {
-  position: absolute; top: 15%; left: 50%; transform: translateX(-50%); width: 60%; height: 64%;
-  display: flex; flex-direction: column; gap: 3cqi; padding: 2.4cqi 2.4cqi 2cqi;
+  position: absolute; top: 13%; left: 50%; transform: translateX(-50%); width: 66%; height: 73%;
+  display: flex; flex-direction: column; gap: 1.4cqi; padding: 1.8cqi 2cqi 1.6cqi;
   background: color-mix(in srgb, rgb(var(--bg)) 92%, transparent);
   border: 1px solid var(--line-2); border-radius: 0 0 calc(18px * var(--rr)) calc(18px * var(--rr));
   box-shadow: 0 24px 50px -20px rgba(0, 0, 0, 0.8);
@@ -283,14 +284,14 @@ html[data-motion="none"] .studio * { transition: none !important; animation: non
 .sh-tabs span { padding: 0.4cqi 1.4cqi; color: var(--t3); font-size: clamp(11px, 1.25cqi, 13px); white-space: nowrap; border-radius: var(--r-pill); }
 .sh-tabs span.on { color: var(--t1); background: var(--card-3); }
 .sh-grid { flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 1.2cqi; min-height: 0; }
-.sh-card { position: relative; grid-column: span var(--span); display: flex; flex-direction: column; gap: 0.7cqi; min-width: 0; padding: 1.2cqi; background: var(--card); border: 1px solid var(--line); border-radius: calc(10px * var(--rr)); }
-.sh-card b { font-size: clamp(11px, 1.2cqi, 13px); font-weight: 600; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sh-card > i { height: 0.7cqi; min-height: 4px; background: var(--card-3); border-radius: 3px; }
-.sh-card > i.short { width: 60%; }
+.sh-card { position: relative; grid-column: span var(--span); display: flex; flex-direction: column; justify-content: center; gap: 0.45cqi; min-width: 0; padding: 0.85cqi 1.1cqi; background: var(--card); border: 1px solid var(--line); border-radius: calc(10px * var(--rr)); }
+.sh-card b { flex: none; font-size: clamp(11px, 1.15cqi, 13px); line-height: 1.25; font-weight: 600; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sh-card > i:not(.sh-badge) { flex: none; height: 0.55cqi; min-height: 3px; background: var(--card-3); border-radius: 3px; }
+.sh-card > i.short:not(.sh-badge) { width: 60%; }
 .sh-card[data-part="claude"] { border-color: color-mix(in srgb, var(--amber) 40%, transparent); }
-.sh-card[data-part="claude"] > i:first-of-type { background: color-mix(in srgb, var(--amber) 45%, transparent); }
-.sh-card[data-part="projekty"] > i:first-of-type { background: color-mix(in srgb, var(--blue) 45%, transparent); }
-.sh-card[data-part="poznamky"] > i:first-of-type { background: color-mix(in srgb, var(--green) 40%, transparent); }
+.sh-card[data-part="claude"] > i:not(.sh-badge):first-of-type { background: color-mix(in srgb, var(--amber) 45%, transparent); }
+.sh-card[data-part="projekty"] > i:not(.sh-badge):first-of-type { background: color-mix(in srgb, var(--blue) 45%, transparent); }
+.sh-card[data-part="poznamky"] > i:not(.sh-badge):first-of-type { background: color-mix(in srgb, var(--green) 40%, transparent); }
 .sh-more { display: grid; place-items: center; color: var(--t3); font-size: clamp(11px, 1.2cqi, 13px); }
 .sh-foot { display: flex; gap: 1cqi; min-height: 0; }
 .sh-foot:empty { display: none; }

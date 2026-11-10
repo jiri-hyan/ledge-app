@@ -90,7 +90,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `htop`; volume `vslider` | `hslider` | `knob` | `eq` | `icon`; limits `bars` | `ring`; weather `now` | `range`;
   meeting `card` | `countdown`. `color` = `accent` (výchozí) | `load` (podle zátěže) | `gradient` | `#rrggbb`;
   `weight` = `thin` | `mid` | `bold` (čára grafů Systému); `smooth` = vyhlazené křivky; `metrics` = `cpu`, `ram`,
-  `disk`, `net` (chybí = CPU, RAM, Disk); `seconds` = vteřinová ručička analogových hodin. Lišta s `player` /
+  `gpu`, `disk`, `net` (chybí = CPU, RAM, Disk); `seconds` = vteřinová ručička analogových hodin. Lišta s `player` /
   `volume` / `weather` / `meeting` (nebo `days` ve vzhledu `dots` / `sheet`) zapne zdroj dat jako příslušná karta;
   limity stáhne `claude.limitsFetch` i pro sekci `limits` na viditelné záložce. Upravuje se v režimu ✎ přímo v liště.
   `upgrades` = jednorázové úpravy rozložení po aktualizaci,

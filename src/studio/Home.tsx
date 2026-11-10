@@ -116,7 +116,7 @@ export default function Home(p: { s: Snapshot; go: (target: string) => void; mod
           <div class="sh-wall" />
           {/* 1 · proužek: skutečný vzhled zavřeného Ledge */}
           <div class="sh-strip" {...zone("pruzek")}>
-            <StripLookPreview look={normLook(cfg.strip?.look)} state="work" a={a()} opacity={cfg.strip?.opacity ?? STRIP_OPACITY} shape={normShape(cfg.strip?.lookShape)} compose={cfg.strip?.compose} />
+            <StripLookPreview look={normLook(cfg.strip?.look)} state="work" a={a()} opacity={cfg.strip?.opacity ?? STRIP_OPACITY} shape={normShape(cfg.strip?.lookShape)} compose={cfg.strip?.compose} fitWidth={320} />
             <Badge n={1} />
           </div>
           {/* 2 · otevírání: kurzor k hraně */}

@@ -16,8 +16,8 @@ import Days from "./SecTime";
 import System from "./SecSystem";
 import { Limits, Meeting, WeatherSec } from "./SecInfo";
 import { barDesignOf, BAR_NAMES } from "./designs";
-import { addable, type BarSection, type NotchBar as Bar } from "./bar";
-import { barAdding, barTarget, barWithDraft, closeSection, editBar, moveBarSection, openSection, setBarAdding } from "./barState";
+import { addable, BAR_PRESETS, BAR_PRESET_IDS, type BarPresetId, type BarSection, type NotchBar as Bar } from "./bar";
+import { applyBarPreset, barAdding, barTarget, barWithDraft, closeSection, editBar, moveBarSection, openSection, resetBarToAuto, setBarAdding } from "./barState";
 import { tx } from "../layout/text";
 import "./notch.css";
 
@@ -48,6 +48,15 @@ export default function NotchBar(p: { s: Snapshot; now: number; sections: BarSec
   );
 }
 
+function presetName(id: BarPresetId): string {
+  switch (id) {
+    case "hw_claude": return t("cards.notch.preset.hwClaude", "Výkon (CPU·RAM·GPU) a Claude");
+    case "media_day": return t("cards.notch.preset.mediaDay", "Hudba, čas a počasí");
+    case "agenda": return t("cards.notch.preset.agenda", "Schůzky a agenda");
+    case "cockpit": return t("cards.notch.preset.cockpit", "Plný kokpit (6 sekcí)");
+  }
+}
+
 /** Režim ✎: lišta jako upravitelný náhled. */
 export function NotchBarEdit(p: { s: Snapshot; now: number; page: LayoutPage }) {
   let box!: HTMLDivElement;
@@ -72,6 +81,26 @@ export function NotchBarEdit(p: { s: Snapshot; now: number; page: LayoutPage }) 
   onCleanup(() => (setBarAdding(null), closeSection(null, false)));
   return (
     <div class="nb-editwrap">
+      <div class="nb-presets">
+        <span class="nb-plabel">{t("cards.notch.presets", "Hotové sestavy lišty:")}</span>
+        <For each={BAR_PRESET_IDS}>
+          {(id) => (
+            <button
+              type="button"
+              class="nb-pbtn"
+              classList={{ on: JSON.stringify(bar()) === JSON.stringify(BAR_PRESETS[id]) }}
+              onClick={() => applyBarPreset(p.page, BAR_PRESETS[id])}
+            >
+              {presetName(id)}
+            </button>
+          )}
+        </For>
+        <Show when={p.page.notchBar}>
+          <button type="button" class="nb-pbtn" onClick={() => resetBarToAuto(p.page)}>
+            {t("cards.notch.auto", "Automaticky z karet")}
+          </button>
+        </Show>
+      </div>
       <div class="nb nb-edit" ref={box} role="list" aria-label={t("cards.notch.editAria", "Lišta výřezu — klikni na sekci pro vzhled, táhni pro pořadí")}>
         <For each={bar().sections}>
           {(sec, i) => (

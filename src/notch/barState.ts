@@ -71,3 +71,17 @@ export function addBarSection(page: LayoutPage, id: BarId) {
 export function moveBarSection(page: LayoutPage, from: number, to: number) {
   edit(page, (b) => moveSection(b, from, to));
 }
+
+export function applyBarPreset(page: LayoutPage, preset: NotchBar) {
+  setBarTarget(null);
+  setBarDraft(null);
+  setBarAdding(null);
+  change((l) => withBar(l, page.id, preset));
+}
+
+export function resetBarToAuto(page: LayoutPage) {
+  setBarTarget(null);
+  setBarDraft(null);
+  setBarAdding(null);
+  change((l) => withBar(l, page.id, undefined));
+}

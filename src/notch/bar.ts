@@ -7,7 +7,7 @@ import { storedBarDesign } from "./designs.ts";
 
 export const BAR_IDS = ["player", "days", "system", "volume", "limits", "weather", "meeting"] as const;
 export type BarId = (typeof BAR_IDS)[number];
-export const METRICS = ["cpu", "ram", "disk", "net"] as const;
+export const METRICS = ["cpu", "ram", "gpu", "disk", "net"] as const;
 export type Metric = (typeof METRICS)[number];
 /** Metriky Systému bez volby (dnešní lišta). */
 export const DEFAULT_METRICS: readonly Metric[] = ["cpu", "ram", "disk"];
@@ -20,6 +20,44 @@ export const MAX_SECTIONS = 6;
 /** Sekce lišty; výchozí hodnoty se nezapisují (`design` výchozí, `color` accent, `weight` mid, metriky dnešní). */
 export type BarSection = { id: BarId; design?: string; color?: string; weight?: Weight; smooth?: true; metrics?: Metric[]; seconds?: true };
 export type NotchBar = { sections: BarSection[] };
+
+export type BarPresetId = "hw_claude" | "media_day" | "agenda" | "cockpit";
+export const BAR_PRESET_IDS: readonly BarPresetId[] = ["hw_claude", "media_day", "agenda", "cockpit"];
+export const BAR_PRESETS: Readonly<Record<BarPresetId, NotchBar>> = {
+  hw_claude: {
+    sections: [
+      { id: "system", design: "area", color: "load", smooth: true, metrics: ["cpu", "ram", "gpu"] },
+      { id: "limits" },
+      { id: "days" },
+    ],
+  },
+  media_day: {
+    sections: [
+      { id: "player" },
+      { id: "days" },
+      { id: "weather", design: "range" },
+      { id: "volume" },
+    ],
+  },
+  agenda: {
+    sections: [
+      { id: "days", design: "sheet" },
+      { id: "meeting" },
+      { id: "limits", design: "ring" },
+      { id: "weather" },
+    ],
+  },
+  cockpit: {
+    sections: [
+      { id: "player" },
+      { id: "system", design: "rings", color: "load", metrics: ["cpu", "ram", "gpu"] },
+      { id: "limits" },
+      { id: "days", design: "clock" },
+      { id: "weather", design: "range" },
+      { id: "volume", design: "eq" },
+    ],
+  },
+};
 
 const isId = (x: unknown): x is BarId => typeof x === "string" && (BAR_IDS as readonly string[]).includes(x);
 const isHex = (x: unknown): x is string => typeof x === "string" && /^#[0-9a-fA-F]{6}$/.test(x);

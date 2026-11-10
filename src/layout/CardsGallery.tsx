@@ -40,15 +40,12 @@ function MiniCard(q: { look?: CardLook; wide?: boolean; label?: string; style?: 
 
 /** Miniatura předvolby: šest karet se vzhledem předvolby (hrdina jen u karet, které ho umí). */
 function PresetMini(q: { a?: Appearance; preset: string; tall?: boolean }) {
-  const looks = () => {
-    const pr = LOOK_PRESETS.find((x) => x.id === q.preset);
-    const ids: CardId[] = ["claude", "projects", "weather", "notes", "calendar", "timer"];
-    return ids.map((id) => normalizeCardLook(pr?.patch, id));
-  };
+  const pr = LOOK_PRESETS.find((x) => x.id === q.preset);
+  const ids: CardId[] = ["claude", "projects", "weather", "notes", "calendar", "timer"];
   return (
     <span class="theme-scope cg-mini" classList={{ "cg-tall": !!q.tall }} style={q.a ? scopeStyle(q.a) : undefined} aria-hidden="true">
       <span class="cg-grid">
-        <For each={looks()}>{(l, i) => <MiniCard look={l} wide={i() === 0} />}</For>
+        <For each={ids}>{(id, i) => <MiniCard look={normalizeCardLook(pr?.patch, id)} wide={i() === 0} label={cardName(id)} />}</For>
       </span>
     </span>
   );

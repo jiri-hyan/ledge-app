@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/notch/bar.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addable, addSection, barPlan, materialize, moveSection, normalizeNotchBar, normalizeSection, patchSection, removeSection, toggleMetric, MAX_SECTIONS } from "./bar.ts";
+import { addable, addSection, barPlan, materialize, moveSection, normalizeNotchBar, normalizeSection, patchSection, removeSection, toggleMetric, BAR_PRESETS, BAR_PRESET_IDS, MAX_SECTIONS } from "./bar.ts";
 import { BAR_DESIGNS, BAR_NAMES, barDesignOf, storedBarDesign } from "./designs.ts";
 
 const all = { media: true, volume: true };
@@ -36,7 +36,7 @@ test("normalizace sekce: tabulka", () => {
     [{ id: "system", color: "#A0b1c2", weight: "bold", smooth: true }, { id: "system", color: "#A0b1c2", weight: "bold", smooth: true }],
     [{ id: "system", color: "modra", weight: "x", smooth: 1 }, { id: "system" }],
     [{ id: "system", metrics: ["cpu", "ram", "disk"] }, { id: "system" }],
-    [{ id: "system", metrics: ["net", "cpu", "net", "gpu"] }, { id: "system", metrics: ["net", "cpu"] }],
+    [{ id: "system", metrics: ["net", "cpu", "net", "gpu", "fan"] }, { id: "system", metrics: ["net", "cpu", "gpu"] }],
     [{ id: "days", design: "strip" }, { id: "days" }],
     [{ id: "days", design: "analog", seconds: true }, { id: "days", design: "analog", seconds: true }],
     [{ id: "volume", design: "nesmysl", color: "load" }, { id: "volume", color: "load" }],
@@ -125,4 +125,14 @@ test("první úprava odvozené lišty: config má dál všechny karty, system be
   const bez = withBar(e, "p", removeSection(m.bar, m.bar.sections.findIndex((s) => s.id === "system")));
   assert.deepEqual(bez.pages[0].cards.map((c) => c.id), cards);
   assert.deepEqual(barPlan(bez.pages[0].notchBar, cards, all).taken, ["media"], "system zpět v mřížce");
+});
+
+test("BAR_PRESETS: 4 předvolby jsou platné a normalizované", () => {
+  assert.equal(BAR_PRESET_IDS.length, 4);
+  for (const id of BAR_PRESET_IDS) {
+    const p = BAR_PRESETS[id];
+    assert.ok(p, id);
+    assert.ok(p.sections.length > 0 && p.sections.length <= MAX_SECTIONS, id);
+    assert.deepEqual(normalizeNotchBar(p), p, id);
+  }
 });

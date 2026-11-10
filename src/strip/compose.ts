@@ -147,8 +147,14 @@ const DESIGN: Record<string, StripCompose> = {
   claudefocus: mk("capsule", 440, 32, 75, ["claude:iconText", "activity:text"], ["time:text"], ["limit5h:ring", "limitWeek:ring"], { sep: "gap", deco: { ...DEFAULT_DECO, edge: "flow", len: "full", color: "claude", live: { ...DEFAULT_LIVE, on: true } } }),
   matrix: mk("capsule", 460, 26, 15, ["claude:text:#22c55e", "servers:text:#22c55e"], ["time:text:#4ade80"], ["cpu:spark:#22c55e", "memory:spark:#22c55e", "gpu:spark:#22c55e"], { sep: "bar", mono: true, fill: { ...DEFAULT_FILL, kind: "black" }, deco: { ...DEFAULT_DECO, edge: "glow", len: "full", color: "#22c55e", width: 1 } }),
   zen: mk("island", 220, 26, 100, ["claude:dot"], ["time:text"], ["battery:icon"], { sep: "none", fill: { ...DEFAULT_FILL, kind: "glass" }, deco: { ...DEFAULT_DECO, edge: "outline", color: "#ffffff", width: 1 } }),
+  weatherstation: mk("capsule", 380, 32, 85, ["weather:iconText:#38bdf8", "date:text"], ["time:text"], ["battery:iconText"], { sep: "dot", fill: { ...DEFAULT_FILL, kind: "gradient", from: "#0c4a6e", to: "#0f172a" }, deco: { ...DEFAULT_DECO, edge: "glow", len: "wide", color: "#38bdf8" } }),
+  fullhud: mk("notch", 540, 32, 65, ["claude:dotPct", "weather:iconText", "music:iconText"], ["time:text", "date:text"], ["cpu:spark", "memory:spark", "gpu:spark", "battery:iconText"], { sep: "bar", deco: { ...DEFAULT_DECO, edge: "flow", len: "full", color: "claude", live: { ...DEFAULT_LIVE, on: true } } }),
+  pomodoro: mk("island", 360, 32, 100, ["timer:iconText:#f59e0b", "claude:icon"], ["time:text"], ["music:iconText", "limit5h:ring"], { sep: "gap", fill: { ...DEFAULT_FILL, kind: "glass" }, deco: { ...DEFAULT_DECO, edge: "outline", color: "#f59e0b", width: 1 } }),
+  cornerhud: mk("corner", 320, 28, 80, ["claude:dotPct", "weather:iconText"], ["time:text"], ["cpu:text", "memory:text"], { sep: "dot", deco: { ...DEFAULT_DECO, edge: "underline", len: "full", color: "accent" } }),
+  devops: mk("capsule", 460, 30, 50, ["servers:badge:#22c55e", "repos:iconText", "claude:iconText"], ["time:text"], ["cpu:graph", "memory:graph", "limit5h:bar"], { sep: "pills", mono: true, deco: { ...DEFAULT_DECO, edge: "underline", len: "full", color: "#22c55e" } }),
+  dropglass: mk("drop", 420, 36, 90, ["weather:chip:#38bdf8", "date:iconText"], ["time:text"], ["music:chip:#ec4899", "battery:ring"], { sep: "gap", fill: { ...DEFAULT_FILL, kind: "glass" }, deco: { ...DEFAULT_DECO, edge: "gradient", len: "wide", color: "#38bdf8", color2: "#ec4899" } }),
 };
-export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset", "tall", "cubes", "aurora", "embers", "comet", "hardware", "hwbar", "cyber", "hwrings", "devtools", "groove", "claudefocus", "matrix", "zen"] as const;
+export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset", "tall", "cubes", "aurora", "embers", "comet", "hardware", "hwbar", "cyber", "hwrings", "devtools", "groove", "claudefocus", "matrix", "zen", "weatherstation", "fullhud", "pomodoro", "cornerhud", "devops", "dropglass"] as const;
 export type DesignId = (typeof DESIGN_IDS)[number];
 
 const clone = (c: StripCompose): StripCompose => ({ ...c, left: c.left.map((p) => ({ ...p })), center: c.center.map((p) => ({ ...p })), right: c.right.map((p) => ({ ...p })), deco: { ...c.deco, live: { ...c.deco.live } }, fill: { ...c.fill }, text: { ...c.text } });
@@ -251,9 +257,26 @@ export function setPieceLook(c: StripCompose, item: ComposeItem, patch: { size?:
   return x;
 }
 
-/** Styly, které položka nabízí: průběh jen CPU / paměť / GPU (mají historii), „tečka + 5h“ a „prstenec 5h“ jen Claude. */
+const ITEM_ALLOWED_STYLES: Record<ComposeItem, readonly ItemStyle[]> = {
+  time: ["icon", "text", "iconText", "chip"],
+  date: ["icon", "text", "iconText", "chip"],
+  weather: ["icon", "text", "iconText", "chip"],
+  claude: ["icon", "badge", "text", "ring", "dot", "iconText", "chip", "dotPct", "ring5h"],
+  activity: ["icon", "badge", "text", "dot", "iconText", "chip"],
+  servers: ["icon", "badge", "text", "dot", "iconText", "chip"],
+  repos: ["icon", "badge", "text", "dot", "iconText", "chip"],
+  cpu: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "spark", "chip"],
+  memory: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "spark", "chip"],
+  gpu: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "spark", "chip"],
+  limit5h: ["text", "ring", "graph", "dot", "bar", "chip"],
+  limitWeek: ["text", "ring", "graph", "dot", "bar", "chip"],
+  battery: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "chip"],
+  timer: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "chip"],
+  music: ["icon", "text", "graph", "dot", "iconText", "bar", "chip"],
+};
+
 export function stylesFor(item: ComposeItem): ItemStyle[] {
-  return ITEM_STYLES.filter((s) => (s === "spark" ? item === "cpu" || item === "memory" || item === "gpu" : s === "dotPct" || s === "ring5h" ? item === "claude" : true));
+  return ITEM_STYLES.filter((s) => ITEM_ALLOWED_STYLES[item].includes(s));
 }
 export function setPieceColor(c: StripCompose, item: ComposeItem, color: string): StripCompose {
   const x = clone(c);
@@ -342,7 +365,7 @@ export function setStyle(c: StripCompose, item: ComposeItem, style: ItemStyle | 
 }
 export function setAllStyles(c: StripCompose, style: ItemStyle): StripCompose {
   const x = clone(c);
-  for (const s of SLOTS) x[s] = x[s].map((p) => ({ ...p, style }));
+  for (const s of SLOTS) x[s] = x[s].map((p) => (stylesFor(p.item).includes(style) ? { ...p, style } : p));
   return x;
 }
 

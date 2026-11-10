@@ -75,9 +75,9 @@ test("kostky: přidat, přesunout, odebrat, styl — vstup netknutý", () => {
     [shiftPiece(c, "time", -1), "capsule 300×30 r55 | claude:icon,time:text |  | limit5h:ring"],
     [shiftPiece(c, "claude", -1), "capsule 300×30 r55 | claude:icon | time:text | limit5h:ring"],
     [shiftPiece(putPiece(c, "date", "center"), "time", 1), "capsule 300×30 r55 | claude:icon | date:icon,time:text | limit5h:ring"],
-    [setStyle(c, "time", "next"), "capsule 300×30 r55 | claude:icon | time:ring | limit5h:ring"],
+    [setStyle(c, "time", "next"), "capsule 300×30 r55 | claude:icon | time:iconText | limit5h:ring"],
     [setStyle(c, "claude", "badge"), "capsule 300×30 r55 | claude:badge | time:text | limit5h:ring"],
-    [setAllStyles(c, "dot"), "capsule 300×30 r55 | claude:dot | time:dot | limit5h:dot"],
+    [setAllStyles(c, "dot"), "capsule 300×30 r55 | claude:dot | time:text | limit5h:dot"],
     [withShape(c, "line"), "line 300×10 r55 | claude:icon | time:text | limit5h:ring"],
     [withShape(composeOf("line"), "capsule"), "capsule 620×18 r0 | claude:dot | limit5h:dot | music:dot"],
   ];
@@ -177,8 +177,13 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
   // náhrady nových stylů = Rust compose::parts
   for (const [item, style, frac, want] of [["claude", "ring5h", false, "ring"], ["time", "ring5h", false, "icon"], ["limit5h", "bar", true, "under"], ["time", "bar", false, "text"], ["cpu", "spark", true, "spark"], ["limit5h", "spark", true, "meter"], ["time", "chip", false, "iconText"], ["claude", "dotPct", false, "dotPct"]])
     assert.equal(drawKind(item, style, frac), want, `${item}:${style}`);
-  // 20 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
-  assert.equal(DESIGN_IDS.length, 20);
+  for (const it of ["weather", "time", "date"]) {
+    for (const st of ["dot", "ring", "graph", "bar"]) {
+      assert.ok(!stylesFor(it).includes(st), `${it} nesmí mít ${st}`);
+    }
+  }
+  // 26 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
+  assert.equal(DESIGN_IDS.length, 26);
   const seen = new Set();
   for (const id of DESIGN_IDS) {
     const c = designOf(id);
@@ -186,7 +191,7 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
     for (const s of ["left", "center", "right"]) for (const p of c[s]) assert.ok(stylesFor(p.item).includes(p.style), `${id} ${p.item}:${p.style}`);
     seen.add(JSON.stringify([c.deco, c.fill, c.sep, c.text, c.left, c.center, c.right]));
   }
-  assert.equal(seen.size, 20);
+  assert.equal(seen.size, 26);
   assert.notEqual(designOf("glass"), designOf("glass"), "vždy nová kopie");
   assert.ok(sameCompose(designOf("hardware"), designOf("hardware")));
   assert.ok(!sameCompose(designOf("hardware"), designOf("cyber")));

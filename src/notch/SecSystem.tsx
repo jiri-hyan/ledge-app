@@ -47,6 +47,7 @@ function rowsOf(v: SystemView, want: readonly Metric[]): Row[] {
   const all: Record<Metric, Row | null> = {
     cpu: v.cpu != null ? { key: "cpu", name: "CPU", pct: v.cpu, hist: v.cpuHist, max: 100, text: fmtPct(v.cpu) } : null,
     ram: v.memTotal > 0 ? { key: "ram", name: "RAM", pct: v.memPct, hist: v.memHist, max: 100, text: fmtPct(v.memPct) } : null,
+    gpu: v.gpu != null ? { key: "gpu", name: "GPU", pct: v.gpu, hist: v.gpuHist, max: 100, text: fmtPct(v.gpu) } : null,
     disk: diskPct != null ? { key: "disk", name: t("cards.notch.disk", "Disk"), pct: diskPct, text: fmtPct(diskPct) } : null,
     net:
       v.rx != null || v.tx != null

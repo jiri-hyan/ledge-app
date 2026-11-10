@@ -245,4 +245,11 @@ registerDict("en", {
   "cards.size.height": "Drawer height — drag, arrow keys, double-click = default",
   "cards.size.title": "Drag = drawer size (Alt = no grid snapping), double-click = default",
   "cards.size.overflow": "Cards out of view: {n} — scroll down, nothing was deleted",
+  "cards.size.closedLabel": "Closed notch",
+  "cards.size.closedWidthHint": "Drag = closed notch width, double-click = 300 px",
+  "cards.size.closedHeightHint": "Drag = closed notch height, double-click = 30 px",
+  "cards.size.closedBothHint": "Drag = closed notch width and height",
+  "cards.size.closedReset": "Default notch",
+  "cards.size.openReset": "Default drawer",
+  "cards.size.openLabel": "Open drawer",
 });

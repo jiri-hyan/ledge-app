@@ -92,9 +92,8 @@ export function snapTo(v: number, lines: readonly number[], free: boolean): numb
 
 export type Side = "left" | "right";
 
-/** Které boky jdou táhnout: na ose uprostřed oba (šířka symetricky), u hrany jen ten volný; široký notch má pevnou šířku. */
-export function widthSides(pos: StripPosition, layout: LayoutId): Side[] {
-  if (layout === "notch") return [];
+/** Které boky jdou táhnout: na ose uprostřed oba (šířka symetricky), u hrany jen ten volný. */
+export function widthSides(pos: StripPosition, _layout?: LayoutId): Side[] {
   if (pos === "left") return ["right"];
   if (pos === "right") return ["left"];
   return ["left", "right"];

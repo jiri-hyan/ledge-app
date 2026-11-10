@@ -1,16 +1,16 @@
-// Přebití předvolby šířky (P2-3): zrcadlo pořadí v `appearance/geom.rs::sized_width`.
+// Přebití předvolby šířky (P2-3): zrcadlo pořadí v `appearance/geom.rs::sized_width` (tažení > notch > nic).
 //   node --experimental-strip-types --test src/settings/widthOverride.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { clearDragWidth, widthOverride } from "./widthOverride.ts";
 
-test("pořadí přebití: notch > tažení > nic", () => {
+test("pořadí přebití: tažení > notch > nic", () => {
   const cases = [
     [{ layout: "classic" }, null],
     [{ layout: "classic", size: {} }, null],
     [{ layout: "classic", size: { width: 0, height: 400 } }, null],
     [{ layout: "classic", size: { width: 1180 } }, { kind: "drag", px: 1180, perPage: false }],
-    [{ layout: "notch", size: { width: 1180 } }, { kind: "notch" }],
+    [{ layout: "notch", size: { width: 1180 } }, { kind: "drag", px: 1180, perPage: false }],
     [{ layout: "notch" }, { kind: "notch" }],
     // šířky záložek platí jen s perPage
     [{ layout: "classic", size: { pages: { prace: { width: 900 } } } }, null],

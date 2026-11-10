@@ -35,14 +35,26 @@ const MINI_W: Record<string, string> = { custom: "64%", narrow: "48%", medium: "
 export function DrawerMini(q: { a: Appearance }) {
   const cols = () => Math.min(5, LAYOUTS[q.a.layout]?.cols ?? 4);
   const sh = () => stripShape(q.a.strip.style, q.a.strip.size);
+  const cards = () => {
+    const list = normalizeLayout(cfg.layout).pages[0]?.cards.slice(0, Math.min(6, cols() * 2)) ?? [];
+    if (list.length) return list;
+    return (["claude", "projects", "notes", "weather", "system"] as const).map((id) => ({ id, size: "m" as const }));
+  };
   return (
     <span class="ap-mini sd-mini theme-scope" style={scopeStyle(q.a)} data-layout={q.a.layout} aria-hidden="true">
       <i class="ap-mstrip" style={{ height: `${Math.round(sh().h * 0.5)}px`, "border-radius": `0 0 ${sh().r * 0.5}px ${sh().r * 0.5}px` }} />
       <span class="ap-mdrawer" style={{ width: MINI_W[q.a.width] ?? "64%" }}>
         <b class="ap-mt">14:32</b>
         <span class="ap-mgrid" style={{ "--mc": String(cols()) }}>
-          <span class="ap-mcard wide"><i class="ap-mh" /><i class="ap-ml" /></span>
-          <For each={Array.from({ length: cols() * 2 })}>{() => <span class="ap-mcard"><i class="ap-mh" /><i class="ap-ml" /><i class="ap-ml short" /></span>}</For>
+          <For each={cards()}>
+            {(c, i) => (
+              <span class="ap-mcard" classList={{ wide: c.size === "l" || c.size === "xl" || i() === 0 }}>
+                <b class="sd-mtitle">{cardName(c.id)}</b>
+                <i class="ap-ml" />
+                <i class="ap-ml short" />
+              </span>
+            )}
+          </For>
         </span>
       </span>
     </span>

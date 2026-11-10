@@ -1,6 +1,6 @@
 // Šířka šuplíku: co přebíjí předvolbu „Šířka“ v Nastavení (zrcadlo `appearance/geom.rs::sized_width`).
-// Pořadí v Rustu: rozložení Notch (pevná šířka, ignoruje i tažení) > vlastní šířka z tažení v ✎
-// (`appearance.size.width`, s `perPage` i šířky záložek) > předvolba `appearance.width` > `drawer.width`.
+// Pořadí v Rustu: vlastní šířka z tažení v ✎ (`appearance.size.width`, s `perPage` i šířky záložek)
+// > rozložení Notch (pevná šířka) > předvolba `appearance.width` > `drawer.width`.
 import type { Appearance, DrawerSize } from "../types";
 
 export type WidthOverride =
@@ -9,11 +9,11 @@ export type WidthOverride =
 
 /** Co právě přebíjí předvolbu šířky; `null` = předvolba platí. Čistá funkce. */
 export function widthOverride(a: Pick<Appearance, "layout" | "size">): WidthOverride | null {
-  if (a.layout === "notch") return { kind: "notch" };
   const s = a.size;
-  if (!s) return null;
-  const own = [s.width, ...(s.perPage ? Object.values(s.pages ?? {}).map((p) => p.width) : [])].filter((w): w is number => !!w && w > 0);
-  return own.length ? { kind: "drag", px: own[0], perPage: !!s.perPage } : null;
+  const own = s ? [s.width, ...(s.perPage ? Object.values(s.pages ?? {}).map((p) => p.width) : [])].filter((w): w is number => !!w && w > 0) : [];
+  if (own.length) return { kind: "drag", px: own[0], perPage: !!s?.perPage };
+  if (a.layout === "notch") return { kind: "notch" };
+  return null;
 }
 
 /** `appearance.size` bez vlastní šířky (výšky zůstanou) — tlačítko „Zrušit přebití“. */
