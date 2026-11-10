@@ -154,8 +154,8 @@ function body(look: StripLookId, s: PreviewState, a: Appearance): JSX.Element {
   }
 }
 
-/** `compose` = `strip.compose` (jen u `custom`, kolo 23; `ComposePreview`). */
-export default function StripLookPreview(q: { look: StripLookId; state: PreviewState; a: Appearance; opacity: number; shape?: LookShape; compose?: unknown }) {
+/** `compose` = `strip.compose` (jen u `custom`, kolo 23; `ComposePreview`). `fitWidth` zmenší měřítko v úzké miniatuře. */
+export default function StripLookPreview(q: { look: StripLookId; state: PreviewState; a: Appearance; opacity: number; shape?: LookShape; compose?: unknown; fitWidth?: number }) {
   const lshape = () => (SHAPEABLE_LOOKS.includes(q.look) && q.shape && q.shape !== "round" ? q.shape : undefined);
   const shape = () => stripShape(q.a.strip.style, q.a.strip.size);
   return (
@@ -169,7 +169,7 @@ export default function StripLookPreview(q: { look: StripLookId; state: PreviewS
           </span>
         </Match>
         <Match when={q.look === "custom"}>
-          <ComposePreview compose={q.compose} state={q.state} opacity={q.opacity} k={STRIP_SIZE[q.a.strip.size] * 0.78} />
+          <ComposePreview compose={q.compose} state={q.state} opacity={q.opacity} k={STRIP_SIZE[q.a.strip.size] * 0.78} fitWidth={q.fitWidth} />
         </Match>
         {/* Neviditelný do události: v klidu a při běžném dění není vidět vůbec nic */}
         <Match when={q.look !== "classic" && (q.look !== "ghost" || q.state === "wait" || q.state === "done")}>

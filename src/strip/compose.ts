@@ -8,7 +8,7 @@
 export const COMPOSE_SHAPES = ["capsule", "notch", "line", "corner", "drop", "island"] as const;
 export type ComposeShape = (typeof COMPOSE_SHAPES)[number];
 /** Jen položky se skutečným zdrojem v Rustu (`looks::Facts`). */
-export const COMPOSE_ITEMS = ["time", "date", "claude", "limit5h", "limitWeek", "music", "timer", "cpu", "memory", "battery", "weather", "servers", "repos", "activity"] as const;
+export const COMPOSE_ITEMS = ["time", "date", "claude", "limit5h", "limitWeek", "music", "timer", "cpu", "memory", "gpu", "battery", "weather", "servers", "repos", "activity"] as const;
 export type ComposeItem = (typeof COMPOSE_ITEMS)[number];
 export const ITEM_STYLES = ["icon", "badge", "text", "ring", "graph", "dot", "iconText", "bar", "spark", "chip", "dotPct", "ring5h"] as const;
 export type ItemStyle = (typeof ITEM_STYLES)[number];
@@ -138,8 +138,11 @@ const DESIGN: Record<string, StripCompose> = {
   aurora: mk("notch", 320, 32, 70, ["claude:icon"], ["time:text"], ["limit5h:ring"], { deco: { ...DEFAULT_DECO, edge: "flow", len: "wide", color: "aurora", live: { ...DEFAULT_LIVE, on: true } } }),
   embers: mk("capsule", 380, 30, 60, ["claude:dotPct"], ["time:text"], ["cpu:spark"], { fill: { ...DEFAULT_FILL, kind: "gradient", from: "#2a0e05", via: "#160603", to: "#000000", flow: true }, deco: { ...DEFAULT_DECO, edge: "light", len: "full", color: "embers", live: { ...DEFAULT_LIVE, on: true } } }),
   comet: mk("island", 300, 30, 100, ["claude:iconText"], [], ["time:text"], { deco: { ...DEFAULT_DECO, edge: "comet", len: "full", color: "ocean", speed: 2, live: { ...DEFAULT_LIVE, on: true, work: "comet" } } }),
+  hardware: mk("notch", 420, 32, 70, ["cpu:spark", "memory:spark"], ["time:text"], ["gpu:spark"], { deco: { ...DEFAULT_DECO, edge: "underline", len: "wide", color: "#22d3ee" } }),
+  hwbar: mk("notch", 380, 30, 65, ["claude:dotPct"], ["time:text"], ["cpu:bar", "memory:bar", "gpu:bar"], { sep: "gap", deco: { ...DEFAULT_DECO, edge: "glow", len: "center", color: "claude" } }),
+  cyber: mk("capsule", 460, 30, 40, ["claude:iconText", "limit5h:ring"], ["time:text"], ["cpu:text", "memory:text", "gpu:text"], { sep: "pills", mono: true, fill: { ...DEFAULT_FILL, kind: "gradient", from: "#0f172a", to: "#020617" }, deco: { ...DEFAULT_DECO, edge: "gradient", len: "full", color: "#38bdf8", color2: "#a855f7" } }),
 };
-export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset", "tall", "cubes", "aurora", "embers", "comet"] as const;
+export const DESIGN_IDS = ["islands", "neon", "terminal", "chips", "glass", "sunset", "tall", "cubes", "aurora", "embers", "comet", "hardware", "hwbar", "cyber"] as const;
 export type DesignId = (typeof DESIGN_IDS)[number];
 
 const clone = (c: StripCompose): StripCompose => ({ ...c, left: c.left.map((p) => ({ ...p })), center: c.center.map((p) => ({ ...p })), right: c.right.map((p) => ({ ...p })), deco: { ...c.deco, live: { ...c.deco.live } }, fill: { ...c.fill }, text: { ...c.text } });
@@ -240,9 +243,9 @@ export function setPieceLook(c: StripCompose, item: ComposeItem, patch: { size?:
   return x;
 }
 
-/** Styly, které položka nabízí: průběh jen CPU / paměť (mají historii), „tečka + 5h“ a „prstenec 5h“ jen Claude. */
+/** Styly, které položka nabízí: průběh jen CPU / paměť / GPU (mají historii), „tečka + 5h“ a „prstenec 5h“ jen Claude. */
 export function stylesFor(item: ComposeItem): ItemStyle[] {
-  return ITEM_STYLES.filter((s) => (s === "spark" ? item === "cpu" || item === "memory" : s === "dotPct" || s === "ring5h" ? item === "claude" : true));
+  return ITEM_STYLES.filter((s) => (s === "spark" ? item === "cpu" || item === "memory" || item === "gpu" : s === "dotPct" || s === "ring5h" ? item === "claude" : true));
 }
 export function setPieceColor(c: StripCompose, item: ComposeItem, color: string): StripCompose {
   const x = clone(c);
@@ -316,7 +319,7 @@ export function drawKind(item: ComposeItem, style: ItemStyle, hasFrac: boolean):
   if (style === "graph") return hasFrac ? "meter" : "icon";
   if (style === "chip") return "iconText";
   if (style === "bar") return hasFrac ? "under" : "text";
-  if (style === "spark") return item === "cpu" || item === "memory" ? "spark" : hasFrac ? "meter" : "icon";
+  if (style === "spark") return item === "cpu" || item === "memory" || item === "gpu" ? "spark" : hasFrac ? "meter" : "icon";
   return style;
 }
 

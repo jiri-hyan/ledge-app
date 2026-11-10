@@ -26,6 +26,8 @@ pub struct SystemView {
     pub at_ms: i64,
     /// vytížení CPU v %; `None` = čeká se na druhý vzorek
     pub cpu: Option<f32>,
+    /// vytížení GPU v %; `None` = čeká se na druhý vzorek nebo nedostupné
+    pub gpu: Option<f32>,
     pub mem_used: u64,
     pub mem_total: u64,
     pub mem_pct: f32,
@@ -34,6 +36,7 @@ pub struct SystemView {
     pub rx: Option<u64>,
     pub tx: Option<u64>,
     pub cpu_hist: Vec<f32>,
+    pub gpu_hist: Vec<f32>,
     pub mem_hist: Vec<f32>,
     pub rx_hist: Vec<u64>,
     pub tx_hist: Vec<u64>,
@@ -47,6 +50,7 @@ pub struct SystemView {
 struct Last {
     at: i64,
     cpu: Option<f32>,
+    gpu: Option<f32>,
     mem_used: u64,
     mem_total: u64,
     rx: Option<u64>,
@@ -55,6 +59,7 @@ struct Last {
 
 struct State {
     prev_cpu: Option<(CpuTimes, i64)>,
+    prev_gpu: Option<(Vec<u64>, i64)>,
     prev_net: Option<((u64, u64), i64)>,
     last: Option<Last>,
     disks: Vec<Disk>,
@@ -62,6 +67,7 @@ struct State {
     /// kdy se naposled zapsalo do historie (stará historie se po pauze zahodí)
     hist_at: i64,
     cpu_h: Ring<f32>,
+    gpu_h: Ring<f32>,
     mem_h: Ring<f32>,
     rx_h: Ring<u64>,
     tx_h: Ring<u64>,
@@ -69,12 +75,14 @@ struct State {
 
 static STATE: Mutex<State> = Mutex::new(State {
     prev_cpu: None,
+    prev_gpu: None,
     prev_net: None,
     last: None,
     disks: Vec::new(),
     disks_at: i64::MIN,
     hist_at: i64::MIN,
     cpu_h: Ring::new(HISTORY),
+    gpu_h: Ring::new(HISTORY),
     mem_h: Ring::new(HISTORY),
     rx_h: Ring::new(HISTORY),
     tx_h: Ring::new(HISTORY),
@@ -84,6 +92,7 @@ fn build(st: &State, last: &Last, cfg: &SystemConfig) -> SystemView {
     SystemView {
         at_ms: last.at,
         cpu: last.cpu,
+        gpu: last.gpu,
         mem_used: last.mem_used,
         mem_total: last.mem_total,
         mem_pct: calc::mem_pct(last.mem_used, last.mem_total),
@@ -91,6 +100,7 @@ fn build(st: &State, last: &Last, cfg: &SystemConfig) -> SystemView {
         rx: last.rx,
         tx: last.tx,
         cpu_hist: st.cpu_h.to_vec(),
+        gpu_hist: st.gpu_h.to_vec(),
         mem_hist: st.mem_h.to_vec(),
         rx_hist: st.rx_h.to_vec(),
         tx_hist: st.tx_h.to_vec(),
@@ -111,6 +121,7 @@ pub fn poll(now: i64, record: bool, cfg: &SystemConfig) -> Option<SystemView> {
     };
     // čtení mimo zámek: WinAPI může chvíli trvat, plánovač a karta se nemají blokovat
     let cpu_now = win::cpu_times();
+    let gpu_now = win::gpu_nodes();
     let (mem_total, mem_avail) = win::memory()?;
     let net_now = win::net_totals();
     let disks = disks_due.then(win::fixed_disks);
@@ -121,6 +132,11 @@ pub fn poll(now: i64, record: bool, cfg: &SystemConfig) -> Option<SystemView> {
         _ => None,
     };
     st.prev_cpu = cpu_now.map(|c| (c, now));
+    let gpu = match (&gpu_now, &st.prev_gpu) {
+        (Some(c), Some((p, at))) if calc::fresh(*at, now) => calc::gpu_pct(p, c, now - *at),
+        _ => None,
+    };
+    st.prev_gpu = gpu_now.map(|g| (g, now));
     let (rx, tx) = match (net_now, st.prev_net) {
         (Some((r, t)), Some(((pr, pt), at))) if calc::fresh(at, now) => (calc::rate(pr, r, now - at), calc::rate(pt, t, now - at)),
         _ => (None, None),
@@ -131,11 +147,12 @@ pub fn poll(now: i64, record: bool, cfg: &SystemConfig) -> Option<SystemView> {
         st.disks_at = now;
     }
     let mem_used = mem_total.saturating_sub(mem_avail);
-    let last = Last { at: now, cpu, mem_used, mem_total, rx, tx };
+    let last = Last { at: now, cpu, gpu, mem_used, mem_total, rx, tx };
     st.last = Some(last);
     if record {
         if !calc::fresh(st.hist_at, now) {
             st.cpu_h.clear();
+            st.gpu_h.clear();
             st.mem_h.clear();
             st.rx_h.clear();
             st.tx_h.clear();
@@ -143,6 +160,9 @@ pub fn poll(now: i64, record: bool, cfg: &SystemConfig) -> Option<SystemView> {
         st.hist_at = now;
         if let Some(c) = cpu {
             st.cpu_h.push(c);
+        }
+        if let Some(g) = gpu {
+            st.gpu_h.push(g);
         }
         st.mem_h.push(calc::mem_pct(mem_used, mem_total));
         if let (Some(r), Some(t)) = (rx, tx) {
@@ -166,6 +186,11 @@ pub fn next_strip_due(now: i64, every_ms: i64) -> i64 {
 /// Paměť bez známé velikosti (0) = `None`, ne 0 %.
 pub fn last_pct() -> Option<(Option<f32>, Option<f32>, i64)> {
     STATE.lock().last.map(|l| (l.cpu, (l.mem_total > 0).then(|| calc::mem_pct(l.mem_used, l.mem_total)), l.at))
+}
+
+/// Poslední vzorek GPU % pro styly zavřeného Ledge (`looks::facts::gpu_fact`): (GPU %, kdy). Jen paměť.
+pub fn last_gpu() -> Option<(Option<f32>, i64)> {
+    STATE.lock().last.map(|l| (l.gpu, l.at))
 }
 
 /// Segment položky proužku `system` z posledního vzorku (jen paměť). Bez vzorku nic.

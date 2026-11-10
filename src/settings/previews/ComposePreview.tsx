@@ -23,7 +23,7 @@ type Val = { g: string; text: string; num?: string; p?: number; c: Tone; ev?: bo
 
 export const ITEM_GLYPH: Record<ComposeItem, string> = {
   time: "◷", date: "▦", claude: "✳", limit5h: "5h", limitWeek: "7d", music: "♪", timer: "⏱",
-  cpu: "▤", memory: "▤", battery: "▭", weather: "☀", servers: "▣", repos: "⑂", activity: "✎",
+  cpu: "▤", memory: "▤", gpu: "▤", battery: "▭", weather: "☀", servers: "▣", repos: "⑂", activity: "✎",
 };
 
 export function sampleVal(item: ComposeItem, s: PreviewState): Val | null {
@@ -45,6 +45,7 @@ export function sampleVal(item: ComposeItem, s: PreviewState): Val | null {
     case "timer": return s === "timer" ? { g: "⏱", text: t("appearance.sample.timer", "18 min"), num: "18", p: 70, c: "acc", ev: true } : null;
     case "cpu": return { g: "▤", text: "CPU 23 %", num: "23", p: 23, c: "off" };
     case "memory": return { g: "▤", text: "RAM 46 %", num: "46", p: 46, c: "off" };
+    case "gpu": return { g: "▤", text: "GPU 14 %", num: "14", p: 14, c: "off" };
     case "battery": return { g: "", text: "82 %", num: "82", p: 82, c: "off" };
     case "weather": return { g: "☀", text: "21°", c: "off" };
     case "servers": return { g: "▣", text: t("appearance.compose.sampleServers", "Servery 3"), num: "3", c: "ok" };
@@ -144,15 +145,38 @@ function centerOf(c: StripCompose, s: PreviewState): Piece[] {
   return [ev ?? c.center.find((p) => sampleVal(p.item, s)) ?? c.center[0]];
 }
 
+/** Odhad šířky obsahu při `k = 1`, aby miniatury v galerii („Hotové designy“) zmenšily měřítko `k` a neořízly kraje. */
+function estContentW(c: StripCompose, s: PreviewState): number {
+  const sp = SPACE_MULT[c.text.spacing];
+  const pw = (p: Piece) => {
+    const base =
+      p.style === "dot" ? 14 :
+      p.style === "icon" || p.style === "ring" || p.style === "ring5h" || p.style === "badge" ? 28 :
+      p.style === "graph" ? 36 :
+      p.style === "spark" ? 82 :
+      p.item === "claude" ? 148 :
+      p.item === "music" ? 116 :
+      p.item === "time" ? 54 : 84;
+    const pill = p.bg || p.style === "chip" || c.sep === "pills" || c.sep === "islands" ? 16 : 0;
+    return base * SIZE_MULT[p.size ?? "normal"] * c.text.size + pill;
+  };
+  const slotW = (ps: Piece[]) => ps.reduce((sum, p) => sum + pw(p), 0) + Math.max(0, ps.length - 1) * 10 * sp;
+  const lw = slotW(c.left);
+  const cw = slotW(centerOf(c, s));
+  const rw = slotW(c.right);
+  const sides = cw > 0 ? 2 * Math.max(lw, rw) : lw + rw;
+  return Math.round(sides + cw + 36 * sp);
+}
+
 /** Rozměry těla v px náhledu (`k` = měřítko; zaoblení jako Rust `compose::spec`). */
-export function bodyStyle(c: StripCompose, k: number, opacity: number): JSX.CSSProperties {
+export function bodyStyle(c: StripCompose, k: number, opacity: number, minW?: number): JSX.CSSProperties {
   const h = c.height * k;
   const r = c.shape === "drop" ? (c.round / 100) * h : ((c.round / 100) * h) / 2;
   const pill = c.shape === "island" || c.shape === "corner";
   return {
     "--k": String(k),
     "--so": String(opacity),
-    "min-width": `${c.width * k}px`,
+    "min-width": `${(minW ?? c.width) * k}px`,
     height: `${h}px`,
     "border-radius": pill ? `${r}px` : `0 0 ${r}px ${r}px`,
     "--ear": `${Math.min(18, Math.max(6, c.height * 0.42)) * k}px`,
@@ -164,10 +188,15 @@ export function bodyStyle(c: StripCompose, k: number, opacity: number): JSX.CSSP
 }
 
 /** `fx` = „Vyzkoušet“ stavu živé hrany z editoru (i limit, který přepínač „Co se děje“ nemá). */
-export default function ComposePreview(q: { compose: unknown; state: PreviewState; opacity: number; k?: number; pos?: string; fx?: LiveState }) {
+export default function ComposePreview(q: { compose: unknown; state: PreviewState; opacity: number; k?: number; pos?: string; fx?: LiveState; fitWidth?: number }) {
   const c = () => normCompose(q.compose);
   const ef = () => edgeLook(c().deco, q.fx ?? liveOf(q.state), !!q.fx);
-  const k = () => q.k ?? 0.78;
+  const naturalW = () => Math.max(c().width, estContentW(c(), q.state));
+  const k = () => {
+    const base = q.k ?? 0.78;
+    const ear = c().shape === "notch" ? 28 : 0;
+    return q.fitWidth ? Math.min(base, q.fitWidth / Math.max(160, naturalW() + ear)) : base;
+  };
   const hidden = () => c().hideIdle && q.state !== "wait" && q.state !== "done";
   const all = () => [...c().left, ...c().center, ...c().right];
   return (
@@ -181,7 +210,7 @@ export default function ComposePreview(q: { compose: unknown; state: PreviewStat
         }
       >
         <span class="apv-sx" data-look="custom" data-cshape={c().shape} data-edge={ef().fx} data-len={c().deco.len} data-run={ef().run || (c().fill.flow && (q.state === "work" || q.state === "wait" || c().deco.always)) ? "" : undefined} data-fflow={c().fill.flow && c().fill.kind === "gradient" ? "" : undefined} data-fill={c().fill.kind} data-sep={c().sep} data-mono={c().mono ? "" : undefined}
-          style={{ ...bodyStyle(c(), k(), q.opacity), ...decoStyle(c(), q.state, q.fx) }}>
+          style={{ ...bodyStyle(c(), k(), q.opacity, naturalW()), ...decoStyle(c(), q.state, q.fx) }}>
           <span class="apv-cs" data-slot="left"><For each={c().left}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
           <span class="apv-cs" data-slot="center"><For each={centerOf(c(), q.state)}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>
           <span class="apv-cs" data-slot="right"><For each={c().right}>{(p) => <PieceBox piece={p} state={q.state} />}</For></span>

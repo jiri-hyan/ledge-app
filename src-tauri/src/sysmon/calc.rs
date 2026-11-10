@@ -32,6 +32,18 @@ fn round1(v: f32) -> f32 {
     ((v * 10.0).round() / 10.0).clamp(0.0, 100.0)
 }
 
+/// Vytížení GPU v % ze dvou vzorků běžícího času enginů (v 100ns ticích) za `dt_ms` ms. Stejně jako Správce
+/// úloh bere nejvytíženější engine (3D, Compute, Copy, Video Decode běží nezávisle).
+pub fn gpu_pct(prev: &[u64], cur: &[u64], dt_ms: i64) -> Option<f32> {
+    if dt_ms <= 0 || prev.is_empty() || prev.len() != cur.len() {
+        return None;
+    }
+    let span = (dt_ms as u64).checked_mul(10_000)?;
+    let max_diff = prev.iter().zip(cur).try_fold(0u64, |acc, (p, c)| c.checked_sub(*p).map(|d| acc.max(d)))?;
+    let pct = (max_diff.min(span) as f64 / span as f64) * 100.0;
+    Some(round1(pct as f32))
+}
+
 /// Rychlost v bajtech za sekundu z dvou stavů čítače; `None` = čítač šel zpět (restart adaptéru, jiná
 /// množina adaptérů) nebo uplynul nulový čas.
 pub fn rate(prev: u64, cur: u64, dt_ms: i64) -> Option<u64> {
@@ -227,5 +239,11 @@ mod tests {
         }
         assert_eq!(mem_pct(8, 16), 50.0);
         assert_eq!(mem_pct(0, 0), 0.0);
+        assert_eq!(gpu_pct(&[1_000_000, 0], &[6_000_000, 1_000_000], 2000), Some(25.0));
+        assert_eq!(gpu_pct(&[0], &[30_000_000], 2000), Some(100.0), "ořez na 100 %");
+        assert_eq!(gpu_pct(&[100], &[50], 2000), None, "čítač šel zpět");
+        assert_eq!(gpu_pct(&[100], &[100, 200], 2000), None, "jiný počet enginů");
+        assert_eq!(gpu_pct(&[], &[], 2000), None);
+        assert_eq!(gpu_pct(&[0], &[100], 0), None);
     }
 }

@@ -125,6 +125,7 @@ registerDict("en", {
   "appearance.compose.item.limit5h": "5 h limit",
   "appearance.compose.item.limitWeek": "Weekly limit",
   "appearance.compose.item.memory": "Memory",
+  "appearance.compose.item.gpu": "Graphics (GPU)",
   "appearance.compose.item.music": "Music",
   "appearance.compose.item.repos": "Repos",
   "appearance.compose.item.servers": "Servers",

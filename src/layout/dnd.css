@@ -21,6 +21,19 @@
 .lp-box, .lp-slot { display: contents; }
 .lp-box[data-flex] { display: flex; flex-direction: column; position: relative; gap: var(--s1); }
 .lp-box[data-flex] > .lp-slot { display: block; min-width: 0; }
+/* široká karta Claude (L / XL): viditelné části (limity, session, útrata) se naskládají vedle sebe místo pod sebe */
+[data-card="claude"][data-size="l"] .lp-box:not(:has(.lp-edit)),
+[data-card="claude"][data-size="xl"] .lp-box:not(:has(.lp-edit)) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--s2) var(--s3);
+  align-items: start;
+}
+[data-card="claude"][data-size="l"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty),
+[data-card="claude"][data-size="xl"] .lp-box:not(:has(.lp-edit)) > .lp-slot:not(:empty) {
+  display: block;
+  min-width: 0;
+}
 
 /* lišta části v úpravách: úchyt + název (+ „Ukázat“ u skryté); chytá se za celou lištu */
 .lp-edit { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s1); padding: 2px var(--s2); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--t2); background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--line-2)); border-radius: var(--r-sm); cursor: grab; touch-action: none; user-select: none; pointer-events: auto; }

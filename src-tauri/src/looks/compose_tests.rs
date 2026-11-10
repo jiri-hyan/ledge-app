@@ -204,6 +204,7 @@ fn needs_only_with_item() {
         (cmp(Form::Capsule, &[pc(Music, i)], &[], &[]), (true, false, false)),
         (cmp(Form::Capsule, &[pc(Battery, i)], &[pc(Cpu, i)], &[]), (false, true, true)),
         (cmp(Form::Capsule, &[], &[pc(Memory, i)], &[]), (false, false, true)),
+        (cmp(Form::Capsule, &[], &[pc(Gpu, i)], &[]), (false, false, true)),
     ];
     for (c, want) in table {
         assert_eq!(compose::needs(&c), want, "{c:?}");
@@ -262,7 +263,7 @@ fn ts_mirror() {
     let forms = [Form::Capsule, Form::Notch, Form::Line, Form::Corner, Form::Drop, Form::Island];
     let items = [
         PieceItem::Time, PieceItem::Date, PieceItem::Claude, PieceItem::Limit5h, PieceItem::LimitWeek, PieceItem::Music, PieceItem::Timer,
-        PieceItem::Cpu, PieceItem::Memory, PieceItem::Battery, PieceItem::Weather, PieceItem::Servers, PieceItem::Repos,
+        PieceItem::Cpu, PieceItem::Memory, PieceItem::Gpu, PieceItem::Battery, PieceItem::Weather, PieceItem::Servers, PieceItem::Repos,
         PieceItem::Activity,
     ];
     // hrany a délky linky (kolo 28) hlídá `edgefx::ts_mirror` proti `src/strip/edgefx.ts`

@@ -4,6 +4,7 @@ import { onCleanup, onMount } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { api, on, type Snapshot } from "../api";
 import { EMPTY_SNAPSHOT } from "../snapshot";
+import { initAppearance } from "../theme/apply";
 import { Toast } from "../ui/toast";
 import Studio from "./Studio";
 
@@ -13,7 +14,11 @@ export default function StudioWindow() {
   onMount(() => {
     void api.getState().then(apply, () => {});
     const off = on<Snapshot>("state", apply);
-    onCleanup(() => void off.then((f) => f()));
+    const offApp = initAppearance();
+    onCleanup(() => {
+      void off.then((f) => f());
+      void offApp.then((f) => f());
+    });
   });
   return (
     <>

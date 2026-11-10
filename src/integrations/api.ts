@@ -10,6 +10,7 @@ export type Disk = { letter: string; total: number; free: number; system: boolea
 export interface SystemView {
   atMs: number;
   cpu: number | null;
+  gpu?: number | null;
   memUsed: number;
   memTotal: number;
   memPct: number;
@@ -17,6 +18,7 @@ export interface SystemView {
   rx: number | null;
   tx: number | null;
   cpuHist: number[];
+  gpuHist?: number[];
   memHist: number[];
   rxHist: number[];
   txHist: number[];

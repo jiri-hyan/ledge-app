@@ -27,6 +27,7 @@
 .sd-lrow .sd-sub { grid-column: 2 / 4; }
 .sd-key { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--green); }
 .sd-lrow[data-k="mem"] .sd-key { background: var(--accent); }
+.sd-lrow[data-k="gpu"] .sd-key { background: var(--blue); }
 .sd-lrow[data-k="disk"] .sd-key { background: var(--teal); }
 
 /* budíky */

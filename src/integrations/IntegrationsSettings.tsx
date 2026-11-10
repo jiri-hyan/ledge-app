@@ -66,7 +66,7 @@ export function SystemSettings() {
           ]}
         />
       </Row>
-      <p class="int-note">{t("settings.system.note", "Karta Systém měří, jen když je vidět a šuplík je otevřený. Položka „Systém“ v proužku měří každých 10 sekund. Teplotu ani grafickou kartu Ledge neukazuje — nejdou spolehlivě zjistit.")}</p>
+      <p class="int-note">{t("settings.system.note", "Karta Systém měří CPU, paměť, GPU, disky a síť, jen když je vidět a šuplík je otevřený. Položka „Systém“ v proužku měří každých 10 sekund. Teplotu Ledge neukazuje — nejde spolehlivě zjistit bez ovladače.")}</p>
     </>
   );
 }

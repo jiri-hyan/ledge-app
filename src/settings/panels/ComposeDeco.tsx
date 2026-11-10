@@ -27,6 +27,9 @@ export const DESIGN_NAME: Record<DesignId, () => string> = {
   aurora: () => t("appearance.compose.design.aurora", "Polární záře"),
   embers: () => t("appearance.compose.design.embers", "Žhavá římsa"),
   comet: () => t("appearance.compose.design.comet", "Kometa"),
+  hardware: () => t("appearance.compose.design.hardware", "Výkon: CPU · RAM · GPU"),
+  hwbar: () => t("appearance.compose.design.hwbar", "Výřez: Claude + CPU · RAM · GPU"),
+  cyber: () => t("appearance.compose.design.cyber", "Cyber HUD"),
 };
 const FILL_NAME: Record<FillKind, () => string> = {
   black: () => t("appearance.compose.fill.black", "Černá"),
@@ -71,7 +74,7 @@ export function ComposeDesigns(q: Q & { state: PreviewState; a: Appearance; opac
         <For each={DESIGN_IDS}>
           {(id) => (
             <button class="ap-style cx-pre" type="button" role="listitem" onClick={() => q.commit(designOf(id))}>
-              <StripLookPreview look="custom" compose={designOf(id)} state={q.state} a={q.a} opacity={q.opacity} />
+              <StripLookPreview look="custom" compose={designOf(id)} state={q.state} a={q.a} opacity={q.opacity} fitWidth={232} />
               <span class="ap-name">{DESIGN_NAME[id]()}</span>
             </button>
           )}

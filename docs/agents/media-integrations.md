@@ -47,10 +47,10 @@ Dvě karty z katalogu (✎ → + Přidat kartu), **výchozí na žádné zálož
   vypnuto („Zapnout GitHub“ jedním klikem s větou, co se čte), `gh` chybí, nepřihlášeno („gh auth login“ + Kopírovat),
   offline (zůstanou poslední data + chyba). Tauri: `github_view(force)`, `github_open(url)`, `github_copy_login`.
 - **Systém** — sekce `system`: `disks` (písmena disků, prázdné = všechny pevné), `netUnit` (`bytes` = MB/s, `bits` =
-  Mbit/s). CPU % z dvou vzorků `GetSystemTimes`, paměť `GlobalMemoryStatusEx`, volné místo pevných disků
+  Mbit/s). CPU % z dvou vzorků `GetSystemTimes`, paměť `GlobalMemoryStatusEx`, GPU % z `D3DKMTQueryStatistics`, volné místo pevných disků
   (`GetDiskFreeSpaceExW`, čte se nejvýš 1× za 30 s), síť `GetIfTable2` (jen fyzické adaptéry nahoře). Žádné WMI, žádný
   proces. Vzorkuje se **jen** s viditelnou kartou (1× za 2 s) nebo se zapnutou položkou proužku `system` (1× za 10 s);
-  sparkline = posledních 60 vzorků karty v paměti. Klik na CPU / paměť otevře Správce úloh. Teplota a GPU záměrně
+  sparkline = posledních 60 vzorků karty v paměti. Klik na CPU / paměť / GPU otevře Správce úloh. Teplota záměrně
   ne (nespolehlivé). Tauri: `system_view`, `system_taskmgr`.
 - **Proužek:** položky `github` a `system` (výchozí vypnuté) drží plánovač `integrations.rs`; bez nich žádné vlákno
   neběží. Ve fullscreen hře (Ledge „mrtvý“) se nevzorkuje ani nevolá `gh`.

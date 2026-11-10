@@ -8,6 +8,7 @@
    čtou s výchozí hodnotou = dnešní vzhled. Ozdoby jednotlivých stylů: blok „Styly“ na konci. */
 @import "./ui/toast.css";
 :root {
+  color-scheme: dark;
   /* škály vzhledu (1 = výchozí): písmo, hustota mezer, zaoblení, krytí pozadí, rychlost animací */
   --fz: 1;
   --dens: 1;
@@ -176,7 +177,11 @@ html[data-glass="on"] .shell {
 .mini.ok { color: var(--on-light); background: var(--t1); border-color: transparent; }
 .mini.ok:hover { background: var(--pri-hover); }
 .mini.danger { color: var(--on-light); background: var(--red); border-color: transparent; }
-select, input[type="number"], input[type="text"] { font: var(--fs-ui) var(--sans); color: var(--t1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 8px; }
+input[type="number"], input[type="text"] { font: var(--fs-ui) var(--sans); color: var(--t1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 8px; }
+select { font: 500 var(--fs-ui) var(--sans); color: var(--t1); background-color: var(--raised); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 10px; cursor: pointer; transition: border-color var(--fast), background-color var(--fast); }
+select:hover:not(:disabled) { border-color: var(--t3); }
+select option, select optgroup { background-color: var(--raised); color: var(--t1); }
+html[data-scheme="light"], .theme-scope[data-scheme="light"] { color-scheme: light; }
 input[type="number"] { width: 66px; }
 input[type="text"] { width: 260px; }
 .banner { display: flex; gap: 10px; align-items: flex-start; font-size: var(--fs-ui); color: var(--red); background: color-mix(in srgb, var(--red) 8%, transparent); border: 1px solid color-mix(in srgb, var(--red) 25%, transparent); border-radius: var(--r-lg); padding: 9px 13px; margin-bottom: var(--gap-section); }

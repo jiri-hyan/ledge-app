@@ -63,6 +63,7 @@ pub enum PieceItem {
     Timer,
     Cpu,
     Memory,
+    Gpu,
     Battery,
     Weather,
     Servers,
@@ -374,6 +375,8 @@ pub fn value(item: PieceItem, f: &Facts) -> Option<Val> {
             .map(|v| Val { glyph: Some(Glyph::Cpu), short: None, ..v }),
         PieceItem::Memory => share("RAM", f.mem, f.mem.map(|p| if p >= capsule::WARN_PCT { Rgba::AMBER } else { Rgba::TEXT }).unwrap_or(Rgba::TEXT))
             .map(|v| Val { glyph: Some(Glyph::Cpu), short: None, ..v }),
+        PieceItem::Gpu => share("GPU", f.gpu, f.gpu.map(|p| if p >= capsule::WARN_PCT { Rgba::AMBER } else { Rgba::TEXT }).unwrap_or(Rgba::TEXT))
+            .map(|v| Val { glyph: Some(Glyph::Cpu), short: None, ..v }),
         PieceItem::Battery => f.battery.map(|b| {
             let c = if b.charging { Rgba::GREEN } else if b.percent <= 20 { Rgba::RED } else { Rgba::TEXT };
             Val { num: Some(b.percent.to_string()), frac: Some(frac(b.percent as f64)), ..val0(None, c, pct(b.percent as f64)) }
@@ -535,6 +538,7 @@ fn parts_raw(p: &Piece, f: &Facts) -> Vec<Part> {
             let hist: &[f32] = match p.item {
                 PieceItem::Cpu => &f.cpu_hist,
                 PieceItem::Memory => &f.mem_hist,
+                PieceItem::Gpu => &f.gpu_hist,
                 _ => &[],
             };
             match (hist.len() >= 2, v.frac) {
@@ -667,8 +671,8 @@ pub fn spec(c: &Compose) -> Spec {
 }
 
 /// Co vlastní vzhled potřebuje za data navíc (hudba = vlákno `media`, baterie = odběr změn napájení,
-/// systém = vzorky CPU / paměti) — jen když tu položku opravdu má.
+/// systém = vzorky CPU / paměti / GPU) — jen když tu položku opravdu má.
 pub fn needs(c: &Compose) -> (bool, bool, bool) {
     let c = c.norm();
-    (c.has(PieceItem::Music), c.has(PieceItem::Battery), c.has(PieceItem::Cpu) || c.has(PieceItem::Memory))
+    (c.has(PieceItem::Music), c.has(PieceItem::Battery), c.has(PieceItem::Cpu) || c.has(PieceItem::Memory) || c.has(PieceItem::Gpu))
 }

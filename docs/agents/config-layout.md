@@ -178,7 +178,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     výchozí, `notch`, `line` = linka přes celou hranu s úsekem na položku, `corner`, `drop`, `island`), `width`
     60–620 px (výchozí 300; u `line` se nepoužije), `height` 18–52 px (`line` 2–10, výchozí 30), `round` 0–100 %
     (výchozí 55), sloty `left` / `center` / `right` = pole `{ "item", "style" }`, dohromady 1–5 položek, každá
-    nejvýš jednou. `item`: `time`, `date`, `claude`, `limit5h`, `limitWeek`, `music`, `timer`, `cpu`, `memory`,
+    nejvýš jednou. `item`: `time`, `date`, `claude`, `limit5h`, `limitWeek`, `music`, `timer`, `cpu`, `memory`, `gpu`,
     `battery`, `weather`, `servers`, `repos`, `activity` (kolo 23, „Claude aktivita“: čekající schválení s počtem,
     jinak fáze vedoucí session + soubor — fáze je odhad podle posledního nástroje z hooku `PostToolUse`, krok
     čtení → úpravy → testy → hotovo jako podíl prstence; bez hooků nic) (jen co má skutečný zdroj; bez dat se položka nekreslí, prstenec limitu

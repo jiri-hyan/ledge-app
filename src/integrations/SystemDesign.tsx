@@ -35,6 +35,7 @@ export default function SystemDesign(p: P) {
   const size = (n: number) => fmtSize(n, num);
   const rate = (r: number | null) => fmtRate(r, v().netUnit, num);
   const cpuLoad = () => loadOf(v().cpu);
+  const gpuLoad = () => loadOf(v().gpu);
   const memLoad = () => loadOf(v().memPct);
   const disk = () => fullestDisk(v().disks);
   const diskPct = () => (disk() ? disk()!.used * 100 : null);
@@ -49,6 +50,7 @@ export default function SystemDesign(p: P) {
   };
   const pct = (x: number) => fmtPct(x, num);
   const cpuTip = () => histTip(t("cards.system.cpu", "CPU"), v().cpuHist, pct(v().cpu ?? NaN), pct);
+  const gpuTip = () => histTip(t("cards.system.gpu", "GPU"), v().gpuHist ?? [], pct(v().gpu ?? NaN), pct);
   const memTip = () => histTip(t("cards.system.mem", "Paměť"), v().memHist, `${pct(v().memPct)} (${size(v().memUsed)} / ${size(v().memTotal)})`, pct);
   const diskTip = () => (disk() ? t("cards.sd.tip.disk", "Disk {letter}: zaplněno {pct}, volné {free} z {total}", { letter: disk()!.disk.letter, pct: pct(diskPct()!), free: size(disk()!.disk.free), total: size(disk()!.disk.total) }) : "");
   const netTip = () => `${t("cards.system.down", "Příjem")} ${rate(v().rx)} · ${t("cards.system.up", "Odesílání")} ${rate(v().tx)} · ${t("cards.sd.tip.peak", "špička {rx} / {tx} za posledních {sec} s", { rx: rate(Math.max(0, ...v().rxHist)), tx: rate(Math.max(0, ...v().txHist)), sec: windowSec(v().rxHist.length) })}`;
@@ -58,6 +60,7 @@ export default function SystemDesign(p: P) {
   const rows = () => [
     { k: "cpu", label: t("cards.system.cpu", "CPU"), val: pct(v().cpu ?? NaN), sub: (() => { const s = histStats(v().cpuHist); return s ? t("cards.sd.avgPeak", "ø {avg} · špička {peak}", { avg: pct(s.avg), peak: pct(s.peak) }) : ""; })(), tip: cpuTip(), open: true },
     { k: "mem", label: t("cards.system.mem", "Paměť"), val: pct(v().memPct), sub: t("cards.system.memOf", "{used} z {total}", { used: size(v().memUsed), total: size(v().memTotal) }), tip: memTip(), open: true },
+    ...(v().gpu != null ? [{ k: "gpu", label: t("cards.system.gpu", "GPU"), val: pct(v().gpu!), sub: (() => { const s = histStats(v().gpuHist ?? []); return s ? t("cards.sd.avgPeak", "ø {avg} · špička {peak}", { avg: pct(s.avg), peak: pct(s.peak) }) : ""; })(), tip: gpuTip(), open: true }] : []),
     ...(disk() ? [{ k: "disk", label: diskName(), val: pct(diskPct()!), sub: t("cards.system.diskFree", "{free} volné", { free: size(disk()!.disk.free) }), tip: diskTip(), open: false }] : []),
   ];
 
@@ -95,7 +98,7 @@ export default function SystemDesign(p: P) {
         </Match>
         <Match when={p.design === "gauges"}>
           <div class="sd-gauges">
-            <For each={[{ k: "cpu", pct: v().cpu, tone: tone(cpuLoad()), tip: cpuTip(), label: t("cards.system.cpu", "CPU"), sub: "", open: true }, { k: "mem", pct: v().memPct, tone: tone(memLoad()), tip: memTip(), label: t("cards.system.mem", "Paměť"), sub: `${size(v().memUsed)} / ${size(v().memTotal)}`, open: true }, ...(disk() ? [{ k: "disk", pct: diskPct(), tone: diskTone(), tip: diskTip(), label: diskName(), sub: t("cards.system.diskFree", "{free} volné", { free: size(disk()!.disk.free) }), open: false }] : [])]}>
+            <For each={[{ k: "cpu", pct: v().cpu, tone: tone(cpuLoad()), tip: cpuTip(), label: t("cards.system.cpu", "CPU"), sub: "", open: true }, { k: "mem", pct: v().memPct, tone: tone(memLoad()), tip: memTip(), label: t("cards.system.mem", "Paměť"), sub: `${size(v().memUsed)} / ${size(v().memTotal)}`, open: true }, ...(v().gpu != null ? [{ k: "gpu", pct: v().gpu ?? null, tone: tone(gpuLoad()), tip: gpuTip(), label: t("cards.system.gpu", "GPU"), sub: "", open: true }] : []), ...(disk() ? [{ k: "disk", pct: diskPct(), tone: diskTone(), tip: diskTip(), label: diskName(), sub: t("cards.system.diskFree", "{free} volné", { free: size(disk()!.disk.free) }), open: false }] : [])]}>
               {(g) => (
                 <button class="sd-gauge" title={g.tip} onClick={g.open ? p.onOpen : undefined} disabled={!g.open}>
                   <Gauge frac={g.pct != null ? g.pct / 100 : null} tone={g.tone} title={g.tip} label={g.tip}>
@@ -135,7 +138,7 @@ export default function SystemDesign(p: P) {
           <div class="sd-term" role="table">
             <For each={rows()}>
               {(r) => {
-                const n = () => (r.k === "cpu" ? v().cpu : r.k === "mem" ? v().memPct : diskPct());
+                const n = () => (r.k === "cpu" ? v().cpu : r.k === "gpu" ? (v().gpu ?? null) : r.k === "mem" ? v().memPct : diskPct());
                 return (
                   <button class="sd-trow" title={r.tip} onClick={r.open ? p.onOpen : undefined} disabled={!r.open}>
                     <span class="sd-tk">{r.k === "disk" ? diskName() : r.label}</span>
@@ -170,6 +173,14 @@ export default function SystemDesign(p: P) {
               <Spark values={v().memHist} max={100} load={memLoad()} title={memTip()} />
               <small class="sd-sub sd-wide">{size(v().memUsed)} / {size(v().memTotal)}</small>
             </button>
+            <Show when={v().gpu != null}>
+              <button class="sd-tile" title={gpuTip()} onClick={p.onOpen} data-load={gpuLoad()}>
+                <b class="sd-big">{pct(v().gpu ?? NaN)}</b>
+                <span class="sd-l">{t("cards.system.gpu", "GPU")}</span>
+                <Spark values={v().gpuHist ?? []} max={100} load={gpuLoad()} title={gpuTip()} />
+                <Show when={histStats(v().gpuHist ?? [])}>{(s) => <small class="sd-sub sd-wide">{t("cards.sd.avgPeak", "ø {avg} · špička {peak}", { avg: pct(s().avg), peak: pct(s().peak) })}</small>}</Show>
+              </button>
+            </Show>
             <div class="sd-tile" title={netTip()}>
               <b class="sd-big">{rate(v().rx)}</b>
               <span class="sd-l">↓ {t("cards.system.down", "Příjem")}</span>

@@ -42,6 +42,7 @@ export const ITEM_NAME: Record<ComposeItem, () => string> = {
   timer: () => t("appearance.compose.item.timer", "Časovač"),
   cpu: () => t("appearance.compose.item.cpu", "Výkon (CPU)"),
   memory: () => t("appearance.compose.item.memory", "Paměť"),
+  gpu: () => t("appearance.compose.item.gpu", "Grafika (GPU)"),
   battery: () => t("appearance.compose.item.battery", "Baterie"),
   weather: () => t("appearance.compose.item.weather", "Počasí"),
   servers: () => t("appearance.compose.item.servers", "Servery"),

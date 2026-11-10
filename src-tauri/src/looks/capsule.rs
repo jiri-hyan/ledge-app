@@ -104,6 +104,9 @@ pub fn fill(look: Look, f: &Facts, s: &mut Show) {
             if let Some(m) = f.mem {
                 system.push(text(format!("RAM {}", pct(m)), Rgba::TEXT));
             }
+            if let Some(g) = f.gpu {
+                system.push(text(format!("GPU {}", pct(g)), Rgba::TEXT));
+            }
             system.extend(battery(f));
             s.parts = joined(vec![weather, middle, system]);
         }

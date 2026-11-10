@@ -72,13 +72,13 @@ export function PartSlot(p: { card: CardId; k: string; hidden?: boolean; titled?
         )}
       </Show>
       <Show when={!p.hidden}>
-        <Show when={p.titled && !editing() && !p.empty}>
+        <Show when={p.titled && !p.empty && !editing()}>
           <button class="lp-head" aria-expanded={open()} onClick={() => setFolded((f) => toggleFold(f, fk()))}>
             <span class="lp-chev" classList={{ on: open() }}>›</span>
             {name()}
           </button>
         </Show>
-        <Show when={p.titled} fallback={p.children}>
+        <Show when={p.titled && (!p.empty || editing())} fallback={p.children}>
           <div class="lp-fold" data-open={open() ? "true" : "false"}>
             <div class="lp-fold-in">{p.children}</div>
           </div>

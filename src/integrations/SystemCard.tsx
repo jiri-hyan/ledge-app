@@ -60,6 +60,7 @@ export default function SystemCard(p: { menu?: JSX.Element; design?: string }) {
     });
   });
   const cpuLoad = () => loadOf(view()?.cpu);
+  const gpuLoad = () => loadOf(view()?.gpu);
   const memLoad = () => loadOf(view()?.memPct);
   const unit = () => view()?.netUnit ?? "bytes";
   const netMax = () => {
@@ -85,6 +86,13 @@ export default function SystemCard(p: { menu?: JSX.Element; design?: string }) {
               <span class="sys-sub">{t("cards.system.memOf", "{used} z {total}", { used: size(v().memUsed), total: size(v().memTotal) })}</span>
               <Spark values={v().memHist} max={100} load={memLoad()} />
             </button>
+            <Show when={v().gpu != null || (v().gpuHist?.length ?? 0) > 0}>
+              <button class="sys-row sys-click" onClick={openTaskManager} title={t("cards.system.taskmgr", "Otevřít Správce úloh")}>
+                <span class="sys-l">{t("cards.system.gpu", "GPU")}</span>
+                <b class="sys-v" classList={{ "sys-warm": gpuLoad() === "warm", "sys-hot": gpuLoad() === "hot" }}>{fmtPct(v().gpu ?? null, num)}</b>
+                <Spark values={v().gpuHist ?? []} max={100} load={gpuLoad()} />
+              </button>
+            </Show>
             <For each={v().disks}>
               {(d) => (
                 <div class="sys-row" title={t("cards.system.diskTitle", "Disk {letter}: {total} celkem", { letter: d.letter, total: size(d.total) })}>

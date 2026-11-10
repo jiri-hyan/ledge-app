@@ -177,8 +177,8 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
   // náhrady nových stylů = Rust compose::parts
   for (const [item, style, frac, want] of [["claude", "ring5h", false, "ring"], ["time", "ring5h", false, "icon"], ["limit5h", "bar", true, "under"], ["time", "bar", false, "text"], ["cpu", "spark", true, "spark"], ["limit5h", "spark", true, "meter"], ["time", "chip", false, "iconText"], ["claude", "dotPct", false, "dotPct"]])
     assert.equal(drawKind(item, style, frac), want, `${item}:${style}`);
-  // 6 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
-  assert.equal(DESIGN_IDS.length, 11);
+  // 14 předvoleb: v rozsahu, každá jiná výzdoba, nic mimo seznamy
+  assert.equal(DESIGN_IDS.length, 14);
   const seen = new Set();
   for (const id of DESIGN_IDS) {
     const c = designOf(id);
@@ -186,7 +186,7 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
     for (const s of ["left", "center", "right"]) for (const p of c[s]) assert.ok(stylesFor(p.item).includes(p.style), `${id} ${p.item}:${p.style}`);
     seen.add(JSON.stringify([c.deco, c.fill, c.sep, c.text, c.left, c.center, c.right]));
   }
-  assert.equal(seen.size, 11);
+  assert.equal(seen.size, 14);
   assert.notEqual(designOf("glass"), designOf("glass"), "vždy nová kopie");
 });
 

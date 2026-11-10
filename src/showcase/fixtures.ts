@@ -65,8 +65,8 @@ export function systemFull(now: number) {
   const rxHist = wave(60, 500, 380, 1).map((v) => v * 4_000);
   const txHist = wave(60, 120, 90, 2).map((v) => v * 3_000);
   return {
-    atMs: now, cpu: 38, memUsed: 11.2 * GB, memTotal: 32 * GB, memPct: 35,
+    atMs: now, cpu: 38, gpu: 18, memUsed: 11.2 * GB, memTotal: 32 * GB, memPct: 35,
     disks: [{ letter: "C", total: 953 * GB, free: 311 * GB, system: true }, { letter: "D", total: 1862 * GB, free: 1204 * GB, system: false }],
-    rx: rxHist[59], tx: txHist[59], cpuHist: wave(60, 40, 22, 0), memHist: wave(60, 35, 6, 3), rxHist, txHist, netUnit: "bytes", allDisks: ["C", "D"],
+    rx: rxHist[59], tx: txHist[59], cpuHist: wave(60, 40, 22, 0), gpuHist: wave(60, 20, 14, 4), memHist: wave(60, 35, 6, 3), rxHist, txHist, netUnit: "bytes", allDisks: ["C", "D"],
   };
 }

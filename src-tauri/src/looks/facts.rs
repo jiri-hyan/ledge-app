@@ -98,23 +98,38 @@ pub fn system_fact(sample: Option<(Option<f32>, Option<f32>, i64)>, now: i64) ->
     }
 }
 
+/// GPU v % z posledního vzorku `sysmon` (`(gpu, kdy)`); starší než `SYSTEM_SHOW_MS` = nic.
+pub fn gpu_fact(sample: Option<(Option<f32>, i64)>, now: i64) -> Option<f64> {
+    match sample {
+        Some((gpu, at)) if now - at < SYSTEM_SHOW_MS && now >= at => gpu.map(f64::from),
+        _ => None,
+    }
+}
+
 /// Kolik vzorků drží mini graf proužku (~4 min po 10 s).
 pub const SPARK_N: usize = 24;
 /// Nejkratší odstup dvou bodů grafu (vzorky karty po 2 s by osu zhustily).
 pub const SPARK_STEP_MS: i64 = 8_000;
 
-/// Historie CPU / paměti pro styl „průběh“ vlastního vzhledu — jen ze skutečných vzorků `sysmon`, které proužek
+/// Historie CPU / paměti / GPU pro styl „průběh“ vlastního vzhledu — jen ze skutečných vzorků `sysmon`, které proužek
 /// stejně čte (nic nevzorkuje navíc, žádný časovač). Mezera delší než `SYSTEM_SHOW_MS` = graf od začátku.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SysHist {
     at: Option<i64>,
     pub cpu: Vec<f32>,
     pub mem: Vec<f32>,
+    pub gpu: Vec<f32>,
 }
 
 impl SysHist {
     /// Zapíše vzorek `(cpu, paměť, kdy)`, pokud je nový a aspoň `SPARK_STEP_MS` po předchozím bodu.
+    #[cfg(test)]
     pub fn push(&mut self, sample: Option<(Option<f32>, Option<f32>, i64)>, now: i64) {
+        self.push_with_gpu(sample, None, now);
+    }
+
+    /// Zapíše vzorek `(cpu, paměť, kdy)` + volitelné `gpu`.
+    pub fn push_with_gpu(&mut self, sample: Option<(Option<f32>, Option<f32>, i64)>, gpu: Option<f32>, now: i64) {
         let Some((cpu, mem, at)) = sample.filter(|s| now >= s.2 && now - s.2 < SYSTEM_SHOW_MS) else {
             // žádný čerstvý vzorek: starý graf by lhal
             *self = SysHist::default();
@@ -128,7 +143,7 @@ impl SysHist {
             }
         }
         self.at = Some(at);
-        for (v, h) in [(cpu, &mut self.cpu), (mem, &mut self.mem)] {
+        for (v, h) in [(cpu, &mut self.cpu), (mem, &mut self.mem), (gpu, &mut self.gpu)] {
             if let Some(v) = v {
                 h.push(v.clamp(0.0, 100.0));
                 if h.len() > SPARK_N {

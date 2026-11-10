@@ -265,12 +265,14 @@ pub struct Facts {
     pub battery: Option<BatteryFact>,
     /// počasí (jen čerstvá data karty Počasí)
     pub weather: Option<WeatherFact>,
-    /// CPU a paměť v % z posledního čerstvého vzorku (`sysmon`)
+    /// CPU, paměť a GPU v % z posledního čerstvého vzorku (`sysmon`)
     pub cpu: Option<f64>,
     pub mem: Option<f64>,
-    /// historie CPU / paměti v % ze vzorků proužku (~10 s, nejstarší první; `facts::SysHist`)
+    pub gpu: Option<f64>,
+    /// historie CPU / paměti / GPU v % ze vzorků proužku (~10 s, nejstarší první; `facts::SysHist`)
     pub cpu_hist: Vec<f32>,
     pub mem_hist: Vec<f32>,
+    pub gpu_hist: Vec<f32>,
     /// živá aktivita vedoucí session (položka skládačky „Claude aktivita“; `claude/activity.rs`)
     pub activity: Option<facts::ActivityFact>,
     /// „14:32“
@@ -304,8 +306,10 @@ impl Default for Facts {
             weather: None,
             cpu: None,
             mem: None,
+            gpu: None,
             cpu_hist: Vec::new(),
             mem_hist: Vec::new(),
+            gpu_hist: Vec::new(),
             activity: None,
             clock: String::new(),
             date: String::new(),
@@ -340,6 +344,7 @@ pub fn without(mut f: Facts, hide: &[StripItem]) -> Facts {
             StripItem::System => {
                 f.cpu = None;
                 f.mem = None;
+                f.gpu = None;
             }
             StripItem::Clock => {
                 f.clock.clear();
