@@ -8,6 +8,7 @@ import { t } from "../i18n";
 import { say, sayError } from "../ui/toast";
 import { closeLook } from "../tilelook/state";
 import { clickOf, placeProblem, withProjectFields, type ProjectPatch } from "./model";
+import { recordUse } from "../util/frecency";
 
 export type PanelMode = "edit" | "choose";
 export type PanelTarget = { id: string; mode: PanelMode; focus?: "run" | "log" };
@@ -88,6 +89,7 @@ export async function changeFolder(pr: ProjectView): Promise<string | null> {
 
 export async function launch(pr: ProjectView) {
   try {
+    recordUse("proj:" + pr.id);
     const r = await api.launch(pr.id);
     if (r?.outcome === "alreadyRunning") {
       if (r.url) api.openUrl(r.url);

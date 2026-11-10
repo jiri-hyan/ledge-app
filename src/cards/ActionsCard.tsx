@@ -20,6 +20,7 @@ import { isPlain, tileLabel } from "../tilelook/model";
 import { lookOf, lookTarget, openLook, saveTileLook } from "../tilelook/state";
 import { openTileMenu } from "../tilelook/TileMenu";
 import { actionIconSrc } from "../actions/api";
+import { frecencyMap, isFrecencySort, sortByFrecency, toggleFrecencySort } from "../util/frecency";
 
 /** Vzhled akce jde měnit jen u akcí z configu (skripty ze složky v configu nejsou). */
 export function actionLookMenu(e: MouseEvent, a: ActionView, cfgError: string | null) {
@@ -34,7 +35,17 @@ export const actionAuto = (a: ActionView) => ({ src: actionIconSrc(a), mono: a.m
 export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean; skipLinks?: boolean; view?: CardView; menu?: JSX.Element }) {
   /** `skipLinks`: na záložce je i karta Odkazy → weby, složky a soubory jsou jen tam (žádné dvojí dlaždice) */
   const own = () => (p.skipLinks ? (p.s.actions ?? []).filter((a) => !isLink(a)) : (p.s.actions ?? []));
-  const groups = () => visibleGroups([...own(), ...(p.s.scripts ?? [])], p.s.mode);
+  const rawGroups = () => visibleGroups([...own(), ...(p.s.scripts ?? [])], p.s.mode);
+  const groups = () => {
+    const list = rawGroups();
+    if (!isFrecencySort("act") || editing()) return list;
+    const now = Date.now();
+    const map = frecencyMap();
+    return list.map((g) => ({
+      ...g,
+      items: sortByFrecency(g.items, (a) => "act:" + a.id, map, now),
+    }));
+  };
   const ids = () => groups().flatMap((g) => g.items.map((a) => a.id));
   /** výstup skriptu (i z palety, když skripty v kartě nejsou) */
   const scriptOut = () => (lastResult()?.id.startsWith("script:") ? lastResult()!.id : null);
@@ -49,6 +60,17 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
           <span class="ic" style="background:var(--teal)" />
           {t("actions.card.title", "Odkazy a akce")}
           <span class="n">{ids().length || ""}</span>
+          <Show when={ids().length > 1}>
+            <button
+              class="mini"
+              classList={{ ok: isFrecencySort("act") }}
+              aria-pressed={isFrecencySort("act")}
+              title={t("actions.card.sortUsageTitle", "Řadit akce podle toho, jak často a nedávno je spouštíš")}
+              onClick={() => toggleFrecencySort("act")}
+            >
+              {t("actions.card.sortUsage", "★ Podle používání")}
+            </button>
+          </Show>
           <button class="mini" onClick={edit}>{t("actions.card.edit", "Upravit")}</button>
           {p.menu}
         </h4>

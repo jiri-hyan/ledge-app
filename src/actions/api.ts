@@ -7,6 +7,7 @@ import { inTauri } from "../api";
 import type { ActionCfg, ActionCheck, ActionOutcome, ActionView } from "../types";
 import { errorText, say } from "../ui/toast";
 import { t } from "../i18n";
+import { recordUse } from "../util/frecency";
 
 const call = <T>(cmd: string, args?: Record<string, unknown>): Promise<T | undefined> => (inTauri ? invoke<T>(cmd, args) : Promise.resolve(undefined));
 
@@ -63,6 +64,7 @@ export async function runAction(
   if (a.needsConfirm && !(await ask(a))) return false;
   setBusy((s) => new Set(s).add(a.id));
   try {
+    recordUse("act:" + a.id);
     const out = await run(a.needsConfirm ? a.confirmText : null);
     if (out && !out.hide) {
       say(out.message);

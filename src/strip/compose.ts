@@ -40,7 +40,7 @@ export const SPACE_MULT: Record<TextSpacing, number> = { tight: 0.7, normal: 1, 
 
 /** `color`: chybí = podle hodnoty (dnešní), `accent`, `#rrggbb`. Kolo 27: `size` (chybí = normal), `bg` kostka kolem dílu
  *  (chybí = žádná, `accent`, `#rrggbb`), `ink` barva textu (chybí = podle `color`). */
-export type Piece = { item: ComposeItem; style: ItemStyle; color?: string; size?: PieceSize; bg?: string; ink?: string };
+export type Piece = { item: ComposeItem; style: ItemStyle; color?: string; size?: PieceSize; bg?: string; ink?: string; onlyActive?: boolean };
 /** Akcent hrany: `color` = `accent` | `claude` (podle stavu Clauda) | `#rrggbb`; `color2` = druhá barva přechodu. */
 export type ComposeFill = { kind: FillKind; from: string; to: string; dir: (typeof FILL_DIRS)[number]; via: string; flow: boolean };
 export type StripCompose = {
@@ -189,6 +189,7 @@ export function normCompose(raw: unknown): StripCompose {
       if (bg) x.bg = bg;
       const ink = pieceColor((p as Piece).ink);
       if (ink) x.ink = ink;
+      if ((p as Piece).onlyActive === true) x.onlyActive = true;
       out.push(x);
     }
     return out;
@@ -235,16 +236,17 @@ export function setText(c: StripCompose, patch: Partial<ComposeText>): StripComp
 }
 
 /** Vlastní vzhled dílu (kolo 27): velikost, pozadí kostky, barva textu; prázdné / `normal` = dnešní (klíč se vynechá). */
-export function setPieceLook(c: StripCompose, item: ComposeItem, patch: { size?: PieceSize; bg?: string; ink?: string }): StripCompose {
+export function setPieceLook(c: StripCompose, item: ComposeItem, patch: { size?: PieceSize; bg?: string; ink?: string; onlyActive?: boolean }): StripCompose {
   const x = clone(c);
   for (const s of SLOTS)
     x[s] = x[s].map((p) => {
       if (p.item !== item) return p;
-      const { size: _s, bg: _b, ink: _i, ...rest } = p;
+      const { size: _s, bg: _b, ink: _i, onlyActive: _o, ...rest } = p;
       const size = patch.size ?? p.size;
       const bg = "bg" in patch ? pieceColor(patch.bg) : p.bg;
       const ink = "ink" in patch ? pieceColor(patch.ink) : p.ink;
-      return { ...rest, ...(size === "small" || size === "large" ? { size } : {}), ...(bg ? { bg } : {}), ...(ink ? { ink } : {}) };
+      const onlyActive = "onlyActive" in patch ? patch.onlyActive === true : p.onlyActive === true;
+      return { ...rest, ...(size === "small" || size === "large" ? { size } : {}), ...(bg ? { bg } : {}), ...(ink ? { ink } : {}), ...(onlyActive ? { onlyActive: true } : {}) };
     });
   return x;
 }

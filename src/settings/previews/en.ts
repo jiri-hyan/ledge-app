@@ -210,6 +210,8 @@ registerDict("en", {
   "appearance.compose.piece.bg": "Background",
   "appearance.compose.piece.bgNone": "None",
   "appearance.compose.piece.ink": "Text color",
+  "appearance.compose.piece.onlyActive": "Only when active",
+  "appearance.compose.piece.onlyActiveHint": "Hides the block when calm to save space in the strip (e.g. idle Claude, 0 servers or low load).",
   "appearance.compose.designs": "Ready-made designs",
   "appearance.compose.designsHint": "One click replaces the whole custom look; Undo brings it back.",
   "appearance.compose.dir.diag": "Diagonal",

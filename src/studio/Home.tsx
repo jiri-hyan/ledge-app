@@ -8,10 +8,11 @@ import { For, Show, createMemo, createSignal } from "solid-js";
 import { t } from "../i18n";
 import { lbl } from "../theme/label";
 import type { Snapshot } from "../types";
-import { cfg, useSettings } from "../settings/ctx";
+import { cfg, offerUndo, replaceDraft, snapshotDraft, useSettings } from "../settings/ctx";
 import { normalizeAppearance } from "../theme/appearance";
 import { normalizeLayout } from "../layout/model";
 import { cardName, pageName } from "../layout/text";
+import { PROFILES, activeProfile, applyProfileToConfig, hideCardEverywhere, type ProfileId } from "./profiles";
 import { normLook } from "../settings/panels/AppearanceClosed";
 import { normHover } from "../settings/panels/AppearanceHover";
 import { normShape, STRIP_LOOKS } from "../strip/looks";
@@ -35,6 +36,13 @@ const REMINDER_TEXT: Record<string, () => [string, string, string]> = {
   calendar: () => [t("settings.studio.rem.calendar", "Kalendář není připojený"), t("settings.studio.rem.calendar.text", "Karta kalendáře je v šuplíku, ale nemá odkud brát schůzky."), t("settings.studio.rem.calendar.go", "Připojit")],
   project: () => [t("settings.studio.rem.project", "Zatím žádný projekt"), t("settings.studio.rem.project.text", "Přidej složku s projektem — jak ho spustit, Ledge zjistí sám."), t("settings.studio.rem.project.go", "Přidat projekt")],
   autostart: () => [t("settings.studio.rem.autostart", "Ledge se nespouští s Windows"), t("settings.studio.rem.autostart.text", "Po restartu ho budeš muset pustit ručně."), t("settings.studio.rem.autostart.go", "Zapnout")],
+};
+
+const PROFILE_TEXT: Record<ProfileId, () => [string, string, string]> = {
+  ai_builder: () => [t("settings.studio.prof.ai", "AI & Claude vývojář"), t("settings.studio.prof.ai.desc", "Claude + živá aktivita vedle sebe, projekty, repa a limity v proužku."), t("settings.studio.prof.ai.tag", "Claude · Aktivita · Repa")],
+  power_hw: () => [t("settings.studio.prof.hw", "Výkon a hardware"), t("settings.studio.prof.hw.desc", "CPU, RAM a GPU s grafy v notchi, velká karta Systém, běžící servery a rychlé přepínače."), t("settings.studio.prof.hw.tag", "CPU · RAM · GPU · Servery")],
+  focus_zen: () => [t("settings.studio.prof.zen", "Fokus a minimalismus"), t("settings.studio.prof.zen.desc", "Klidný ostrůvek, rozbalení jen na dění, časovač soustředění a jen 4 hlavní karty."), t("settings.studio.prof.zen.tag", "Klid · Časovač · Čistý šuplík")],
+  organizer: () => [t("settings.studio.prof.org", "Organizátor a schůzky"), t("settings.studio.prof.org.desc", "Přehled Dnes, Kalendář, Poznámky a rychlé akce v kompaktním náhledu."), t("settings.studio.prof.org.tag", "Dnes · Kalendář · Poznámky")],
 };
 
 const TIP_TEXT: Record<string, () => [string, string]> = {
@@ -86,6 +94,19 @@ export default function Home(p: { s: Snapshot; go: (target: string) => void; mod
   const fix = (r: Reminder) => {
     if (r.fix === "autostart") return c.set("autostart", true);
     p.go(r.go);
+  };
+
+  const pickProfile = (id: ProfileId) => {
+    const prev = snapshotDraft();
+    const next = applyProfileToConfig(prev, id);
+    replaceDraft(next);
+    offerUndo(t("settings.studio.prof.applied", "Osobní profil „{name}“ nastaven", { name: PROFILE_TEXT[id]()[0] }), () => replaceDraft(prev));
+  };
+
+  const dismissCard = (cardId: "weather" | "calendar") => {
+    const prev = snapshotDraft();
+    c.set("layout", hideCardEverywhere(cfg.layout, cardId));
+    offerUndo(t("cards.hide.doneCard", "Karta „{name}“ skryta", { name: cardName(cardId) }), () => replaceDraft(prev));
   };
 
   return (
@@ -157,6 +178,30 @@ export default function Home(p: { s: Snapshot; go: (target: string) => void; mod
           </span>
           <Show when={p.guideDone}><em>{p.guideDone} / 8</em></Show>
         </button>
+        <section class="sh-profiles">
+          <div class="sh-prof-head">
+            <h3>{t("settings.studio.prof.title", "Osobní profily — nastav si Ledge podle sebe")}</h3>
+            <small>{t("settings.studio.prof.hint", "Jeden klik sladí horní proužek, chování po najetí i rozložení karet. Změnu jde hned vrátit.")}</small>
+          </div>
+          <div class="sh-prof-grid">
+            <For each={PROFILES}>
+              {(pr) => {
+                const on = () => activeProfile(cfg) === pr.id;
+                return (
+                  <button type="button" class="sh-prof" classList={{ on: on() }} aria-pressed={on()} onClick={() => pickProfile(pr.id)}>
+                    <div class="sh-prof-top">
+                      <span class="sh-prof-ico" aria-hidden="true">{pr.icon}</span>
+                      <b>{PROFILE_TEXT[pr.id]()[0]}</b>
+                      <Show when={on()}><span class="sh-prof-badge">{t("settings.studio.prof.active", "Aktivní")}</span></Show>
+                    </div>
+                    <small>{PROFILE_TEXT[pr.id]()[1]}</small>
+                    <span class="sh-prof-tag">{PROFILE_TEXT[pr.id]()[2]}</span>
+                  </button>
+                );
+              }}
+            </For>
+          </div>
+        </section>
       </section>
 
       <aside class="sh-side">
@@ -184,7 +229,12 @@ export default function Home(p: { s: Snapshot; go: (target: string) => void; mod
                     <b>{REMINDER_TEXT[r.id]()[0]}</b>
                     <small>{REMINDER_TEXT[r.id]()[1]}</small>
                   </div>
-                  <button class="btn pri" onClick={() => fix(r)}>{REMINDER_TEXT[r.id]()[2]}</button>
+                  <div class="sh-rem-btns">
+                    <Show when={r.id === "city" || r.id === "calendar"}>
+                      <button class="btn" onClick={() => dismissCard(r.id === "city" ? "weather" : "calendar")}>{t("settings.studio.rem.hideCard", "Skrýt kartu")}</button>
+                    </Show>
+                    <button class="btn pri" onClick={() => fix(r)}>{REMINDER_TEXT[r.id]()[2]}</button>
+                  </div>
                 </article>
               )}
             </For>

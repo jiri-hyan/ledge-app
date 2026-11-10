@@ -181,4 +181,8 @@ registerDict("en", {
   "cards.projects.allHidden": "All projects are hidden on this tab.",
   "cards.projects.showAll": "Show all",
   "cards.projects.actions": "Actions for {name}",
+  // kontextový návrh přepnutí záložky
+  "cards.ctx.claudeWorking": "Claude is working ({n}×) on tab {tab}",
+  "cards.ctx.procFailed": "Server crashed on tab {tab}",
+  "cards.ctx.switchTab": "Switch to {tab}",
 });

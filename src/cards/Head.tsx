@@ -23,6 +23,8 @@ import RunningPill from "../projects/RunningPill";
 import DirtyPill from "./DirtyPill";
 import ChipsRow from "./ChipsRow";
 import HeadClock from "./HeadClock";
+import { fmtDuration, leftMs } from "../timer/model";
+import { timerDo } from "../timer/TimerCard";
 import "./head.css";
 
 const plain = (s: string) => s.replace(/<[^>]+>/g, "");
@@ -32,6 +34,8 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
   const working = () => p.s.sessions.filter((x) => x.state === "working").length;
   const unfinished = () => p.s.sessions.filter((x) => x.uncommitted.length > 0 || x.unpushed > 0);
   const waiting = () => p.s.pending.length + p.s.questions.length;
+  const cd = () => p.s.timer?.countdown;
+  const focusRunning = () => cd()?.state === "running" || cd()?.state === "paused";
   // jen „dostupná“ — nelze_overit (gh chybí, offline) hlavička neukazuje, to patří do Nastavení
   const avail = () => (p.page === "main" && p.s.update.state === "dostupna" ? p.s.update : null);
   // jednorázově po první spuštění nové verze (poznámky z cache); zmizí po „Rozumím“ v panelu
@@ -83,6 +87,22 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
                         <span class="chip amber" data-prio="3" title={unfinished().map((x) => x.title ?? x.project ?? x.cwd).join("\n")}><span class="d" /><span class="ic">⏸</span><span class="lng">{rich(tp("cards.head.unfinished", unfinished().length, "<b>{n}</b> session nedokončily"))}</span><span class="shr">{rich(t("cards.head.unfinishedShort", "<b>{n}</b> nedokonč.", { n: unfinished().length }))}</span></span>
                       </Show>
                       <DirtyPill s={p.s} />
+                      <Show when={focusRunning() ? cd() : null}>
+                        {(c) => (
+                          <button
+                            class="chip violet hl-focus-chip"
+                            data-prio="4"
+                            title={c().state === "running" ? t("cards.head.focusPause", "Fokus běží — klik = pauza, pravý klik = zrušit") : t("cards.head.focusResume", "Fokus pozastaven — klik = pokračovat, pravý klik = zrušit")}
+                            onClick={() => void timerDo({ op: c().state === "running" ? "pause" : "resume" })}
+                            onContextMenu={(e) => { e.preventDefault(); void timerDo({ op: "cancel" }); }}
+                          >
+                            <span class="d" />
+                            <span class="ic">🎯</span>
+                            <b class="lbl">{fmtDuration(leftMs(c(), p.now), true)}</b>
+                            <b class="cnt">{fmtDuration(leftMs(c(), p.now), true)}</b>
+                          </button>
+                        )}
+                      </Show>
                       <Show when={bubble()}>
                         {(b) => (
                           <button class="chip dim" data-prio="6" title={t("cards.pkg.chipTitle", "Ledge běží uvnitř aplikace {app} (balíček MSIX): nastavení, data a spouštění po startu jdou do její izolované kopie. Klik = Nastavení → Restartovat mimo.", { app: b().app })} onClick={() => { p.onSettings(); gotoSettingsPanel("f-autostart"); }}>
@@ -111,6 +131,16 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
               </Match>
               <Match when={part === "note" && p.s.notesEnabled && main() && on("note")}>
                 <button class="icon-btn wide" onClick={p.onNote} title={t("cards.head.newNote", "Nová poznámka")}><IconNote /><span class="hl-lbl">{t("cards.head.note", "Poznámka")}</span></button>
+                <Show when={!focusRunning()}>
+                  <button
+                    class="icon-btn hl-focus-btn"
+                    onClick={() => void timerDo({ op: "start", minutes: 25 })}
+                    title={t("cards.head.focusStart", "Spustit Fokus (25 min odpočet)")}
+                    aria-label={t("cards.head.focusStart", "Spustit Fokus (25 min odpočet)")}
+                  >
+                    🎯
+                  </button>
+                </Show>
               </Match>
               <Match when={part === "search" && p.onPalette && p.page !== "note" && on("search")}>
                 <button class="icon-btn" data-tip="palette" onClick={() => p.onPalette?.()} title={t("cards.head.paletteTitle", "Hledat a spouštět (Ctrl+K)")} aria-label={t("cards.head.palette", "Paleta příkazů")}><IconSearch /></button>

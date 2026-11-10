@@ -90,3 +90,8 @@
 @container hl-head (max-width: 780px) { .hl-lbl { display: none; } }
 /* v úzkém šuplíku jsou ikonky a tečky těsnější */
 .hl-chips[data-style="dots"] > .chip, .hl-chips[data-style="icons"] > .chip, .hl-chips[data-style="merged"][data-shrink="2"] > .chip { padding: 0 7px; }
+
+/* 1-klik Fokus v hlavičce */
+.hl-focus-chip { cursor: pointer; font-variant-numeric: tabular-nums; }
+.hl-focus-chip:hover { background: color-mix(in srgb, var(--violet) 18%, var(--card-2)); }
+.hl-focus-btn { font-size: 14px; }

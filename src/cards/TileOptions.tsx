@@ -8,6 +8,7 @@ import { saveLayout } from "../layout/edit";
 import { setTiles, showProject, TILE_SIZES, type TileOpts, type TileSize } from "../layout/model";
 import { PopCap, PopItem, PopSep } from "../ui/Popover";
 import { MenuChoice } from "./CardMenu";
+import { isFrecencySort, toggleFrecencySort } from "../util/frecency";
 
 export const tileSizeName = (s: TileSize): string =>
   s === "small" ? t("cards.tiles.small", "Malé ikony") : s === "large" ? t("cards.tiles.large", "Velké") : t("cards.tiles.tile", "Dlaždice");
@@ -24,6 +25,9 @@ export default function TileOptions(p: { page: string; tiles: TileOpts; projects
       </PopItem>
       <PopItem checked={p.tiles.git} onClick={() => save({ git: !p.tiles.git })}>
         {t("cards.tiles.git", "Větev a stav gitu")}
+      </PopItem>
+      <PopItem checked={isFrecencySort("proj")} onClick={() => toggleFrecencySort("proj")}>
+        {t("cards.tiles.frecency", "Řadit podle používání")}
       </PopItem>
       <Show when={p.projects.length > 1}>
         <PopCap>{t("cards.tiles.which", "Projekty na téhle záložce")}</PopCap>

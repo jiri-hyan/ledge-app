@@ -25,6 +25,7 @@ import { openCardLook } from "../layout/lookState";
 import type { CardLook } from "../layout/look";
 import { DeskPinItems } from "../desk/pin";
 import { setTile, tileOf, TILE_NAMES, TILES, type Tile } from "../layout/bento";
+import { isCardCollapsed, toggleCardCollapsed } from "../layout/collapsed";
 
 const UNDO_MS = 6000;
 const [hidden, setHidden] = createSignal<{ text: string; undo: (l: Layout) => Layout } | null>(null);
@@ -177,6 +178,9 @@ export default function CardMenu(p: {
             <PopSep />
             {/* widgety na ploše (`desk/`): karta, kterou jde mít na ploše, nabídne „Připnout na plochu“ */}
             <DeskPinItems card={p.card} close={close} />
+            <PopItem onClick={() => { close(); toggleCardCollapsed(p.page, p.card); }}>
+              {isCardCollapsed(p.page, p.card) ? t("cards.menu.expand", "Rozbalit kartu") : t("cards.menu.collapse", "Sbalit na hlavičku")}
+            </PopItem>
             <PopItem onClick={() => { close(); openCardLook(p.page, p.card, p.look, p.cfgError); }}>{t("cards.cardlook.menu", "Vzhled karty…")}</PopItem>
             <PopItem onClick={hideCard}>{t("cards.hide.card", "Skrýt kartu")}</PopItem>
             <For each={p.parts ?? []}>

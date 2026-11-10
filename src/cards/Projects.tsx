@@ -33,6 +33,7 @@ import Popover, { boxOf } from "../ui/Popover";
 import { tileColumns } from "../ui/place";
 import { api } from "../api";
 import { hideWithUndo } from "./CardMenu";
+import { frecencyMap, isFrecencySort, sortByFrecency } from "../util/frecency";
 import "./projects.css";
 
 type Drag = { id: string; x: number; y: number; over: string | null; moved: boolean };
@@ -77,7 +78,10 @@ export default function Projects(p: {
   onShowAll?: () => void;
 }) {
   const tiles = () => p.tiles ?? DEFAULT_TILES;
-  const list = () => visibleProjects(p.s.projects, tiles());
+  const list = () => {
+    const base = visibleProjects(p.s.projects, tiles());
+    return isFrecencySort("proj") && !editing() ? sortByFrecency(base, (x) => `proj:${x.id}`, frecencyMap(), Date.now()) : base;
+  };
   const view = () => p.view ?? "tiles";
   /** Bento: běžící dopředu (velké dlaždice); v úpravách pořadí z configu */
   const entries = () => {

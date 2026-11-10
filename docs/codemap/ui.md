@@ -39,7 +39,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [ui-detail.md](ui-detai
 | `pad.ts` | dvoumístné číslo s nulou (jediná kopie `pad2`, bez importů za běhu; `format.ts` ji re-exportuje) | `pad2` |
 | `ui/shortcuts.ts` | zdroj pravdy klávesy a gesta (`SHORTCUTS`, skupiny; test `shortcuts.test.mjs`: každý záznam cs+en) … | `SHORTCUTS` `shortcutsOf` `shortcutText` |
 | `idleTimers.test.mjs` | hlídač „v klidu nic netikne“: `setInterval` jen na seznamu povolených míst, hodiny v `App.tsx` až uvnitř efektu pro viditelný … | — |
-| `util/path.ts` · `util/time.ts` | jediné `normPath` / `samePath` (Windows cesty; re-exportují `pin/model.ts` a `projects/model.ts`) · sdílený `debounce` (`flush` / … | `samePath` `normPath` `debounce` |
+| `util/path.ts` · `util/time.ts` · `util/frecency.ts` | jediné `normPath` / `samePath` · sdílený `debounce` · lokální řazení podle používání (`sortByFrecency` `recordUse`) | `samePath` `normPath` `debounce` `sortByFrecency` `recordUse` |
 | `ui/Confirm.tsx` | jediné potvrzení nevratné akce (inline panel, Esc = Zrušit; fokus jen v okně, které ho má): Přihrádka … | `Confirm` |
 | `ui/toast.tsx` · `ui/toast.css` · `ui/rich.tsx` | hlášky dole (`toast.css` je společné pro šuplík i lístek — ten ho přizpůsobí proměnnými `--toast-*` v `pin.css`) … | `say` `sayError` `errorText` `Toast` · `rich` |
 | `uiErrors.ts` · `ui/errorline.ts` · `ui/Boundary.tsx` · `ui/boundary.css` | chyby UI: `window.onerror` / `unhandledrejection` / pád vykreslení → `ui_log`; `ErrorBoundary` s „Zkusit znovu“ … | `installErrorLog` `logUiError` `errorLine` `Boundary` |

@@ -81,6 +81,16 @@ export function PieceLook(q: Q & { p: Piece; itemName: string }) {
       </label>
       <ColorPick label={t("appearance.compose.piece.bg", "Pozadí")} none={t("appearance.compose.piece.bgNone", "Žádné")} value={q.p.bg ?? ""} set={(v) => q.commit(setPieceLook(q.c, item(), { bg: v }))} />
       <ColorPick label={t("appearance.compose.piece.ink", "Barva textu")} none={t("appearance.compose.colorAuto", "Podle hodnoty")} value={q.p.ink ?? ""} set={(v) => q.commit(setPieceLook(q.c, item(), { ink: v }))} />
+      <label class="cx-lp">
+        <span>{t("appearance.compose.piece.onlyActive", "Jen při aktivitě")}</span>
+        <input
+          type="checkbox"
+          checked={!!q.p.onlyActive}
+          aria-label={t("appearance.compose.piece.onlyActive", "Jen při aktivitě")}
+          title={t("appearance.compose.piece.onlyActiveHint", "V klidu se kostka schová a uvolní v proužku místo (např. klidný Claude, 0 serverů nebo nízké vytížení).")}
+          onChange={(e) => q.commit(setPieceLook(q.c, item(), { onlyActive: e.currentTarget.checked }))}
+        />
+      </label>
     </details>
   );
 }

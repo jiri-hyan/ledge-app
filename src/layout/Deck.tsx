@@ -45,6 +45,7 @@ import "./surfaces.css";
 import type { PartKey } from "./model";
 import { lookFor } from "./lookState";
 import type { HeroFacts } from "./hero";
+import { isCardCollapsed, toggleCardCollapsed } from "./collapsed";
 import "./layout.css";
 import "./dnd.css";
 
@@ -381,6 +382,7 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
             data-size={sizeNow(id)}
             data-card={id}
             data-notch={p.editing && p.notched?.(id) ? t("cards.notch.inBar", "v liště nahoře") : undefined}
+            data-collapsed={!p.editing && isCardCollapsed(p.page.id, id) ? "" : undefined}
             data-h={hNow(id)}
             data-dim={gapDim(id)}
             data-cl-bg={cl(id).attrs["data-cl-bg"]}
@@ -402,6 +404,14 @@ export default function Deck(p: { page: LayoutPage; layout: Layout; editing: boo
             classList={{ lifted: drag()?.id === id && drag()?.home === p.page.id }}
             data-cl-live={cl(id).attrs["data-cl-surface"] === "flow" && drawerShown() ? "" : undefined}
             onPointerDown={(e) => cd.down(e, id)}
+            onDblClick={(e) => {
+              if (p.editing) return;
+              const el = e.target as HTMLElement | null;
+              if (el?.closest("h4") && !el.closest("button, a, input, select, [data-cmenu]")) {
+                e.preventDefault();
+                toggleCardCollapsed(p.page.id, id);
+              }
+            }}
           >
             <Show when={p.shown(id)} fallback={
               <div class="card lay-ghost">

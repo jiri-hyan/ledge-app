@@ -108,9 +108,11 @@ export function PieceView(q: { piece: Piece; state: PreviewState }): JSX.Element
   );
 }
 
+const calmInIdle = (item: ComposeItem) => item === "claude" || item === "activity" || item === "music" || item === "timer" || item === "servers" || item === "repos" || item === "cpu" || item === "memory" || item === "gpu";
+
 /** Díl v obálce: barevný podklad (`chip`), vlastní barva dílu (`--pcol`), kapsle / oddělovače přes CSS. */
 function PieceBox(q: { piece: Piece; state: PreviewState }) {
-  const v = () => sampleVal(q.piece.item, q.state);
+  const v = () => (q.piece.onlyActive && q.state === "idle" && calmInIdle(q.piece.item) ? null : sampleVal(q.piece.item, q.state));
   // kostka kolem dílu: `bg` má přednost před stylem „podklad“ (jako Rust `chip_of`)
   const chip = () => cssColor(q.piece.bg) ?? (q.piece.style === "chip" ? cssColor(q.piece.color) ?? (v() && v()!.c !== "off" ? TONE[v()!.c] : "var(--accent)") : undefined);
   // velikost dílu = `zoom` (jako Rust: části, mezery i písmo dílu v jednom měřítku); `ink` barví jen text

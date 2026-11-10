@@ -195,6 +195,9 @@ pub struct Piece {
     pub bg: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub ink: String,
+    // jen při aktivitě (klidná položka se sama schová)
+    #[serde(rename = "onlyActive", skip_serializing_if = "std::ops::Not::not")]
+    pub only_active: bool,
 }
 
 fn is_normal(s: &PieceSize) -> bool {
@@ -203,7 +206,7 @@ fn is_normal(s: &PieceSize) -> bool {
 
 impl Piece {
     pub fn new(item: PieceItem, style: PieceStyle) -> Piece {
-        Piece { item, style, color: String::new(), size: PieceSize::Normal, bg: String::new(), ink: String::new() }
+        Piece { item, style, color: String::new(), size: PieceSize::Normal, bg: String::new(), ink: String::new(), only_active: false }
     }
 }
 
@@ -462,9 +465,30 @@ pub fn chip_of(p: &Piece, f: &Facts) -> Option<Rgba> {
     })
 }
 
+/// Má položka právě teď aktivní událost nebo zvýšenou zátěž (pro volbu `onlyActive` „Jen při aktivitě“)?
+pub fn is_active(item: PieceItem, f: &Facts) -> bool {
+    match item {
+        PieceItem::Claude | PieceItem::Activity => f.waiting > 0 || f.working > 0 || f.done > 0 || f.reminder.is_some() || f.activity.is_some(),
+        PieceItem::Music => f.music.is_some(),
+        PieceItem::Timer => f.timer.is_some(),
+        PieceItem::Servers => f.servers > 0 || f.server_failed,
+        PieceItem::Repos => f.repos > 0,
+        PieceItem::Cpu => f.cpu.is_some_and(|p| p >= 50.0),
+        PieceItem::Memory => f.mem.is_some_and(|p| p >= 75.0),
+        PieceItem::Gpu => f.gpu.is_some_and(|p| p >= 40.0),
+        PieceItem::Limit5h => f.limit5h.is_some_and(|p| p >= 70.0),
+        PieceItem::LimitWeek => f.limit7d.is_some_and(|p| p >= 70.0),
+        PieceItem::Battery => f.battery.is_some_and(|b| b.charging || b.percent <= 30),
+        PieceItem::Time | PieceItem::Date | PieceItem::Weather => true,
+    }
+}
+
 /// Položka ve zvoleném stylu → díly ke kreslení (v barvě dílu, když ji má). Styl, který položka neumí (prstenec
 /// bez podílu, ikona bez ikony, průběh bez historie), spadne na nejbližší, co umí; prázdný text = nic.
 pub fn parts(p: Piece, f: &Facts) -> Vec<Part> {
+    if p.only_active && !is_active(p.item, f) {
+        return vec![];
+    }
     let out = parts_raw(&p, f);
     let out = match piece_color(&p.color, f) {
         Some(c) => recolor(out, c),

@@ -201,7 +201,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     s pevnou šířkou). Kolo 27: `text` = `{ size, weight, spacing }` — písmo nezávislé na výšce: `size` násobek odvozené velikosti
     0,6–1,4 (výchozí 1), `weight` `normal` (dnešní) / `semi` / `bold`, `spacing` `tight` / `normal` / `wide` (mezery mezi díly a okraje
     ×0,7 / 1 / ×1,4). Díl navíc volitelně `size` (`small` ×0,82 / `normal` / `large` ×1,25), `bg` (kostka kolem dílu: prázdné =
-    žádná, `accent`, `#rrggbb`; průhlednost jako u stylu „podklad“) a `ink` (barva textu odděleně od `color`). Bez nich
+    žádná, `accent`, `#rrggbb`; průhlednost jako u stylu „podklad“), `ink` (barva textu odděleně od `color`) a `onlyActive` (díl se v proužku ukáže jen při aktivitě nebo zvýšené zátěži, v klidu se schová). Bez nich
     (starý config) vše jako dřív. Neznámá barva = výchozí, neznámý druh / oddělení = chyba configu.
     **Kolo 28 — živá hrana** (chybějící klíče = vzhled před kolem 28): `deco.edge` navíc `flow` (přelévání),
     `dashes` (čárky; ve stavu limitu naplněné poměrem limitu), `comet`, `light` (rozsvícení celé římsy),

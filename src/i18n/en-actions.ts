@@ -83,6 +83,8 @@ registerDict("en", {
   "actions.card.empty": "Websites, folders, apps and commands in one click.",
   "actions.card.add": "Add action",
   "actions.card.asks": "Asks before running.",
+  "actions.card.sortUsage": "★ By usage",
+  "actions.card.sortUsageTitle": "Sort actions by how often and recently you run them",
   // panel Nastavení
   // skripty (Script Commands, `actions/ScriptsSettings.tsx`)
   "actions.scripts.title": "Scripts",

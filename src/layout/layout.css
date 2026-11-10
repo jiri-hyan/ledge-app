@@ -28,6 +28,13 @@ html .deck.deck[data-bento] { gap: var(--k-gap, 16px); }
 .deck[data-bento] > .deck-item.deck-item { grid-row: span var(--h, 2); height: auto; max-height: none; min-height: 0; }
 .deck[data-bento] > .deck-item > :not(.lay-tools, .lay-rs, .lay-target) { min-height: 0; overflow-y: auto; overscroll-behavior-y: auto; }
 
+/* sbalená karta na 1 řádek hlavičky (dvojklik na hlavičku nebo z ⋯ menu) */
+.deck > .deck-item[data-collapsed] { height: auto !important; max-height: none !important; grid-row: span 1 !important; }
+.deck > .deck-item[data-collapsed] > :first-child { padding-top: 10px; padding-bottom: 10px; min-height: 0; }
+.deck > .deck-item[data-collapsed] > :first-child > :not(h4) { display: none !important; }
+.deck > .deck-item[data-collapsed] > :first-child > h4 { margin-bottom: 0 !important; cursor: pointer; }
+.deck > .deck-item[data-collapsed] > :first-child > h4::after { content: "▸"; font-size: var(--fs-xs); color: var(--t3); margin-left: 4px; }
+
 /* ---------- vzhled karty (`look`, layout/look.ts) — obecně pro každou kartu na `.deck-item` ----------
    Karta = první dítě položky; bez atributů `data-cl-*` se nic nemění (karta podle design stylu).
    `.deck > .deck-item[…] > :first-child` přebije i `html[data-style] .card` (0,3,0 > 0,2,1). */

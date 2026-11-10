@@ -20,7 +20,7 @@ scéna vpravo. Panely uvnitř částí = dnešní `src/settings/panels/*` → [s
 | `src/studio/autosave.ts` | Solid lepidlo autosave: debounce → ověřit → zapsat, psaní do textových polí zápis odloží, konflikt / sloučení změny zvenku, Vrátit (Ctrl+Z, položka, vše) | `useAutosave` `undo` `undoOne` `undoAll` `adoptExternal` `resolveConflict` `saveState` `history` |
 | `src/studio/Studio.tsx` | skořápka: titulek (drobečky, hledání `smartSearch`, stav zápisu, Změny, Průvodce, okno), páteř, domov / část, scéna, průvodce, skoky (hash, `studio-goto`, `settingsTarget`), chyba ověření rozbalí Doladit | `Studio` `go` `reveal` `pick` |
 | `src/studio/PartView.tsx` | obrazovka části: hlavička + otázky (blok uvnitř), v průvodci jen hlavní otázky a bez Doladit | `PartView` |
-| `src/studio/Home.tsx` | domov „Tvůj Ledge“: klikací kresba se stanicemi, Na co nezapomenout, Rychle (ovladače), všechny části | `Home` |
+| `src/studio/Home.tsx` · `profiles.ts` | domov „Tvůj Ledge“: klikací kresba se stanicemi, Osobní profily (`PROFILES`, `applyProfileToConfig`), Na co nezapomenout, Rychle, všechny části | `Home` `PROFILES` `applyProfileToConfig` `activeProfile` `hideCardEverywhere` |
 | `src/studio/Scene.tsx` | scéna části (Proužek, Otevírání, Vzhled šuplíku, Obsah, Claude) z existujících náhledů; `peek*` jen tady | `Scene` `SCENE_PARTS` `DrawerMini` |
 | `src/studio/StudioWindow.tsx` · `main.tsx` · `settings.html` | vstup okna: snapshot (`get_state` + `state`), Toast; líný slovník; demo jen mimo Tauri | `StudioWindow` |
 | `src/studio/demo.ts` · `demo-config.json` | ukázkový hostitel JEN pro `settings.html?demo=1` mimo Tauri (snímky), config = `Config::default()` | `installDemo` |

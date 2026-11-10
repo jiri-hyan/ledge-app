@@ -9,7 +9,7 @@
 // karet `viewOf`) a vzhled zástupců (pravý klik → `tilelook/TileMenu.tsx`).
 // Dynamické karty (widgety ze skriptů `widget:<soubor>`) kreslí `widgets/WidgetCard.tsx` z `Snapshot.widgets`.
 import { createEffect, createMemo, on as onChange, onCleanup, onMount, Show, type JSX } from "solid-js";
-import type { Snapshot } from "./api";
+import { api, type Snapshot } from "./api";
 import type { NotesNav } from "./nav";
 import ClaudeSessions, { ClaudeInbox } from "./ClaudeSessions";
 import { NotesCard } from "./notes/NotesCard";
@@ -54,6 +54,7 @@ import Deck from "./layout/Deck";
 import { CardLookPanel, Catalog, DropNew } from "./lazyViews";
 import EditBar from "./layout/EditBar";
 import { beginEdit, catalogOpen, draft, editing, editPage, saveLayout, setCatalogOpen } from "./layout/edit";
+import { pageName } from "./layout/text";
 import { LIMIT_CARDS, limitOf, normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type CardSize, type PartKey } from "./layout/model";
 import { sizeOutcome } from "./layout/size";
 import { colsNow } from "./layout/cols";
@@ -162,6 +163,21 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     ...(on("favorites") && (on("nowPlaying") || on("sound")) ? (["favorites"] as const) : []),
   ];
   const inbox = () => p.s.pending.length + p.s.questions.length > 0;
+  // kontextový návrh přepnutí záložky, když Claude pracuje nebo spadl server na jiné záložce
+  const ctxTab = createMemo(() => {
+    if (editing()) return null;
+    const working = (p.s.sessions ?? []).filter((x) => x.state === "working").length;
+    if (working > 0 && !has("claude") && !has("activity")) {
+      const target = layout().pages.find((pg) => pg.id !== page().id && (pageHas(pg, "claude") || pageHas(pg, "activity")));
+      if (target) return { page: target, text: t("cards.ctx.claudeWorking", "Claude právě pracuje ({n}×) na záložce {tab}", { n: working, tab: pageName(target) }) };
+    }
+    const failed = (p.s.procs ?? []).filter((x) => x.phase === "failed").length;
+    if (failed > 0 && !has("running") && !has("projects")) {
+      const target = layout().pages.find((pg) => pg.id !== page().id && (pageHas(pg, "running") || pageHas(pg, "projects")));
+      if (target) return { page: target, text: t("cards.ctx.procFailed", "Server spadl na záložce {tab}", { tab: pageName(target) }) };
+    }
+    return null;
+  });
   // názvy umístěných widgetů pro katalog a „karta odebrána“
   createEffect(() => rememberWidgets(p.s.widgets));
 
@@ -235,6 +251,15 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       <BgLaunch s={p.s} />
       {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
       <Show when={has("media") || has("clock") || has("toggles") || has("winquick") || notch().sections.some((x) => x.id === "player" || x.id === "volume")}><PersonalLive /></Show>
+      {/* kontextový pruh při práci Clauda / pádu serveru na jiné záložce */}
+      <Show when={ctxTab()}>
+        {(ct) => (
+          <div class="card-undo" role="status">
+            <span>✦ {ct().text}</span>
+            <button class="mini ok" onClick={() => void api.setMode(ct().page.id)}>{t("cards.ctx.switchTab", "Přepnout na {tab}", { tab: pageName(ct().page) })}</button>
+          </div>
+        )}
+      </Show>
       {/* kontextové návrhy (max 3 chipy) — jen z reálných událostí, `src/suggest/` */}
       <Show when={!editing()}><SuggestBar s={p.s} now={p.now} nav={p.nav} /></Show>
       {/* přetažení odkazu / souboru na otevřený šuplík → editor akce s návrhem (`actions/DropNew.tsx`) */}

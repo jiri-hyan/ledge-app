@@ -225,4 +225,11 @@ test("písmo a vlastní vzhled dílu (kolo 27)", () => {
   c = setPieceLook(c, "time", { size: "normal", bg: "nope", ink: "" });
   assert.deepEqual(c.center[0], { item: "time", style: "text" });
   assert.ok(!("size" in DEFAULT_COMPOSE.center[0]));
+  // onlyActive: true se zachová, false / chybějící se vynechá
+  let act = setPieceLook(DEFAULT_COMPOSE, "claude", { onlyActive: true });
+  assert.equal(act.left[0].onlyActive, true);
+  assert.deepEqual(normCompose(act).left[0], act.left[0]);
+  act = setPieceLook(act, "claude", { onlyActive: false });
+  assert.equal(act.left[0].onlyActive, undefined);
+  assert.ok(!("onlyActive" in act.left[0]));
 });

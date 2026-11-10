@@ -437,3 +437,33 @@ fn piece_look_bg_ink_size() {
     assert_eq!(sh.segs[1][0].size, PieceSize::Large);
     assert_eq!(compose::show(&Compose { center: vec![plain], ..Compose::default() }, &f).segs[1][0].size, PieceSize::Normal);
 }
+
+#[test]
+fn only_active_hides_calm_pieces() {
+    use PieceItem::*;
+    use PieceStyle::*;
+    let idle = facts(State::Idle);
+    let work = facts(State::Work);
+
+    // Claude s only_active: v klidu skrytý, při práci viditelný
+    let claude_active = Piece { only_active: true, ..pc(Claude, Text) };
+    assert!(compose::parts(claude_active.clone(), &idle).is_empty());
+    assert!(!compose::parts(claude_active, &work).is_empty());
+
+    // Servery s only_active: skryté při servers == 0, viditelné při servers > 0
+    let mut s_facts = facts(State::Idle);
+    s_facts.servers = 0;
+    let srv_active = Piece { only_active: true, ..pc(Servers, Badge) };
+    assert!(compose::parts(srv_active.clone(), &s_facts).is_empty());
+    s_facts.servers = 2;
+    assert!(!compose::parts(srv_active, &s_facts).is_empty());
+
+    // Serializace: onlyActive: false se vynechá, true se zapíše
+    let piece_false = Piece { only_active: false, ..pc(Claude, Icon) };
+    let json_false = serde_json::to_value(&piece_false).unwrap();
+    assert!(json_false.get("onlyActive").is_none());
+    let piece_true = Piece { only_active: true, ..pc(Claude, Icon) };
+    let json_true = serde_json::to_value(&piece_true).unwrap();
+    assert_eq!(json_true.get("onlyActive"), Some(&serde_json::json!(true)));
+}
+
