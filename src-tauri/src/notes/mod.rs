@@ -27,6 +27,8 @@
 //! (koncept, předvyplnění), `md` (Markdown náhled, úkoly, titulek), `meta` (barva, štítky), `links` (`[[vazby]]`, `#štítky`), `edit` (čtení / uložení / úkol /
 //! filtr karty). Veřejné API je re-exportované, cesty `notes::…` platí dál. Mapa: `docs/codemap/notes.md`.
 
+mod attach;
+pub mod brief;
 mod draft;
 pub mod edit;
 pub mod export;
@@ -36,7 +38,10 @@ pub mod folder_sync_plan;
 pub mod folder_sync_scan;
 #[cfg(test)]
 mod folder_sync_tests;
+pub mod files;
 mod frontmatter;
+pub mod ops;
+pub mod sections;
 pub mod lifecycle;
 pub mod links;
 pub mod openwith;
@@ -52,8 +57,11 @@ mod store;
 mod testkit;
 pub mod when;
 
+pub use attach::ImageIn;
+pub use brief::{Item, ItemImage, set_item};
 pub use draft::*;
 pub use frontmatter::*;
+pub use sections::{Question, add_questions, answer, log_append};
 pub use recycle::recycle;
 pub use reminders::*;
 pub use store::*;

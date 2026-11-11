@@ -253,3 +253,31 @@ týden); co chybí (cena neznámého modelu, okno bez dat), zůstane prázdné. 
 tabulky s větou, že jde o odhad, ne fakturaci. Tauri `export_usage(format)`, žádná síť. Mapa: `docs/codemap/smart.md`.
 
 **Stav incidentů Anthropicu** v kartě limitů: volba `smart.incidents`, viz [config-behavior.md](config-behavior.md) (Chytřejší šuplík).
+
+## Zadání z poznámky přes API
+
+Poznámka se zadáním (projekt, cíl, body `- [ ]`) → „Poslat orchestrátorovi“ (`brief_send(path)`) → Ledge
+spustí `claude.exe -p --input-format stream-json --output-format stream-json --verbose` **v cwd projektu**
+s vlastním `--session-id <uuid>`, `--model`, `--max-budget-usd` (= `budget − cost`), `--permission-mode
+acceptEdits`, inline `--mcp-config` se serverem `ledge` (`ledge.exe --mcp`, klíč `Ledge/mcp` si proxy čte
+sama), `--allowedTools` jen `mcp__ledge__notes_{read,ask,log,propose_done,create}` a `--append-system-prompt`
+s rolí (orchestrátor podle CLAUDE.md projektu; nejasnost → `notes_ask` a konec tahu; hotový bod jen
+`notes_propose_done` s důkazem, nikdy `[x]`; navazující práce → `notes_create`, nedělat ji).
+
+- **Platí se z API klíče, ne z předplatného.** Klíč leží ve Správci pověření (generic `Ledge/anthropic`,
+  uživatel `api`; `apikey_set` / `apikey_status` / `apikey_clear`, jde i `cmdkey /generic:Ledge/anthropic
+  /user:api /pass:<klíč>`). Do procesu jde jen jako `ANTHROPIC_API_KEY` v env dítěte; `ANTHROPIC_AUTH_TOKEN`
+  a `CLAUDE_CODE_OAUTH_TOKEN` se z env dítěte odeberou (přebily by ho). Nikdy v argumentech, logu, chybě ani
+  configu. **Pojistka:** hlásí-li úvodní `init` jiné `apiKeySource` než `ANTHROPIC_API_KEY`, Ledge strom
+  procesu hned zabije a do `## Log` zapíše „běh by jel z předplatného“.
+- **Jeden tah na běh.** Na stdin jde jedna zpráva (cesta k poznámce, text zadání čte session přes MCP), po
+  řádku `result` Ledge zavře stdin a proces doběhne — nic nečeká. Výsledek: `cost` (z `total_cost_usd`),
+  `status: waiting` (v `## Otázky` je nezodpovězená otázka) / `review`; chyba (`is_error`, vyčerpaný strop,
+  pád, ruční zastavení) → `status: draft` + řádek do `## Log`.
+- **Pokračovat** (`brief_resume(path)`) = `--resume <session>` jen ze stavu `waiting` / `review`;
+  **Zastavit** (`brief_stop(path)`) zabije celý strom (Job Object s KILL_ON_JOB_CLOSE — i při ukončení Ledge).
+- **Odmítne s vysvětlením:** bez projektu, s vypnutým MCP („zapni MCP“), bez klíče, s vyčerpaným rozpočtem,
+  a když je Claude Code jen jako `claude.cmd` (text z poznámky přes `cmd.exe` neposílá).
+- Config: `claude.brief.model` (výchozí `sonnet`), `claude.brief.budgetUsd` (výchozí `2.0`); poznámka je
+  přebije `model:` / `budget:`. Náklad: CLI ≥ 2.1.277 hlásí s `--resume` součet session (nepřičítá se), starší
+  jen běh (přičítá se); verze se čte jednou za běh Ledge (`claude --version`). Mapa: `docs/codemap/sessions.md`.

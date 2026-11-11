@@ -52,6 +52,9 @@ impl Host for MemHost {
     fn notes_root(&self) -> Option<std::path::PathBuf> {
         self.notes.lock().clone()
     }
+    fn project_dir(&self, id: &str) -> Option<std::path::PathBuf> {
+        self.cfg.lock().projects.iter().find(|p| p.id == id).and_then(|p| p.path.clone()).map(Into::into)
+    }
     fn notes_changed(&self) {
         self.note_writes.fetch_add(1, Ordering::SeqCst);
     }
@@ -153,7 +156,8 @@ fn tools_list_matches_contract() {
     let contract = [
         "ledge_status", "apps_discover", "tiles_list", "tiles_add", "tiles_update", "tiles_remove", "actions_list", "actions_add", "actions_update",
         "actions_remove", "layout_get", "layout_preview", "layout_apply", "strip_get", "strip_set", "appearance_get", "appearance_set",
-        "notes_list", "notes_read", "notes_create", "notes_append", "notes_toggle_task", "notes_pin", "undo_last", "open_drawer",
+        "notes_list", "notes_read", "notes_create", "notes_append", "notes_toggle_task", "notes_set_status", "notes_ask", "notes_propose_done", "notes_log", "notes_pin",
+        "undo_last", "open_drawer",
     ];
     assert_eq!(names, contract);
     for t in list.as_array().unwrap() {

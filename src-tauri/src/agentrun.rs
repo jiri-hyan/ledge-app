@@ -91,12 +91,8 @@ fn take(t: &Mutex<Tail>, cap: usize) -> (Vec<u8>, bool) {
 
 /// `claude <args>` bez okna. Po termínu zabije přímého potomka a vrátí chybu.
 pub fn run(args: &[String], cwd: Option<&Path>, wait: Duration, cap: usize) -> Result<Out, String> {
-    let (exe, args) = match program()? {
-        Program::Exe(p) => (p, args.to_vec()),
-        Program::Batch(p) => (p, agentview::for_batch(args)),
-    };
-    let mut cmd = Command::new(&exe);
-    cmd.args(&args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).creation_flags(NO_WINDOW);
+    let mut cmd = command_for(program()?, args)?;
+    cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).creation_flags(NO_WINDOW);
     if let Some(d) = cwd {
         cmd.current_dir(d);
     }
@@ -134,6 +130,17 @@ pub fn run(args: &[String], cwd: Option<&Path>, wait: Duration, cap: usize) -> R
     Ok(Out { ok: status.success(), stdout, stderr, cut })
 }
 
+/// Příkaz pro `claude <args>`: exe přímo, dávka (`claude.cmd`) jen bez metaznaků `cmd.exe` (registr L1).
+pub(crate) fn command_for(p: Program, args: &[String]) -> Result<Command, String> {
+    let (exe, args) = match p {
+        Program::Exe(p) => (p, args.to_vec()),
+        Program::Batch(p) => (p, agentview::for_batch(args)?),
+    };
+    let mut cmd = Command::new(exe);
+    cmd.args(args);
+    Ok(cmd)
+}
+
 /// `claude attach <id>` v novém okně terminálu (výslovný klik). Neexistující složka session
 /// (smazaný worktree) → domovská složka; `attach` podle id funguje odkudkoli.
 pub fn attach(cwd: &str, id: &str) -> Result<(), String> {
@@ -147,5 +154,40 @@ pub fn attach(cwd: &str, id: &str) -> Result<(), String> {
     match agentview::attach_command(false, &dir, id).ok_or_else(bad)? {
         Launch::Cmd(raw) => Command::new("cmd").raw_arg(raw).creation_flags(NO_WINDOW).spawn().map(|_| ()).map_err(|e| crate::errors::spawn(tr("Terminál nejde otevřít", "Can't open a terminal"), &e)),
         Launch::Wt(_) => Err(bad()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Skutečná příkazová řádka přes `cmd.exe` (bez okna): sonda `.cmd` zapíše `%*` do souboru; text
+    /// s metaznaky se do dávky vůbec nedostane, žádný příkaz z textu se nespustí.
+    #[test]
+    fn batch_command_line_is_safe() {
+        let dir = std::env::temp_dir().join(format!("ledge-l1-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let probe = dir.join("claude.cmd");
+        std::fs::write(&probe, "@echo off\r\n>\"%~dp0out.txt\" echo(%*\r\n").unwrap();
+        let pwn = dir.join("pwn.txt");
+        let s = |a: &[&str]| a.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let inj = format!("x & echo pwn>\"{}\"", pwn.display());
+        for bad in [inj.as_str(), "100% hotovo", "%PATH%", "a | b", "a ^& b", "a < b", "a > b", "\"uvozovky\""] {
+            assert!(command_for(Program::Batch(probe.clone()), &s(&["--bg", bad])).is_err(), "{bad}");
+        }
+        for (args, want) in [
+            (s(&["--bg", "oprav testy v app"]), r#"--bg "oprav testy v app""#),
+            (s(&["--bg", "--name", "flaky", "hotovo! (app); a=b, c"]), r#"--bg --name flaky "hotovo! (app); a=b, c""#),
+            (s(&["--bg", "radek 1\nradek 2"]),r#"--bg "radek 1 radek 2""#),
+        ] {
+            let mut cmd = command_for(Program::Batch(probe.clone()), &args).unwrap();
+            let st = cmd.current_dir(&dir).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).creation_flags(NO_WINDOW).status().unwrap();
+            assert!(st.success());
+            let out = std::fs::read_to_string(dir.join("out.txt")).unwrap();
+            assert_eq!(out.trim_end(), want);
+        }
+        assert!(!pwn.exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

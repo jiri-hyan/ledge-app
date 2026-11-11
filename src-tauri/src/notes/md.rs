@@ -23,13 +23,13 @@ pub fn esc(s: &str) -> String {
     o
 }
 
-fn is_fence(line: &str) -> bool {
+pub(super) fn is_fence(line: &str) -> bool {
     let t = line.trim_start();
     t.starts_with("```") || t.starts_with("~~~")
 }
 
 /// Položka seznamu: (odsazení, číslo u číslované, zbytek za značkou).
-fn list_item(line: &str) -> Option<(usize, Option<u32>, &str)> {
+pub(super) fn list_item(line: &str) -> Option<(usize, Option<u32>, &str)> {
     let indent = line.len() - line.trim_start_matches([' ', '\t']).len();
     let t = &line[indent..];
     if let Some(rest) = t.strip_prefix("- ").or_else(|| t.strip_prefix("* ")).or_else(|| t.strip_prefix("+ ")) {
@@ -50,15 +50,51 @@ fn digits_val(d: &str) -> Option<u32> {
     d.parse().ok()
 }
 
-/// `[ ] text` / `[x] text` → (hotovo?, text).
-fn task_box(rest: &str) -> Option<(bool, &str)> {
-    let checked = match rest.get(..3)? {
-        "[ ]" => false,
-        "[x]" | "[X]" => true,
+/// Stav bodu: `- [ ]` otevřený, `- [~]` navržený jako hotový (čeká na potvrzení člověkem), `- [x]` hotový.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskState {
+    Open,
+    Proposed,
+    Done,
+}
+
+impl TaskState {
+    /// Znak v hranatých závorkách.
+    pub fn mark(self) -> char {
+        match self {
+            Self::Open => ' ',
+            Self::Proposed => '~',
+            Self::Done => 'x',
+        }
+    }
+
+    /// `open` / `proposed` / `done` (jak je posílá UI a MCP).
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "open" => Some(Self::Open),
+            "proposed" => Some(Self::Proposed),
+            "done" => Some(Self::Done),
+            _ => None,
+        }
+    }
+}
+
+/// `[ ] text` / `[~] text` / `[x] text` → (stav, text).
+pub(super) fn task_state(rest: &str) -> Option<(TaskState, &str)> {
+    let state = match rest.get(..3)? {
+        "[ ]" => TaskState::Open,
+        "[~]" => TaskState::Proposed,
+        "[x]" | "[X]" => TaskState::Done,
         _ => return None,
     };
     let after = &rest[3..];
-    (after.is_empty() || after.starts_with(' ')).then(|| (checked, after.trim_start()))
+    (after.is_empty() || after.starts_with(' ')).then(|| (state, after.trim_start()))
+}
+
+/// `[ ] text` / `[x] text` → (hotovo?, text); navržený `[~]` se pro odškrtávání bere jako nehotový.
+fn task_box(rest: &str) -> Option<(bool, &str)> {
+    task_state(rest).map(|(s, t)| (s == TaskState::Done, t))
 }
 
 /// Úkoly v těle: (řádek od 0, hotovo?). Bloky kódu se přeskočí.
@@ -119,7 +155,7 @@ pub fn relative_image(src: &str) -> bool {
 }
 
 /// `[text](url)` od pozice `[`: (text, url, délka v bajtech).
-fn bracket_link(s: &str) -> Option<(&str, &str, usize)> {
+pub(super) fn bracket_link(s: &str) -> Option<(&str, &str, usize)> {
     let close = s.find("](")?;
     let text = &s[1..close];
     if text.contains('[') {
@@ -141,6 +177,20 @@ fn bracket_link(s: &str) -> Option<(&str, &str, usize)> {
         _ => None,
     })?;
     Some((text, &rest[..end], close + 2 + end + 1))
+}
+
+/// Počet obrázků `![` v těle mimo bloky kódu (ploty ``` a ~~~).
+pub fn image_count(body: &str) -> usize {
+    let mut code = false;
+    let mut n = 0;
+    for line in body.split('\n') {
+        if is_fence(line) {
+            code = !code;
+        } else if !code {
+            n += line.matches("![").count();
+        }
+    }
+    n
 }
 
 /// Relativní obrázky `![](src)` v těle — bez duplicit, v pořadí výskytu.
@@ -385,11 +435,15 @@ pub fn to_html(body: &str) -> String {
             close_para(&mut out, &mut para);
             lists.open_item(&mut out, indent_width(line), num);
             blank = false;
-            match task_box(rest) {
-                Some((checked, text)) => {
+            match task_state(rest) {
+                Some((state, text)) => {
+                    let (class, aria) = match state {
+                        TaskState::Done => (" on", "true"),
+                        TaskState::Proposed => (" proposed", "mixed"),
+                        TaskState::Open => ("", "false"),
+                    };
                     out.push_str(&format!(
-                        "<li data-task=\"1\"><span class=\"md-check{}\" role=\"checkbox\" aria-checked=\"{checked}\" data-line=\"{i}\"></span><span>",
-                        if checked { " on" } else { "" }
+                        "<li data-task=\"1\"><span class=\"md-check{class}\" role=\"checkbox\" aria-checked=\"{aria}\" data-line=\"{i}\"></span><span>"
                     ));
                     inline(text, &mut out, false);
                     lists.set_item("</span></li>");
@@ -577,5 +631,22 @@ mod tests {
             let _ = to_html(&text);
             assert!(t0.elapsed() < std::time::Duration::from_secs(5), "{name}: {:?}", t0.elapsed());
         }
+    }
+
+    #[test]
+    fn proposed_state_is_a_task_but_not_done() {
+        let body = "- [ ] a\n- [~] b — důkaz: commit 1\n2. [~] c\n- [x] d\n- [~]bez mezery\n- [?] e";
+        assert_eq!(tasks(body), vec![(0, false), (1, false), (2, false), (3, true)]);
+        for (rest, st) in [("[ ] a", TaskState::Open), ("[~] a", TaskState::Proposed), ("[x] a", TaskState::Done), ("[X] a", TaskState::Done)] {
+            assert_eq!(task_state(rest).map(|t| t.0), Some(st), "{rest}");
+        }
+        for (s, c) in [("open", ' '), ("Proposed", '~'), (" done ", 'x')] {
+            assert_eq!(TaskState::parse(s).map(TaskState::mark), Some(c));
+        }
+        assert_eq!(TaskState::parse("hotovo"), None);
+        let html = to_html("- [~] b — důkaz: x");
+        assert!(html.contains("md-check proposed\" role=\"checkbox\" aria-checked=\"mixed\""), "{html}");
+        // `[~]` se dá vrátit na otevřený stejnou cestou jako úkol
+        assert_eq!(toggle_line("- [~] b\n", 0, false).unwrap(), "- [ ] b\n");
     }
 }

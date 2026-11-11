@@ -9,7 +9,14 @@
 # Poznámky vydání (kolo 24): odkaz ke stažení, „Co je nového“ (ručně z `docs/releases/<verze>.md`, jinak feat/fix/perf
 # ze seznamu změn), instalace se SmartScreen, ověření SHA256 a podpisu, „Nastav s Claudem“, sbalený seznam změn.
 #
-# Podpis (kolo 21): instalátor se podepíše soukromým klíčem MIMO repo (`-SigningKey`, proměnná LEDGE_SIGNING_KEY,
+# Build a podpis v GitHub Actions (výchozí od 11. 11. 2026): snapshot se pushne do veřejného repa a jeho workflow
+# `Sestavení a podpis` (šablona `.github/verejne-repo/workflows/vydani.yml`, kopíruje se do každého snapshotu)
+# instalátor postaví a podepíše klíčem z tajných údajů veřejného repa (LEDGE_SIGNING_KEY + LEDGE_SIGNING_KEY_PASSWORD).
+# Skript počká, stáhne `<instalátor>` + `.sig`, ověří je a vydá jako dřív. Na PC tak není potřeba žádný klíč —
+# vydávat jde z kteréhokoli počítače s přihlášeným `gh` (právo zápisu do veřejného repa).
+# `-Local` = původní cesta níže (lokální build a podpis vlastním klíčem), záloha, kdyby Actions nejely.
+#
+# Podpis lokálně (-Local, kolo 21): instalátor se podepíše soukromým klíčem MIMO repo (`-SigningKey`, proměnná LEDGE_SIGNING_KEY,
 # výchozí %USERPROFILE%\.ledge-signing\ledge-update.key; vytvoří ho jednou scripts/signing-setup.ps1) přes
 # `tauri signer sign` → `<instalátor>.sig`, který Ledge ověří zapečeným veřejným klíčem (updsign.rs). Heslo ke klíči
 # (bez člověka, nic se neptá): TAURI_SIGNING_PRIVATE_KEY_PASSWORD, jinak DPAPI soubor vedle klíče
@@ -24,7 +31,8 @@
 # vydání se nikdy nepřepisuje (vydej vyšší verzi).
 #
 # Použití: powershell -NoProfile -File scripts/publish.ps1 [-Public jiri-hyan/ledge-app]
-#          [-Private jiri-hyan/ledge] [-AlsoPrivate] [-Clone <složka klonu veřejného repa>] [-DryRun] [-Version x.y.z]
+#          [-Private jiri-hyan/ledge] [-AlsoPrivate] [-Clone <složka klonu veřejného repa>] [-DryRun] [-Version x.y.z] [-Local]
+#   -Local        build a podpis na tomhle PC vlastním klíčem (záloha); bez něj staví a podepisuje GitHub Actions
 #   -AlsoPrivate  stejný instalátor vydá i v soukromém repu (přechod: Ledge ≤ 0.2.8 hledá aktualizace tam)
 #   -DryRun       jen snapshot do klonu + kontrola denylistu, nic necommituje, nebuilduje ani nevydá
 # Podmínky: větev main, čistý strom, HEAD pushnutý do soukromého repa.
@@ -36,7 +44,8 @@ param(
   [switch]$DryRun,
   [string]$Version,
   [string]$SigningKey = $(if ($env:LEDGE_SIGNING_KEY) { $env:LEDGE_SIGNING_KEY } else { Join-Path $env:USERPROFILE '.ledge-signing\ledge-update.key' }),
-  [string]$PasswordFile
+  [string]$PasswordFile,
+  [switch]$Local
 )
 # 'Continue': git/gh píšou průběh na stderr, PowerShell 5.1 by to pod 'Stop' bral jako chybu —
 # návratové kódy se kontrolují výslovně ($LASTEXITCODE) a chyby končí `exit 1`
@@ -71,6 +80,53 @@ function Assert-SigningKey {
     catch { Fail "DPAPI soubor $pf nejde odemknout (je vázaný na účet a stroj, kde vznikl) — heslo obnov ze zálohy do TAURI_SIGNING_PRIVATE_KEY_PASSWORD" }
   }
   Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+}
+
+# Podpis v CI: veřejné repo má oba tajné údaje a v repu je vyplněný update.pub. Hodnoty tajných údajů nejdou přečíst,
+# shodu klíče s update.pub proto ověří až Test-SigKeyId nad staženým .sig (před publikací).
+function Assert-CiSigning {
+  $embedded = Get-Content (Join-Path $root 'src-tauri\signing\update.pub') -Raw -Encoding UTF8
+  if (-not $embedded -or -not $embedded.Trim()) { Fail 'src-tauri/signing/update.pub je prázdný — Ledge by podpis neověřil' }
+  $names = @(gh secret list --repo $Public --json name --jq '.[].name' 2>$null)
+  if ($LASTEXITCODE -ne 0) { Fail "nejde přečíst seznam tajných údajů $Public (gh přihlášený s právem k repu?)" }
+  foreach ($n in 'LEDGE_SIGNING_KEY', 'LEDGE_SIGNING_KEY_PASSWORD') {
+    if ($names -notcontains $n) { Fail "veřejné repo $Public nemá tajný údaj $n — jednou ho nastav (docs/podpis-vydani.md), nebo vydej s -Local" }
+  }
+}
+
+# Podpis patří klíči zapečenému v Ledge: ID klíče (8 bajtů za algoritmem) v .sig = ID v update.pub. Jinak by vydání
+# žádná nainstalovaná kopie neověřila — chytí špatně nastavený tajný údaj dřív, než se cokoli publikuje.
+function Test-SigKeyId([string]$sigPath) {
+  $pubLines = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content (Join-Path $root 'src-tauri\signing\update.pub') -Raw).Trim())) -split "`n"
+  $sigLines = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content -LiteralPath $sigPath -Raw).Trim())) -split "`n"
+  $pk = [Convert]::FromBase64String($pubLines[1].Trim())
+  $sg = [Convert]::FromBase64String($sigLines[1].Trim())
+  if ($pk.Length -lt 10 -or $sg.Length -lt 10) { return $false }
+  for ($i = 2; $i -lt 10; $i++) { if ($pk[$i] -ne $sg[$i]) { return $false } }
+  return $true
+}
+
+# Build + podpis v Actions veřejného repa nad commitem $sha; vrátí složku se staženým instalátorem a .sig.
+function Invoke-CiBuild([string]$sha) {
+  $wf = 'vydani.yml'
+  $since = (Get-Date).ToUniversalTime().AddSeconds(-5)
+  gh workflow run $wf --repo $Public --ref main -f "version=$v" -f "sha=$sha" | Out-Host
+  if ($LASTEXITCODE -ne 0) { Fail "spuštění workflow $wf v $Public selhalo" }
+  $runId = $null
+  for ($i = 0; $i -lt 30 -and -not $runId; $i++) {
+    Start-Sleep -Seconds 4
+    $runs = gh run list --repo $Public --workflow $wf --event workflow_dispatch --limit 10 --json databaseId,headSha,createdAt | ConvertFrom-Json
+    $runId = @($runs | Where-Object { $_.headSha -eq $sha -and ([datetime]$_.createdAt).ToUniversalTime() -ge $since } | Select-Object -First 1).databaseId
+  }
+  if (-not $runId) { Fail "běh workflow $wf pro $sha jsem v $Public nenašel" }
+  Write-Host "build CI:   https://github.com/$Public/actions/runs/$runId (čekám; build trvá zhruba 15–25 min)"
+  gh run watch $runId --repo $Public --exit-status --interval 30 | Out-Null
+  if ($LASTEXITCODE -ne 0) { Fail "build/podpis v Actions selhal — log: https://github.com/$Public/actions/runs/$runId (snapshot je pushnutý, další běh ho použije)" }
+  $dir = Join-Path $env:TEMP "ledge-ci-$v-$runId"
+  Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
+  gh run download $runId --repo $Public -n "ledge-$v" -D $dir | Out-Host
+  if ($LASTEXITCODE -ne 0) { Fail "stažení artefaktu ledge-$v z běhu $runId selhalo" }
+  $dir
 }
 
 # Podpis souboru: heslo jen v prostředí podprocesu podpisu a hned po něm pryč (i při chybě); výstup tauri hesla neobsahuje.
@@ -139,7 +195,7 @@ try {
   $head = git rev-parse HEAD
   if ($head -ne (git rev-parse origin/main)) { Fail 'HEAD není shodný s origin/main — nejdřív push/pull' }
   $deny = Get-Denylist
-  if (-not $DryRun) { Assert-SigningKey }
+  if (-not $DryRun) { if ($Local) { Assert-SigningKey } else { Assert-CiSigning } }
 
   # další verze = nejvyšší vydaná vX.Y.Z v OBOU repech, patch + 1 (jedna řada verzí; Ledge porovnává čísla);
   # -Version x.y.z vydá zadanou verzi (musí být vyšší než poslední vydaná) — např. skok na 0.3.0
@@ -163,7 +219,14 @@ try {
   }
   git -C $Clone fetch -q origin 2>$null
   $hasMain = git -C $Clone ls-remote --heads origin main
-  if ($hasMain) { git -C $Clone checkout -q -B main origin/main } else { git -C $Clone checkout -q --orphan main 2>$null }
+  # klon patří jen skriptu: zbytky z dřívějšího běhu (DryRun, pád) by checkout tiše zastavily a snapshot by vznikl
+  # nad starým commitem → push mimo fast-forward. Proto nejdřív úklid a vynucený checkout, chyba = konec.
+  git -C $Clone reset -q --hard 2>$null
+  git -C $Clone clean -fdxq
+  if ($hasMain) {
+    git -C $Clone checkout -q -f -B main origin/main
+    if ($LASTEXITCODE -ne 0) { Fail "klon $Clone nejde přepnout na origin/main" }
+  } else { git -C $Clone checkout -q --orphan main 2>$null }
   # celý strom klonu (kromě .git) pryč a nahradit archivem HEAD — smazané soubory tak zmizí i veřejně
   Get-ChildItem -Path $Clone -Force | Where-Object { $_.Name -ne '.git' } | Remove-Item -Recurse -Force
   $tar = Join-Path $env:TEMP "ledge-snapshot-$v.tar"
@@ -173,6 +236,9 @@ try {
   & (Join-Path $env:SystemRoot 'System32/tar.exe') -xf $tar -C $Clone
   if ($LASTEXITCODE -ne 0) { Fail 'rozbalení snapshotu selhalo' }
   Remove-Item $tar
+  # .github/ je export-ignore — veřejné repo dostane jen šablony z .github/verejne-repo/ (workflow build + podpis)
+  $pubGh = Join-Path $root '.github\verejne-repo'
+  if (Test-Path $pubGh) { Copy-Item -Path (Join-Path $pubGh '*') -Destination (New-Item -ItemType Directory -Force (Join-Path $Clone '.github')) -Recurse -Force }
 
   $hits = @(Find-Denied $Clone $deny)
   $prevTag = "v$last"
@@ -205,6 +271,18 @@ try {
   }
   $pubHead = git -C $Clone rev-parse HEAD
 
+  if (-not $Local) {
+    # ---- build + podpis v GitHub Actions veřejného repa (klíč jen v jeho tajných údajích) ----
+    # snapshot musí být na veřejném main dřív, než se workflow spustí (běží nad ním a s jeho vydani.yml)
+    git -C $Clone push -q origin main
+    if ($LASTEXITCODE -ne 0) { Fail 'push snapshotu do veřejného repa selhal' }
+    $ciDir = Invoke-CiBuild $pubHead
+    $setup = Get-ChildItem -Path $ciDir -Filter "*_$($v)_*-setup.exe" | Select-Object -First 1
+    if (-not $setup) { Fail "artefakt z CI nemá instalátor pro $v ($ciDir)" }
+    $sigPath = "$($setup.FullName).sig"
+    if (-not (Test-Path -LiteralPath $sigPath)) { Fail "artefakt z CI nemá podpis $sigPath — nic se nevydalo" }
+    $sha = (Get-FileHash -Algorithm SHA256 -Path $setup.FullName).Hash.ToLowerInvariant()
+  } else {
   # ---- build (verze se zapíše jen dočasně, necommituje se) ----
   $verFiles = 'src-tauri/tauri.conf.json', 'package.json', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock'
   try {
@@ -226,6 +304,8 @@ try {
   Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue  # -f a -k se vylučují
   $signExit = Invoke-Sign $setup.FullName
   if ($signExit -ne 0 -or -not (Test-Path -LiteralPath $sigPath)) { Fail 'podpis instalátoru selhal (špatné heslo ke klíči? DPAPI soubor / TAURI_SIGNING_PRIVATE_KEY_PASSWORD) — nic se nevydalo' }
+  }
+  if (-not (Test-SigKeyId $sigPath)) { Fail "podpis $sigPath nepatří klíči ze src-tauri/signing/update.pub — Ledge by vydání odmítl; nevydávám (tajný údaj LEDGE_SIGNING_KEY?)" }
   # důvěryhodný komentář musí jmenovat tenhle soubor a verzi — jinak by ho Ledge odmítl (updsign::comment_names)
   $sigText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((Get-Content -LiteralPath $sigPath -Raw).Trim()))
   if ($sigText -notmatch "(?m)^trusted comment: .*\tfile:$([regex]::Escape($setup.Name))\tversion:$([regex]::Escape($v))\s*$") { Fail "podpis $sigPath nejmenuje $($setup.Name) / verzi $v — nevydávám" }

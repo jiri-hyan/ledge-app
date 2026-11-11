@@ -138,6 +138,10 @@ export interface HooksStatus {
   hint: string | null;
 }
 
+// --- zadání přes API (kolo 19) ---
+/** Zrcadlo `config::BriefConfig` (`claude.brief`): výchozí model a strop $ zadání; poznámka je může přebít. */
+export interface BriefConfig { model: string; budgetUsd: number }
+
 // --- questions ---
 /** Možnost otázky Clauda (`AskUserQuestion`); `preview` = volitelný náhled (text/markup od Clauda). */
 export interface QuestionOption { label: string; description: string; preview: string | null }

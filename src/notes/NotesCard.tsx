@@ -4,6 +4,7 @@
 // karty (vzhled karty, vlna 8 P): seznam / dlaždice / kompaktní (`.note-list[data-view]`). Lístky 2.0: řádek nese
 // barvu poznámky (proužek vlevo) a štítky, pod záložkami filtr podle štítku (`note_tags`, jen když nějaké jsou).
 
+import { BriefChip } from "./BriefPanel";
 import { createMemo, createResource, For, Match, Show, Switch, type JSX } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { quiet } from "../uiErrors";
@@ -63,6 +64,7 @@ export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: 
         <div class="name">{head() || t("notes.imageOnly", "(jen obrázek)")}</div>
         <div class="sub">{n().heading ? "" : `${projName(p.s, n().project)} · `}{ago(n().createdMs, p.now)}{n().images ? tp("notes.row.images", n().images, " · {n}× obrázek") : ""}{n().tags?.length ? ` · ${n().tags!.slice(0, 4).map((x) => `#${x}`).join(" ")}` : ""}</div>
       </button>
+      <BriefChip n={n()} />
       <Show when={n().tasksTotal > 0}>
         <span class="pill" classList={{ g: n().tasksDone === n().tasksTotal, n: n().tasksDone < n().tasksTotal }} title={t("notes.row.tasks", "Splněné úkoly")}>{n().tasksDone}/{n().tasksTotal}</span>
       </Show>

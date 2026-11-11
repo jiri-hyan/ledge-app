@@ -52,11 +52,29 @@ pub struct ClaudeConfig {
     /// drží ho jen po dobu dotazu a nikam jinam neposílá. Jen když je karta s limity vidět nebo proužek limity
     /// ukazuje, nikdy ve hře. Výchozí vypnuto (`limitsfetch.rs`).
     pub limits_fetch: bool,
+    /// Zadání z poznámky přes API klíč („Poslat orchestrátorovi“, `briefrun`): výchozí model a strop $.
+    /// Poznámka je může přebít vlastním `model:` / `budget:`.
+    pub brief: BriefConfig,
 }
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, toast_done: None, costs: true, context_bar: false, limits_pace: false, limits_alert: false, limits_desktop: false, limits_fetch: false }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, toast_done: None, costs: true, context_bar: false, limits_pace: false, limits_alert: false, limits_desktop: false, limits_fetch: false, brief: BriefConfig::default() }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct BriefConfig {
+    /// Model session ze zadání (`sonnet`, `opus`, `haiku` nebo id modelu).
+    pub model: String,
+    /// Strop útraty jednoho zadání v USD (součet všech běhů; `--max-budget-usd` = strop − útrata). 0,1–100.
+    pub budget_usd: f64,
+}
+
+impl Default for BriefConfig {
+    fn default() -> Self {
+        Self { model: "sonnet".into(), budget_usd: 2.0 }
     }
 }
 

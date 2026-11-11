@@ -232,6 +232,16 @@
     "allow-mcp-rotate-key",
     "allow-mcp-reveal-key",
     "allow-studio-open",
-    "allow-studio-win"
+    "allow-studio-win",
+    "allow-note-set-status",
+    "allow-note-answer",
+    "allow-note-task-set",
+    "allow-project-files",
+    "allow-brief-send",
+    "allow-brief-resume",
+    "allow-brief-stop",
+    "allow-apikey-set",
+    "allow-apikey-status",
+    "allow-apikey-clear"
   ]
 }

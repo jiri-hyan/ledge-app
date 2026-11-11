@@ -5,6 +5,7 @@ pub(crate) mod accounts;
 pub(crate) mod actions;
 pub(crate) mod cliphist;
 pub(crate) mod agents;
+pub(crate) mod brief;
 pub(crate) mod calendar;
 pub(crate) mod config;
 pub(crate) mod integrations;

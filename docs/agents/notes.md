@@ -79,6 +79,49 @@ Zavolat Řehořovi kvůli fakturám
   dokončí start. Obrázek se maže/archivuje s poznámkou jen když ho nepoužívá jiná poznámka ve složce.
   `.smazane\` ani `_archiv\` ručně neupravuj.
 
+### Zadání pro Claude Code session (kolo 19)
+
+Poznámka může být zadání: Claude Code ji čte přes MCP Ledge, ptá se do ní a body navrhuje jako hotové;
+potvrzuje je jen šéf. Vše je **volitelné** — poznámka bez těchto věcí se chová jako dřív a staré Ledge
+nové klíče zachová.
+
+Frontmatter (další klíče vedle `project`, `created`…):
+
+| klíč | hodnota | kdo píše |
+|---|---|---|
+| `status` | `draft` `ready` `running` `waiting` `review` `done` | člověk v Ledge; model přes `notes_set_status` jen `running` / `waiting` / `review` |
+| `session` | id session Claude Code (`[A-Za-z0-9-]`) | běh (Ledge) |
+| `cost` · `budget` | dosavadní náklad · strop, USD (číslo ≥ 0) | běh · člověk |
+| `model` | `sonnet` `opus` `haiku` | člověk |
+
+Neplatná hodnota = klíč se bere jako chybějící (žádné divadlo).
+
+Body (úkoly) mají tři stavy:
+
+```markdown
+- [ ] Opravit header na mobilu @src/components/Header.tsx:42
+  ![Na tomto snímku je vidět rozbitý header](./2026-11-11-101500-zadani-1.png)
+- [~] Dokončit přihlášení — důkaz: commit abc123, test `login_ok`
+1. [x] Hotovo — důkaz: PR 5
+```
+
+- `[ ]` otevřený, `[~]` **navržený jako hotový** (model přidá ` — důkaz: …`), `[x]` hotový. **`[x]` dává jen
+  člověk v Ledge** — model přes MCP nikdy (`notes_propose_done` nastaví `[~]`; `notes_toggle_task` smí jen
+  znovu otevřít; `notes_append` / `notes_create` odmítnou text s novým `[x]`). Platí i pro číslované body.
+- **Snímek patří k bodu**, když je obrázek na vlastním řádku, odsazený víc než bod a hned pod ním (nebo
+  pod jeho dalším snímkem). Popisek = alt text (`![popisek](…)`). Ostatní obrázky jsou nenavázané.
+- **Odkazy na soubory projektu** `@cesta` nebo `@cesta:řádek` (jen cesta s `/` či `.`; e-mail a `@jmeno`
+  se nebere). Cesta se bere ke složce projektu poznámky; `..`, absolutní cesta a `C:` se zahazují.
+  `notes_read` vrací `refs: [{raw, path, line, exists}]` (`path` null = mimo projekt).
+- Sekce `## Otázky`: otázka `- ❓ text`, odpověď odsazeně `  - ↳ text` (píše člověk). `## Log`: jen
+  připisuj řádky `- <ISO čas> text` (`notes_log`); starší řádky neupravuj. Sekce se založí, když chybí.
+  Otázky se číslují od 0 (`questions[].index`).
+- Zápis mění jen dotčené řádky; tělo, neznámé klíče a CRLF zůstanou bajtově stejné.
+
+MCP (viz [api-mcp.md](api-mcp.md)): `notes_read` (body se `state`, `evidence`, `images`, `refs`; `questions`;
+`looseImages`; `status`/`cost`/`budget`/`model`), `notes_set_status`, `notes_ask`, `notes_propose_done`,
+`notes_log`, `notes_toggle_task` (volitelné `text`).
+
 ### Lístky na plochu (overlay okna)
 
 Kteroukoli poznámku jde **připnout na plochu** jako malé okno bez rámu přes ostatní okna (špendlík u

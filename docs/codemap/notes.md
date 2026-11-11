@@ -15,6 +15,11 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src-tauri/src/notes/reminders.rs` · `draft.rs` | karta a připomínky, stav peeku · … | `due_split` |
 | `src-tauri/src/notes/md.rs` | Markdown → bezpečné HTML, úkoly … | `to_html` |
 | `src-tauri/src/notes/md_list.rs` | zásobník seznamů pro `to_html` … | `Lists` |
+| `src-tauri/src/notes/brief.rs` | zadání v těle (čisté): body se třemi stavy, důkaz, snímky, odkazy `@` … | `scan_body` |
+| `src-tauri/src/notes/sections.rs` | sekce `## Otázky` (`- ❓` / `  - ↳`) a `## Log` (jen … | `Question` |
+| `src-tauri/src/notes/attach.rs` | vstup snímků a skládání těla se snímkem pod bodem … | `ImageIn` |
+| `src-tauri/src/notes/ops.rs` | I/O zápisy zadání pod zámkem cesty s kontrolou otisku … | `set_status` |
+| `src-tauri/src/notes/files.rs` | soubory projektu pro výběr po `@`: fuzzy filtr (čistý, max … | `fuzzy` |
 | `src-tauri/src/notes/export.rs` | export poznámky: md bez frontmatteru s … | `Format` |
 | `src-tauri/src/notes/pdf.rs` | PDF přes WebView2 … | `print` |
 | `src-tauri/src/notes/openwith.rs` | „Otevřít v …“: aplikace registrované … | `MD_PROGIDS_KEY` |
@@ -44,6 +49,9 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src/notes/RowMenu.tsx` · `UndoBar.tsx` | ⋯ řádku (společné menu `ui/Popover.tsx` … | `runAction` |
 | `src/notes/NoteEditor.tsx` | stránka „note“ (nová i úprava) … |  |
 | `src/notes/lists.ts` · `listkeys.ts` | chytré seznamy v textarea (editor i … | `onEnter` |
+| `src/notes/brief.ts` · `brief.test.mjs` | zadání pro Claude Code (čisté): body, otázky, log, akce … | `parseTasks` |
+| `src/notes/BriefPanel.tsx` · `apikey.ts` | panel zadání v editoru (čip stavu + náklad, Poslat … | `BriefPanel` |
+| `src/notes/ImgCaption.tsx` · `imgmeta.ts` · `AtSuggest.tsx` | popisek a kotva snímku, našeptávač `@` souborů … | `ImgCaption` |
 | `src/notes/NoteMenu.tsx` · `exportActions.ts` | ⋯ editoru (Export) · Markdown / HTML / … | `exportItems` |
 | `src/notes/NotesCard.tsx` | karta se záložkami, filtr podle štítku … | `copyNote` |
 | `src/notes/bento.ts` | čistá logika Bento: která poznámka je … | `heroOf` |

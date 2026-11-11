@@ -90,3 +90,14 @@ export async function openExternal(path: string) {
     say(String(e), true);
   }
 }
+
+/** Klik na `@cesta[:řádek]` v náhledu: v appce zatím není otevření souboru projektu (jen poznámek), proto se cesta zkopíruje. */
+export async function copyRef(path: string, line: number | null) {
+  const txt = line === null ? path : `${path}:${line}`;
+  try {
+    await navigator.clipboard.writeText(txt);
+    say(t("notes.md.refCopied", "Cesta zkopírována: {p}", { p: txt }));
+  } catch {
+    say(t("notes.md.refCopyFail", "Cestu nejde zkopírovat: {p}", { p: txt }), true);
+  }
+}

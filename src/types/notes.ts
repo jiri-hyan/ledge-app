@@ -25,7 +25,24 @@ export interface NoteView {
   color?: string;
   /** štítky: `tags:` ze frontmatteru + `#štítek` v textu; chybí = žádné */
   tags?: string[];
+  /** zadání pro Claude Code (kolo 19): stav, session, náklad a limit v $, model — jen co jádro skutečně zná */
+  status: BriefStatus | null;
+  session: string | null;
+  cost: number | null;
+  budget: number | null;
+  model: "sonnet" | "opus" | "haiku" | null;
 }
+
+export type BriefStatus = "draft" | "ready" | "running" | "waiting" | "review" | "done";
+/** Nový snímek k uložení (Rust `attach::ImageIn`): holé PNG v base64, nebo s popiskem a kotvou — `anchorLine` = řádek odesílaného textu (od 0), musí to být bod seznamu. */
+export type ImageIn = string | { png: string; caption?: string; anchorLine?: number };
+
+/** Bod zadání z jádra (`NoteDetail.items`); `line` = řádek těla od 0. */
+export interface BriefItemImage { src: string; path: string; caption: string }
+export interface BriefItemRef { raw: string; rel: string; line: number | null; path: string | null; exists: boolean }
+export interface BriefItem { line: number; state: "open" | "proposed" | "done"; text: string; evidence: string | null; images: BriefItemImage[]; refs: BriefItemRef[] }
+/** Otázka ze sekce `## Otázky`; `answer` null = nezodpovězená. */
+export interface BriefQuestion { index: number; line: number; text: string; answer: string | null }
 
 /** Kategorie poznámek z `notes.kinds`. */
 export interface NoteKind { id: string; label: string; color: string; icon: string }
@@ -38,6 +55,10 @@ export interface NoteDetail extends NoteView {
   hash: string;
   /** relativní obrázky (`./a-1.png`) jako data URL */
   imageData: { src: string; data: string }[];
+  items: BriefItem[];
+  /** snímky, které nepatří k žádnému bodu */
+  looseImages: BriefItemImage[];
+  questions: BriefQuestion[];
 }
 
 export interface SaveNote {
@@ -51,7 +72,7 @@ export interface SaveNote {
   /** lokální čas `YYYY-MM-DDTHH:MM` — offset doplní Rust; null = bez připomínky */
   remind: string | null;
   /** nové PNG (base64 bez prefixu), připojí se na konec */
-  images: string[];
+  images: ImageIn[];
 }
 export type SaveOutcome = { outcome: "saved"; note: NoteDetail } | { outcome: "changed" };
 
@@ -75,7 +96,7 @@ export interface NewNote {
   /** hodnota z `datetime-local` (lokální čas) — offset doplní Rust */
   remind: string | null;
   /** PNG v base64 (bez prefixu data:) */
-  images: string[];
+  images: ImageIn[];
   /** kategorie; null = výchozí */
   kind: string | null;
   /** vlastní nadpis; chybí / prázdný = název je první řádek */

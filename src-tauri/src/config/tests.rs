@@ -37,6 +37,22 @@ fn enforce_commit_old_config_and_values() {
 }
 
 #[test]
+fn brief_old_config_and_limits() {
+    // starý config bez `claude.brief` → dnešní výchozí (sonnet, $2)
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800,"approvalTimeoutS":45}}"#).unwrap();
+    assert_eq!(cfg.claude.brief, BriefConfig { model: "sonnet".into(), budget_usd: 2.0 });
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"brief":{"budgetUsd":5.5}}}"#).unwrap();
+    assert_eq!((cfg.claude.brief.model.as_str(), cfg.claude.brief.budget_usd), ("sonnet", 5.5));
+    assert!(validate(&cfg).is_ok());
+    for (b, m, ok) in [(0.05, "sonnet", false), (101.0, "sonnet", false), (2.0, "--x", false), (2.0, "opus", true)] {
+        let mut c = Config::default();
+        c.claude.brief = BriefConfig { model: m.into(), budget_usd: b };
+        assert_eq!(validate(&c).is_ok(), ok, "{b} {m}");
+    }
+    assert!(schema_json().contains("budgetUsd"));
+}
+
+#[test]
 fn roundtrip_and_atomic_save() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("config.json");

@@ -5,7 +5,7 @@
 
 use crate::i18n::tr;
 use super::{
-    DEFAULT_KIND, GENERAL, MAX_IMAGES, MAX_NOTE_BYTES, decode_png, edit, get, iso, local_from_naive, md, parse_time, path_lock,
+    DEFAULT_KIND, GENERAL, ImageIn, MODELS, STATUSES, attach, money, one_of, session_id, MAX_IMAGES, MAX_NOTE_BYTES, decode_png, edit, get, iso, local_from_naive, md, parse_time, path_lock,
     render, split, with_done, write_atomic, yaml_value,
 };
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
@@ -50,6 +50,16 @@ pub struct NoteView {
     /// štítky: `tags:` ze frontmatteru + `#štítek` v těle (`meta::tags_of`)
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// stav zadání (`status:`): `draft|ready|running|waiting|review|done`; neznámá hodnota = `None`
+    pub status: Option<String>,
+    /// id session Claude Code (`session:`)
+    pub session: Option<String>,
+    /// dosavadní náklad v USD (`cost:`)
+    pub cost: Option<f64>,
+    /// strop nákladu v USD (`budget:`)
+    pub budget: Option<f64>,
+    /// model (`model:`): `sonnet|opus|haiku`
+    pub model: Option<String>,
 }
 
 /// Vlastní nadpis z frontmatteru (`title:`): oříznutý, nejvýš 120 znaků, prázdný = žádný.
@@ -99,13 +109,18 @@ pub fn parse_note(path: &Path, text: &str, folder_project: Option<&str>, fallbac
         done,
         title: display_title(&front, body),
         heading: heading_of(&front),
-        images: body.matches("![").count(),
+        images: md::image_count(body),
         kind: get(&front, "kind").map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).unwrap_or_else(|| DEFAULT_KIND.into()),
         updated: get(&front, "updated").and_then(|s| parse_time(&s)).as_ref().map(iso),
         tasks_done: tasks.iter().filter(|t| t.1).count(),
         tasks_total: tasks.len(),
         color: super::meta::color_of(&front),
         tags: super::meta::tags_of(&front, body),
+        status: one_of(get(&front, "status"), &STATUSES),
+        session: session_id(get(&front, "session")),
+        cost: money(get(&front, "cost")),
+        budget: money(get(&front, "budget")),
+        model: one_of(get(&front, "model"), &MODELS),
     }
 }
 
@@ -243,9 +258,9 @@ pub struct NewNote {
     /// `2026-10-17T09:00` z `datetime-local` (= lokální čas) nebo ISO s offsetem
     #[serde(default)]
     pub remind: Option<String>,
-    /// PNG v base64 (i jako data URL)
+    /// PNG v base64 (i jako data URL), nebo `{png, caption?, anchorLine?}` (viz `attach::compose`)
     #[serde(default)]
-    pub images: Vec<String>,
+    pub images: Vec<ImageIn>,
     /// kategorie (id z `notes.kinds`); `None`/`DEFAULT_KIND` = klíč se nezapíše
     #[serde(default)]
     pub kind: Option<String>,
@@ -283,7 +298,7 @@ pub fn create(root: &Path, note: &NewNote, now: &DateTime<FixedOffset>) -> Resul
     if note.images.len() > MAX_IMAGES {
         return Err(trf!("Nejvýš {MAX_IMAGES} obrázků na poznámku.", "At most {MAX_IMAGES} images per note."));
     }
-    let images = note.images.iter().map(|b| decode_png(b)).collect::<Result<Vec<_>, _>>()?;
+    let images = note.images.iter().map(|i| decode_png(i.png())).collect::<Result<Vec<_>, _>>()?;
     let remind = match note.remind.as_deref().map(str::trim).filter(|r| !r.is_empty()) {
         Some(r) => Some(parse_time(r).ok_or_else(|| trf!("Neplatné datum připomínky „{r}“.", "Invalid reminder date “{r}”."))?),
         None => None,
@@ -319,12 +334,15 @@ pub fn create(root: &Path, note: &NewNote, now: &DateTime<FixedOffset>) -> Resul
     }
     front.push("done: false".into());
 
-    let mut body = format!("\n{text}\n");
+    let mut names = Vec::new();
     for (i, png) in images.iter().enumerate() {
         let name = format!("{base}-{}.png", i + 1);
         write_atomic(&dir.join(&name), png)?;
-        body.push_str(&format!("\n![](./{name})\n"));
+        names.push(name);
     }
+    // `text` je oříznutý o úvodní prázdné řádky — kotvy snímků se o ně posunou
+    let skipped = note.text.len() - note.text.trim_start().len();
+    let body = attach::compose(text, &note.images, &names, note.text[..skipped].matches('\n').count());
     let path = dir.join(format!("{base}.md"));
     write_atomic(&path, render(&front, &body).as_bytes())?;
     Ok(path)
@@ -444,7 +462,7 @@ mod tests {
             text: "Zavolat Řehořovi\n\nkvůli fakturám".into(),
             project: Some("atlas".into()),
             remind: Some("2026-10-17T09:00:00+02:00".into()),
-            images: vec![b64(&img), format!("data:image/png;base64,{}", b64(&img))],
+            images: vec![b64(&img).into(), format!("data:image/png;base64,{}", b64(&img)).into()],
             kind: None,
             title: Some(" Plán   týdne ".into()),
         };
@@ -492,7 +510,7 @@ mod tests {
         let root = tmp_root();
         let now = at("2026-10-16T14:03:22+02:00");
         assert!(create(root.path(), &NewNote { text: "  ".into(), ..Default::default() }, &now).is_err());
-        let bad_img = NewNote { text: "x".into(), images: vec![b64(b"not a png at all, just some bytes......")], ..Default::default() };
+        let bad_img = NewNote { text: "x".into(), images: vec![b64(b"not a png at all, just some bytes......").into()], ..Default::default() };
         assert!(create(root.path(), &bad_img, &now).is_err());
         let bad_remind = NewNote { text: "x".into(), remind: Some("zítra".into()), ..Default::default() };
         assert!(create(root.path(), &bad_remind, &now).is_err());
@@ -648,5 +666,46 @@ mod tests {
             .collect();
         hs.into_iter().for_each(|h| h.join().unwrap());
         assert_eq!(crate::fsx::read_string_retry(&p).unwrap().matches("done:").count(), 1);
+    }
+
+    #[test]
+    fn parse_note_brief_fields_default_to_none_and_validate() {
+        let p = Path::new("2026-11-11-100000-a.md");
+        let v = parse_note(p, "---\ncreated: 2026-11-11T10:00:00+01:00\n---\n\ntext\n", None, 0);
+        assert_eq!((v.status, v.session, v.cost, v.budget, v.model), (None, None, None, None, None));
+        let t = "---\nstatus: Running\nsession: 0b9e-1c\ncost: 1.5\nbudget: 20\nmodel: Opus\n---\n\ntext\n";
+        let v = parse_note(p, t, None, 0);
+        assert_eq!((v.status.as_deref(), v.session.as_deref(), v.cost, v.budget, v.model.as_deref()), (Some("running"), Some("0b9e-1c"), Some(1.5), Some(20.0), Some("opus")));
+        // neplatné hodnoty = prázdné (žádné divadlo), ne chyba
+        let t = "---\nstatus: hotovo\nsession: a b;c\ncost: -3\nbudget: nan\nmodel: gpt\n---\n\ntext\n";
+        let v = parse_note(p, t, None, 0);
+        assert_eq!((v.status, v.session, v.cost, v.budget, v.model), (None, None, None, None, None));
+        // starý JSON `NoteView` se do UI posílá s novými poli jako `null`
+        let j = serde_json::to_value(parse_note(p, "x", None, 0)).unwrap();
+        assert!(j["status"].is_null() && j["cost"].is_null() && j["model"].is_null());
+    }
+
+    #[test]
+    fn image_count_skips_code_blocks() {
+        let p = Path::new("2026-11-11-100000-a.md");
+        let body = "\n![](a.png)\n```\n![x](b.png)\n```\n- [ ] bod\n  ![popis](./c.png)\n~~~\n![y](d.png)\n~~~\n";
+        assert_eq!(parse_note(p, body, None, 0).images, 2);
+    }
+
+    #[test]
+    fn create_places_captioned_image_under_item_and_old_shape_still_appends() {
+        let root = tmp_root();
+        let now = at("2026-11-11T10:00:00+01:00");
+        let img = b64(&png(5));
+        let j = serde_json::json!({
+            "text": "\n\n- [ ] a\n- [ ] b",
+            "images": [img.clone(), { "png": img.clone(), "caption": "Rozbitý header", "anchorLine": 2 }, { "png": img, "anchorLine": 99 }]
+        });
+        let note: NewNote = serde_json::from_value(j).unwrap();
+        let path = create(root.path(), &note, &now).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        // anchorLine 2 v původním textu = první bod i po oříznutí úvodních prázdných řádků
+        assert!(text.ends_with("\n\n- [ ] a\n  ![Rozbitý header](./2026-11-11-100000-a-2.png)\n- [ ] b\n\n![](./2026-11-11-100000-a-1.png)\n\n![](./2026-11-11-100000-a-3.png)\n"), "{text}");
+        assert_eq!(root.path().join("_obecne").read_dir().unwrap().filter(|e| e.as_ref().unwrap().path().extension().is_some_and(|x| x == "png")).count(), 3);
     }
 }

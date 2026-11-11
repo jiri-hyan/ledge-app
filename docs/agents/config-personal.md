@@ -84,3 +84,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
 - **Pruh kontextu session** — `claude.contextBar` (výchozí `false`): pod každou živou session (s hooky) pruh velikosti
   kontextu z posledního `usage` v jejím transcriptu, rysky 250 k / 350 k (viz „Útrata Claude (odhad)“ → kontext);
   `false` = nic se nečte.
+- **Zadání přes API** — `claude.brief.model` (výchozí `"sonnet"`; `sonnet`/`opus`/`haiku` nebo id modelu) a
+  `claude.brief.budgetUsd` (výchozí `2.0`, 0,1–100): model a strop útraty jednoho zadání z poznámky („Poslat
+  orchestrátorovi“). Poznámka je přebije vlastním `model:` / `budget:`. Platí se z API klíče ve Správci pověření
+  (`Ledge/anthropic`), ne z předplatného; viz [sessions.md](sessions.md) → „Zadání z poznámky přes API“.

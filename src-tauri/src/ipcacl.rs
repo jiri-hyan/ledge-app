@@ -83,12 +83,12 @@ mod tests {
     }
 
     /// Co smí lístek: `pin_*` svého okna a práce s jeho poznámkou (číst, uložit, hotovo, archiv, koš, koncept,
-    /// odkazy `[[…]]`, export, otevřít v aplikaci). Ne: config, akce, widgety, šuplík, `pin_*` šuplíku.
+    /// odkazy `[[…]]`, export, otevřít v aplikaci, Potvrdit / Vrátit bod zadání `[~]`). Ne: config, akce, widgety, šuplík, `pin_*` šuplíku.
     const PIN_WINDOW: &[&str] = &[
         "note_archive", "note_delete", "note_delete_undo", "note_done", "note_draft_clear", "note_draft_load", "note_draft_save",
         "note_edit_draft_load", "note_edit_draft_save", "note_export", "note_link_create", "note_link_resolve", "note_link_suggest",
         "note_open", "note_open_with", "note_open_with_apps", "note_read", "note_render", "note_save", "note_set_meta",
-        "note_suggest_remind", "note_toggle_task", "note_unarchive", "open_url", "pin_drag", "pin_edit_in_ledge", "pin_hide",
+        "note_suggest_remind", "note_task_set", "note_toggle_task", "note_unarchive", "open_url", "pin_drag", "pin_edit_in_ledge", "pin_hide",
         "pin_hint_seen", "pin_init", "pin_look_all", "pin_open", "pin_set", "pin_unpin", "ui_log",
     ];
     /// Co smí widget na ploše: `desk_*` svého okna, kliky / výstup / obnovení widgetu (bez souhlasu — ten jen
@@ -102,7 +102,8 @@ mod tests {
     /// Co smí Ledge Studio: config (číst, ověřit, zapsat, výchozí, export / import), dialogy a příkazy panelů
     /// Nastavení; okenní tlačítka `studio_win`. Ne: fokus a velikost šuplíku, spouštění projektů z karet, `pin_*`, `desk_drag`.
     const STUDIO_WINDOW: &[&str] = &[
-        "account_cancel", "account_connect", "account_disconnect", "account_google_calendars", "accounts_status",
+        "account_cancel", "account_connect", "account_disconnect", "account_google_calendars", "accounts_status", "apikey_clear",
+        "apikey_set", "apikey_status",
         "action_check", "action_consent", "action_icon", "action_icon_refresh", "anim_stats", "app_info",
         "calendar_outlook_load", "calendar_outlook_probe", "calendar_test", "check_config", "clip_apps", "clip_clear",
         "clip_enable", "config_defaults", "config_export", "config_import_preview", "desk_hide_all", "desk_pin",

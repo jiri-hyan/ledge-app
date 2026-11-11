@@ -1,0 +1,99 @@
+# Sestavení a podpis instalátoru Ledge — běží ve VEŘEJNÉM repu (jiri-hyan/ledge-app, Actions zdarma).
+# Šablona žije v soukromém repu v `.github/verejne-repo/` a scripts/publish.ps1 ji kopíruje do každého snapshotu.
+#
+# Spouští jen scripts/publish.ps1 (`gh workflow run`, právo zápisu do repa). Sestaví snapshot `sha`, podepíše
+# instalátor klíčem z tajných údajů repa a vrátí `<instalátor>` + `<instalátor>.sig` jako artefakt. Vydání samo
+# (poznámky, SHA256SUMS, publikace) dělá publish.ps1 lokálně — tenhle workflow do vydání nesahá (contents: read).
+# Klíč tak neleží na žádném PC: tajné údaje LEDGE_SIGNING_KEY (obsah ledge-update.key) a
+# LEDGE_SIGNING_KEY_PASSWORD (heslo) nastaví jednou `gh secret set` (docs/podpis-vydani.md).
+name: Sestavení a podpis
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: verze x.y.z
+        required: true
+      sha:
+        description: commit snapshotu
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vydani
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Kontrola vstupů
+        env:
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw "verze '$env:VERSION' není x.y.z" }
+          if ($env:SHA -notmatch '^[0-9a-f]{40}$') { throw "sha '$env:SHA' není plný commit" }
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
+
+      # pnpm-lock.yaml má lockfileVersion 9.0 → pnpm 9; Vite 8 chce Node ^20.19 || >=22.12
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Verze
+        env:
+          VERSION: ${{ inputs.version }}
+        run: ./scripts/ci-version.ps1 -Version $env:VERSION
+
+      - name: Závislosti
+        run: pnpm install --frozen-lockfile
+
+      - name: Build NSIS instalátoru
+        run: pnpm tauri build --bundles nsis
+
+      - name: Podpis
+        env:
+          VERSION: ${{ inputs.version }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.LEDGE_SIGNING_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.LEDGE_SIGNING_KEY_PASSWORD }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY -or -not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+            throw 'chybí tajné údaje LEDGE_SIGNING_KEY / LEDGE_SIGNING_KEY_PASSWORD (docs/podpis-vydani.md)'
+          }
+          $nsis = 'src-tauri/target/release/bundle/nsis'
+          $setup = Get-ChildItem -Path $nsis -Filter "*_$($env:VERSION)_*-setup.exe" | Select-Object -First 1
+          if (-not $setup) { throw "v $nsis není *_$($env:VERSION)_*-setup.exe" }
+          node node_modules/@tauri-apps/cli/tauri.js signer sign --app-version $env:VERSION $setup.FullName
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path "$($setup.FullName).sig")) { throw 'podpis selhal (špatné heslo nebo klíč v tajných údajích?)' }
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item $setup.FullName, "$($setup.FullName).sig" out/
+          Get-ChildItem out | ForEach-Object { "$($_.Name)  $((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())" }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ledge-${{ inputs.version }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 3

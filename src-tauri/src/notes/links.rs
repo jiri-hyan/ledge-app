@@ -230,6 +230,11 @@ mod tests {
             tasks_total: 0,
             color: None,
             tags: Vec::new(),
+            status: None,
+            session: None,
+            cost: None,
+            budget: None,
+            model: None,
         }
     }
 

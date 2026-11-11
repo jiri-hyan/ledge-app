@@ -225,3 +225,28 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 @container (max-width: 259px) { .note-tl-item { grid-template-columns: 12px 1fr; } .note-tl-date { display: none; } .note-tl-item::before { left: 5px; } }
 /* Lístečky: na úzké kartě jeden sloupec, na široké víc (auto-fill už řeší mřížka) */
 @container (max-width: 259px) { .note-list[data-view="tiles"] { grid-template-columns: 1fr; } }
+/* Zadání pro Claude Code (kolo 19): panel v editoru, popisky snímků, našeptávač @ */
+.brief { display: flex; flex-direction: column; gap: var(--s2); padding: var(--s3); border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--well); }
+.brief-head { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.brief-why { color: var(--amber); font-size: var(--fs-md); }
+.brief-sec { font-size: var(--fs-md); color: var(--t3); text-transform: uppercase; letter-spacing: 0.04em; margin-top: var(--s2); }
+.brief-qt { color: var(--t1); }
+.brief-qa { display: flex; gap: var(--s2); margin-top: 4px; }
+.brief-ans { color: var(--t2); margin-top: 2px; padding-left: 18px; }
+.brief-in { flex: 1; min-width: 0; font: var(--fs-ui) var(--sans); color: var(--t1); background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 4px 8px; }
+.brief-t { display: flex; align-items: center; gap: var(--s2); }
+.brief-tilde { color: var(--amber); }
+.brief-ev { display: block; color: var(--t3); }
+.brief-log summary { cursor: pointer; color: var(--t3); font-size: var(--fs-md); }
+.brief-log pre { margin: 4px 0 0; white-space: pre-wrap; font: var(--fs-md) var(--mono, monospace); color: var(--t2); max-height: 160px; overflow: auto; }
+.note-imgc { display: flex; flex-direction: column; gap: 4px; width: 160px; }
+.note-imgc .note-img { width: 100%; }
+.img-cap { display: flex; flex-direction: column; gap: 2px; }
+.img-cap .hint { color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-textwrap { position: relative; display: flex; flex-direction: column; }
+.at-list { position: absolute; left: 8px; right: 8px; bottom: 8px; max-height: 190px; overflow: auto; z-index: 5; display: flex; flex-direction: column; background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-sm); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+.at-item { text-align: left; padding: 4px 10px; font: var(--fs-md) var(--mono, monospace); color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.at-item.on { background: color-mix(in srgb, var(--t1) 14%, transparent); }
+.brief-chip, .brief-cost { white-space: nowrap; }
+.brief-q { display: flex; flex-direction: column; }
+.brief-tt { color: var(--t1); }

@@ -10,7 +10,7 @@ import type { CtxView } from "./sessions/ctx";
 import type { CalendarTest, OutlookProbe } from "./types";
 import type { MediaAction } from "./types";
 import type { Deleted, Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
-import type { PinInit, PinPrefs } from "./types";
+import type { BriefStatus, PinInit, PinPrefs } from "./types";
 import type { FolderCandidates, PortHolder } from "./types";
 
 export type * from "./types";
@@ -108,6 +108,18 @@ export const api = {
   noteDelete: (path: string, keepPin = false) => call<Deleted>("note_delete", { path, keepPin }),
   noteDeleteUndo: (id: string) => call<string>("note_delete_undo", { id }),
   noteToggleTask: (path: string, line: number, checked: boolean, expectedHash: string) => call<SaveOutcome>("note_toggle_task", { path, line, checked, expectedHash }),
+  // --- zadání pro Claude Code (kolo 19): `note_*` z jádra poznámek, `brief_*` / `apikey_*` ze spouštění session ---
+  noteSetStatus: (path: string, status: BriefStatus) => call<NoteDetail>("note_set_status", { path, status }),
+  noteAnswer: (path: string, index: number, answer: string) => call<NoteDetail>("note_answer", { path, index, answer }),
+  noteTaskSet: (path: string, line: number, text: string, state: "open" | "proposed" | "done", evidence?: string | null) => call<NoteDetail>("note_task_set", { path, line, text, state, evidence }),
+  projectFiles: (projectId: string, query: string) => call<string[]>("project_files", { projectId, query }),
+  briefSend: (path: string) => call("brief_send", { path }),
+  briefResume: (path: string) => call("brief_resume", { path }),
+  briefStop: (path: string) => call("brief_stop", { path }),
+  /** Klíč jde jen do Správce pověření Windows; z `apikey_status` se nikdy nevrací. */
+  apikeySet: (key: string) => call("apikey_set", { key }),
+  apikeyStatus: () => call<boolean>("apikey_status"),
+  apikeyClear: () => call("apikey_clear"),
   noteRender: (body: string) => call<string>("note_render", { body }),
   /** Export poznámky do souboru (dialog Uložit jako): vrací uloženou cestu, null = uživatel zrušil. */
   noteExport: (path: string, format: "md" | "html" | "pdf") => call<string | null>("note_export", { path, format }),

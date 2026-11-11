@@ -77,6 +77,11 @@ impl Host for LiveHost {
         crate::threads::notes_watch::notes_root()
     }
 
+    fn project_dir(&self, id: &str) -> Option<std::path::PathBuf> {
+        let p = crate::state::find_project(id).ok()?;
+        core().project_dir(&p)
+    }
+
     fn notes_changed(&self) {
         crate::threads::notes_watch::reload_notes();
         crate::threads::notes_sync::send_sync(crate::threads::notes_sync::SyncMsg::Local);

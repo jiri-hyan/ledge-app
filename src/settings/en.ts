@@ -298,6 +298,9 @@ registerDict("en", {
   "settings.f.claude.hooks": "Connection to Claude Code",
   "settings.f.claude.hooks.hint": "So Ledge can see sessions and show permission requests. It only changes Claude Code's settings; anyone else's settings stay.",
   "settings.f.claude.hooks.kw": "hooks settings.json connect disconnect link",
+  "settings.f.claude.apiKey": "API key for briefs",
+  "settings.f.claude.apiKey.hint": "For sessions started from a brief in a note; billed to this key, not the subscription. Stored in Windows Credential Manager.",
+  "settings.f.claude.apiKey.kw": "api key brief orchestrator note session billing credential",
   // Poznámky
   "settings.f.notes.enabled": "Quick notes and reminders",
   "settings.f.notes.enabled.hint": "A card in the drawer, reminders in the strip",

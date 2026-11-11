@@ -20,7 +20,7 @@ export type ListItem = {
   rest: string;
 };
 
-const TASK = /^(\s*)([-*+]) \[[ xX]\](?: (.*))?$/;
+const TASK = /^(\s*)([-*+]) \[[ xX~]\](?: (.*))?$/;
 const ITEM = /^(\s*)([-*+]|\d+[.)]) (.*)$/;
 
 /** Řádek jako položka seznamu (odrážka, číslo `1.` / `1)`, úkol `- [ ]`), jinak null. */

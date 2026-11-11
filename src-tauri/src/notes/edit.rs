@@ -39,6 +39,20 @@ pub struct NoteDetail {
     /// otisk souboru při čtení — `save` / `toggle_task` ho chtějí zpátky
     pub hash: String,
     pub image_data: Vec<NoteImage>,
+    /// body zadání (`- [ ]` / `- [~]` / `- [x]`) se stavem, důkazem, snímky a odkazy `@cesta`
+    pub items: Vec<Item>,
+    /// snímky, které nepatří k žádnému bodu
+    pub loose_images: Vec<ItemImage>,
+    /// otázky ze sekce `## Otázky`
+    pub questions: Vec<Question>,
+}
+
+impl NoteDetail {
+    /// Dorovná odkazy `@cesta` proti složce projektu poznámky (`None` = projekt bez složky).
+    pub fn with_refs(mut self, project_dir: Option<&Path>) -> Self {
+        brief::resolve_refs(&mut self.items, project_dir);
+        self
+    }
 }
 
 /// Obrázky dohromady nejvýš tolik (data URL jdou přes IPC).
@@ -105,7 +119,7 @@ pub(super) fn utf8_text(bytes: &[u8]) -> Result<&str, String> {
 }
 
 /// Složka poznámky je obecná (kořen nebo `_obecne`) — bez projektu stačí klíč vynechat.
-fn general_folder(real_root: &Path, real: &Path) -> bool {
+pub(super) fn general_folder(real_root: &Path, real: &Path) -> bool {
     let parent = real.parent().unwrap_or(real_root);
     parent == real_root || parent.file_name().is_some_and(|n| n == GENERAL)
 }
@@ -118,7 +132,16 @@ pub(super) fn detail(path: &Path, real: &Path, real_root: &Path, bytes: &[u8]) -
     let (_, body) = split(&text);
     // do UI jde tělo bez koncových \n (soubor je drží, `compose_body` je při uložení vrátí)
     let body = body_view(body).1.trim_end_matches(['\n', '\r']);
-    NoteDetail { view, body: body.to_string(), hash: hash(bytes), image_data: load_images(real_root, parent, body) }
+    let sc = brief::scan_body(body, path.parent().unwrap_or(parent));
+    NoteDetail {
+        view,
+        body: body.to_string(),
+        hash: hash(bytes),
+        image_data: load_images(real_root, parent, body),
+        items: sc.items,
+        loose_images: sc.loose,
+        questions: sections::questions(body),
+    }
 }
 
 /// Poznámka k úpravě. `path` = cesta z UI (klíč v kartě), ověřená přes `check_note_path`.
@@ -146,9 +169,10 @@ pub struct SaveNote {
     /// lokální čas z výběru připomínky nebo ISO s offsetem; prázdné = bez připomínky
     #[serde(default)]
     pub remind: Option<String>,
-    /// nové PNG (base64) — připojí se na konec jako `![](./<jméno>-N.png)`
+    /// nové PNG (base64, nebo `{png, caption?, anchorLine?}`) — bez kotvy na konec jako
+    /// `![](./<jméno>-N.png)`, s `anchorLine` odsazeně pod bod na tom řádku (viz `attach::compose`)
     #[serde(default)]
-    pub images: Vec<String>,
+    pub images: Vec<ImageIn>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -195,8 +219,8 @@ pub fn apply_meta(front: &mut Vec<String>, general: bool, req: &SaveNote, now: &
 }
 
 /// Tělo k zápisu: úvodní prázdný řádek, text, nové obrázky (zapíše je do `dir` jako `<base>-N.png`).
-fn compose_body(dir: &Path, base: &str, text: &str, pngs: &[Vec<u8>]) -> Result<String, String> {
-    let mut body = format!("\n{}\n", text.trim_end());
+fn compose_body(dir: &Path, base: &str, text: &str, pngs: &[Vec<u8>], imgs: &[ImageIn]) -> Result<String, String> {
+    let mut names = Vec::new();
     let mut n = 1;
     for png in pngs {
         while dir.join(format!("{base}-{n}.png")).exists() {
@@ -204,9 +228,9 @@ fn compose_body(dir: &Path, base: &str, text: &str, pngs: &[Vec<u8>]) -> Result<
         }
         let name = format!("{base}-{n}.png");
         write_atomic(&dir.join(&name), png)?;
-        body.push_str(&format!("\n![](./{name})\n"));
+        names.push(name);
     }
-    Ok(body)
+    Ok(attach::compose(text.trim_end(), imgs, &names, 0))
 }
 
 fn check_content(req: &SaveNote) -> Result<Vec<Vec<u8>>, String> {
@@ -216,7 +240,7 @@ fn check_content(req: &SaveNote) -> Result<Vec<Vec<u8>>, String> {
     if req.images.len() > MAX_IMAGES {
         return Err(trf!("Nejvýš {MAX_IMAGES} obrázků na poznámku.", "At most {MAX_IMAGES} images per note."));
     }
-    req.images.iter().map(|b| decode_png(b)).collect()
+    req.images.iter().map(|i| decode_png(i.png())).collect()
 }
 
 /// Přepíše poznámku (atomicky, pod zámkem cesty). Jiný obsah na disku než při čtení = `Changed`.
@@ -235,7 +259,7 @@ pub fn save(root: &Path, req: &SaveNote, now: &DateTime<FixedOffset>) -> Result<
     apply_meta(&mut front, general_folder(&real_root, &real), req, now)?;
     let dir = real.parent().ok_or_else(|| tr("Poznámka bez složky.", "Note without a folder."))?;
     let base = real.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    let body = compose_body(dir, &base, &req.body, &pngs)?;
+    let body = compose_body(dir, &base, &req.body, &pngs, &req.images)?;
     let out = render(&front, &body);
     write_atomic(&real, out.as_bytes())?;
     Ok(SaveOutcome::Saved { note: Box::new(detail(path, &real, &real_root, out.as_bytes())) })
@@ -253,7 +277,7 @@ pub fn save_copy(root: &Path, req: &SaveNote, now: &DateTime<FixedOffset>) -> Re
     let dir = real.parent().ok_or_else(|| tr("Poznámka bez složky.", "Note without a folder."))?;
     let _name_guard = NAME_LOCK.lock();
     let base = unique_base(dir, &format!("{}-{}", now.format("%Y-%m-%d-%H%M%S"), slug(&req.body)));
-    let body = compose_body(dir, &base, &req.body, &pngs)?;
+    let body = compose_body(dir, &base, &req.body, &pngs, &req.images)?;
     let name = format!("{base}.md");
     write_atomic(&dir.join(&name), render(&front, &body).as_bytes())?;
     // cesta ve tvaru, jak ji zná UI (vedle původní), ne kanonická `\\?\…`
@@ -512,6 +536,11 @@ mod tests {
             tasks_total: 0,
             color: None,
             tags: Vec::new(),
+            status: None,
+            session: None,
+            cost: None,
+            budget: None,
+            model: None,
         };
         let all: Vec<NoteView> = (0..35).map(|i| mk(i, i >= 30)).collect();
         let open = query(&all, &NoteQuery { limit: Some(8), ..Default::default() }, 0);
@@ -619,7 +648,7 @@ mod tests {
         let mut png = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
         png.extend([7u8; 40]);
         let mut r = req(&p, &d.hash, "x");
-        r.images = vec![b64_encode(&png)];
+        r.images = vec![b64_encode(&png).into()];
         save(&root, &r, &at("2026-10-18T10:00:00+02:00")).unwrap();
         assert!(std::fs::read_to_string(&p).unwrap().ends_with("\nx\n\n![](./n-2.png)\n"));
         assert_eq!(std::fs::read(root.join("n-2.png")).unwrap(), png);
@@ -648,7 +677,7 @@ mod tests {
         let mut png = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
         png.extend([3u8; 32]);
         let mut r = req(&path, &first.hash, "Dashboard - sekce úkoly\n\n- [ ] bod");
-        r.images = vec![b64_encode(&png)];
+        r.images = vec![b64_encode(&png).into()];
         let SaveOutcome::Saved { note } = save(root.path(), &r, &now).unwrap() else { panic!("changed") };
         // druhé čtení (editor) = to, co lístek právě uložil
         let again = read(root.path(), &path).unwrap();
@@ -683,6 +712,11 @@ mod tests {
             tasks_total: 0,
             color: None,
             tags: Vec::new(),
+            status: None,
+            session: None,
+            cost: None,
+            budget: None,
+            model: None,
         };
         let all = [
             mk("nova", "napad", Some("a"), None, false),

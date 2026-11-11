@@ -25,6 +25,8 @@ const PENDING = [
 
 // Záměrně česky i v angličtině (kontrola d): soubor, přesný text, proč.
 const ALLOW_CZECH = [
+  { file: "notes/brief.ts", text: " — důkaz: ", why: "značka formátu zadání v souboru poznámky (stejná v Rustu i v MCP), ne text pro uživatele" },
+  { file: "notes/brief.ts", text: "Otázky", why: "název sekce `## Otázky` ve formátu zadání v souboru poznámky" },
   { file: "onboarding/steps/Basics.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },
   { file: "onboarding/steps/Basics.tsx", text: "Ahoj! Nastavíme si Ledge.", why: "ukázka češtiny u volby jazyka" },
   { file: "settings/panels/Start.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },

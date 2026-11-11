@@ -205,10 +205,21 @@ pub fn bg_args(prompt: &str, name: Option<&str>) -> Result<Vec<String>, &'static
     Ok(v)
 }
 
-/// Spuštění přes `claude.cmd` (dávka): Rust argumenty pro dávku escapuje, nový řádek ale dávkou
-/// neprojde → mezera.
-pub fn for_batch(args: &[String]) -> Vec<String> {
-    args.iter().map(|a| a.replace('\n', " ")).collect()
+/// Znaky, které `cmd.exe` (a obálka `claude.cmd` při rozvinutí `%*`) vykládá — v dávce je neposíláme.
+pub const BATCH_META: [char; 7] = ['%', '&', '"', '^', '|', '<', '>'];
+
+/// Spuštění přes `claude.cmd` (dávka): nový řádek dávkou neprojde → mezera. Argument s metaznakem
+/// `cmd.exe` (`BATCH_META`) se odmítne celý — escapování přes dvě vrstvy (`cmd /c` + `%*` v obálce)
+/// není spolehlivé a text úkolu je od uživatele (registr L1). Nativní `claude.exe` jede bez shellu.
+pub fn for_batch(args: &[String]) -> Result<Vec<String>, String> {
+    if args.iter().any(|a| a.contains(BATCH_META)) {
+        return Err(tr(
+            "Claude Code je tu jen jako claude.cmd a text obsahuje znaky % & \" ^ | < > — přes cmd.exe ho neposílám. Odeber je, nebo nainstaluj nativní Claude Code (claude.exe).",
+            "Claude Code is only available as claude.cmd and the text contains % & \" ^ | < > — it isn't sent through cmd.exe. Remove them or install native Claude Code (claude.exe).",
+        )
+        .into());
+    }
+    Ok(args.iter().map(|a| a.replace(['\r', '\n'], " ")).collect())
 }
 
 /// Id z výpisu `claude --bg` („backgrounded · 7c5dcf5d · name“ podle docs); jinak `None`.
@@ -397,7 +408,11 @@ mod tests {
         assert!(bg_args(&"ž".repeat(PROMPT_MAX), None).is_ok(), "strop ve znacích, ne bajtech");
         assert!(bg_args("ok", Some(&"n".repeat(NAME_MAX + 1))).is_err());
         assert_eq!(clean_name(Some("a\nb")), Ok(Some("ab".into())));
-        assert_eq!(for_batch(&s(&["--bg", "a\nb"])), s(&["--bg", "a b"]));
+        assert_eq!(for_batch(&s(&["--bg", "a\nb"])), Ok(s(&["--bg", "a b"])));
+        for bad in ["100%", "a & calc", "\"x\"", "a^b", "a|b", "a<b", "a>b", "%PATH%"] {
+            assert!(for_batch(&s(&["--bg", bad])).is_err(), "{bad}");
+        }
+        assert!(for_batch(&s(&["--bg", "oprav testy (app), hned!"])).is_ok());
     }
 
     #[test]

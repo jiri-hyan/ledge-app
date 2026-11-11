@@ -300,7 +300,7 @@ struct NewNoteArgs<'a> {
 }
 impl NewNoteArgs<'_> {
     fn create(self, root: &Path, now: &chrono::DateTime<chrono::FixedOffset>) -> PathBuf {
-        super::create(root, &super::NewNote { text: self.text.into(), project: self.project.map(str::to_string), images: self.images, ..Default::default() }, now).unwrap()
+        super::create(root, &super::NewNote { text: self.text.into(), project: self.project.map(str::to_string), images: self.images.into_iter().map(Into::into).collect(), ..Default::default() }, now).unwrap()
     }
 }
 

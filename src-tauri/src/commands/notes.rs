@@ -59,7 +59,66 @@ pub(crate) fn note_query(q: notes::edit::NoteQuery) -> notes::edit::QueryResult 
 /// Poznámka k úpravě v Ledge: tělo, otisk (ochrana proti přepsání) a obrázky jako data URL.
 #[tauri::command(async)]
 pub(crate) fn note_read(path: String) -> Result<notes::edit::NoteDetail, String> {
-    notes::edit::read(&notes_root().ok_or_else(off)?, Path::new(&path))
+    notes::edit::read(&notes_root().ok_or_else(off)?, Path::new(&path)).map(with_refs)
+}
+
+/// Složka projektu poznámky (id z `project:` → config → složka), `None` = obecná / bez složky.
+fn project_dir_of(project: Option<&str>) -> Option<std::path::PathBuf> {
+    let p = crate::state::find_project(project?).ok()?;
+    core().project_dir(&p)
+}
+
+/// Odkazy `@cesta` v bodech dorovná proti složce projektu poznámky.
+fn with_refs(d: notes::edit::NoteDetail) -> notes::edit::NoteDetail {
+    let dir = project_dir_of(d.view.project.as_deref());
+    d.with_refs(dir.as_deref())
+}
+
+/// `Saved` s dorovnanými odkazy `@cesta` (stejně jako `note_read`).
+fn saved_with_refs(o: notes::edit::SaveOutcome) -> notes::edit::SaveOutcome {
+    match o {
+        notes::edit::SaveOutcome::Saved { note } => notes::edit::SaveOutcome::Saved { note: Box::new(with_refs(*note)) },
+        other => other,
+    }
+}
+
+/// Po zápisu zadání: přenačíst poznámky, pustit sync a vrátit čerstvý detail (nový otisk pro UI).
+fn written(d: notes::edit::NoteDetail) -> notes::edit::NoteDetail {
+    reload_notes();
+    send_sync(SyncMsg::Local);
+    with_refs(d)
+}
+
+/// Stav zadání (`status:`): `draft|ready|running|waiting|review|done`, prázdný = odebrat.
+#[tauri::command(async)]
+pub(crate) fn note_set_status(path: String, status: String) -> Result<notes::edit::NoteDetail, String> {
+    let root = notes_root().ok_or_else(off)?;
+    notes::ops::set_status(&root, Path::new(&path), &status, &notes::now_local()).map(written)
+}
+
+/// Odpověď šéfa na otázku `index` (od 0) v sekci `## Otázky`; prázdná odpověď ji odebere.
+#[tauri::command(async)]
+pub(crate) fn note_answer(path: String, index: usize, answer: String) -> Result<notes::edit::NoteDetail, String> {
+    let root = notes_root().ok_or_else(off)?;
+    notes::ops::answer_question(&root, Path::new(&path), index, &answer, &notes::now_local()).map(written)
+}
+
+/// Stav bodu `open|proposed|done` (potvrzení `[~]` → `[x]` dělá jen člověk tady). Bod se hledá podle
+/// `text`, `line` je nápověda (posunutý řádek se dohledá; nejednoznačné = chyba). `evidence`: text
+/// nastaví, prázdný odebere, chybějící nechá.
+#[tauri::command(async)]
+pub(crate) fn note_task_set(path: String, line: usize, text: String, state: String, evidence: Option<String>) -> Result<notes::edit::NoteDetail, String> {
+    let root = notes_root().ok_or_else(off)?;
+    let state = notes::md::TaskState::parse(&state).ok_or_else(|| trf!("Neznámý stav bodu „{state}“ (open, proposed, done).", "Unknown item state “{state}” (open, proposed, done)."))?;
+    notes::ops::task_set(&root, Path::new(&path), Some(line), Some(&text), state, evidence.as_deref(), &notes::now_local()).map(written)
+}
+
+/// Soubory projektu pro výběr po `@` (`git ls-files`, fuzzy, nejvýš 20). Bez složky / bez gitu = prázdné.
+#[tauri::command(async)]
+pub(crate) fn project_files(project_id: String, query: String) -> Result<Vec<String>, String> {
+    let p = crate::state::find_project(&project_id)?;
+    let dir = core().project_dir(&p).ok_or_else(|| tr("Složka projektu nenalezena.", "Project folder not found."))?;
+    Ok(notes::files::project_files(&dir, &query))
 }
 
 /// Text poznámky (tělo bez frontmatteru; prázdné = nadpis) do schránky Windows — „Kopírovat text“ u řádku.
@@ -82,6 +141,7 @@ pub(crate) fn note_save(note: notes::edit::SaveNote, copy: bool) -> Result<notes
     } else {
         notes::edit::save(&root, &note, &now)?
     };
+    let out = saved_with_refs(out);
     if matches!(out, notes::edit::SaveOutcome::Saved { .. }) {
         reload_notes();
         send_sync(SyncMsg::Local);
@@ -93,7 +153,7 @@ pub(crate) fn note_save(note: notes::edit::SaveNote, copy: bool) -> Result<notes
 #[tauri::command(async)]
 pub(crate) fn note_toggle_task(path: String, line: usize, checked: bool, expected_hash: String) -> Result<notes::edit::SaveOutcome, String> {
     let root = notes_root().ok_or_else(off)?;
-    let out = notes::edit::toggle_task(&root, Path::new(&path), line, checked, &expected_hash, &notes::now_local())?;
+    let out = saved_with_refs(notes::edit::toggle_task(&root, Path::new(&path), line, checked, &expected_hash, &notes::now_local())?);
     if matches!(out, notes::edit::SaveOutcome::Saved { .. }) {
         reload_notes();
         send_sync(SyncMsg::Local);

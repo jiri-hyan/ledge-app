@@ -460,7 +460,7 @@ pub fn save(path: &Path, f: &DeskFile) -> std::io::Result<()> {
 /// Je widget vidět? Schovaný všemi (paleta / Nastavení) ne; ve hře (`yielding`) jen s vypnutým
 /// „schovat ve hře“.
 pub fn shown(w: &DeskWidget, yielding: bool, hidden_all: bool) -> bool {
-    !hidden_all && !(yielding && w.hide_in_game)
+    !(hidden_all || yielding && w.hide_in_game)
 }
 
 /// Má být navrchu? Jen vrstva Navrchu a ne ve hře (hře vždy ustoupí, i když zůstane vidět).

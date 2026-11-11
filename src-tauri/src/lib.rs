@@ -40,6 +40,7 @@ mod attention;
 mod autostart;
 mod calendar;
 mod battery;
+mod briefrun;
 mod claude;
 mod cliphist;
 mod cloning;
@@ -412,6 +413,10 @@ pub fn run() {
             commands::notes::note_draft_load,
             commands::notes::note_draft_save,
             commands::notes::note_draft_images,
+            commands::notes::note_set_status,
+            commands::notes::note_answer,
+            commands::notes::note_task_set,
+            commands::notes::project_files,
             commands::notes::note_draft_clear,
             commands::notes::notes_sync_now,
             commands::notefolder::note_folder_sync_now,
@@ -560,7 +565,13 @@ pub fn run() {
             commands::mcp::mcp_state,
             commands::mcp::mcp_set_enabled,
             commands::mcp::mcp_rotate_key,
-            commands::mcp::mcp_reveal_key
+            commands::mcp::mcp_reveal_key,
+            commands::brief::brief_send,
+            commands::brief::brief_resume,
+            commands::brief::brief_stop,
+            commands::brief::apikey_set,
+            commands::brief::apikey_status,
+            commands::brief::apikey_clear
         ])
         .build(tauri::generate_context!())
         .expect("ledge: start selhal")
@@ -574,6 +585,7 @@ pub fn run() {
                 && let Some(c) = CORE.get()
             {
                 c.procs.stop_all();
+                briefrun::proc::stop_all();
                 // poslední posun lístku mohl čekat na zpožděný zápis
                 pins::win::flush();
                 desk::save::flush();

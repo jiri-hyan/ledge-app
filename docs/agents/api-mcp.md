@@ -46,7 +46,8 @@ Claude (MCP) (výchozí vypnuto). Mapa: `docs/codemap/mcp.md`.
   `actions_list` / `actions_add` / `actions_update` / `actions_remove`, `layout_get` / `layout_preview` /
   `layout_apply`, `strip_get` / `strip_set`, `appearance_get` / `appearance_set` (styl jen z katalogu stylů,
   hodnoty jen z výčtů schématu), `notes_list` / `notes_read` / `notes_create` / `notes_append` /
-  `notes_toggle_task` / `notes_pin` (poznámky, viz níže), `undo_last`, `open_drawer`. Každý má JSON Schema
+  `notes_toggle_task` / `notes_pin` / `notes_set_status` / `notes_ask` / `notes_propose_done` / `notes_log` (poznámky,
+  viz níže), `undo_last`, `open_drawer`. Každý má JSON Schema
   vstupu a popis pro model.
   **Velikost:** `tools/list` < 20 kB (test `tools_list_stays_small`; schémata configu bez popisů polí, `default`
   a mezí, `*_update` a `layout_preview` bez druhé kopie schématu), výstupy nástrojů jsou jednořádkový JSON a
@@ -61,6 +62,14 @@ Claude (MCP) (výchozí vypnuto). Mapa: `docs/codemap/mcp.md`.
   Po zápisu `Host::notes_changed` (= `reload_notes` + sync). Zápisy do poznámek **nejsou** v `undo_last`
   (zásobník je na části configu) a drží stejný zámek zápisů jako config. `notes_read` ořízne tělo na 30 000
   znaků (`truncated`).
+  **Zadání (kolo 19, formát v [notes.md](notes.md) → „Zadání“):** `notes_read` vrací u bodů `state` (`open|proposed|done`),
+  `evidence`, `images [{path, caption}]` (absolutní cesta — čti ji nástrojem Read), `refs [{raw, path, line, exists}]`,
+  dále `questions [{index, text, answer}]`, `looseImages`, `status`/`cost`/`budget`/`model`/`session`. `notes_ask` přidá
+  otázky (1–10) do `## Otázky`, `notes_log` připíše řádek do `## Log`, `notes_set_status` smí jen `running|waiting|review`,
+  `notes_propose_done(path, text, evidence, line?)` nastaví `[~]` (bod se hledá podle `text`, `line` je nápověda;
+  nejednoznačné = chyba). **Model nikdy nedá `[x]`:** `notes_toggle_task` smí jen znovu otevřít, `notes_append` /
+  `notes_create` odmítnou nový `[x]` (test `model_can_never_write_done_over_mcp`); potvrzuje člověk v Ledge
+  (`note_task_set`). `tools/list` neposílá `title` (šetří místo; jméno stačí).
 - **Zápis = stejná cesta jako Uložit v Nastavení:** načíst config → změna → `config::validate_field` (stejná
   validace, i editoru rozložení) → snímek dotčených částí do Vrátit (posledních 20, jen v paměti) →
   `save_config` → událost `config-changed`. Neplatný vstup = výsledek s `isError: true` a větou, co je špatně a

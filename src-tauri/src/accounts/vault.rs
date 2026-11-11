@@ -66,6 +66,10 @@ pub trait Vault: Send + Sync {
     fn read(&self, target: &str) -> Result<Option<Vec<u8>>, String>;
     fn write(&self, target: &str, data: &[u8]) -> Result<(), String>;
     fn delete(&self, target: &str) -> Result<(), String>;
+    /// Zápis se jménem uživatele záznamu (jen kosmetika ve Správci pověření; výchozí = `write`).
+    fn write_as(&self, target: &str, _user: &str, data: &[u8]) -> Result<(), String> {
+        self.write(target, data)
+    }
 }
 
 /// Uloží záznam (díly; přebytečné staré díly smaže).
@@ -140,10 +144,14 @@ impl Vault for WinCred {
     }
 
     fn write(&self, target: &str, data: &[u8]) -> Result<(), String> {
+        self.write_as(target, "Ledge", data)
+    }
+
+    fn write_as(&self, target: &str, user: &str, data: &[u8]) -> Result<(), String> {
         use windows::Win32::Security::Credentials::{CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredWriteW};
         use windows::core::PWSTR;
         let mut name: Vec<u16> = target.encode_utf16().chain([0]).collect();
-        let mut user: Vec<u16> = "Ledge".encode_utf16().chain([0]).collect();
+        let mut user: Vec<u16> = user.encode_utf16().chain([0]).collect();
         let mut blob = data.to_vec();
         let cred = CREDENTIALW {
             Type: CRED_TYPE_GENERIC,

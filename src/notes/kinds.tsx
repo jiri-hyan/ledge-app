@@ -16,6 +16,7 @@ const PATHS: Record<string, string> = {
   flag: "M5 21V4M5 4h11l-2 4 2 4H5",
   star: "M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z",
   bug: "M8 8a4 4 0 0 1 8 0v7a4 4 0 0 1-8 0zM4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2",
+  brief: "M5 4h14v12H8l-3 3zM9 8h6M9 11h4",
   heart: "M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10",
 };
 
@@ -29,9 +30,15 @@ export function KindIcon(p: { icon: string }) {
 
 const GRAY = "#94a3b8";
 
+/** Zadání pro Claude Code (kolo 19): vestavěná kategorie — nemusí být v `notes.kinds`, UI ji nabídne samo. */
+export const BRIEF_KIND = "zadani";
+const briefKind = (): NoteKind => ({ id: BRIEF_KIND, label: t("notes.kind.brief", "Zadání"), color: "#a78bfa", icon: "brief" });
+/** Poznámka je zadání: kategorie, nebo už má stav (jádro ho zapsalo). */
+export const isBrief = (n: { kind: string; status?: string | null }) => n.kind === BRIEF_KIND || !!n.status;
+
 /** Kategorie podle id; neznámá (z druhého PC / smazaná z configu) = id jako text, šedá. */
 export function kindOf(kinds: NoteKind[], id: string): NoteKind {
-  return kinds.find((k) => k.id === id) ?? (id === DEFAULT_KIND ? { id, label: t("notes.kind.default", "Poznámka"), color: GRAY, icon: "note" } : { id, label: id, color: GRAY, icon: "" });
+  return kinds.find((k) => k.id === id) ?? (id === BRIEF_KIND ? briefKind() : null) ?? (id === DEFAULT_KIND ? { id, label: t("notes.kind.default", "Poznámka"), color: GRAY, icon: "note" } : { id, label: id, color: GRAY, icon: "" });
 }
 
 export const kindColor = (k: NoteKind) => k.color || GRAY;
@@ -44,7 +51,8 @@ export function KindBadge(p: { kinds: NoteKind[]; id: string }) {
 
 /** Výběr kategorie: řada pilulek s ikonou (neznámé id z poznámky se ukáže jako další pilulka). */
 export function KindPicker(p: { kinds: NoteKind[]; value: string; onChange: (id: string) => void }) {
-  const list = () => (p.kinds.some((k) => k.id === p.value) ? p.kinds : [...p.kinds, kindOf(p.kinds, p.value)]);
+  const base = () => (p.kinds.some((k) => k.id === BRIEF_KIND) ? p.kinds : [...p.kinds, briefKind()]);
+  const list = () => (base().some((k) => k.id === p.value) ? base() : [...base(), kindOf(p.kinds, p.value)]);
   return (
     <div class="kind-pills" role="radiogroup" aria-label={t("notes.kind.label", "Kategorie")}>
       <For each={list()}>

@@ -7,9 +7,11 @@
 // myš nevidí — vypíná ho zkratka (`hotkeys.notePassthrough`) nebo Ctrl+K v Ledge; nápověda při prvním zapnutí.
 // Barva a štítky jdou do frontmatteru poznámky (`note_set_meta`), vazby `[[…]]` otevřou další lístek.
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { api, on, type NoteDetail, type PinInit, type PinPrefs } from "../api";
+import { api, on, type ImageIn, type NoteDetail, type PinInit, type PinPrefs } from "../api";
 import Markdown from "../notes/Markdown";
 import { b64Of, pasteImages } from "../notes/draft";
+import { anchorAt, cleanCaption, imageIn, parseTasks, resolveAnchor, type Anchor } from "../notes/brief";
+import { copyRef } from "../notes/store";
 import { trimBody } from "../notes/editdraft";
 import { listKey } from "../notes/listkeys";
 import { fromMs } from "../notes/remind";
@@ -53,6 +55,8 @@ export default function PinApp() {
   const [adding, setAdding] = createSignal(false);
   const [addText, setAddText] = createSignal("");
   const [menu, setMenu] = createSignal(false);
+  /** vložený snímek čeká na popisek („Co je na snímku?“) — uloží se až po Uložit / Přeskočit */
+  const [snap, setSnap] = createSignal<{ imgs: string[]; anchor: Anchor | null; caption: string } | null>(null);
   /** návrh připomínky z právě přidaného bodu („zítra v 10 zavolat X“) — jen po přidání, nic se neptá v klidu */
   const [sug, setSug] = createSignal<Suggest | null>(null);
   let sugSeq = 0;
@@ -157,7 +161,7 @@ export default function PinApp() {
   }
 
   /** Zápis celého těla (+ nové PNG) s otiskem; „changed“ = soubor se mezitím změnil jinde. */
-  function write(body: string, images: string[] = []): Promise<"saved" | "changed"> {
+  function write(body: string, images: ImageIn[] = []): Promise<"saved" | "changed"> {
     const n = note();
     if (!n) return Promise.resolve("changed");
     const before = text();
@@ -173,7 +177,7 @@ export default function PinApp() {
   }
 
   /** Přidání na konec (bod, vložený text, obrázek): při změně jinde načíst a zkusit ještě jednou. */
-  async function add(line: string, images: string[] = []): Promise<boolean> {
+  async function add(line: string, images: ImageIn[] = []): Promise<boolean> {
     try {
       for (let i = 0; i < 2; i++) {
         const n = note();
@@ -343,8 +347,10 @@ export default function PinApp() {
     const items = [...(e.clipboardData?.items ?? [])];
     if (items.some((i) => i.kind === "file" && i.type.startsWith("image/"))) {
       let got: string[] = [];
+      // kotva: řádek s kurzorem, jen při úpravě textu (v náhledu kurzor není → snímek na konec)
+      const anchor = editing() && ta ? anchorAt(text(), ta.selectionStart) : null;
       await pasteImages(e, () => got, (v) => (got = v));
-      if (got.length && (await add("", b64Of(got)))) say(t("notes.pin.imageSaved", "Obrázek uložený do poznámky."));
+      if (got.length) setSnap({ imgs: got, anchor, caption: "" });
       return;
     }
     const tag = (e.target as HTMLElement | null)?.tagName ?? "";
@@ -353,6 +359,33 @@ export default function PinApp() {
     if (!txt.trim()) return;
     e.preventDefault();
     await add(txt);
+  }
+
+  /** Uloží čekající snímek s popiskem (prázdný = bez popisku) pod bod s kurzorem. */
+  async function saveSnap(skip: boolean) {
+    const sn = snap();
+    const n = note();
+    if (!sn || !n) return;
+    const caption = skip ? "" : cleanCaption(sn.caption);
+    const anchorLine = resolveAnchor(editing() ? text() : n.body, sn.anchor);
+    setSnap(null);
+    if (await add("", b64Of(sn.imgs).map((png) => imageIn(png, caption, anchorLine)))) say(t("notes.pin.imageSaved", "Obrázek uložený do poznámky."));
+    else setSnap(sn);
+  }
+
+  /** Body `[~]` ke kontrole přímo na lístku: Potvrdit / Vrátit → jádro přepíše řádek, lístek se načte znovu. */
+  const review = () => (editing() || through() ? [] : parseTasks(note()?.body ?? "").filter((x) => x.state === "review"));
+  async function setTask(line: number, text: string, state: "open" | "done", evidence: string | null) {
+    const n = note();
+    if (!n) return;
+    try {
+      // jádro vrací celou poznámku po zápisu (jen mimo úpravy, takže text v poli se nemíjí)
+      const r = await api.noteTaskSet(n.path, line, text, state, state === "done" ? evidence : null);
+      if (r) setNote(r);
+      else await load();
+    } catch (e) {
+      say(/not found/i.test(String(e)) ? t("notes.brief.oldCore", "Tuhle část Ledge ještě neumí — aktualizuj aplikaci.") : String(e), true);
+    }
   }
 
   // ---------- lišta ----------
@@ -511,8 +544,8 @@ export default function PinApp() {
           <Show when={!gone() && note()}>
             {(n) => (
               <Show when={editing()} fallback={
-                <div class="pin-md" onDblClick={(e) => !(e.target as HTMLElement).closest(".md-check, .md-link, .md-wiki") && startEdit(caretAt(e))}>
-                  <Markdown body={n().body} images={n().imageData} onToggle={toggle} onWiki={(name) => !through() && void wiki.follow(name)} />
+                <div class="pin-md" onDblClick={(e) => !(e.target as HTMLElement).closest(".md-check, .md-link, .md-wiki, .md-at") && startEdit(caretAt(e))}>
+                  <Markdown body={n().body} images={n().imageData} onToggle={toggle} onWiki={(name) => !through() && void wiki.follow(name)} onRef={copyRef} />
                 </div>
               }>
                 <textarea
@@ -570,6 +603,35 @@ export default function PinApp() {
             </div>
           )}
         </Show>
+        <Show when={snap()}>
+          {(sn) => (
+            <div class="pin-foot pin-snap">
+              <input
+                class="pin-add"
+                ref={(el) => queueMicrotask(() => el.focus())}
+                value={sn().caption}
+                maxLength={200}
+                placeholder={t("notes.brief.captionPh", "Co je na snímku?")}
+                onInput={(e) => setSnap({ ...sn(), caption: e.currentTarget.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.preventDefault(), void saveSnap(false));
+                  else if (e.key === "Escape") (e.preventDefault(), void saveSnap(true));
+                }}
+              />
+              <button class="pin-btn pri" onClick={() => void saveSnap(false)}>{t("notes.brief.captionSave", "Uložit snímek")}</button>
+              <button class="pin-btn" onClick={() => void saveSnap(true)}>{t("notes.brief.captionSkip", "Bez popisku")}</button>
+            </div>
+          )}
+        </Show>
+        <For each={review()}>
+          {(task) => (
+            <div class="pin-foot pin-review">
+              <span title={t("notes.brief.proposed", "Navrženo jako hotové — čeká na tebe")}>◔ {task.text}{task.evidence ? ` — ${task.evidence}` : ""}</span>
+              <button class="pin-btn pri" onClick={() => void setTask(task.line, task.text, "done", task.evidence)}>{t("notes.brief.confirm", "Potvrdit")}</button>
+              <button class="pin-btn" onClick={() => void setTask(task.line, task.text, "open", null)}>{t("notes.brief.return", "Vrátit")}</button>
+            </div>
+          )}
+        </For>
         <Show when={!through() && note() && !gone()}>
           <Show when={adding()} fallback={
             <div class="pin-foot">

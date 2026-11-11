@@ -149,11 +149,8 @@ fn write_checked(base: &Path, rel: &str, bytes: &[u8], over: Option<&str>) -> Re
     let lock = path_lock(&dst);
     let _g = lock.lock();
     match over {
-        Some(h) => {
-            if read_checked(&dst, h)?.is_none() {
-                return Ok(false);
-            }
-        }
+        Some(h) if read_checked(&dst, h)?.is_none() => return Ok(false),
+        Some(_) => {}
         None if dst.exists() => return Ok(false),
         None => {}
     }

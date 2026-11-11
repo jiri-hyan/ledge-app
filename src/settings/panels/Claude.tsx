@@ -17,6 +17,7 @@ import { fieldLabel } from "../labels";
 import QuestionsSection from "./Questions";
 import NotifySection from "./Notify";
 import { McpSettings } from "../../mcp/McpSettings";
+import ApiKeySetup from "./ApiKey";
 
 const HOOKS_TEXT: Record<HooksStatus["state"], [string, string]> = {
   full: ["settings.hooks.full", "Zapojené"],
@@ -113,6 +114,11 @@ export default function ClaudePanel(p: PanelProps) {
         </Show>
       </Section>
       <NotifySection />
+      <Section title={t("settings.claude.apikey", "API klíč pro zadání")}>
+        <Row id="claude.apiKey" stack live>
+          <ApiKeySetup />
+        </Row>
+      </Section>
       <QuestionsSection s={p.s} />
       <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
         <Row id="claude.statusLine" stack live>

@@ -267,3 +267,5 @@ button, input, textarea { font: inherit; color: inherit; }
 .pin-wiki-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .pin-wiki-list button { height: 22px; padding: 0 8px; border: 1px solid var(--pin-line); border-radius: 6px; background: var(--pin-well); cursor: pointer; font-size: 12px; text-shadow: none; }
 .pin-wiki-list button.on, .pin-wiki-list button:hover { border-color: var(--pin-accent); }
+.pin-snap, .pin-review { flex-wrap: wrap; gap: 6px; }
+.pin-review > span { flex: 1 1 100%; font-size: 12px; overflow-wrap: anywhere; }

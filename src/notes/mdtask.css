@@ -10,3 +10,10 @@
 .md-wiki { color: var(--md-wiki, #7ab8ff); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
 .md-wiki:hover { text-decoration-style: solid; }
 .md-tag { display: inline-block; padding: 0 5px; border-radius: 999px; font-size: 0.92em; line-height: 1.45; background: var(--md-tag-bg, rgba(122, 184, 255, 0.16)); color: var(--md-tag-fg, inherit); cursor: pointer; }
+/* `[~]` navržený jako hotový: půl zaškrtnutí (čárka), čeká na Potvrdit / Vrátit; klik nic nepřepíná */
+.md-check.proposed { cursor: default; border-style: dashed; }
+.md-check.proposed::after { content: ""; position: absolute; left: 3px; top: 5px; width: 7px; height: 0; border-top: 2px solid var(--md-check-ink-soft, currentColor); opacity: 0.7; }
+/* `@cesta` čip a popisek snímku v náhledu (kolo 19) — barvy z `currentColor`, ať sedí v šuplíku i na lístku */
+.md-at { font-family: var(--mono, monospace); font-size: 0.92em; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, currentColor 14%, transparent); cursor: pointer; }
+.md-at:hover { background: color-mix(in srgb, currentColor 26%, transparent); }
+.md-cap { display: block; font-size: 0.85em; opacity: 0.7; margin: 2px 0 6px; }

@@ -93,6 +93,39 @@ pub fn with_done(text: &str, done: bool) -> String {
     render(&front, body)
 }
 
+/// Nastaví / odebere víc klíčů najednou (`Some` = nastav, `None` = odeber). Pořadí a neznámé klíče
+/// zůstanou, nový klíč jde na konec. Hodnotu volající dodá už bezpečnou (`yaml_value`).
+pub fn set_meta(front: &mut Vec<String>, pairs: &[(&str, Option<&str>)]) {
+    for (k, v) in pairs {
+        match v {
+            Some(v) => set(front, k, v),
+            None => unset(front, k),
+        }
+    }
+}
+
+/// Hodnoty `status:` zadání.
+pub const STATUSES: [&str; 6] = ["draft", "ready", "running", "waiting", "review", "done"];
+/// Hodnoty `model:` zadání.
+pub const MODELS: [&str; 3] = ["sonnet", "opus", "haiku"];
+
+/// Peníze z frontmatteru: konečné číslo ≥ 0.
+pub(crate) fn money(v: Option<String>) -> Option<f64> {
+    v?.trim().parse::<f64>().ok().filter(|x| x.is_finite() && *x >= 0.0)
+}
+
+/// Hodnota klíče, jen když je v povoleném seznamu (bez ohledu na velikost písmen).
+pub(crate) fn one_of(v: Option<String>, allowed: &[&str]) -> Option<String> {
+    let v = v?.trim().to_ascii_lowercase();
+    allowed.contains(&v.as_str()).then_some(v)
+}
+
+/// Id session: jen `[A-Za-z0-9-]`, nejvýš 64 znaků (jde na příkazový řádek).
+pub(crate) fn session_id(v: Option<String>) -> Option<String> {
+    let v = v?.trim().to_string();
+    (!v.is_empty() && v.len() <= 64 && v.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')).then_some(v)
+}
+
 /// Hodnota do frontmatteru: bezpečné id jak je, jinak v uvozovkách (`get` je zase sundá).
 pub(crate) fn yaml_value(v: &str) -> String {
     if !v.is_empty() && v.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
@@ -105,6 +138,14 @@ pub(crate) fn yaml_value(v: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+/// Jako `with_done` pro `set_meta`: text → text, tělo bajtově stejné.
+fn with_meta(text: &str, pairs: &[(&str, Option<&str>)]) -> String {
+    let (front, body) = split(text);
+    let mut front = front.unwrap_or_default();
+    set_meta(&mut front, pairs);
+    render(&front, body)
+}
 
     #[test]
     fn frontmatter_split_tolerates_bom_crlf_and_missing() {
@@ -211,5 +252,21 @@ mod tests {
         assert_eq!(body, "tělo");
         // set_done na „falešné“ hlavičce nic nerozbije — přidá skutečnou nad ni
         assert_eq!(with_done(t, true), format!("---\ndone: true\n---\n{t}"));
+    }
+
+    #[test]
+    fn set_meta_keeps_order_unknown_keys_and_body() {
+        let text = "---\ncreated: 2026-11-11T10:00:00+01:00\nx-vlastni: \"a: b\"\nstatus: draft\nlist:\n  - 1\ndone: false\n---\n\nTělo\r\n- [ ] a\n";
+        let out = with_meta(text, &[("status", Some("ready")), ("cost", Some("0.5")), ("budget", None)]);
+        assert_eq!(
+            out,
+            "---\ncreated: 2026-11-11T10:00:00+01:00\nx-vlastni: \"a: b\"\nstatus: ready\nlist:\n  - 1\ndone: false\ncost: 0.5\n---\n\nTělo\r\n- [ ] a\n"
+        );
+        // odebrání klíčů a prázdný seznam změn
+        let gone = with_meta(&out, &[("status", None), ("cost", None)]);
+        assert_eq!(gone, text.replace("status: draft\n", ""));
+        assert_eq!(with_meta(text, &[]), text);
+        // bez frontmatteru vznikne nový, tělo zůstane
+        assert_eq!(with_meta("jen text\n", &[("status", Some("draft"))]), "---\nstatus: draft\n---\njen text\n");
     }
 }

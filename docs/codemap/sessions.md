@@ -9,6 +9,8 @@ Detail (toky, invarianty, testy, co nečíst, historie): [sessions-detail.md](se
 | `src-tauri/src/sessions.rs` | čistá logika: parsování zdrojů, sloučení, stav, co udělá klik, strop spawnů, náhled textu | `parse_agents` `Agent.job_id` `id` `parse_registry` `is_registry_file` |
 | `src-tauri/src/agentview.rs` | Agent View (čistá): stav úlohy, `waitingFor`, které akce, validace id, argumenty `attach/logs/stop/rm/respawn` a `--bg`, úklid výstupu, nalezení `claude` | `JobState` `job_state` `WaitFor` `wait_for` `JobAction` |
 | `src-tauri/src/agentrun.rs` · `commands/agents.rs` | I/O Agent View: běh `claude` bez okna a bez Job Objectu (termín, strop výstupu), `attach` v terminálu · Tauri příkazy | `program` `run` `Out` `attach` `agent_action(id, action, confirmed)` |
+| `src-tauri/src/briefrun/` (`mod.rs` · `args.rs` · `stream.rs` · `plan.rs` · `key.rs` · `note.rs` · `proc.rs`) | zadání z poznámky přes API klíč (`claude -p` stream-json v … | `Brief` |
+| `src-tauri/src/commands/brief.rs` | Tauri příkazy zadání a API klíče (kontrakt `src/api.ts`) | `brief_send(path)` |
 | `src-tauri/src/sessionlive.rs` | I/O: vlákno `sessions` (spawn `claude agents`), watcher registru, cache | `start` `request` `Wake` `with_cache` `Cache` `unseen` `claude_dir` |
 | `src-tauri/src/winfocus.rs` | Win32: strom procesů, okna, přepnutí, `claude --resume` | `switch_to` `launch` `ancestors` `pick_window` `pid_alive` |
 | `src-tauri/src/subagents.rs` | subagenti jedné session (čistá) | `Subagents::{start, stop, clear_running}` `shorten` `DONE_KEEP` |

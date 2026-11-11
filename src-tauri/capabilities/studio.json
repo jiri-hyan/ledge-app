@@ -92,6 +92,9 @@
     "allow-widget-templates",
     "allow-widgets-list",
     "allow-widgets-open-dir",
-    "allow-win-settings-open"
+    "allow-win-settings-open",
+    "allow-apikey-clear",
+    "allow-apikey-set",
+    "allow-apikey-status"
   ]
 }

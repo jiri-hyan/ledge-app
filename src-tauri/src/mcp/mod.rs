@@ -74,6 +74,10 @@ pub trait Host: Send + Sync {
     fn notes_root(&self) -> Option<std::path::PathBuf> {
         None
     }
+    /// Složka projektu podle jeho id (pro odkazy `@cesta` v bodech zadání); `None` = není / nemá složku.
+    fn project_dir(&self, _id: &str) -> Option<std::path::PathBuf> {
+        None
+    }
     /// Po zápisu do poznámek: přenačíst je v Ledge (karta, připomínky) a pustit synchronizaci.
     fn notes_changed(&self) {}
     /// Připnout poznámku na plochu jako lístek, nebo ji odepnout (cesta je už ověřená).

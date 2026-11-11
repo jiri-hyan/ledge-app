@@ -9,10 +9,12 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   vývojovou historii: každé vydání = jeden nový commit „snapshot“ (`git archive HEAD`, cesty
   s `export-ignore` v `.gitattributes` se vynechají), autor `jiri-hyan` s noreply e-mailem GitHubu. Strom
   i seznam změn se před commitem prověří proti `scripts/private/denylist.txt` (jména klientů, strojů,
-  osobní údaje — soubor je jen ve vývojovém repu); jediný nález = konec bez vydání. Pak lokální build
-  (verze = nejvyšší `v0.2.x` v obou repech + 1, zapíše se jen dočasně přes `scripts/ci-version.ps1`)
-  a podpis instalátoru (`tauri signer sign`, klíč mimo repo — [podpis-vydani.md](../podpis-vydani.md); bez klíče nebo
-  s klíčem, jehož veřejná půlka není `src-tauri/signing/update.pub`, skript skončí ještě před snapshotem)
+  osobní údaje — soubor je jen ve vývojovém repu); jediný nález = konec bez vydání. Pak build a podpis
+  instalátoru v **GitHub Actions veřejného repa** (workflow ze šablony `.github/verejne-repo/`, klíč jen v tajných
+  údajích repa, na PC žádný — vydávat jde z kteréhokoli PC; [podpis-vydani.md](../podpis-vydani.md)); skript počká,
+  stáhne instalátor + `.sig` a ověří ID klíče proti `src-tauri/signing/update.pub`. Záloha `-Local` = lokální build
+  (verze = nejvyšší vydaná v obou repech + 1, zapíše se jen dočasně přes `scripts/ci-version.ps1`) a podpis
+  vlastním klíčem mimo repo (bez klíče nebo s cizím klíčem skript skončí ještě před snapshotem)
   a vydání ve veřejném repu **přes koncept** (kompatibilní s immutable releases: koncept → všechny soubory →
   kontrola seznamu → publikace; nepovedený běh nechá neveřejný koncept, další běh vydá stejnou verzi a doplní
   ho): instalátor + `<instalátor>.sig` + přílohy `SHA256SUMS.txt` (`<hex>  <soubor>`) a

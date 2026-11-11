@@ -18,7 +18,20 @@ Proto je každý instalátor od kola 21 **podepsaný** a Ledge bez platného pod
 
 ## Jak to funguje
 
-**Při vydání** (`scripts/publish.ps1`, lokálně na stroji vydavatele):
+**Výchozí cesta (od 11. 11. 2026): build a podpis v GitHub Actions — vydávat jde z kteréhokoli PC bez klíče.**
+Soukromý klíč a heslo jsou jen v tajných údajích veřejného repa `jiri-hyan/ledge-app` (`LEDGE_SIGNING_KEY` =
+obsah `ledge-update.key`, `LEDGE_SIGNING_KEY_PASSWORD` = heslo). `publish.ps1` ověří, že oba tajné údaje existují,
+udělá snapshot (přibalí do něj workflow z `.github/verejne-repo/`), pushne ho, spustí workflow `Sestavení a podpis`
+(Actions ve veřejném repu jsou zdarma), počká, stáhne instalátor + `.sig`, ověří komentář podpisu **i ID klíče
+proti `update.pub`** a vydá přes koncept jako dřív. Workflow má jen `contents: read` a do vydání nesahá; spustit ho
+může jen účet s právem zápisu (`workflow_dispatch`). Nastavení tajných údajů (jednou, z PC, kde klíč je):
+`gh secret set LEDGE_SIGNING_KEY -R jiri-hyan/ledge-app < ledge-update.key` a totéž pro heslo ze souboru
+(`signing-backup.ps1 -PasswordOut`, soubor pak smazat). Když build v Actions spadne, nic se nevydá, ale snapshot
+už je na veřejném `main` (další běh ho použije). Model hrozeb: kdo ovládne GitHub účet, může workflow spustit
+a podepsat si cokoli — podpis pak chrání hlavně proti podvržení souboru mimo účet (např. přes ukradený token
+jen k vydáním), ne proti převzetí celého účtu. Lokální podpis níže zůstává jako záloha: `publish.ps1 -Local`.
+
+**Při vydání s `-Local`** (`scripts/publish.ps1 -Local`, lokálně na stroji vydavatele s klíčem):
 
 1. Ještě před snapshotem a buildem skript ověří, že soukromý klíč existuje, leží mimo repo a jeho veřejná
    půlka je ta, která je v repu v `src-tauri/signing/update.pub`. Jinak skončí s vysvětlením.

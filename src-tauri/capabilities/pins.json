@@ -41,6 +41,7 @@
     "allow-pin-open",
     "allow-pin-set",
     "allow-pin-unpin",
-    "allow-ui-log"
+    "allow-ui-log",
+    "allow-note-task-set"
   ]
 }

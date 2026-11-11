@@ -9,7 +9,12 @@ import { IconFile, IconShield, IconX } from "../icons";
 import { say } from "../ui/toast";
 import { t } from "../i18n";
 import * as D from "./draft";
-import { KindPicker } from "./kinds";
+import { isBrief, KindPicker } from "./kinds";
+import BriefPanel from "./BriefPanel";
+import ImgCaption from "./ImgCaption";
+import { AtList, createAt } from "./AtSuggest";
+import { anchorAt } from "./brief";
+import { anchorNew, clearMeta, imagesFor } from "./imgmeta";
 import Markdown, { toggleLocal } from "./Markdown";
 import ProjectPicker from "./ProjectPicker";
 import RemindPicker from "./RemindPicker";
@@ -26,7 +31,7 @@ import { listKey } from "./listkeys";
 import { firstLine } from "./headline";
 import { setNoteColor } from "./colorset";
 import { useWikiFollow, useWikiSuggest, WikiList, WikiMissing } from "./WikiLinks";
-import { editPath, notePreset, openExternal, projectAccent, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
+import { copyRef, editPath, notePreset, openExternal, projectAccent, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
 
 export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => void }) {
   let root!: HTMLDivElement;
@@ -38,6 +43,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   const [conflict, setConflict] = createSignal(false);
   const [ready, setReady] = createSignal(false);
   const [dropAsk, setDropAsk] = createSignal(false);
+  const [capFocus, setCapFocus] = createSignal("");
   const editing = () => editPath() !== null;
 
   // pole podle režimu (nová = koncept, úprava = rozepsaná úprava)
@@ -57,6 +63,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   // vazby [[…]]: klik v náhledu otevře poznámku (rozepsanou úpravu odloží lišta), psaní `[[` našeptává
   const wiki = useWikiFollow((path) => setEditPath(path));
   const wikiS = useWikiSuggest((v) => setText(v));
+  const at = createAt({ text, project: proj, setText, ta: () => ta });
   const dirty = () => (editing() ? D.edDirty() : hasContent());
 
   // rozepsané na disk s debounce; obrázky konceptu hned (jsou vzácné)
@@ -171,11 +178,12 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   /** Uloží novou poznámku; `pin` ji rovnou připne na plochu jako lístek („Uložit a připnout“). */
   async function saveNew(pin: boolean) {
     const sent = { ...D.draftMeta(), images: D.draftImgs() };
-    const path = await api.noteCreate({ text: sent.text, project: sent.project || null, remind: sent.remind || null, images: D.b64Of(sent.images), kind: sent.kind || null, title: sent.title.trim() || undefined });
+    const path = await api.noteCreate({ text: sent.text, project: sent.project || null, remind: sent.remind || null, images: imagesFor(sent.images, sent.text), kind: sent.kind || null, title: sent.title.trim() || undefined });
     if (pin && path) await togglePin(path);
     // mezitím dopsané (save je async) nezahodit: reset a zavření jen když se koncept nezměnil
     const same = D.draft() === sent.text && D.draftImgs() === sent.images && D.draftProj() === sent.project && D.draftRemind() === sent.remind;
     if (same) {
+      clearMeta();
       D.resetDraft();
       api.close();
     } else say(t("notes.editor.savedKept", "Uloženo — mezitím dopsaný text zůstal v konceptu."));
@@ -186,11 +194,12 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     if (!b) return;
     const id = seq;
     const out = await api.noteSave(
-      { path: b.path, expectedHash: D.edHash(), body: D.edText(), project: D.edProj() || null, kind: D.edKind(), title: D.edTitle().trim(), remind: D.edRemind() || null, images: D.b64Of(D.edImgs()) },
+      { path: b.path, expectedHash: D.edHash(), body: D.edText(), project: D.edProj() || null, kind: D.edKind(), title: D.edTitle().trim(), remind: D.edRemind() || null, images: imagesFor(D.edImgs(), D.edText()) },
       copy,
     );
     if (id !== seq) return; // mezitím se otevřela jiná poznámka — uložená zůstává uložená, editor se nesahá
     if (out?.outcome === "changed") return setConflict(true);
+    clearMeta();
     D.resetEdit();
     say(copy ? t("notes.editor.savedCopy", "Uloženo jako nová poznámka vedle původní.") : t("notes.editor.saved", "Uloženo"));
     p.onLeave();
@@ -347,7 +356,14 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
         title={t("notes.editor.titleHint", "Projekt a datum se k nadpisu přidají samy.")}
         onInput={(e) => setTitle(e.currentTarget.value)}
       />
+      <Show when={editing() && D.edBase() && isBrief({ kind: kind(), status: D.edBase()?.status })}>
+        <BriefPanel n={{ path: D.edBase()!.path, status: D.edBase()!.status, cost: D.edBase()!.cost, budget: D.edBase()!.budget, project: proj() || null }} body={text()} dirty={D.edDirty()} />
+      </Show>
+      <Show when={!editing() && kind() === "zadani"}>
+        <div class="hint">{t("notes.brief.saveHint", "Zadání ulož (Ctrl+Enter) — pak ho jde poslat orchestrátorovi.")}</div>
+      </Show>
       <Show when={preview()} fallback={
+        <div class="note-textwrap">
         <textarea
           ref={(el) => (ta = el)}
           class="note-text"
@@ -358,14 +374,19 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
           onInput={(e) => {
             setText(e.currentTarget.value);
             wikiS.onInput(e.currentTarget);
+            at.update();
           }}
-          onKeyDown={(e) => wikiS.onKey(e) || listKey(e, e.currentTarget, setText)}
-          onBlur={() => wikiS.close()}
+          onKeyDown={(e) => wikiS.onKey(e) || at.key(e) || listKey(e, e.currentTarget, setText)}
+          onKeyUp={(e) => ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key) && at.update()}
+          onClick={at.update}
+          onBlur={() => (wikiS.close(), at.close())}
         />
+        <AtList at={at} />
+        </div>
       }>
         <div class="note-preview">
           <Show when={text().trim()} fallback={<div class="empty">{t("notes.editor.emptyPreview", "Zatím prázdné.")}</div>}>
-            <Markdown body={text()} images={editing() ? D.edBase()?.imageData ?? [] : []} onToggle={toggleTask} onWiki={(n) => void wiki.follow(n)} />
+            <Markdown body={text()} images={editing() ? D.edBase()?.imageData ?? [] : []} onToggle={toggleTask} onWiki={(n) => void wiki.follow(n)} onRef={copyRef} />
           </Show>
         </div>
       </Show>
@@ -375,9 +396,12 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
         <div class="note-imgs">
           <For each={imgs()}>
             {(u, i) => (
-              <div class="note-img">
-                <img src={u} alt="" draggable={false} />
-                <button title={t("notes.editor.removeImage", "Odebrat obrázek")} onClick={() => setImgs(imgs().filter((_, j) => j !== i()))}><IconX /></button>
+              <div class="note-imgc">
+                <div class="note-img">
+                  <img src={u} alt="" draggable={false} />
+                  <button title={t("notes.editor.removeImage", "Odebrat obrázek")} onClick={() => setImgs(imgs().filter((_, j) => j !== i()))}><IconX /></button>
+                </div>
+                <ImgCaption url={u} focus={capFocus() === u} />
               </div>
             )}
           </For>
@@ -417,7 +441,13 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     </div>
   );
 
-  function pasteImagesHere(e: ClipboardEvent) {
-    return D.pasteImages(e, imgs, setImgs);
+  /** Snímek ze schránky: naváže se na řádek s kurzorem (`anchorAt`) a hned se nabídne pole „Co je na snímku?“. */
+  async function pasteImagesHere(e: ClipboardEvent) {
+    const before = imgs();
+    const anchor = ta && !preview() && root.contains(document.activeElement) ? anchorAt(text(), ta.selectionStart) : null;
+    await D.pasteImages(e, imgs, setImgs);
+    anchorNew(before, imgs(), anchor);
+    const added = imgs().find((u) => !before.includes(u));
+    if (added) setCapFocus(added);
   }
 }

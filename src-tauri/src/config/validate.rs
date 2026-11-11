@@ -109,6 +109,12 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     if !valid_repo(&cfg.update.repo) {
         return Err(fe("update.repo", trf!("update.repo „{}“ musí mít tvar owner/name (např. jiri-hyan/ledge-app).", "update.repo “{}” must have the form owner/name (e.g. jiri-hyan/ledge-app).", cfg.update.repo)));
     }
+    if !(0.1..=100.0).contains(&cfg.claude.brief.budget_usd) {
+        return Err(fe("claude.brief.budgetUsd", tr("claude.brief.budgetUsd musí být 0,1–100.", "claude.brief.budgetUsd must be 0.1–100.")));
+    }
+    if crate::briefrun::args::clean_model(&cfg.claude.brief.model).is_err() {
+        return Err(fe("claude.brief.model", tr("claude.brief.model: čekám sonnet, opus, haiku nebo id modelu.", "claude.brief.model: expected sonnet, opus, haiku or a model id.")));
+    }
     if !(0.0..=1.0).contains(&cfg.strip.opacity) {
         return Err(fe("strip.opacity", tr("strip.opacity musí být 0–1.", "strip.opacity must be 0–1.")));
     }
