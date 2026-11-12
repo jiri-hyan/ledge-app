@@ -137,3 +137,9 @@ karta Claude a schvalování: [sessions.md](sessions.md), loga a dlaždice: [pro
 
 `types/*` celé (hledej konkrétní typ), `motion.ts` (jen když měníš morf), `icons.tsx`, `Settings.tsx` mimo
 sekci, kterou měníš.
+
+## Tok state → UI (kolo 32)
+
+- Rust posílá `state` jen při změně obsahu (otisk JSON, `core-detail.md`); `App.tsx` `apply` = `reconcile` do storu.
+- Pravidlo: `invoke` z `createEffect` jen při změně VSTUPU (`on([...])` nad konkrétními signály, ne nad celým `s`);
+  příkaz, který `mark_dirty`, a efekt, který na výsledný `state` zase volá příkaz, tvoří zpětnou smyčku.

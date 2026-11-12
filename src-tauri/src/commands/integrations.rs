@@ -26,9 +26,12 @@ pub(crate) fn system_taskmgr() -> Result<(), String> {
 #[tauri::command(async)]
 pub(crate) fn github_view(force: bool) -> GithubView {
     let cfg = core().cfg.read().github.clone();
+    let before = github::stamp();
     let v = github::refresh(&cfg, if force { Mode::Force } else { Mode::Card });
-    // proužek ukazuje počet „čeká na revizi“ z téhle paměti
-    mark_dirty();
+    // proužek ukazuje počet „čeká na revizi“ z téhle paměti; bez změny paměti nic (smyčka UI → příkaz → state, L67)
+    if github::stamp() != before {
+        mark_dirty();
+    }
     v
 }
 

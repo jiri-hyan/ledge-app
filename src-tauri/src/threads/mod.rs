@@ -3,6 +3,7 @@
 //! Spouští je `run()` v `lib.rs`; komunikují přes `Core` (`core()`), kanály a `mark_dirty`.
 
 pub(crate) mod emit;
+pub(crate) mod emitgate;
 pub(crate) mod hover;
 pub(crate) mod notes_folder;
 pub(crate) mod notes_sync;

@@ -276,6 +276,13 @@ pub fn refresh(cfg: &GithubConfig, mode: Mode) -> GithubView {
     out
 }
 
+/// Otisk paměti (čas načtení, stav, běží dotaz) — příkaz karty podle něj pozná, jestli se něco změnilo (`mark_dirty`
+/// jen tehdy, L67).
+pub fn stamp() -> (Option<i64>, Status, bool) {
+    let st = STATE.lock();
+    (st.fetched_at, st.status, st.loading)
+}
+
 /// Paměť bez sahání na síť: (PR k revizi, vlastní PR, čas posledního úspěšného načtení) — jen při zapnutém
 /// GitHubu a stavu `Ok`, jinak `None`. Pro návrhy a puls (`suggest/`); nic nespouští.
 pub fn cached_prs(cfg: &GithubConfig) -> Option<(Vec<Pr>, Vec<Pr>, Option<i64>)> {

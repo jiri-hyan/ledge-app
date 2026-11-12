@@ -2,7 +2,7 @@
 
 `lib.rs` je jen seznam modulů a `run()` (Tauri builder, založení `Core`, start vláken, registrace příkazů `commands::…`).
 
-Detail (toky, invarianty, testy, co nečíst, historie): [core-detail.md](core-detail.md).
+Detail (toky, invarianty, testy, historie): [core-detail.md](core-detail.md).
 
 | soubor | účel | klíčové symboly |
 |---|---|---|
@@ -28,7 +28,8 @@ Detail (toky, invarianty, testy, co nečíst, historie): [core-detail.md](core-d
 | `settings.rs` | config za běhu + vlákno `config-watch`; nový uživatel → … | `load_or_seed` `apply_config` |
 | `ctl.rs` | most `/status` doplněk a `/ctl/*` (open, close, settings, launch, stop, reload) | `status_extra`, `ctl_handler` |
 | `threads/ui.rs` | vlákno `ui`: sériově `UiCmd` → `Drawer` | `spawn_ui_thread` |
-| `threads/emit.rs` | vlákno `emit`: stav do šuplíku, proužek, připomínky, git | `spawn_emit_thread` |
+| `threads/emit.rs` | vlákno `emit`: stav, proužek, připomínky, git | `spawn_emit_thread` |
+| `threads/emitgate.rs` | brána `emit`: dedup stavu, hlídač (core-detail) | `Tally` |
 | `threads/hover.rs` | vlákno `hover`: myš, fullscreen, lištové okno, tlak → otevřít/zavřít … | `spawn_hover_thread` |
 | `threads/notes_watch.rs`, `notes_sync.rs` | vlákna poznámek (watcher, git sync) — viz [notes.md](notes.md) | `NotesState` `reload_notes` |
 | `commands/*.rs` (`commands/{config,pkgctx,timer,update}.rs`) | Tauri příkazy po oblastech: `drawer` (stav, režim, fokus, odkazy … | `git_pull` `pull_message` |
@@ -42,7 +43,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [core-detail.md](core-d
 | `procman.rs` | dev servery / appky v Job Objectu, URL z logu, porty | `ProcMan::{launch_dev, launch_app, stop, stop_all, snapshot}` |
 | `config/*` (`config/{claude,drawer,hotkeys,io,personal,project,sections,validate}.rs`) | `config.json` + schéma, validace (s polem … | `Config` `Sections` |
 | `config/validate.rs` | `validate` / `validate_field` celého configu … | `validate` `validate_field` |
-| `config/recovery.rs` · `config/lenient_tests.rs` | stav „co je s configem špatně“ (vadné sekce, kopie `.broken-*`, varování o rozsazích `claude.*`), čisté `prune_list` / `range_warnings` / `sections_message`; načtení po sekcích je v `io.rs` (`load_lenient`, `save_with`, `restore_backup`); fixtures `fixtures/config-versions/*.json` | `set_load` `range_warnings` `prune_list` `load_lenient` `restore_backup` |
+| `config/recovery.rs` · `config/lenient_tests.rs` | stav „co je s configem špatně“ (vadné sekce, kopie `.broken-*`, varování o rozsazích `claude.*`), čisté `prune_list` / `range_warnings` / `sections_message`; načtení po sekcích v `io.rs`; fixtures `fixtures/config-versions/*.json` | `set_load` `range_warnings` `prune_list` `load_lenient` `restore_backup` |
 | `drawerfit.rs` | strop výšky šuplíku (80 % pracovní plochy monitoru) a širší Full pro Nastavení … | `limits`, `fit_full` |
 | `fsx.rs` | sdílený atomický zápis (unikátní tmp, `sync_all`, rename s retry), JSON load/save | `write_atomic` `read_retry` `save_json` `load_json_keep_broken` |
 | `dirs.rs` | jediné čtení `%USERPROFILE%`/`%APPDATA%`/`%LOCALAPPDATA%`; v testech panika bez přepsání (`dirs::testing`) | `home` `appdata` `claude_dir` |

@@ -148,3 +148,14 @@ Nečti: `claude/` (most, viz [sessions.md](sessions.md)), `notes*` ([notes.md](n
   smaže ji otevření šuplíku (`notify::stage(.., drawer_open)`).
 - Testy: `notify/{conf,route,queue,choreo}.rs` (tabulky), `attention::notices_open_session_never_allow`,
   `remind::notice_has_join_only_with_link`.
+
+## Tok state → UI a brána `emit` (kolo 32, L67)
+
+- `mark_dirty` (`#[track_caller]`, zapíše volající místo) → `emit` se probudí → `snapshot_timed` → JSON jednou (`RawValue`) →
+  otisk (`emitgate::fingerprint`) → `emit_to` JEN když se liší od naposledy odeslaného (šuplík i Studio zvlášť; po zavření
+  šuplíku se otisk zapomene, `UiCmd::Show` posílá vždy čerstvý). Shodný stav = žádný přenos do WebView.
+- Odstup snapshotů `emitgate::min_gap` = 8× cena posledního (120 ms … 2 s): pomalý snapshot nezabere víc než ~1/9 jádra.
+- Hlídač: `Tally::report` 1×/min zapíše do `ledge.log` řádek `emit: N průchodů, M odesláno, K shodných přeskočeno; pomalé:
+  snapshot/zbytek/emit_to/desk/strip=ms (jen > 50 ms); budí: soubor:řádek×n`, ale jen když je > 1 průchod/s nebo pomalý krok.
+  Tak se příště pozná, kdo drží `dirty` (zdroj smyčky), bez hádání.
+- Pravidlo: příkaz volaný z UI smí `mark_dirty` jen při skutečné změně (ne při každém volání).

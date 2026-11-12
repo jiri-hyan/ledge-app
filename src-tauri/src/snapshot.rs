@@ -188,6 +188,12 @@ pub(crate) fn monogram(name: &str) -> String {
 }
 
 pub(crate) fn snapshot() -> Snapshot {
+    snapshot_timed().0
+}
+
+/// Snapshot + ceny tří hrubých částí v ms (`projekty`, `sessions`, `zbytek`) pro hlídač výkonu vlákna `emit`.
+pub(crate) fn snapshot_timed() -> (Snapshot, [(&'static str, u64); 3]) {
+    let t0 = std::time::Instant::now();
     let c = core();
     let cfg = c.cfg.read().clone();
     let git = c.git.lock().clone();
@@ -221,10 +227,12 @@ pub(crate) fn snapshot() -> Snapshot {
             mute_dirty: p.mute_dirty,
         });
     }
+    let t1 = std::time::Instant::now();
     let sessions = {
         let dirs: Vec<(String, String)> = projects.iter().filter_map(|p| Some((p.id.clone(), p.path.clone()?))).collect();
         session_rows(&dirs, &|id| projects.iter().find(|p| p.id == id).map(|p| p.name.clone()))
     };
+    let t2 = std::time::Instant::now();
     let mode = c.mode.lock().clone();
     // snapshot má pevný strop — neroste s počtem poznámek (zbytek přes note_list); platí i pro Osobní
     let (notes_kind_counts, notes_rev, notes_archived) = {
@@ -244,7 +252,7 @@ pub(crate) fn snapshot() -> Snapshot {
         ((Vec::new(), 0), Vec::new(), 0, (Vec::new(), 0))
     };
     let personal = personal_view(&cfg, personal_notes);
-    Snapshot {
+    let snap = Snapshot {
         mode: crate::layout::page_id(&cfg.layout, &mode),
         personal_enabled: cfg.modes.personal_enabled,
         view: c.drawer.view(),
@@ -288,7 +296,10 @@ pub(crate) fn snapshot() -> Snapshot {
         actions: crate::actionstate::views(&cfg.actions),
         widgets: crate::widgets::live::snapshot_views(&cfg),
         suggest: crate::suggest::view(&cfg),
-    }
+    };
+    let ms = |a: std::time::Instant, b: std::time::Instant| b.duration_since(a).as_millis() as u64;
+    let parts = [("projekty", ms(t0, t1)), ("sessions", ms(t1, t2)), ("zbytek", ms(t2, std::time::Instant::now()))];
+    (snap, parts)
 }
 
 /// Karta Claude: živý seznam (`sessionlive`) + hook stav; `dirs` = (id projektu, složka).

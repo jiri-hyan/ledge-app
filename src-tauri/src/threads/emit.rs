@@ -2,10 +2,11 @@
 //! hlídá termíny připomínek a git stav pro proužek. Spí na `Core.wake` (budí ho `mark_dirty`) a sám
 //! se probudí jen v nejbližším termínu z `next_wake` — v klidu ~1×/min (hodiny), ne 1×/s.
 
+use super::emitgate::{self, Tally};
 use super::notes_watch::check_reminders;
 use crate::drawer::{self, View};
 use crate::refresh::{maybe_refresh_weather, refresh_git_async};
-use crate::snapshot::snapshot;
+use crate::snapshot::snapshot_timed;
 use crate::state::{FLASH, core, now_ms};
 use crate::stripview::refresh_strip;
 use crate::weather;
@@ -60,6 +61,10 @@ pub(crate) fn spawn_emit_thread() {
         .name("emit".into())
         .spawn(|| {
             let mut last_emit = Instant::now() - Duration::from_secs(1);
+            // L67: otisk naposledy odeslaného stavu (šuplík / Studio zvlášť), cena posledního snapshotu, čítač
+            let (mut sent_drawer, mut sent_studio): (Option<u64>, Option<u64>) = (None, None);
+            let mut gap = emitgate::min_gap(0);
+            let mut tally = Tally::default();
             // git hned po startu (za 10 s), pak co `GIT_EVERY`
             let mut last_git = Instant::now() - GIT_EVERY + Duration::from_secs(10);
             loop {
@@ -90,33 +95,81 @@ pub(crate) fn spawn_emit_thread() {
                 crate::accounts::calsync::maybe_refresh(false);
                 crate::accounts::mail::maybe_refresh(false);
                 let since = last_emit.elapsed();
-                if since < Duration::from_millis(120) {
-                    std::thread::sleep(Duration::from_millis(120) - since);
+                if since < gap {
+                    std::thread::sleep(gap - since);
                 }
                 let dirty = std::mem::replace(&mut *c.dirty.lock(), false);
                 // Ledge Studio (otevřené jen na výslovný klik) dostává stav i se zavřeným šuplíkem
                 let studio = if dirty { crate::studio::window() } else { None };
-                if dirty && (c.drawer.view() != View::Hidden || studio.is_some()) {
-                    let snap = snapshot();
-                    if c.drawer.view() != View::Hidden {
-                        let _ = c.app.emit_to(drawer::LABEL, "state", &snap);
+                tally.wakes += 1;
+                let mut steps: Vec<(&str, u64)> = Vec::new();
+                let ms = |t: Instant| t.elapsed().as_millis() as u64;
+                let open = c.drawer.view() != View::Hidden;
+                if dirty && (open || studio.is_some()) {
+                    let t = Instant::now();
+                    let (snap, parts) = snapshot_timed();
+                    steps.extend(parts);
+                    let json = serde_json::to_string(&snap).unwrap_or_default();
+                    let fp = emitgate::fingerprint(&json);
+                    let raw = serde_json::value::RawValue::from_string(json).ok();
+                    let cost = ms(t);
+                    let (mut sent_any, mut skipped) = (false, false);
+                    if let Some(raw) = raw.as_ref() {
+                        let t = Instant::now();
+                        if open {
+                            if emitgate::should_send(sent_drawer, fp) {
+                                let _ = c.app.emit_to(drawer::LABEL, "state", raw);
+                                sent_drawer = Some(fp);
+                                sent_any = true;
+                            } else {
+                                skipped = true;
+                            }
+                        }
+                        if let Some(w) = &studio {
+                            if emitgate::should_send(sent_studio, fp) {
+                                let _ = w.emit_to(crate::studio::LABEL, "state", raw);
+                                sent_studio = Some(fp);
+                                sent_any = true;
+                            } else {
+                                skipped = true;
+                            }
+                        }
+                        steps.push(("emit_to", ms(t)));
                     }
-                    if let Some(w) = studio {
-                        let _ = w.emit_to(crate::studio::LABEL, "state", &snap);
+                    if sent_any {
+                        tally.sent += 1;
+                    } else if skipped {
+                        tally.same += 1;
                     }
+                    gap = emitgate::min_gap(cost);
                     last_emit = Instant::now();
                 } else if dirty {
                     // šuplík zavřený → poslat až při otevření (UiCmd::Show posílá vždy čerstvý)
                 }
+                if !open {
+                    // po zavření se při příštím otevření posílá vždy (Show doručil čerstvý stav, my o něm nevíme)
+                    sent_drawer = None;
+                }
+                if dirty && studio.is_none() {
+                    sent_studio = None;
+                }
                 // widgety na ploše: data jen viditelným a jen při změně (`desk::live`), jinak nic
+                let t = Instant::now();
                 crate::desk::live::tick();
+                steps.push(("desk", ms(t)));
                 if let Some(run) = git_round(last_git.elapsed(), c.dead()) {
                     last_git = Instant::now();
                     if run {
                         refresh_git_async();
                     }
                 }
+                let t = Instant::now();
                 refresh_strip();
+                steps.push(("strip", ms(t)));
+                tally.note_slow(&steps);
+                if let Some(line) = tally.report(now_ms(), emitgate::take_sources) {
+                    crate::state::log(&line);
+                }
             }
         })
         .ok();

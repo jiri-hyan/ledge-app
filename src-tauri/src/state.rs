@@ -132,8 +132,10 @@ pub(crate) fn core() -> &'static Arc<Core> {
     CORE.get().expect("core")
 }
 
+#[track_caller]
 pub(crate) fn mark_dirty() {
     if let Some(c) = CORE.get() {
+        crate::threads::emitgate::note_source(std::panic::Location::caller());
         *c.dirty.lock() = true;
         c.wake.notify_one();
     }
