@@ -10,6 +10,7 @@
 //! Geometrie: pozice = vnější levý horní roh ve FYZICKÝCH px (virtuální plocha, tím je dán i monitor),
 //! velikost = vnitřní v LOGICKÝCH px — po přesunu na monitor s jiným DPI zůstane lístek stejně velký.
 
+pub(crate) mod home;
 pub(crate) mod win;
 
 use crate::webpanel::Area;

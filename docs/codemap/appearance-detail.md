@@ -194,6 +194,18 @@ normalizace, pořadí karet, presety), `node --test src/theme/pages.test.mjs` (k
 motivy: tokeny, tón, normalizace, export / import, vzhled záložek, zrcadlo `appearance/pages.rs`); `cargo test appearance::pages`
 (validace, limity, kontrast, `light`, `palette_for`, schéma).
 
+## Toky do proužku (kolo 31a)
+
+- **config → proužek:** `save_config` → `apply_config` (`settings.rs`) → `integrations::resync_needed` → `integrations::sync`
+  → `mark_dirty` a hned PŘÍMO `stripview::refresh_strip()` na volajícím vlákně (nečeká na smyčku `emit`: ta má 120ms
+  odstup a řadu kroků před sebou) → `Strip::set` překreslí jen při změně `StripModel` (do ~1 snímku).
+- **vzorek → proužek:** `integrations::worker` (jen s položkou `system` / stylem s CPU, 1× za `SYSTEM_EVERY_MS` = 10 s,
+  ve hře nic) → `sysmon::poll` → `mark_dirty` + přímo `refresh_strip` → `look_facts` čte `sysmon::last_pct`.
+  Ostatní živé položky (baterie, počasí, limity, hudba, GitHub) jdou přes `mark_dirty` → `emit` → `refresh_strip`.
+- Změna configu i vzorek CPU/RAM překreslují proužek přímo, `emit` už jen dobíhá (ověřeno živě 12. 11.). `refresh_strip` nesmí pod
+  drženým `cfg.read()` config znovu číst (parking_lot RwLock + čekající `apply_config` = deadlock, L65): hodnoty se předávají
+  parametrem (`limitslive::view_for(&cfg)`).
+
 ## Co nečíst
 
 `strip.rs` celý (jen `draw`), `drawer.rs` mimo `place`/`set_anchor`, `themes.ts` (jen hodnoty).

@@ -467,6 +467,7 @@ pub(crate) fn restore_all() {
 
 /// Změnila se sestava monitorů (vlákno `hover`): widgety mimo domov, jejichž monitor je zpět, jdou domů.
 pub(crate) fn on_monitors() {
+    crate::pins::win::on_monitors(); // lístky na plochu mají stejný „domov“ (`pins/home.rs`)
     let back: Vec<String> = displaced(|d| d.keys().cloned().collect());
     if back.is_empty() {
         return;

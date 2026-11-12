@@ -22,7 +22,7 @@ vedle jako `config.json.broken-<unix s>` — rozbitý config se tak nikdy potich
 Vadná je jen jedna sekce (špatný typ, hodnota mimo rozsah, duplicitní `projects[].id`)? Ledge načte ostatní
 top-level sekce, vadnou nahradí výchozí a banner řekne které; soubor se nemění, dokud něco neuloží — pak se
 nejdřív celý zkopíruje a cesta kopie se ukáže s tlačítkem Obnovit (`config_restore_backup`; současný soubor
-zůstane jako `config.json.1`). Kopií `config.json.broken-*` zůstává posledních 5, nejstarší se maže až po
+zůstane jako `config.json.1`; zálohy `.1..3` se při běžném ukládání rotují nejvýš 1× za 10 min). Kopií `config.json.broken-*` zůstává posledních 5, nejstarší se maže až po
 vytvoření nové. Hodnoty `claude.approvalTimeoutS` (5–550), `questionHoldS` (0–550), `questionUnseenS` (0 nebo
 5–550) a `port` (1024–65535) mimo rozsah se načtou (starý config nesmí selhat), ale banner je hlásí místo tichého ořezu.
 

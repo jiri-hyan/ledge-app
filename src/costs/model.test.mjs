@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/costs/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bars, compact, floorTrend, pickRange, progressPct, share, usdDigits } from "./model.ts";
+import { bars, compact, dayUnpriced, isLowerBound, sumUnpriced, floorTrend, pickRange, progressPct, share, usdDigits } from "./model.ts";
 
 test("zkrácení tokenů", () => {
   const cases = [
@@ -61,4 +61,14 @@ test("trend podlahy nové relace", () => {
     ["nula", r(10_000, 10_000, 0), { dir: "flat", abs: 0 }],
   ];
   for (const [name, row, want] of cases) assert.deepEqual(floorTrend(row), want, name);
+});
+
+test("nenacenéné tokeny dne: chybějící pole = 0, součet, dolní odhad", () => {
+  assert.equal(dayUnpriced({}), 0);
+  assert.equal(dayUnpriced({ unpriced: 7 }), 7);
+  assert.equal(dayUnpriced({ unpriced: -3 }), 0);
+  assert.equal(sumUnpriced([{ unpriced: 2 }, {}, { unpriced: 5 }]), 7);
+  assert.equal(sumUnpriced([]), 0);
+  assert.equal(isLowerBound({}), false);
+  assert.equal(isLowerBound({ unpriced: 1 }), true);
 });

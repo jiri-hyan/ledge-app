@@ -417,6 +417,8 @@ registerDict("en", {
   "settings.hotkeys.how": "Click a field and press a combination (e.g. Ctrl+Alt+N). Esc cancels, Backspace clears the shortcut.",
   "settings.hotkeys.noteOff": "Notes are off — this shortcut isn't registered",
   "settings.hotkeys.clash": "The same shortcut is set for “{o}”",
+  "settings.hotkeys.taken": "Taken by another app — it doesn't work.",
+  "settings.hotkeys.takenUse": "Try {k}",
 
   // Záloha a obnova
   "settings.backup.export.btn": "Export…",

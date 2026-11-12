@@ -18,6 +18,7 @@ registerDict("en", {
   "sessions.costs.computing": "counting…",
   "sessions.costs.tokens": "{n} tokens",
   "sessions.costs.split": "input {i} · output {o} · cache write {w} · cache read {r}",
+  "sessions.costs.dayUnpriced": "+ {n} tok. without a price",
   "sessions.costs.unpriced": "{n} tokens without a price (model missing from the price list)",
   "sessions.costs.barsLabel": "Spend per day",
   "sessions.costs.empty": "No Claude replies in this period.",

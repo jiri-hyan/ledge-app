@@ -130,6 +130,7 @@ pub(crate) fn pin_drag(window: WebviewWindow) -> Result<(), String> {
     if win::prefs_of(&label).is_some_and(|p| p.locked || p.through) {
         return Ok(());
     }
+    win::adopt_here(&label, &window);
     window.start_dragging().map_err(|e| crate::errors::any(crate::i18n::tr("Lístek nejde přesunout", "Can't move the sticky"), &e))
 }
 

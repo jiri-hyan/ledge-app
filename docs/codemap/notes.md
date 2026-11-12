@@ -74,6 +74,6 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src/notes/pins.ts` | šuplík: připnout / odepnout, nový … | `togglePin` |
 
 Další soubory (podrobnosti v detailu):
-`src-tauri/src/commands/{notefolder.rs,notelinks.rs,notes.rs,pins.rs}` · `src-tauri/src/config/notes.rs` · `src-tauri/src/notes/{edit.rs,folder_sync.rs,folder_sync_apply.rs,folder_sync_plan.rs,folder_sync_scan.rs,lifecycle.rs,recycle.rs}` · `src-tauri/src/notesync/{cycle.rs,git.rs,init.rs,plan.rs}` · `src-tauri/src/threads/notes_folder.rs`
+`src-tauri/src/commands/{notefolder.rs,notelinks.rs,notes.rs,pins.rs}` · `src-tauri/src/pins/home.rs` · `src-tauri/src/config/notes.rs` · `src-tauri/src/notes/{edit.rs,folder_sync.rs,folder_sync_apply.rs,folder_sync_plan.rs,folder_sync_scan.rs,lifecycle.rs,recycle.rs}` · `src-tauri/src/notesync/{cycle.rs,git.rs,init.rs,plan.rs}` · `src-tauri/src/threads/notes_folder.rs`
 `src/notes/{FolderLinkSection.tsx,NoteEditor.tsx,NoteMenu.tsx,NotesCard.tsx,NotesPage.tsx,ProjectPicker.tsx,RemindPicker.tsx,RemindSuggest.tsx,RowMenu.tsx,UndoBar.tsx,WikiLinks.tsx,api.ts,bento.ts,draft.ts,editdraft.ts,en-folder.ts,exportActions.ts,folderlink.ts,kinds.tsx,lifeactions.ts,lifecycle.ts,lifeicons.tsx,lifelabels.tsx,listkeys.ts,lists.ts,meta.ts,pins.ts,popup.ts,remind.ts,store.ts,suggest.ts,wiki.ts}`
 `src/pin/{PinApp.tsx,PinMenu.tsx,StyleGallery.tsx,hide.ts,icons.tsx,main.tsx,pinmeta.ts,styles.ts}`

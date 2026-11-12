@@ -129,6 +129,9 @@ fn secret_re() -> &'static Regex {
             r"|\b(?:sk|rk)_live_[A-Za-z0-9]{20,}",                         // Stripe
             r"|\beyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}", // JWT
             r"|-----BEGIN [A-Z ]*PRIVATE KEY-----",                        // PEM klíč
+            r"|\bnpm_[A-Za-z0-9]{36}\b",                                   // npm token
+            r"|\b(?i:AccountKey|SharedAccessKey)=[A-Za-z0-9+/]{20,}",       // connection string (Azure Storage, Service Bus)
+            r"|\b[A-Za-z][A-Za-z0-9+.\-]{1,15}://[^\s/:@]+:[^\s/@]+@",      // URL s heslem (scheme://uzivatel:heslo@)
         ))
         .expect("secret regex")
     })
@@ -137,7 +140,23 @@ fn secret_re() -> &'static Regex {
 /// Vypadá text jako (nebo obsahuje) přístupový token / klíč? Heuristika nad známými tvary — heslo
 /// bez tvaru nepozná (na to jsou značky formátů a `excludeApps`).
 pub fn looks_secret(text: &str) -> bool {
-    secret_re().is_match(text)
+    secret_re().is_match(text) || azure_pat(text) || bearer(text)
+}
+
+/// Azure DevOps PAT: 52 znaků base32 (`a-z2-7`) bez předpony. Samo o sobě by chytalo i dlouhá slova, proto
+/// musí mít číslici i písmeno (hash commitu je hex a má 40 / 64 znaků, ohraničení `\b` ho nezachytí).
+fn azure_pat(text: &str) -> bool {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\b[a-z2-7]{52}\b").expect("pat regex"));
+    re.find_iter(text).any(|m| m.as_str().bytes().any(|b| b.is_ascii_digit()) && m.as_str().bytes().any(|b| b.is_ascii_lowercase()))
+}
+
+/// `Bearer <token>` (hlavička Authorization): token aspoň 20 znaků a s číslicí — „bearer“ v běžné větě ani
+/// popis schématu (`Bearer authentication-scheme-description`) tak neplaší.
+fn bearer(text: &str) -> bool {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\b[Bb]earer\s+([A-Za-z0-9._~+/\-]{20,})").expect("bearer regex"));
+    re.captures_iter(text).any(|c| c[1].bytes().any(|b| b.is_ascii_digit()))
 }
 
 /// Text z UTF-16 bufferu schránky do prvního NUL. `None` = NUL v prvních `MAX_TEXT_BYTES + 1`
@@ -249,12 +268,40 @@ mod tests {
             ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U", true, Some(Skip::Secret)),
             ("-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn…", true, Some(Skip::Secret)),
             ("xoxb-1234567890-abcdefghij", true, Some(Skip::Secret)),
+            ("npm_0123456789abcdefghijABCDEFGHIJ012345", true, Some(Skip::Secret)),
+            ("//registry.npmjs.org/:_authToken=npm_0123456789abcdefghijABCDEFGHIJ012345", true, Some(Skip::Secret)),
+            // Azure DevOps PAT: 52 × base32
+            ("a2b3c4d5e6f7a2b3c4d5e6f7a2b3c4d5e6f7a2b3c4d5e6f7a2b3", true, Some(Skip::Secret)),
+            ("pat = a2b3c4d5e6f7a2b3c4d5e6f7a2b3c4d5e6f7a2b3c4d5e6f7a2b3\n", true, Some(Skip::Secret)),
+            ("DefaultEndpointsProtocol=https;AccountName=app;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;EndpointSuffix=core.windows.net", true, Some(Skip::Secret)),
+            ("Endpoint=sb://app.example.com/;SharedAccessKeyName=root;SharedAccessKey=0123456789abcdefghijklmnopqrstuvwxyz0123=", true, Some(Skip::Secret)),
+            ("Authorization: Bearer 0123456789abcdefghijKLMNOP", true, Some(Skip::Secret)),
+            ("curl -H 'authorization: bearer abc123.def456_ghi789-jkl012'", true, Some(Skip::Secret)),
+            ("postgres://uzivatel:tajne@db.example.com:5432/app", true, Some(Skip::Secret)),
+            ("git clone https://uzivatel:ghx@example.com/app.git", true, Some(Skip::Secret)),
             // ne-tajemství podobného tvaru
             ("task-runner-configuration-file-name", true, None),
             ("sk-short", true, None),
             ("AKIA je zkratka", true, None),
             ("git push origin main", true, None),
             ("eyJ.eyJ.x", true, None),
+            // běžný text a hashe: žádné falešné poplachy
+            ("9fceb02d0ae598e95dc970b74767f19372d61af8", true, None),
+            ("9fceb02d0ae598e95dc970b74767f19372d61af89fceb02d0ae598e95dc970b7", true, None),
+            ("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", true, None),
+            ("a2b3c4d5e6f7a2b3c4d5e6f7a2b3c4d5e6f7a2b3c4d5e6f7a2b3c", true, None),
+            ("The bearer of this letter is welcome", true, None),
+            ("Bearer authentication-scheme-description", true, None),
+            ("Bearer token", true, None),
+            ("npm_install_all_the_things", true, None),
+            ("npm install --save-dev typescript", true, None),
+            ("AccountKey=", true, None),
+            ("AccountKey=abc", true, None),
+            ("https://example.com/path?a=1", true, None),
+            ("https://example.com:8080/app", true, None),
+            ("ssh://git@example.com/app.git", true, None),
+            ("mailto:uzivatel@example.com", true, None),
+            ("čas 12:30 u uzivatel@example.com", true, None),
         ];
         for (text, secrets, want) in cases {
             assert_eq!(text_verdict(text, secrets), want, "{}", text.chars().take(40).collect::<String>());

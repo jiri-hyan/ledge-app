@@ -24,7 +24,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [core-detail.md](core-d
 | `tray.rs` | ikona v oznamovací oblasti (Tauri `tray-icon`, bez vlákna a pollingu) … | `init` `relabel` `action_for` |
 | `gamemode.rs` | herní režim: „je Ledge mrtvý?“, rozhodnutí podnětů (zkratky, druhé spuštění) … | `is_dead` `decide` `Trigger` |
 | `refresh.rs` | obnovy na pozadí + reakce na události (počasí jen s kartou na otevřené záložce … | `maybe_refresh_weather` |
-| `hotkeys.rs` | globální zkratky | `sync_hotkeys` |
+| `hotkeys.rs` | zkratky, `taken` = obsazené | `sync_hotkeys` |
 | `settings.rs` | config za běhu + vlákno `config-watch`; nový uživatel → … | `load_or_seed` `apply_config` |
 | `ctl.rs` | most `/status` doplněk a `/ctl/*` (open, close, settings, launch, stop, reload) | `status_extra`, `ctl_handler` |
 | `threads/ui.rs` | vlákno `ui`: sériově `UiCmd` → `Drawer` | `spawn_ui_thread` |

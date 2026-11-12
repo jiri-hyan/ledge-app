@@ -107,9 +107,10 @@ export function heat(values: readonly (number | null | undefined)[], w: number, 
 }
 
 /** Trend posledního bodu vůči předposlednímu: znaménko a rozdíl (< 2 čísla = `null`). Pro šipku u velkého čísla. */
-export function trend(values: readonly (number | null | undefined)[]): { dir: -1 | 0 | 1; delta: number } | null {
+export function trend(values: readonly (number | null | undefined)[], minDelta = 0): { dir: -1 | 0 | 1; delta: number } | null {
   const v = finite(values);
   if (v.length < 2) return null;
   const delta = v[v.length - 1] - v[v.length - 2];
-  return { dir: delta > 0 ? 1 : delta < 0 ? -1 : 0, delta };
+  // změna pod `minDelta` (v jednotkách řady, např. 1 p. b.) je šum = beze změny
+  return { dir: Math.abs(delta) < minDelta ? 0 : delta > 0 ? 1 : delta < 0 ? -1 : 0, delta };
 }

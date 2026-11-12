@@ -75,8 +75,8 @@ pád serveru (červená) > bliknutí „hotovo“** (`attention::Event::rank`: N
 Při vstupu do okna jednou `attention::signal` (bliknutí + puls) a s `remindToast` toast s tlačítkem Připojit
 (aktivace protokolem, Ledge nebere fokus). Mrtvý Ledge (fullscreen hra / herní režim) nic; toast ne při
 „nerušit“ / prezentaci / otevřeném šuplíku. Budík = `next_alarm` (začátek okna, začátek, konec „začíná“);
-data z paměti — po startu `ensure_cache` načte cache z disku i se skrytou kartou; kvůli připomínce se nic
-nestahuje (čerstvost = poslední otevření karty / načtení z Outlooku).
+data z paměti — po startu `ensure_cache` načte cache z disku i se skrytou kartou; stahování kvůli připomínce (zavřená karta) řeší jen `bgfetch.rs` (≥ 15 min);
+čerstvost jinak = poslední otevření karty / načtení z Outlooku.
 
 **Výkon:** nic nepolluje. ICS i Outlook jen s viditelnou kartou (šuplík Full a karta Kalendář na otevřené
 záložce — `layout::page_has`), data starší `MAX_AGE_MS` (15 min). Emit vlákno dostane termín karty jen

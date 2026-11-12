@@ -147,3 +147,83 @@ pub fn rebind_plan(old: &[(&'static str, String)], new: &[(&'static str, String)
     };
     (uniq(old), uniq(new))
 }
+
+/// Které akce zůstaly bez zkratky, protože její registraci odmítl systém (`failed` = zkratky z configu, jejichž
+/// `register` selhal): dvojice (akce, zkratka). Akce se stejnou zkratkou jako selhalá jsou taky obsazené.
+pub fn taken_actions(active: &[(&'static str, String)], failed: &[String]) -> Vec<(&'static str, String)> {
+    active
+        .iter()
+        .filter(|(_, k)| failed.iter().any(|f| normalize_hotkey(f) == normalize_hotkey(k)))
+        .map(|(a, k)| (*a, k.clone()))
+        .collect()
+}
+
+/// Návrh jiné zkratky místo obsazené `key`: stejná klávesa s dalším modifikátorem (Shift, pak Alt, pak Ctrl+Alt
+/// …), první kombinace, která není v `avoid` (zkratky z configu a už obsazené). Bez klávesy nebo bez
+/// modifikátoru žádný návrh (holou klávesu globálně nikdo nechce).
+pub fn suggest_hotkey(key: &str, avoid: &[String]) -> Option<String> {
+    let norm = normalize_hotkey(key);
+    let mut parts: Vec<&str> = norm.split('+').collect();
+    let base = parts.pop().filter(|b| !b.is_empty())?;
+    if parts.is_empty() {
+        return None;
+    }
+    let has = |m: &str| parts.contains(&m);
+    let used: Vec<String> = avoid.iter().map(|a| normalize_hotkey(a)).collect();
+    let name = |m: &str| match m {
+        "ctrl" => "Ctrl",
+        "alt" => "Alt",
+        "shift" => "Shift",
+        _ => "Super",
+    };
+    for extra in ["shift", "alt", "ctrl", "super"] {
+        if has(extra) {
+            continue;
+        }
+        let mods: Vec<&str> = ["ctrl", "alt", "shift", "super"].into_iter().filter(|m| *m == extra || has(m)).collect();
+        let cand = format!("{}+{}", mods.iter().map(|m| name(m)).collect::<Vec<_>>().join("+"), base.to_uppercase());
+        if !used.contains(&normalize_hotkey(&cand)) {
+            return Some(cand);
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod taken_tests {
+    use super::*;
+
+    fn s(v: &str) -> String {
+        v.to_string()
+    }
+
+    #[test]
+    fn taken_matches_failed_keys_in_any_spelling() {
+        let active = vec![("toggle", s("Ctrl+Alt+Space")), ("note", s("Ctrl+Alt+N")), ("deny", s("Ctrl+Alt+D"))];
+        for (failed, want) in [
+            (vec![], vec![]),
+            (vec![s("alt+ctrl+n")], vec!["note"]),
+            (vec![s("Ctrl+Alt+Space"), s("Ctrl+Alt+D")], vec!["toggle", "deny"]),
+            (vec![s("Ctrl+Alt+X")], vec![]),
+        ] {
+            let got: Vec<&str> = taken_actions(&active, &failed).iter().map(|(a, _)| *a).collect();
+            assert_eq!(got, want, "{failed:?}");
+        }
+    }
+
+    #[test]
+    fn suggestion_adds_modifier_and_skips_used() {
+        for (key, avoid, want) in [
+            ("Ctrl+Alt+N", vec![], Some("Ctrl+Alt+Shift+N")),
+            ("Ctrl+Alt+N", vec![s("shift+alt+ctrl+n")], Some("Ctrl+Alt+Super+N")),
+            ("Ctrl+N", vec![], Some("Ctrl+Shift+N")),
+            ("Ctrl+Shift+N", vec![], Some("Ctrl+Alt+Shift+N")),
+            ("Ctrl+Alt+Shift+Super+N", vec![], None),
+            ("N", vec![], None),
+            ("", vec![], None),
+            ("Ctrl+", vec![], None),
+        ] {
+            assert_eq!(suggest_hotkey(key, &avoid).as_deref(), want, "{key}");
+        }
+    }
+}

@@ -18,9 +18,10 @@ test("útrata: posledních n dní, součet, cena jen s cenou", () => {
   assert.deepEqual(lastDays(days, 2).map((d) => d.date), ["2026-10-15", "2026-10-21"]);
   assert.deepEqual(lastDays(undefined, 7), []);
   const cases = [
-    [days, { tokens: 35, cost: 1.75 }],
-    [[day("a", 3, null), day("b", 4, null)], { tokens: 7, cost: null }],
-    [[], { tokens: 0, cost: null }],
+    [days, { tokens: 35, cost: 1.75, unpriced: 0 }],
+    [[day("a", 3, null), day("b", 4, null)], { tokens: 7, cost: null, unpriced: 0 }],
+    [[], { tokens: 0, cost: null, unpriced: 0 }],
+    [[{ ...day("a", 3, 1), unpriced: 2 }, { ...day("b", 4, null), unpriced: 4 }, day("c", 1, 0.5)], { tokens: 8, cost: 1.5, unpriced: 6 }],
   ];
   for (const [input, want] of cases) assert.deepEqual(sumDays(input), want);
 });

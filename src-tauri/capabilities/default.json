@@ -139,6 +139,7 @@
     "allow-hooks-status",
     "allow-hooks-install",
     "allow-hooks-remove",
+    "allow-hotkeys-taken",
     "allow-question-answer",
     "allow-question-release",
     "allow-question-seen",

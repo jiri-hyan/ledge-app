@@ -99,10 +99,13 @@ pub(crate) fn apply_config(mut new: Config) {
     }
     // karty GitHub / Systém: nová volba = čerstvá data; položka proužku zapne / vypne plánovač
     crate::github::on_config(&old.github, &new.github);
-    if old.strip != new.strip || old.github != new.github || old.system != new.system {
+    if crate::integrations::resync_needed(&old, &new) {
         crate::integrations::sync(&new);
     }
     mark_dirty();
+    // proužek se přepočítá a překreslí hned na vlákně, které config uložilo (do ~1 snímku), ne až po průchodu
+    // smyčkou `emit` (ta má 120ms odstup a řadu kroků před `refresh_strip`); bez změny modelu se nekreslí nic
+    crate::stripview::refresh_strip();
 }
 
 /// Výsledek čtení configu z disku (čisté rozhodnutí bez zápisu stavu).

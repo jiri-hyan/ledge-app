@@ -108,7 +108,7 @@ mod tests {
         "calendar_outlook_load", "calendar_outlook_probe", "calendar_test", "check_config", "clip_apps", "clip_clear",
         "clip_enable", "config_defaults", "config_export", "config_import_preview", "desk_hide_all", "desk_pin",
         "desk_profile_apply", "desk_profile_delete", "desk_profile_save", "desk_set", "desk_unpin", "edge_try", "geo_search",
-        "get_config", "get_state", "hooks_install", "hooks_remove", "hooks_status", "launcher_catalog_read",
+        "get_config", "get_state", "hooks_install", "hooks_remove", "hooks_status", "hotkeys_taken", "launcher_catalog_read",
         "launcher_import_check", "logo_preview", "look_image", "look_image_add", "mcp_reveal_key", "mcp_rotate_key",
         "mcp_set_enabled", "mcp_state", "note_folder_check", "note_folder_clear_conflicts", "note_folder_sync_now",
         "note_open", "note_tags", "notes_sync_now", "notify_preview", "open_app_file", "open_config_file", "open_url", "pick_path",

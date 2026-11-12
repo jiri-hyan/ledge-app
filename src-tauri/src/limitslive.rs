@@ -260,6 +260,16 @@ pub fn view() -> LimitsView {
         let cfg = core().cfg.read();
         (cfg.claude.limits_pace, cfg.claude.limits_desktop, cfg.claude.limits_fetch)
     };
+    view_with(pace, desktop, fetch)
+}
+
+/// Jako `view`, ale volby dostane od volajícího, který už drží `cfg.read()` (`stripview::look_facts`): druhé
+/// čtení configu pod drženým guardem se s čekajícím `apply_config` (zápis) zasekne (parking_lot RwLock).
+pub fn view_for(cfg: &crate::config::Config) -> LimitsView {
+    view_with(cfg.claude.limits_pace, cfg.claude.limits_desktop, cfg.claude.limits_fetch)
+}
+
+fn view_with(pace: bool, desktop: bool, fetch: bool) -> LimitsView {
     let fetch = crate::limitsfetch::view_key(fetch);
     with(|l| {
         let s = best(l);
@@ -335,4 +345,21 @@ pub(crate) fn start_watch() {
             drop(w);
         })
         .ok();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `view_for` bere volby z předaného configu (bez čtení `core().cfg`, které by pod guardem uvázlo).
+    #[test]
+    fn view_for_reads_options_from_given_config() {
+        let mut cfg = crate::config::Config::default();
+        assert!(!view_for(&cfg).pace);
+        cfg.claude.limits_pace = true;
+        cfg.claude.limits_desktop = true;
+        let v = view_for(&cfg);
+        assert!(v.pace);
+        assert_ne!(v.desktop, "");
+    }
 }

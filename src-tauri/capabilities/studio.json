@@ -42,6 +42,7 @@
     "allow-hooks-install",
     "allow-hooks-remove",
     "allow-hooks-status",
+    "allow-hotkeys-taken",
     "allow-launcher-catalog-read",
     "allow-launcher-import-check",
     "allow-logo-preview",

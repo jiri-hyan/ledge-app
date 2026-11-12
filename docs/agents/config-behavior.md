@@ -160,8 +160,10 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
 - **Historie schránky** — sekce `clipboard` (Nastavení → Šuplík a karty → Obsah karet → Historie schránky; zapnout
   jde i přímo z palety): `enabled` (výchozí **`false`** — nic se neposlouchá ani neukládá), `max` (1–200,
   výchozí 25 nepřipnutých), `skipSecrets` (výchozí `true`: neukládat tvary `sk-…`, `ghp_…`/`github_pat_…`,
-  `glpat-…`, `AKIA…`, `AIza…`, `xox?-…`, `sk_live_…`, JWT, PEM soukromý klíč), `excludeApps` (exe, ze kterých
-  se nic neukládá; výchozí `KeePass.exe`, `KeePassXC.exe`, `1Password.exe`, `Bitwarden.exe`),
+  `glpat-…`, `AKIA…`, `AIza…`, `xox?-…`, `sk_live_…`, `npm_…`, JWT, PEM soukromý klíč, Azure DevOps PAT,
+  `AccountKey=`/`SharedAccessKey=`, `Bearer …`, URL s heslem `scheme://uzivatel:heslo@`), `excludeApps` (exe, ze kterých
+  se nic neukládá; výchozí všichni známí správci hesel: `KeePass`, `KeePassXC`, `1Password`, `Bitwarden`, `Enpass`, `Dashlane`,
+  `NordPass`, `RoboForm`, `LastPass`, `Proton Pass`, `Keeper` — vždy `<název>.exe`),
   `clearOnLock` (výchozí `true`: Win+L smaže nepřipnuté), `savePins` (výchozí `true`: připnuté do
   `%LOCALAPPDATA%\Ledge\clip-pins.json` = `{"pins":[{"text":"…","atMs":…}]}`; `false` soubor smaže).
   Jen text (`CF_UNICODETEXT`), jen paměť, nic přes síť. Nikdy se neuloží obsah se značkou

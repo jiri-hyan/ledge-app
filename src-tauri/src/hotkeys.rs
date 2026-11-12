@@ -60,17 +60,32 @@ pub(crate) fn sync_hotkeys() {
             log(&format!("zkratka {k}: odregistrace selhala: {e}"));
         }
     }
+    let replanned = *reg != new;
+    let mut failed = Vec::new();
     for k in regs {
         match parse_shortcut(&k) {
             Some(sc) => {
                 if let Err(e) = gs.register(sc) {
                     log(&format!("zkratka {k}: registrace selhala (obsazená jinou aplikací?): {e}"));
+                    failed.push(k);
                 }
             }
             None => log(&format!("zkratka „{k}“ nejde přečíst")),
         }
     }
+    // beze změny sady se nic nepřeregistrovalo → stav „obsazená“ z minula platí dál
+    if replanned {
+        *TAKEN.lock() = config::taken_actions(&new, &failed);
+    }
     *reg = new;
+}
+
+/// Akce, jejichž zkratku při poslední registraci odmítl systém (obsazená jinou aplikací): UI to ukáže u zkratky
+/// (`commands::config::hotkeys_taken`), jinak by Nastavení hlásilo „uloženo“ a zkratka by mlčky nefungovala.
+static TAKEN: parking_lot::Mutex<Vec<(&'static str, String)>> = parking_lot::Mutex::new(Vec::new());
+
+pub(crate) fn taken() -> Vec<(&'static str, String)> {
+    TAKEN.lock().clone()
 }
 
 /// Je zkratka `k` zaregistrovaná Ledgem (obsazená jinou aplikací → ne)?

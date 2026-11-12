@@ -267,9 +267,42 @@ pub(crate) fn spawn_hover_thread() {
                         }
                     }
                 }
-                let near = p.y < mon.rect.top + 80 * scale / 96 || view != View::Hidden;
+                let near = near_zone(p.x, p.y, (zl, zr), mon.rect.top, scale, view != View::Hidden);
                 std::thread::sleep(Duration::from_millis(if near { 16 } else { 100 }));
             }
         })
         .ok();
+}
+
+/// Rezerva (logické px) kolem zóny proužku, ve které se smyčka drží na 16 ms (kurzor do zóny dorazí
+/// z boku i shora; výška i šířka stejná).
+const NEAR_PX: i32 = 80;
+
+/// Je kurzor „blízko“ proužku (rychlý tik 16 ms)? Pásmo = zóna proužku `(zl, zr)` + rezerva do stran
+/// a `NEAR_PX` pod horní hranou; otevřený šuplík (`open`) drží rychlý tik vždy. Jinde 100 ms.
+fn near_zone(x: i32, y: i32, (zl, zr): (i32, i32), top: i32, scale: i32, open: bool) -> bool {
+    let m = NEAR_PX * scale / 96;
+    open || (y < top + m && x >= zl - m && x <= zr + m)
+}
+
+#[cfg(test)]
+mod near_tests {
+    use super::near_zone;
+
+    #[test]
+    fn near_band_needs_x_and_y() {
+        let z = (900, 1020); // zóna proužku, horní hrana 0, 96 dpi → rezerva 80
+        for (x, y, open, want, what) in [
+            (960, 10, false, true, "nad proužkem"),
+            (830, 10, false, true, "v rezervě vlevo"),
+            (1100, 79, false, true, "v rezervě vpravo"),
+            (100, 10, false, false, "záhlaví okna daleko vlevo"),
+            (1800, 0, false, false, "daleko vpravo"),
+            (960, 80, false, false, "pod pásmem"),
+            (100, 500, true, true, "otevřený šuplík = vždy rychle"),
+        ] {
+            assert_eq!(near_zone(x, y, z, 0, 96, open), want, "{what}");
+        }
+        assert!(near_zone(760, 100, z, 0, 192, false), "192 dpi = rezerva 160");
+    }
 }

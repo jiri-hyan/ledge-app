@@ -87,6 +87,8 @@ export const api = {
   getConfig: () => call<any>("get_config"),
   saveConfig: (cfg: any) => call("save_config", { cfg }),
   openConfigFile: () => call("open_config_file"),
+  /** zkratky, které systém neregistroval (drží je jiná aplikace), s návrhem jiné */
+  hotkeysTaken: () => call<{ action: string; key: string; suggestion: string | null }[]>("hotkeys_taken"),
   configRestoreBackup: () => call("config_restore_backup"),
   configBackupDismiss: () => call("config_backup_dismiss"),
   configBackupReveal: () => call("config_backup_reveal"),

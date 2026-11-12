@@ -62,6 +62,8 @@ pub struct Day {
     pub date: String,
     pub tokens: u64,
     pub cost: Option<f64>,
+    /// tokeny dne bez ceny (cena `cost` je pak jen dolní odhad)
+    pub unpriced: u64,
 }
 
 /// Řádek časové osy: projekt a jeho tokeny po místních hodinách dneška (24 čísel; hodina bez odpovědí = 0).
@@ -175,7 +177,7 @@ pub fn build(ix: &Index, today: i32, window: u32, project_of: &dyn Fn(&str) -> S
     let days = (from..=today)
         .map(|d| {
             let l = per_day.remove(&d).unwrap_or_default();
-            Day { date: date_of(d), tokens: l.tokens, cost: l.cost }
+            Day { date: date_of(d), tokens: l.tokens, cost: l.cost, unpriced: l.unpriced }
         })
         .collect();
     Summary { ranges, days, hours: hour_rows(ix, today, project_of), floor: floor::build(ix, today, project_of) }
@@ -235,6 +237,10 @@ mod tests {
         assert_eq!(s.days.last().unwrap().cost, Some(40.0));
         assert_eq!(s.days[0].tokens, 0, "den bez odpovědí = 0, ne vynechaný");
         assert_eq!(s.days[0].cost, None);
+        assert_eq!(s.days[0].unpriced, 0);
+        assert_eq!(s.days[s.days.len() - 7].unpriced, 5, "den s neznámým modelem nese unpriced");
+        assert_eq!(s.days[s.days.len() - 7].cost, None);
+        assert_eq!(s.days.last().unwrap().unpriced, 0);
         assert_eq!(s.days.last().unwrap().date, date_of(t));
     }
 

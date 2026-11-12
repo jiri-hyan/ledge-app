@@ -6,7 +6,7 @@ import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { ago, num } from "../format";
 import { t } from "../i18n";
-import { bars, compact, floorTrend, pickRange, progressPct, share, usdDigits, type CostLine, type FloorRow } from "./model";
+import { bars, compact, dayUnpriced, floorTrend, isLowerBound, pickRange, progressPct, share, usdDigits, type CostDay, type CostLine, type FloorRow } from "./model";
 import "./costs.css";
 
 const OPEN_KEY = "ledge.costs.open";
@@ -31,6 +31,18 @@ function store(key: string, v: string) {
 export function usd(v: number | null | undefined): string {
   if (v == null) return "—";
   return t("sessions.costs.usd", "{v} $", { v: num(v, usdDigits(v)) });
+}
+
+/** Částka dne: při tokenech bez ceny „≥ X $“ (dolní odhad), nikdy vymyšlená cena. */
+export function usdDay(d: Pick<CostDay, "cost" | "unpriced">): string {
+  return isLowerBound(d) && d.cost != null ? `≥ ${usd(d.cost)}` : usd(d.cost);
+}
+
+/** Tooltip dne / sloupce: datum, částka, tokeny a případně „+ N tok. bez ceny“. */
+export function dayTip(d: CostDay): string {
+  const base = `${d.date}: ${usdDay(d)} · ${tok(d.tokens)}`;
+  const u = dayUnpriced(d);
+  return u > 0 ? `${base} · ${t("sessions.costs.dayUnpriced", "+ {n} tok. bez ceny", { n: tok(u) })}` : base;
 }
 
 /** „3,4 M“ tokenů */
@@ -137,7 +149,7 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
                   <div class="cost-bars" role="img" aria-label={t("sessions.costs.barsLabel", "Útrata po dnech")}>
                     <For each={cv()!.summary!.days}>
                       {(d, i) => (
-                        <span class="cost-col" title={`${d.date}: ${usd(d.cost)} · ${tok(d.tokens)}`}>
+                        <span class="cost-col" title={dayTip(d)}>
                           <span class="cost-bar" classList={{ dim: cv()!.summary!.days.length - i() > r().days }} style={{ height: `${Math.max(heights()[i()] ?? 0, 0) * 100}%` }} />
                         </span>
                       )}

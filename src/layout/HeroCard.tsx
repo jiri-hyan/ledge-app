@@ -21,7 +21,7 @@ export default function HeroCard(p: { id: CardId; facts: HeroFacts; menu?: JSX.E
       </h4>
       <div class="hero-body">
         <Show when={p.facts.empty} fallback={
-          <Stat value={num(p.facts.value, p.facts.digits)} unit={p.facts.unit} label={tx(p.facts.label)} sub={sub()} series={p.facts.series} min={p.facts.min} max={p.facts.max} />
+          <Stat value={(p.facts.lowerBound ? "≥ " : "") + num(p.facts.value, p.facts.digits)} unit={p.facts.unit} label={tx(p.facts.label)} sub={sub()} series={p.facts.series} min={p.facts.min} max={p.facts.max} noTrend={p.facts.noTrend} trendMin={p.facts.trendMin} seriesLabel={p.facts.seriesLabel ? tx(p.facts.seriesLabel.text, p.facts.seriesLabel.vars) : undefined} />
         }>
           {(e) => (
             <div class="hero-empty" role="status">

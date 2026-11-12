@@ -301,7 +301,8 @@ fn look_facts(
     let reminder = reminder.or_else(|| meeting.map(|m| (m.to_string(), 1)));
     use windows::Win32::System::SystemInformation::GetLocalTime;
     let lt = unsafe { GetLocalTime() };
-    let limits = crate::limitslive::view();
+    // `view_for`, ne `view`: config už držíme (druhé `cfg.read()` pod guardem = deadlock s čekajícím zápisem)
+    let limits = crate::limitslive::view_for(cfg);
     // počasí a systém jen z paměti (karta Počasí / plánovač `integrations`), proužek nic nestahuje
     let weather = {
         let w = c.weather.lock();

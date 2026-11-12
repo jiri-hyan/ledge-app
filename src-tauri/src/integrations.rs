@@ -41,6 +41,12 @@ pub fn wants(cfg: &Config) -> Want {
     Want { github: on(StripItem::Github) && cfg.github.enabled && cfg.github.review, system: on(StripItem::System) || by_look }
 }
 
+/// Změnil se config tak, že se má plánovač přepočítat (`sync`) — jen části, které `wants` čte (`strip`,
+/// `github`, `system`). Čistá funkce, aby se to nedalo potichu rozjet s `wants` (kolo 31a).
+pub fn resync_needed(old: &Config, new: &Config) -> bool {
+    old.strip != new.strip || old.github != new.github || old.system != new.system
+}
+
 /// Co plánovač udělá teď a za jak dlouho se má znovu podívat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Plan {
@@ -110,7 +116,10 @@ fn worker() {
         if p.github {
             let _ = github::refresh(&gh, Mode::Auto);
         }
+        // vzorek / odpověď `gh` jde do proužku hned a přímo (jen při změně modelu se překreslí), ne oklikou přes
+        // vlákno `emit` (jeho propustnost a pořadí kroků na čerstvosti čísel v proužku nesmí záviset)
         mark_dirty();
+        crate::stripview::refresh_strip();
     }
 }
 
@@ -160,6 +169,59 @@ mod tests {
         c.strip.look = crate::looks::Look::Minimum;
         c.strip.look_hide.clear();
         assert_eq!(wants(&c), Want::default(), "minimum systém neukazuje");
+    }
+
+    #[test]
+    fn wants_system_for_every_look_that_shows_it() {
+        use crate::looks::compose::{Piece, PieceItem, PieceStyle};
+        use crate::looks::Look;
+        // styl → čeká systém? (Vlastní bez dílu CPU / RAM / GPU nic; Trojice ano)
+        for look in Look::ALL {
+            let mut c = Config::default();
+            c.strip.look = look;
+            assert_eq!(wants(&c).system, look == Look::Trio, "{look:?}");
+        }
+        for item in [PieceItem::Cpu, PieceItem::Memory, PieceItem::Gpu, PieceItem::Time] {
+            let mut c = Config::default();
+            c.strip.look = Look::Custom;
+            c.strip.compose.right = vec![Piece::new(item, PieceStyle::Icon)];
+            let shows = item != PieceItem::Time;
+            assert_eq!(wants(&c).system, shows, "{item:?}");
+            c.strip.enabled = false;
+            assert!(!wants(&c).system, "{item:?}: vypnutý proužek nevzorkuje");
+        }
+    }
+
+    #[test]
+    fn resync_follows_everything_wants_reads() {
+        let base = Config::default();
+        let mut cases: Vec<(&str, Config, bool)> = Vec::new();
+        let mut c = base.clone();
+        c.strip.look = crate::looks::Look::Trio;
+        cases.push(("styl", c, true));
+        let mut c = base.clone();
+        c.strip.look_shape = crate::looks::Shape::Sharp;
+        cases.push(("tvar", c, true));
+        let mut c = base.clone();
+        c.strip.items.push(StripItem::System);
+        cases.push(("položka", c, true));
+        let mut c = base.clone();
+        c.strip.enabled = !c.strip.enabled;
+        cases.push(("zapnutí", c, true));
+        let mut c = base.clone();
+        c.system.net_unit = crate::sysmon::conf::NetUnit::Bits;
+        cases.push(("systém", c, true));
+        cases.push(("beze změny", base.clone(), false));
+        for (name, new, want) in cases {
+            assert_eq!(resync_needed(&base, &new), want, "{name}");
+        }
+    }
+
+    /// Se zavřeným šuplíkem (plán nezná šuplík vůbec) se vzorek spustí, jakmile je splatný.
+    #[test]
+    fn plan_samples_without_drawer() {
+        let p = plan(20_000, None, Some(10_000 + SYSTEM_EVERY_MS));
+        assert!(p.system && p.wait_ms.is_none());
     }
 
     #[test]

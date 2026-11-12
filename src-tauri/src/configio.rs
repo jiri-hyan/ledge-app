@@ -19,9 +19,26 @@ fn backup_path(path: &Path, n: usize) -> std::path::PathBuf {
     s.into()
 }
 
+/// Nejkratší odstup mezi dvěma rotacemi záloh: autosave píše configu často a bez toho by `.1..3` kryly
+/// jen poslední vteřiny. Stáří se bere z času změny `.1` (= okamžik poslední rotace).
+pub const ROTATE_EVERY: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// Čistě: rotovat? `age` = stáří `.1` (`None` = záloha není nebo čas nejde zjistit → rotovat).
+pub fn should_rotate(age: Option<std::time::Duration>, every: std::time::Duration) -> bool {
+    age.is_none_or(|a| a >= every)
+}
+
+/// Rotace s odstupem `ROTATE_EVERY` (běžné uložení). Výslovné kroky (obnova z `.broken`) volají `rotate_backups_now`.
+pub fn rotate_backups(path: &Path) {
+    let age = std::fs::metadata(backup_path(path, 1)).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok());
+    if should_rotate(age, ROTATE_EVERY) {
+        rotate_backups_now(path);
+    }
+}
+
 /// Před zápisem posune zálohy `.1 → .2 → .3` a současný soubor uloží jako `.1` (atomicky přes `fsx`).
 /// Stejný obsah jako `.1` se neduplikuje. Chyba se jen zaloguje — uložení nikdy neblokuje.
-pub fn rotate_backups(path: &Path) {
+pub fn rotate_backups_now(path: &Path) {
     let Ok(cur) = std::fs::read(path) else { return };
     if std::fs::read(backup_path(path, 1)).is_ok_and(|b| b == cur) {
         return;
@@ -192,18 +209,37 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         let p = d.join("config.json");
-        rotate_backups(&p); // chybí soubor = nic
+        rotate_backups_now(&p); // chybí soubor = nic
         assert!(!backup_path(&p, 1).exists());
         for v in ["a", "b", "c", "d", "e"] {
             std::fs::write(&p, v).unwrap();
-            rotate_backups(&p);
+            rotate_backups_now(&p);
         }
         let rd = |n| std::fs::read_to_string(backup_path(&p, n)).unwrap();
         assert_eq!((rd(1), rd(2), rd(3)), ("e".into(), "d".into(), "c".into()));
         assert!(!backup_path(&p, 4).exists());
-        rotate_backups(&p); // beze změny se nedubluje
+        rotate_backups_now(&p); // beze změny se nedubluje
         assert_eq!(rd(2), "d");
+        // běžné uložení: čerstvé `.1` (právě zapsané) rotaci přeskočí, změna obsahu se do záloh nedostane
+        std::fs::write(&p, "f").unwrap();
+        rotate_backups(&p);
+        assert_eq!((rd(1), rd(2)), ("e".into(), "d".into()), "throttle: .1 je čerstvé");
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn should_rotate_table() {
+        use std::time::Duration as D;
+        let e = ROTATE_EVERY;
+        for (age, want, what) in [
+            (None, true, "záloha není / čas neznámý"),
+            (Some(D::from_secs(0)), false, "právě zapsáno"),
+            (Some(e - D::from_secs(1)), false, "těsně před"),
+            (Some(e), true, "přesně interval"),
+            (Some(e * 6), true, "dávno"),
+        ] {
+            assert_eq!(should_rotate(age, e), want, "{what}");
+        }
     }
 
     #[test]

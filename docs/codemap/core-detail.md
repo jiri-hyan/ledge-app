@@ -24,7 +24,7 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
 | `tray.rs` | ikona v oznamovací oblasti (Tauri `tray-icon`, bez vlákna a pollingu): levý klik = otevřít šuplík (`gamemode::handle(Relaunch)`, fokus smí — klik je výslovný), nabídka Otevřít · Nastavení · Ukončit Ledge; ukončení = `app.exit(0)` → `RunEvent::Exit` (`stop_all`, `pins::win::flush`), tutéž cestou jako aktualizace; popisky z `ui.lang`, po změně jazyka `relabel` z `settings::apply_config` | `init`, `relabel`, `action_for`, `texts`, `Action` |
 | `gamemode.rs` | herní režim: „je Ledge mrtvý?“, rozhodnutí podnětů (zkratky, druhé spuštění), stav v `game-mode.json` vedle configu | `is_dead`, `decide`, `Trigger`, `Outcome`, `handle`, `set`, `load`, `save`, `FILE` |
 | `refresh.rs` | obnovy na pozadí + reakce na události (počasí jen s kartou na otevřené záložce, `layout::page_has`) | `maybe_refresh_weather`, `reclassify_links`, `refresh_logos`, `refresh_git_async`, `on_claude_change`, `on_proc_event` |
-| `hotkeys.rs` | globální zkratky | `sync_hotkeys`, `sync_approve_keys`, `on_shortcut` |
+| `hotkeys.rs` | globální zkratky; selhání `register` → `TAKEN` (`config::taken_actions`) → `commands::config::hotkeys_taken` (+ návrh `config::suggest_hotkey`) → `settings/panels/Hotkeys.tsx` | `sync_hotkeys`, `sync_approve_keys`, `on_shortcut`, `taken` |
 | `settings.rs` | config za běhu + vlákno `config-watch`; nový uživatel → `onboarding::fresh_config` | `load_or_seed`, `apply_config`, `watch_config` |
 | `ctl.rs` | most `/status` doplněk a `/ctl/*` (open, close, settings, launch, stop, reload) | `status_extra`, `ctl_handler` |
 | `threads/ui.rs` | vlákno `ui`: sériově `UiCmd` → `Drawer` | `spawn_ui_thread` |
@@ -69,7 +69,7 @@ příkazů `commands::…`). Všechno ostatní je v modulech níže — čti map
   (`limitslive::next_deadline`, [limits.md](limits.md)), časovač (`timer::next_deadline_live` — jen když běží:
   konec odpočtu a změna minuty v proužku, ~60/h navíc; pozastavený / žádný nic). V klidu ~80 probuzení/h.
   `hover` ho budí i po změně fullscreenu (peek připomínky).
-- `hover`: 16 ms u hrany / 100 ms daleko / 500 ms ve fullscreenu; co 3 s `monitor_fresh` + výčet monitorů.
+- `hover`: 16 ms v pásmu `near_zone` (zóna proužku ± 80 px do stran a 80 px pod hranou, otevřený šuplík vždy) / 100 ms jinde (záhlaví oken mimo pásmo) / 500 ms ve fullscreenu; co 3 s `monitor_fresh` + výčet monitorů.
 - `ui`, `notes-watch`, `notes-sync`, `config-watch`, `strip`, `rawpush`, `update`, `media` a `volume` (vzniknou až při prvním zobrazení záložky Osobní; `media` i dřív, je-li v proužku položka `media`, [media.md](media.md)), `shelf-drop` (vznikne až
   při prvním tahu souborů na proužek, [shelf.md](shelf.md)), `cliphist` (jen se zapnutou historií schránky, [clipboard.md](clipboard.md)): blokují na kanálu / událostech. `strip` má časovač (~30 fps) jen během pulsu `attention::PULSE_MS` (1,2 s) a ~240 ms po změně šířky ostrůvku, střídání `ticker` po 5 s jen při víc událostech; v klidu žádný;
   `toast` je jednorázové vlákno na jedno oznámení. `pins-save` (zpožděný zápis stavu lístků na plochu) vznikne s

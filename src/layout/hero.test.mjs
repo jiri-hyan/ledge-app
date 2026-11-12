@@ -4,7 +4,7 @@
 //   node --experimental-strip-types --test src/layout/hero.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { costSeries, heroFacts } from "./hero.ts";
+import { costSeries, heroFacts, tokText } from "./hero.ts";
 import { localDate } from "../board/model.ts";
 
 const NOW = 1_800_000_000_000;
@@ -102,4 +102,30 @@ test("Claude: důvod chybějících limitů z dalších zdrojů má přednost p�
     [{}, "cards.hero.why.waiting"],
   ];
   for (const [extra, key] of cases) assert.equal(why(extra), key, JSON.stringify(extra));
+});
+
+test("L56: limit má pevnou osu 0-100, práh šipky a tooltip; útrata dnes bez šipky s obdobím", () => {
+  const h = heroFacts("claude", { limits: { ...limits(42.7), history5h: [[1, 40], [2, 41]] } }, NOW);
+  assert.deepEqual([h.min, h.max, h.trendMin], [0, 100, 1]);
+  assert.equal(h.seriesLabel.vars.n, 2);
+  assert.equal(h.noTrend, undefined);
+  assert.equal(heroFacts("claude", { limits: limits(42.7) }, NOW).seriesLabel, undefined, "bez řady bez tooltipu");
+  const sp = heroFacts("claude", { limits: limits(10), costs: { summary: { days: days(1, 2, 0.37) } } }, NOW, "spend");
+  assert.equal(sp.noTrend, true, "nedokončený dnešek se nesrovnává se včerejškem");
+  assert.deepEqual(sp.sub.text[0], "cards.hero.spendPeriod");
+  assert.equal(sp.lowerBound, false);
+  assert.ok(sp.seriesLabel);
+});
+
+test("L55: dnešek s tokeny bez ceny = dolní odhad a počet tokenů, nic nevymyšleno", () => {
+  const d = days(1, 0.37);
+  d[1].unpriced = 1500;
+  const sp = heroFacts("claude", { limits: limits(10), costs: { summary: { days: d } } }, NOW, "spend");
+  assert.equal(sp.value, 0.37);
+  assert.equal(sp.lowerBound, true);
+  assert.deepEqual([sp.sub.text[0], sp.sub.vars.n], ["cards.hero.spendUnpriced", "1.5 k"]);
+});
+
+test("tokText: zkrácení", () => {
+  for (const [n, w] of [[0, "0"], [999, "999"], [1500, "1.5 k"], [250_000, "250 k"], [3_400_000, "3.4 M"]]) assert.equal(tokText(n), w);
 });

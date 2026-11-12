@@ -6,7 +6,7 @@ import { createEffect, For, on, Show, type JSX } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { ago } from "../format";
 import { t } from "../i18n";
-import { tok, usd } from "../costs/CostsSection";
+import { dayTip, tok, usd, usdDay } from "../costs/CostsSection";
 import { progressPct } from "../costs/model";
 import { barHeights, heat, hourRows, hourSpan, hoursMax, isToday, lastDays, sumDays, usageState } from "./model";
 import { originText } from "./text";
@@ -37,6 +37,7 @@ export default function UsageCard(p: { s: Snapshot; now: number; menu?: JSX.Elem
     const [a, b] = span();
     return Array.from({ length: b - a + 1 }, (_, i) => a + i);
   };
+  const unpr = (n: number) => (n > 0 ? ` · ${t("sessions.costs.dayUnpriced", "+ {n} tok. bez ceny", { n: tok(n) })}` : "");
   const pct = () => progressPct(cv()?.progress);
   const name = (r: { name: string; other: boolean }) => (r.other ? t("sessions.costs.other", "ostatní") : r.name || t("sessions.costs.noDir", "bez složky"));
   return (
@@ -62,12 +63,12 @@ export default function UsageCard(p: { s: Snapshot; now: number; menu?: JSX.Elem
         }>
           <div class="bd-hero">
             <div class="bd-hero-main">
-              <span class="bd-big" title={t("sessions.costs.tip", "Odhad podle ceníku API — při předplatném ji neplatíš.")}>{fresh() ? usd(today()?.cost) : "—"}</span>
-              <span class="bd-sub">{fresh() ? t("cards.board.usage.todayTok", "dnes · {n} tokenů", { n: tok(today()?.tokens ?? 0) }) : t("cards.board.usage.stale", "dnešek ještě nepočítán")}</span>
+              <span class="bd-big" title={t("sessions.costs.tip", "Odhad podle ceníku API — při předplatném ji neplatíš.")}>{fresh() ? usdDay(today() ?? { cost: null }) : "—"}</span>
+              <span class="bd-sub">{fresh() ? t("cards.board.usage.todayTok", "dnes · {n} tokenů", { n: tok(today()?.tokens ?? 0) }) + unpr(today()?.unpriced ?? 0) : t("cards.board.usage.stale", "dnešek ještě nepočítán")}</span>
             </div>
             <div class="bd-hero-side">
-              <span class="bd-mid">{usd(weekSum().cost)}</span>
-              <span class="bd-sub">{t("cards.board.usage.weekTok", "7 dní · {n}", { n: tok(weekSum().tokens) })}</span>
+              <span class="bd-mid">{weekSum().unpriced > 0 && weekSum().cost != null ? "≥ " : ""}{usd(weekSum().cost)}</span>
+              <span class="bd-sub">{t("cards.board.usage.weekTok", "7 dní · {n}", { n: tok(weekSum().tokens) }) + unpr(weekSum().unpriced)}</span>
             </div>
           </div>
           <div class="bd-bars">
@@ -78,7 +79,7 @@ export default function UsageCard(p: { s: Snapshot; now: number; menu?: JSX.Elem
               fluid
               hi={fresh() ? week().length - 1 : -99}
               label={t("sessions.costs.barsLabel", "Útrata po dnech")}
-              title={(i) => { const d = week()[i]; return d ? `${d.date}: ${usd(d.cost)} · ${tok(d.tokens)}` : ""; }}
+              title={(i) => { const d = week()[i]; return d ? dayTip(d) : ""; }}
             />
           </div>
           <Show when={fresh()}>

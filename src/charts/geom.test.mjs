@@ -103,17 +103,20 @@ test("trend", () => {
   assert.deepEqual(trend([3, 1]), { dir: -1, delta: -2 });
   assert.deepEqual(trend([2, 2, 2]), { dir: 0, delta: 0 });
   assert.deepEqual(trend([1, NaN, 4]), { dir: 1, delta: 3 });
+  assert.deepEqual(trend([40, 40.1], 1), { dir: 0, delta: 40.1 - 40 }, "pod prahem = beze změny");
+  assert.deepEqual(trend([40, 42], 1), { dir: 1, delta: 2 });
+  assert.deepEqual(trend([42, 40], 1), { dir: -1, delta: -2 });
 });
 
 test("komponenty: žádná knihovna, CDN, časovač ani animace; kreslí jen viditelné", () => {
-  for (const f of ["Sparkline.tsx", "Ring.tsx", "Bars.tsx", "Heat.tsx", "Stat.tsx", "visible.ts", "charts.css"]) {
+  for (const f of ["Sparkline.tsx", "Bars.tsx", "Stat.tsx", "visible.ts", "charts.css"]) {
     const src = readFileSync(new URL(`./${f}`, import.meta.url), "utf8");
     assert.doesNotMatch(src, /https?:\/\//, `${f}: žádná síť / CDN`);
     assert.doesNotMatch(src, /setInterval|setTimeout|requestAnimationFrame/, `${f}: žádný časovač`);
     assert.doesNotMatch(src, /@keyframes|animation\s*:|<animate/, `${f}: žádná animace v klidu`);
     assert.doesNotMatch(src, /from "(d3|chart\.js|recharts|echarts)/, `${f}: žádná knihovna grafů`);
   }
-  for (const f of ["Sparkline.tsx", "Ring.tsx", "Bars.tsx", "Heat.tsx"]) {
+  for (const f of ["Sparkline.tsx", "Bars.tsx"]) {
     const src = readFileSync(new URL(`./${f}`, import.meta.url), "utf8");
     assert.match(src, /useVisible/, `${f}: kreslí jen viditelné`);
     assert.match(src, /from "\.\/geom"/, `${f}: geometrie z geom.ts`);

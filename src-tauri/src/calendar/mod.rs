@@ -7,6 +7,7 @@
 //! Zdroje jako abstrakce (`source.rs`: odkaz ICS, klasický Outlook v PC `outlook.rs`, místo pro účty
 //! Microsoft/Google), odkaz „Připojit“ (`meeting.rs`) a připomínka schůzky (`remind.rs`).
 
+pub mod bgfetch;
 pub mod cache;
 pub mod conf;
 pub mod expand;

@@ -20,12 +20,18 @@ export type StatProps = {
   /** pevný rozsah sparklinu (procenta 0–100) */
   min?: number;
   max?: number;
+  /** bez šipky trendu (nedokončené období by lhalo, např. dnešek vs. celý včerejšek) */
+  noTrend?: boolean;
+  /** nejmenší změna posledního bodu, od které šipka ukáže směr (jinak →) */
+  trendMin?: number;
+  /** tooltip a popis sparklinu (co je osa, jaké období, jednotka) */
+  seriesLabel?: string;
   /** velikost: „lg“ (výchozí, 2,6 × tělo) nebo „md“ (2 × tělo) */
   size?: "md" | "lg";
 };
 
 export default function Stat(p: StatProps) {
-  const dir = () => trend(p.series ?? [])?.dir ?? null;
+  const dir = () => p.noTrend ? null : trend(p.series ?? [], p.trendMin ?? 0)?.dir ?? null;
   const arrow = (d: number) => (d > 0 ? "↑" : d < 0 ? "↓" : "→");
   return (
     <div class="chart-stat" data-size={p.size ?? "lg"} classList={{ "chart-stat-empty": p.value === null }}>
@@ -46,8 +52,8 @@ export default function Stat(p: StatProps) {
       </Show>
       <Show when={p.value !== null ? p.series : null}>
         {(s) => (
-          <span class="chart-stat-spark">
-            <Sparkline values={s()} h={28} fluid min={p.min} max={p.max} />
+          <span class="chart-stat-spark" title={p.seriesLabel}>
+            <Sparkline values={s()} h={28} fluid min={p.min} max={p.max} label={p.seriesLabel} />
           </span>
         )}
       </Show>

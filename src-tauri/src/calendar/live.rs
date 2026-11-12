@@ -2,15 +2,17 @@
 //! snapshot a termíny pro emit vlákno.
 //!
 //! Žádný poll: stahuje se jen při otevření šuplíku na Osobní se zapnutou kartou, když jsou data starší
-//! než `MAX_AGE_MS` (po pokusu aspoň `RETRY_MS` pauza). Skrytá karta = nic se nestahuje. Emit vlákno se
+//! než `MAX_AGE_MS` (po pokusu aspoň `RETRY_MS` pauza). Skrytá karta = nic se nestahuje, kromě
+//! kalendářů s připomínkou (`bgfetch.rs`: pozadí ≥ 15 min, jen se živým Ledge). Emit vlákno se
 //! kvůli kalendáři probudí jen při otevřené kartě, a to v čase další změny výběru (`view::pick`
 //! `next_change`: začátek/konec dnešní události, půlnoc). Adresa feedu se nikde neloguje; stav i cache
 //! (`%LOCALAPPDATA%\Ledge\calendar-cache.json`) jsou klíčované otiskem adresy (`conf::key`; jiné zdroje
 //! `source::key`). Načítání podle zdroje: `source::fetch` (ICS zde `fetch_parse`, Outlook v PC jen když
 //! běží — jinak nápověda `HINT_OUTLOOK_CLOSED` a tlačítko „Načíst z Outlooku“ → `load_outlook`).
 //! Připomínky (`remind.rs`) čtou výskyty přes `reminder_feeds` / `with_reminders` a po startu si
-//! vyžádají cache z disku (`ensure_cache`) — nic se kvůli nim nestahuje.
+//! vyžádají cache z disku (`ensure_cache`) ; stahování zavřené karty řeší jen `bgfetch.rs`.
 
+use super::bgfetch;
 use super::conf;
 use super::source::{self, Target};
 use super::tz::SystemLocal;
@@ -29,6 +31,8 @@ use std::time::Duration;
 pub const MAX_AGE_MS: i64 = 15 * 60 * 1000;
 /// Po pokusu (i nepovedeném) aspoň tolik pauza.
 pub const RETRY_MS: i64 = 2 * 60 * 1000;
+/// Nejbližší probuzení kvůli stažení na pozadí (pojistka proti točení emit vlákna).
+pub const BG_MIN_WAKE_MS: i64 = 60_000;
 pub const TIMEOUT: Duration = Duration::from_secs(15);
 /// Větší odpověď se zahodí (chyba) — paměť i čas parsování.
 pub const MAX_BYTES: usize = 5 * 1024 * 1024;
@@ -282,14 +286,26 @@ fn card_visible(cfg: &Config, opening: bool) -> bool {
     crate::notchbar::calendar_visible(cfg, &c.mode.lock()) && (opening || c.drawer.view() == View::Full)
 }
 
-/// Stáhne zastaralé kalendáře, když je karta vidět. Výsledek přes `mark_dirty`. Jinak nic.
+/// Režim stahování z configu a stavu jádra (karta vidět / zapnutá připomínka / mrtvý Ledge), viz `bgfetch::mode`.
+fn fetch_mode(cfg: &Config, opening: bool) -> bgfetch::Mode {
+    bgfetch::mode(card_visible(cfg, opening), !reminder_feeds(cfg).is_empty(), core().dead())
+}
+
+/// Stáhne zastaralé kalendáře, když je karta vidět — nebo (zavřený šuplík, jiná záložka) jen kalendáře se zapnutou
+/// připomínkou, nejvýš 1× za 15 min (L43: nová pozvánka dostane připomínku). Výsledek přes `mark_dirty`. Jinak nic.
 pub(crate) fn maybe_refresh(opening: bool) {
-    let feeds = {
+    let (feeds, mode) = {
         let cfg = core().cfg.read();
-        if !card_visible(&cfg, opening) {
+        let mode = fetch_mode(&cfg, opening);
+        if mode == bgfetch::Mode::Skip {
             return;
         }
-        source::targets(&cfg.personal.calendars)
+        let mut feeds = source::targets(&cfg.personal.calendars);
+        if mode == bgfetch::Mode::Background {
+            let keep: Vec<String> = reminder_feeds(&cfg).into_iter().map(|(_, k, _)| k).collect();
+            feeds.retain(|(k, _)| keep.contains(k));
+        }
+        (feeds, mode)
     };
     if feeds.is_empty() {
         return;
@@ -309,7 +325,7 @@ pub(crate) fn maybe_refresh(opening: bool) {
                 st.error = Some(stuck().into());
                 dirty = true;
             }
-            if needs_fetch(now, st.fetched_ms, st.attempt_ms, st.loading) {
+            if needs_fetch(now, st.fetched_ms, st.attempt_ms, st.loading) && bgfetch::gate(mode, now, st.attempt_ms) {
                 st.attempt_ms = Some(now);
                 if matches!(u, Target::OutlookLocal) && !outlook_up {
                     dirty |= st.hint != Some(HINT_OUTLOOK_CLOSED);
@@ -443,14 +459,31 @@ pub(crate) fn on_config(old: &Config, new: &Config) {
     mark_dirty();
 }
 
-/// Termín pro `next_wake` emit vlákna: jen s viditelnou kartou — další změna výběru, nebo watchdog
-/// běžícího stahování.
+/// Termín pro `next_wake` emit vlákna: s viditelnou kartou další změna výběru, nebo watchdog běžícího
+/// stahování; bez karty jen s připomínkou termín dalšího stažení jejích kalendářů (`bgfetch::due_at`).
 pub(crate) fn next_deadline() -> Option<i64> {
-    {
+    let (mode, remind) = {
         let cfg = core().cfg.read();
-        if !card_visible(&cfg, false) {
-            return None;
+        (fetch_mode(&cfg, false), reminder_feeds(&cfg))
+    };
+    match mode {
+        bgfetch::Mode::Skip => return None,
+        bgfetch::Mode::Background => {
+            let floor = now_ms() + BG_MIN_WAKE_MS;
+            return with(|l| {
+                remind
+                    .iter()
+                    .filter_map(|(_, k, _)| match l.feeds.get(k) {
+                        Some(s) if s.loading => s.attempt_ms.map(|a| a + 2 * TIMEOUT.as_millis() as i64 + 1),
+                        Some(s) => Some(bgfetch::due_at(s.fetched_ms, s.attempt_ms, bgfetch::retry_ms(mode))),
+                        None => Some(0),
+                    })
+                    .min()
+                    // pojistka proti točení: i splatný / chybějící termín nejdřív za minutu (stažení běží z `maybe_refresh`)
+                    .map(|d| d.max(floor))
+            });
         }
+        bgfetch::Mode::Visible => {}
     }
     with(|l| {
         let watchdog = l.feeds.values().filter(|s| s.loading).filter_map(|s| s.attempt_ms).map(|a| a + 2 * TIMEOUT.as_millis() as i64 + 1).min();

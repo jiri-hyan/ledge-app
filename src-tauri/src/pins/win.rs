@@ -40,10 +40,21 @@ static RESTORE_PENDING: AtomicBool = AtomicBool::new(false);
 static OPENING: Mutex<()> = Mutex::new(());
 /// Lístky právě vytvořené „Nový lístek“ — UI hned otevře „+ bod“ (vyzvedne `take_fresh`).
 static FRESH: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// Lístky mimo domov (domovský monitor chybí): label → kam jsme okno dali / kde ho nechaly Windows. Domov v souboru
+/// zůstane (`home.rs`), po návratu monitoru (`on_monitors`) se okno vrátí.
+static DISPLACED: Mutex<Vec<(String, (i32, i32))>> = Mutex::new(Vec::new());
 /// Zpoždění zápisu po posledním pohybu / změně.
 const SAVE_DELAY: Duration = Duration::from_millis(400);
 /// Nejbližší „vynoř se“ schovaného lístku (ms epochy, 0 = žádný) — vlákno `emit` jen čte číslo.
 static NEXT_UNHIDE: AtomicI64 = AtomicI64::new(0);
+
+fn set_displaced(label: &str, pos: Option<(i32, i32)>) {
+    let mut d = DISPLACED.lock();
+    d.retain(|(l, _)| l != label);
+    if let Some(p) = pos {
+        d.push((label.to_string(), p));
+    }
+}
 
 fn store_path() -> PathBuf {
     crate::actionrun::local_dir().join(FILE)
@@ -223,7 +234,10 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
     let pin = with(|s| s.reopen(path, look).clone());
     let index = windows().len();
     let (fb, gap) = fallback();
-    let place = restore(&pin, &monitors(), &fb, gap, index);
+    let mons = monitors();
+    let place = restore(&pin, &mons, &fb, gap, index);
+    // domov na chybějícím monitoru: okno stojí jinde, domov v souboru zůstane (vrátí ho `on_monitors`)
+    let away = pin.x.is_some() && !home::home_on_screen(&pin, &mons, fb.scale);
     // Výchozí logická pozice pro tvorbu (tao ji přepočte podle monitoru); přesně ji hned nastaví
     // `set_position` ve fyzických px. Okno je průhledné a stránka se ještě nenačetla → nic neblikne.
     let w = WebviewWindowBuilder::new(app(), &label, WebviewUrl::App("pin.html".into()))
@@ -247,10 +261,14 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
     let _ = w.set_position(PhysicalPosition::new(place.x, place.y));
     let _ = w.set_size(PhysicalSize::new(place.w, place.h));
     apply(&w, &pin.prefs);
-    with(|s| {
-        let p = s.reopen(path, look);
-        (p.x, p.y) = (Some(place.x), Some(place.y));
-    });
+    if away {
+        set_displaced(&label, Some((place.x, place.y)));
+    } else {
+        with(|s| {
+            let p = s.reopen(path, look);
+            (p.x, p.y) = (Some(place.x), Some(place.y));
+        });
+    }
     watch(&w, &label);
     if focus {
         FRESH.lock().push(label.clone());
@@ -278,14 +296,7 @@ fn apply(w: &WebviewWindow, p: &PinPrefs) {
 fn watch(w: &WebviewWindow, label: &str) {
     let (label, win) = (label.to_string(), w.clone());
     w.on_window_event(move |e| match e {
-        tauri::WindowEvent::Moved(p) => {
-            with(|s| {
-                if let Some(pin) = s.by_label_mut(&label) {
-                    (pin.x, pin.y) = (Some(p.x), Some(p.y));
-                }
-            });
-            persist();
-        }
+        tauri::WindowEvent::Moved(p) => moved(&label, &win, p.x, p.y),
         tauri::WindowEvent::Resized(sz) => {
             let scale = win.scale_factor().unwrap_or(1.0).max(0.1);
             if sz.width == 0 || sz.height == 0 || win.is_minimized().unwrap_or(false) {
@@ -312,10 +323,81 @@ fn watch(w: &WebviewWindow, label: &str) {
     });
 }
 
+/// Okno se posunulo: skutečný přesun = nový domov; minimalizace (Win+D) a poloha mimo monitory se neukládají;
+/// při chybějícím domovském monitoru okno jen stojí jinde (`DISPLACED`) a domov zůstane.
+fn moved(label: &str, win: &WebviewWindow, x: i32, y: i32) {
+    if DISPLACED.lock().iter().any(|(l, p)| l == label && *p == (x, y)) {
+        return;
+    }
+    let minimized = win.is_minimized().unwrap_or(false);
+    let mons = monitors();
+    let verdict = with(|s| s.by_label_mut(label).map(|pin| home::move_verdict(pin, x, y, minimized, &mons, 1.0)));
+    match verdict {
+        Some(home::MoveVerdict::Save) => {
+            set_displaced(label, None);
+            with(|s| {
+                if let Some(pin) = s.by_label_mut(label) {
+                    (pin.x, pin.y) = (Some(x), Some(y));
+                }
+            });
+            persist();
+        }
+        Some(home::MoveVerdict::Away) => set_displaced(label, Some((x, y))),
+        Some(home::MoveVerdict::Ignore) | None => {}
+    }
+}
+
+/// Uživatel tahá lístek za lištu (`pin_drag`): kde ho pustí, tam je nový domov — i když byl mimo domov
+/// (odpojený monitor). Bez toho by tah po odpojení monitoru nikdy nic neuložil.
+pub(crate) fn adopt_here(label: &str, win: &WebviewWindow) {
+    if !DISPLACED.lock().iter().any(|(l, _)| l == label) {
+        return;
+    }
+    let Ok(p) = win.outer_position() else { return };
+    let mons = monitors();
+    let pos_ok = with(|s| s.by_label_mut(label).is_some_and(|pin| home::move_verdict(&Pin { x: None, y: None, ..pin.clone() }, p.x, p.y, false, &mons, 1.0) == home::MoveVerdict::Save));
+    if pos_ok {
+        set_displaced(label, None);
+        with(|s| {
+            if let Some(pin) = s.by_label_mut(label) {
+                (pin.x, pin.y) = (Some(p.x), Some(p.y));
+            }
+        });
+        persist();
+    }
+}
+
+/// Změnila se sestava monitorů (volá `desk::win::on_monitors` z vlákna `hover`): lístky mimo domov, jejichž monitor
+/// je zpět, jdou domů.
+pub(crate) fn on_monitors() {
+    let away: Vec<String> = DISPLACED.lock().iter().map(|(l, _)| l.clone()).collect();
+    if away.is_empty() {
+        return;
+    }
+    let mons = monitors();
+    let (fb, gap) = fallback();
+    for (i, label) in away.into_iter().enumerate() {
+        let Some(pin) = with(|s| s.by_label_mut(&label).map(|p| p.clone())) else {
+            set_displaced(&label, None);
+            continue;
+        };
+        if !home::home_on_screen(&pin, &mons, fb.scale) {
+            continue;
+        }
+        let place = restore(&pin, &mons, &fb, gap, i);
+        set_displaced(&label, None);
+        if let Some(w) = app().get_webview_window(&label) {
+            let _ = w.set_position(PhysicalPosition::new(place.x, place.y));
+            let _ = w.set_size(PhysicalSize::new(place.w, place.h));
+        }
+    }
+}
+
 /// Odepne lístek (poznámka zůstane, poloha a vzhled se pamatují) a zavře jeho okno.
 pub(crate) fn close(path: &str) {
     let label = label_for(path);
     with(|s| s.close(path, crate::state::now_ms()));
+    set_displaced(&label, None);
     persist();
     if let Some(w) = app().get_webview_window(&label) {
         let _ = w.destroy();

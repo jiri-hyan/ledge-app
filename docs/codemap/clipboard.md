@@ -10,7 +10,7 @@ zapnutí i přímo z palety). Cituj symbolem, ne číslem řádku.
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
 | `src-tauri/src/cliphist/mod.rs` | config, validace, čistá historie (dedup, strop, připnuté, náhled), soubor připnutých, stav za běhu, operace pro příkazy | `ClipboardConfig` `validate` `History` (`push` `trim` `pin` `remove` `clear_unpinned` `view` `from_pins`) `Entry` `EntryView` `Pin` `preview` `load_pins` `save_pins_to` `sync` `on_text` `on_lock` `list` `paste` `pin` `remove` `clear` `MAX_PINS` `MAX_TOTAL_BYTES` |
-| `src-tauri/src/cliphist/filter.rs` | čistá rozhodnutí „neukládat“: značky formátů, zdrojová aplikace, prázdné / bílé / > 64 KB, tvary tokenů, vlastní zápis | `Fmt` `Skip` `formats_verdict` `pre_verdict` `text_verdict` `looks_secret` `app_excluded` `exe_key` `utf16_text` `Own` `is_own` `MAX_TEXT_BYTES` `DWORD_FORMATS` |
+| `src-tauri/src/cliphist/filter.rs` | čistá rozhodnutí „neukládat“: značky formátů, zdrojová aplikace, prázdné / bílé / > 64 KB, tvary tokenů, vlastní zápis | `Fmt` `Skip` `formats_verdict` `pre_verdict` `text_verdict` `looks_secret` `azure_pat` `bearer` `app_excluded` `exe_key` `utf16_text` `Own` `is_own` `MAX_TEXT_BYTES` `DWORD_FORMATS` |
 | `src-tauri/src/cliphist/win.rs` | tenká WinAPI: vlákno `cliphist`, okno `HWND_MESSAGE`, `AddClipboardFormatListener`, `WTSRegisterSessionNotification`; čtení formátů, DWORD, textu, vlastníka | `start` `stop` `seq` `run` `wndproc` `on_update` `formats` `read_text` `owner_exe` |
 | `src-tauri/src/cliphist/apps.rs` | „Přidat běžící program“ (jen na klik): okna (EnumWindows) + správci hesel v oznamovací oblasti (Toolhelp); čisté názvy | `KNOWN` `known_label` `choice` `app_list` `running` `AppChoice` |
 | `src-tauri/src/cliphist/tests.rs` | historie, náhled, připnuté v tempdiru, config, validace | |
@@ -47,7 +47,7 @@ Lepidlo: `config/*` (`Config.clipboard` + `cliphist::validate`), `settings.rs` (
 - **Co se nikdy neuloží** (`filter.rs`): formát `ExcludeClipboardContentFromMonitorProcessing` nebo
   `Clipboard Viewer Ignore` (přítomnost), `CanIncludeInClipboardHistory` / `CanUploadToCloudClipboard` = 0
   (nečitelná hodnota = 0), vlastník schránky v `excludeApps`, ne-text, prázdné, bílé znaky, > 64 KB (celý
-  text pryč, nic se neořezává), se `skipSecrets` tvary tokenů. Text se čte AŽ po formátech a aplikaci.
+  text pryč, nic se neořezává), se `skipSecrets` tvary tokenů (i `npm_…`, Azure DevOps PAT `azure_pat`, `AccountKey=`, `Bearer …` `bearer`, URL s heslem). Výchozí `excludeApps` = všichni z `apps::KNOWN`. Text se čte AŽ po formátech a aplikaci.
 - `CanUploadToCloudClipboard = 0` bereme přísněji (i lokální historie) — vědomé rozhodnutí soukromí.
 - Vlastní zápis (`paste`): `Own.seq` = pořadové číslo schránky po zápisu; než ho známe, rozhoduje shoda
   textu. Vložená položka zůstává na svém místě (nový záznam nevznikne).

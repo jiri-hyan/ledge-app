@@ -5,7 +5,7 @@
 // Kolo 25: karta Claude ukáže VŽDY to, co si šéf zvolil (limit 5 h / týden / útrata); chybí-li zdroj, vrátí prázdný
 // stav `empty` (nadpis + proč) — dřív tiše spadla na útratu a nešlo poznat, že limity chybí.
 import { left, pctText, winState, type LimitWindow } from "../limits/model.ts";
-import { usdDigits, type CostDay } from "../costs/model.ts";
+import { compact, dayUnpriced, usdDigits, type CostDay } from "../costs/model.ts";
 import { isToday } from "../board/model.ts";
 import { tempIn, tempUnit } from "../cards/temp.ts";
 
@@ -24,7 +24,20 @@ export type HeroFacts = {
   empty?: { title: Text; why: Text };
   min?: number;
   max?: number;
+  /** částka je dolní odhad (část tokenů bez ceny) → UI předsadí „≥“ */
+  lowerBound?: boolean;
+  /** bez šipky trendu (období není dokončené, srovnání by nebylo férové) */
+  noTrend?: boolean;
+  /** šipka až od této změny posledního bodu (v jednotkách řady) */
+  trendMin?: number;
+  /** tooltip sparklinu: co je osa, období, jednotka */
+  seriesLabel?: { text: Text; vars?: Record<string, string | number> };
 };
+
+/** Limit je v procentech 0–100: pevná osa sparklinu, ať 40→41 % nevypadá jako strmý růst. */
+export const LIMIT_AXIS = { min: 0, max: 100 } as const;
+/** Šipka u limitu až od změny ≥ 1 procentní bod (menší je šum zaokrouhlení). */
+export const LIMIT_TREND_MIN = 1;
 
 /** Výřez snapshotu, který hrdina čte (snadno se sestaví v testu). */
 export type HeroInput = {
@@ -40,6 +53,12 @@ export function costSeries(days: readonly CostDay[] | undefined, n = 14): number
   const d = (days ?? []).slice(-n);
   const priced = d.some((x) => x.cost != null && x.cost > 0);
   return d.map((x) => (priced ? x.cost ?? 0 : x.tokens));
+}
+
+/** Počet tokenů zkráceně („1.5 k“) bez závislosti na UI (jen pro druhý řádek hrdiny). */
+export function tokText(n: number): string {
+  const c = compact(n);
+  return `${c.digits ? c.v.toFixed(c.digits) : Math.round(c.v)}${c.unit ? ` ${c.unit}` : ""}`;
 }
 
 /** Co je hrdina karty Claude: limit 5 h (výchozí), týdenní limit, útrata dnes. */
@@ -87,7 +106,11 @@ function limitFacts(s: HeroInput, now: number, w: LimW, label: Text, series: num
         : rest
           ? { text: ["cards.hero.reset", "reset za {h} h {m} min"] as Text, vars: { h: rest.d * 24 + rest.h, m: rest.m } }
           : undefined;
-    return { value: Number(pctText(st.pct)), digits: 0, unit: "%", label, sub, series: series.length >= 2 ? series : undefined };
+    const spark = series.length >= 2;
+    return {
+      value: Number(pctText(st.pct)), digits: 0, unit: "%", label, sub, series: spark ? series : undefined,
+      ...(spark ? { ...LIMIT_AXIS, trendMin: LIMIT_TREND_MIN, seriesLabel: { text: ["cards.hero.seriesLimit", "Poslední vzorky limitu ({n}), osa 0–100 %; šipka = poslední vs. předchozí vzorek (od 1 p. b.)"] as Text, vars: { n: series.length } } } : {}),
+    };
   }
   const title: Text = ["cards.hero.noLimits", "Limity zatím nejsou"];
   if (st.kind === "reset") return emptyFacts(label, title, ["cards.hero.why.reset", "Okno se obnovilo; nové číslo přijde s další odpovědí Clauda."]);
@@ -99,7 +122,18 @@ function spendFacts(s: HeroInput, now: number, series: number[]): HeroFacts {
   // „dnes“ jen když poslední den přehledu je dnešní místní datum (jinak by starý přehled lhal o dnešku)
   const days = s.costs?.summary?.days;
   const today = isToday(s.costs, now) ? days?.[days.length - 1] : undefined;
-  if (today?.cost != null) return { value: today.cost, digits: usdDigits(today.cost), unit: "$", label, series: series.length >= 2 ? series : undefined };
+  if (today?.cost != null) {
+    const u = dayUnpriced(today);
+    const sub: HeroFacts["sub"] = u > 0
+      ? { text: ["cards.hero.spendUnpriced", "dnes od 0:00 do teď · dolní odhad, + {n} tok. bez ceny"] as Text, vars: { n: tokText(u) } }
+      : { text: ["cards.hero.spendPeriod", "dnes od 0:00 do teď"] as Text };
+    // šipka ne: dnešek není dokončený, srovnání s celým včerejškem by ráno vždy ukázalo pokles
+    return {
+      value: today.cost, digits: usdDigits(today.cost), unit: "$", label, sub, lowerBound: u > 0, noTrend: true,
+      series: series.length >= 2 ? series : undefined,
+      seriesLabel: series.length >= 2 ? { text: ["cards.hero.seriesSpend", "Útrata po dnech, posledních {n} dní; poslední sloupec = dnešek do teď (nedokončený)"] as Text, vars: { n: series.length } } : undefined,
+    };
+  }
   return emptyFacts(label, ["cards.hero.noSpend", "Útrata dnes zatím není"], ["cards.hero.why.spend", "Přehled útraty ještě nemá dnešek s cenou — zapni a nech dopočítat v Nastavení → Claude → Útrata."]);
 }
 

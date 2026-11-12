@@ -24,7 +24,10 @@ export interface CostDay {
   /** YYYY-MM-DD, místní den */
   date: string;
   tokens: number;
+  /** null = žádný token dne nemá cenu; jinak součet jen NACENĚNÝCH tokenů (při `unpriced` > 0 dolní odhad) */
   cost: number | null;
+  /** tokeny dne bez ceny v ceníku (starý snapshot bez pole = 0) */
+  unpriced?: number;
 }
 /** Řádek časové osy (Rust `usage::view::HourRow`): projekt a tokeny po místních hodinách dneška (24 čísel). */
 export interface CostHourRow {
@@ -82,6 +85,15 @@ export function bars(days: CostDay[]): number[] {
   const max = Math.max(0, ...days.map(val));
   return days.map((d) => (max > 0 ? val(d) / max : 0));
 }
+
+/** Tokeny dne bez ceny (chybějící pole = 0). */
+export const dayUnpriced = (d: { unpriced?: number }) => Math.max(0, d.unpriced ?? 0);
+
+/** Součet nenaceněných tokenů přes dny. */
+export const sumUnpriced = (days: readonly { unpriced?: number }[]) => days.reduce((a, d) => a + dayUnpriced(d), 0);
+
+/** Je cena dne jen dolní odhad? (aspoň jeden token bez ceny → částka „≥“, nikdy ne vymyšlená cena). */
+export const isLowerBound = (d: { unpriced?: number }) => dayUnpriced(d) > 0;
 
 /** Podíl řádku na celku 0–1 (podle ceny, když ji mají oba; jinak podle tokenů). */
 export function share(line: CostLine, total: CostLine): number {

@@ -32,6 +32,24 @@ pub(crate) fn save_config_inner(mut cfg: Config) -> Result<(), String> {
     Ok(())
 }
 
+/// Zkratka, kterou systém neregistroval (drží ji jiná aplikace), s návrhem jiné; UI ji ukáže u pole zkratky.
+#[derive(serde::Serialize)]
+pub(crate) struct HotkeyTaken {
+    action: &'static str,
+    key: String,
+    suggestion: Option<String>,
+}
+
+/// Obsazené zkratky po poslední registraci (prázdné = všechny zaregistrované nebo vypnuté).
+#[tauri::command]
+pub(crate) fn hotkeys_taken() -> Vec<HotkeyTaken> {
+    let taken = crate::hotkeys::taken();
+    let h = core().cfg.read().hotkeys.clone();
+    let mut avoid: Vec<String> = vec![h.toggle, h.note, h.approve, h.deny, h.game_mode, h.note_passthrough, h.note_pin];
+    avoid.extend(taken.iter().map(|(_, k)| k.clone()));
+    taken.into_iter().map(|(action, key)| HotkeyTaken { suggestion: config::suggest_hotkey(&key, &avoid), action, key }).collect()
+}
+
 #[tauri::command]
 pub(crate) fn open_config_file() -> Result<(), String> {
     let path = config::config_path();

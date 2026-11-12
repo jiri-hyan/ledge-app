@@ -39,8 +39,9 @@ pub const PINS_FILE: &str = "clip-pins.json";
 
 // ---------- config ----------
 
+/// Výchozí vyloučené aplikace = všichni známí správci hesel (`apps::KNOWN`, jeden seznam pro config i výběr v UI).
 fn default_apps() -> Vec<String> {
-    ["KeePass.exe", "KeePassXC.exe", "1Password.exe", "Bitwarden.exe"].map(String::from).to_vec()
+    apps::KNOWN.iter().map(|(_, label)| format!("{label}.exe")).collect()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]

@@ -186,12 +186,55 @@ pub fn serialize(items: &[Item]) -> String {
 struct Store {
     file: PathBuf,
     items: Vec<Item>,
+    /// `false` = soubor šel jen přečíst s chybou / byl rozbitý: úklid `shelf-drops` v tomto běhu nic nemaže
+    /// (prázdný seznam by jinak smazal soubory, na které přihrádka ukazovala).
+    sweep_ok: bool,
+    /// `false` = seznam se nepodařilo načíst (chyba čtení): nic se neukládá a příští `with` zkusí načíst znovu
+    /// (jinak by první změna přepsala `shelf.json` jen novými položkami).
+    ready: bool,
+}
+
+/// Výsledek čtení `shelf.json`: chybějící soubor je prázdná přihrádka, nečitelný / rozbitý ne.
+#[derive(Debug, PartialEq)]
+enum Loaded {
+    Items(Vec<Item>),
+    /// platný soubor to není, ale jde ho odklidit (přejmenovat) → ukládat smí
+    Broken,
+    /// chyba čtení jiná než NotFound (zámek antivirem…): neukládat, zkusit znovu
+    Unreadable,
+}
+
+/// Smí se po tomto načtení ukládat? (Ne, dokud se existující soubor nepodařilo přečíst.)
+fn may_save(l: &Loaded) -> bool {
+    !matches!(l, Loaded::Unreadable)
+}
+
+/// Čistě: výsledek `read_to_string` → `Loaded`. Chybějící soubor = prázdno; jiná chyba čtení nebo
+/// nevalidní JSON = `Broken`, chyba čtení = `Unreadable` (ruční úpravy typu chybějící pole parse snese).
+fn classify(read: std::io::Result<String>) -> Loaded {
+    match read {
+        Ok(s) if serde_json::from_str::<Stored>(&s).is_ok() => Loaded::Items(parse(&s)),
+        Ok(_) => Loaded::Broken,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Loaded::Items(Vec::new()),
+        Err(_) => Loaded::Unreadable,
+    }
 }
 
 static STORE: Mutex<Option<Store>> = Mutex::new(None);
 
-fn load_from(file: &Path) -> Vec<Item> {
-    std::fs::read_to_string(file).map(|s| parse(&s)).unwrap_or_default()
+fn load_from(file: &Path) -> Loaded {
+    let r = std::fs::read_to_string(file);
+    let l = classify(r);
+    if l == Loaded::Broken {
+        // rozbitý JSON: kopie vedle (podle vzoru configu), ať ho další uložení nepřepíše
+        let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| FILE.into());
+        let bak = file.with_file_name(format!("{name}.broken-{secs}"));
+        if std::fs::rename(file, &bak).is_err() {
+            return Loaded::Unreadable; // rozbitý soubor nejde odklidit → ukládáním bychom ho ztratili
+        }
+    }
+    l
 }
 
 fn save_to(file: &Path, items: &[Item]) -> Result<(), String> {
@@ -201,12 +244,23 @@ fn save_to(file: &Path, items: &[Item]) -> Result<(), String> {
 /// Práce se seznamem (načte se líně při prvním použití). `f` vrací `true` = změna → uložit + událost.
 fn with<R>(f: impl FnOnce(&mut Vec<Item>) -> (R, bool)) -> Result<R, String> {
     let mut g = STORE.lock();
-    let first = g.is_none();
-    let s = g.get_or_insert_with(|| {
+    let first = g.as_ref().is_none_or(|s| !s.ready);
+    if first {
         let file = crate::config::config_dir().join(FILE);
-        let items = load_from(&file);
-        Store { file, items }
-    });
+        let l = load_from(&file);
+        let ready = may_save(&l);
+        if !matches!(l, Loaded::Items(_)) {
+            crate::log(&format!("shelf: {} je rozbitý nebo nejde přečíst (rozbitý → .broken-*) — úklid shelf-drops vypnut", file.display()));
+        }
+        *g = Some(match l {
+            Loaded::Items(items) => Store { file, items, sweep_ok: true, ready },
+            _ => Store { file, items: Vec::new(), sweep_ok: false, ready },
+        });
+    }
+    let Some(s) = g.as_mut() else { return Err(String::new()) };
+    if !s.ready {
+        return Err(tr("Přihrádku teď nejde načíst, zkus to za chvíli", "The shelf can't be loaded right now, try again in a moment").into());
+    }
     let (r, changed) = f(&mut s.items);
     if changed {
         save_to(&s.file, &s.items)?;
@@ -214,8 +268,11 @@ fn with<R>(f: impl FnOnce(&mut Vec<Item>) -> (R, bool)) -> Result<R, String> {
     if changed || first {
         // vlastní soubory ze schránky, na které už nic neodkazuje (odebrání, Vyprázdnit, zbytky z minula)
         let refs: Vec<String> = s.items.iter().map(|i| i.path.clone()).collect();
+        let sweep_ok = s.sweep_ok;
         drop(g);
-        drops::sweep(&refs);
+        if sweep_ok {
+            drops::sweep(&refs);
+        }
     } else {
         drop(g);
     }
@@ -467,11 +524,41 @@ mod tests {
     fn store_in_tempdir() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("sub").join(FILE);
-        assert!(load_from(&file).is_empty(), "chybějící soubor = prázdná přihrádka");
+        assert_eq!(load_from(&file), Loaded::Items(vec![]), "chybějící soubor = prázdná přihrádka");
         let v = items(&[r"C:\a", r"C:\b"]);
         save_to(&file, &v).unwrap();
-        assert_eq!(load_from(&file), v);
+        assert_eq!(load_from(&file), Loaded::Items(v));
         assert!(!file.with_extension("json.tmp").exists());
+    }
+
+    #[test]
+    fn classify_table() {
+        use std::io::{Error, ErrorKind};
+        let denied = || Err(Error::from(ErrorKind::PermissionDenied));
+        // (čtení, výsledek je Broken, smí se ukládat)
+        for (read, broken, save, what) in [
+            (Err(Error::from(ErrorKind::NotFound)), false, true, "chybí = prázdno, sweep i uložení smí"),
+            (denied(), false, false, "chyba čtení = nemazat, NEUKLÁDAT"),
+            (Ok("nesmysl".to_string()), true, true, "rozbitý JSON = odklidit, pak smí uložit"),
+            (Ok(String::new()), true, true, "prázdný soubor (useknutý zápis)"),
+            (Ok("{}".to_string()), false, true, "platný prázdný objekt"),
+            (Ok(r#"{"items":[{"path":"C:/a"}]}"#.to_string()), false, true, "platný seznam"),
+        ] {
+            let l = classify(read);
+            assert_eq!(l == Loaded::Broken, broken, "{what}");
+            assert_eq!(may_save(&l), save, "{what}");
+        }
+    }
+
+    #[test]
+    fn broken_file_is_renamed_and_blocks_sweep() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(FILE);
+        std::fs::write(&file, "{ rozbité").unwrap();
+        assert_eq!(load_from(&file), Loaded::Broken);
+        assert!(!file.exists(), "rozbitý soubor přejmenován");
+        let n = std::fs::read_dir(dir.path()).unwrap().filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().contains(".broken-")).count();
+        assert_eq!(n, 1);
     }
 
     #[test]

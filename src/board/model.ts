@@ -24,9 +24,9 @@ export function lastDays(days: CostDay[] | undefined, n: number): CostDay[] {
 }
 
 /** Součet dní: tokeny vždy, cena jen když ji aspoň jeden den má (jinak null = „—“, ne 0 $). */
-export function sumDays(days: CostDay[]): { tokens: number; cost: number | null } {
+export function sumDays(days: CostDay[]): { tokens: number; cost: number | null; unpriced: number } {
   const priced = days.filter((d) => d.cost != null);
-  return { tokens: days.reduce((a, d) => a + d.tokens, 0), cost: priced.length ? priced.reduce((a, d) => a + (d.cost ?? 0), 0) : null };
+  return { tokens: days.reduce((a, d) => a + d.tokens, 0), cost: priced.length ? priced.reduce((a, d) => a + (d.cost ?? 0), 0) : null, unpriced: days.reduce((a, d) => a + Math.max(0, d.unpriced ?? 0), 0) };
 }
 
 /** Je přehled ze dneška? (poslední den sloupců = dnešní místní datum). Starý = časová osa patří jinému dni. */

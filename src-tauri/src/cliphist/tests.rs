@@ -145,7 +145,13 @@ fn config_defaults_off_and_roundtrip() {
     let cfg: crate::config::Config = serde_json::from_str(r#"{"clipboard":{"enabled":true}}"#).unwrap();
     assert!(cfg.clipboard.enabled);
     assert_eq!(cfg.clipboard.max, DEFAULT_MAX, "chybějící pole = výchozí");
-    assert_eq!(cfg.clipboard.exclude_apps.len(), 4);
+    assert_eq!(cfg.clipboard.exclude_apps.len(), apps::KNOWN.len(), "výchozí = všichni známí správci hesel");
+    for (key, _) in apps::KNOWN {
+        assert!(filter::app_excluded(Some(&format!("{key}.exe")), &cfg.clipboard.exclude_apps), "{key}");
+    }
+    // starý config s uloženým výchozím seznamem (4 správci) se nemění
+    let old: crate::config::Config = serde_json::from_str(r#"{"clipboard":{"excludeApps":["KeePass.exe"]}}"#).unwrap();
+    assert_eq!(old.clipboard.exclude_apps, vec!["KeePass.exe".to_string()]);
     let back = serde_json::to_string(&cfg.clipboard).unwrap();
     for k in ["\"enabled\":true", "\"max\":25", "\"skipSecrets\":true", "\"excludeApps\"", "\"clearOnLock\":true", "\"savePins\":true"] {
         assert!(back.contains(k), "{back}");

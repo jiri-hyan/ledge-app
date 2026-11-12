@@ -1,9 +1,10 @@
 // Sekce „Klávesové zkratky“ (stránka Otevírání a klávesy; dřív samostatný panel Zkratky): globální zkratky zapnout/vypnout
 // a editor „stiskni kombinaci“ pro každou akci, kolize hned u pole (`model.hotkeyCollisions`, stejné
 // pravidlo jako Rust `hotkey_collision`).
-import { For, Show } from "solid-js";
+import { createResource, For, Show } from "solid-js";
+import { api, inTauri } from "../../api";
 import { t } from "../../i18n";
-import { useSettings } from "../ctx";
+import { base, useSettings } from "../ctx";
 import { Toggle } from "../fields/controls";
 import { HotkeyInput } from "../fields/Hotkey";
 import { Row, Section } from "../fields/Row";
@@ -14,6 +15,28 @@ const ACTIONS: HotkeyAction[] = ["toggle", "note", "approve", "deny", "gameMode"
 
 export function HotkeysSection() {
   const c = useSettings();
+  // po každém uložení (nový `base`) znovu: registraci zkratky může odmítnout systém, protože ji drží jiná aplikace
+  const [taken] = createResource(base, () => (inTauri ? api.hotkeysTaken().catch(() => []) : Promise.resolve([])));
+  const takenOf = (a: string) => taken()?.find((x) => x.action === a && h()[a as HotkeyAction] === x.key);
+  const TakenNote = (p: { a: string }) => (
+    <Show when={takenOf(p.a)}>
+      {(x) => (
+        <span class="st-hotkey-conflict" role="alert">
+          {t("settings.hotkeys.taken", "Obsazená jinou aplikací — nefunguje.")}
+          <Show when={x().suggestion}>
+            {(sg) => (
+              <>
+                {" "}
+                <button class="st-link" onClick={() => c.set(`hotkeys.${p.a}`, sg())}>
+                  {t("settings.hotkeys.takenUse", "Zkusit {k}", { k: sg() })}
+                </button>
+              </>
+            )}
+          </Show>
+        </span>
+      )}
+    </Show>
+  );
   const h = () => c.cfg.hotkeys;
   const clash = () => hotkeyCollisions(h(), !!c.cfg.notes?.enabled);
   const conflict = (a: HotkeyAction) => {
@@ -33,6 +56,7 @@ export function HotkeysSection() {
           {(a) => (
             <Row id={`hotkeys.${a}`} dim={a === "note" && !c.cfg.notes?.enabled} hint={a === "note" && !c.cfg.notes?.enabled ? t("settings.hotkeys.noteOff", "Poznámky jsou vypnuté — tahle zkratka se neregistruje") : undefined}>
               <HotkeyInput value={h()[a] ?? ""} onChange={(v) => c.set(`hotkeys.${a}`, v)} label={fieldLabel(`hotkeys.${a}`)} conflict={conflict(a)} />
+              <TakenNote a={a} />
             </Row>
           )}
         </For>
@@ -40,10 +64,12 @@ export function HotkeysSection() {
       {/* lístky na plochu: registruje se jen s lístkem na ploše, i s vypnutými zkratkami (cesta z průchozího režimu) */}
       <Row id="hotkeys.notePassthrough" dim={!c.cfg.notes?.enabled} hint={!c.cfg.notes?.enabled ? t("settings.hotkeys.noteOff", "Poznámky jsou vypnuté — tahle zkratka se neregistruje") : undefined}>
         <HotkeyInput value={h().notePassthrough ?? ""} onChange={(v) => c.set("hotkeys.notePassthrough", v)} label={fieldLabel("hotkeys.notePassthrough")} conflict={h().enabled ? conflict("notePassthrough") : null} />
+        <TakenNote a="notePassthrough" />
       </Row>
       {/* rychlý nový lístek: výchozí bez zkratky, platí i s vypnutými zkratkami, ve hře nic */}
       <Row id="hotkeys.notePin" dim={!c.cfg.notes?.enabled} hint={!c.cfg.notes?.enabled ? t("settings.hotkeys.noteOff", "Poznámky jsou vypnuté — tahle zkratka se neregistruje") : undefined}>
         <HotkeyInput value={h().notePin ?? ""} onChange={(v) => c.set("hotkeys.notePin", v)} label={fieldLabel("hotkeys.notePin")} conflict={h().enabled ? conflict("notePin") : null} />
+        <TakenNote a="notePin" />
       </Row>
     </Section>
   );

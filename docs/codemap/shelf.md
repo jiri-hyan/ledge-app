@@ -9,7 +9,7 @@ zmínka pro Claude Code), otevřít, ukázat ve složce, odebrat, vyprázdnit, p
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `src-tauri/src/shelf/mod.rs` | čistá logika + úložiště `%APPDATA%\Ledge\shelf.json` (líně při prvním použití, zápis přes `.tmp` + rename), config, překryv proužku, stav „tah nad proužkem“, testy | `ShelfConfig` `Item` `add` `remove` `normalize` `same` `claude_ref` `clip_text` `Format` `split` `parse` `serialize` `add_paths` `remove_path` `clear` `contains` `items` `Hint` `overlay` `zone` `Arm` `MAX_ITEMS` `ZONE_MIN_H` `DONE_MS` |
+| `src-tauri/src/shelf/mod.rs` | čistá logika + úložiště `%APPDATA%\Ledge\shelf.json` (líně při prvním použití (`classify`); zápis přes `.tmp` + rename), config, překryv proužku, stav „tah nad proužkem“, testy | `ShelfConfig` `Item` `add` `remove` `normalize` `same` `claude_ref` `clip_text` `Format` `split` `parse` `serialize` `add_paths` `remove_path` `clear` `contains` `items` `Hint` `overlay` `zone` `Arm` `MAX_ITEMS` `ZONE_MIN_H` `DONE_MS` |
 | `src-tauri/src/shelf/drop.rs` | cíl přetažení: líně vzniklé vlákno `shelf-drop` (OLE STA), neviditelné vrstvené okno (krytí 1/255) s `IDropTarget` (+ `IDropTargetHelper` pro náhled tahu), jen `CF_HDROP`; heuristika „je to OLE tah“ | `set_armed` `ole_drag_likely` `pick_effect` `Target` `run` `OVER` |
 | `src-tauri/src/shelf/dragout.rs` | tah ven: na hlavním vlákně `SHCreateDataObject` (absolutní PIDL) + `SHDoDragDrop` s výchozím zdrojem shellu | `start` `drag` |
 | `src-tauri/src/shelf/clip.rs` | text do schránky (`CF_UNICODETEXT`, opakované `OpenClipboard`) | `set_text` |

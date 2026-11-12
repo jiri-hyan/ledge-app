@@ -370,6 +370,7 @@ pub fn run() {
             commands::config::get_config,
             commands::config::save_config,
             commands::config::open_config_file,
+            commands::config::hotkeys_taken,
             commands::config::config_restore_backup,
             commands::config::config_backup_dismiss,
             commands::config::config_backup_reveal,

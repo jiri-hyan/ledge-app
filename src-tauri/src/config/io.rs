@@ -164,7 +164,7 @@ pub fn restore_backup(path: &Path, backup: &Path) -> Result<Partial, String> {
         .map_err(|e| crate::errors::json(tr("Kopie configu", "Config copy"), &e))?;
     let part = lenient_from_value(&raw)?;
     let _guard = RESTORE.lock();
-    crate::configio::rotate_backups(path);
+    crate::configio::rotate_backups_now(path);
     crate::fsx::write_atomic(path, &bytes).map_err(|e| crate::errors::io(&trf!("{} nejde zapsat", "Can't write {}", path.display()), &e))?;
     Ok(part)
 }
