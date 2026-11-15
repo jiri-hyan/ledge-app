@@ -2,60 +2,14 @@
 // Pruhy jako htop. Volby: barva (akcent / podle zátěže / přechod / hex), tloušťka a vyhlazení čáry, metriky
 // CPU / RAM / Disk / Síť. Data jen z `intApi.systemView` vzorkovaného po 2 s JEN s otevřeným šuplíkem (zavřený =
 // žádný časovač); graf až od dvou skutečných vzorků, bez dat prázdný stav. Tooltip (title) nese hodnotu.
-import { For, Match, Show, Switch, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
+import { For, Match, Show, Switch, createUniqueId } from "solid-js";
 import { t } from "../i18n";
-import { drawerShown } from "../media/shown";
-import { intApi, type SystemView } from "../integrations/api";
-import { fmtPct, fmtRate, loadOf } from "../integrations/format";
+import { useSystemView } from "../integrations/sysview";
+import { fmtRate } from "../integrations/format";
 import { ring } from "../charts/geom";
-import { chartPaths, htopBar, lastBars, paintOf, solidOf, weightPx, GRADIENT_CSS, type Paint } from "./look";
-import { metricsOf, type BarSection, type Metric } from "./bar";
-
-/** Odstup vzorků systému (stejně jako karta Systém). */
-const EVERY_MS = 2000;
-
-/** Vzorky systému jen s otevřeným šuplíkem. */
-function useSystemView() {
-  const [view, setView] = createSignal<SystemView | null>(null);
-  createEffect(() => {
-    if (!drawerShown()) return;
-    let alive = true;
-    let timer: number | undefined;
-    const tick = async () => {
-      try {
-        const v = await intApi.systemView();
-        if (alive && v) setView(v);
-      } catch {
-        /* jeden vzorek navíc nic neřeší — příště */
-      }
-      if (alive) timer = window.setTimeout(tick, EVERY_MS);
-    };
-    void tick();
-    onCleanup(() => {
-      alive = false;
-      if (timer !== undefined) window.clearTimeout(timer);
-    });
-  });
-  return view;
-}
-
-type Row = { key: Metric; name: string; pct: number | null; hist?: number[]; max?: number; text: string };
-
-function rowsOf(v: SystemView, want: readonly Metric[]): Row[] {
-  const disk = v.disks.find((x) => x.system) ?? v.disks[0];
-  const diskPct = disk && disk.total > 0 ? ((disk.total - disk.free) / disk.total) * 100 : null;
-  const all: Record<Metric, Row | null> = {
-    cpu: v.cpu != null ? { key: "cpu", name: "CPU", pct: v.cpu, hist: v.cpuHist, max: 100, text: fmtPct(v.cpu) } : null,
-    ram: v.memTotal > 0 ? { key: "ram", name: "RAM", pct: v.memPct, hist: v.memHist, max: 100, text: fmtPct(v.memPct) } : null,
-    gpu: v.gpu != null ? { key: "gpu", name: "GPU", pct: v.gpu, hist: v.gpuHist, max: 100, text: fmtPct(v.gpu) } : null,
-    disk: diskPct != null ? { key: "disk", name: t("cards.notch.disk", "Disk"), pct: diskPct, text: fmtPct(diskPct) } : null,
-    net:
-      v.rx != null || v.tx != null
-        ? { key: "net", name: t("cards.notch.net", "Síť"), pct: null, hist: v.rxHist, text: `↓ ${fmtRate(v.rx, v.netUnit)}  ↑ ${fmtRate(v.tx, v.netUnit)}` }
-        : null,
-  };
-  return want.map((m) => all[m]).filter((r): r is Row => !!r);
-}
+import { chartPaths, htopBar, lastBars, weightPx, GRADIENT_CSS, type Paint } from "./look";
+import { metricsOf, type BarSection } from "./bar";
+import { paintRow, rowsOf, toneRow, type Row } from "./sysRows";
 
 /** Mini graf z reálných vzorků (čára, volitelně plocha); přechod = SVG gradient. */
 function Chart(p: { values: number[]; max?: number; smooth: boolean; weight?: string; paint: Paint; area: boolean }) {
@@ -87,12 +41,12 @@ const fill = (p: Paint) => (p.kind === "gradient" ? GRADIENT_CSS : p.css);
 
 export default function System(p: { sec: BarSection; design: string }) {
   const view = useSystemView();
-  const rows = () => (view() ? rowsOf(view()!, metricsOf(p.sec)) : []);
-  /** Dnešní vzhled bez volby barvy: akcent, přetížení jantar (jako dřív). */
-  const paint = (r: Row): Paint => (!p.sec.color && r.pct != null && loadOf(r.pct) !== "ok" ? { kind: "solid", css: "var(--amber)" } : paintOf(p.sec.color, r.pct));
+  const rows = () => (view() ? rowsOf(view()!, metricsOf(p.sec), { disk: t("cards.notch.disk", "Disk"), net: t("cards.notch.net", "Síť") }) : []);
+  /** Dnešní vzhled bez volby barvy: akcent, zátěž jantar / červená (disk podle volného místa, jako karta Systém). */
+  const paint = (r: Row): Paint => paintRow(r, p.sec.color);
   const tip = (r: Row) => `${r.name} ${r.text}`;
   /** Barva čísla / textu: jen se zvolenou barvou (výchozí = barva textu); přechod = akcent. */
-  const tone = (r: Row) => (p.sec.color && r.pct != null ? solidOf(p.sec.color, r.pct) : undefined);
+  const tone = (r: Row) => toneRow(r, p.sec.color);
   return (
     <section class="nb-sec nb-sys" data-design={p.design} aria-label={t("cards.notch.system", "Systém")}>
       <Show when={rows().length} fallback={<small class="nb-empty">{t("cards.notch.sysWait", "Čekám na první vzorek systému…")}</small>}>
@@ -137,7 +91,7 @@ export default function System(p: { sec: BarSection; design: string }) {
           <Match when={true}>
             <For each={rows()}>
               {(r) => (
-                <div class="nb-row" data-load={loadOf(r.pct)} title={tip(r)}>
+                <div class="nb-row" data-load={r.load} title={tip(r)}>
                   <span class="nb-rn">{r.name}</span>
                   <Show
                     when={r.hist && r.hist.length >= 2}

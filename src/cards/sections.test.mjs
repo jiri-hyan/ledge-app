@@ -35,6 +35,6 @@ test("klíče se shodují s Rustem (`config::Sections` v config/sections.rs, cam
 });
 
 test("každé pole je karta rozložení nebo její část (odvozené z layout)", () => {
-  for (const k of SECTION_KEYS) assert.ok(CARD_IDS.includes(k) || k in PARTS, k);
+  for (const k of SECTION_KEYS) assert.ok(CARD_IDS.includes(k) || k in PARTS || k === "links", k); // `links` = dřívější karta, od kola 34 odvozená z `actions`
   for (const k of CLAUDE_PARTS) assert.equal(PARTS[k], "claude", k);
 });

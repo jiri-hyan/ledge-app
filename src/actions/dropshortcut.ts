@@ -35,15 +35,15 @@ export function draftFrom(p: DropPayload, takenIds: string[]): ActionCfg {
   return a;
 }
 
-/** Karty, ve kterých se akce typu `kind` ukáže: odkazy (web, složka, soubor) v Odkazech i Rychlých akcích,
- *  aplikace jen v Rychlých akcích. */
-export function hostCards(kind: ActionKind): readonly string[] {
-  return kind === "app" ? ["actions"] : ["links", "actions"];
+/** Karty, ve kterých se akce typu `kind` ukáže: jakákoli akce (odkaz, aplikace, příkaz) v kartě Odkazy a akce
+ *  (od kola 34 jediná; dřívější karta Odkazy je její součást). */
+export function hostCards(_kind: ActionKind): readonly string[] {
+  return ["actions"];
 }
 
 /** Uvidí se nová akce na záložce s kartami `pageCards`? Když ne, kterou kartu nabídnout přidat. */
-export function visibility(pageCards: readonly string[], kind: ActionKind): { visible: true } | { visible: false; add: "links" | "actions" } {
+export function visibility(pageCards: readonly string[], kind: ActionKind): { visible: true } | { visible: false; add: "actions" } {
   const hosts = hostCards(kind);
   if (pageCards.some((c) => hosts.includes(c))) return { visible: true };
-  return { visible: false, add: kind === "app" ? "actions" : "links" };
+  return { visible: false, add: "actions" };
 }

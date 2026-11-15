@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STRIP_COLORS, STRIP_ITEM_IDS, STRIP_OPACITY, clipCustom, customLen, previewSegments, withColor, withQuiet } from "./strip.ts";
+import { STRIP_COLORS, STRIP_ITEM_IDS, STRIP_OPACITY, clipCustom, customLen, monitorOptions, previewSegments, withColor, withQuiet } from "./strip.ts";
 
 test("položky a barvy se shodují s Rustem (stripconf.rs)", () => {
   const src = readFileSync(new URL("../../src-tauri/src/stripconf.rs", import.meta.url), "utf8");
@@ -59,4 +59,21 @@ test("náhled: pořadí, prázdné vynechá, klid vs. dění", () => {
   assert.deepEqual(calm.map((s) => [s.id, s.hidden, s.color]), [["mode", false, null], ["clock", true, null], ["custom", false, "violet"]]);
   assert.deepEqual(previewSegments(strip, sample, true).map((s) => s.hidden), [false, false, false]);
   assert.deepEqual(previewSegments({}, sample, false), []);
+});
+
+test("volba monitoru: Hlavní / Všechny / připojené, neznámá uložená hodnota navíc", () => {
+  const lab = { primary: "Hlavní", all: "Všechny", dev: (m) => `Monitor ${m.n} · ${m.w}×${m.h}`, gone: "Nepřipojený" };
+  const list = [
+    { id: "dev:A;1920x1080@0,0", n: 1, w: 1920, h: 1080, primary: true },
+    { id: "dev:B;2560x1440@1920,0", n: 2, w: 2560, h: 1440, primary: false },
+  ];
+  const vals = (cur) => monitorOptions(list, cur, lab).map((o) => o.v);
+  assert.deepEqual(vals("primary"), ["primary", "all", list[0].id, list[1].id]);
+  assert.deepEqual(vals("all"), ["primary", "all", list[0].id, list[1].id]);
+  assert.deepEqual(vals(list[1].id), ["primary", "all", list[0].id, list[1].id]);
+  assert.deepEqual(vals("dev:Z;800x600@0,0").slice(-1), ["dev:Z;800x600@0,0"], "odpojený monitor zůstane vybraný");
+  assert.equal(monitorOptions(list, "2", lab).at(-1).label, "Nepřipojený", "starý index");
+  assert.equal(monitorOptions(list, "", lab).length, 4);
+  assert.deepEqual(monitorOptions([], "primary", lab).map((o) => o.v), ["primary", "all"], "bez monitorů (IPC selhalo)");
+  assert.equal(monitorOptions(list, list[1].id, lab)[3].label, "Monitor 2 · 2560×1440");
 });

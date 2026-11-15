@@ -1,0 +1,17 @@
+/* „Poslat do {název}“ — náhled odeslání v plovoucím panelu (`SendDialog.tsx`). */
+.mono-dlg { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--pop); border: 1px solid var(--line-2); border-radius: var(--r-lg); }
+.mono-dlg header { display: flex; align-items: baseline; gap: 8px; }
+.mono-dlg header small { color: var(--t2); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.mono-mode { display: flex; gap: 6px; }
+.mono-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.mono-items li { display: flex; flex-direction: column; gap: 1px; }
+.mono-items li label { display: flex; align-items: baseline; gap: 6px; cursor: pointer; }
+.mono-items li small { margin-left: 22px; color: var(--t2); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.mono-items li.sent { opacity: .6; }
+.mono-items li.warn small { color: var(--amber, var(--t1)); }
+.mono-title { overflow-wrap: anywhere; }
+.mono-note, .mono-result p { margin: 0; color: var(--t2); font-size: var(--fs-sm); }
+.mono-warn { margin: 0; color: var(--amber, var(--t1)); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.mono-dlg footer { display: flex; justify-content: flex-end; gap: 6px; }
+@media (prefers-contrast: more) { .mono-dlg { border-color: color-mix(in srgb, var(--t1) 60%, transparent); } }
+@media (forced-colors: active) { .mono-dlg { border: 1px solid CanvasText; } }

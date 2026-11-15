@@ -11,7 +11,7 @@ Detail (toky, invarianty, testy, historie): [core-detail.md](core-detail.md).
 | `hostile.rs` | jen testy: nepřátelské vstupy parserů (výstup gitu, cesty, hlavičky … | `fuzz` |
 | `i18n.rs` | jazyk textů jádra (hlášky, chyby, stavy ve snapshotu, proužek) … | `tr(cs, en)` |
 | `errors.rs` | srozumitelné chyby: `io::Error` / text (`os error N`, `(0x8007NNNN)`) / … | `Kind` `kind_of_io` |
-| `state.rs` | sdílený stav a jeho přístup | `Core` `pub(crate)` `CORE` |
+| `state.rs` · `guard.rs` · `qa.rs` | stav; dohled vláken; izolace QA | `Core` `CORE` `guarded` `isolated` |
 | `snapshot.rs` | stav pro UI (`get_state`, událost `state`) — jen paměť, žádné I/O | `snapshot` `Snapshot` |
 | `stripview.rs` | obsah proužku podle `strip.items` (vč. `waiting`, `custom`, `timer`, `media` = … | `refresh_strip` `look_facts` |
 | `looks/*` | styly zavřeného Ledge (`strip.look`, `strip.lookHide`) … | `Look` `Facts` `Show` `Part` |
@@ -30,32 +30,34 @@ Detail (toky, invarianty, testy, historie): [core-detail.md](core-detail.md).
 | `threads/ui.rs` | vlákno `ui`: sériově `UiCmd` → `Drawer` | `spawn_ui_thread` |
 | `threads/emit.rs` | vlákno `emit`: stav, proužek, připomínky, git | `spawn_emit_thread` |
 | `threads/emitgate.rs` | brána `emit`: dedup stavu, hlídač (core-detail) | `Tally` |
-| `threads/hover.rs` | vlákno `hover`: myš, fullscreen, lištové okno, tlak → otevřít/zavřít … | `spawn_hover_thread` |
+| `threads/hover.rs` · `tracker.rs` · `fswatch.rs` | hover per monitor; fullscreen 500 ms | `spawn_hover_thread` `Tracker` `FsWatch` |
 | `threads/notes_watch.rs`, `notes_sync.rs` | vlákna poznámek (watcher, git sync) — viz [notes.md](notes.md) | `NotesState` `reload_notes` |
 | `commands/*.rs` (`commands/{config,pkgctx,timer,update}.rs`) | Tauri příkazy po oblastech: `drawer` (stav, režim, fokus, odkazy … | `git_pull` `pull_message` |
 | `focusreturn.rs` | návrat fokusu do předchozí aplikace: `remember` v `Drawer::focus` (těsně před … | `remember` `on_close` |
-| `drawer.rs` | okno šuplíku (WebView2), argumenty Chromia, handshake morfu, suspend, sklo … | `Drawer::{show, hide, warm, ack, set_dormant, take_focus, release_focus, destroy_if_idle, set_anchor, set_expand_ms}` |
-| `hovermode.rs` | co se stane po najetí (`drawer.hover`: `full` výchozí / `compact` / `island` … | `HoverMode` `hover_target` |
+| `drawer.rs` | okno šuplíku (WebView2), argumenty Chromia, handshake morfu, suspend, sklo … | `Drawer::{show, hide, warm, set_dormant, take_focus}` |
+| `hovermode.rs` | co se stane po najetí (`drawer.hover`: `full` výchozí / `island` / `dock` … | `HoverMode` `hover_target` |
 | `strip.rs` | nativní proužek: vrstvené okno, D2D, click-through, vlákno `strip` … | `Strip::{start, set}` |
+| `hovermode.rs` | co se stane po najetí (`drawer.hover`: `full` výchozí / `compact` / `island` / `dock` … | `HoverMode` `hover_target` |
+| `strip.rs` · `stripclassic.rs` · `stripset.rs` | proužek · tečky na monitorech | `Strip::start_on` `apply` |
 | `edge.rs` | čistá logika „otevřít myší?“ (tabulkové testy) | `armed` `PushTracker` |
 | `rawpush.rs` | raw myš (tlak na hranu), vlákno `rawpush`, aktivní jen u hrany | `RawPush::{start, arm, take}` |
-| `screen.rs` | monitory, DPI, kurzor, fullscreen (QUNS + okno v popředí) | `monitors` `pick` |
+| `screen.rs` · `winstyle.rs` | monitory, zobrazení, fullscreen; styl bez fokusu | `pick` `no_activate` |
 | `procman.rs` | dev servery / appky v Job Objectu, URL z logu, porty | `ProcMan::{launch_dev, launch_app, stop, stop_all, snapshot}` |
 | `config/*` (`config/{claude,drawer,hotkeys,io,personal,project,sections,validate}.rs`) | `config.json` + schéma, validace (s polem … | `Config` `Sections` |
 | `config/validate.rs` | `validate` / `validate_field` celého configu … | `validate` `validate_field` |
-| `config/recovery.rs` · `config/lenient_tests.rs` | stav „co je s configem špatně“ (vadné sekce, kopie `.broken-*`, varování o rozsazích `claude.*`), čisté `prune_list` / `range_warnings` / `sections_message`; načtení po sekcích v `io.rs`; fixtures `fixtures/config-versions/*.json` | `set_load` `range_warnings` `prune_list` `load_lenient` `restore_backup` |
+| `config/recovery.rs` · `config/lenient_tests.rs` | vadný config (sekce, `.broken-*`) → core-detail | `set_load` `range_warnings` `prune_list` `load_lenient` `restore_backup` |
 | `drawerfit.rs` | strop výšky šuplíku (80 % pracovní plochy monitoru) a širší Full pro Nastavení … | `limits`, `fit_full` |
 | `fsx.rs` | sdílený atomický zápis (unikátní tmp, `sync_all`, rename s retry), JSON load/save | `write_atomic` `read_retry` `save_json` `load_json_keep_broken` |
 | `dirs.rs` | jediné čtení `%USERPROFILE%`/`%APPDATA%`/`%LOCALAPPDATA%`; v testech panika bez přepsání (`dirs::testing`) | `home` `appdata` `claude_dir` |
 | `util.rs` | `now_ms`, `cut`/`clip_line` (UTF-8, `…`), `pct` (saturující) | `now_ms` `cut` `pct` |
-| `autostart.rs` / `migrate.rs` | HKCU Run (míří na instalovanou kopii; v bublině MSIX nic … | `apply` `gate` `decide` |
+| `autostart.rs` / `migrate.rs` / `webdata.rs` / `twoinst.rs` | Run / Notch→Ledge / profil WebView2 / 2 inst. | `apply` `plan` `decide` |
 | `pkgctx.rs` | bublina MSIX (Ledge spuštěný z Claude desktop) … | `ctx` `current` `detect` |
 | `outside.rs` | spuštění MIMO bublinu: jednorázová úloha Plánovače z XML (`InteractiveToken` … | `task_xml` `run_task` |
 | `update.rs` / `updatenet.rs` | nová verze: verze, rozbor vydání (veřejné API, záložně `gh` … | `evaluate` `evaluate_tag` |
 | `updsign.rs` | podpis instalátoru (S1): minisign / Ed25519 ve formátu `tauri signer sign` … | `verify_bytes` `verify_file` |
 | `ipcacl.rs` | kdo smí volat vlastní příkazy (N4): `build.rs` předá seznam z … | `handler_commands` |
 | `uilog.rs` | chyby frontendu do `ledge.log` (příkaz `ui_log`): zkrácení, zahlazení cest, strop frekvence … | `clean`, `line`, `Limiter`, `record` |
-| `updater.rs` | stav aktualizací a vlákno `update` (spí na kanálu, žádný časovač navíc) … | `Updater::{start, check_now, retry_fetch, mark_notes_read, install, rollback, view}` |
+| `updater.rs` | stav aktualizací a vlákno `update` (spí na kanálu, žádný časovač navíc) … | `Updater::{start, check_now, install, rollback}` |
 | `updcache.rs` | cache instalátorů `%LOCALAPPDATA%\Ledge\updates\<tag>` (manifest `release.json` … | `Manifest` `Entry` `scan` |
 | `updseen.rs` | `updates\seen.json`: naposledy spuštěná verze, předchozí (cíl návratu) … | `Seen` `Known` `on_start` |
 | `actions.rs` · `actionrun.rs` · `actionicons.rs` · `actionstate.rs` | rychlé akce → [actions.md](actions.md) | `Action` `run_action` |
@@ -66,5 +68,5 @@ Detail (toky, invarianty, testy, historie): [core-detail.md](core-detail.md).
 | `cliphist/*` | historie schránky (vlákno `cliphist` jen se zapnutým `clipboard.enabled`) → … | `sync`, `paste` |
 | `media.rs` · `volume.rs` · `battery.rs` | Osobní: právě hraje, hlasitost, baterie → [media.md](media.md) | `ensure`, `sync`, `view` |
 
-Další soubory (podrobnosti v detailu):
+Další (detail):
 `src-tauri/src/{rawpush.rs,updcache.rs,updseen.rs}` · `src/ui/errortext.ts`

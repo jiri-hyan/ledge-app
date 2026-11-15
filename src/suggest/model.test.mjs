@@ -2,14 +2,15 @@
 //   node --experimental-strip-types --test src/suggest/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLIP_FRESH_MS, DEV_FRESH_MS, DISMISS_MS, GH_FRESH_MS, MAX_CHIPS, MEET_LEAD_MS, MEET_NOTE_MS, clipUrl, currentMeetings, meetingNoteText, trackMeetings, devUrl, dismiss, hostOf, isDismissed, isKnown, knownLinks, normUrl, pick, sameSuggestions } from "./model.ts";
+import { CLIP_FRESH_MS, DEV_FRESH_MS, DISMISS_MS, GH_FRESH_MS, MAX_CHIPS, MEET_LEAD_MS, MEET_NOTE_MS, clipUrl, digestOn, currentMeetings, meetingNoteText, nextChange, trackMeetings, devUrl, dismiss, hostOf, isDismissed, isKnown, knownLinks, normUrl, pick, sameSuggestions } from "./model.ts";
 
 const NOW = 1_800_000_000_000;
-const ON = { clipboard: true, devServer: true, github: true, reminders: true, githubPulse: true };
+const ON = { clipboard: true, devServer: true, github: true, reminders: true, digest: true, githubPulse: true };
 const pr = (n, repo = "a/b") => ({ repo, number: n, title: `PR ${n}`, url: `https://github.com/${repo}/pull/${n}` });
 const base = () => ({
   on: { ...ON },
   reminders: [],
+  tasks: { overdue: 0, today: 0 },
   notes: true,
   meetings: [],
   github: { review: [], failing: [], fetchedMs: NOW - 1000 },
@@ -228,10 +229,10 @@ test("schůzka: Připojit 10 min předem do konce, poznámka do 15 min po konci"
   assert.equal(at(end)[0].start, start, "poznámka zná začátek (titulek)");
 });
 
-test("schůzka: vypnuté připomínky, vypnuté poznámky, zavření a pořadí", () => {
+test("schůzka: nezávisí na volbě připomínek poznámek (L102), vypnuté poznámky, zavření a pořadí", () => {
   const m = meet("Review", NOW, NOW + 30 * MIN);
   const input = { ...base(), meetings: [m] };
-  assert.deepEqual(kinds(pick({ ...input, on: { ...ON, reminders: false } }, new Map(), NOW)), []);
+  assert.deepEqual(kinds(pick({ ...input, on: { ...ON, reminders: false } }, new Map(), NOW)), ["meeting"], "chip Připojit i bez připomínek poznámek");
   assert.deepEqual(kinds(pick({ ...input, notes: false }, new Map(), NOW + 31 * MIN)), [], "bez poznámek žádný chip ze schůzky");
   const [c] = pick(input, new Map(), NOW);
   assert.deepEqual(kinds(pick(input, dismiss(new Map(), c.key, NOW), NOW + 1)), [], "zavřená");
@@ -240,7 +241,7 @@ test("schůzka: vypnuté připomínky, vypnuté poznámky, zavření a pořadí"
   assert.deepEqual(kinds(pick(input, dismiss(new Map(), c.key, NOW), NOW + 31 * MIN)), ["meetingNote"]);
   // pořadí: připomínka · schůzka · CI
   const all = pick({ ...input, reminders: [{ path: "p", title: "t", remindMs: 1 }], github: { review: [], failing: [pr(2)], fetchedMs: NOW } }, new Map(), NOW);
-  assert.deepEqual(kinds(all), ["reminder", "meeting", "ghCi"]);
+  assert.deepEqual(kinds(all), ["meeting", "reminder", "ghCi"]);
   // víc schůzek najednou: nejdřívější + zbytek v `more`
   const two = pick({ ...base(), meetings: [meet("B", NOW + 2 * MIN, NOW + 40 * MIN), meet("A", NOW, NOW + 20 * MIN)] }, new Map(), NOW);
   assert.deepEqual([two[0].title, two[0].more], ["A", 1]);
@@ -270,4 +271,134 @@ test("poznámka ze schůzky: první řádek „{název} — {datum}“", () => {
   assert.equal(meetingNoteText({ title: "Standup", start }), "Standup — 5. 10. 2026\n\n");
   assert.equal(meetingNoteText({ title: "  ", start }), "— — 5. 10. 2026\n\n");
   assert.equal(meetingNoteText({ title: "Plán Q4", start: new Date(2026, 0, 31, 23, 59).getTime() }).split("\n")[0], "Plán Q4 — 31. 1. 2026");
+});
+
+test("chip Dnes: jen s nenulovými úkoly, pod volbou reminders, zavření podle čísel, pořadí za připomínkou", () => {
+  const tasks = (overdue, today) => ({ ...base(), tasks: { overdue, today } });
+  const want = (list) => list.map((s) => [s.kind, s.overdue, s.today]);
+  assert.deepEqual(pick(tasks(0, 0), new Map(), NOW), []);
+  assert.deepEqual(want(pick(tasks(2, 0), new Map(), NOW)), [["today", 2, 0]]);
+  assert.deepEqual(want(pick(tasks(0, 3), new Map(), NOW)), [["today", 0, 3]]);
+  assert.equal(pick(tasks(2, 3), new Map(), NOW)[0].key, "today:2:3");
+  // volba „Přehled“ vypnutá → žádný chip (připomínky ji nevypínají, L193)
+  assert.deepEqual(pick({ ...tasks(1, 1), on: { ...ON, digest: false } }, new Map(), NOW), []);
+  assert.deepEqual(kinds(pick({ ...tasks(1, 1), on: { ...ON, reminders: false } }, new Map(), NOW)), ["today"]);
+  // zavřený chip zůstane zavřený, po změně čísel se vrátí
+  const d = dismiss(new Map(), "today:2:3", NOW);
+  assert.deepEqual(pick(tasks(2, 3), d, NOW + 1), []);
+  assert.deepEqual(kinds(pick(tasks(2, 4), d, NOW + 1)), ["today"]);
+  // za připomínkou
+  const both = pick({ ...tasks(1, 0), reminders: [{ path: "p", title: "A", remindMs: NOW - 5 }] }, new Map(), NOW);
+  assert.deepEqual(kinds(both), ["reminder", "today"]);
+  // stejný obsah = stejné chipy; jiná čísla = jiné
+  assert.equal(sameSuggestions(pick(tasks(1, 2), new Map(), NOW), pick(tasks(1, 2), new Map(), NOW)), true);
+  assert.equal(sameSuggestions(pick(tasks(1, 2), new Map(), NOW), pick(tasks(1, 3), new Map(), NOW)), false);
+});
+
+test("hranice přepočtu: nejbližší časová změna výstupu pick (ne každá sekunda)", () => {
+  const m = { title: "Daily", start: NOW + 30 * 60_000, end: NOW + 60 * 60_000, join: { url: "https://meet.example/x", provider: "meet" } };
+  const noGh = { ...base(), github: { review: [], failing: [], fetchedMs: null } };
+  const withM = { ...noGh, meetings: [m] };
+  assert.equal(nextChange(base(), new Map(), NOW), NOW - 1000 + GH_FRESH_MS + 1, "bez schůzek: čerstvost GitHubu");
+  assert.equal(nextChange(withM, new Map(), NOW), m.start - MEET_LEAD_MS, "schůzka: −10 min");
+  assert.equal(nextChange(withM, new Map(), m.start - MEET_LEAD_MS), m.end, "uvnitř okna: konec schůzky");
+  assert.equal(nextChange(withM, new Map(), m.end), m.end + MEET_NOTE_MS + 1, "po konci: konec nabídky poznámky");
+  assert.equal(nextChange(noGh, new Map([["x", NOW + 5000]]), NOW), NOW + 5000, "zavřený chip se vrátí");
+  assert.equal(nextChange(noGh, new Map(), NOW), null, "nic = žádná hranice");
+  // mezi hranicemi se výstup nemění: pick v `now` a těsně před hranicí je stejný, na hranici jiný
+  const edge = nextChange(withM, new Map(), NOW);
+  assert.ok(sameSuggestions(pick(withM, new Map(), NOW), pick(withM, new Map(), edge - 1)));
+  assert.ok(!sameSuggestions(pick(withM, new Map(), edge - 1), pick(withM, new Map(), edge)));
+});
+
+// ---- V1 „Pruh ví“: chipy briefWaiting a claudeSince ----
+const HID = NOW - 10 * 60_000;
+const sess = (id, o = {}) => ({ id, name: id.toUpperCase(), status: "idle", ended: false, endReason: null, updatedAt: HID, canOpen: true, activity: null, ...o });
+const brief = (status, o = {}) => ({ waiting: status === "waiting" ? 1 : 0, review: status === "review" ? 1 : 0, first: { path: "C:\n\z.md", title: "Zadání Z", status }, ...o });
+
+test("briefWaiting: otázka / kontrola, počet dalších, jen se zapnutými poznámkami a zdrojem", () => {
+  const got = pick({ ...base(), briefs: brief("waiting", { review: 2 }) }, new Map(), NOW);
+  assert.deepEqual(got.map((c) => [c.kind, c.title, c.brief, c.path, c.more]), [["briefWaiting", "Zadání Z", "waiting", "C:\n\z.md", 2]]);
+  assert.equal(pick({ ...base(), briefs: brief("review") }, new Map(), NOW)[0].brief, "review");
+  assert.deepEqual(pick({ ...base(), briefs: { waiting: 0, review: 0, first: null } }, new Map(), NOW), []);
+  assert.deepEqual(pick({ ...base(), notes: false, briefs: brief("review") }, new Map(), NOW), []);
+  assert.deepEqual(pick({ ...base(), on: { ...ON, digest: false }, briefs: brief("review") }, new Map(), NOW), []);
+});
+
+test("claudeSince: čeká / doběhlo / chyba / skončila od schování; klíč nese čas schování", () => {
+  const claude = { hiddenAt: HID, sessions: [sess("a", { activity: { phase: "done", at: HID + 1 } }), sess("w", { status: "waiting" }), sess("o", { activity: { phase: "done", at: HID - 1 } })] };
+  const got = pick({ ...base(), claude }, new Map(), NOW);
+  assert.equal(got.length, 1);
+  assert.deepEqual([got[0].kind, got[0].key, got[0].since.map((i) => `${i.kind}:${i.id}`)], ["claudeSince", `claude-since:${HID}`, ["waiting:w", "done:a"]]);
+  // zavření platí do dalšího schování (nový klíč)
+  assert.deepEqual(pick({ ...base(), claude }, new Map([[`claude-since:${HID}`, NOW + 1]]), NOW), []);
+  assert.equal(pick({ ...base(), claude: { ...claude, hiddenAt: HID + 5 } }, new Map([[`claude-since:${HID}`, NOW + 1]]), NOW).length, 1);
+  // bez schování jen čekající; bez čehokoli nic; vypnutý zdroj nic
+  assert.deepEqual(pick({ ...base(), claude: { ...claude, hiddenAt: null } }, new Map(), NOW)[0].since.map((i) => i.id), ["w"]);
+  assert.deepEqual(pick({ ...base(), claude: { hiddenAt: HID, sessions: [sess("n")] } }, new Map(), NOW), []);
+  assert.deepEqual(pick({ ...base(), on: { ...ON, digest: false }, claude }, new Map(), NOW), []);
+});
+
+test("priorita nových chipů: zadání · schůzka · připomínka · Claude od posledně · CI · PR; MAX_CHIPS ořízne konec", () => {
+  const full = {
+    ...base(),
+    briefs: brief("waiting"),
+    reminders: [{ path: "p", title: "Zavolat", remindMs: NOW - 5 }],
+    meetings: [{ title: "Daily", start: NOW + 5 * 60_000, end: NOW + 35 * 60_000, join: { url: "https://meet.example/x", provider: "meet" } }],
+    claude: { hiddenAt: HID, sessions: [sess("w", { status: "waiting" })] },
+    github: { review: [pr(1)], failing: [pr(2)], fetchedMs: NOW - 1000 },
+  };
+  assert.equal(MAX_CHIPS, 3);
+  assert.deepEqual(kinds(pick(full, new Map(), NOW)), ["briefWaiting", "meeting", "reminder"]);
+  const { reminders, ...noRem } = full;
+  assert.deepEqual(kinds(pick({ ...noRem, reminders: [], briefs: null }, new Map(), NOW)), ["meeting", "claudeSince", "ghCi"]);
+});
+
+test("sameSuggestions: změna sessions nebo stavu zadání chip překreslí, stejný obsah ne", () => {
+  const mk = (claude, briefs) => pick({ ...base(), claude, briefs }, new Map(), NOW);
+  const c1 = { hiddenAt: HID, sessions: [sess("a", { activity: { phase: "done", at: HID + 1 } })] };
+  const c2 = { hiddenAt: HID, sessions: [sess("a", { activity: { phase: "done", at: HID + 9 } })] };
+  const c3 = { hiddenAt: HID, sessions: [sess("a", { activity: { phase: "done", at: HID + 1 } }), sess("b", { status: "waiting" })] };
+  assert.ok(sameSuggestions(mk(c1), mk(c2)));
+  assert.ok(!sameSuggestions(mk(c1), mk(c3)));
+  assert.ok(!sameSuggestions(mk(undefined, brief("waiting")), mk(undefined, { ...brief("waiting"), first: { path: "C:\n\z.md", title: "Zadání Z", status: "review" } })));
+});
+
+test("nextChange: nové chipy nepřidávají vlastní hranici (počítají se při změně snapshotu)", () => {
+  const i = { ...base(), briefs: brief("review"), claude: { hiddenAt: HID, sessions: [sess("w", { status: "waiting" })] } };
+  assert.equal(nextChange(i, new Map(), NOW), nextChange(base(), new Map(), NOW));
+});
+
+test("dev server s chybami: chip i po hodinách běhu, klíč nese počet chyb (zavřený se vrátí jen při nových)", () => {
+  const p = (o) => ({ id: "web", phase: "ready", port: 3000, url: null, readyAt: NOW - DEV_FRESH_MS - 5000, errors: 3, ...o });
+  const [c] = pick({ ...base(), procs: [p({})] }, new Map(), NOW);
+  assert.equal(c.kind, "dev");
+  assert.equal(c.errors, 3);
+  assert.equal(c.proc, "web");
+  assert.ok(c.key.endsWith(":3"));
+  assert.equal(pick({ ...base(), procs: [p({ errors: 0 })] }, new Map(), NOW).length, 0, "starý bez chyb se nenabízí");
+  const closed = dismiss(new Map(), c.key, NOW);
+  assert.equal(pick({ ...base(), procs: [p({})] }, closed, NOW).length, 0, "zavřený zůstane zavřený");
+  assert.equal(pick({ ...base(), procs: [p({ errors: 4 })] }, closed, NOW).length, 1, "nové chyby = nový chip");
+  assert.equal(pick({ ...base(), procs: [p({ phase: "failed" })] }, new Map(), NOW).length, 0, "spadlý má vlastní stav na dlaždici");
+});
+
+test("L193: dvě volby — reminders vypíná jen připomínku, digest zadání / ranní shrnutí / Dnes / Claude od posledně; starý snapshot bez digest = zapnuto", () => {
+  const rem = [{ path: "p", title: "t", remindMs: 1 }];
+  const all = { ...base(), tasks: { overdue: 1, today: 1 }, reminders: rem, briefs: brief("review"), claude: { hiddenAt: HID, sessions: [sess("w")] } };
+  const k = (on) => kinds(pick({ ...all, on }, new Map(), NOW));
+  const both = k(ON);
+  assert.ok(both.includes("reminder") && both.includes("briefWaiting"));
+  const noRem = k({ ...ON, reminders: false });
+  assert.ok(!noRem.includes("reminder") && noRem.includes("briefWaiting"), "bez připomínek přehled zůstává");
+  const noDig = k({ ...ON, digest: false });
+  assert.ok(noDig.includes("reminder") && !["briefWaiting", "today", "morning", "claudeSince"].some((x) => noDig.includes(x)), "bez přehledu zůstává připomínka");
+  const { digest: _d, ...old } = ON;
+  assert.deepEqual(k(old), both, "chybějící digest + reminders true = zapnuto");
+  // migrace: klíč chybí → platí reminders; explicitní digest vyhrává
+  for (const [dg, rem, want] of [[undefined, true, true], [undefined, false, false], [null, false, false], [true, false, true], [false, true, false]]) {
+    assert.equal(digestOn({ reminders: rem, digest: dg }), want, `digest ${dg}, reminders ${rem}`);
+  }
+  const k2 = (on) => kinds(pick({ ...all, on }, new Map(), NOW));
+  assert.ok(!k2({ ...old, reminders: false }).includes("briefWaiting"), "starý config s reminders=false: přehled zůstane vypnutý");
 });

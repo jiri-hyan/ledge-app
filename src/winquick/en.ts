@@ -3,7 +3,7 @@ import { registerDict } from "../i18n";
 
 registerDict("en", {
   "cards.layout.card.winquick": "Windows quick tiles",
-  "cards.layout.desc.winquick": "Tiles you pick yourself: microphone, sound output, terminal in a project folder, folders, Windows theme, Wi-Fi / Bluetooth, Settings pages and the latest screenshot",
+  "cards.layout.desc.winquick": "Tiles you pick yourself: microphone, sound output, terminal in a project folder, folders, Windows theme, Wi-Fi / Bluetooth, Settings pages and the latest screenshot; look Toggles: sound, microphone, volume and battery",
   "cards.winquick.title": "Windows quick tiles",
   "cards.winquick.edit": "Edit tiles",
   "cards.winquick.done": "Done",

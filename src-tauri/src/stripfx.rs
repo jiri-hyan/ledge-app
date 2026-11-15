@@ -74,7 +74,7 @@ pub(crate) fn edge_try(state: String, deco: Option<Deco>) -> Result<(), String> 
     use crate::i18n::tr;
     let st = LiveState::from_id(&state).ok_or_else(|| tr("Neznámý stav.", "Unknown state.").to_string())?;
     let c = crate::state::core();
-    if c.dead() {
+    if c.dead_surface() {
         return Err(tr("Ledge je teď ztlumený (hra přes celou obrazovku nebo herní režim).", "Ledge is muted right now (fullscreen game or game mode).").into());
     }
     c.strip.set(|m| m.fx_try = Some(Try { state: st, deco, at: Instant::now() }));

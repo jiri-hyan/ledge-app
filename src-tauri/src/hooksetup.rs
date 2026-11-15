@@ -509,6 +509,9 @@ pub fn status_cached(port: u16) -> HooksStatus {
 /// se postará terminál (`claude::bridge`), Nastavení nabídne „Zapojit“ (`stale_hint`).
 pub fn migrate_on_start(port: u16) {
     use crate::state::{log, mark_dirty};
+    if crate::qa::isolated() {
+        return;
+    }
     std::thread::Builder::new()
         .name("hooks-migrate".into())
         .spawn(move || {
@@ -538,6 +541,9 @@ static APPLY_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
 /// Zapíše výsledek `f` (merge/remove) atomicky; před první změnou existujícího souboru záloha.
 pub fn apply(path: &Path, f: impl FnOnce(&str) -> Result<(String, bool), String>) -> Result<bool, String> {
+    if crate::qa::isolated() {
+        return Err(crate::i18n::tr("Izolovaná instance (QA) nezapisuje do settings.json.", "The isolated (QA) instance doesn't write settings.json.").into());
+    }
     let _guard = APPLY_LOCK.lock();
     let text = read(path)?;
     let (new, changed) = f(&text)?;

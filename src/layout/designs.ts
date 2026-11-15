@@ -33,11 +33,25 @@ export const CARD_DESIGNS: Record<string, readonly Design[]> = {
     { id: "net", name: ["cards.design.system.net", "Síť"], line: ["cards.design.system.net.line", "Příjem a odesílání v popředí, CPU a paměť menší."] },
   ],
   weather: WEATHER_DESIGNS,
-  week: WEEK_DESIGNS,
+  // kolo 34: sloučené karty — Velké hodiny, Týden a Rychlé přepínače jsou vzhledy karet Čas, Kalendář a Rychlé dlaždice Windows
+  clock: [
+    { id: "classic", name: ["cards.design.clock.classic", "Hodiny"], line: ["cards.design.clock.classic.line", "Čas s týdnem a datem, na notebooku i baterie."] },
+    { id: "big", name: ["cards.design.clock.big", "Velké hodiny"], line: ["cards.design.clock.big.line", "Čas obřími číslicemi a pod ním datum."] },
+  ],
+  calendar: [
+    { id: "list", name: ["cards.design.calendar.list", "Dnes a zítra"], line: ["cards.design.calendar.list.line", "Události z kalendáře: dnes a zítra."] },
+    ...WEEK_DESIGNS,
+  ],
+  winquick: [
+    { id: "tiles", name: ["cards.design.winquick.tiles", "Dlaždice"], line: ["cards.design.winquick.tiles.line", "Dlaždice, které si vybereš: mikrofon, výstup, terminál, složky, motiv…"] },
+    { id: "toggles", name: ["cards.design.winquick.toggles", "Přepínače"], line: ["cards.design.winquick.toggles.line", "Zvuk a mikrofon jedním klikem, hlasitost − / + a baterie."] },
+  ],
   notes: NOTES_DESIGNS,
 };
 
 /** Vzhledy karty (prázdné = karta má jen jeden vzhled). */
+/** Vzhledy karty Claude, které kreslí `cards/ClaudeDesign.tsx` (klasický ne) — tady, ať `MainPage` nemusí importovat celou kartu. */
+export const isClaudeDesign = (id: string | undefined): boolean => !!id && id !== "classic";
 export const designsOf = (cardId: string): readonly Design[] => CARD_DESIGNS[cardId] ?? [];
 
 /** Platné id vzhledu, který se má do configu zapsat: neznámé i výchozí = undefined (pole pryč). */

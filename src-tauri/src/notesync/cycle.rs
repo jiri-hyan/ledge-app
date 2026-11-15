@@ -1,13 +1,16 @@
 //! Jeden cyklus synchronizace nad existujícím repem: `add -A` → commit jen se změnami → `fetch` →
-//! `rebase --autostash` (jen když remote utekl) → `push` (jen když jsme napřed). Konflikt =
-//! `rebase --abort` a `Outcome::Konflikt` (lokální commit zůstane). Závisí na `git.rs`.
+//! `rebase` nad čistým stromem (jen když remote utekl; soubor s konfliktními značkami se nikdy necommituje) → `push` (jen když jsme napřed). Konflikt =
+//! `rebase --abort` a `conflict::merge_keep_both` (konfliktní verze jako kopie, sync jede dál); jen když to selže,
+//! `Outcome::Konflikt` (lokální commit zůstane). Závisí na `git.rs`, `conflict.rs`.
 
 use crate::i18n::tr;
+use super::conflict::merge_keep_both;
 use super::git::{Fail, commit_all, git, local_fail, net_fail, nul_list};
 use super::{Ctx, IGNORE, Outcome, commit_message, ensure_lines};
 
 /// Jeden cyklus nad existujícím repem: commit → fetch → rebase → push.
-pub(super) fn cycle(ctx: &Ctx) -> Outcome {
+/// `notes`: řádky do logu (vytvořené kopie konfliktů).
+pub(super) fn cycle(ctx: &Ctx, notes: &mut Vec<String>) -> Outcome {
     let (root, remote) = (ctx.root, ctx.remote);
     let gd = root.join(".git");
     if gd.join("rebase-merge").exists() || gd.join("rebase-apply").exists() || gd.join("MERGE_HEAD").exists() {
@@ -54,20 +57,33 @@ pub(super) fn cycle(ctx: &Ctx) -> Outcome {
             (1, 0)
         };
         if behind > 0 {
-            if let Err(f) = git(root, remote, &["rebase", "-q", "--autostash", &upstream], false) {
+            // změna uložená od prvního commitu (fetch může trvat) se commitne TEĎ; rebase pak běží nad čistým stromem
+            // bez `--autostash` — jeho pop s konfliktem by nechal značky v poznámce a příští cyklus by je poslal dál
+            if let Err(o) = commit_all(root, remote, &commit_message(ctx.pc, &ctx.now)) {
+                return o;
+            }
+            if let Err(f) = git(root, remote, &["rebase", "-q", &upstream], false) {
                 let files = git(root, remote, &["diff", "--name-only", "--diff-filter=U", "-z"], false).map(|s| nul_list(&s)).unwrap_or_default();
                 let _ = git(root, remote, &["rebase", "--abort"], false);
                 if files.is_empty() {
                     return local_fail("git rebase", f);
                 }
-                return Outcome::Konflikt {
-                    files,
-                    message: tr(
-                        "Stejná poznámka se změnila na dvou PC. Lokální verze zůstala v lokálním commitu; vyřeš ručně (`git pull --rebase` v kořeni poznámek) nebo jednu verzi zahoď.",
-                        "The same note changed on two PCs. The local version stayed in a local commit; resolve it by hand (`git pull --rebase` in the notes folder) or drop one version.",
-                    )
-                    .into(),
-                };
+                // konflikt jedné poznámky nezastaví sync ostatních: kopie lokální verze vedle, remote na místě
+                let today = ctx.now.format("%Y-%m-%d").to_string();
+                match merge_keep_both(root, remote, &upstream, &commit_message(ctx.pc, &ctx.now), &today) {
+                    Ok(copies) => notes.extend(copies.into_iter().map(|c| format!("sync poznámek: konflikt dvou PC, lokální verze uložena jako kopie: {c}"))),
+                    Err(why) => {
+                        notes.push(format!("sync poznámek: konflikt se nepodařilo rozdělit na kopie ({why})"));
+                        return Outcome::Konflikt {
+                            files,
+                            message: tr(
+                                "Stejná poznámka se změnila na dvou PC. Lokální verze zůstala v lokálním commitu; vyřeš ručně (`git pull --rebase` v kořeni poznámek) nebo jednu verzi zahoď.",
+                                "The same note changed on two PCs. The local version stayed in a local commit; resolve it by hand (`git pull --rebase` in the notes folder) or drop one version.",
+                            )
+                            .into(),
+                        };
+                    }
+                }
             }
             pulled = true;
         }

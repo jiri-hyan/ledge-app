@@ -34,10 +34,11 @@ Sloupců méně než 2 = nic.
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `src/charts/geom.ts` | čistá geometrie: body a path sparklinu (plocha uzavřená dole), prstenec jako `stroke-dasharray`, obdélníky sloupců, buňky pásu po sloupcích s úrovní, trend; souřadnice na 2 desetiny | `finite` `extent` `sparkPoints` `sparkline` `ring` `bars` `heat` `heatLevel` `trend` |
+| `src/charts/geom.ts` | čistá geometrie: body a path sparklinu (plocha uzavřená dole), prstenec jako `stroke-dasharray`, obdélníky sloupců, trend; souřadnice na 2 desetiny | `finite` `extent` `sparkPoints` `sparkline` `ring` `bars` `trend` |
 | `src/charts/dial.ts` · `Gauge.tsx` · `Rings.tsx` | kolo 25, budík (půlkruh s ručičkou a ryskou plánu) a soustředné prstence pro vzhledy karet Claude a Systém: čistá geometrie (`dialPath`, `needleEnd`, `ringDash`, `concentric`, `toneOf`, test `dial.test.mjs`), šířka podle obalu (viewBox), tooltip jako SVG `<title>`, kreslí jen viditelné | `Gauge` `Rings` `dialPath` `ringDash` |
+| `src/charts/thresholds.ts` | **jedna tabulka prahů** limitu a zátěže (`WARN_PCT` 75 / `FULL_PCT` 90, `toneOf`) — zrcadlo Rust `looks/capsule.rs`, test `thresholds.test.mjs`; viz „Tabulka prahů“ v [limits-detail.md](limits-detail.md) | `WARN_PCT` `FULL_PCT` `toneOf` |
 | `src/charts/visible.ts` | „kreslit jen viditelné“: IntersectionObserver obalu + otevřený šuplík; bez observeru = viditelné | `useVisible` |
-| `src/charts/Sparkline.tsx` · `Bars.tsx` | tenké komponenty nad `geom.ts` (viz API); `Ring`/`Heat` smazány (kolo 31b, nic je neimportovalo; `geom.ts` `ring`/`heatLevel` zůstávají jako testovaná geometrie bez komponenty) | `Sparkline` `Bars` |
+| `src/charts/Sparkline.tsx` · `Bars.tsx` | tenké komponenty nad `geom.ts` (viz API); `Ring`/`Heat` smazány (kolo 31b) a v kole 33 i `heat`/`heatLevel` z `geom.ts` (nikdo je nepoužíval); JEDINÁ definice úrovně buňky časové osy je `board/model.ts::heat` (0–4, `UsageCard`); pevné okno 60 vzorků zprava pro Systém je `integrations/format.ts::historyPoints` (jiná funkce než `geom.sparkPoints`, dřív se jmenovaly stejně) | `Sparkline` `Bars` |
 | `src/charts/Stat.tsx` | číslo jako hrdina: číslo, jednotka, popisek, druhý řádek, šipka trendu a sparkline z `series`; `value` null = „—“ | `Stat` |
 | `src/charts/charts.css` | barvy a typografie grafů (`chart-*`), žádná animace ani filtr | |
 

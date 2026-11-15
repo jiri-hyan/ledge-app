@@ -27,6 +27,7 @@
     "allow-widget-edit",
     "allow-widget-output",
     "allow-widget-refresh",
-    "allow-widgets-list"
+    "allow-widgets-list",
+    "allow-win-look"
   ]
 }

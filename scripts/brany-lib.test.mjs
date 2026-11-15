@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test scripts/brany-lib.test.mjs
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFailedTests, canRetry, retryArgs, flakyLine, stampText, stampMatches, isFullRun, buildCommand } from './brany-lib.mjs'
+import { parseFailedTests, canRetry, retryArgs, flakyLine, stampText, stampMatches, isFullRun, buildCommand, parseSince, emptyChangedWarning, isLinkLockError, lockOwnerPid, lockIsStale } from './brany-lib.mjs'
 
 const ALL = ['test', 'clippy', 'tsc', 'ui', 'build']
 
@@ -63,4 +63,36 @@ test('buildCommand: vite build samotný, když tsc běží ve stejném běhu', (
   assert.equal(buildCommand(ALL, q), 'Q(corepack pnpm exec vite build)')
   assert.equal(buildCommand(['build'], q), 'Q(corepack pnpm build)')
   assert.equal(buildCommand(['ui', 'build'], q), 'Q(corepack pnpm build)')
+})
+
+test('parseSince: --since <ref>, --since=<ref>, chybějící hodnota, --allow-empty', () => {
+  assert.deepEqual(parseSince(['--changed']), { since: null, allowEmpty: false })
+  assert.deepEqual(parseSince(['--changed', '--since', 'HEAD~1']), { since: 'HEAD~1', allowEmpty: false })
+  assert.deepEqual(parseSince(['--since=abc123', '--allow-empty']), { since: 'abc123', allowEmpty: true })
+  assert.equal(parseSince(['--changed', '--since']).since, '')
+  assert.equal(parseSince(['--since', '--force']).since, '')
+})
+
+test('emptyChangedWarning: 0 souborů varuje, --allow-empty a neprázdná změna ne', () => {
+  assert.match(emptyChangedWarning(0, false), /NIC SE NEOVĚŘILO/)
+  assert.equal(emptyChangedWarning(0, true), null)
+  assert.equal(emptyChangedWarning(3, false), null)
+})
+
+test('isLinkLockError: rozpozná zamčený soubor při linku, ne obyčejnou chybu', () => {
+  assert.equal(isLinkLockError('LINK : fatal error LNK1104: cannot open file \'x.exe\''), true)
+  assert.equal(isLinkLockError('error: linking with `link.exe` failed: exit code: 1104\n = note: LINK : fatal error LNK1104'), true)
+  assert.equal(isLinkLockError('error[E0425]: cannot find value `x`'), false)
+  assert.equal(isLinkLockError('test result: ok. 3 passed'), false)
+})
+
+test('zámek cargo: vlastník, opuštěný (mrtvý pid / stáří / smetí)', () => {
+  const now = Date.parse('2026-11-13T10:00:00Z')
+  const fresh = '123\n2026-11-13T09:59:00Z\nC:/x'
+  assert.equal(lockOwnerPid(fresh), 123)
+  assert.equal(lockOwnerPid('abc'), null)
+  assert.equal(lockIsStale(fresh, true, now), false)
+  assert.equal(lockIsStale(fresh, false, now), true)
+  assert.equal(lockIsStale('123\n2026-11-13T08:00:00Z\n', true, now), true)
+  assert.equal(lockIsStale('', true, now), true)
 })

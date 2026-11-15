@@ -112,7 +112,7 @@ registerDict("en", {
   "appearance.accent.fuchsia": "Fuchsia",
   "appearance.accent.rose": "Raspberry",
   "settings.f.appearance.backdrop": "Drawer background",
-  "settings.f.appearance.backdrop.hint": "Gradients, your own gradient, live backgrounds (fire, polar lights, lava, stars, rain, grain)",
+  "settings.f.appearance.backdrop.hint": "Gradients, your own gradient, live backgrounds (fire, polar lights, lava, stars, rain, grain). Pick your own photo in Launch and games → Extensions → Wallpaper background.",
   "settings.f.appearance.backdrop.kw": "background backdrop gradient fire aurora lava stars rain grain mesh wallpaper",
   "settings.f.appearance.backdrop.cards": "Cards over the background",
   "settings.f.appearance.backdrop.cards.hint": "Card transparency over the background: automatic, solid, tinted or glass",

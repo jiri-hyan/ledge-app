@@ -75,3 +75,10 @@ export function textProblems(v: Record<string, string>, keys: readonly string[] 
   if (btn < MIN_CONTRAST) out.push({ key: "on-light", ratio: btn });
   return out;
 }
+
+/** Text na plochu barvy akcentu (`--on-accent`): čistá černá nebo bílá podle většího kontrastu (nejhorší možný poměr je √21 ≈ 4,58, proto ne #111). Jinak než `on-light`
+ *  (ten je ručně laděné k `t1`) se počítá z akcentu, takže platí i pro vlastní a z pozadí odvozený akcent. */
+export function onAccent(accent: string): string {
+  const a = parseColor(accent);
+  return contrast(parseColor("#000000"), a) >= contrast(parseColor("#ffffff"), a) ? "#000000" : "#ffffff";
+}

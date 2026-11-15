@@ -1,7 +1,7 @@
 // Vzhledy karty Poznámky: výchozí první, neznámé nespadne, starý `view` se převede, Kanban dělí na otevřené a hotové.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { kanbanSplit, LEGACY_VIEW_DESIGN, NOTES_DESIGNS, notesDesign } from "./noteDesigns.ts";
+import { groupCount, kanbanCount, kanbanSplit, LEGACY_VIEW_DESIGN, NOTES_DESIGNS, notesDesign } from "./noteDesigns.ts";
 import { designOf, designsOf, storedDesign } from "../layout/designs.ts";
 import { normalizeCardLook } from "../layout/look.ts";
 
@@ -39,4 +39,9 @@ test("kanbanSplit: otevřené a hotové, pořadí zůstává", () => {
   assert.deepEqual(r.open.map((x) => x.id), [1, 3]);
   assert.deepEqual(r.done.map((x) => x.id), [2]);
   assert.deepEqual(kanbanSplit([]), { open: [], done: [] });
+});
+
+test("počty v hlavičkách: kanban ukáže celek, skupiny dolní odhad při ořezu (N3b)", () => {
+  for (const [shown, total, want] of [[8, 40, "8 / 40"], [3, 3, "3"], [0, 0, "0"], [5, null, "5"], [5, undefined, "5"], [8, 8, "8"], [8, 7, "8"]]) assert.equal(kanbanCount(shown, total), want, `${shown}/${total}`);
+  for (const [shown, cut, want] of [[3, true, "3+"], [3, false, "3"], [0, true, "0"]]) assert.equal(groupCount(shown, cut), want, `${shown}/${cut}`);
 });

@@ -29,7 +29,7 @@ The drawer slides down when you touch the top edge of the screen.</sub>
 
 ## Why Ledge
 
-Ledge is built by one developer for his own daily work on Windows with Claude Code, and shared as open
+Ledge is built for daily work on Windows with Claude Code, and shared as open
 source (MIT). It doesn't try to fit everyone out of the box: it has a lot of settings, and if it still isn't
 quite right for you, [fork it and make it yours](#make-it-yours).
 

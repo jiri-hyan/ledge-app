@@ -1,7 +1,9 @@
 // Čistá logika lístků na plochu (bez DOM a Tauri, testy `model.test.mjs`): přidání bodu / textu na
 // konec těla poznámky, barvy podle průhledností (text vždy čitelný), porovnání cest a stav připnutí
 // ze snapshotu šuplíku (`Snapshot.pins`, Rust `pins::win::view`).
+import { clampNum as clamp, pad2 } from "../pad.ts";
 import { normPath, samePath } from "../util/path.ts";
+import { taskLineOf } from "../notes/taskline.ts";
 import { SUGGEST_MAX_CHARS, looksTimed, toLocalValue, type Suggest } from "../notes/suggest.ts";
 
 /** Průhlednost textu nejníž sem (%) — stejně jako Rust `pins::TEXT_MIN`. */
@@ -14,10 +16,9 @@ export type SaveState = "idle" | "pending" | "saving" | "saved";
 export const BG_RGB = "24, 26, 32";
 export const FG_RGB = "244, 245, 248";
 
-const TASK = /^\s*[-*+] \[[ xX]\]/;
 const NUMBERED = /^(\s*)(\d+)([.)])\s/;
 /** Řádek seznamu, který se za sebe lepí bez prázdného řádku: bod checklistu `- [ ]` nebo číslovaná položka `1.` / `1)`. */
-export const isTaskLine = (l: string) => TASK.test(l) || NUMBERED.test(l);
+export const isTaskLine = (l: string) => taskLineOf(l) !== null || NUMBERED.test(l);
 
 const flat = (text: string) => text.replace(/\s+/g, " ").trim();
 
@@ -44,7 +45,6 @@ export function appendLine(body: string, line: string): string {
   return `${base}${tight ? "\n" : "\n\n"}${add}`;
 }
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : hi));
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Barvy lístku: `bg` 0–100 % neprůhlednost pozadí, `text` `TEXT_MIN`–100 % neprůhlednost textu.
@@ -64,9 +64,16 @@ export function pinColors(bg: number, text: number) {
 export { normPath, samePath };
 
 export type PinRef = { path: string; through: boolean };
-export type PinsLike = { open: PinRef[]; key: string } | undefined | null;
+export type PinsLike = { open: PinRef[]; hidden?: { path: string; until: number }[]; key: string } | undefined | null;
 
 export const isPinned = (pins: PinsLike, path: string) => !!pins?.open.some((p) => samePath(p.path, path));
+/** Kdy se schovaný lístek poznámky vrátí (ms epochy); `null` = není schovaný. */
+export const hiddenUntil = (pins: PinsLike, path: string): number | null => pins?.hidden?.find((p) => samePath(p.path, path))?.until ?? null;
+/** Čas návratu schovaného lístku pro popisek: dnes jen `time` (`H:MM`), jindy i den a měsíc. */
+export function backAt(ms: number, now: number): { today: boolean; d: number; m: number; time: string } {
+  const d = new Date(ms);
+  return { today: d.toDateString() === new Date(now).toDateString(), d: d.getDate(), m: d.getMonth() + 1, time: `${d.getHours()}:${pad2(d.getMinutes())}` };
+}
 export const anyThrough = (pins: PinsLike) => !!pins?.open.some((p) => p.through);
 
 /** Začátek textu řádku Markdownu (odsazení, odrážka / číslo / úkol / nadpis / citace). */

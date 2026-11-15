@@ -153,10 +153,10 @@ pub(crate) fn spawn_notes_watch(rx: mpsc::Receiver<NotesMsg>, tx: mpsc::Sender<N
     use notify::{RecursiveMode, Watcher};
     std::thread::Builder::new()
         .name("notes-watch".into())
-        .spawn(move || {
+        .spawn(move || crate::guard::guarded("notes-watch", crate::guard::CAP, || {
             let mut _watcher: Option<notify::RecommendedWatcher> = None;
             let mut rewatch = true;
-            let mut last_rewatch = Instant::now() - Duration::from_secs(60);
+            let mut last_rewatch = crate::guard::ago(Duration::from_secs(60));
             let mut swept = false;
             loop {
                 if rewatch {
@@ -204,7 +204,7 @@ pub(crate) fn spawn_notes_watch(rx: mpsc::Receiver<NotesMsg>, tx: mpsc::Sender<N
                     reload_notes();
                 }
             }
-        })
+        }))
         .ok();
 }
 

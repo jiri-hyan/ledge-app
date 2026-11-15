@@ -7,6 +7,7 @@
 //! Okno smí volat jen příkazy z `capabilities/studio.json` (tabulka `STUDIO_WINDOW` v `ipcacl.rs`).
 //! Když okno nejde vytvořit, `studio_open` vrátí chybu a šuplík vykreslí TÝŽ komponent jako stránku.
 
+use crate::qa::QaDataDir as _;
 use crate::state::core;
 use std::sync::atomic::{AtomicU64, Ordering};
 use serde::{Deserialize, Serialize};
@@ -156,9 +157,10 @@ pub fn open(target: Option<String>, focus: bool) -> Result<(), String> {
         .always_on_top(false)
         .min_inner_size(MIN_W, MIN_H)
         .inner_size(at.w as f64 / scale, at.h as f64 / scale)
-        .position(at.x as f64 / scale, at.y as f64 / scale)
+        .position(crate::qa::park_x(at.x) as f64 / scale, at.y as f64 / scale)
         // stejné argumenty + data dir jako šuplík → jeden proces prohlížeče
-        .additional_browser_args(crate::drawer::BROWSER_ARGS)
+        .additional_browser_args(crate::qa::browser_args())
+        .qa_data_dir()
         .disable_drag_drop_handler()
         .build();
     let win = match win {
@@ -170,7 +172,7 @@ pub fn open(target: Option<String>, focus: bool) -> Result<(), String> {
     }
     .map_err(|e| crate::errors::any(crate::i18n::tr("Ledge Studio se neotevřelo", "Ledge Studio didn't open"), &e))?;
     GENERATION.fetch_add(1, Ordering::SeqCst);
-    let _ = win.set_position(PhysicalPosition::new(at.x, at.y));
+    let _ = win.set_position(PhysicalPosition::new(crate::qa::park_x(at.x), at.y));
     let _ = win.set_size(PhysicalSize::new(at.w as u32, at.h as u32));
     if saved.max {
         let _ = win.maximize();
@@ -194,8 +196,8 @@ pub fn open(target: Option<String>, focus: bool) -> Result<(), String> {
     });
     hide_drawer();
     let _ = win.show();
-    if focus {
-        let _ = win.set_focus();
+    if focus && !crate::qa::isolated() {
+        let _ = win.set_focus(); // QA: parkované okno fokus nebere
     }
     Ok(())
 }
@@ -213,8 +215,8 @@ fn reveal(w: &WebviewWindow, target: Option<String>, focus: bool) -> Result<(), 
     hide_drawer();
     let _ = w.unminimize();
     let _ = w.show();
-    if focus {
-        let _ = w.set_focus();
+    if focus && !crate::qa::isolated() {
+        let _ = w.set_focus(); // QA: parkované okno fokus nebere
     }
     if let Some(t) = target {
         let _ = w.emit_to(LABEL, GOTO, t);

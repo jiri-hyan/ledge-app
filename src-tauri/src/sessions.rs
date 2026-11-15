@@ -193,6 +193,8 @@ pub struct Row {
     pub uncommitted: Vec<String>,
     pub unpushed: u32,
     pub ended: bool,
+    /// proč skončila (`SessionEnd.reason` z hooku), jen u `ended`; `None` = nevíme
+    pub end_reason: Option<String>,
     pub subagents: Subagents,
     pub can_open: bool,
     pub open_hint: String,
@@ -281,6 +283,11 @@ fn last_segment(cwd: &str) -> String {
     cwd.rsplit(['/', '\\']).find(|s| !s.is_empty()).unwrap_or("session").to_string()
 }
 
+/// Hook-Waiting platí, dokud registr nemá novější změnu stavu (`status_at`); bez ní (nebo bez registru) platí vždy.
+pub fn hook_waiting_fresh(hook_updated_at: u64, reg_status_at: Option<u64>) -> bool {
+    reg_status_at.is_none_or(|t| hook_updated_at >= t)
+}
+
 /// `dirs` = (id projektu, složka), `name_of` = id → název.
 pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_of: &dyn Fn(&str) -> Option<String>, now: u64) -> Vec<Row> {
     let mut hooks: HashMap<String, Session> = hooked.into_iter().map(|s| (s.id.clone(), s)).collect();
@@ -288,7 +295,8 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
     let mut rows = Vec::new();
     let mut push = |id: &str, cwd: String, base: Base, h: Option<Session>| {
         let r = reg.get(id).copied();
-        let waiting = h.as_ref().is_some_and(|h| h.state == SessionState::Waiting);
+        // L234: hook „čeká“ přebije registr jen když není starší než jeho poslední změna stavu (Esc neposílá `Stop`)
+        let waiting = h.as_ref().is_some_and(|h| h.state == SessionState::Waiting && hook_waiting_fresh(h.updated_at, r.and_then(|r| r.status_at)));
         let status = if waiting && base.status != Status::Ended { Status::Waiting } else { base.status };
         let unfinished = h.as_ref().is_some_and(Session::unfinished);
         // skončená bez rozdělané práce nikoho nezajímá — kromě úlohy na pozadí (je v seznamu, dokud ji nikdo neodebere)
@@ -311,7 +319,7 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
         let background = kind.as_deref().is_some_and(|k| k.eq_ignore_ascii_case("background"));
         let waiting_for = base.waiting_for.filter(|_| status == Status::Waiting);
         let action = decide_open(entrypoint.as_deref(), kind.as_deref(), alive, pid);
-        let (uncommitted, unpushed, subagents, activity) = h.map(|h| (h.uncommitted, h.unpushed, h.subagents, h.activity)).unwrap_or_default();
+        let (uncommitted, unpushed, subagents, activity, end_reason) = h.map(|h| (h.uncommitted, h.unpushed, h.subagents, h.activity, h.end_reason)).unwrap_or_default();
         rows.push(Row {
             id: id.to_string(),
             title: title.filter(|t| *t != name),
@@ -325,6 +333,7 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
             since: base.since.or(r.and_then(|r| r.status_at)),
             hooked: base.hooked,
             ended: status == Status::Ended,
+            end_reason: end_reason.filter(|_| status == Status::Ended),
             can_open: !matches!(action, OpenAction::Unavailable(_)),
             open_hint: open_hint(&action, &name),
             name,
@@ -376,6 +385,8 @@ pub fn merge(live: &Live, hooked: Vec<Session>, dirs: &[(String, String)], name_
             Status::Ended
         } else {
             match h.state {
+                // L234: starší hook „čeká“ nepřebije novější stav z registru (Esc neposílá `Stop`)
+                SessionState::Waiting if !hook_waiting_fresh(h.updated_at, r.and_then(|r| r.status_at)) => live_status(r.and_then(|r| r.status.as_deref()), None, None),
                 SessionState::Waiting => Status::Waiting,
                 SessionState::Working => Status::Working,
                 SessionState::Idle => Status::Idle,
@@ -603,11 +614,11 @@ mod tests {
             assert_eq!(clean_preview(inp).as_deref(), *want, "{inp:?}");
         }
         // řádek karty: titulek z hooku i jméno ze seznamu jdou přes filtr
-        let agents = parse_agents(r#"[{"pid":3,"sessionId":"s1","cwd":"C:/x/WorkSpace","status":"busy","name":"<system-reminder>a</system-reminder>"}]"#).unwrap();
+        let agents = parse_agents(r#"[{"pid":3,"sessionId":"s1","cwd":"C:/x/Projekt","status":"busy","name":"<system-reminder>a</system-reminder>"}]"#).unwrap();
         let mut h = hook("s1", "", SessionState::Working, 1);
         h.title = Some("<system-reminder> Linked sessions now (s…".into());
         let rows = merge(&Live { agents: Some(&agents), fetched_at: 0, registry: &[] }, vec![h], &[], &|_| None, 2);
-        assert_eq!((rows[0].name.as_str(), rows[0].title.as_deref()), ("WorkSpace", None));
+        assert_eq!((rows[0].name.as_str(), rows[0].title.as_deref()), ("Projekt", None));
     }
 
     #[test]
@@ -657,7 +668,21 @@ mod tests {
     }
 
     fn hook(id: &str, cwd: &str, state: SessionState, updated_at: u64) -> Session {
-        Session { id: id.into(), cwd: cwd.into(), state, title: None, updated_at, uncommitted: vec![], unpushed: 0, ended: false, subagents: Subagents::default(), transcript: None, activity: None }
+        Session { id: id.into(), cwd: cwd.into(), state, title: None, updated_at, uncommitted: vec![], unpushed: 0, ended: false, end_reason: None, subagents: Subagents::default(), transcript: None, activity: None }
+    }
+
+    /// L234: hook „čeká“ přebije registr jen když není starší než jeho změna stavu.
+    #[test]
+    fn hook_waiting_fresh_table() {
+        for (hook, reg, want) in [(100, None, true), (100, Some(100), true), (100, Some(99), true), (100, Some(101), false), (0, Some(1), false)] {
+            assert_eq!(hook_waiting_fresh(hook, reg), want, "hook {hook} reg {reg:?}");
+        }
+        // celá cesta přes `merge`: registr „busy“ novější než hook-Waiting → pracuje, ne „čeká“
+        let registry = vec![parse_registry(r#"{"pid":5,"sessionId":"s-esc","entrypoint":"cli","status":"busy","statusUpdatedAt":9000}"#).unwrap()];
+        let live = Live { agents: None, fetched_at: 0, registry: &registry };
+        let name_of = |_: &str| None;
+        let st = |t: u64| merge(&live, vec![hook("s-esc", r"C:\x", SessionState::Waiting, t)], &[], &name_of, 10_000)[0].status;
+        assert_eq!((st(5000), st(9500)), (Status::Working, Status::Waiting));
     }
 
     #[test]
@@ -676,12 +701,15 @@ mod tests {
         let mut dirty = hook("h-dirty", r"C:\Users\x\Desktop\atlas-v2\sub", SessionState::Idle, 100);
         dirty.uncommitted = vec!["a.rs".into()];
         dirty.ended = true;
+        dirty.end_reason = Some("logout".into());
         let hooked = vec![cli, hook("h-new", r"C:\nove", SessionState::Working, 15_000), hook("h-gone", r"C:\x", SessionState::Idle, 100), dirty];
         let live = Live { agents: Some(&agents), fetched_at: 20_000, registry: &registry };
         let rows = merge(&live, hooked, &dirs, &name_of, 30_000);
         let got: Vec<(&str, Status)> = rows.iter().map(|r| (r.id.as_str(), r.status)).collect();
         assert_eq!(got, [("s-bg", Status::Waiting), ("s-cli", Status::Waiting), ("s-desk", Status::Working), ("h-new", Status::Working), ("h-dirty", Status::Ended)]);
         let by = |id: &str| rows.iter().find(|r| r.id == id).unwrap();
+        // důvod konce jen u skončené (`h-dirty`), jinak None
+        assert_eq!(rows.iter().filter_map(|r| r.end_reason.as_deref().map(|e| (r.id.as_str(), e))).collect::<Vec<_>>(), [("h-dirty", "logout")]);
         // desktop: jméno z agents, stav z čerstvějšího registru, projekt z cwd, klik = přepnout do appky
         let d = by("s-desk");
         assert_eq!((d.name.as_str(), d.project.as_deref(), d.project_id.as_deref()), ("Review commitů", Some("Atlas"), Some("atlas")));

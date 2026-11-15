@@ -170,6 +170,11 @@ pub fn norm_piece_color(s: &str) -> String {
     let s = s.trim().to_ascii_lowercase();
     if s == "accent" || parse_hex(&s).is_some() { s } else { String::new() }
 }
+/// Barva celého dílu: jako `norm_piece_color` + `heat` (zelená → červená podle hodnoty, kolo 33).
+pub fn norm_piece_tint(s: &str) -> String {
+    let t = s.trim().to_ascii_lowercase();
+    if t == "heat" { t } else { norm_piece_color(&t) }
+}
 fn norm_hex(s: &str) -> String {
     let s = s.trim().to_ascii_lowercase();
     if parse_hex(&s).is_some() { s } else { String::new() }
@@ -354,7 +359,10 @@ mod tests {
         ] {
             assert_eq!(norm_edge_color(raw), edge, "{raw}");
             assert_eq!(norm_piece_color(raw), piece, "{raw}");
+            assert_eq!(norm_piece_tint(raw), piece, "{raw}");
         }
+        // `heat` jen pro barvu dílu, ne pro podklad / text
+        assert_eq!((norm_piece_tint(" Heat "), norm_piece_color("heat").as_str()), ("heat".to_string(), ""));
         let d = Deco { width: 9, color2: "x".into(), ..Deco::default() }.norm();
         assert_eq!((d.width, d.color2.as_str()), (3, ""));
         assert_eq!(Deco { width: 0, ..Deco::default() }.norm().width, 1);

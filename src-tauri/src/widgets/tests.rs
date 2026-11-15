@@ -201,3 +201,33 @@ fn config_serde_and_schema() {
     assert_eq!(cfg.widgets, WidgetsConfig::default());
     assert!(crate::config::schema_json().contains("\"widgets\""));
 }
+
+#[test]
+fn kit_files_are_scanned_without_header_or_consent() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    write(d, "ok.kit.json", r#"{"kit":1,"title":"Kokpit","icon":"◐","rows":[{"text":"Čeká {waiting.count}"}]}"#);
+    write(d, "BOM.KIT.JSON", "\u{feff}{\"kit\":1,\"title\":\"Velká písmena\",\"rows\":[{\"text\":\"a\"}]}");
+    write(d, "rozbity.kit.json", "{ tohle není json");
+    write(d, "config.json", r#"{"kit":1,"title":"Ne","rows":[{"text":"a"}]}"#);
+    write(d, ".skryty.kit.json", r#"{"kit":1,"title":"Ne","rows":[{"text":"a"}]}"#);
+    write(d, ".kit.json", r#"{"kit":1,"title":"Ne","rows":[{"text":"a"}]}"#);
+    write(d, "velky.kit.json", &format!(r#"{{"kit":1,"title":"V","rows":[{{"text":"{}"}}]}}"#, "x".repeat(20_000)));
+    let s = scan_dir(d, None);
+    let ids: Vec<&str> = s.widgets.iter().map(|w| w.id.as_str()).collect();
+    assert_eq!(ids, ["widget:BOM.KIT.JSON", "widget:ok.kit.json", "widget:rozbity.kit.json", "widget:velky.kit.json"]);
+    assert!(s.widgets.iter().all(|w| w.kind == Kind::Kit && w.sha.is_empty() && w.fingerprint().is_none()));
+    let ok = s.get("widget:ok.kit.json").unwrap();
+    assert_eq!((ok.title().as_str(), ok.meta.as_ref().unwrap().icon.as_deref()), ("Kokpit", Some("◐")));
+    assert!(ok.kit.is_some() && s.get("widget:BOM.KIT.JSON").unwrap().kit.is_some());
+    for bad in ["widget:rozbity.kit.json", "widget:velky.kit.json"] {
+        let w = s.get(bad).unwrap();
+        assert!(w.kit.is_none() && w.meta.is_err(), "{bad}");
+    }
+    // kit se nikdy nespouští: bez problému (není co hledat), ale `run::command` ho odmítne
+    assert_eq!(problem(ok, std::ffi::OsStr::new("")), None);
+    assert!(run::command(ok, ok.meta.as_ref().unwrap(), std::ffi::OsStr::new("")).is_err());
+    // čerstvé čtení před akcí jde přes jméno, ne příponu `.json`
+    assert_eq!(fresh(d, "widget:ok.kit.json").unwrap().kind, Kind::Kit);
+    assert!(fresh(d, "widget:config.json").is_err());
+}

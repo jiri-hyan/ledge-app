@@ -50,6 +50,13 @@ Zavolat Řehořovi kvůli fakturám
   tvar; čte i `tags: a, b` a blokový seznam `- a`). Štítkem je i `#štítek` v textu (ne v kódu, ne `# Nadpis`,
   ne `#1`). Štítek = písmena, číslice, `-` `_` `/`, Ledge ho bere malými písmeny. **Agent smí `color` i `tags`
   nastavit.** Barva podle štítku: config `notes.tagColors` (`{"qa": "red"}`), platí jen bez vlastní `color`.
+- **Propojená aplikace** („Poslat do {název}“ v ⋯ poznámky; název a adresa v configu `connector`): odeslaná poznámka jako celek má ve
+  frontmatteru `connector: <id poznámky na straně aplikace>`; odeslaný bod `- [ ]` má pod sebou (a pod svými snímky) odsazený
+  řádek `↳ [Název](https://…/?tab=tasks&task=<id>)` (bez názvu `↳ [Úkol](…)`, bez adresy webu holé `↳ [Název] <id>`).
+  **Řádek pod bodem začínající `↳ [` znamená „odesláno“** (jedna značka `SENT_MARK`; pozná starý i nový tvar, i vlastní řádek
+  s touto předponou). Podle nich Ledge pozná, že už je odeslaný, a podruhé ho neodešle. Agent je smí nechat být; smazáním
+  řádku / klíče se bod nabídne k odeslání znovu (odeslání nese `clientRequestId`, který má duplicitu zabránit).
+  V textu bodu: `řešitel Tomáš Hora` / `assignee tomas` / `@tomas` = řešitel, samostatné `!` (4), `!!` (5), `!1`…`!5` = priorita.
 - Vazba na jinou poznámku: `[[titulek poznámky]]` nebo `[[titulek|popisek]]` (jako Obsidian). Ledge cíl hledá
   podle titulku (první řádek, bez ohledu na velikost písmen a diakritiku), pak podle jména souboru; v náhledu i
   lístku je vazba klikatelná, neexistující nabídne vytvořit novou poznámku s tím titulkem.
@@ -117,6 +124,15 @@ Body (úkoly) mají tři stavy:
   připisuj řádky `- <ISO čas> text` (`notes_log`); starší řádky neupravuj. Sekce se založí, když chybí.
   Otázky se číslují od 0 (`questions[].index`).
 - Zápis mění jen dotčené řádky; tělo, neznámé klíče a CRLF zůstanou bajtově stejné.
+- **Termín a priorita bodu** (jediná gramatika `notes/taskline.rs`, zrcadlo `src/notes/taskline.ts`): text za
+  značkou je `text [⏰ YYYY-MM-DD[ HH:MM]] [! | !!] [ — důkaz: …]`, tokeny na konci textu, oddělené právě jednou
+  mezerou. Čas místní, bez offsetu; **bez času = celodenní** (dnes celý den, po termínu až od půlnoci).
+  `!` = vysoká, `!!` = nejvyšší (4 / 5 při odeslání do propojené aplikace); jen samostatný token na konci — „Pozor!“, `a!b`, `Co?!`, `!!!`
+  a URL s `!` priorita nejsou. Víc `⏰` → platí poslední v ocase, ostatní zůstanou v textu. Čte se i `📅 YYYY-MM-DD`
+  (Obsidian Tasks, celodenní; zůstane `📅`, dokud termín neměníš). Ledge mění jen tyto tokeny (`note_task_snooze`,
+  otisk souboru jako u `note_toggle_task`); odškrtnutí `[x]` token nemaže. Body v blocích kódu se ignorují.
+  Příklad: `- [ ] Doktor ⏰ 2026-11-14 09:00 !`. Termín bodu zároveň ovládá připomínku poznámky (dřívější z `remind:`
+  a nejbližšího termínu otevřeného bodu). Úkol pod odeslaným bodem (`↳ [`…) se do čísel „po termínu“ nepočítá.
 
 MCP (viz [api-mcp.md](api-mcp.md)): `notes_read` (body se `state`, `evidence`, `images`, `refs`; `questions`;
 `looseImages`; `status`/`cost`/`budget`/`model`), `notes_set_status`, `notes_ask`, `notes_propose_done`,

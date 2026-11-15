@@ -42,14 +42,14 @@ pub const FAIL_CODE: i64 = -32000;
 pub fn fail_text(f: Fail) -> String {
     match f {
         Fail::NotRunning => tr(
-            "Ledge neběží — spusť Ledge (a zapni v Ledge Nastavení → Claude (MCP)).",
-            "Ledge isn't running — start Ledge (and turn it on in Ledge Settings → Claude (MCP)).",
+            "Ledge neběží — spusť Ledge (a zapni v Ledge Nastavení → Claude → Claude (MCP)).",
+            "Ledge isn't running — start Ledge (and turn it on in Ledge Settings → Claude → Claude (MCP)).",
         )
         .into(),
-        Fail::Disabled => tr("MCP je v Ledge vypnuté — zapni v Ledge Nastavení → Claude (MCP).", "MCP is off in Ledge — turn it on in Ledge Settings → Claude (MCP).").into(),
+        Fail::Disabled => tr("MCP je v Ledge vypnuté — zapni v Ledge Nastavení → Claude → Claude (MCP).", "MCP is off in Ledge — turn it on in Ledge Settings → Claude → Claude (MCP).").into(),
         Fail::BadKey => tr(
-            "Klíč MCP nesedí — v Ledge Nastavení → Claude (MCP) ho mezitím někdo vyměnil; restartuj klienta.",
-            "The MCP key doesn't match — it was replaced in Ledge Settings → Claude (MCP); restart the client.",
+            "Klíč MCP nesedí — v Ledge Nastavení → Claude → Claude (MCP) ho mezitím někdo vyměnil; restartuj klienta.",
+            "The MCP key doesn't match — it was replaced in Ledge Settings → Claude → Claude (MCP); restart the client.",
         )
         .into(),
         Fail::Other(c) => trf!("Ledge odpověděl chybou {c}.", "Ledge answered with error {c}."),

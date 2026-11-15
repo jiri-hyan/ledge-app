@@ -8,6 +8,7 @@ registerDict("en", {
   "ui.keys.group.settings": "Settings",
   "ui.keys.hover": "Moving the mouse to the top edge of the screen opens the drawer; moving away closes it.",
   "ui.keys.palette": "Command palette: projects, actions, notes, settings, calculations and conversions. Type “?” to find this help.",
+  "ui.keys.typeTo": "In a drawer that has focus just start typing: the palette opens with your character. It also shows music and volume (volume 40), “Join” for a meeting, “x:” checks off a task and “allow” / “deny” answers a waiting Claude request (Enter).",
   "ui.keys.esc": "Closes the palette; otherwise cancels drawer editing, goes back to the main page and finally closes the drawer.",
   "ui.keys.quick": "Launches the Nth shortcut on the tab (numbers show while you hold Alt). Arrows move through shortcuts, Enter launches the selected one; works only in a drawer that has focus.",
   "ui.keys.tabWheel": "The mouse wheel over the tabs in the header switches tabs.",

@@ -1,98 +1,98 @@
 //! Vlákno `hover`: poloha myši (100 ms daleko od okraje, 16 ms u něj), fullscreen (500 ms),
 //! lištové okno v popředí (100 ms), tlak na hranu (`edge.rs`, `rawpush.rs`) → otevření/zavření šuplíku.
-//! Skrytý nebo do okna zamčený kurzor (hra) šuplík neotevře (`pointer::blocked_now`); změna monitoru / DPI
-//! proužek hned přepočítá (`pointer::display_changed`).
+//! Skrytý nebo do okna zamčený kurzor (hra) šuplík neotevře (`pointer::blocked_now`). Změnu zobrazení (monitor,
+//! DPI, pracovní plocha) hlásí okno proužku (`state::display_event`); vlákno ji jen zachytí podle počítadla
+//! (`display_gen`) a přepočítá podle `pointer::display_plan`. Výčet co 60 s (`MONITOR_TTL`) je jen pojistka.
 
 use crate::appearance::geom;
 use crate::config::{self, Trigger};
 use crate::drawer::{Opener, View};
 use crate::state::{UiCmd, core, log, mark_dirty};
 use crate::stripview::refresh_strip;
+use super::tracker;
 use crate::{edge, rawpush, screen};
+use windows::Win32::Foundation::RECT;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 pub(crate) fn spawn_hover_thread() {
     std::thread::Builder::new()
         .name("hover".into())
-        .spawn(|| {
-            let mut zone_since: Option<Instant> = None;
-            let mut outside_since: Option<Instant> = None;
-            let mut last_fs_check = Instant::now() - Duration::from_secs(5);
+        .spawn(|| crate::guard::guarded("hover", crate::guard::CAP, || {
+            let mut fswatch = super::fswatch::FsWatch::default();
             let mut mon = core().monitor();
             let mut last_mon = Instant::now();
-            let mut last_warm = Instant::now() - Duration::from_secs(10);
-            let mut approach_since: Option<Instant> = None;
+            let mut seen_gen = crate::state::display_gen();
+            let mut last_warm = crate::guard::ago(Duration::from_secs(10));
             let mut fg = screen::ForegroundProbe::default();
-            let mut last_fg_check = Instant::now() - Duration::from_secs(1);
-            let mut push = edge::PushTracker::default();
+            let mut last_fg_check = crate::guard::ago(Duration::from_secs(1));
             let mut latch = edge::BarLatch::default();
             let raw = rawpush::RawPush::start();
             let mut raw_armed = false;
-            let mut shelf_arm = crate::shelf::Arm::default();
             let mut drawer_arm = crate::shelf::Arm::default();
-            let mut others = screen::monitors().iter().map(|m| m.rect).collect::<Vec<_>>();
+            let mut tracker = tracker::Tracker::default();
+            let mut targets: Vec<tracker::Target> = Vec::with_capacity(4);
+            let mut all_mons = screen::monitors();
+            let mut others = all_mons.iter().map(|m| m.rect).collect::<Vec<_>>();
             let own_pid = std::process::id();
             let t0 = Instant::now();
             loop {
                 let c = core();
-                if last_mon.elapsed() > Duration::from_secs(3) {
+                // událost zobrazení z okna proužku (≤ 100 ms odezva) nebo pojistka po `MONITOR_TTL`
+                let gen_now = crate::state::display_gen();
+                if gen_now != seen_gen || last_mon.elapsed() > crate::state::MONITOR_TTL {
+                    if gen_now == seen_gen {
+                        crate::state::display_event(); // pojistka: zneplatní cache monitorů
+                    }
+                    seen_gen = crate::state::display_gen();
                     let before = mon;
-                    mon = c.monitor_fresh();
-                    // jiné rozlišení / DPI / monitor (probuzení, odpojení): proužek a zóna hned na nové místo
-                    if super::pointer::display_changed(&before, &mon) {
+                    mon = c.monitor();
+                    let now_all = screen::monitors();
+                    let plan = super::pointer::display_plan(&before, &mon, &all_mons, &now_all);
+                    // jiné rozlišení / DPI / pracovní plocha / monitor: proužek a zóna hned na nové místo
+                    if plan.strip {
                         log(&format!("monitor proužku se změnil: {:?} @ {} dpi", (mon.rect.left, mon.rect.top, mon.rect.right, mon.rect.bottom), mon.dpi));
                         refresh_strip();
                         mark_dirty();
                     }
-                    let now_mons = screen::monitors().iter().map(|m| m.rect).collect::<Vec<_>>();
-                    if now_mons != others {
-                        // připojený monitor → widgety na ploše, které stály mimo domov, jdou domů
+                    if plan.windows {
+                        // změna sestavy (připojení, DPI, panel): widgety a lístky mimo domov jdou domů
                         crate::desk::win::on_monitors();
+                        // tečky na dalších monitorech (`strip.monitor = all`): vznik / zánik / DPI (`stripset::apply`)
+                        if !plan.strip {
+                            refresh_strip();
+                        }
                     }
-                    others = now_mons;
+                    others = now_all.iter().map(|m| m.rect).collect();
+                    all_mons = now_all;
                     last_mon = Instant::now();
                 }
-                if last_fs_check.elapsed() > Duration::from_millis(500) {
-                    last_fs_check = Instant::now();
-                    let state = screen::fullscreen_state(&mon);
-                    let fs = state != screen::FsState::None;
-                    // pro lístky: co přesně leží přes monitor (prohlížeč ve F11 ≠ hra); okno v popředí se
-                    // čte jen při pokrytí a exe je v cache podle HWND — žádný nový polling
-                    let kind = match state {
-                        screen::FsState::None => crate::pins::FsKind::None,
-                        screen::FsState::Exclusive => crate::pins::FsKind::Exclusive,
-                        screen::FsState::Covering => match fg.read() {
-                            Some(f) => crate::pins::cover_kind(f.pid == own_pid, f.exe),
-                            None => crate::pins::FsKind::CoverOther,
-                        },
-                    };
-                    crate::desk::win::set_fs_kind(kind);
-                    let kind_changed = crate::pins::win::set_fs_kind(kind);
-                    if c.fullscreen.swap(fs, Ordering::Relaxed) != fs {
-                        log(&format!("fullscreen: {fs}"));
-                        if fs && c.drawer.view() != View::Hidden {
-                            c.send_ui(UiCmd::Hide);
+                fswatch.tick(&mon, &all_mons, &mut fg, own_pid);
+                let srect = *c.strip.rect.lock();
+                // cíle hoveru: hlavní proužek (0) + tečky na vedlejších monitorech (`strip.monitor = all`)
+                {
+                    let cfg = c.cfg.read();
+                    targets.clear();
+                    targets.push(zone_target(&cfg, &mon, srect));
+                    if cfg.strip.monitor == crate::screen::SPEC_ALL {
+                        for m in crate::stripset::secondary_monitors(&cfg.strip.monitor) {
+                            targets.push(zone_target(&cfg, &m, crate::stripset::rect_of(&m.device_name())));
                         }
-                        refresh_strip();
-                        // lístky „Vždy navrchu“ hře ustoupí (a pak se vrátí)
-                        crate::pins::win::sync_dead();
-                        crate::desk::win::sync_yield();
-                        // konec fullscreenu → emit vlákno hned dožene peek připomínky (`check_reminders`)
-                        mark_dirty();
-                    } else if kind_changed {
-                        // fullscreen trvá, ale změnilo se okno v popředí (prohlížeč ↔ hra)
-                        crate::pins::win::sync_dead();
-                        crate::desk::win::sync_yield();
                     }
                 }
-                // mrtvý Ledge (fullscreen hra nebo herní režim): myš nic, kontrola fullscreenu jede dál
-                if c.dead() {
-                    zone_since = None;
-                    shelf_arm = crate::shelf::Arm::default();
+                let cur = screen::cursor();
+                let view = c.drawer.view();
+                // otevřený šuplík drží svůj monitor, jinak cíl pod kurzorem, jinak hlavní
+                let open_idx = (view != View::Hidden).then(|| *c.opened_on.lock()).flatten().and_then(|h| targets.iter().position(|t| t.handle == h));
+                let active = cur.map_or(open_idx.unwrap_or(0), |p| tracker::pick_active((p.x, p.y), &targets, open_idx));
+                tracker.select(active, targets.len());
+                let t = targets[active];
+                // mrtvý Ledge (fullscreen hra nebo herní režim) na monitoru aktivního cíle: myš nic, kontrola
+                // fullscreenu jede dál
+                if c.dead_on(t.handle) {
+                    tracker.reset_all();
                     drawer_arm = crate::shelf::Arm::default();
                     crate::shelf::drop::set_armed(None);
-                    push = edge::PushTracker::default();
                     if raw_armed {
                         raw.arm(false);
                         raw_armed = false;
@@ -100,13 +100,8 @@ pub(crate) fn spawn_hover_thread() {
                     std::thread::sleep(Duration::from_millis(500));
                     continue;
                 }
-                let srect = *c.strip.rect.lock();
-                // osa Ledge (střed / vlevo / vpravo podle `appearance.strip.position`) — zóna bez proužku
-                let cx = geom::axis2_for(&c.cfg.read(), mon.rect.left, mon.rect.right, mon.dpi).div_euclid(2);
-                let scale = mon.dpi as i32;
-                // zóna = proužek v jakémkoli stylu (linka a lišta přes celou šířku, roh, …) + kousek do
-                // stran, nebo střed hrany, když je proužek skrytý (neviditelný styl v klidu)
-                let (zl, zr, zb) = crate::looks::frame::zone(srect, cx, mon.rect, mon.dpi);
+                // hlavní zóna a lištové okno (bar režim) patří jen hlavnímu monitoru
+                let (zl, zr) = (targets[0].zl, targets[0].zr);
                 // lištové okno (prohlížeč) v popředí? Exe je v cache podle HWND, jinak pár levných volání.
                 // Monitor nad proužkem (kurzor hranou projde) = tlačit nejde → bar režim ne.
                 if last_fg_check.elapsed() > Duration::from_millis(100) {
@@ -128,7 +123,7 @@ pub(crate) fn spawn_hover_thread() {
                     };
                     let bar = latch.update(t0.elapsed().as_millis() as u64, sample, edge::BAR_OFF_HOLD_MS);
                     if c.bar_window.swap(bar, Ordering::Relaxed) != bar {
-                        push = edge::PushTracker::default();
+                        tracker.reset_push();
                         refresh_strip();
                     }
                 }
@@ -138,8 +133,13 @@ pub(crate) fn spawn_hover_thread() {
                     (d.trigger, d.edge_delay_ms, d.dwell_delay_ms, d.close_delay_ms, d.keep_warm_s, d.hover_delay_ms, b.push_ms, b.push_distance, d.hover)
                 };
                 c.drawer.destroy_if_idle(Duration::from_secs(keep_warm));
-                let Some(p) = screen::cursor() else {
-                    push = edge::PushTracker::default();
+                // šuplík schovaný (dok ≥ 60 s, ostatní ≥ 120 s): vlákna hudby a hlasitosti pryč (L145/L168; další zobrazení je vrátí)
+                if crate::media::release_due(hover_mode == crate::hovermode::HoverMode::Dock, c.drawer.hidden_secs()) {
+                    crate::media::release();
+                    crate::volume::release();
+                }
+                let Some(p) = cur else {
+                    tracker.reset_push();
                     crate::shelf::drop::set_armed(None);
                     if raw_armed {
                         raw.arm(false);
@@ -148,10 +148,9 @@ pub(crate) fn spawn_hover_thread() {
                     std::thread::sleep(Duration::from_millis(100));
                     continue;
                 };
-                let view = c.drawer.view();
-                let in_x = p.x >= zl && p.x <= zr;
-                let at_edge = in_x && p.y <= mon.rect.top + 1 && p.y >= mon.rect.top - 2;
-                let on_strip = in_x && p.y >= mon.rect.top && p.y < zb;
+                let scale = t.scale();
+                let in_x = t.in_x(p.x);
+                let pm = tracker.cur();
                 // přihrádka: tah souborů na proužek (šuplík zavřený / peek) → neviditelný cíl přetažení
                 // nad zónou (`shelf::drop`); tlačítko a kurzor se čtou jen s kurzorem v zóně
                 // zóna se vybírá STAVEM šuplíku (`shelf::shortcut::target_for`): zavřený = přihrádka, otevřený naplno
@@ -162,9 +161,10 @@ pub(crate) fn spawn_hover_thread() {
                     (cfg.shelf.enabled, cfg.smart.drop_shortcut)
                 };
                 let target = crate::shelf::shortcut::target_for(view == View::Full, shelf_on && !view.covers_strip(), shortcut_on);
-                let shelf_zone = (target == Some(crate::shelf::shortcut::Kind::Shelf)).then(|| crate::shelf::zone(zl, zr, zb, mon.rect.top, scale));
-                let shortcut_zone = (target == Some(crate::shelf::shortcut::Kind::Shortcut)).then(|| c.drawer.rect());
-                let shelf_rect = shelf_arm.step(shelf_zone, p.x, p.y, || screen::primary_button_down() && crate::shelf::drop::ole_drag_likely());
+                let shelf_zone = (target == Some(crate::shelf::shortcut::Kind::Shelf)).then(|| crate::shelf::zone(t.zl, t.zr, t.zb, t.rect.top, scale));
+                let drawer_rect = if view == View::Hidden { RECT::default() } else { c.drawer.rect() };
+                let shortcut_zone = (target == Some(crate::shelf::shortcut::Kind::Shortcut)).then_some(drawer_rect);
+                let shelf_rect = pm.shelf_arm.step(shelf_zone, p.x, p.y, || screen::primary_button_down() && crate::shelf::drop::ole_drag_likely());
                 let shortcut_rect = drawer_arm.step(shortcut_zone, p.x, p.y, || {
                     screen::primary_button_down() && crate::shelf::drop::ole_drag_likely() && fg.read().is_some_and(|f| f.pid != own_pid)
                 });
@@ -173,105 +173,85 @@ pub(crate) fn spawn_hover_thread() {
                         .map(|r| (r, crate::shelf::shortcut::Kind::Shelf))
                         .or(shortcut_rect.map(|r| (r, crate::shelf::shortcut::Kind::Shortcut))),
                 );
-                let dropping = shelf_rect.is_some();
                 // tlak na hranu (lištová okna): raw myš jen pár px u hrany v zóně, jinak v klidu žádné WM_INPUT
-                let bar_push = c.bar_window.load(Ordering::Relaxed);
-                let want_raw = bar_push
-                    && trigger != Trigger::Off
-                    && !view.covers_strip()
-                    && in_x
-                    && p.y >= mon.rect.top
-                    && p.y <= mon.rect.top + 3 * scale / 96;
+                let bar_push = c.bar_window.load(Ordering::Relaxed) && active == 0;
+                let want_raw = bar_push && trigger != Trigger::Off && !view.covers_strip() && in_x && p.y >= t.rect.top && p.y <= t.rect.top + 3 * scale / 96;
                 if want_raw != raw_armed {
                     raw.arm(want_raw);
                     raw_armed = want_raw;
                 }
                 let r = raw.take();
                 // tlačítko se čte jen na horním řádku zóny
-                let button = in_x && p.y == mon.rect.top && screen::primary_button_down();
+                let button = in_x && p.y == t.rect.top && screen::primary_button_down();
                 let tick = edge::PushTick {
                     now_ms: t0.elapsed().as_millis() as u64,
                     x: p.x,
-                    pressing: edge::pressing(in_x, p.y, mon.rect.top, button),
+                    pressing: edge::pressing(in_x, p.y, t.rect.top, button),
                     up: r.up,
                     clicked: r.clicked,
                     relative: r.live && !r.absolute,
                 };
-                let push_state = push.step(tick, &edge::PushCfg::new(push_ms, push_distance, edge::PUSH_SLACK_PX * scale / 96));
+                let push_state = pm.push.step(tick, &edge::PushCfg::new(push_ms, push_distance, edge::PUSH_SLACK_PX * scale / 96));
                 // předehřátí: myš míří k horní hraně poblíž zóny
                 let approaching = view == View::Hidden
                     && trigger != Trigger::Off
-                    && p.y < mon.rect.top + 140 * scale / 96
-                    && p.x >= zl - 360 * scale / 96
-                    && p.x <= zr + 360 * scale / 96;
+                    && p.y < t.rect.top + 140 * scale / 96
+                    && p.x >= t.zl - 360 * scale / 96
+                    && p.x <= t.zr + 360 * scale / 96;
                 if approaching {
-                    let t = *approach_since.get_or_insert_with(Instant::now);
-                    if t.elapsed() > Duration::from_millis(60) && !c.drawer.is_warm() && last_warm.elapsed() > Duration::from_secs(2) {
+                    let at = *pm.approach_since.get_or_insert_with(Instant::now);
+                    if at.elapsed() > Duration::from_millis(60) && !c.drawer.is_warm() && last_warm.elapsed() > Duration::from_secs(2) {
                         last_warm = Instant::now();
                         c.send_ui(UiCmd::Warm);
                     }
                 } else {
-                    approach_since = None;
+                    pm.approach_since = None;
                 }
-                match view {
-                    View::Hidden | View::Peek => {
-                        outside_since = None;
-                        let peek_hover = view == View::Peek && {
-                            let r = c.drawer.rect();
-                            p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom
-                        };
-                        let delays = edge::Delays { edge: edge_ms, dwell: dwell_ms, hover: hover_ms };
-                        let armed = edge::armed(trigger, bar_push, at_edge, on_strip, push_state, &delays);
-                        let (armed, full) = edge::hover_open(armed, peek_hover, dwell_ms, c.claude.attention());
-                        // tah na přihrádku šuplík neotevírá; skrytý / zamčený kurzor (hra v okně) taky ne —
-                        // kurzor se čte jen u hrany v zóně
-                        let blocked = armed.is_some() && (at_edge || on_strip) && super::pointer::blocked_now();
-                        // kurzor na oznámení s tlačítkem (Notch): šuplík se neotevře, oznámení počká
-                        let notch = crate::notify::owns_pointer(p.x, p.y);
-                        let armed = if dropping || blocked || notch { None } else { armed };
-                        // při tlačení proužek (linka) „nažhaví“ už během nabíjení
-                        let pushing = bar_push && trigger != Trigger::Off && push_state != edge::Push::Idle;
-                        let hot = (armed.is_some() || pushing) && !peek_hover;
-                        c.strip.set(|m| m.hot = hot);
-                        match armed {
-                            Some(ms) => {
-                                let t = *zone_since.get_or_insert_with(Instant::now);
-                                if t.elapsed() >= Duration::from_millis(ms) {
-                                    zone_since = None;
-                                    push.fire();
-                                    // KTERÝ pohled: peek (Claude čeká), celý, nebo náhled podle `drawer.hover`
-                                    c.send_ui(UiCmd::Show(crate::hovermode::hover_target(hover_mode, full, peek_hover), Opener::Hover));
-                                }
-                            }
-                            None => zone_since = None,
-                        }
+                let hidden_or_peek = matches!(view, View::Hidden | View::Peek);
+                let ctx = tracker::Ctx {
+                    view,
+                    opener: c.drawer.opener(),
+                    trigger,
+                    delays: edge::Delays { edge: edge_ms, dwell: dwell_ms, hover: hover_ms },
+                    close_ms,
+                    hover_mode,
+                    push: push_state,
+                    bar_push,
+                    attention: hidden_or_peek && c.claude.attention(),
+                    dropping: shelf_rect.is_some(),
+                    // kurzor na oznámení s tlačítkem (Notch): šuplík se neotevře, oznámení počká
+                    notch: hidden_or_peek && crate::notify::owns_pointer(p.x, p.y),
+                    drawer: drawer_rect,
+                };
+                // skrytý / zamčený kurzor (hra v okně) šuplík neotevře — kurzor se čte jen u hrany v zóně
+                let out = pm.step(&t, (p.x, p.y), Instant::now(), &ctx, super::pointer::blocked_now);
+                c.strip.set(|m| m.hot = out.hot && active == 0);
+                match out.action {
+                    tracker::Action::Open(v) => {
+                        // šuplík se otevře na monitoru, kde ho spustil kurzor (`ui` to čte z `opened_on`)
+                        *c.opened_on.lock() = Some(t.handle);
+                        c.send_ui(UiCmd::Show(v, Opener::Hover));
                     }
-                    // celý šuplík i náhled po najetí: odjetí myši zavírá stejně
-                    View::Full | View::Compact | View::Island => {
-                        zone_since = None;
-                        c.strip.set(|m| m.hot = false);
-                        if c.drawer.opener() == Opener::Hover {
-                            let r = c.drawer.rect();
-                            let m = 28 * scale / 96;
-                            let inside = p.x >= r.left - m && p.x <= r.right + m && p.y <= r.bottom + m;
-                            if inside {
-                                outside_since = None;
-                            } else {
-                                let t = *outside_since.get_or_insert_with(Instant::now);
-                                if t.elapsed() >= Duration::from_millis(close_ms) {
-                                    outside_since = None;
-                                    log(&format!("drawer: zavírám — myš odjela ({},{}) mimo {:?}", p.x, p.y, (r.left, r.top, r.right, r.bottom)));
-                                    c.send_ui(UiCmd::Hide);
-                                }
-                            }
-                        }
+                    tracker::Action::Close => {
+                        let r = drawer_rect;
+                        log(&format!("drawer: zavírám — myš odjela ({},{}) mimo {:?}", p.x, p.y, (r.left, r.top, r.right, r.bottom)));
+                        c.send_ui(UiCmd::Hide);
                     }
+                    tracker::Action::None => {}
                 }
-                let near = near_zone(p.x, p.y, (zl, zr), mon.rect.top, scale, view != View::Hidden);
+                let near = near_zone(p.x, p.y, (t.zl, t.zr), t.rect.top, scale, view != View::Hidden);
                 std::thread::sleep(Duration::from_millis(if near { 16 } else { 100 }));
             }
-        })
+        }))
         .ok();
+}
+
+/// Cíl hoveru pro monitor `m`: zóna podle skutečného obdélníku proužku / tečky `srect` (prázdný = skrytý →
+/// pruh na ose Ledge monitoru, `looks::frame::zone`).
+fn zone_target(cfg: &config::Config, m: &crate::screen::Monitor, srect: RECT) -> tracker::Target {
+    let cx = geom::axis2_for(cfg, m.rect.left, m.rect.right, m.dpi).div_euclid(2);
+    let (zl, zr, zb) = crate::looks::frame::zone(srect, cx, m.rect, m.dpi);
+    tracker::Target { handle: m.handle, rect: m.rect, dpi: m.dpi, zl, zr, zb }
 }
 
 /// Rezerva (logické px) kolem zóny proužku, ve které se smyčka drží na 16 ms (kurzor do zóny dorazí

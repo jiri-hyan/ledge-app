@@ -24,6 +24,7 @@ export const PLACEMENT: readonly (readonly [string, string, Level])[] = [
   ["strip.opacity", "vzhled", "advanced"],
   ["timer.strip", "vzhled", "basic"],
   ["drawer.hover", "vzhled", "basic"],
+  ["drawer.dockCards", "vzhled", "basic"],
   ["drawer.hoverExpandMs", "vzhled", "advanced"],
   ["drawer.width", "vzhled", "advanced"],
   ["drawer.glass", "vzhled", "advanced"],
@@ -40,6 +41,7 @@ export const PLACEMENT: readonly (readonly [string, string, Level])[] = [
   // Aplikace → Spouštění a hry
   ["autostart", "spousteni", "basic"],
   ["drawer.keepWarmS", "spousteni", "basic"],
+  ["extensions", "spousteni", "basic"],
   // Šuplík a karty → Obsah karet
   ["personal", "osobni", "basic"],
   ["personal.weather.lat", "osobni", "advanced"],
@@ -56,6 +58,9 @@ export const PLACEMENT: readonly (readonly [string, string, Level])[] = [
   ["claude", "claude", "basic"],
   ["claude.port", "claude", "advanced"],
   ["mcp", "claude", "basic"],
+  ["connector", "claude", "basic"],
+  ["connector.url", "claude", "advanced"],
+  ["connector.name", "claude", "advanced"],
   ["notify", "claude", "basic"],
   ["smart.approvalSound", "claude", "basic"],
   ["smart.incidents", "claude", "basic"],

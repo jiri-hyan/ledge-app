@@ -11,7 +11,7 @@ registerDict("en", {
   // karta Pošta
   "cards.mail.title": "Mail",
   "cards.mail.unreadTitle": "Unread in the Inbox",
-  "cards.mail.off": "Mail is turned off in Settings → Drawer and cards → Card contents → Calendars → Advanced.",
+  "cards.mail.off": "Mail is turned off in {path}.",
   "cards.mail.unset": "Sign in to your Microsoft (Outlook) account to see your unread count and the latest subjects here. Ledge reads only message headers and sends nothing anywhere.",
   "cards.mail.connect": "Set up account…",
   "cards.mail.unavailable": "Couldn't load your mail.",
@@ -28,7 +28,7 @@ registerDict("en", {
   "cards.mail.day": "{m}/{d}",
   "cards.layout.card.mail": "Mail",
   "cards.layout.desc.mail": "Unread count and latest subjects from Outlook (Microsoft account)",
-  "cards.calendar.chipAccount": "{name} ({domain}) — set up the account in Settings → Drawer and cards → Card contents → Calendars → Advanced",
+  "cards.calendar.chipAccount": "{name} ({domain}) — set up the account in {path}",
 
   // proužek
   "settings.strip.item.mail": "Mail — unread (Microsoft account)",
@@ -98,7 +98,7 @@ registerDict("en", {
   "settings.f.accounts.microsoft.calendar.hint": "The account's calendar events show next to the ICS links.",
   "settings.f.accounts.microsoft.calendar.kw": "calendar outlook events meetings teams",
   "settings.f.accounts.microsoft.mail": "Mail in the Mail card",
-  "settings.f.accounts.microsoft.mail.hint": "Unread count and the subjects of the 5 newest messages. Add the card in Drawer and cards, to the strip with the Mail item.",
+  "settings.f.accounts.microsoft.mail.hint": "Unread count and the subjects of the 5 newest messages. Add the card in Settings → Tabs and cards, to the strip with the Mail item.",
   "settings.f.accounts.microsoft.mail.kw": "mail email unread inbox outlook",
   "settings.f.accounts.google": "Google account",
   "settings.f.accounts.google.hint": "Google Calendar (read-only). Sign in in the browser through your own app registration.",

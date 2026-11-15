@@ -1,4 +1,4 @@
-/* Záložka Osobní: hodiny (ClockCard), počasí (WeatherCard), odkazy (LinksCard). Tokeny ze styles.css. */
+/* Záložka Osobní: hodiny (ClockCard), počasí (WeatherCard), starší odkazy (ActionsCard). Tokeny ze styles.css. */
 .big-time { font: 600 calc(46px * var(--fz))/1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin-top: 2px; }
 .big-time .sec { font-size: calc(18px * var(--fz)); font-weight: 500; color: var(--t3); margin-left: 5px; }
 .big-date { font-size: var(--fs-body); color: var(--t2); margin-top: 9px; }
@@ -19,6 +19,3 @@
 .lmono { width: 28px; height: 28px; border-radius: var(--r-sm); display: grid; place-items: center; flex-shrink: 0; font: 650 var(--fs-xs) var(--display); background: var(--card-2); color: var(--t1); transition: background var(--fast); }
 .lkind { color: var(--t3); flex-shrink: 0; display: grid; }
 .lkind svg { width: 15px; height: 15px; }
-
-/* vlna 8 P: v režimu úprav šuplíku klik na odkaz = jeho vzhled (karta jinak klik nepropouští) */
-.lnk-card[data-edit] .link-row { pointer-events: auto; }

@@ -7,3 +7,8 @@ export const normPath = (p: string): string => p.trim().replace(/\//g, "\\").rep
 
 /** Jsou to tytéž cesty? (`C:/Work/App/` = `c:\work\app`) */
 export const samePath = (a: string, b: string): boolean => normPath(a) === normPath(b);
+
+/** Poslední část cesty pro popisek: „C:\r\src\main.rs“ → „main.rs“, koncové lomítko se ignoruje (Rust `activity::base_name`). */
+export function baseName(path: string): string {
+  return path.split(/[\\/]+/).filter(Boolean).pop() ?? path;
+}

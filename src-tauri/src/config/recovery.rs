@@ -121,9 +121,9 @@ pub fn join_errors(parts: &[Option<String>]) -> Option<String> {
     (!v.is_empty()).then(|| v.join(" "))
 }
 
-/// Všechny chyby pro UI: config (`error`), `cfg_error` jádra (kořen poznámek) a `bridge_error` (most Clauda).
+/// Všechny chyby pro UI: config (`error`), `cfg_error` jádra (kořen poznámek) `bridge_error` (most Clauda) a spadlá vlákna (`guard::down_message`).
 pub fn shown_error(cfg_error: Option<String>, bridge_error: Option<String>) -> Option<String> {
-    join_errors(&[error(), cfg_error, bridge_error])
+    join_errors(&[error(), cfg_error, bridge_error, crate::guard::down_message()])
 }
 
 pub fn view() -> Option<NoticeView> {

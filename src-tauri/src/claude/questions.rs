@@ -345,6 +345,9 @@ impl Claude {
 
     /// Klik šéfa v Ledge: odpovědi → Claude pokračuje. Chyba = česky pro `say()`.
     pub fn answer_question(&self, id: u64, replies: &[Reply]) -> Result<(), String> {
+        if crate::qa::approvals_blocked() {
+            return Err(crate::i18n::tr("Izolovaná instance (QA) na otázky Clauda neodpovídá.", "The isolated (QA) instance doesn't answer Claude's questions.").into());
+        }
         let mut g = self.inner.lock();
         let i = g.asks.iter().position(|(a, tx)| a.id == id && tx.is_some()).ok_or_else(|| crate::i18n::tr("Otázka už v Ledge není — odpověz v okně Claude.", "The question is no longer in Ledge — answer in the Claude window."))?;
         let map = build_answers(&g.asks[i].0.questions, replies)?;

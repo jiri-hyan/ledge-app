@@ -7,9 +7,8 @@
 .sess-logo { width: 24px; height: 24px; border-radius: var(--r-sm); display: grid; place-items: center; flex-shrink: 0; font: 650 var(--fs-2xs) var(--display); color: var(--white); background: var(--card-2); box-shadow: var(--ring-logo); }
 .sess-logo img { width: 16px; height: 16px; object-fit: contain; }
 .sess-logo.has-img { background: var(--logo-plate); }
-.subag, .more-idle, .hint-link { display: block; font: var(--fs-xs) var(--mono); color: var(--t3); background: none; border: 0; padding: 0 0 6px 34px; text-align: left; cursor: pointer; }
-.subag:hover, .more-idle:hover, .hint-link:hover { color: var(--t1); }
-.more-idle { padding: 6px 0; }
+.subag, .hint-link { display: block; font: var(--fs-xs) var(--mono); color: var(--t3); background: none; border: 0; padding: 0 0 6px 34px; text-align: left; cursor: pointer; }
+.subag:hover, .hint-link:hover { color: var(--t1); }
 .hint-link { padding: var(--s2) 0 0; color: var(--violet); }
 .subag-list { padding: 0 0 6px 34px; }
 /* Doplňky schválení (sessions/PermExtra.tsx): „Vždy povolit“ s pravidlem a cílem, „Zamítnout s důvodem…“. */
@@ -48,3 +47,4 @@
 .sess-plan-head { align-self: flex-start; font: var(--fs-xs) var(--mono); color: var(--t3); background: none; border: 0; padding: 0; cursor: pointer; }
 .sess-plan-head:hover { color: var(--t1); }
 .sess-plan-body { max-height: min(360px, calc(var(--drawer-max-h, 720px) / 2)); overflow: auto; background: var(--well); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: var(--s2) 12px; }
+.sess-cost { color: var(--t2); cursor: help; }

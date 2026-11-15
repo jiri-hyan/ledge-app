@@ -51,8 +51,21 @@ pub struct Event {
     pub recurrence_id: Option<Dt>,
     /// `STATUS:CANCELLED`
     pub cancelled: bool,
+    /// adresy `ATTENDEE` s `PARTSTAT=DECLINED` (malé písmo, bez `mailto:`; strop `MAX_DECLINED`)
+    pub declined: Vec<String>,
+    /// účastníci bez odmítnutých, místností a pozorovatelů (L85; strop `people::MAX_RAW`)
+    pub attendees: Vec<super::people::Person>,
     /// odkaz na schůzku (pořadí zdroje `meeting::RANK_*`, odkaz) — nejlepší z vlastností události
     pub join: Option<(u8, super::meeting::Join)>,
+}
+
+const MAX_DECLINED: usize = 20;
+
+/// Odmítl událost majitel kalendáře? Vlastní adresu feed výslovně neuvádí; Google ji dává do `X-WR-CALNAME`
+/// (u hlavního kalendáře) — jen když název vypadá jako adresa, jinak `false` (nic se neskrývá naslepo).
+pub fn declined_by_owner(e: &Event, calendar_name: &str) -> bool {
+    let own = calendar_name.trim().to_ascii_lowercase();
+    own.contains('@') && !own.contains(char::is_whitespace) && e.declined.contains(&own)
 }
 
 /// Jeden přechod pásma (STANDARD nebo DAYLIGHT) z VTIMEZONE.
@@ -369,6 +382,19 @@ pub fn parse(bytes: &[u8], keep: &mut dyn FnMut(&Event) -> bool) -> Result<Feed,
                 "RDATE" => ev.rdates.extend(parse_dt_list(&p)),
                 "EXDATE" => ev.exdates.extend(parse_dt_list(&p)),
                 "RECURRENCE-ID" => ev.recurrence_id = prop_dt(&p),
+                "ATTENDEE" => {
+                    let v = p.value.trim();
+                    let mail = v.split_once(':').map_or(v, |(_, a)| a).trim().to_ascii_lowercase();
+                    let part = p.param("PARTSTAT").unwrap_or("");
+                    if part.eq_ignore_ascii_case("DECLINED") && ev.declined.len() < MAX_DECLINED {
+                        ev.declined.push(mail.clone());
+                    }
+                    let thing = p.param("CUTYPE").is_some_and(|c| ["RESOURCE", "ROOM"].iter().any(|k| c.eq_ignore_ascii_case(k)))
+                        || p.param("ROLE").is_some_and(|r| r.eq_ignore_ascii_case("NON-PARTICIPANT"));
+                    if !thing && ev.attendees.len() < super::people::MAX_RAW {
+                        ev.attendees.extend(super::people::person(p.param("CN").unwrap_or(""), &mail, part));
+                    }
+                }
                 "STATUS" => ev.cancelled = p.value.trim().eq_ignore_ascii_case("CANCELLED"),
                 other => {
                     if let Some(rank) = super::meeting::rank_of(other) {
@@ -508,6 +534,66 @@ BEGIN:VEVENT\r\nSUMMARY:bez začátku\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
         let b = &f.events[1];
         assert!(b.cancelled);
         assert_eq!((b.start.clone(), b.duration), (Some(Dt::Date(d(2026, 10, 20))), Some(172_800)));
+    }
+
+    #[test]
+    fn declined_attendees_and_owner() {
+        let ics = "BEGIN:VCALENDAR
+X-WR-CALNAME:Tomas@Firma.cz
+BEGIN:VEVENT
+UID:1
+DTSTART:20261019T100000Z
+ATTENDEE;CN=Tomáš;PARTSTAT=DECLINED:mailto:tomas@firma.cz
+ATTENDEE;PARTSTAT=ACCEPTED:mailto:eva@firma.cz
+END:VEVENT
+\nBEGIN:VEVENT
+UID:2
+DTSTART:20261019T100000Z
+ATTENDEE;PARTSTAT=DECLINED:mailto:eva@firma.cz
+END:VEVENT
+BEGIN:VEVENT
+UID:3
+DTSTART:20261019T100000Z
+ATTENDEE;PARTSTAT=ACCEPTED:mailto:tomas@firma.cz
+END:VEVENT
+END:VCALENDAR
+";
+        let f = all(ics.as_bytes());
+        assert_eq!(f.events[0].declined, ["tomas@firma.cz"]);
+        assert_eq!(f.events[2].declined.len(), 0);
+        // (událost, název kalendáře, odmítnuto majitelem?)
+        let cases = [(0, "Tomas@Firma.cz", true), (0, "Rodina", false), (0, "", false), (0, "Tomáš doma@x", false), (1, "tomas@firma.cz", false), (2, "tomas@firma.cz", false)];
+        for (i, name, want) in cases {
+            assert_eq!(declined_by_owner(&f.events[i], name), want, "{i} {name}");
+        }
+    }
+
+    #[test]
+    fn attendees_exclude_declined_rooms_and_observers() {
+        use crate::calendar::people::Resp;
+        let ics = "BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:1
+DTSTART:20261019T100000Z
+ORGANIZER;CN=Šéf:mailto:sef@firma.cz
+ATTENDEE;CN=\"Hora, Tomáš\";PARTSTAT=ACCEPTED;ROLE=REQ-PARTICIPANT:mailto:Tomas@firma.cz
+ATTENDEE;CN=Eva;PARTSTAT=TENTATIVE:mailto:eva@firma.cz
+ATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:petr@firma.cz
+ATTENDEE;CN=Karel;PARTSTAT=DECLINED:mailto:karel@firma.cz
+ATTENDEE;CN=Zasedačka 2;CUTYPE=ROOM;PARTSTAT=ACCEPTED:mailto:room2@firma.cz
+ATTENDEE;CN=Kopie;ROLE=NON-PARTICIPANT:mailto:kopie@firma.cz
+END:VEVENT
+BEGIN:VEVENT
+UID:2
+DTSTART:20261019T100000Z
+END:VEVENT
+END:VCALENDAR
+";
+        let f = all(ics.as_bytes());
+        let got: Vec<(&str, &str, Resp)> = f.events[0].attendees.iter().map(|p| (p.name.as_str(), p.email.as_str(), p.resp)).collect();
+        assert_eq!(got, [("Hora, Tomáš", "tomas@firma.cz", Resp::Accepted), ("Eva", "eva@firma.cz", Resp::Tentative), ("", "petr@firma.cz", Resp::Pending)]);
+        // zdroj bez ATTENDEE = žádní účastníci (avatary se nekreslí)
+        assert!(f.events[1].attendees.is_empty());
     }
 
     #[test]

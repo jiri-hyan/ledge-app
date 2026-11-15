@@ -38,7 +38,7 @@ test("applyProfileToConfig({}, id) nastaví profil tak, že activeProfile(next) 
 
   // Změna hover nebo pruhu zruší aktivní profil
   const p0 = applyProfileToConfig({}, "ai_builder");
-  assert.equal(activeProfile({ ...p0, drawer: { hover: "compact" } }), null);
+  assert.equal(activeProfile({ ...p0, drawer: { hover: "island" } }), null);
   assert.equal(activeProfile({ ...p0, strip: { look: "classic" } }), null);
 });
 
@@ -59,6 +59,6 @@ test("hideCardEverywhere(layout, 'weather') odebere kartu počasí ze všech str
 
   const personalAfter = nextLayout.pages.find((p) => p.id === "osobni");
   assert.equal(personalAfter.cards.length, beforeCount - 1);
-  assert.ok(personalAfter.cards.some((c) => c.id === "bigclock"));
+  assert.ok(personalAfter.cards.some((c) => c.id === "clock" && c.look?.design === "big"));
   assert.ok(personalAfter.cards.some((c) => c.id === "media"));
 });

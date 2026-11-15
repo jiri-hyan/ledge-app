@@ -85,7 +85,10 @@ fn compute(generation: u64, list: Vec<Action>) {
             other => actionicons::local(other),
         };
         if let Some((mime, bytes)) = got {
-            icons.insert(a.id.clone(), (fnv(&bytes), format!("data:{mime};base64,{}", crate::icons::b64(&bytes))));
+            // beze změny obsahu (stejný `fnv`) se data URL nekóduje znovu — vezme se z minulého výpočtu (L212)
+            let k = fnv(&bytes);
+            let url = with_store(|s| s.icons.get(&a.id).filter(|e| e.0 == k).map(|e| e.1.clone())).unwrap_or_else(|| format!("data:{mime};base64,{}", crate::icons::b64(&bytes)));
+            icons.insert(a.id.clone(), (k, url));
         }
     }
     let changed = with_store(|s| {

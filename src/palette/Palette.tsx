@@ -11,17 +11,20 @@
 import { createEffect, createMemo, createSignal, For, Index, on, onCleanup, onMount, Show } from "solid-js";
 import { api, on as onEvent, type NoteView, type Snapshot } from "../api";
 import { IconFolder, IconLink, IconNote, IconSearch, IconSettings, IconShield, IconTerminal } from "../icons";
-import { ActionIcon, ConfirmAction, answerConfirm, confirmPending } from "../actions/ui";
-import { buildItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
+import { ActionIcon, ConfirmAction, answerConfirm, confirmPending, confirmShownAt } from "../actions/ui";
+import { confirmEnterOk } from "./confirmkey";
+import { buildItems, noteItems, SECTION_LABEL, type Nav, type PItem, type Section } from "./items";
 import { bumpUsage, cleanUsage, pushRecent, rank, segments, type Ranked, type Usage } from "./search";
 import { mergeNoteHits, type NoteHit } from "./notehits";
+import { liveItems } from "./live";
+import { lineStillTask, taskCommand, taskItems, taskQuery } from "./tasks";
 import { arrow, shown, visible } from "./compact";
 import { clipCommand, clipItems, emojiCommand, paletteTips, quickRows, scriptItems, windowsItems } from "./more";
 import { clampSel, clipQuery, clipRows, type ClipList, type ClipRow } from "../cliphist/model";
 import { clipApi } from "../cliphist/api";
 import { emojiLoaded, emojiQuery, loadEmoji } from "./emoji";
 import { scriptsApi } from "../actions/scripts";
-import type { ScriptView } from "../types";
+import type { ScriptView, TaskRow } from "../types";
 import { lang, t } from "../i18n";
 import { say, sayError } from "../ui/toast";
 import "./palette.css";
@@ -87,8 +90,8 @@ function saveRecent(ids: string[]) {
   }
 }
 
-export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClose: () => void }) {
-  const [q, setQ] = createSignal("");
+export default function Palette(p: { s: Snapshot; took: boolean; initial?: string; nav: Nav; onClose: () => void }) {
+  const [q, setQ] = createSignal(p.initial ?? "");
   const [sel, setSel] = createSignal(0);
   const [notes, setNotes] = createSignal<NoteView[]>([]);
   const [scripts, setScripts] = createSignal<ScriptView[]>([]);
@@ -99,13 +102,18 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   const [waiting, setWaiting] = createSignal(false);
   /** kompaktní paleta s prázdným polem rozbalená šipkou dolů */
   const [browsing, setBrowsing] = createSignal(false);
+  /** úkoly z indexu jádra pro `x:…` (`note_tasks`, načtené při vstupu do režimu) */
+  const [tasks, setTasks] = createSignal<TaskRow[]>([]);
   /** historie schránky (`v:`); `undefined` = ještě nenačtená */
   const [clip, setClip] = createSignal<ClipList>();
   let input!: HTMLInputElement;
   let list!: HTMLDivElement;
 
   onMount(() => {
-    requestAnimationFrame(() => input.focus());
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length); // úvodní znak z psaní v šuplíku: kurzor za něj
+    });
     if (p.s.notesEnabled) api.noteList(200).then((n) => n && setNotes(n), () => {});
     // levný sken složky skriptů (stat, jen změněné soubory); vypnuté / bez složky = prázdné
     scriptsApi.list().then((l) => l && setScripts(l.scripts), () => {});
@@ -118,9 +126,11 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   const loadClip = () => clipApi.list().then((l) => setClip(l ?? { enabled: false, items: [] }), () => setClip({ enabled: false, items: [] }));
   createEffect(on(() => clipText() !== null, (inClip) => inClip && void loadClip()));
 
-  const base = createMemo(() => [...buildItems(p.s, notes(), p.nav), ...scriptItems(scripts()), emojiCommand(setQ), clipCommand(setQ)]);
+  const noteRows = createMemo(() => noteItems(p.s, notes(), p.nav));
+  const base = createMemo(() => [...buildItems(p.s, p.nav), ...noteRows(), ...scriptItems(scripts()), emojiCommand(setQ), clipCommand(setQ), ...(p.s.notesEnabled ? [taskCommand(setQ)] : [])]);
   // stránky Nastavení Windows jen s dotazem — přepočet při psaní nesahá na `buildItems`
-  const items = createMemo(() => [...mergeNoteHits(base(), hits().list, hits().q, p.nav, t("palette.note.untitled", "(bez názvu)")), ...windowsItems(p.s, q())]);
+  // hudba / schůzky / schválení Clauda (`live.ts`) jen z dat snapshotu a dotazu — schválení jen s napsaným slovesem
+  const items = createMemo(() => [...mergeNoteHits(base(), hits().list, hits().q, p.nav, t("palette.note.untitled", "(bez názvu)")), ...windowsItems(p.s, q()), ...liveItems(p.s, q())]);
   // Hledání v těle poznámek: po 180 ms ticha, od 2 znaků, ne v režimu schránky; starší odpověď se zahodí
   let hitTimer: ReturnType<typeof setTimeout> | undefined;
   let hitSeq = 0;
@@ -128,7 +138,7 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
     clearTimeout(hitTimer);
     const id = ++hitSeq;
     const query = text.trim();
-    if (!p.s.notesEnabled || clipText() !== null || query.length < 2) {
+    if (!p.s.notesEnabled || clipText() !== null || taskQuery(text) !== null || query.length < 2) {
       setHits((h) => (h.list.length ? { q: "", list: [] } : h));
       return;
     }
@@ -140,6 +150,28 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
     }, HIT_DELAY);
   }));
   onCleanup(() => clearTimeout(hitTimer));
+  // `x:` = úkoly z indexu v paměti jádra (`note_tasks`): jedno načtení při vstupu do režimu, hledání jen filtruje; tělo a otisk
+  // poznámky se čtou až při odškrtnutí
+  const inTasks = createMemo(() => p.s.notesEnabled && taskQuery(q()) !== null);
+  const loadTasks = () => api.noteTasks({ limit: 1000 }).then((l) => setTasks(l?.rows ?? []), () => setTasks([]));
+  createEffect(on(inTasks, (yes) => yes && void loadTasks()));
+  /** Odškrtnout: stejný zápis jako checkbox v poznámce (`note_toggle_task`), jádro hlídá otisk souboru; řádek se před zápisem
+   *  ověří proti čerstvě načtenému tělu (index může být o krok pozadu). */
+  async function checkTask(row: TaskRow) {
+    try {
+      const d = await api.noteRead(row.path);
+      if (!d || !lineStillTask(d.body, row.line, row.text)) {
+        say(t("palette.task.changed", "Poznámka se mezitím změnila — zkus to znovu."), true);
+        return void loadTasks();
+      }
+      const r = await api.noteToggleTask(row.path, row.line, true, d.hash);
+      if (r?.outcome === "saved") say(t("palette.task.done", "Odškrtnuto."));
+      else say(t("palette.task.changed", "Poznámka se mezitím změnila — zkus to znovu."), true);
+      void loadTasks();
+    } catch (e) {
+      sayError(e);
+    }
+  }
   const recentSet = createMemo(() => new Set(recent()));
   const fold = () => ({ compact: p.s.paletteCompact, query: q(), browsing: browsing() });
   // nedávné, které v položkách pořád jsou (smazaná akce / poznámka se nepočítá)
@@ -157,6 +189,8 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
   const results = createMemo(() => {
     const ct = clipText();
     if (ct !== null) return clipItems(clipRows(clip(), ct, Date.now()));
+    const tq = taskQuery(q());
+    if (tq !== null) return taskItems(tasks(), tq, checkTask).map((item) => ({ item, score: 0, ranges: [] }));
     const qr = quick();
     if (qr.only) return qr.rows;
     const list = visible(rank(items(), q(), recent(), 60, usage()), what(), recentSet());
@@ -278,8 +312,10 @@ export default function Palette(p: { s: Snapshot; took: boolean; nav: Nav; onClo
       else close();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (confirmPending("palette")) answerConfirm(true);
-      else choose(results()[sel()]);
+      if (confirmPending("palette")) {
+        // držený / dvojitý Enter nepotvrdí (L239)
+        if (confirmEnterOk(confirmShownAt("palette") ?? 0, Date.now(), e.repeat)) answerConfirm(true);
+      } else choose(results()[sel()]);
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       const next = arrow(e.key, fold(), sel(), n);

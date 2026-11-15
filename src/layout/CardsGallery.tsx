@@ -141,7 +141,7 @@ export default function CardsGallery() {
         </For>
       </div>
       <h4 class="cg-sub">{t("cards.gallery.bento", "Bento šablony")}</h4>
-      <small class="cg-hint">{t("cards.gallery.bentoHint", "Šablona přidá novou záložku s dlaždicemi (největší = nejdůležitější); tvoje záložky zůstanou. Bento zapneš i na existující záložce v Šuplík a karty.")}</small>
+      <small class="cg-hint">{t("cards.gallery.bentoHint", "Šablona přidá novou záložku s dlaždicemi (největší = nejdůležitější); tvoje záložky zůstanou. Bento zapneš i na existující záložce v Nastavení → Záložky a karty.")}</small>
       <div class="ap-styles" role="list">
         <For each={TEMPLATES}>
           {(tp) => (

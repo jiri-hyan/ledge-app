@@ -36,6 +36,13 @@ pub(crate) fn set_mode(mode: String) {
     mark_dirty();
 }
 
+/// „Zkusit znovu“ u karet Počasí a Kalendář po selhání stažení (vynuluje odstup mezi pokusy, stáhne hned).
+#[tauri::command]
+pub(crate) fn retry_online() {
+    crate::refresh::retry_weather();
+    crate::calendar::live::retry_failed();
+}
+
 /// Herní režim (Nastavení, paleta): zapnutí zavře šuplík; vypíná se zkratkou / dalším spuštěním (`gamemode.rs`).
 #[tauri::command]
 pub(crate) fn set_game_mode(on: bool) {
@@ -61,7 +68,7 @@ pub(crate) fn drawer_size(page: String, w: u32, h: u32, done: bool) -> Result<[u
     use crate::appearance::{geom, size};
     let want = size::clamp(size::PageSize { width: w, height: h });
     let c = core();
-    let mon = c.monitor();
+    let mon = c.drawer_monitor();
     let lim = crate::drawerfit::limits(mon.rect, mon.work, mon.dpi);
     // v úpravách může být vidět jiná záložka než `mode` → velikost okna podle té, kterou uživatel táhne
     let id = crate::layout::page_id(&c.cfg.read().layout, &page);
@@ -126,15 +133,24 @@ pub(crate) fn focus_drawer() {
     core().send_ui(UiCmd::Focus);
 }
 
-/// Klik do náhledu po najetí (Compact / Island: prázdné místo, „▾ celý šuplík“) nebo jeho setrvání
-/// (`drawer.hoverExpandMs`, odpočítává frontend) → celý šuplík stejným openerem. Fokus nebere (otevřený
-/// najetím zůstane NOACTIVATE, zavře ho odjetí myši); z jiných pohledů nic.
+/// Klik do náhledu po najetí (Island / střední panel: prázdné místo, „▾ celý šuplík“) nebo jeho
+/// setrvání (`drawer.hoverExpandMs`, odpočítává frontend) → o krok víc stejným openerem (`hovermode::expand_target`:
+/// dok → střední panel, jinak celý šuplík; `to_full` = rovnou celý). Fokus nebere (otevřený najetím zůstane
+/// NOACTIVATE, zavře ho odjetí myši); z jiných pohledů nic.
 #[tauri::command]
-pub(crate) fn expand_drawer() {
+pub(crate) fn expand_drawer(to_full: Option<bool>) {
     let c = core();
-    if matches!(c.drawer.view(), View::Compact | View::Island) {
-        c.send_ui(UiCmd::Show(View::Full, c.drawer.opener()));
+    let dock = c.cfg.read().drawer.hover == crate::hovermode::HoverMode::Dock;
+    if let Some(next) = crate::hovermode::expand_target(c.drawer.view(), dock, to_full.unwrap_or(false)) {
+        c.send_ui(UiCmd::Show(next, c.drawer.opener()));
     }
+}
+
+/// 📌 v docku (`drawer.hover = dock`): upevnit okno (neodjede, nezavře blur, smí být aktivní) / uvolnit.
+/// Jen výslovný klik z UI; ve fullscreenu a herním režimu se okno zavře i upevněné (`threads/ui.rs`).
+#[tauri::command]
+pub(crate) fn drawer_pin(on: bool) {
+    core().send_ui(UiCmd::Pin(on));
 }
 
 /// Odchod ze stránky poznámky zpět do šuplíku: opener na hodnotu před `focus_drawer`.

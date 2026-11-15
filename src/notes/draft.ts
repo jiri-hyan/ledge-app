@@ -4,10 +4,10 @@
 
 import { createSignal } from "solid-js";
 import { api, type EditDraft, type NoteDetail } from "../api";
-import { say } from "../ui/toast";
+import { say, sayError } from "../ui/toast";
 import { fromMs } from "./remind";
 import { DEFAULT_KIND } from "./kinds";
-import { planOther, planSame, trimBody } from "./editdraft";
+import { canRestoreDraft, draftFields, parkInto, planDraftPersist, planOther, planSame, toDiskEdit, trimBody } from "./editdraft";
 import { samePath } from "../pin/model";
 import { debounce } from "../util/time";
 import { t } from "../i18n";
@@ -28,8 +28,7 @@ export const b64Of = (urls: string[]) => urls.map((u) => u.slice(u.indexOf(",") 
 /** Zapsat koncept na disk; prázdný koncept (nic napsáno, nic vybráno) = smazat. */
 function persistDraft() {
   const m = draftMeta();
-  const empty = !m.text.trim() && !draftImgs().length && !m.remind && !m.projectTouched && !m.kind && !m.title.trim();
-  (empty ? api.noteDraftClear() : api.noteDraftSave(m)).catch(() => {});
+  (planDraftPersist(m, draftImgs().length) === "clear" ? api.noteDraftClear() : api.noteDraftSave(m)).catch(() => {});
 }
 
 const draftSave = debounce(persistDraft, 500);
@@ -57,14 +56,15 @@ export function resetDraft() {
 export async function restoreDraft() {
   if (draft() || draftImgs().length) return;
   const d = await api.noteDraftLoad().catch(() => null);
-  if (!d || draft() || draftImgs().length) return;
-  setDraft(d.text);
-  setDraftProj(d.project);
-  setProjTouched(d.projectTouched);
-  setDraftRemind(d.remind);
-  setDraftKind(d.kind || DEFAULT_KIND);
-  setDraftTitle(d.title ?? "");
-  setDraftImgs(d.images.map((b) => `data:image/png;base64,${b}`));
+  if (!canRestoreDraft(draft(), draftImgs().length, d) || !d) return;
+  const f = draftFields(d, DEFAULT_KIND);
+  setDraft(f.text);
+  setDraftProj(f.project);
+  setProjTouched(f.projectTouched);
+  setDraftRemind(f.remind);
+  setDraftKind(f.kind);
+  setDraftTitle(f.title);
+  setDraftImgs(f.imgs);
 }
 
 // ---------- úprava existující poznámky ----------
@@ -101,7 +101,7 @@ export function loadEditFrom(n: NoteDetail) {
 
 /** Rozepsaná úprava, která se nenechá přepsat otevřením jiné poznámky: čeká v liště editoru
  *  („Máš rozepsanou úpravu «název» — Otevřít ji · Zahodit“), dokud šéf nerozhodne. Jen v paměti
- *  (na disku drží `edit.json` tu nejnovější) — po restartu se vrátí z disku jako jedna. */
+ *  (na disku drží `edit.json` tu nejnovější, s nadpisem, bez obrázků) — po restartu se vrátí z disku jako jedna. */
 export type ParkedEdit = { base: NoteDetail; hash: string; text: string; project: string; kind: string; remind: string; imgs: string[]; /** chybí = nadpis z disku */ title?: string };
 export const [parked, setParked] = createSignal<ParkedEdit[]>([]);
 export const parkedTop = (): ParkedEdit | null => {
@@ -110,7 +110,7 @@ export const parkedTop = (): ParkedEdit | null => {
 };
 const hasParked = (path: string) => parked().some((x) => samePath(x.base.path, path));
 function park(x: ParkedEdit) {
-  setParked([...parked().filter((y) => !samePath(y.base.path, x.base.path)), x]);
+  setParked(parkInto(parked(), x));
 }
 
 /** Rozepsaná úprava právě otevřené poznámky (null = nic, co by stálo za uložení: bez změny nebo bez textu). */
@@ -122,8 +122,7 @@ function snapshot(): ParkedEdit | null {
 
 /** Co má být na disku v `edit.json`: rozepsaná otevřená úprava, jinak nejnovější odložená, jinak nic. */
 function diskEdit(): EditDraft | null {
-  const s = snapshot() ?? parkedTop();
-  return s ? { path: s.base.path, hash: s.hash, text: s.text, project: s.project, kind: s.kind, remind: s.remind } : null;
+  return toDiskEdit(snapshot() ?? parkedTop());
 }
 
 function persistEdit() {
@@ -147,7 +146,7 @@ export function resetEdit() {
 /** Úprava na disku je zastaralá: soubor se od ní změnil (lístek, sync) — editor ukáže konflikt hned. */
 export const [edStale, setEdStale] = createSignal(false);
 const dropDiskEdit = () => api.noteEditDraftSave(diskEdit()).catch(() => {});
-const fieldsOf = (n: NoteDetail) => ({ path: n.path, hash: n.hash, text: trimBody(n.body), project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs) });
+const fieldsOf = (n: NoteDetail) => ({ path: n.path, hash: n.hash, text: trimBody(n.body), project: n.project ?? "", kind: n.kind, remind: fromMs(n.remindMs), title: n.heading ?? "" });
 
 /** Pořadí otevírání: dokončí se jen poslední čtení — pozdě doběhlé čtení jiné poznámky nesmí přepsat editor
  *  (a uložení pak zapsat do cizí poznámky). */
@@ -188,7 +187,7 @@ export async function openEdit(path: string): Promise<string | null | undefined>
       const pn = (await api.noteRead(other.path).catch(() => null)) ?? null;
       if (id !== openSeq) return undefined;
       // rozepsaná poznámka mezitím zmizela (smazaná, archivovaná) → úprava už nemá komu patřit
-      if (pn) park({ base: pn, hash: disk.hash, text: disk.text, project: disk.project, kind: disk.kind || DEFAULT_KIND, remind: disk.remind, imgs: [] });
+      if (pn) park({ base: pn, hash: disk.hash, text: disk.text, project: disk.project, kind: disk.kind || DEFAULT_KIND, remind: disk.remind, imgs: [], title: disk.title ?? undefined });
       else void dropDiskEdit();
     }
     disk = null;
@@ -201,17 +200,15 @@ export async function openEdit(path: string): Promise<string | null | undefined>
     n = (await api.noteRead(path)) ?? null;
   } catch (e) {
     if (id !== openSeq) return undefined;
-    say(String(e), true);
+    sayError(e);
     if (disk && samePath(disk.path, path)) void dropDiskEdit();
     return null;
   }
   if (id !== openSeq) return undefined;
   if (!n) return null;
   loadEditFrom(n);
-  const draft = mem ? { path: mem.base.path, hash: mem.hash, text: mem.text, project: mem.project, kind: mem.kind, remind: mem.remind } : disk;
-  let plan = planSame(draft, fieldsOf(n));
-  if (plan.do === "drop" && mem && mem.title !== undefined && mem.title !== (n.heading ?? "")) plan = { do: "restore", stale: mem.hash !== n.hash }; // změněný jen nadpis
-  if (plan.do === "drop" && mem?.imgs.length) plan = { do: "restore", stale: mem.hash !== n.hash }; // změněný jen obrázky
+  const draft = mem ? toDiskEdit(mem) : disk;
+  const plan = planSame(draft, fieldsOf(n), { imgs: !!mem?.imgs.length }); // změněný jen nadpis / obrázky se neztratí
   if (plan.do === "drop") {
     if (!mem) void dropDiskEdit();
   } else if (plan.do === "restore" && draft) {
@@ -220,7 +217,7 @@ export async function openEdit(path: string): Promise<string | null | undefined>
     setEdProj(draft.project);
     setEdKind(draft.kind || DEFAULT_KIND);
     setEdRemind(draft.remind);
-    if (mem?.title !== undefined) setEdTitle(mem.title);
+    if (draft.title != null) setEdTitle(draft.title);
     setEdImgs(mem?.imgs ?? []);
     setEdStale(plan.stale);
     if (!mem) say(plan.stale ? t("notes.draft.restoredStale", "Poznámka se od rozepsané úpravy změnila (třeba lístkem na ploše) — tvoje úprava zůstala tady, „Načíst znovu“ ukáže novou verzi.") : t("notes.draft.restored", "Obnovena rozepsaná úprava."));

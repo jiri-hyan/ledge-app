@@ -53,7 +53,7 @@ export function kindForTarget(kind: ActionKind, target: string): ActionKind | nu
   return null;
 }
 
-/** Odkaz = akce, která jen něco otevře (web, okno s webem, složka, soubor) — ukazuje je karta Odkazy.
+/** Odkaz = akce, která jen něco otevře (web, okno s webem, složka, soubor) — ukazuje je karta Odkazy a akce (kolo 34 sloučená s dřívější Odkazy).
  *  Starý `personal.links` převádí na akce Rust (`linkmigrate.rs`) při načtení configu. */
 export const LINK_KINDS: readonly ActionKind[] = ["url", "web", "folder", "file"];
 export const isLink = (a: { kind: ActionKind; script?: boolean }) => !a.script && LINK_KINDS.includes(a.kind);
@@ -62,11 +62,6 @@ export const isLink = (a: { kind: ActionKind; script?: boolean }) => !a.script &
 export function onPage(a: { showOn: ShowOn }, mode: string): boolean {
   const want: ShowOn | null = mode === "osobni" ? "personal" : mode === "prace" ? "work" : null;
   return !want || a.showOn === "both" || a.showOn === want;
-}
-
-/** Odkazy (akce `isLink`) viditelné na záložce `mode`, v pořadí seznamu akcí (karta Odkazy). */
-export function linkActions<T extends { kind: ActionKind; showOn: ShowOn; script?: boolean }>(list: readonly T[], mode: string): T[] {
-  return list.filter((a) => isLink(a) && onPage(a, mode));
 }
 
 /** Akce viditelné na záložce `mode` (id z `layout`) ve skupinách; bez skupiny první, jinak pořadí výskytu.

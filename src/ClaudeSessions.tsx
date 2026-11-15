@@ -7,10 +7,10 @@
 // „Zobrazit další (k) · +3 nečinné“ ↔ „Méně“ (rozbalení zvlášť pro každou záložku). Kdo čeká na tebe
 // (schválení, otázka), je vždy nahoře a nikdy se neschová; pak pracující, nečinné podle poslední aktivity
 // a skončené (`sessions/order.ts`).
-import { createSignal, For, Show, type JSX } from "solid-js";
+import { createEffect, createSignal, For, on, Show, type JSX } from "solid-js";
 import { api, type Snapshot, type SessionView, type Pending, type SubagentDone, type Ask } from "./api";
-import { ago, uptime } from "./format";
-import { say } from "./ui/toast";
+import { ago, num, uptime } from "./format";
+import { say, sayError } from "./ui/toast";
 import { logoSrc } from "./logos";
 import { t, tp } from "./i18n";
 import QuestionCard from "./questions/QuestionCard";
@@ -20,7 +20,9 @@ import DiffPreview from "./sessions/DiffPreview";
 import PlanReview from "./sessions/PlanReview";
 import GitPanel from "./sessions/GitPanel";
 import { addonsMissing, planTitle } from "./sessions/plan";
-import CostsSection from "./costs/CostsSection";
+import CostsSection, { usd } from "./costs/CostsSection";
+import { tokText } from "./costs/model";
+import { sessionCost, sessionCostText } from "./sessions/cost";
 import ContextBar from "./sessions/ContextBar";
 import AgentActions, { BgPill } from "./sessions/AgentActions";
 import { statusPill } from "./sessions/agentview";
@@ -72,9 +74,14 @@ export default function ClaudeSessions(p: { s: Snapshot; now: number; onSettings
       await api.hooksInstall();
       say(q ? t("questions.hooksAdded", "Otázky Clauda zapojené — platí pro nově spuštěné session") : t("sessions.plan.hookAdded", "Review plánu zapojené — platí pro nově spuštěné session"));
     } catch (e) {
-      say(String(e), true);
+      sayError(e);
     }
   }
+  // cena u session čte stejný index jako sekce útraty: přepočet žádáme při otevřeném šuplíku a změně session
+  // (Rust ho pustí nejvýš 1× / 60 s, vlákno s nízkou prioritou, čte jen přírůstky; vypnutá útrata = nic)
+  createEffect(on([() => p.s.view, () => p.s.sessions.map((x) => `${x.id}:${x.updatedAt}`).join("|")], ([v]) => {
+    if (v === "full" && p.s.sessions.length && p.s.costs?.state !== "off") void api.costsRefresh().catch(() => {});
+  }));
   const row = (ss: SessionView) => <SessionRow ss={ss} s={p.s} now={p.now} pending={pendingFor(ss.id)} asks={asksFor(ss.id)} />;
   return (
     <div class="card" data-anim>
@@ -126,6 +133,18 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
     return p.ss.since ? uptime(p.ss.since, p.now) : "";
   };
   const sub = () => [proj()?.name ?? lastSeg(p.ss.cwd), p.ss.title].filter(Boolean).join(" · ");
+  const cost = () => sessionCost(p.s.costs?.summary?.sessions, p.ss.id);
+  const costTip = () => {
+    const c = cost();
+    if (!c) return "";
+    const why = [c.partial ? t("sessions.cost.partial", "odpovědi starší než {n} dní se nepočítají", { n: p.s.costs?.windowDays ?? 30 }) : "", c.unpriced > 0 ? t("sessions.cost.unpriced", "{n} tokenů modelu bez ceny se nenaceňuje", { n: num(c.unpriced, 0) }) : ""].filter(Boolean).join("; ");
+    const at = p.s.costs?.computedAt;
+    return [
+      t("sessions.cost.tip", "Odhad v cenách API od startu session (včetně jejích subagentů), {n} odpovědí, {tok} tokenů", { n: c.requests, tok: tokText(c.tokens, (v, d) => num(v, d)) }),
+      why && t("sessions.cost.lowerTip", "Dolní odhad: {why}", { why }),
+      at ? t("sessions.cost.when", "spočteno {when}", { when: ago(at, p.now) }) : "",
+    ].filter(Boolean).join("\n");
+  };
   const running = () => p.ss.subagents.running;
   const done = () => p.ss.subagents.done;
   const agentLine = () => {
@@ -139,7 +158,7 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
     try {
       await api.sessionOpen(p.ss.id);
     } catch (e) {
-      say(String(e), true);
+      sayError(e);
     }
   }
   return (
@@ -162,6 +181,7 @@ function SessionRow(p: { ss: SessionView; s: Snapshot; now: number; pending: Pen
         </Show>
         <BgPill ss={p.ss} />
         <span class={`pill ${st()[0]}`}>{st()[1]()}</span>
+        <Show when={cost()}>{(c) => <span class="meta sess-cost" title={costTip()}>{sessionCostText(c(), usd)}</span>}</Show>
         <span class="meta">{when()}</span>
       </div>
       <ContextBar ss={p.ss} s={p.s} now={p.now} />

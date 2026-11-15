@@ -13,6 +13,7 @@
 
 use crate::drawer::{Opener, View};
 use crate::limits::{self, Armed, Kind, Sample, Source};
+use crate::looks::capsule;
 use crate::state::{UiCmd, core, mark_dirty};
 use crate::strip::{Rgba, Segment};
 use parking_lot::Mutex;
@@ -48,8 +49,10 @@ struct Live {
     /// běžící připomínka resetu: okno a do kdy (ms)
     notice: Option<(Kind, i64)>,
     last_stat: Option<Instant>,
-    /// historie 5h okna pro tempo (`limits::push_hist`), plní se jen s volbou `claude.limitsPace`
+    /// historie 5h okna pro tempo (`limits::push_hist`), plní se s volbou `claude.limitsPace` nebo `claude.limitsAlert`
     hist: Vec<(i64, f64)>,
+    /// konec 5h okna, pro které už se ohlásilo „dojde za ~N min“ (0 = nic; `limits::eta_runs_out`)
+    eta_alerted: i64,
 }
 
 static LIVE: Mutex<Option<Live>> = Mutex::new(None);
@@ -161,6 +164,7 @@ pub(crate) fn tick(now: i64) {
         (cfg.claude.limits_reminder, c.fullscreen.load(Ordering::Relaxed), cfg.claude.limits_pace, cfg.claude.limits_alert, cfg.claude.limits_desktop)
     };
     let mut alerts: Vec<(Kind, u8, f64)> = Vec::new();
+    let mut eta: Option<(i64, f64)> = None;
     let mut dirty = false;
     let mut show = false;
     let mut hide = false;
@@ -172,7 +176,7 @@ pub(crate) fn tick(now: i64) {
         }
         if let Some(s) = best(l) {
             limits::arm(&mut l.armed, &s, now);
-            if let (true, Some(w)) = (pace, s.five_hour) {
+            if let (true, Some(w)) = (pace || alert, s.five_hour) {
                 dirty |= limits::push_hist(&mut l.hist, s.at, w.pct);
             }
         }
@@ -181,8 +185,19 @@ pub(crate) fn tick(now: i64) {
             if let Some(s) = best(l).filter(|s| now - s.at <= limits::STALE_MS) {
                 alerts = limits::alerts_due(&mut l.alerted, &s);
             }
+            // odhad „dojde za ~N min“ z historie vzorků (počítá se při příchodu vzorku, žádný časovač); jednou za okno
+            if let Some(w) = best(l).filter(|s| now - s.at <= limits::STALE_MS).and_then(|s| s.five_hour)
+                && let Some(r) = w.resets_at
+                && l.eta_alerted != r
+                && let Some(ms) = limits::eta_runs_out(&l.hist, w.pct, Some(r), now)
+                && ms <= limits::ETA_ALERT_MS
+            {
+                l.eta_alerted = r;
+                eta = Some((ms, w.pct));
+            }
         } else {
             l.alerted.clear();
+            l.eta_alerted = 0;
         }
         let fired = limits::due(&mut l.armed, now);
         // vypnuto / fullscreen = připomínka propadne (nic se neodkládá)
@@ -209,6 +224,15 @@ pub(crate) fn tick(now: i64) {
         };
         let title = crate::i18n::tr("Limit Claude se blíží", "Claude limit is getting close").to_string();
         let body = trf!("Limit {} je na {} % (práh {} %).", "The {} limit is at {}% ({}% threshold).", name, pct.round() as i64, lvl);
+        crate::notify::emit(crate::notify::Notice { kind: crate::notify::Kind::Limit, title, body, pct: Some(pct as f32), count: 1, ..Default::default() });
+    }
+    // odhad jen když zrovna nepřišel práh 80 / 90 % (ten je důležitější a říká totéž)
+    if alerts.is_empty()
+        && let Some((ms, pct)) = eta
+        && crate::attention::signal(Rgba::AMBER, true)
+    {
+        let title = crate::i18n::tr("Limit Claude se blíží", "Claude limit is getting close").to_string();
+        let body = trf!("Při tomto tempu dojde limit 5h za ~{} min (teď {} %).", "At this pace the 5h limit runs out in ~{} min ({}% now).", (ms / 60_000).max(1), pct.round() as i64);
         crate::notify::emit(crate::notify::Notice { kind: crate::notify::Kind::Limit, title, body, pct: Some(pct as f32), count: 1, ..Default::default() });
     }
     if show {
@@ -303,8 +327,8 @@ pub(crate) fn strip_segments(segs: &mut Vec<Segment>) {
     };
     let Some(text) = limits::strip_text(&s, now, &clock) else { return };
     let dot = match limits::top_fresh(&s, now) {
-        Some(p) if p >= 90.0 => Rgba::RED,
-        Some(p) if p >= 70.0 => Rgba::AMBER,
+        Some(p) if p >= capsule::FULL_PCT => Rgba::RED,
+        Some(p) if p >= capsule::WARN_PCT => Rgba::AMBER,
         Some(_) => Rgba::GREEN,
         None => Rgba::TEAL,
     };
@@ -355,6 +379,7 @@ mod tests {
     #[test]
     fn view_for_reads_options_from_given_config() {
         let mut cfg = crate::config::Config::default();
+        cfg.claude.limits_pace = false;
         assert!(!view_for(&cfg).pace);
         cfg.claude.limits_pace = true;
         cfg.claude.limits_desktop = true;

@@ -9,7 +9,7 @@ import { t } from "../i18n";
 import Gauge from "../charts/Gauge";
 import Rings from "../charts/Rings";
 import type { SystemView } from "./api";
-import { diskLoad, fmtPct, fmtRate, fmtSize, loadOf, sparkPoints, type Load } from "./format";
+import { diskLoad, fmtPct, fmtRate, fmtSize, loadOf, historyPoints, type Load } from "./format";
 import { fullestDisk, histStats, loadBars, termCells, windowSec } from "./systemLooks";
 import "./systemLooks.css";
 
@@ -24,8 +24,8 @@ function Spark(p: { values: number[]; max?: number; floor?: number; load?: Load;
   return (
     <svg class="sd-spark" data-load={p.load} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={p.title}>
       <title>{p.title}</title>
-      <polyline points={sparkPoints(p.values, W, H, p.max, p.floor)} />
-      <Show when={p.second}>{(s) => <polyline class="sd-spark-2" points={sparkPoints(s().values, W, H, p.max, p.floor)} />}</Show>
+      <polyline points={historyPoints(p.values, W, H, p.max, p.floor)} />
+      <Show when={p.second}>{(s) => <polyline class="sd-spark-2" points={historyPoints(s().values, W, H, p.max, p.floor)} />}</Show>
     </svg>
   );
 }

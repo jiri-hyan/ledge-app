@@ -109,7 +109,7 @@ pub(crate) fn shelf_clear() -> Result<(), String> {
 #[tauri::command(async)]
 pub(crate) fn shelf_paste() -> Result<usize, String> {
     if !core().cfg.read().shelf.enabled {
-        return Err(tr("Přihrádka je vypnutá (Nastavení → Šuplík a karty).", "The shelf is turned off (Settings → Drawer and cards).").into());
+        return Err(tr("Přihrádka je vypnutá (Nastavení → Záložky a karty).", "The shelf is turned off (Settings → Tabs and cards).").into());
     }
     shelf::paste::paste_clipboard()
 }

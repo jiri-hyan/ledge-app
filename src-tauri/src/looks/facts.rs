@@ -75,7 +75,8 @@ pub fn battery_fact(v: Option<&crate::battery::BatteryView>) -> Option<super::Ba
     v.map(|b| super::BatteryFact { percent: b.percent.min(100), charging: b.charging })
 }
 
-/// Jak staré počasí z karty Počasí proužek ještě ukáže (proužek sám nic nestahuje; starší = nic).
+/// Jak staré počasí z karty Počasí proužek ještě ukáže (proužek sám nic nestahuje; starší = nic). Totéž pravidlo
+/// má TS `src/cards/weatherAge.ts` (`WX_GONE_MS`; „stará“ od `weather::MAX_AGE_MS` = `WX_OLD_MS`).
 pub const WEATHER_SHOW_MS: i64 = 3 * 60 * 60 * 1000;
 
 /// Počasí z paměti (`Core.weather`): jen data mladší než `WEATHER_SHOW_MS`, jinak `None`.

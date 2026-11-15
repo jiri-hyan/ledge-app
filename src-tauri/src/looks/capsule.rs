@@ -7,17 +7,19 @@ use super::{Facts, Glyph, OK, Part, RUN, Show, State, WAIT, done_text, icon, sta
 use crate::looks::{IDLE, Look};
 use crate::strip::Rgba;
 
-/// Oranžová prstenců „čeká na tebe“ (odlišná od jantaru limitu ≥ 80 %); obrys těla pulzuje přes `attention::pulse`.
+/// Oranžová prstenců „čeká na tebe“ (odlišná od jantaru limitu od `WARN_PCT`); obrys těla pulzuje přes `attention::pulse`.
 pub const CALL: Rgba = Rgba(1.0, 0.56, 0.2, 1.0);
 
-/// Od kolika % je prstenec limitu jantarový / červený (jako upozornění na limit).
-pub const WARN_PCT: f64 = 80.0;
-pub const FULL_PCT: f64 = 100.0;
+/// Jediná tabulka prahů „zelená → červená“ (kolo 33, L81; kolo 34 N1: i pro všechny limity): jantar od 75 %, červená
+/// od 90 %. Zrcadlí ji `src/charts/thresholds.ts` (`WARN_PCT` / `FULL_PCT`, test `thresholds.test.mjs` čte tento soubor);
+/// používá ji karta, prstenec, proužek (`limits.rs`, `limitslive.rs`), hrana (`edgefx::LIMIT_AT`), `compose::is_active`.
+pub const WARN_PCT: f64 = 75.0;
+pub const FULL_PCT: f64 = 90.0;
 
 /// „42 %“ (CPU, paměť, baterie).
 use crate::util::pct_text as pct;
 
-/// Barva prstence podle čerpání limitu (akcent → jantar od 80 % → červená od 100 %).
+/// Barva prstence podle čerpání limitu (akcent → jantar od `WARN_PCT` → červená od `FULL_PCT`).
 pub fn ring_color(p: f64, accent: Rgba) -> Rgba {
     if p >= FULL_PCT {
         Rgba::RED
@@ -25,6 +27,25 @@ pub fn ring_color(p: f64, accent: Rgba) -> Rgba {
         Rgba::AMBER
     } else {
         accent
+    }
+}
+
+/// Spojitá barva podle hodnoty (styl `ringText`, barva dílu `heat`): 0 % zelená → jantar v `WARN_PCT` → červená
+/// ve `FULL_PCT` a výš. Lineárně po úsecích v sRGB, jen pár násobení (žádný gradientní štětec).
+pub fn heat(p: f64) -> Rgba {
+    let mix = |a: Rgba, b: Rgba, t: f64| {
+        let t = t.clamp(0.0, 1.0) as f32;
+        let l = |x: f32, y: f32| x * (1.0 - t) + y * t;
+        Rgba(l(a.0, b.0), l(a.1, b.1), l(a.2, b.2), 1.0)
+    };
+    if !p.is_finite() || p <= 0.0 {
+        Rgba::GREEN
+    } else if p < WARN_PCT {
+        mix(Rgba::GREEN, Rgba::AMBER, p / WARN_PCT)
+    } else if p < FULL_PCT {
+        mix(Rgba::AMBER, Rgba::RED, (p - WARN_PCT) / (FULL_PCT - WARN_PCT))
+    } else {
+        Rgba::RED
     }
 }
 
@@ -247,9 +268,16 @@ mod tests {
         assert_eq!(day_of(""), "");
         assert_eq!(day_of("ne 18. 10."), "ne 18. 10.");
         let acc = Rgba::VIOLET;
-        for (p, want) in [(0.0, acc), (79.9, acc), (80.0, Rgba::AMBER), (99.0, Rgba::AMBER), (100.0, Rgba::RED)] {
+        for (p, want) in [(0.0, acc), (74.9, acc), (75.0, Rgba::AMBER), (89.9, Rgba::AMBER), (90.0, Rgba::RED), (100.0, Rgba::RED)] {
             assert_eq!(ring_color(p, acc), want, "{p}");
         }
+        // heat: pevné body (zrcadlí `src/notch/look.test.mjs`), spojitost a nesmyslné vstupy
+        for (p, want) in [(0.0, Rgba::GREEN), (-5.0, Rgba::GREEN), (f64::NAN, Rgba::GREEN), (75.0, Rgba::AMBER), (90.0, Rgba::RED), (100.0, Rgba::RED), (250.0, Rgba::RED)] {
+            assert_eq!(heat(p), want, "{p}");
+        }
+        let mid = heat(37.5);
+        assert!((mid.0 - (Rgba::GREEN.0 + Rgba::AMBER.0) / 2.0).abs() < 1e-5 && (mid.1 - (Rgba::GREEN.1 + Rgba::AMBER.1) / 2.0).abs() < 1e-5);
+        assert!(heat(60.0).0 < heat(70.0).0, "červená složka roste");
         for (code, day, want) in [(0, true, Glyph::Sun), (1, false, Glyph::Moon), (3, true, Glyph::Cloud), (61, false, Glyph::Cloud), (95, true, Glyph::Cloud)] {
             assert_eq!(weather_glyph(code, day), want, "{code}");
         }

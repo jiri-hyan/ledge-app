@@ -33,6 +33,8 @@ export interface NoteView {
   model: "sonnet" | "opus" | "haiku" | null;
 }
 
+/** Zadání čekající na člověka (Rust `notes::briefwait::BriefWaiting`): počty a první (otázka před kontrolou). */
+export interface BriefWaiting { waiting: number; review: number; first: { path: string; title: string; status: "waiting" | "review" } | null }
 export type BriefStatus = "draft" | "ready" | "running" | "waiting" | "review" | "done";
 /** Nový snímek k uložení (Rust `attach::ImageIn`): holé PNG v base64, nebo s popiskem a kotvou — `anchorLine` = řádek odesílaného textu (od 0), musí to být bod seznamu. */
 export type ImageIn = string | { png: string; caption?: string; anchorLine?: number };
@@ -78,7 +80,8 @@ export type SaveOutcome = { outcome: "saved"; note: NoteDetail } | { outcome: "c
 
 /** Volby lístku na plochu (Rust `pins::PinPrefs`). `bg` 0–100 %, `text` 50–100 % neprůhlednost. */
 export interface PinPrefs { onTop: boolean; locked: boolean; through: boolean; bg: number; text: number; collapsed: boolean; /** styl (Rust `pins::PinStyle`) */ style: "classic" | "paper" | "glass" | "stripe" | "minimal" | "dark" }
-export interface PinsView { open: { path: string; through: boolean }[]; key: string }
+/** Lístky ve snapshotu: `open` = okno stojí, `hidden` = schované do `until` (ms epochy, „Schovat do…“; vrátí se samy). */
+export interface PinsView { open: { path: string; through: boolean }[]; hidden: { path: string; until: number }[]; key: string }
 /** Start okna lístku (`pin_init`): poznámka, volby, zkratka průchozího režimu (a jestli je zaregistrovaná). */
 export interface PinInit { path: string; prefs: PinPrefs; key: string; keyOk: boolean; hintSeen: boolean; lang: "cs" | "en"; fresh: boolean; /** `notes.tagColors` — barva podle štítku */ tagColors: Record<string, string>; /** id projektu → název */ projects?: Record<string, string>; /** id projektu → barva `#rrggbb` */ projectColors?: Record<string, string> }
 
@@ -87,8 +90,33 @@ export interface NoteQuery { kind?: string | null; project?: string | null; incl
 export interface Deleted { id: string; title: string }
 export interface QueryResult { notes: NoteView[]; total: number }
 
+/** Řádek úkolu napříč poznámkami (Rust `notes::taskindex::TaskRow`). `line` = řádek těla od 0 (jako u `noteToggleTask`). */
+export interface TaskRow {
+  path: string;
+  line: number;
+  /** text bez termínu, priority a důkazu (≤ 160 znaků) */
+  text: string;
+  state: "open" | "proposed";
+  /** termín (ms); celodenní má 9:00 toho dne */
+  dueMs: number | null;
+  allDay: boolean;
+  /** 0, 1 (`!`), 2 (`!!`) */
+  prio: 0 | 1 | 2;
+  project: string | null;
+  noteTitle: string;
+  kind: string;
+  /** předáno propojené aplikaci (řádek ↳ [ pod bodem) — šedě, nepočítá se */
+  forwarded: boolean;
+}
+export interface TaskCounts { overdue: number; today: number; proposed: number; undated: number }
+export interface TaskList { rows: TaskRow[]; counts: TaskCounts }
+export interface TaskQuery { project?: string | null; /** výchozí 200, nejvýš 1000 */ limit?: number }
+/** Rychlý úkol z věty (Rust `notes::taskquick::QuickTask`). */
+export interface QuickTask { title: string; whenIso: string | null; priority: 0 | 1 | 2; assignee: string | null; /** hotový řádek `- [ ] …` */ line: string }
+
+
 /** Rozepsaná úprava existující poznámky (`<root>\.draft\edit.json`). */
-export interface EditDraft { path: string; hash: string; text: string; project: string; kind: string; remind: string }
+export interface EditDraft { path: string; hash: string; text: string; project: string; kind: string; remind: string; /** vlastní nadpis; chybí = nadpis z disku */ title?: string | null }
 
 export interface NewNote {
   text: string;

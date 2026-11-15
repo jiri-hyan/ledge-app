@@ -50,6 +50,7 @@ export const EXCEPTIONS = {
   },
   pin: {},
   desk: {
+    retry_online: "CalendarCard: „Zkusit znovu“ se při `readOnly` (widget na ploše) neukazuje",
     set_mode: SHELL,
     drawer_size: SHELL,
     drawer_size_end: SHELL,
@@ -232,4 +233,14 @@ test("stripComments: řádkové i blokové komentáře pryč, URL v řetězci z�
   assert.equal(stripComments("a // b\nc"), "a \nc")
   assert.equal(stripComments("a /* x\ny */ b"), "a  b")
   assert.equal(stripComments('u = "http://example.com"'), 'u = "http://example.com"')
+})
+
+// L297: inline <style> ve vstupním HTML přiměje Tauri přidat do `style-src` nonce → 'unsafe-inline' přestane
+// platit a zablokují se VŠECHNY style atributy v okně (statické `style={{…}}` ze šablon Solidu).
+test("vstupní HTML oken nemá inline <style> (CSP nonce by zablokoval style atributy)", () => {
+  const htmls = fs.readdirSync(root).filter((f) => f.endsWith(".html"))
+  assert.ok(htmls.includes("settings.html") && htmls.includes("index.html"), "vstupy oken nalezeny")
+  for (const f of htmls) {
+    assert.ok(!/<style[\s>]/i.test(fs.readFileSync(path.join(root, f), "utf8")), `${f}: inline <style> — dej pozadí do atributu nebo do CSS`)
+  }
 })

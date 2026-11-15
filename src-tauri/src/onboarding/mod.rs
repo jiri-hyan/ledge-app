@@ -138,7 +138,7 @@ mod tests {
             assert_eq!(cfg.strip.items, [StripItem::Mode, StripItem::Clock, StripItem::Running, StripItem::Claude, StripItem::Waiting, StripItem::Repos], "{text}");
             let work: Vec<&str> = cfg.layout.pages[0].cards.iter().map(|c| c.id.as_str()).collect();
             assert_eq!(work, ["projects", "actions", "shelf", "running", "claude", "repos", "notes"], "{text}");
-            assert_eq!(cfg.layout.pages[1].cards.len(), 10, "{text}");
+            assert_eq!(cfg.layout.pages[1].cards.len(), 9, "{text}"); // Odkazy sloučené s Odkazy a akce (kolo 34)
             assert!(cfg.drawer.sections.claude && cfg.drawer.sections.weather && cfg.drawer.sections.actions, "{text}: sections odvozené z plného rozložení");
         }
         // vlastní položky proužku a vlastní rozložení se nemění

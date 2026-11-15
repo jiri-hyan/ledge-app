@@ -334,8 +334,9 @@ pub fn import_image(dir: &Path, src: &Path) -> Result<String, String> {
     let key = format!("{:016x}", crate::icons::fnv1a(&out));
     std::fs::create_dir_all(dir).map_err(|e| crate::errors::io(tr("Obrázek nejde uložit", "Can't save the image"), &e))?;
     let path = dir.join(format!("{key}.{ext}"));
-    if !path.exists() {
-        std::fs::write(&path, &out).map_err(|e| crate::errors::io(tr("Obrázek nejde uložit", "Can't save the image"), &e))?;
+    // prázdný soubor = pozůstatek rozepsaného zápisu: přepsat
+    if !path.metadata().is_ok_and(|m| m.len() > 0) {
+        crate::fsx::write_atomic_dir(&path, &out).map_err(|e| crate::errors::io(tr("Obrázek nejde uložit", "Can't save the image"), &e))?;
     }
     Ok(key)
 }

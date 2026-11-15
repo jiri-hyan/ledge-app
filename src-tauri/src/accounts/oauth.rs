@@ -161,10 +161,10 @@ pub fn classify(status: u16, body: &[u8]) -> (TokenFail, String) {
 /// Lidská věta k chybě (bez kódů, adres a tokenů).
 pub fn human(p: Provider, f: TokenFail) -> String {
     match (f, p) {
-        (TokenFail::Revoked, _) => trf!("Přihlášení k účtu {} vypršelo — přihlas se znovu v Nastavení → Účty.", "Your {} sign-in expired — sign in again in Settings → Accounts.", p.label()),
+        (TokenFail::Revoked, _) => trf!("Přihlášení k účtu {} vypršelo — přihlas se znovu v Nastavení → Obsah karet → Kalendáře → Pokročilé.", "Your {} sign-in expired — sign in again in Settings → Card contents → Calendars → Advanced.", p.label()),
         (TokenFail::Client, Provider::Microsoft) => tr(
-            "Microsoft nezná tohle Client ID nebo nemá povolené veřejné klienty — zkontroluj registraci aplikace (průvodce v Nastavení → Účty).",
-            "Microsoft doesn't know this Client ID or public clients aren't allowed — check the app registration (guide in Settings → Accounts).",
+            "Microsoft nezná tohle Client ID nebo nemá povolené veřejné klienty — zkontroluj registraci aplikace (průvodce v Nastavení → Obsah karet → Kalendáře → Pokročilé).",
+            "Microsoft doesn't know this Client ID or public clients aren't allowed — check the app registration (guide in Settings → Card contents → Calendars → Advanced).",
         )
         .into(),
         (TokenFail::Client, Provider::Google) => tr(

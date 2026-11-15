@@ -1,4 +1,4 @@
-// Klávesnice v otevřeném šuplíku (kolo 20, `smart.quickKeys`): Alt+1…9 spustí N-tého zástupce na záložce,
+// Klávesnice v otevřeném šuplíku (kolo 20; od kola 33 vždy zapnuto, volba `smart.quickKeys` zrušena, starý klíč se ignoruje): Alt+1…9 spustí N-tého zástupce na záložce,
 // šipky mezi zástupci přesouvají fokus, Enter spustí (nativně, tlačítko). ČISTÁ logika — `keyPlan` rozhodne
 // z popisu události a stavu, `neighbor` najde souseda podle rozmístění; DOM a události řeší `quick.ts`.
 // Pravidla: jen s volbou zapnutou, jen na hlavní stránce, ne v úpravách šuplíku, ne s paletou, ne v polích

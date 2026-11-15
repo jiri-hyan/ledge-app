@@ -63,6 +63,9 @@ if (-not (Get-RealFile $Setup)) {
   Fail "Instalátor $Setup existuje jen v bublině (WMI ho nevidí). Zkopíruj ho mimo AppData (např. na Plochu) a spusť znovu s -Setup."
 }
 Write-Host "instalátor: $Setup"
+# L217: instalátor starší než nainstalovaná verze (typicky lokální build se zástupnou 0.2.0) = tichý downgrade; jen varování
+$prevVer = Get-RealReg 'Software\Microsoft\Windows\CurrentVersion\Uninstall\Ledge' 'DisplayVersion'
+if ($prevVer) { node (Join-Path $PSScriptRoot 'vydani-check.mjs') downgrade $prevVer $Setup | ForEach-Object { Write-Warning $_ } }
 
 # ---------- 2. tichá instalace mimo bublinu ----------
 $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }

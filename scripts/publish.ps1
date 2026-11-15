@@ -6,8 +6,7 @@
 # změn prověří proti `scripts/private/denylist.txt` (jména klientů, strojů…) — jediný nález = konec.
 # Pak lokální build (stejný tvar jako dřív) a GitHub Release vX.Y.<Z+1> (nebo -Version) ve veřejném repu s řádkem
 # `SHA256 (<instalátor>) = <hex>`, který čte Ledge (update.rs `sha_for`).
-# Poznámky vydání (kolo 24): odkaz ke stažení, „Co je nového“ (ručně z `docs/releases/<verze>.md`, jinak feat/fix/perf
-# ze seznamu změn), instalace se SmartScreen, ověření SHA256 a podpisu, „Nastav s Claudem“, sbalený seznam změn.
+# Poznámky vydání (kolo 24): odkaz ke stažení, „Co je nového“ (ručně z povinného `docs/releases/<verze>.md`), instalace se SmartScreen, ověření SHA256 a podpisu, „Nastav s Claudem“, sbalený seznam změn.
 #
 # Build a podpis v GitHub Actions (výchozí od 11. 11. 2026): snapshot se pushne do veřejného repa a jeho workflow
 # `Sestavení a podpis` (šablona `.github/verejne-repo/workflows/vydani.yml`, kopíruje se do každého snapshotu)
@@ -34,6 +33,7 @@
 #          [-Private jiri-hyan/ledge] [-AlsoPrivate] [-Clone <složka klonu veřejného repa>] [-DryRun] [-Version x.y.z] [-Local]
 #   -Local        build a podpis na tomhle PC vlastním klíčem (záloha); bez něj staví a podepisuje GitHub Actions
 #   -AlsoPrivate  stejný instalátor vydá i v soukromém repu (přechod: Ledge ≤ 0.2.8 hledá aktualizace tam)
+#   -SkipGateCheck  výjimka z pojistky L213 (razítko plných bran `.brany-ok` musí odpovídat stromu HEAD); jen výslovně, zapíše se do %LOCALAPPDATA%\ledge-publish.log
 #   -DryRun       jen snapshot do klonu + kontrola denylistu, nic necommituje, nebuilduje ani nevydá
 # Podmínky: větev main, čistý strom, HEAD pushnutý do soukromého repa.
 param(
@@ -45,7 +45,8 @@ param(
   [string]$Version,
   [string]$SigningKey = $(if ($env:LEDGE_SIGNING_KEY) { $env:LEDGE_SIGNING_KEY } else { Join-Path $env:USERPROFILE '.ledge-signing\ledge-update.key' }),
   [string]$PasswordFile,
-  [switch]$Local
+  [switch]$Local,
+  [switch]$SkipGateCheck
 )
 # 'Continue': git/gh píšou průběh na stderr, PowerShell 5.1 by to pod 'Stop' bral jako chybu —
 # návratové kódy se kontrolují výslovně ($LASTEXITCODE) a chyby končí `exit 1`
@@ -110,8 +111,15 @@ function Test-SigKeyId([string]$sigPath) {
 function Invoke-CiBuild([string]$sha) {
   $wf = 'vydani.yml'
   $since = (Get-Date).ToUniversalTime().AddSeconds(-5)
-  gh workflow run $wf --repo $Public --ref main -f "version=$v" -f "sha=$sha" | Out-Host
-  if ($LASTEXITCODE -ne 0) { Fail "spuštění workflow $wf v $Public selhalo" }
+  # L32: čerstvě pushnutý snapshot (nebo změněný workflow) GitHub chvíli nezná → HTTP 404; opakovat 6× po 10 s
+  for ($try = 1; $try -le 6; $try++) {
+    $out = (gh workflow run $wf --repo $Public --ref main -f "version=$v" -f "sha=$sha" 2>&1 | Out-String)
+    Write-Host $out
+    if ($LASTEXITCODE -eq 0) { break }
+    if ($out -notmatch '404' -or $try -eq 6) { Fail "spuštění workflow $wf v $Public selhalo" }
+    Write-Host "workflow $wf zatím neznámý (HTTP 404), zkouším znovu za 10 s ($try/6)"
+    Start-Sleep -Seconds 10
+  }
   $runId = $null
   for ($i = 0; $i -lt 30 -and -not $runId; $i++) {
     Start-Sleep -Seconds 4
@@ -166,26 +174,6 @@ function Publish-Release([string]$repo, [string]$target) {
   if ($LASTEXITCODE -ne 0) { Fail "publikace konceptu $tag ($repo) selhala — koncept je úplný: gh release edit $tag --repo $repo --draft=false" }
 }
 
-# Řádky denylistu = regulární výrazy (bez ohledu na velikost písmen); # = komentář.
-function Get-Denylist {
-  $f = Join-Path $root 'scripts\private\denylist.txt'
-  if (-not (Test-Path $f)) { Fail "chybí $f — bez něj se veřejně nevydává" }
-  @(Get-Content $f -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
-}
-
-function Find-Denied([string]$dir, [string[]]$deny) {
-  $hits = @()
-  Get-ChildItem -Path $dir -Recurse -File -Force | Where-Object { $_.FullName -notmatch '\\\.git\\' } | ForEach-Object {
-    $rel = $_.FullName.Substring($dir.Length + 1)
-    foreach ($d in $deny) { if ($rel -match "(?i)$d") { $hits += "jméno souboru: $rel ~ $d" } }
-    if ($_.Extension -notin '.png', '.ico', '.icns', '.jpg', '.webp', '.bmp') {
-      $text = [IO.File]::ReadAllText($_.FullName)
-      foreach ($d in $deny) { if ($text -match "(?i)$d") { $hits += "$rel ~ $d" } }
-    }
-  }
-  $hits
-}
-
 Push-Location $root
 try {
   $branch = git rev-parse --abbrev-ref HEAD
@@ -194,7 +182,7 @@ try {
   git fetch -q origin main
   $head = git rev-parse HEAD
   if ($head -ne (git rev-parse origin/main)) { Fail 'HEAD není shodný s origin/main — nejdřív push/pull' }
-  $deny = Get-Denylist
+  if (-not (Test-Path (Join-Path $root 'scripts/private/denylist.txt'))) { Fail 'chybi scripts/private/denylist.txt - bez nej se verejne nevydava' }
   if (-not $DryRun) { if ($Local) { Assert-SigningKey } else { Assert-CiSigning } }
 
   # další verze = nejvyšší vydaná vX.Y.Z v OBOU repech, patch + 1 (jedna řada verzí; Ledge porovnává čísla);
@@ -211,6 +199,19 @@ try {
     $v = $Version
   } else { $v = "$($last.Major).$($last.Minor).$($last.Build + 1)" }
   "verze:      $v (poslední vydaná: $last)"
+
+  # pojistky (L213/L214, logika v scripts/vydani-lib.mjs): poznámky vydání musí existovat; plné brány musely projít nad stromem HEAD
+  node (Join-Path $PSScriptRoot 'vydani-check.mjs') notes $v
+  if ($LASTEXITCODE -ne 0) { Fail "chybí poznámky vydání docs/releases/$v.md — bez nich se nevydává (žádný tichý fallback na commity)" }
+  if (-not $DryRun) {
+    if ($SkipGateCheck) {
+      Write-Warning 'PŘESKAKUJI kontrolu plných bran (-SkipGateCheck) — vydání nemusí být otestované'
+      Add-Content -Path (Join-Path $env:LOCALAPPDATA 'ledge-publish.log') -Value ("{0} v{1} -SkipGateCheck HEAD {2}" -f (Get-Date -Format s), $v, $head) -Encoding UTF8
+    } else {
+      node (Join-Path $PSScriptRoot 'vydani-check.mjs') gates
+      if ($LASTEXITCODE -ne 0) { Fail 'plné brány neprošly nad tímto stromem — spusť node scripts/brany.mjs (nebo výslovně -SkipGateCheck)' }
+    }
+  }
 
   # ---- snapshot do klonu veřejného repa ----
   if (-not (Test-Path (Join-Path $Clone '.git'))) {
@@ -240,7 +241,6 @@ try {
   $pubGh = Join-Path $root '.github\verejne-repo'
   if (Test-Path $pubGh) { Copy-Item -Path (Join-Path $pubGh '*') -Destination (New-Item -ItemType Directory -Force (Join-Path $Clone '.github')) -Recurse -Force }
 
-  $hits = @(Find-Denied $Clone $deny)
   $prevTag = "v$last"
   git rev-parse -q --verify "refs/tags/$prevTag" *> $null
   # seznam změn jen z commitů, které mění něco, co jde ven (ne čistě interní export-ignore cesty)
@@ -253,9 +253,10 @@ try {
   $skipFile = Join-Path $root 'scripts\private\notes-skip.txt'
   $skip = if (Test-Path $skipFile) { @(Get-Content $skipFile -Encoding UTF8 | ForEach-Object { ($_ -split '#')[0].Trim() } | Where-Object { $_ }) } else { @() }
   $log = @($log | Where-Object { $skip -notcontains $_.Substring(0, 40) } | ForEach-Object { $_.Substring(41) })
-  foreach ($line in $log) { foreach ($d in $deny) { if ($line -match "(?i)$d") { $hits += "seznam změn: $line ~ $d" } } }
-  if ($hits.Count) { $hits | ForEach-Object { "  ZAKÁZÁNO: $_" }; Fail "snapshot obsahuje zakázaná slova ($($hits.Count)) — oprav na main a vydej znovu" }
-  "snapshot:   $Clone čistý (denylist $($deny.Count) vzorů)"
+  # zakazana slova: jedna implementace (scripts/denylist-check.mjs) - jmena i obsah rozbaleneho klonu + predmety commitu od $prevTag; vypisuje jen soubor:radek ~ vzor #index
+  node (Join-Path $PSScriptRoot 'denylist-check.mjs') --dir $Clone --since $prevTag
+  if ($LASTEXITCODE -ne 0) { Fail 'snapshot obsahuje zakazana slova (nebo kontrola selhala) - oprav na main a vydej znovu' }
+  "snapshot:   $Clone cisty"
   if ($DryRun) { 'DryRun: konec bez commitu, buildu a vydání'; exit 0 }
 
   # autor i committer = jiri-hyan s noreply e-mailem GitHubu (žádná osobní ani pracovní adresa)
@@ -290,6 +291,10 @@ try {
     if ($LASTEXITCODE -ne 0) { Fail 'ci-version.ps1 selhal' }
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'release.ps1')
     if ($LASTEXITCODE -ne 0) { Fail 'release.ps1 (build) selhal' }
+    # sestavena binarka nesmi nest cestu s uzivatelskym jmenem ani zakazane slovo (ASCII i UTF-16LE); bez nalezu vypise jen offset a vzor
+    $builtDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $root 'src-tauri\target' }
+    node (Join-Path $PSScriptRoot 'denylist-check.mjs') --exe (Join-Path $builtDir 'release\ledge.exe')
+    if ($LASTEXITCODE -ne 0) { Fail 'denylist-check --exe: ledge.exe nese zakazany text nebo cestu uzivatele - nevydavam' }
   } finally {
     git checkout -q -- @verFiles
   }

@@ -148,6 +148,9 @@ impl Vault for WinCred {
     }
 
     fn write_as(&self, target: &str, user: &str, data: &[u8]) -> Result<(), String> {
+        if crate::qa::isolated() {
+            return Err(crate::i18n::tr("Izolovaná instance (QA) nezapisuje do Správce pověření.", "The isolated (QA) instance doesn't write to Credential Manager.").into());
+        }
         use windows::Win32::Security::Credentials::{CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredWriteW};
         use windows::core::PWSTR;
         let mut name: Vec<u16> = target.encode_utf16().chain([0]).collect();
@@ -169,6 +172,9 @@ impl Vault for WinCred {
     }
 
     fn delete(&self, target: &str) -> Result<(), String> {
+        if crate::qa::isolated() {
+            return Err(crate::i18n::tr("Izolovaná instance (QA) nezapisuje do Správce pověření.", "The isolated (QA) instance doesn't write to Credential Manager.").into());
+        }
         use windows::Win32::Foundation::ERROR_NOT_FOUND;
         use windows::Win32::Security::Credentials::{CRED_TYPE_GENERIC, CredDeleteW};
         use windows::core::HSTRING;

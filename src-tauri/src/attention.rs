@@ -274,7 +274,7 @@ fn live_gate(toast_on: bool) -> Gate {
     use crate::drawer::View;
     let c = crate::state::core();
     let no_motion = c.cfg.read().appearance.motion.style == crate::appearance::MotionStyle::None;
-    let mut gate = Gate { dead: c.dead(), no_motion, toast_on, quiet: false, drawer_full: c.drawer.view() == View::Full };
+    let mut gate = Gate { dead: c.dead_surface(), no_motion, toast_on, quiet: false, drawer_full: c.drawer.view() == View::Full };
     if !gate.dead && !gate.no_motion {
         gate.no_motion = os_animations_off();
     }
@@ -392,6 +392,8 @@ pub(crate) fn notice_of(ev: Event, sid: &str, title: String, body: String, tool:
 
 /// Stav pro `catch_up`: byl Ledge při minulém průchodu mrtvý?
 static WAS_DEAD: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// totéž pro povrchy na monitoru proužku (`Core::dead_surface`)
+static WAS_DEAD_HERE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Kdy `catch_up` naposledy zopakoval puls čekající otázky.
 static LAST_REPULSE: Mutex<Option<Instant>> = Mutex::new(None);
 
@@ -401,7 +403,7 @@ fn asking_now() -> (bool, bool, Option<u64>) {
     let c = crate::state::core();
     let asking = !c.claude.questions().is_empty();
     // čekající otázka = jantarová linka, proužek je vidět i vypnutý (`stripview`: ambientní barva)
-    let shown = asking && c.drawer.view() == View::Hidden && !c.dead();
+    let shown = asking && c.drawer.view() == View::Hidden && !c.dead_surface();
     // poslední puls i poslední pokus o něj (bez animací se puls nenastaví — jinak by se `emit` točil)
     let pulse = WATCH.lock().as_ref().and_then(|w| w.pulse).map(|(_, t)| t);
     let ago = [pulse, *LAST_REPULSE.lock()].into_iter().flatten().map(|t| t.elapsed().as_millis() as u64).min();
@@ -416,11 +418,14 @@ pub(crate) fn catch_up() {
     let c = crate::state::core();
     let dead = c.dead();
     let was = WAS_DEAD.swap(dead, Ordering::Relaxed);
-    // do hry zkratky Schválit / Zamítnout odregistrovat, po hře vrátit
+    // do hry zkratky Schválit / Zamítnout odregistrovat, po hře vrátit (globální: hra kdekoli)
     if was != dead {
         crate::hotkeys::sync_approve_keys();
     }
-    if revive_peek(was, dead, c.drawer.view() == View::Hidden, c.claude.attention()) {
+    // peek po hře je povrch: hra na jiném monitoru než proužek ho nepotlačí a nevrací
+    let dead_here = c.dead_surface();
+    let was_here = WAS_DEAD_HERE.swap(dead_here, Ordering::Relaxed);
+    if revive_peek(was_here, dead_here, c.drawer.view() == View::Hidden, c.claude.attention()) {
         c.send_ui(crate::state::UiCmd::Show(View::Peek, crate::drawer::Opener::Hover));
     }
     let (asking, shown, ago) = asking_now();

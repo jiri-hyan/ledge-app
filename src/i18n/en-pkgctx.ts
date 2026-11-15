@@ -16,6 +16,6 @@ registerDict("en", {
   "settings.pkg.stopRestart": "Stop and restart",
   "settings.pkg.autostartBlocked": "Not possible right now — Ledge is running inside the {family} package; Windows wouldn't see the entry at sign-in. It's written automatically after a restart outside.",
   "cards.pkg.chip": "In the {app} bubble",
-  "cards.pkg.chipTitle": "Ledge is running inside the {app} app (an MSIX package): settings, data and start with Windows go into its isolated copy. Click = Settings → Restart outside.",
+  "cards.pkg.chipTitle": "Ledge is running inside the {app} app (an MSIX package): settings, data and start with Windows go into its isolated copy. Click = {path}.",
   "cards.update.outside": "Ledge is running in the {app} bubble — the installer will run outside it (Task Scheduler), install Ledge for real and start it from there.",
 });

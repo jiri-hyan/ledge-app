@@ -2,6 +2,8 @@
 // stáří vzorku a času resetu, odpočet, šířka pruhu, úroveň barvy. Stejná pravidla jako Rust
 // `limits.rs` (`state`); hranici stáří posílá jádro (`LimitsView.staleMs`), nic se nevymýšlí.
 
+import { WARN_PCT, toneOf } from "../charts/thresholds.ts";
+
 export interface LimitWindow {
   /** spotřeba 0–100 (může být desetinná) */
   pct: number;
@@ -36,8 +38,8 @@ export function left(resetsAt: number | null | undefined, now: number): { d: num
 /** Šířka pruhu v % (0–100). */
 export const bar = (pct: number) => Math.max(0, Math.min(100, pct));
 
-/** Barva pruhu: < 70 % ok, < 90 % pozor, jinak plno. */
-export const level = (pct: number): "ok" | "warn" | "bad" => (pct >= 90 ? "bad" : pct >= 70 ? "warn" : "ok");
+/** Barva pruhu: < `WARN_PCT` ok, < `FULL_PCT` pozor, jinak plno (jedna tabulka `charts/thresholds.ts`). */
+export const level = toneOf;
 
 /** Celé procento k zobrazení („42 %“) — dolů, ať 99,6 % nevypadá jako plných 100. */
 export const pctText = (pct: number) => String(Math.floor(pct));
@@ -50,7 +52,7 @@ export function otherDay(ms: number, now: number): boolean {
 }
 
 /** Od jaké spotřeby 5h okna se při práci Clauda zvýrazní čas resetu. */
-export const HINT_FROM_PCT = 80;
+export const HINT_FROM_PCT = WARN_PCT;
 
 /**
  * Čas resetu k zvýraznění (ms), nebo null: 5h okno má čerstvý vzorek, je od `HINT_FROM_PCT` a zbývá do resetu,

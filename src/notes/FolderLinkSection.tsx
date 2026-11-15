@@ -9,7 +9,7 @@ import { base, useSettings } from "../settings/ctx";
 import { PathPick, Seg, Toggle } from "../settings/fields/controls";
 import { Advanced } from "../settings/fields/Advanced";
 import { Row, Section } from "../settings/fields/Row";
-import { say, sayError } from "../ui/toast";
+import { errorText, say, sayError } from "../ui/toast";
 import { conflictSentence, deleteSentence, DIRECTION_IDS, directionHint, directionLabel, dirtyLink, linkCfg, openablePath, stateText, stateTone, writeSentence } from "./folderlink";
 
 export default function FolderLinkSection() {
@@ -26,7 +26,7 @@ export default function FolderLinkSection() {
         const r = await api.noteFolderCheck(path);
         return r === undefined ? null : { n: r.n, warn: r.warn ?? null };
       } catch (e) {
-        return { err: String(e) };
+        return { err: errorText(e) };
       }
     },
   );

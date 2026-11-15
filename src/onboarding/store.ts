@@ -19,6 +19,8 @@ export interface Wiz {
   busy: boolean;
   lang: Lang;
   trigger: string;
+  /** `autostart` z configu (Ledge se spouští s Windows) — krok Hotovo to uživateli řekne */
+  autostart: boolean;
   repos: FoundRepo[];
   reposState: Load;
   /** výchozí výběr rep už proběhl (další skeny výběr uživatele nepřepíšou) */
@@ -47,6 +49,7 @@ const fresh = (): Wiz => ({
   busy: false,
   lang: "cs",
   trigger: "hover",
+  autostart: false,
   repos: [],
   reposState: "idle",
   repoSelInit: false,
@@ -85,7 +88,7 @@ export const steps = () => visibleSteps({ themesReady: wiz.themesState === "read
 export async function prefetch() {
   const cfg = await api.getConfig().catch(() => null);
   if (cfg) {
-    setWiz({ trigger: cfg.drawer?.trigger ?? "hover", lang: cfg.ui?.lang === "en" ? "en" : "cs", theme: cfg.appearance?.theme ?? null });
+    setWiz({ trigger: cfg.drawer?.trigger ?? "hover", autostart: cfg.autostart === true, lang: cfg.ui?.lang === "en" ? "en" : "cs", theme: cfg.appearance?.theme ?? null });
   }
   void loadThemes();
   void loadClaude(); // hned: podle něj se ukáže krok Claude a karta na Práci

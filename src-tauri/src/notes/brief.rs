@@ -79,27 +79,7 @@ fn image_of(base: &Path, alt: &str, src: &str) -> ItemImage {
     ItemImage { src: src.to_string(), path: join_rel(base, src).to_string_lossy().into_owned(), caption: alt.trim().to_string() }
 }
 
-/// Text bodu rozdělený na text a důkaz (` — důkaz: …`, též `–`/`-` a `dukaz`/`evidence`).
-pub fn split_evidence(text: &str) -> (&str, Option<&str>) {
-    let mut best: Option<(usize, usize)> = None;
-    for dash in [" — ", " – ", " - "] {
-        for (i, _) in text.match_indices(dash) {
-            let rest = &text[i + dash.len()..];
-            for kw in ["důkaz", "dukaz", "evidence"] {
-                if rest.get(..kw.len()).is_some_and(|h| h.to_lowercase() == kw)
-                    && rest[kw.len()..].starts_with(':')
-                    && best.is_none_or(|(b, _)| i < b)
-                {
-                    best = Some((i, i + dash.len() + kw.len() + 1));
-                }
-            }
-        }
-    }
-    match best {
-        Some((i, ev)) => (text[..i].trim_end(), Some(text[ev..].trim()).filter(|e| !e.is_empty())),
-        None => (text.trim_end(), None),
-    }
-}
+pub use super::taskline::split_evidence;
 
 /// Odkazy `@rel` / `@rel:řádek` v textu. `@` musí stát na začátku slova (e-mail `a@b.cz` ani `@jmeno`
 /// bez `/` či `.` se neberou). Duplicity (stejné `raw`) se vynechají.
@@ -183,7 +163,8 @@ pub fn scan_body(body: &str, base: &Path) -> Scan {
                     _ => break,
                 }
             }
-            let (text, evidence) = split_evidence(after);
+            let tl = super::taskline::parse_tail(after);
+            let (text, evidence) = (tl.head, tl.evidence());
             sc.items.push(Item { line: i, state, text: text.to_string(), evidence: evidence.map(str::to_string), images, refs: parse_refs(text) });
         }
         sc.loose.extend(inline_images(line, base));

@@ -32,6 +32,24 @@ pub fn display_changed(old: &Monitor, new: &Monitor) -> bool {
     old.handle != new.handle || old.rect != new.rect || old.work != new.work || old.dpi != new.dpi
 }
 
+/// Co přepočítat po události zobrazení (`display_plan`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DisplayPlan {
+    /// monitor proužku se změnil → proužek, zóna a šuplík na nové místo (`refresh_strip`)
+    pub strip: bool,
+    /// sestava monitorů se změnila (připojení / odpojení, rozlišení, pracovní plocha, DPI) → okna na ploše
+    /// (`desk::win::on_monitors`: widgety a lístky mimo domov jdou domů)
+    pub windows: bool,
+}
+
+/// Starý vs. nový výčet monitorů → co přepočítat. Porovnává `rect`, `work`, DPI a zařízení, ne `handle`
+/// (ten se po novém připojení mění, i když je vše stejné). Dřív `windows` jen při změně `rect`.
+pub fn display_plan(old_strip: &Monitor, new_strip: &Monitor, old_all: &[Monitor], new_all: &[Monitor]) -> DisplayPlan {
+    let key = |m: &Monitor| (m.rect.left, m.rect.top, m.rect.right, m.rect.bottom, m.work.left, m.work.top, m.work.right, m.work.bottom, m.dpi, m.device);
+    let same = old_all.len() == new_all.len() && old_all.iter().zip(new_all).all(|(a, b)| key(a) == key(b));
+    DisplayPlan { strip: display_changed(old_strip, new_strip), windows: !same }
+}
+
 /// Aktuální stav kurzoru z Windows (`GetCursorInfo` + `GetClipCursor` + virtuální plocha).
 pub fn blocked_now() -> bool {
     unsafe {
@@ -98,8 +116,30 @@ mod tests {
     }
 
     #[test]
+    fn display_plan_table() {
+        let m = Monitor { handle: 1, rect: R(0, 0, 1920, 1080), work: R(0, 0, 1920, 1040), primary: true, dpi: 96, device: [0; 32] };
+        let side = Monitor { handle: 2, rect: R(1920, 0, 3840, 1080), primary: false, ..m };
+        let both = [m, side];
+        // (název, nový výčet, nový monitor proužku, čekané {strip, windows})
+        type Case = (&'static str, Vec<Monitor>, Monitor, (bool, bool));
+        let cases: Vec<Case> = vec![
+            ("nic", both.to_vec(), m, (false, false)),
+            ("jiný handle, vše ostatní stejné", vec![Monitor { handle: 9, ..m }, side], Monitor { handle: 9, ..m }, (true, false)),
+            ("připojen třetí monitor", [&both[..], &[Monitor { handle: 3, rect: R(3840, 0, 5760, 1080), ..m }]].concat(), m, (false, true)),
+            ("odpojen vedlejší", vec![m], m, (false, true)),
+            ("DPI vedlejšího (proužek na hlavním)", vec![m, Monitor { dpi: 144, ..side }], m, (false, true)),
+            ("DPI hlavního = proužku", vec![Monitor { dpi: 144, ..m }, side], Monitor { dpi: 144, ..m }, (true, true)),
+            ("hlavní panel přesunut (jen work)", vec![Monitor { work: R(0, 40, 1920, 1080), ..m }, side], Monitor { work: R(0, 40, 1920, 1080), ..m }, (true, true)),
+            ("monitor nad primárním", vec![m, Monitor { rect: R(0, -1080, 1920, 0), ..side }], m, (false, true)),
+        ];
+        for (name, all, strip, (s, w)) in cases {
+            assert_eq!(display_plan(&m, &strip, &both, &all), DisplayPlan { strip: s, windows: w }, "{name}");
+        }
+    }
+
+    #[test]
     fn display_change_table() {
-        let m = Monitor { handle: 1, rect: R(0, 0, 1920, 1080), work: R(0, 0, 1920, 1040), primary: true, dpi: 96 };
+        let m = Monitor { handle: 1, rect: R(0, 0, 1920, 1080), work: R(0, 0, 1920, 1040), primary: true, dpi: 96, device: [0; 32] };
         assert!(!display_changed(&m, &m), "stejný monitor = nic");
         let cases = [
             ("DPI 100 → 150 %", Monitor { dpi: 144, ..m }),

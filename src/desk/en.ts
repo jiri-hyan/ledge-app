@@ -34,7 +34,7 @@ registerDict("en", {
   "cards.desk.script.consent": "The script isn't allowed yet — allow it in Ledge on the widget's card.",
   "cards.desk.settings": "Widget settings…",
   "cards.desk.through": "Click-through",
-  "cards.desk.throughTip": "Clicks go to the window below the widget. Turn it off in Settings → On the desktop.",
+  "cards.desk.throughTip": "Clicks go to the window below the widget. Turn it off in {path}.",
   "cards.desk.unknown": "Ledge no longer knows this widget — unpin it under ⋯.",
   "cards.desk.unpin": "Unpin from the desktop",
   "cards.desk.wait.approve": "approve",

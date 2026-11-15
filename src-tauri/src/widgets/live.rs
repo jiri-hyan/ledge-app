@@ -11,6 +11,7 @@ use crate::config::Config;
 use crate::drawer::View;
 use crate::i18n::tr;
 use crate::state::{core, mark_dirty, now_ms};
+use crate::widgetkit::spec::Spec;
 use crate::strip::{Rgba, Segment};
 use parking_lot::{Condvar, Mutex};
 use serde::Serialize;
@@ -159,7 +160,7 @@ pub fn rescan(cfg: &WidgetsConfig) -> Result<(), String> {
 }
 
 fn ready(l: &Live, w: &Widget) -> bool {
-    w.meta.is_ok() && l.problems.get(&w.id).is_some_and(Option::is_none) && l.consent.get(&w.id) == Some(&Consent::Granted)
+    w.kind != Kind::Kit && w.meta.is_ok() && l.problems.get(&w.id).is_some_and(Option::is_none) && l.consent.get(&w.id) == Some(&Consent::Granted)
 }
 
 fn thread() {
@@ -239,6 +240,9 @@ fn attempt(id: &str, dir: &std::path::Path) -> Outcome {
         Ok(w) => w,
         Err(e) => return Outcome::Problem(e),
     };
+    if w.kind == Kind::Kit {
+        return Outcome::Problem(tr("šablona se nespouští", "a template is never run").into());
+    }
     let m = match &w.meta {
         Ok(m) => m.clone(),
         Err(e) => return Outcome::Problem(e.clone()),
@@ -335,6 +339,12 @@ pub struct WidgetView {
     pub has_output: bool,
     /// je položkou proužku (`strip.items`)
     pub in_strip: bool,
+    /// `*.kit.json`: ověřená šablona, UI z ní počítá data (`src/widgetkit`); `data` zůstává prázdné
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spec: Option<Spec>,
+    /// co se při načtení šablony zahodilo / ořezalo
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
 }
 
 fn view_of(l: &Live, id: &str, enabled: bool, strip: &[String]) -> WidgetView {
@@ -360,6 +370,8 @@ fn view_of(l: &Live, id: &str, enabled: bool, strip: &[String]) -> WidgetView {
             running: false,
             has_output: false,
             in_strip,
+            spec: None,
+            notes: vec![],
         };
     };
     let m = w.meta.as_ref().ok();
@@ -375,6 +387,8 @@ fn view_of(l: &Live, id: &str, enabled: bool, strip: &[String]) -> WidgetView {
         "off"
     } else if problem.is_some() {
         "problem"
+    } else if w.kind == Kind::Kit {
+        "ok"
     } else if consent.is_some() {
         "consent"
     } else if e.error.is_some() {
@@ -404,6 +418,8 @@ fn view_of(l: &Live, id: &str, enabled: bool, strip: &[String]) -> WidgetView {
         running: e.running,
         has_output: e.output.is_some(),
         in_strip,
+        spec: w.kit.clone(),
+        notes: w.kit.as_ref().map(|s| s.notes.clone()).unwrap_or_default(),
     }
 }
 
@@ -501,7 +517,7 @@ pub fn edit_path(cfg: &WidgetsConfig, id: &str) -> Result<PathBuf, String> {
     let dir = super::resolve_dir(cfg)?;
     let file = plan::file_of(id).ok_or_else(|| tr("Neznámý widget.", "Unknown widget."))?;
     let path = dir.join(file);
-    let kind = std::path::Path::new(file).extension().and_then(|e| e.to_str()).and_then(Kind::from_ext).ok_or_else(|| tr("Neznámý widget.", "Unknown widget."))?;
+    let kind = Kind::from_name(file).ok_or_else(|| tr("Neznámý widget.", "Unknown widget."))?;
     let path = if kind == Kind::Exe { super::sidecar_of(&path) } else { path };
     if path.is_file() { Ok(path) } else { Err(trf!("Soubor {} neexistuje.", "The file {} doesn't exist.", path.display())) }
 }

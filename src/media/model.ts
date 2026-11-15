@@ -68,3 +68,14 @@ export function throttle<T>(
 export function outputPickerShown(devices: number): boolean {
   return devices > 1;
 }
+
+/**
+ * Co z „Právě hraje“ se ukáže v ostrůvku, docku a paletě (jedna definice, L231): `playing` = hraje, `paused` = pauza
+ * nebo přechod skladby (`changing` — bez blikání prázdna mezi skladbami), `stopped` / neznámé / nic = `null`.
+ * Proužek (Rust `mediaconf::strip_text`) ukazuje záměrně jen `playing`.
+ */
+export function shownStatus(m: { status: string } | null | undefined): "playing" | "paused" | null {
+  if (!m) return null;
+  if (m.status === "playing") return "playing";
+  return m.status === "paused" || m.status === "changing" ? "paused" : null;
+}

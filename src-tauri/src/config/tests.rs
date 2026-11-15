@@ -40,13 +40,16 @@ fn enforce_commit_old_config_and_values() {
 fn brief_old_config_and_limits() {
     // starý config bez `claude.brief` → dnešní výchozí (sonnet, $2)
     let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800,"approvalTimeoutS":45}}"#).unwrap();
-    assert_eq!(cfg.claude.brief, BriefConfig { model: "sonnet".into(), budget_usd: 2.0 });
+    assert_eq!(cfg.claude.brief, BriefConfig { model: "sonnet".into(), budget_usd: 2.0, auto_resume: false });
     let cfg: Config = serde_json::from_str(r#"{"claude":{"brief":{"budgetUsd":5.5}}}"#).unwrap();
     assert_eq!((cfg.claude.brief.model.as_str(), cfg.claude.brief.budget_usd), ("sonnet", 5.5));
+    assert!(!cfg.claude.brief.auto_resume);
+    let cfg: Config = serde_json::from_str(r#"{"claude":{"brief":{"autoResume":true}}}"#).unwrap();
+    assert!(cfg.claude.brief.auto_resume && cfg.claude.brief.budget_usd == 2.0);
     assert!(validate(&cfg).is_ok());
     for (b, m, ok) in [(0.05, "sonnet", false), (101.0, "sonnet", false), (2.0, "--x", false), (2.0, "opus", true)] {
         let mut c = Config::default();
-        c.claude.brief = BriefConfig { model: m.into(), budget_usd: b };
+        c.claude.brief = BriefConfig { model: m.into(), budget_usd: b, auto_resume: false };
         assert_eq!(validate(&c).is_ok(), ok, "{b} {m}");
     }
     assert!(schema_json().contains("budgetUsd"));
@@ -155,7 +158,7 @@ fn sections_defaults_all_on() {
     assert_eq!(obj.len(), Sections::FIELDS.len());
     // výchozí = podle čistého výchozího rozložení: jen karty, které v něm jsou
     let on: Vec<&str> = obj.iter().filter(|(_, v)| **v == serde_json::Value::Bool(true)).map(|(k, _)| k.as_str()).collect();
-    assert_eq!(on, ["battery", "clock", "favorites", "links", "notes", "nowPlaying", "projects", "sound"], "{d}");
+    assert_eq!(on, ["actions", "battery", "clock", "favorites", "links", "notes", "nowPlaying", "projects", "sound"], "{d}");
     assert_eq!(Sections::default(), crate::layout::derived_sections(&crate::layout::LayoutConfig::default(), &Sections::default()));
     // (JSON drawer.sections, pole → očekávaná hodnota)
     let cases: &[(&str, &[(&str, bool)])] = &[
@@ -288,31 +291,38 @@ fn hotkey_normalize_and_collisions() {
     assert!(load_str(r#"{"hotkeys":{"toggle":"Ctrl+Alt+N"}}"#).is_ok());
 }
 
-/// Zkratka průchozího režimu lístků: jen s lístkem na ploše, i s vypnutými zkratkami (cesta ven),
+/// Zkratka průchozího režimu lístků: se zapnutými zkratkami s lístkem na ploše, s vypnutými jen při průchozím lístku (cesta ven),
 /// starý config ji dostane výchozí, kolize se hlásí jen se zapnutými zkratkami.
 #[test]
 fn pin_passthrough_hotkey() {
     let keys = |v: &[(&'static str, String)]| v.iter().map(|(a, k)| format!("{a}={k}")).collect::<Vec<_>>();
     let old = load_str(r#"{"hotkeys":{"toggle":"Ctrl+Alt+Space","note":"Ctrl+Alt+N"}}"#).unwrap();
     assert_eq!(old.hotkeys.note_passthrough, "Ctrl+Alt+P");
-    let cases: &[(bool, bool, bool, &[&str])] = &[
-        // (zkratky zapnuté, poznámky zapnuté, lístek na ploše, registrované)
-        (false, true, false, &[]),
-        (false, true, true, &["notePassthrough=Ctrl+Alt+P"]),
-        (false, false, true, &[]),
-        (true, true, false, &["toggle=Ctrl+Alt+Space", "note=Ctrl+Alt+N"]),
-        (true, true, true, &["toggle=Ctrl+Alt+Space", "note=Ctrl+Alt+N", "notePassthrough=Ctrl+Alt+P"]),
+    const P: &str = "notePassthrough=Ctrl+Alt+P";
+    const ON: &[&str] = &["toggle=Ctrl+Alt+Space", "note=Ctrl+Alt+N"];
+    const ON_P: &[&str] = &["toggle=Ctrl+Alt+Space", "note=Ctrl+Alt+N", P];
+    let cases: &[(bool, bool, bool, bool, &[&str])] = &[
+        // (zkratky zapnuté, poznámky zapnuté, lístek na ploše, některý průchozí, registrované)
+        (false, true, false, false, &[]),
+        (false, true, true, false, &[]), // L260: vypnuté zkratky + neprůchozí lístek = zkratka volná
+        (false, true, true, true, &[P]), // průchozí lístek = cesta ven
+        (false, true, false, true, &[]), // průchozí bez otevřeného lístku nenastane (pojistka)
+        (false, false, true, true, &[]),
+        (false, false, true, false, &[]),
+        (true, true, false, false, ON),
+        (true, true, true, false, ON_P),
+        (true, true, true, true, ON_P),
     ];
-    for (enabled, notes, open, want) in cases {
+    for (enabled, notes, open, through, want) in cases {
         let mut cfg = old.clone();
         cfg.hotkeys.enabled = *enabled;
         cfg.notes.enabled = *notes;
-        assert_eq!(keys(&active_hotkeys_pins(&cfg, false, *open)), *want, "{enabled} {notes} {open}");
+        assert_eq!(keys(&active_hotkeys_pins(&cfg, false, *open, *through)), *want, "enabled={enabled} notes={notes} open={open} through={through}");
     }
     // prázdná = žádná zkratka
     let mut cfg = old.clone();
     cfg.hotkeys.note_passthrough = " ".into();
-    assert!(active_hotkeys_pins(&cfg, false, true).is_empty());
+    assert!(active_hotkeys_pins(&cfg, false, true, true).is_empty());
     // kolize: se zapnutými zkratkami chyba u pole, s vypnutými ne (registruje se sama)
     assert!(load_str(r#"{"hotkeys":{"enabled":true,"notePassthrough":"Alt+Ctrl+N"}}"#).unwrap_err().contains("hotkeys.notePassthrough"));
     assert!(load_str(r#"{"hotkeys":{"notePassthrough":"Ctrl+Alt+N"}}"#).is_ok());
@@ -327,7 +337,7 @@ fn pin_new_hotkey_and_pin_defaults() {
     let keys = |v: &[(&'static str, String)]| v.iter().map(|(a, k)| format!("{a}={k}")).collect::<Vec<_>>();
     let old = load_str(r#"{"hotkeys":{"toggle":"Ctrl+Alt+Space"},"notes":{"enabled":true,"root":""}}"#).unwrap();
     assert_eq!(old.hotkeys.note_pin, "");
-    assert!(active_hotkeys_pins(&old, false, false).is_empty(), "výchozí = žádná zkratka");
+    assert!(active_hotkeys_pins(&old, false, false, false).is_empty(), "výchozí = žádná zkratka");
     let p = &old.notes.pins;
     assert_eq!((p.style.as_str(), p.bg, p.text, p.remember_last), ("classic", 88, 100, true));
     assert!(old.notes.tag_colors.is_empty());
@@ -342,7 +352,7 @@ fn pin_new_hotkey_and_pin_defaults() {
         cfg.hotkeys.note_pin = "Ctrl+Alt+L".into();
         cfg.hotkeys.enabled = *enabled;
         cfg.notes.enabled = *notes;
-        assert_eq!(keys(&active_hotkeys_pins(&cfg, false, false)), *want, "{enabled} {notes}");
+        assert_eq!(keys(&active_hotkeys_pins(&cfg, false, false, false)), *want, "{enabled} {notes}");
     }
     assert!(load_str(r#"{"hotkeys":{"enabled":true,"notePin":"Ctrl+Alt+N"}}"#).unwrap_err().contains("hotkeys.notePin"));
     assert!(load_str(r#"{"notes":{"pins":{"style":"paper","bg":40}}}"#).is_ok());
@@ -645,7 +655,7 @@ fn limits_sources_off_in_old_config() {
 
 #[test]
 fn limits_alert_off_in_old_config() {
-    assert!(!Config::default().claude.limits_alert);
+    assert!(Config::default().claude.limits_alert, "nová instalace: zapnuto");
     let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800}}"#).unwrap();
     assert!(!cfg.claude.limits_alert);
     let cfg: Config = serde_json::from_str(r#"{"claude":{"limitsAlert":true}}"#).unwrap();
@@ -654,7 +664,7 @@ fn limits_alert_off_in_old_config() {
 
 #[test]
 fn limits_pace_off_in_old_config() {
-    assert!(!Config::default().claude.limits_pace);
+    assert!(Config::default().claude.limits_pace, "nová instalace: zapnuto");
     let cfg: Config = serde_json::from_str(r#"{"claude":{"enabled":true,"port":47800}}"#).unwrap();
     assert!(!cfg.claude.limits_pace);
     let cfg: Config = serde_json::from_str(r#"{"claude":{"limitsPace":true}}"#).unwrap();
@@ -678,4 +688,23 @@ fn project_links_validation_table() {
     assert_eq!(mk("Docs", "file:///C:/x").as_deref(), Some("projects.0.links.0.url"));
     assert_eq!(mk("Docs", "https://").as_deref(), Some("projects.0.links.0.url"));
     assert_eq!(mk("Docs", "https://exa mple.com").as_deref(), Some("projects.0.links.0.url"));
+}
+
+/// `passthrough_key_ok`: nápověda lístku nelže při vypnutých zkratkách (L260).
+#[test]
+fn pin_passthrough_key_ok_table() {
+    // (živá teď, registrovaná, plán po zapnutí průchozího, očekávané)
+    for (live, reg, plan, want) in [(false, false, true, true), (false, false, false, false), (true, false, true, false), (true, true, true, true)] {
+        assert_eq!(passthrough_key_ok(live, reg, plan), want, "{live} {reg} {plan}");
+    }
+    // plán z configu: vypnuté zkratky + platná = je; prázdná / vypnuté poznámky = není
+    let planned = |f: &dyn Fn(&mut Config)| {
+        let mut cfg = load_str("{}").unwrap();
+        cfg.hotkeys.enabled = false;
+        f(&mut cfg);
+        active_hotkeys_pins(&cfg, false, true, true).iter().any(|(a, _)| *a == "notePassthrough")
+    };
+    assert!(planned(&|_| {}));
+    assert!(!planned(&|c| c.hotkeys.note_passthrough = " ".into()));
+    assert!(!planned(&|c| c.notes.enabled = false));
 }

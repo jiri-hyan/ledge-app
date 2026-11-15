@@ -20,7 +20,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   Záložky v pořadí (1–9, klávesy 1–9 / paleta „Přejít na záložku“); `prace` a `osobni` jsou vestavěné
   (prázdný `name` = „Práce“ / „Osobní“ podle jazyka), vlastní záložka potřebuje `name`, `id` = `a-z0-9-`.
   Karty: `projects`, `running`, `claude`, `repos`, `notes`, `actions`, `shelf`, `clock`, `timer`, `weather`,
-  `calendar`, `links`, `media` (Právě hraje + hlasitost), `github`, `system`, `mail` (Pošta — účet Microsoft;
+  `calendar`, `media` (Právě hraje + hlasitost), `github`, `system`, `mail` (Pošta — účet Microsoft;
   ty tři jsou jen v katalogu, na žádné záložce ve výchozím rozložení nejsou — `layout::OPT_IN`), `activity` (Claude
   aktivita, kolo 23 — jen v katalogu: session s fází, souborem, poslední zprávou a schválením; na záložce zapne
   čtení posledních 64 kB přepisu session při hooku `Stop`, jinak se přepis nečte) a **dynamické** `widget:<soubor>` (widget ze
@@ -119,16 +119,18 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `modes.personalEnabled != false`, dnešní pořadí Osobní. Celé funkce dál vypínají `strip.enabled`,
   `notes.enabled`, `shelf.enabled`, `claude.costs`.
 - **Po najetí myší** — `drawer.hover` (Nastavení → Vzhled → Po najetí): `"full"` = rovnou celý šuplík
-  (výchozí; starý config beze změny), `"compact"` = kompaktní náhled (malý panel pod proužkem: čekající
-  schválení / otázka s Povolit / Zamítnout, nejvýš 3 session Clauda, Právě hraje s ⏮⏯⏭, čas a limit 5h,
-  „▾ celý šuplík“), `"island"` = roztažený ostrůvek (černá kapsle s jedním nejdůležitějším děním: čeká na tebe →
-  hotovo → časovač → hudba → Claude pracuje → klid s časem, datem a počasím). Z náhledu otevře celý šuplík klik
+  (výchozí; starý config beze změny), `"island"` = roztažený ostrůvek (černá kapsle s jedním nejdůležitějším děním: čeká na tebe →
+  hotovo → časovač → hudba → Claude pracuje → klid s časem, datem a počasím), `"dock"` = dok (totéž okno jako
+  ostrůvek, ale řada slotů: rychlá poznámka, hudba s hlasitostí, 📌 upevnit; píše se jen po kliku do slotu
+  nebo zkratkou poznámky `hotkeys.note`, která dok otevře rovnou s poznámkou). Dřívější `"compact"` (kompaktní náhled, zrušen v kole 34) se
+  načte jako `"dock"` (střední panel s kartou Claude ukáže sessiony, schválení, hudbu a čas) a při příštím uložení se zapíše `"dock"`. Z docku vede klik mimo tlačítka nebo setrvání myši nejdřív do STŘEDNÍHO panelu (`View::Mid`, ~1/3 monitoru,
+  max 3 karty `drawer.dockCards`, „▾ celý šuplík“ → plný); z ostrůvku rovnou do celého šuplíku. Z náhledu otevře celý šuplík klik
   mimo tlačítka nebo setrvání myši `drawer.hoverExpandMs` (výchozí `1200`, `0` = jen klikem, jinak 400–10000;
   Nastavení → Vzhled → Po najetí → Pokročilé „Rozbalit náhled samo“;
   nad tlačítky a s čekajícím schválením se neodpočítává). Odjetí myši zavře jako šuplík; s čekajícím Claudem
   zůstane peek se schválením (ve všech režimech — najetí při čekání otevře peek). Náhled bere jen data, která
   Ledge už má (nic nestahuje, fokus nebere); ve hře / herním režimu se neukáže. Bez myši:
-  `POST /ctl/open {"view":"compact"}` / `{"view":"island"}`.
+  `POST /ctl/open {"view":"island"}` (`"dock"` = tentýž pohled) / `{"view":"mid"}` (střední panel).
 - **Proužek** — `strip.items` (pořadí): `mode`, `clock`, `running`, `claude`, `waiting`, `repos`, volitelně
   `limits` (limity Claude 5h / týden), `custom` (vlastní text), `timer` (časovač), `media` (právě hraje:
   „♪ Název · Interpret“ jen při přehrávání, pauza / nic = žádný segment), `mail` (pošta účtu Microsoft:
@@ -165,6 +167,9 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     o napájení (žádný časovač) za stejných podmínek jako karta Čas (`battery::allowed`). Priorita: čeká na tebe (i připomínka) > hotovo (session doběhlá za 5 min) >
     časovač > Claude pracuje > hudba > klid. U stylů mimo `classic` se `items`, `quiet`, `colors`, `custom`,
     `opacity` a `appearance.strip.style`/`color` nepoužijí; `appearance.strip.size` styl zvětší / zmenší.
+    `strip.monitor` = `"primary"` (výchozí) | `"all"` (plný proužek na hlavním monitoru + na každém dalším jen tečka stavů,
+    jedno okno šuplíku) | `"dev:<zařízení>;<š>x<v>@<x>,<y>"` (konkrétní monitor, tak ho ukládá Nastavení; starý číselný
+    index `"0"`…`"3"` se při načtení přepíše na toto a uloží; odpojený / neplatný = hlavní monitor + řádek v logu).
     `strip.enabled: false` = jako dřív jen linka při událostech; nad taby prohlížeče ustoupí na linku všechny
     styly kromě `line`, `dots`, `corner`, `ghost`. Seznam s názvy pro Nastavení: `src/strip/looks.ts` (`STRIP_LOOKS`).
   - `strip.lookHide` — Pokročilé u stylů mimo `classic`: co styl nemá ukazovat (`waiting`, `claude` = pracuje /
@@ -193,6 +198,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     hodnoty, `accent`, `#rrggbb`). Nové `style`: `iconText` (ikona + hodnota), `bar` (hodnota s pruhem), `spark`
     (průběh jen `cpu` / `memory` — body jen ze vzorků, které proužek stejně čte, ~10 s, bez historie = sloupek),
     `chip` (barevný podklad), `dotPct` a `ring5h` (jen `claude`: tečka stavu + 5h %, prstenec 5h v barvě stavu).
+    **Kolo 33:** `ringText` (prstenec a vedle něj hodnota, „82 %“, u `limitWeek` „7d 92 %“; limity, `cpu`, `memory`, `gpu`, `battery`; bez dat limit = prázdná dráha, bez čísla) a barva dílu `heat` (zelená → jantar v 75 % → červená od 90 %, celý díl včetně čísla; bez podílu beze změny). Prázdná barva dál = akcent → jantar od 75 % → červená od 90 % (dřív 80 / 100; jedna tabulka prahů Rust `capsule::WARN_PCT` / `FULL_PCT` ↔ `src/notch/look.ts` `HEAT_*`). Starý config se načte stejně, nový klíč žádný.
     `deco`: `edge` (`none` výchozí, `underline`, `outline`, `glow`, `gradient`), `len` (`center` = 40 %, `full`),
     `color` (`accent` výchozí, `claude` = barva podle stavu Clauda, `#rrggbb`), `color2` (#rrggbb, druhá barva
     přechodu), `width` 1–3 px (výchozí 2). `fill`: `kind` (`black` výchozí, `glass`, `tint`, `gradient`, `none` =

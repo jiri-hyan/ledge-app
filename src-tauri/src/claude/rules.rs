@@ -187,8 +187,8 @@ pub fn body(d: &Decision) -> String {
         Decision::AllowAlways(g) => wrap(json!({"behavior": "allow", "updatedPermissions": [{
             "type": "addRules", "rules": g.rules, "behavior": "allow", "destination": g.destination,
         }]})),
-        Decision::Deny => wrap(json!({"behavior": "deny", "message": "Zamítnuto v Ledge."})),
-        Decision::DenyWith(r) => wrap(json!({"behavior": "deny", "message": format!("Zamítnuto v Ledge: {r}")})),
+        Decision::Deny => wrap(json!({"behavior": "deny", "message": crate::i18n::tr("Zamítnuto v Ledge.", "Denied in Ledge.")})),
+        Decision::DenyWith(r) => wrap(json!({"behavior": "deny", "message": trf!("Zamítnuto v Ledge: {r}", "Denied in Ledge: {r}")})),
         Decision::AllowMode(m) => wrap(super::plan::allow_mode(*m)),
         Decision::ReturnPlan(r) => wrap(json!({"behavior": "deny", "message": super::plan::return_message(r)})),
         Decision::Pass => String::new(),

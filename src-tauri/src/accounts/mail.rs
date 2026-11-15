@@ -42,6 +42,8 @@ struct St {
     loading: bool,
     error: Option<String>,
     account: String,
+    /// neúspěchy za sebou → backoff (`netstate`)
+    fails: crate::netstate::Fails,
 }
 
 static S: Mutex<Option<St>> = Mutex::new(None);
@@ -139,12 +141,9 @@ pub fn web_of(items: &[MailItem]) -> String {
         .unwrap_or_else(|| OUTLOOK_WEB.into())
 }
 
-/// Stáhnout? Ne během pokusu, ne dřív než `RETRY_MS` po pokusu, jinak když jsou data starší než `every`.
-pub fn due(now: i64, fetched: Option<i64>, attempt: Option<i64>, loading: bool, every: i64) -> bool {
-    if loading || attempt.is_some_and(|a| now - a < RETRY_MS.min(every)) {
-        return false;
-    }
-    fetched.is_none_or(|f| now - f >= every)
+/// Politika obnovy (`netstate`): data stará `every`, po pokusu pauza `RETRY_MS` (nejvýš `every`) s backoffem.
+pub fn policy(every: i64) -> crate::netstate::Policy {
+    crate::netstate::Policy { every, retry: RETRY_MS.min(every) }
 }
 
 /// Jak často obnovovat: karta vidět → 2 min, jen položka proužku → 5 min, jinak vůbec.
@@ -190,7 +189,7 @@ pub(crate) fn maybe_refresh(opening: bool) {
         if st.loading && st.attempt_ms.is_some_and(|a| now - a >= STUCK_MS) {
             st.loading = false;
         }
-        let go = due(now, st.fetched_ms, st.attempt_ms, st.loading, every);
+        let go = crate::netstate::needs_fetch(&policy(every), st.loading, st.fetched_ms, st.attempt_ms, st.fails.count(), now);
         if go {
             (st.loading, st.attempt_ms) = (true, Some(now));
         }
@@ -213,8 +212,12 @@ pub(crate) fn maybe_refresh(opening: bool) {
         match res {
             Ok((n, items)) => {
                 (st.unread, st.items, st.fetched_ms, st.error) = (Some(n), items, Some(now_ms()), None);
+                st.fails.ok();
             }
-            Err(e) => st.error = Some(e),
+            Err(e) => {
+                st.error = Some(e);
+                st.fails.fail();
+            }
         }
         drop(g);
         mark_dirty();
@@ -255,9 +258,9 @@ pub(crate) fn next_deadline() -> Option<i64> {
     if st.loading {
         return st.attempt_ms.map(|a| a + STUCK_MS + 1);
     }
-    let after_attempt = st.attempt_ms.map(|a| a + RETRY_MS.min(every));
-    let after_fetch = st.fetched_ms.map(|f| f + every);
-    [after_attempt, after_fetch].into_iter().flatten().max()
+    // tentýž výpočet jako `maybe_refresh` (`netstate::next_at`): nikdy dřív, než by se skutečně ptalo
+    let at = crate::netstate::next_at(&policy(every), st.fetched_ms, st.attempt_ms, st.fails.count(), now_ms(), None);
+    (at > 0).then_some(at)
 }
 
 /// Pro snapshot — jen paměť (nesahá na Správce pověření ani `core().cfg`).
@@ -282,13 +285,21 @@ pub(crate) fn view(cfg: &Config, now: i64) -> MailView {
     }
 }
 
-/// Segment proužku: „✉ 3“ jen při nepřečtených > 0 (jen paměť).
+/// Počet nepřečtených ukázat v proužku? Jen z čerstvého stažení: po chybě (výpadek sítě, vypršené přihlášení)
+/// nebo když je stahování starší než `2 × STRIP_EVERY` se segment skryje — žádné staré číslo jako čerstvé.
+pub fn strip_unread(unread: Option<u32>, fetched: Option<i64>, error: bool, now: i64) -> Option<u32> {
+    let fresh = fetched.is_some_and(|f| now - f < 2 * STRIP_EVERY);
+    unread.filter(|_| fresh && !error)
+}
+
+/// Segment proužku: „✉ 3“ jen při nepřečtených > 0 a čerstvých datech (jen paměť).
 pub(crate) fn strip_segment(cfg: &Config) -> Option<crate::strip::Segment> {
     if !cfg.accounts.microsoft.mail {
         return None;
     }
-    let n = S.lock().as_ref()?.unread?;
-    segment(n)
+    let g = S.lock();
+    let st = g.as_ref()?;
+    segment(strip_unread(st.unread, st.fetched_ms, st.error.is_some(), now_ms())?)
 }
 
 pub fn segment(n: u32) -> Option<crate::strip::Segment> {
@@ -335,11 +346,32 @@ mod tests {
             (None, None, true, CARD_EVERY, false),
         ];
         for (f, a, l, every, want) in cases {
-            assert_eq!(due(now, f, a, l, every), want, "{f:?} {a:?} {l} {every}");
+            assert_eq!(crate::netstate::needs_fetch(&policy(every), l, f, a, 0, now), want, "{f:?} {a:?} {l} {every}");
         }
+        // po 3 neúspěších se čeká 4× základ (8 min)
+        let p = policy(CARD_EVERY);
+        assert!(!crate::netstate::needs_fetch(&p, false, None, Some(now - 2 * RETRY_MS), 3, now));
+        assert!(crate::netstate::needs_fetch(&p, false, None, Some(now - 4 * RETRY_MS), 3, now));
         assert_eq!(cadence(true, true), Some(CARD_EVERY));
         assert_eq!(cadence(false, true), Some(STRIP_EVERY));
         assert_eq!(cadence(false, false), None, "bez karty a položky proužku se nic nečte");
+    }
+
+    #[test]
+    fn strip_unread_hides_stale_and_failed() {
+        let (m, now) = (60_000, 100 * 60_000);
+        // (nepřečtené, staženo, chyba, čeho se dočkáme)
+        let cases = [
+            (Some(3), Some(now - m), false, Some(3)),
+            (Some(3), Some(now - 9 * m), false, Some(3)),
+            (Some(3), Some(now - 10 * m), false, None),
+            (Some(3), Some(now - m), true, None),
+            (Some(3), None, false, None),
+            (None, Some(now - m), false, None),
+        ];
+        for (u, f, e, want) in cases {
+            assert_eq!(strip_unread(u, f, e, now), want, "{u:?} {f:?} {e}");
+        }
     }
 
     #[test]

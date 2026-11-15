@@ -15,6 +15,11 @@ pub fn valid(k: &str) -> bool {
 
 /// Blob ze Správce pověření: UTF-8 (zápis z Ledge), nebo UTF-16LE (`cmdkey /pass:` ukládá široké znaky).
 pub fn decode(blob: &[u8]) -> Option<String> {
+    decode_with(blob, valid)
+}
+
+/// Jako `decode`, jen s vlastní kontrolou tvaru (klíč propojené aplikace: `connector/key.rs`).
+pub fn decode_with(blob: &[u8], ok: fn(&str) -> bool) -> Option<String> {
     let utf16 = blob.len() >= 2 && blob.len().is_multiple_of(2) && blob.iter().skip(1).step_by(2).all(|b| *b == 0);
     let s = if utf16 {
         let w: Vec<u16> = blob.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
@@ -23,7 +28,7 @@ pub fn decode(blob: &[u8]) -> Option<String> {
         String::from_utf8(blob.to_vec()).ok()?
     };
     let s = s.trim().to_string();
-    valid(&s).then_some(s)
+    ok(&s).then_some(s)
 }
 
 /// Uložený platný klíč (nečitelný / neplatný záznam = žádný).

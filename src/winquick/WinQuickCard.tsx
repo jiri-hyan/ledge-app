@@ -6,7 +6,7 @@ import { For, Show, createEffect, createSignal, type JSX } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { t } from "../i18n";
 import { drawerShown } from "../media/shown";
-import { say, sayError } from "../ui/toast";
+import { errorText, say, sayError } from "../ui/toast";
 import { TILE_ICON, addTile, baseName, cleanTiles, missingTiles, moveTile, pinFolder, radioOf, removeTile, type TileId, type WqState } from "./model";
 import "./winquick.css";
 
@@ -43,7 +43,7 @@ export default function WinQuickCard(p: { s: Snapshot; menu?: JSX.Element }) {
   const [open, setOpen] = createSignal<TileId | null>(null);
   const [edit, setEdit] = createSignal(false);
   const [proj, setProj] = createSignal("");
-  const refresh = () => api.wqState().then((x) => { setSt(x ?? null); setErr(""); }).catch((e) => setErr(String(e)));
+  const refresh = () => api.wqState().then((x) => { setSt(x ?? null); setErr(""); }).catch((e) => setErr(errorText(e)));
   // čte se při zobrazení karty a při každém otevření šuplíku; jinak nic
   createEffect(() => { if (drawerShown()) void refresh(); });
 

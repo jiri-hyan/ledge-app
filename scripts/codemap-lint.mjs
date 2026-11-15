@@ -17,6 +17,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { coverageGaps } from './codemap-coverage.mjs'
 import { suggestMoves, formatSuggestion } from './codemap-suggest.mjs'
+import { loadSizes, formatOversize } from './modsize.mjs'
 
 const SKIP_DIRS = new Set(['node_modules', 'target', 'target-agents', 'dist', '.git'])
 const CODE_ROOTS = ['src', 'src-tauri/src', 'scripts']
@@ -87,6 +88,7 @@ export function parseTables(md) {
 // Rozpočet orientace: jádro mapy se čte celé, proto strop; toky a historie patří do `<oblast>-detail.md`.
 export const MAX_CORE_BYTES = 8192
 export const MAX_LINE_CHARS = 600
+export const SOFT_CORE_BYTES = 7680 // měkké varování (info, nepočítá se do chyb): jádro se blíží stropu, další přírůstek dej do -detail.md
 export const isDetail = (name) => /-detail\.md$/.test(name)
 
 /** Rozpočtové nálezy jednoho souboru mapy: [{ kind: 'size' | 'line' | 'detail-link', value, line }]. */
@@ -201,6 +203,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   for (const u of cov.missing) console.log(`bez mapy: ${u}  (jmenuj ho v docs/codemap/*.md, nebo výjimka v COVERAGE_ALLOW s důvodem)`)
   for (const f of cov.unnamed) console.log(`soubor bez řádku v mapě: ${f}  (jmenuj ho výslovně v tabulce některé docs/codemap/*.md)`)
   for (const u of cov.staleAllow) console.log(`zbytečná výjimka COVERAGE_ALLOW: ${u}`)
+  const cmDir = path.join(root, 'docs', 'codemap')
+  for (const n of fs.readdirSync(cmDir).filter((x) => x.endsWith('.md') && !isDetail(x)).sort()) {
+    const b = fs.statSync(path.join(cmDir, n)).size
+    if (b > SOFT_CORE_BYTES && b <= MAX_CORE_BYTES) console.log(`(varování) docs/codemap/${n}: ${b} B > ${SOFT_CORE_BYTES} B — blízko stropu ${MAX_CORE_BYTES} B, nové popisy dej do -detail.md`)
+  }
+  for (const o of loadSizes(root)) console.log(`(info) ${formatOversize(o)}`) // informačně, do `bad` se nepočítá
   const bad = found.length + cov.missing.length + cov.unnamed.length + cov.staleAllow.length
   console.log(bad ? `CODEMAP: ${found.length} zastaralých položek, ${cov.missing.length} modulů bez mapy, ${cov.unnamed.length} souborů bez řádku, ${cov.staleAllow.length} zbytečných výjimek` : 'CODEMAP: v pořádku')
   process.exit(bad ? 1 : 0)

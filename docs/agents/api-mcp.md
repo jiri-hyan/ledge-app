@@ -4,10 +4,12 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
 
 ## Lokální API (jen 127.0.0.1:47800)
 
+`GET /status` a `POST /ctl/*` chtějí hlavičku `Authorization: Bearer <klíč hooků>` (bez ní 401; skripty ji vezmou z `scripts/ledgeapi.ps1::Get-LedgeAuth`). Hooky a `/mcp` mají klíč už dřív.
+
 | volání | co dělá |
 |---|---|
-| `GET /status` | čekající schválení, sessions, běžící procesy, cesta ke configu |
-| `POST /ctl/open` `{"view":"full"\|"peek"\|"compact"\|"island"}` | otevře šuplík / peek / náhled po najetí (bez fokusu, nezavírá se sám); ve hře / herním režimu 400 a nic |
+| `GET /status` | čekající schválení, sessions, běžící procesy (jen povolená pole, bez `cmd`/`cwd`/výstupu), stav šuplíku, blok `qa` (viz „Izolovaná instance pro QA“); bez cesty ke configu (L247, `ctl.rs` `PROC_ALLOW`) |
+| `POST /ctl/open` `{"view":"full"\|"peek"\|"island"\|"mid"}` | otevře šuplík / peek / náhled po najetí (bez fokusu, nezavírá se sám); ve hře / herním režimu 400 a nic |
 | `POST /ctl/close` | zavře šuplík |
 | `POST /ctl/settings` | otevře Nastavení |
 | `POST /ctl/launch` `{"id":"atlas"}` | spustí projekt jako klik na logo |
@@ -78,7 +80,22 @@ Claude (MCP) (výchozí vypnuto). Mapa: `docs/codemap/mcp.md`.
 - **Neuložené úpravy v Nastavení:** zápis přes MCP projde vždy. Otevřené Nastavení dostane událost: bez
   rozpracovaných změn se přenačte; rozpracované v jiné sekci zůstanou a změna zvenku se do nich sloučí; tatáž
   sekce = lišta konfliktu „Načíst nové / Přesto uložit“ (nic se nepřepíše potichu, `src/mcp/merge.ts`).
-- **MCP nic nespouští** (žádné launch/run nástroje). Akce `command` / `app` s argumenty přidaná přes MCP souhlas
+- **Čtení stavu pro jiné nástroje (`live_state`, kolo 34, `mcp/read.rs`):** jen čtení, volba `mcp.readData` (Nastavení →
+  Claude → Claude (MCP) → „Dát Claudovi číst stav Ledge“, výchozí **vypnuto**, platí jen se zapnutým MCP). Bez volby
+  nástroj není v `tools/list` a volání vrátí `isError`. Přenos a klíč jsou stávající (`POST /mcp`, 127.0.0.1,
+  `Authorization: Bearer <klíč MCP>`, bez `Origin`) — žádný druhý server; skript volá `tools/call` `live_state` přímo
+  (`{"part":"limits"}`; části `sessions`, `limits`, `agenda`, `approvals`, `devServers`, `briefs`, bez `part` všechny).
+  Pole: sessions `{id, project, folder, status, since, updatedAt, ended, endReason, alive, uncommittedCount, unpushed,
+  subagentsRunning, activity{phase, tool, at}}`; limits `{at, source, staleMs, fiveHour{pct, resetsAt}, sevenDay{…}}`; agenda =
+  dnešní události `{start, end, allDay, title, ongoing}`; approvals `{questions, pending[{tool, folder, createdAt,
+  expiresAt}]}`; devServers `{id, phase, port, url, startedAt, readyAt, exitCode, errors, errorLines}` (`errorLines` už
+  maskované v `procman`); briefs `{waiting, review}` (jen počty). **Nevystaví se:** titulky a jména sessions (text promptů),
+  cesty (`cwd`, soubory, `configPath`), příkazy a shrnutí schválení, poslední zpráva/soubor aktivity, umístění a účastníci
+  událostí, odkazy na schůzky, `cmd`/`tail`/`lastLine` procesů, názvy a obsah poznámek, e-maily. Pravidlo drží **povolený
+  seznam** `read::ALLOW` (default deny: nové pole zdroje je skryté, dokud ho někdo nepřidá do seznamu i do tabulky v
+  `read::tests::exposed_table`). Nic nepotvrzuje ani nespouští; `GET /status` (širší, s cestou configu) zůstává jen pro
+  klíč hooků. Nepřidávej nástroj, který schvaluje.
+- **MCP nic nespouští** (žádné launch/run nástroje). Akce `command` / `app` (i bez argumentů) přidaná přes MCP souhlas
   nedostane — Ledge se zeptá při prvním spuštění jako u ruční. Zástupce (karta Projekty) se spouští bez
   potvrzení, proto mu MCP smí dát jen skript balíčkovače (`npm run dev`, `pnpm dev`…) nebo příkaz, který Ledge
   sám najde ve složce projektu; jiný příkaz → rychlá akce `command`.
@@ -87,3 +104,13 @@ Claude (MCP) (výchozí vypnuto). Mapa: `docs/codemap/mcp.md`.
 zkratkou, je-li zapnutá). Nepřidávej `/ctl/decide` ani nic podobného: z mostu by se stal způsob, jak si agent
 schválí sám sebe.
 
+## Izolovaná instance pro QA (L295)
+
+Druhý Ledge vedle nainstalovaného, pro živé ověření bez šéfa (`src-tauri/src/qa.rs`). Jen env, v UI ani configu nic není:
+
+- `LEDGE_ISOLATED=1` — bez zámku jedné instance; nezapíše nic mimo svou složku (registr Run, Správce pověření, `~/.claude`/`settings.json`, motiv Windows, instalace aktualizace = vypnuto); bez ikony v oznamovací oblasti, hover vlákna (myš, globální hook) a nativního proužku; **schvalování akcí Clauda a odpovědi na otázky nefungují** (`/ctl/*`, zkratky ani UI). Složky nasměruj proměnnými `LEDGE_CONFIG_DIR`, `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `CLAUDE_CONFIG_DIR` (`dirs.rs`) a port mostu v configu `claude.port`; v configu sandboxu vypni `hotkeys.enabled`.
+- `LEDGE_CDP_PORT=<1024–65535>` — platí jen s izolací (jinak se ignoruje): všechna okna dostanou `--remote-debugging-port` (+ vypnutou okluzi) a parkují se na `x − 30000` mimo plochu, bez fokusu; připoj `connectOverCDP("http://127.0.0.1:<port>")`. **Porty CDP vyžadují** (změřeno, WebView2 157): (1) vlastní složku dat WebView2 `<LEDGE_CONFIG_DIR>/webview2` (`qa::data_dir`, na všech oknech; výchozí složka se bere z known-folderu, ne z env, takže by instance sdílela data i proces prohlížeče s nainstalovaným Ledge), (2) **nepřepsaný `USERPROFILE`** (s cizím domovem WebView2 port neotevře; `APPDATA`/`LOCALAPPDATA` přepsat jde). Argumenty zůstávají produkční (`BROWSER_ARGS` + port + vypnutá okluze), příznaky CDP nerozbíjejí.
+- `GET /status` → `qa`: `{isolated, hotkeys:[{action,key}], pins:{open,through}, desk:{open}, down:[vlákno…], cfgError, media:{live,playing}}` (skládá se při dotazu).
+- Klíč hooků čte izolovaná instance ze sdíleného Správce pověření (jen čtení); nový nevytvoří.
+- Scénář `upgrade` (`scripts/qa/upgrade.mjs`, `--old-exe`): dvě binárky po sobě nad jedním sandboxem; složka dat WebView2 `<LEDGE_CONFIG_DIR>/webview2` je u něj junction na `<LOCALAPPDATA><identifikátor binárky>` (postup a kroky v `docs/agents/install.md`).
+- Scénář `propojeni` (Propojená aplikace): klíč `Ledge/connector` izolovaná instance nezapisuje (`vault.rs`), `connector_state.hasKey` ale čte skutečný Správce pověření; scénář proto ověřuje jen stavy bez klíče a falešný server (127.0.0.1) počítá požadavky.

@@ -15,6 +15,7 @@ import { themeOf } from "./customThemes";
 import { effectiveAppearance } from "./pages";
 import { NOTCH_RADIUS } from "./looks";
 import { cardMode } from "./backdrop";
+import { NO_WIN, resolveAuto, type WinLook } from "./auto";
 
 const [saved, setSaved] = createSignal<Appearance>(DEFAULT_APPEARANCE);
 /** Uložený (platný) vzhled — čte ho i `MainPage` (pořadí karet). */
@@ -46,10 +47,12 @@ export const activePageId = () => activePage;
 /** Naposledy použitý vzhled — přepnutí záložky ho jen znovu použije s přepisem záložky. */
 let lastRaw: unknown = DEFAULT_APPEARANCE;
 let shiftTimer = 0;
+/** Stav Windows pro motiv „Podle Windows“ (načte `initAppearance`, mění ho událost `winlook`). */
+let win: WinLook = NO_WIN;
 
 export function applyAppearance(raw: unknown) {
   lastRaw = raw;
-  const full = normalizeAppearance(raw);
+  const full = resolveAuto(normalizeAppearance(raw), win);
   const a = effectiveAppearance(full, activePage);
   const root = document.documentElement;
   const vars = appearanceVars(a, reduced());
@@ -109,10 +112,18 @@ function commit(raw: unknown) {
 /** Start šuplíku: uložený vzhled + posluchače (událost `appearance`, systémové „omezit pohyb“). */
 export function initAppearance(): Promise<() => void> {
   void api.getConfig().then((cfg) => cfg && commit(cfg.appearance), () => {});
+  // „Podle Windows“: stav hned a pak jen při změně (událost z Rustu, žádný polling)
+  const setWin = (w: WinLook | null | undefined) => {
+    win = w ?? NO_WIN;
+    applyAppearance(lastRaw);
+  };
+  void api.winLook().then(setWin, () => {});
   const onReduced = () => applyAppearance(saved());
   reducedQuery?.addEventListener("change", onReduced);
+  const offWin = on<WinLook>("winlook", setWin);
   return on<Appearance>("appearance", commit).then((off) => () => {
     off();
+    void offWin.then((f) => f());
     reducedQuery?.removeEventListener("change", onReduced);
   });
 }

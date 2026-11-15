@@ -16,6 +16,9 @@ pub const MAX_TITLE: usize = 60;
 const MAX_DESC: usize = 160;
 const MAX_ICON: usize = 8;
 
+/// Přípona šablonového widgetu.
+pub const KIT_SUFFIX: &str = ".kit.json";
+
 /// Druh souboru widgetu: skript (jazyk podle přípony) nebo program.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -25,9 +28,19 @@ pub enum Kind {
     Python,
     Node,
     Exe,
+    /// šablona `*.kit.json` (`widgetkit`) — nic se nespouští
+    Kit,
 }
 
 impl Kind {
+    /// Druh podle jména souboru: `*.kit.json` je šablona, jinak podle přípony.
+    pub fn from_name(name: &str) -> Option<Kind> {
+        if name.len() > KIT_SUFFIX.len() && name.to_ascii_lowercase().ends_with(KIT_SUFFIX) {
+            return Some(Kind::Kit);
+        }
+        Kind::from_ext(std::path::Path::new(name).extension()?.to_str()?)
+    }
+
     pub fn from_ext(ext: &str) -> Option<Kind> {
         if ext.eq_ignore_ascii_case("exe") {
             return Some(Kind::Exe);
@@ -47,14 +60,15 @@ impl Kind {
             Kind::Cmd => Some(Lang::Cmd),
             Kind::Python => Some(Lang::Python),
             Kind::Node => Some(Lang::Node),
-            Kind::Exe => None,
+            Kind::Exe | Kind::Kit => None,
         }
     }
 
     pub fn name(self) -> &'static str {
-        match self.lang() {
-            Some(l) => l.name(),
-            None => tr("program", "program"),
+        match (self, self.lang()) {
+            (Kind::Kit, _) => tr("šablona", "template"),
+            (_, Some(l)) => l.name(),
+            (_, None) => tr("program", "program"),
         }
     }
 
@@ -65,8 +79,14 @@ impl Kind {
             Kind::Python => "python",
             Kind::Node => "node",
             Kind::Exe => "exe",
+            Kind::Kit => "kit",
         }
     }
+}
+
+/// Metadata šablony `*.kit.json` (nic se nespouští: interval a termín jsou jen vyplněné).
+pub fn kit_meta(s: &crate::widgetkit::spec::Spec) -> WidgetMeta {
+    WidgetMeta { title: s.title.clone(), description: None, icon: s.icon.clone(), interval_s: 0, show: Show::Card, timeout_s: 0, args: vec![] }
 }
 
 /// Kde se widget smí ukázat: karta v šuplíku, položka proužku, nebo obojí.
@@ -295,5 +315,28 @@ mod tests {
         assert_eq!(Kind::from_ext("mjs"), Some(Kind::Node));
         assert_eq!(Kind::from_ext("ledge"), None);
         assert_eq!(Kind::Exe.lang(), None);
+    }
+}
+
+#[cfg(test)]
+mod kit_tests {
+    use super::*;
+
+    #[test]
+    fn kind_from_name_table() {
+        for (name, want) in [
+            ("a.kit.json", Some(Kind::Kit)),
+            ("A.KIT.JSON", Some(Kind::Kit)),
+            ("kokpit.v2.kit.json", Some(Kind::Kit)),
+            (".kit.json", None),
+            ("a.json", None),
+            ("kit.json", None),
+            ("a.ps1", Some(Kind::Powershell)),
+            ("p.exe", Some(Kind::Exe)),
+            ("bez_pripony", None),
+        ] {
+            assert_eq!(Kind::from_name(name), want, "{name}");
+        }
+        assert_eq!((Kind::Kit.key(), Kind::Kit.lang().is_none()), ("kit", true));
     }
 }

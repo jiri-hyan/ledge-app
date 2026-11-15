@@ -162,21 +162,75 @@ fn two_pcs_sync_through_bare_repo() {
     ok(lab.sync(&mut sa, "A"));
     ok(lab.sync(&mut sb, "B"));
 
-    // stejná poznámka změněná různě na obou → konflikt, nic se neztratí
+    // stejná poznámka změněná různě na obou → remote zůstane, lokální verze jako kopie, sync jede dál
     write(&a, "_obecne/2026-10-16-140000-prvni.md", b"---\ndone: true\n---\n\nprvni A\n");
     write(&b, "_obecne/2026-10-16-140000-prvni.md", b"---\ndone: false\n---\n\nprvni B\n");
+    write(&b, "_obecne/jina.md", b"jina z B\n");
     ok(lab.sync(&mut sa, "A"));
-    match lab.sync(&mut sb, "B") {
-        Outcome::Konflikt { files, .. } => assert_eq!(files, vec!["_obecne/2026-10-16-140000-prvni.md".to_string()]),
-        o => panic!("čekal jsem konflikt, je {o:?}"),
+    let (pulled, pushed, _) = ok(lab.sync(&mut sb, "B"));
+    assert!(pulled && pushed, "konflikt nezastavil sync");
+    assert_eq!(read(&b, "_obecne/2026-10-16-140000-prvni.md"), "---\ndone: true\n---\n\nprvni A\n", "na místě verze z remote");
+    let copy = "_obecne/2026-10-16-140000-prvni (konflikt Ledge 2026-10-16).md";
+    assert_eq!(read(&b, copy), "---\ndone: false\n---\n\nprvni B\n", "lokální verze v kopii");
+    assert!(!b.join(".git/rebase-merge").exists() && !b.join(".git/MERGE_HEAD").exists());
+    assert!(sb.notes.iter().any(|n| n.contains("kopie") && n.contains(copy)), "{:?}", sb.notes);
+    // druhý PC dostane kopii i nezávislou poznámku; další běhy jsou klidné
+    ok(lab.sync(&mut sa, "A"));
+    assert_eq!(read(&a, copy), "---\ndone: false\n---\n\nprvni B\n");
+    assert_eq!(read(&a, "_obecne/jina.md"), "jina z B\n");
+    ok(lab.sync(&mut sb, "B"));
+}
+
+/// Tabulka scénářů konfliktu dvou PC: žádná verze se neztratí, sync nestojí.
+#[test]
+fn conflict_scenarios_keep_all_data() {
+    let lab = lab();
+    let (mut sa, mut sb) = (Syncer::default(), Syncer::default());
+    let (a, b) = (lab.root("A"), lab.root("B"));
+    write(&a, "n/zmena.md", b"puvodni\n");
+    write(&a, "n/smaz-vs-zmena.md", b"puvodni\n");
+    write(&a, "n/zmena-vs-smaz.md", b"puvodni\n");
+    write(&a, "n/obrazek.png", b"\x89PNG puvodni");
+    ok(lab.sync(&mut sa, "A"));
+    ok(lab.sync(&mut sb, "B"));
+    // A: změna, změna, smazání, nová, obrázek
+    write(&a, "n/zmena.md", b"puvodni\nA\n");
+    write(&a, "n/smaz-vs-zmena.md", b"puvodni\nA\n");
+    std::fs::remove_file(a.join("n/zmena-vs-smaz.md")).unwrap();
+    write(&a, "n/nova.md", b"nova A\n");
+    write(&a, "n/obrazek.png", b"\x89PNG A");
+    ok(lab.sync(&mut sa, "A"));
+    // B: jiná změna, smazání, změna, nová se stejným názvem, jiný obrázek
+    write(&b, "n/zmena.md", b"puvodni\nB\n");
+    std::fs::remove_file(b.join("n/smaz-vs-zmena.md")).unwrap();
+    write(&b, "n/zmena-vs-smaz.md", b"puvodni\nB\n");
+    write(&b, "n/nova.md", b"nova B\n");
+    write(&b, "n/obrazek.png", b"\x89PNG B");
+    let (pulled, pushed, _) = ok(lab.sync(&mut sb, "B"));
+    assert!(pulled && pushed);
+    let day = "(konflikt Ledge 2026-10-16)";
+    // obě změnily → remote na místě, lokální v kopii
+    assert_eq!(read(&b, "n/zmena.md"), "puvodni\nA\n");
+    assert_eq!(read(&b, &format!("n/zmena {day}.md")), "puvodni\nB\n");
+    // smazáno lokálně vs. změněno na remote → zůstává změna
+    assert_eq!(read(&b, "n/smaz-vs-zmena.md"), "puvodni\nA\n");
+    // změněno lokálně vs. smazáno na remote → zůstává změna
+    assert_eq!(read(&b, "n/zmena-vs-smaz.md"), "puvodni\nB\n");
+    // nová na obou se stejným názvem
+    assert_eq!(read(&b, "n/nova.md"), "nova A\n");
+    assert_eq!(read(&b, &format!("n/nova {day}.md")), "nova B\n");
+    // binární soubor: bajty obou verzí
+    assert_eq!(std::fs::read(b.join("n/obrazek.png")).unwrap(), b"\x89PNG A");
+    assert_eq!(std::fs::read(b.join(format!("n/obrazek {day}.png"))).unwrap(), b"\x89PNG B");
+    assert!(sb.notes.len() == 3, "kopie jen u 3 souborů s oběma verzemi: {:?}", sb.notes);
+    // A po dalším syncu = totéž co B (konvergence), nic nezůstalo ve slučování
+    ok(lab.sync(&mut sa, "A"));
+    let (ta, tb) = (tracked(&a), tracked(&b));
+    assert_eq!(ta.iter().collect::<std::collections::BTreeSet<_>>(), tb.iter().collect::<std::collections::BTreeSet<_>>());
+    for f in &ta {
+        assert_eq!(std::fs::read(a.join(f)).unwrap(), std::fs::read(b.join(f)).unwrap(), "{f}");
     }
-    assert_eq!(read(&b, "_obecne/2026-10-16-140000-prvni.md"), "---\ndone: false\n---\n\nprvni B\n", "lokální verze zůstala");
-    assert!(!b.join(".git/rebase-merge").exists() && !b.join(".git/rebase-apply").exists(), "rebase přerušený");
-    let log = gitinfo::run(&b, &["log", "-1", "--format=%s"], Instant::now() + Duration::from_secs(10)).unwrap();
-    assert!(log.starts_with("ledge: B"), "lokální změna je v lokálním commitu: {log}");
-    // další běh hlásí konflikt znovu (nic tiše nepřepíše)
-    assert!(matches!(lab.sync(&mut sb, "B"), Outcome::Konflikt { .. }));
-    assert_eq!(read(&a, "_obecne/2026-10-16-140000-prvni.md"), "---\ndone: true\n---\n\nprvni A\n");
+    assert!(ta.iter().all(|f| !f.ends_with(".md") || !read(&a, f).contains("<<<<<<<")), "žádné konfliktní značky");
 }
 
 #[test]
@@ -254,8 +308,33 @@ fn messages_follow_language() {
     assert_eq!(outcome_text(&ok).unwrap(), "Synchronizováno: staženo i odesláno.");
     with_lang(Lang::En, || {
         assert_eq!(outcome_text(&ok).unwrap(), "Synced: pulled and pushed.");
-        assert_eq!(outcome_text(&Outcome::Konflikt { files: vec!["a.md".into()], message: String::new() }).unwrap_err(), "Conflict: a.md");
+        assert_eq!(outcome_text(&Outcome::Konflikt { files: vec!["a.md".into()], message: String::new() }).unwrap_err(), "Notes diverged in: a.md. Open the notes folder and pick a version.");
         let Outcome::Neprihlaseno(m) = classify("fatal: Authentication failed for 'https://x'") else { panic!("auth") };
         assert!(m.ends_with("run `gh auth setup-git` (once on each PC)"), "{m}");
     });
+}
+
+#[test]
+fn note_with_conflict_markers_is_never_committed_or_pushed() {
+    let lab = lab();
+    let (mut sa, mut sb) = (Syncer::default(), Syncer::default());
+    let a = lab.root("A");
+    write(&a, "_obecne/a.md", b"puvodni\n");
+    ok(lab.sync(&mut sa, "A"));
+    let head = |r: &Path| gitinfo::run(r, &["rev-parse", "HEAD"], Instant::now() + Duration::from_secs(10)).unwrap();
+    let before = head(&a);
+    // zbytek po neúspěšném slučování (např. pop autostash) — značky v poznámce
+    write(&a, "_obecne/a.md", b"<<<<<<< Updated upstream\nA\n=======\nB\n>>>>>>> Stashed changes\n");
+    match lab.sync(&mut sa, "A") {
+        Outcome::Konflikt { files, .. } => assert_eq!(files, vec!["_obecne/a.md".to_string()]),
+        o => panic!("čekal jsem konflikt, je {o:?}"),
+    }
+    assert_eq!(head(&a), before, "nic se necommitlo");
+    assert!(read(&a, "_obecne/a.md").contains("<<<<<<<"), "soubor zůstal beze změny pro ruční opravu");
+    // po opravě sync pokračuje a na druhý PC jde jen čistá verze
+    write(&a, "_obecne/a.md", b"opraveno\n");
+    ok(lab.sync(&mut sa, "A"));
+    let b = lab.root("B");
+    ok(lab.sync(&mut sb, "B"));
+    assert_eq!(read(&b, "_obecne/a.md"), "opraveno\n");
 }

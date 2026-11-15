@@ -11,7 +11,14 @@
       "end": { "dateTime": "2026-10-19T07:15:00.0000000", "timeZone": "UTC" },
       "location": { "displayName": "Microsoft Teams Meeting", "locationType": "default" },
       "onlineMeeting": { "joinUrl": "https://teams.microsoft.com/l/meetup-join/19%3ameeting_abc%40thread.v2/0" },
-      "onlineMeetingUrl": null
+      "onlineMeetingUrl": null,
+      "attendees": [
+        { "type": "required", "status": { "response": "organizer" }, "emailAddress": { "name": "Tomáš Hora", "address": "tomas@contoso.com" } },
+        { "type": "required", "status": { "response": "accepted" }, "emailAddress": { "name": "Žofie Řezníčková", "address": "zofie@contoso.com" } },
+        { "type": "optional", "status": { "response": "none" }, "emailAddress": { "name": "", "address": "Pavel@contoso.com" } },
+        { "type": "required", "status": { "response": "declined" }, "emailAddress": { "name": "Karel", "address": "karel@contoso.com" } },
+        { "type": "resource", "status": { "response": "accepted" }, "emailAddress": { "name": "Zasedačka 2", "address": "room@contoso.com" } }
+      ]
     },
     {
       "id": "AAMkAGI2THVSAAB=",

@@ -5,6 +5,7 @@
 // Viditelná karta potvrdí „zobrazeno“ (`seen.ts`) — bez toho ji pojistka jádra po `questionUnseenS` pustí do Claude.
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
+import { now } from "../clock";
 import { api, inTauri, type Ask, type QuestionReply, type Snapshot } from "../api";
 import { t } from "../i18n";
 import { say, sayError } from "../ui/toast";
@@ -23,7 +24,6 @@ export default function QuestionCard(p: { ask: Ask; s: Snapshot; inSession?: boo
   const [drafts, setDrafts] = createSignal<Draft[]>(p.ask.questions.map(() => emptyDraft()));
   const [busy, setBusy] = createSignal(false);
   const [armed, setArmed] = createSignal(false);
-  const [now, setNow] = createSignal(Date.now());
   let otherBox: HTMLTextAreaElement | undefined;
   let root: HTMLDivElement | undefined;
   // pojistka `claude.questionUnseenS`: jádru říct, že karta je opravdu vidět (`seen.ts`)
@@ -34,8 +34,6 @@ export default function QuestionCard(p: { ask: Ask; s: Snapshot; inSession?: boo
     setPage(0);
     setDrafts(p.ask.questions.map(() => emptyDraft()));
   }, { defer: true }));
-  const timer = window.setInterval(() => setNow(Date.now()), 1000);
-  onCleanup(() => clearInterval(timer));
 
   const qs = () => p.ask.questions;
   const q = () => qs()[Math.min(page(), qs().length - 1)];

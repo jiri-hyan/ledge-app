@@ -3,10 +3,13 @@
 // připomínka po termínu, schůzka s odkazem Připojit (10 min předem) a poznámka ze schůzky (15 min po konci),
 // spadlé CI na mém PR, PR čekající na mou revizi, právě naběhlý dev server, adresa ve schránce, kterou ještě
 // nemám mezi odkazy. Zavřený chip se pamatuje podle klíče 24 h (jen v paměti).
-// Počítá se při změně snapshotu — žádný vlastní časovač ani vlákno.
+// Počítá se při změně snapshotu a na časových hranicích (`nextChange`) — žádný vlastní časovač ani vlákno.
+import type { BriefWaiting } from "../types/notes";
 import type { PrRef, SuggestOn } from "../types/suggest";
+import { claudeSince, sinceSig, type SinceItem, type SinceSession } from "./since.ts";
+import { morningKey, morningParts, morningSig, morningWindowEnd, type MorningInput, type MorningPart } from "./morning.ts";
 
-export type SuggestKind = "reminder" | "meeting" | "meetingNote" | "ghCi" | "ghReview" | "dev" | "clip";
+export type SuggestKind = "reminder" | "meeting" | "meetingNote" | "ghCi" | "ghReview" | "dev" | "clip" | "today" | "claudeSince" | "briefWaiting" | "morning";
 
 /** Jeden chip. Texty skládá UI (`t()`), tady jsou jen data. */
 export interface Suggestion {
@@ -28,6 +31,18 @@ export interface Suggestion {
   /** schůzka (`meeting`, `meetingNote`): začátek v ms (titulek poznámky) a služba odkazu */
   start?: number;
   provider?: string;
+  /** úkoly (`today`): počet po termínu a na dnes */
+  overdue?: number;
+  today?: number;
+  /** `claudeSince`: sessions, které čekají / doběhly / selhaly / skončily od posledního schování šuplíku (`since.ts`) */
+  since?: SinceItem[];
+  /** `dev`: počet chyb z výstupu procesu a jeho id (0 / chybí = jen „běží“); k chybě nabídne zadání (`devbrief.ts`) */
+  errors?: number;
+  proc?: string;
+  /** `briefWaiting`: `waiting` = čeká na odpověď na otázku, `review` = čeká na kontrolu bodů (+ `path`, `title`) */
+  brief?: "waiting" | "review";
+  /** `morning`: ranní shrnutí = jen neprázdné části z reálných zdrojů (`morning.ts`) */
+  morning?: MorningPart[];
 }
 
 /** Schůzka s ověřeným odkazem Připojit (z `personal.calendar`, jen dnešek, bez celodenních). */
@@ -43,17 +58,25 @@ export interface SuggestInput {
   /** připomínky po termínu (`Snapshot.reminders`) */
   reminders: { path: string; title: string; remindMs: number | null }[];
   github: { review: PrRef[]; failing: PrRef[]; fetchedMs: number | null };
+  /** úkoly po termínu a na dnes (`Snapshot.notesTaskCounts`) */
+  tasks: { overdue: number; today: number };
   /** poznámky jsou zapnuté (bez nich se poznámka ze schůzky nenabízí) */
   notes: boolean;
   /** dnešní schůzky s odkazem, i ty, které kalendář už skryl jako skončené (`trackMeetings`) */
   meetings: Meeting[];
   /** procesy spuštěné z Ledge (`Snapshot.procs`) */
-  procs: { id: string; phase: string; port: number | null; url: string | null; readyAt: number | null }[];
+  procs: { id: string; phase: string; port: number | null; url: string | null; readyAt: number | null; errors?: number }[];
   projects: { id: string; name: string }[];
   /** nejnovější položka historie schránky, pokud je to adresa (`clipUrl`) */
   clip: { url: string; atMs: number } | null;
   /** cíle odkazů, které už mám (`knownLinks`) */
   known: string[];
+  /** V1: Claude sessions + kdy se šuplík naposledy schoval (`Snapshot.drawerHiddenAt`); chybí = bez chipu „od posledně“ */
+  claude?: { sessions: readonly SinceSession[]; hiddenAt: number | null };
+  /** V1: zadání čekající na člověka (`Snapshot.briefWaiting`); chybí = bez chipu */
+  briefs?: BriefWaiting | null;
+  /** H5: data ranního shrnutí (kdy se šuplík naposledy schoval, dnešní schůzky, týdenní limit); chybí = bez chipu */
+  morning?: MorningInput;
 }
 
 export const MAX_CHIPS = 3;
@@ -171,19 +194,64 @@ function fromPrs(list: readonly PrRef[], kind: "ci" | "review", d: Dismissed, no
   return { key: prKey(kind, first), kind: kind === "ci" ? "ghCi" : "ghReview", title: `${first.repo}#${first.number}`, detail: first.title, more: open.length - 1, url: first.url, num: first.number };
 }
 
-/** Stejné chipy (podle obsahu)? `pick` se počítá s každým tikem `now`; bez téhle shody by se chipy každou
- *  sekundu překreslily znovu (objekty jsou pokaždé nové). */
+/** Nejbližší okamžik po `now`, kdy se může výstup `pick` změnit jen během času (bez změny snapshotu): schůzka −10 min / konec /
+ *  +15 min, čerstvost GitHubu, dev serveru a schránky, vypršení zavřeného chipu. Podle toho se `pick` přepočítá na hranicích,
+ *  ne každou sekundu (jako `deadlines` v `threads/emit.rs`); null = žádná hranice. */
+export function nextChange(input: SuggestInput, dismissed: Dismissed, now: number): number | null {
+  const t: number[] = [];
+  for (const m of input.meetings) t.push(m.start - MEET_LEAD_MS, endOf(m), endOf(m) + MEET_NOTE_MS + 1);
+  if (input.github.fetchedMs !== null) t.push(input.github.fetchedMs - 60_000, input.github.fetchedMs + GH_FRESH_MS + 1);
+  for (const p of input.procs) if (p.readyAt !== null) t.push(p.readyAt + DEV_FRESH_MS + 1);
+  if (input.clip) t.push(input.clip.atMs + CLIP_FRESH_MS + 1);
+  for (const a of input.morning?.agenda ?? []) t.push(a.end);
+  if (input.morning) t.push(morningWindowEnd(now));
+  for (const until of dismissed.values()) t.push(until);
+  const next = t.filter((x) => x > now);
+  return next.length ? Math.min(...next) : null;
+}
+
+/** Stejné chipy (podle obsahu)? Bez téhle shody by se chipy po každém přepočtu překreslily znovu (objekty jsou pokaždé nové). */
 export function sameSuggestions(a: readonly Suggestion[], b: readonly Suggestion[]): boolean {
-  return a.length === b.length && a.every((x, i) => x.key === b[i].key && x.more === b[i].more && x.title === b[i].title && x.detail === b[i].detail && x.url === b[i].url && x.path === b[i].path && x.num === b[i].num && x.start === b[i].start);
+  return a.length === b.length && a.every((x, i) => x.key === b[i].key && x.more === b[i].more && x.title === b[i].title && x.detail === b[i].detail && x.url === b[i].url && x.path === b[i].path && x.num === b[i].num && x.start === b[i].start && x.overdue === b[i].overdue && x.today === b[i].today && x.brief === b[i].brief && sinceSig(x.since) === sinceSig(b[i].since) && morningSig(x.morning) === morningSig(b[i].morning));
+}
+
+/** Jsou data GitHubu dost čerstvá, aby se z nich něco nabízelo? */
+const ghFreshOf = (input: SuggestInput, now: number): boolean => input.github.fetchedMs !== null && now - input.github.fetchedMs <= GH_FRESH_MS && now >= input.github.fetchedMs - 60_000;
+
+/** Nejvýš `MAX_CHIPS` návrhů z `pickAll`. */
+export function pick(input: SuggestInput, dismissed: Dismissed, now: number): Suggestion[] {
+  return pickAll(input, dismissed, now).slice(0, MAX_CHIPS);
+}
+
+/** Efektivní „Přehled“ (zrcadlo Rust `SuggestConfig::digest_on`): explicitní `digest`, jinak `reminders`. */
+export function digestOn(on: { reminders: boolean; digest?: boolean | null }): boolean {
+  return on.digest ?? on.reminders;
 }
 
 /**
- * Nejvýš `MAX_CHIPS` návrhů v pořadí důležitosti: připomínka · schůzka · spadlé CI · PR k revizi · dev server · schránka.
+ * Všechny návrhy v pořadí důležitosti: zadání čeká na mě · schůzka · připomínka · Dnes (úkoly) · poznámka ze schůzky · Claude od posledně ·
+ * ranní shrnutí · spadlé CI · PR k revizi · dev server · schránka (každý druh má řádek v `hover/priority.ts` `KIND_PRIO`, pořadí hlídá
+ * `priority.test.mjs`). Schůzka s odkazem Připojit je před připomínkou: za 10 minut je naléhavější než splatná poznámka.
  * Jeden chip na druh (další téhož druhu jen jako `more`). Čistá funkce nad snapshotem.
  */
-export function pick(input: SuggestInput, dismissed: Dismissed, now: number): Suggestion[] {
+export function pickAll(input: SuggestInput, dismissed: Dismissed, now: number): Suggestion[] {
   const out: Suggestion[] = [];
   const { on } = input;
+  // přehled (zadání čeká · ranní shrnutí · Dnes · Claude od posledně) má vlastní volbu; bez `digest` platí `reminders` (migrace L193)
+  const digest = digestOn(on);
+
+  // zadání čekající na mě (poznámka `status: waiting|review`): nejdřív otázka, pak kontrola; klíč nese cestu i stav
+  const bw = input.briefs;
+  if (digest && input.notes && bw?.first) {
+    const f = bw.first;
+    const key = `brief:${f.path}|${f.status}`;
+    if (!isDismissed(dismissed, key, now)) out.push({ key, kind: "briefWaiting", title: f.title, detail: "", more: Math.max(0, bw.waiting + bw.review - 1), path: f.path, brief: f.status });
+  }
+
+  // schůzka (Připojit) patří kalendáři, ne volbě „Splatná připomínka“ poznámek (L102) — vypíná se vypnutím kalendáře / připomínky kalendáře
+  const live = input.meetings.filter((m) => now >= m.start - MEET_LEAD_MS && now < endOf(m) && !isDismissed(dismissed, meetKey("join", m), now)).sort((a, b) => a.start - b.start);
+  const lm = live[0];
+  if (lm) out.push({ key: meetKey("join", lm), kind: "meeting", title: lm.title, detail: lm.join.provider, more: live.length - 1, url: lm.join.url, start: lm.start, provider: lm.join.provider });
 
   if (on.reminders) {
     const keyOf = (r: { path: string; remindMs: number | null }) => `rem:${r.path}|${r.remindMs ?? ""}`;
@@ -192,16 +260,39 @@ export function pick(input: SuggestInput, dismissed: Dismissed, now: number): Su
     if (first) out.push({ key: keyOf(first), kind: "reminder", title: first.title, detail: "", more: open.length - 1, path: first.path });
   }
 
-  if (on.reminders) {
-    const live = input.meetings.filter((m) => now >= m.start - MEET_LEAD_MS && now < endOf(m) && !isDismissed(dismissed, meetKey("join", m), now)).sort((a, b) => a.start - b.start);
-    const m = live[0];
-    if (m) out.push({ key: meetKey("join", m), kind: "meeting", title: m.title, detail: m.join.provider, more: live.length - 1, url: m.join.url, start: m.start, provider: m.join.provider });
-    const done = input.meetings.filter((x) => now >= endOf(x) && now - endOf(x) <= MEET_NOTE_MS && !isDismissed(dismissed, meetKey("note", x), now)).sort((a, b) => endOf(b) - endOf(a));
-    const n = input.notes ? done[0] : undefined;
-    if (n) out.push({ key: meetKey("note", n), kind: "meetingNote", title: n.title, detail: "", more: done.length - 1, start: n.start });
+  // ranní shrnutí (H5): první otevření po dlouhé nečinnosti, jen neprázdné části; úkoly obsahuje, proto „Dnes“ ustoupí
+  const ghFresh = ghFreshOf(input, now);
+  let morning: Suggestion | null = null;
+  if (digest && input.morning) {
+    const key = morningKey(now);
+    const gh = on.github && ghFresh;
+    const parts = isDismissed(dismissed, key, now)
+      ? []
+      : morningParts(input.morning, { tasks: input.tasks, reminders: input.reminders.length, briefs: bw ? bw.waiting + bw.review : 0, review: gh ? input.github.review.length : 0, failing: gh ? input.github.failing.length : 0 }, now);
+    if (parts.length) morning = { key, kind: "morning", title: "", detail: "", more: 0, morning: parts };
   }
 
-  const ghFresh = input.github.fetchedMs !== null && now - input.github.fetchedMs <= GH_FRESH_MS && now >= input.github.fetchedMs - 60_000;
+  // „Dnes“: úkoly po termínu a na dnes z poznámek (čísla jádra); klíč nese čísla, zavřený chip se po změně vrátí
+  const { overdue, today } = input.tasks;
+  if (digest && overdue + today > 0 && !morning) {
+    const key = `today:${overdue}:${today}`;
+    if (!isDismissed(dismissed, key, now)) out.push({ key, kind: "today", title: "", detail: "", more: 0, overdue, today });
+  }
+
+  const done = input.meetings.filter((x) => now >= endOf(x) && now - endOf(x) <= MEET_NOTE_MS && !isDismissed(dismissed, meetKey("note", x), now)).sort((a, b) => endOf(b) - endOf(a));
+  const nm = input.notes ? done[0] : undefined;
+  if (nm) out.push({ key: meetKey("note", nm), kind: "meetingNote", title: nm.title, detail: "", more: done.length - 1, start: nm.start });
+
+  // Claude od posledně: čeká / doběhlo / chyba / skončila; klíč nese čas schování, po dalším odchodu se ukáže znovu
+  const cl = input.claude;
+  if (digest && cl) {
+    const since = claudeSince(cl.sessions, cl.hiddenAt);
+    const key = `claude-since:${cl.hiddenAt ?? 0}`;
+    if (since && !isDismissed(dismissed, key, now)) out.push({ key, kind: "claudeSince", title: "", detail: "", more: 0, since });
+  }
+
+  if (morning) out.push(morning);
+
   if (on.github && ghFresh) {
     const ci = fromPrs(input.github.failing, "ci", dismissed, now);
     if (ci) out.push(ci);
@@ -211,14 +302,15 @@ export function pick(input: SuggestInput, dismissed: Dismissed, now: number): Su
 
   if (on.devServer) {
     const live = input.procs
-      .filter((p) => (p.phase === "ready" || p.phase === "running") && p.port !== null && p.readyAt !== null && now - p.readyAt <= DEV_FRESH_MS)
-      .map((p) => ({ p, key: `dev:${p.id}:${p.port}:${p.readyAt}` }))
+      // čerstvě naběhlý, nebo s chybami ve výstupu (chyba po hodinách běhu se ukáže taky; zavřený chip se vrátí jen při nových chybách)
+      .filter((p) => (p.phase === "ready" || p.phase === "running") && p.port !== null && p.readyAt !== null && (now - p.readyAt <= DEV_FRESH_MS || (p.errors ?? 0) > 0))
+      .map((p) => ({ p, key: `dev:${p.id}:${p.port}:${p.readyAt}${(p.errors ?? 0) > 0 ? `:${p.errors}` : ""}` }))
       .filter((x) => !isDismissed(dismissed, x.key, now))
       .sort((a, b) => (b.p.readyAt ?? 0) - (a.p.readyAt ?? 0));
     const top = live[0];
     if (top && top.p.port !== null) {
       const name = input.projects.find((x) => x.id === top.p.id)?.name ?? top.p.id;
-      out.push({ key: top.key, kind: "dev", title: `localhost:${top.p.port}`, detail: name, more: live.length - 1, url: devUrl(top.p.url, top.p.port) });
+      out.push({ key: top.key, kind: "dev", title: `localhost:${top.p.port}`, detail: name, more: live.length - 1, url: devUrl(top.p.url, top.p.port), errors: top.p.errors ?? 0, proc: top.p.id });
     }
   }
 
@@ -228,5 +320,5 @@ export function pick(input: SuggestInput, dismissed: Dismissed, now: number): Su
     if (!isDismissed(dismissed, key, now)) out.push({ key, kind: "clip", title: hostOf(clip.url) || clip.url, detail: clip.url, more: 0, url: clip.url });
   }
 
-  return out.slice(0, MAX_CHIPS);
+  return out;
 }

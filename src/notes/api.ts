@@ -23,4 +23,6 @@ export const notesApi = {
   pinLookAll: () => call<number>("pin_look_all"),
   /** z okna lístku: schovat do `until` (lokální `YYYY-MM-DDTHH:MM`) */
   pinHide: (until: string) => call("pin_hide", { until }),
+  /** výslovný klik do lístku: okno smí přijmout klávesnici (jinak NOACTIVATE) */
+  pinActivate: () => call<void>("pin_activate"),
 };

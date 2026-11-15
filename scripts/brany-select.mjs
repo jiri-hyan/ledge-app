@@ -3,13 +3,15 @@
 // po změně jedné dokumentace nebo jednoho .tsx nepotřebuje cargo.
 //
 //   src/**, *.css, *.ts(x), *.mjs, *.html (UI)        → tsc ui
-//   src-tauri/** (Rust)                                → test clippy
+//   src-tauri/** (Rust, capabilities)                  → test clippy ui (ui: node testy čtou Rust/JSON — codemap,
+//                                                         config-keys, ipc-window-acl; levné, bez cargo; J1)
 //   UI i Rust, nebo package.json / Cargo.* / tauri.conf.json / lockfile → test clippy tsc ui (vše kromě build)
 //   docs/**, *.md                                      → ui (test hniloby codemap čte docs i kód)
-//   cokoli jiného (.github, LICENSE, *.ps1…)           → samo o sobě žádná brána
+//   cokoli jiného (.github, LICENSE, *.ps1…)           → samo o sobě žádná brána (kromě `denylist`)
+//   `denylist` (zakázaná slova, levná) běží u každé neprázdné změny: slovo může nést jakýkoli soubor
 // Docs spolu s jiným druhem změny jen přidají `ui`. Pořadí bran drží brany.mjs (test, clippy, tsc, ui).
 
-const ORDER = ['test', 'clippy', 'tsc', 'ui']
+const ORDER = ['denylist', 'test', 'clippy', 'tsc', 'ui']
 const WIDE = /^(package\.json|pnpm-lock\.yaml|src-tauri\/(Cargo\.(toml|lock)|tauri\.conf\.json))$/
 
 /** Druh změny jednoho souboru: 'wide' | 'rust' | 'ui' | 'docs' | 'other'. */
@@ -33,8 +35,8 @@ export function selectGates(files) {
     want = ['test', 'clippy', 'tsc', 'ui']
     why = kinds.has('wide') ? 'změněn package.json / Cargo.* / tauri.conf.json → vše kromě build' : 'změněn UI i Rust → vše kromě build'
   } else if (kinds.has('rust')) {
-    want = ['test', 'clippy']
-    why = `změněno jen src-tauri/** (${n('rust')} souborů)`
+    want = ['test', 'clippy', 'ui']
+    why = `změněno jen src-tauri/** (${n('rust')} souborů) → ui kvůli testům codemap / config-keys / ipc-window-acl`
   } else if (kinds.has('ui')) {
     want = ['tsc', 'ui']
     why = `změněno jen UI — src/**, ts, css, mjs (${n('ui')} souborů)`
@@ -42,11 +44,12 @@ export function selectGates(files) {
     want = ['ui']
     why = `změněny jen docs / *.md (${n('docs')} souborů) → ui kvůli testu codemap`
   } else {
-    return { gates: [], why: 'změněno jen mimo kód a docs (.github, skripty .ps1…) — žádná brána' }
+    return { gates: ['denylist'], why: 'změněno jen mimo kód a docs (.github, skripty .ps1…) — jen denylist' }
   }
   if (kinds.has('docs') && !want.includes('ui')) {
     want.push('ui')
     why += ' + docs → ui'
   }
+  want.push('denylist')
   return { gates: ORDER.filter((g) => want.includes(g)), why }
 }

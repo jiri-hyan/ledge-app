@@ -5,6 +5,7 @@
 //! při změně (otisk JSON). Ve hře / se schovanými widgety = nic.
 
 use super::Kind;
+use crate::widgetkit::{needs::{needs, Needs}, spec::Spec};
 use crate::state::{core, now_ms};
 use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -49,6 +50,9 @@ pub struct DeskData {
     pub working: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub waiting: Option<Vec<WaitRow>>,
+    /// skutečný počet čekajících (`waiting` je ořezané na `WAIT_MAX`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub waiting_total: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub procs: Option<Vec<crate::procman::ProcView>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -95,12 +99,37 @@ pub(crate) fn invalidate() {
     LAST.store(0, Ordering::Relaxed);
 }
 
-fn fnv(s: &str) -> u64 {
+/// Otisk textu (FNV-1a) — i pro `ext::sup` (změna dat tématu rozšíření).
+pub(crate) fn fnv(s: &str) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for b in s.bytes() {
         h = (h ^ b as u64).wrapping_mul(0x100_0000_01b3);
     }
     h.max(1)
+}
+
+/// Čekající na člověka: ořezaný seznam pro zobrazení + skutečný počet (`waiting.count` v kitu).
+fn fill_waiting(d: &mut DeskData, cfg: &crate::config::Config) {
+    let c = core();
+    let pending = c.claude.pending();
+    let questions = c.claude.questions();
+    let p: Vec<(u64, &str, &str, &str, u64)> = pending.iter().map(|p| (p.id, p.cwd.as_str(), p.tool.as_str(), p.summary.as_str(), p.created_at)).collect();
+    let q: Vec<(u64, &str, &str, u64)> = questions
+        .iter()
+        .map(|a| (a.id, a.cwd.as_str(), a.questions.first().map(|q| if q.question.trim().is_empty() { q.header.as_str() } else { q.question.as_str() }).unwrap_or(""), a.created_at))
+        .collect();
+    d.waiting = Some(wait_rows(&p, &q, &|cwd| crate::stripview::project_for_cwd(cfg, cwd)));
+    d.waiting_total = Some((p.len() + q.len()) as u32);
+}
+
+/// Co okno potřebuje: podle druhu; okno kitu (`Kind::Script` se šablonou) navíc podle zdrojů v šabloně.
+fn window_needs(kinds: &[Kind], kit_specs: &[&Spec]) -> Needs {
+    let has = |k: &Kind| kinds.contains(k);
+    let mut n = Needs { limits: has(&Kind::Limits), waiting: has(&Kind::Waiting), procs: has(&Kind::Dev), calendar: has(&Kind::Agenda) || has(&Kind::Week), costs: has(&Kind::Usage) };
+    for spec in kit_specs {
+        n.merge(needs(spec));
+    }
+    n
 }
 
 /// Sestaví data pro druhy `kinds` (jen paměť).
@@ -110,34 +139,32 @@ fn build(kinds: &[Kind]) -> DeskData {
     let has = |k: &Kind| kinds.contains(k);
     let now = now_ms();
     let mut d = DeskData { now: now - now.rem_euclid(60_000), cfg_error: crate::config::recovery::shown_error(c.cfg_error.lock().clone(), c.bridge_error.lock().clone()), claude_enabled: cfg.claude.enabled, ..Default::default() };
-    if has(&Kind::Limits) {
+    // co okno potřebuje: podle druhu; okno kitu (`Kind::Script` se šablonou) podle zdrojů v šabloně
+    let ids: Vec<&String> = kinds.iter().filter_map(|k| if let Kind::Script(id) = k { Some(id) } else { None }).collect();
+    let views: Vec<_> = if ids.is_empty() { vec![] } else { crate::widgets::live::snapshot_views(&cfg).into_iter().filter(|w| ids.contains(&&w.id)).collect() };
+    let n = window_needs(kinds, &views.iter().filter_map(|w| w.spec.as_ref()).collect::<Vec<_>>());
+    if !ids.is_empty() {
+        d.widgets = Some(views);
+    }
+    if n.limits {
         d.limits = Some(crate::limitslive::view());
         d.working = c.claude.sessions().iter().any(|s| s.state == crate::claude::SessionState::Working);
     }
-    if has(&Kind::Waiting) {
-        let pending = c.claude.pending();
-        let questions = c.claude.questions();
-        let p: Vec<(u64, &str, &str, &str, u64)> = pending.iter().map(|p| (p.id, p.cwd.as_str(), p.tool.as_str(), p.summary.as_str(), p.created_at)).collect();
-        let q: Vec<(u64, &str, &str, u64)> = questions
-            .iter()
-            .map(|a| (a.id, a.cwd.as_str(), a.questions.first().map(|q| if q.question.trim().is_empty() { q.header.as_str() } else { q.question.as_str() }).unwrap_or(""), a.created_at))
-            .collect();
-        d.waiting = Some(wait_rows(&p, &q, &|cwd| crate::stripview::project_for_cwd(&cfg, cwd)));
+    if n.waiting {
+        fill_waiting(&mut d, &cfg);
+    }
+    if n.procs {
+        d.procs = Some(c.procs.snapshot());
     }
     if has(&Kind::Dev) {
-        d.procs = Some(c.procs.snapshot());
         d.projects = cfg.projects.iter().map(|p| NameRef { id: p.id.clone(), name: p.name.clone() }).collect();
     }
-    if has(&Kind::Agenda) || has(&Kind::Week) {
+    if n.calendar {
         d.calendar = Some(crate::calendar::live::view(&cfg, now));
     }
-    if has(&Kind::Usage) {
+    if n.costs {
         crate::costslive::request_desk();
         d.costs = Some(crate::costslive::desk_view());
-    }
-    if kinds.iter().any(|k| matches!(k, Kind::Script(_))) {
-        let ids: Vec<String> = kinds.iter().filter_map(|k| if let Kind::Script(id) = k { Some(id.clone()) } else { None }).collect();
-        d.widgets = Some(crate::widgets::live::snapshot_views(&cfg).into_iter().filter(|w| ids.contains(&w.id)).collect());
     }
     d
 }
@@ -224,6 +251,22 @@ mod tests {
         assert_eq!(*seen.borrow(), [vec![Kind::Clock], vec![Kind::Week], vec![Kind::Usage]]);
         assert_eq!(got.iter().map(|(l, d)| (l.as_str(), d.working)).collect::<Vec<_>>(), [("desk-clock", false), ("desk-week", false), ("desk-usage", true)]);
         assert!(per_window(&[], fake).is_empty());
+    }
+
+    #[test]
+    fn kit_window_gets_only_needed_data() {
+        use crate::widgetkit::spec::parse;
+        let kit = |json: &str| parse(json).unwrap();
+        let k = kit(r#"{"kit":1,"title":"t","rows":[{"bar":"limits.five.pct"},{"text":"{procs.count}"}]}"#);
+        let n = window_needs(&[Kind::Script("a.kit.json".into())], &[&k]);
+        assert_eq!((n.limits, n.waiting, n.procs, n.calendar, n.costs), (true, false, true, false, false));
+        // kit bez zdrojů dat (jen hodiny) nespustí nic — hlavně ne přepočet útraty
+        let clock = kit(r#"{"kit":1,"title":"t","rows":[{"text":"{clock.hm}"}]}"#);
+        assert_eq!(window_needs(&[Kind::Script("b.kit.json".into())], &[&clock]), Needs::default());
+        // skript bez šablony a vlastní druhy okna zůstávají jako dřív
+        assert_eq!(window_needs(&[Kind::Script("c.ps1".into())], &[]), Needs::default());
+        assert!(window_needs(&[Kind::Usage], &[]).costs && !window_needs(&[Kind::Usage], &[]).limits);
+        assert!(window_needs(&[Kind::Week], &[]).calendar);
     }
 
     #[test]

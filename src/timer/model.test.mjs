@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/timer/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { elapsedMs, fmtDuration, leftMs, parseMinutes, presetsOf, progress } from "./model.ts";
+import { elapsedMs, fmtTimer, leftMs, parseMinutes, presetsOf, progress } from "./model.ts";
 
 const T = 1_760_000_000_000;
 
@@ -39,7 +39,7 @@ test("formát se sekundami", () => {
     [3_600_000 + 5 * 60_000 + 7_000, false, "1:05:07"],
     [-5, true, "0:00"],
   ];
-  for (const [ms, up, want] of cases) assert.equal(fmtDuration(ms, up), want, `${ms} ${up}`);
+  for (const [ms, up, want] of cases) assert.equal(fmtTimer(ms, up), want, `${ms} ${up}`);
 });
 
 test("vlastní minuty", () => {

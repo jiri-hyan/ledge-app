@@ -60,8 +60,9 @@ export function shownPosition(tl: MediaTimeline, now: number, playing: boolean, 
   return positionAt(tl, now, playing);
 }
 
-/** Čas „1:42“, od hodiny „1:02:05“; záporné / neplatné = 0:00. */
-export function fmtDuration(ms: number): string {
+/** Čas skladby „1:42“, od hodiny „1:02:05“; vždy dolů, záporné / neplatné (NaN) = 0:00.
+ *  NENÍ to `timer/model.ts` `fmtTimer` (odpočet zaokrouhluje nahoru, `up`); sémantika se liší záměrně. */
+export function fmtTrackTime(ms: number): string {
   const s = Math.floor((Number.isFinite(ms) ? Math.max(0, ms) : 0) / 1000);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);

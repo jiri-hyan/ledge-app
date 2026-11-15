@@ -16,6 +16,7 @@
 //! Čisté části (cesty, URL, label, texty chyb) mají tabulkové testy; samotný tisk potřebuje WebView2
 //! a okno, takže se v testech nespouští (ověření naživo popisuje `docs/codemap/notes.md`).
 
+use crate::qa::QaDataDir as _;
 use crate::i18n::tr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -117,7 +118,8 @@ pub fn print(app: &tauri::AppHandle, html: &str, target: &Path) -> Result<(), St
         .focused(false)
         .skip_taskbar(true)
         .decorations(false)
-        .additional_browser_args(crate::drawer::BROWSER_ARGS)
+        .additional_browser_args(crate::qa::browser_args())
+        .qa_data_dir()
         .disable_drag_drop_handler()
         .on_navigation(move |u| nav_allowed(u.as_str(), &own))
         .build()

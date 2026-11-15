@@ -4,11 +4,13 @@
 // `looks.ts`, výběr stylu v `styles.ts`. DOM a události řeší `apply.ts`.
 import type { Appearance, MotionStyle, StripStyle } from "../types.ts";
 import { THEME_IDS } from "./themes.ts";
+import { onAccent } from "./contrast.ts";
 import { normalizeCustomThemes, themeOf } from "./customThemes.ts";
 import { normalizePages } from "./pages.ts";
 import { isDefaultSize, normalizeSize } from "./size.ts";
 import { accentFromGradient, backdropVars, cardVars, fitAccent, gradientOf, isDefaultBackdrop, normalizeBackdrop } from "./backdrop.ts";
 import { isDefaultHead, isDefaultTabs, normalizeHead, normalizeTabs } from "../layout/headModel.ts";
+import { isDefaultAuto, normalizeAuto } from "./auto.ts";
 import { CLASSIC, FONTS, LAYOUTS, MATERIALS, STYLE_IDS, WIDTHS, lookVars } from "./looks.ts";
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -78,6 +80,8 @@ export function normalizeAppearance(raw: any): Appearance {
     // hlavička a přepínač záložek (kolo 27): jen když se liší od dnešního
     ...(isDefaultHead(normalizeHead(r.head)) ? {} : { head: normalizeHead(r.head) }),
     ...(isDefaultTabs(r.tabs) ? {} : { tabs: normalizeTabs(r.tabs) }),
+    // „Podle Windows“ (kolo 34): jen když je zapnuté nebo upravené
+    ...(isDefaultAuto(normalizeAuto(r.auto)) ? {} : { auto: normalizeAuto(r.auto) }),
   };
 }
 
@@ -141,6 +145,7 @@ export function appearanceVars(a: Appearance, reducedMotion = false): Record<str
     // gradientní akcent (kolo 25): druhá barva zadaná ručně
     if (isHex(a.accent2)) out["accent-grad"] = `linear-gradient(90deg, ${c1}, ${out["accent-2"]})`;
   }
+  try { out["on-accent"] = onAccent(out.accent); } catch { /* akcent není barva: platí výchozí ze styles.css */ }
   if (a.backdrop) Object.assign(out, backdropVars(a.backdrop, out));
   out.fz = String(a.fontScale);
   out.dens = String(DENSITY[a.density]);

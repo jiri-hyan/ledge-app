@@ -3,6 +3,7 @@
 // (bez „omezit pohyb“) — jinak smyčka stojí a nic není naplánované; „omezit pohyb“ = jeden statický snímek.
 // Rozhodnutí je čistá funkce `drawMode` (`backdrop.ts`), smyčka `backdropLoop.ts`, kreslení `backdropLive.ts`.
 import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
+import { drawerShown } from "../media/shown";
 import { backdropNow } from "./apply";
 import { drawMode } from "./backdrop";
 import { createLoop } from "./backdropLoop";
@@ -11,9 +12,7 @@ import "./backdrop.css";
 
 const reducedQuery = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 const [reduced, setReduced] = createSignal(reducedQuery?.matches ?? false);
-const [hidden, setHidden] = createSignal(typeof document !== "undefined" && document.visibilityState === "hidden");
 reducedQuery?.addEventListener("change", () => setReduced(reducedQuery.matches));
-document.addEventListener("visibilitychange", () => setHidden(document.visibilityState === "hidden"));
 
 /** `open` = šuplík je celý otevřený (`view() === "full"`). */
 export default function Backdrop(p: { open: () => boolean }) {
@@ -23,7 +22,7 @@ export default function Backdrop(p: { open: () => boolean }) {
   const speed = createMemo(() => bd()?.speed ?? 1);
   const flame = createMemo(() => bd()?.flame ?? "classic");
   const [cv, setCv] = createSignal<HTMLCanvasElement>();
-  const mode = createMemo(() => drawMode({ open: p.open(), hidden: hidden(), reduced: reduced(), live: !!live() }));
+  const mode = createMemo(() => drawMode({ open: p.open(), hidden: !drawerShown(), reduced: reduced(), live: !!live() }));
   const [size, setSize] = createSignal<[number, number]>([0, 0]);
 
   createEffect(() => {

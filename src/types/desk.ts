@@ -50,6 +50,8 @@ export interface DeskData {
   limits?: LimitsView;
   working: boolean;
   waiting?: DeskWaitRow[];
+  /** skutečný počet čekajících (`waiting` je ořezané na 6) */
+  waitingTotal?: number;
   procs?: ProcView[];
   projects?: { id: string; name: string }[];
   calendar?: CalendarView;

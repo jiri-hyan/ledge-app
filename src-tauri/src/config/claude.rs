@@ -40,9 +40,11 @@ pub struct ClaudeConfig {
     /// tokenů“). Čte konec transcriptu session jen při otevřeném šuplíku (`ctxsize.rs`). `false` = nic se nečte.
     pub context_bar: bool,
     /// Tempo čerpání limitů: v pruzích 5h / týden ryska plánu (rovnoměrné čerpání) a výstražná barva nad plánem.
-    /// Výchozí vypnuto; zapíná sbírání vzorků 5h okna v paměti (`limitslive.rs`).
+    /// Výchozí zapnuto jen pro novou instalaci (starý config bez klíče = vypnuto); zapíná sbírání vzorků 5h okna v paměti (`limitslive.rs`).
+    #[serde(default = "no")]
     pub limits_pace: bool,
-    /// Upozornění (Notch / toast podle `notify`), když 5h nebo týdenní limit dosáhne 80 % a 90 %; jednou za okno. Výchozí vypnuto.
+    /// Upozornění (Notch / toast podle `notify`), když 5h nebo týdenní limit dosáhne 80 % a 90 %; jednou za okno; k tomu odhad „dojde za ~N min“ z historie vzorků (`limits::eta_runs_out`). Výchozí zapnuto jen pro novou instalaci (starý config bez klíče = vypnuto).
+    #[serde(default = "no")]
     pub limits_alert: bool,
     /// Limity 5h / týden i z aplikace Claude (desktop): Ledge čte její `plan-usage-history.json` (jen procenta,
     /// bez času resetu; nic neposílá). Výchozí vypnuto (`limitsrc.rs`, `limitslive.rs`).
@@ -59,7 +61,7 @@ pub struct ClaudeConfig {
 
 impl Default for ClaudeConfig {
     fn default() -> Self {
-        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, toast_done: None, costs: true, context_bar: false, limits_pace: false, limits_alert: false, limits_desktop: false, limits_fetch: false, brief: BriefConfig::default() }
+        Self { enabled: true, port: 47800, approval_timeout_s: 45, enforce_commit: EnforceCommit::Notify, question_hold_s: 540, question_unseen_s: default_question_unseen_s(), limits_reminder: true, toast: false, toast_done: None, costs: true, context_bar: false, limits_pace: true, limits_alert: true, limits_desktop: false, limits_fetch: false, brief: BriefConfig::default() }
     }
 }
 
@@ -70,12 +72,21 @@ pub struct BriefConfig {
     pub model: String,
     /// Strop útraty jednoho zadání v USD (součet všech běhů; `--max-budget-usd` = strop − útrata). 0,1–100.
     pub budget_usd: f64,
+    /// Po odpovědi na POSLEDNÍ otevřenou otázku zadání samo pokračovat (jen `waiting`, jen v mezích stropu $;
+    /// nic neschvaluje, jen pošle další krok zadání, který napsal člověk). Výchozí vypnuto.
+    pub auto_resume: bool,
 }
 
 impl Default for BriefConfig {
     fn default() -> Self {
-        Self { model: "sonnet".into(), budget_usd: 2.0 }
+        Self { model: "sonnet".into(), budget_usd: 2.0, auto_resume: false }
     }
+}
+
+/// Chybějící klíč ve STARÉM configu = vypnuto (nová instalace bez souboru bere `Default` = zapnuto; existující config
+/// se tím nemění). Per-field `serde(default)` přebije výchozí z `impl Default`.
+fn no() -> bool {
+    false
 }
 
 /// Výchozí pojistka neviděné otázky (s).

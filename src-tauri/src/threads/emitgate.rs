@@ -2,8 +2,8 @@
 //! žádné vlákno ani časovač.
 //!
 //! - `should_send`: shodný stav jako poslední odeslaný se neposílá (otisk serializovaného JSON).
-//! - `min_gap`: odstup mezi snapshoty roste s cenou posledního (8× cena, 120 ms … 2 s) — pomalý snapshot
-//!   tak nemůže zabrat víc než ~1/9 jádra, ani kdyby ho něco budilo pořád.
+//! - `min_gap`: odstup mezi snapshoty roste s cenou posledního (8× cena, 120 … 300 ms — strop kvůli odezvě UI na klik, L68; `next_gap`: po 3 pomalých v řadě strop 2 s, L144) — pomalý snapshot (< ~37 ms) tak nezabere víc než ~1/9 jádra, pomalejší je omezen stropem —
+//!   odezva na klik má přednost; hlídač `pomalé:` v logu ukáže, kdy ke stropu dojde.
 //! - `Tally`: kolik průchodů smyčkou, kolik odesláno, kolik přeskočeno a KDO budil (`mark_dirty` s
 //!   `#[track_caller]`); `report` z toho jednou za minutu udělá řádek do `ledge.log`, jen když je co hlásit
 //!   (pomalý krok > 50 ms, nebo > 1 průchod/s).
@@ -31,7 +31,44 @@ pub(crate) fn should_send(last: Option<u64>, now: u64) -> bool {
 
 /// Nejmenší odstup do dalšího snapshotu podle ceny posledního.
 pub(crate) fn min_gap(cost_ms: u64) -> Duration {
-    Duration::from_millis(cost_ms.saturating_mul(8).clamp(120, 2_000))
+    Duration::from_millis(cost_ms.saturating_mul(8).clamp(120, 300))
+}
+
+/// Pomalý snapshot = dražší než ~37 ms (8× cena by přesáhla strop 300 ms).
+const SLOW_STREAK_MS: u64 = 38;
+/// Po tolika pomalých snapshotech v řadě je to zátěž (bouře buzení), ne klik → strop zpět na 2 s (L144).
+const SLOW_STREAK_N: u32 = 3;
+const STORM_CAP_MS: u64 = 2000;
+
+/// Odstup s adaptivním stropem (L144): 300 ms (odezva na klik), ale po `SLOW_STREAK_N` pomalých
+/// snapshotech v řadě až 2 s (8× cena, 300 … 2000 ms), dokud nepřijde rychlý. `streak` drží volající.
+pub(crate) fn next_gap(cost_ms: u64, streak: &mut u32) -> Duration {
+    *streak = if cost_ms >= SLOW_STREAK_MS { streak.saturating_add(1) } else { 0 };
+    if *streak >= SLOW_STREAK_N {
+        Duration::from_millis(cost_ms.saturating_mul(8).clamp(300, STORM_CAP_MS))
+    } else {
+        min_gap(cost_ms)
+    }
+}
+
+/// Okno po vstupu uživatele (otevření šuplíku), kdy adaptivní strop neplatí a platí 300 ms (L169).
+const INPUT_WINDOW_MS: u64 = 1500;
+
+static LAST_INPUT_MS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(i64::MIN / 2);
+
+/// Výslovný vstup uživatele (zatím otevření šuplíku, `threads/ui.rs`): příští snapshot nečeká na bouřkový odstup.
+pub(crate) fn note_input(now_ms: i64) {
+    LAST_INPUT_MS.store(now_ms, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Stáří posledního vstupu uživatele pro `effective_gap`.
+pub(crate) fn input_age_ms(now_ms: i64) -> u64 {
+    now_ms.saturating_sub(LAST_INPUT_MS.load(std::sync::atomic::Ordering::Relaxed)).max(0) as u64
+}
+
+/// Odstup, který se opravdu čeká: v okně po vstupu uživatele nejvýš 300 ms (odezva na klik), jinak adaptivní `gap`.
+pub(crate) fn effective_gap(gap: Duration, input_age_ms: u64) -> Duration {
+    if input_age_ms < INPUT_WINDOW_MS { gap.min(Duration::from_millis(300)) } else { gap }
 }
 
 /// Řádek do logu o krocích přes práh (`name=ms`), jinak `None`.
@@ -108,6 +145,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn effective_gap_caps_after_user_input() {
+        let ms = Duration::from_millis;
+        for (gap, age, want) in [
+            (2000, 0, 300),
+            (2000, 1499, 300),
+            (2000, 1500, 2000),
+            (2000, 60_000, 2000),
+            (120, 10, 120),
+            (300, 10, 300),
+        ] {
+            assert_eq!(effective_gap(ms(gap), age), ms(want), "{gap} {age}");
+        }
+        note_input(10_000);
+        assert_eq!(input_age_ms(10_400), 400);
+        assert_eq!(input_age_ms(9_000), 0, "hodiny dozadu nesmí přetéct");
+    }
+
+    #[test]
     fn should_send_table() {
         let a = fingerprint("{\"a\":1}");
         let b = fingerprint("{\"a\":2}");
@@ -118,9 +173,25 @@ mod tests {
 
     #[test]
     fn min_gap_table() {
-        for (cost, want) in [(0, 120), (5, 120), (15, 120), (20, 160), (100, 800), (250, 2_000), (u64::MAX, 2_000)] {
+        for (cost, want) in [(0, 120), (5, 120), (15, 120), (20, 160), (37, 296), (38, 300), (100, 300), (250, 300), (u64::MAX, 300)] {
             assert_eq!(min_gap(cost).as_millis() as u64, want, "{cost}");
         }
+    }
+
+    #[test]
+    fn next_gap_adaptive_cap() {
+        let mut st = 0;
+        // 250 ms snapshoty: první dva po 300 ms, od třetího 2 s
+        let g: Vec<u64> = (0..4).map(|_| next_gap(250, &mut st).as_millis() as u64).collect();
+        assert_eq!(g, [300, 300, 2000, 2000]);
+        // rychlý snapshot vrátí strop 300 ms
+        assert_eq!(next_gap(5, &mut st).as_millis(), 120);
+        assert_eq!(st, 0);
+        assert_eq!(next_gap(250, &mut st).as_millis(), 300);
+        // střední cena (50 ms) v bouři: 8× = 400 ms
+        let mut st = 5;
+        assert_eq!(next_gap(50, &mut st).as_millis(), 400);
+        assert_eq!(next_gap(u64::MAX, &mut st).as_millis(), 2000);
     }
 
     #[test]

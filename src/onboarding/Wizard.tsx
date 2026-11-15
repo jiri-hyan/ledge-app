@@ -3,6 +3,7 @@
 // patička Zpět / Přeskočit krok / Uložit a pokračovat. Každý krok se ukládá hned (`applyStep`).
 import { createEffect, For, Match, on, onMount, Show, Switch } from "solid-js";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { reducedMotion, type StepId } from "./logic";
 import { closeWizard } from "./state";
 import { applyStep, finish, pending, prefetch, setWiz, steps, wiz } from "./store";
@@ -76,7 +77,7 @@ export default function Wizard(p: { onExit: () => void }) {
             )}
           </For>
         </ol>
-        <button class="mini" disabled={wiz.busy} title={last() ? undefined : t("onboarding.skipAllHint", "Průvodce jde kdykoli spustit znovu: Nastavení → Aplikace → Jazyk a průvodce.")} onClick={() => void exit()}>
+        <button class="mini" disabled={wiz.busy} title={last() ? undefined : t("onboarding.skipAllHint", "Průvodce jde kdykoli spustit znovu: {path}.", { path: settingsPath("zaciname") })} onClick={() => void exit()}>
           {last() ? t("onboarding.close", "Zavřít") : t("onboarding.skipAll", "Přeskočit průvodce")}
         </button>
       </header>

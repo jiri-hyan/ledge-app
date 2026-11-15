@@ -171,7 +171,6 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .note-bento-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note-bento-task { color: var(--blue); }
 .note-bento-muted { color: var(--t3); font-style: italic; }
-.note-bento-empty { color: var(--t3); font-style: italic; font-size: var(--fs-xs); }
 .note-bento-acts { display: flex; flex-direction: column; gap: 6px; }
 .note-bento-btn { width: 100%; justify-content: center; }
 .note-bento-templates { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
@@ -250,3 +249,10 @@ input[type="datetime-local"] { font: var(--fs-ui) var(--sans); color: var(--t1);
 .brief-chip, .brief-cost { white-space: nowrap; }
 .brief-q { display: flex; flex-direction: column; }
 .brief-tt { color: var(--t1); }
+
+/* rychlá poznámka (dock) */
+.note-quick { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.note-quick-ta { min-height: 0; resize: none; }
+.note-quick-bar { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.note-quick-mic { flex: none; padding: 0 6px; line-height: 1.4; }
+.note-quick-hint { margin-left: auto; font-size: calc(11px * var(--fz)); color: var(--t3); white-space: nowrap; }

@@ -5,24 +5,27 @@
 
 import { createEffect, createSignal, For, on as onChange, onCleanup, onMount, Show } from "solid-js";
 import { api, type Snapshot, type View } from "../api";
+import { hasKey, refreshKey } from "./apikey";
 import { IconFile, IconShield, IconX } from "../icons";
-import { say } from "../ui/toast";
+import { errorText, say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import * as D from "./draft";
+import { offsetOfLine } from "./agenda";
 import { isBrief, KindPicker } from "./kinds";
-import BriefPanel from "./BriefPanel";
+import BriefPanel, { blockText } from "./BriefPanel";
 import ImgCaption from "./ImgCaption";
 import { AtList, createAt } from "./AtSuggest";
-import { anchorAt } from "./brief";
+import { anchorAt, briefError, saveSendOffer } from "./brief";
 import { anchorNew, clearMeta, imagesFor } from "./imgmeta";
 import Markdown, { toggleLocal } from "./Markdown";
 import ProjectPicker from "./ProjectPicker";
 import RemindPicker from "./RemindPicker";
 import RemindSuggest from "./RemindSuggest";
 import { remindDefault } from "./remind";
+import { saveDraft } from "./quicksave";
 import { IconPin } from "../pin/icons";
 import { samePath } from "../pin/model";
-import { isPinned, togglePin } from "./pins";
+import { hiddenUntil, isPinned, pinTitle, togglePin } from "./pins";
 import { isArchivedPath, lifeActions, type LifeAction } from "./lifeactions";
 import { actionIcon, actionText } from "./lifelabels";
 import { runAction } from "./RowMenu";
@@ -31,7 +34,7 @@ import { listKey } from "./listkeys";
 import { firstLine } from "./headline";
 import { setNoteColor } from "./colorset";
 import { useWikiFollow, useWikiSuggest, WikiList, WikiMissing } from "./WikiLinks";
-import { copyRef, editPath, notePreset, openExternal, projectAccent, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
+import { editLine, setEditLine, editPath, openRef, notePreset, openExternal, projectAccent, projName, setEditPath, setNotePreset, type NotePreset } from "./store";
 
 export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => void }) {
   let root!: HTMLDivElement;
@@ -65,10 +68,11 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   const wikiS = useWikiSuggest((v) => setText(v));
   const at = createAt({ text, project: proj, setText, ta: () => ta });
   const dirty = () => (editing() ? D.edDirty() : hasContent());
+  const sendOffer = () => saveSendOffer({ brief: isBrief({ kind: kind(), status: editing() ? D.edBase()?.status : undefined }), editing: editing(), dirty: D.edDirty(), status: editing() ? D.edBase()?.status : undefined, project: proj() || null, body: text() }, hasKey());
 
   // rozepsané na disk s debounce; obrázky konceptu hned (jsou vzácné)
   createEffect(onChange([D.draft, D.draftProj, D.projTouched, D.draftRemind, D.draftKind, D.draftTitle], () => ready() && !editing() && D.scheduleDraft(), { defer: true }));
-  createEffect(onChange(D.draftImgs, (i) => ready() && !editing() && api.noteDraftImages(D.b64Of(i)).catch((e) => say(String(e), true)), { defer: true }));
+  createEffect(onChange(D.draftImgs, (i) => ready() && !editing() && api.noteDraftImages(D.b64Of(i)).catch((e) => sayError(e)), { defer: true }));
   createEffect(onChange([D.edText, D.edProj, D.edKind, D.edRemind, D.edTitle], () => ready() && editing() && D.scheduleEdit(), { defer: true }));
   onCleanup(D.flushDraft);
 
@@ -90,6 +94,20 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     }
   }
 
+  /** Klik na úkol v záložce Úkoly: kurzor a posun na jeho řádek (jednou, po načtení úpravy). */
+  function jumpToLine() {
+    const line = editLine();
+    if (line == null) return;
+    setEditLine(null);
+    setTimeout(() => {
+      if (!ta || !editing()) return;
+      const off = offsetOfLine(D.edText(), line);
+      ta.setSelectionRange(off, off);
+      const lh = parseFloat(getComputedStyle(ta).lineHeight);
+      ta.scrollTop = Math.max(0, line * (lh > 0 ? lh : 18) - ta.clientHeight / 3);
+    }, 80);
+  }
+
   // otevření: úprava (rozepsaná úprava jiné poznámky počká v liště), nebo koncept + předvyplnění
   createEffect(onChange(editPath, async (path) => {
     const id = ++seq;
@@ -103,6 +121,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
       if (real === undefined || id !== seq || !samePath(editPath() ?? "", path)) return;
       if (real === null) return p.onLeave();
       if (D.edStale()) setConflict(true);
+      jumpToLine();
     } else {
       D.cancelOpen();
       await D.restoreDraft();
@@ -154,6 +173,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
       D.setProjTouched(true);
     }
     if (pre.kind && !hasContent()) D.setDraftKind(pre.kind);
+    if (pre.body && !hasContent()) D.setDraft(pre.body);
     if (pre.remind) {
       // rozepsanému konceptu nechat jeho termín; prázdný (i se starým termínem) dostane nový
       if (!D.draftRemind() || !hasContent()) D.setDraftRemind(remindDefault());
@@ -169,40 +189,65 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
       if (editing()) await guarded(() => saveEdit(false));
       else await saveNew(pin);
     } catch (e) {
-      say(String(e), true);
+      sayError(e);
     } finally {
       setBusy(false);
     }
   }
 
-  /** Uloží novou poznámku; `pin` ji rovnou připne na plochu jako lístek („Uložit a připnout“). */
-  async function saveNew(pin: boolean) {
-    const sent = { ...D.draftMeta(), images: D.draftImgs() };
-    const path = await api.noteCreate({ text: sent.text, project: sent.project || null, remind: sent.remind || null, images: imagesFor(sent.images, sent.text), kind: sent.kind || null, title: sent.title.trim() || undefined });
-    if (pin && path) await togglePin(path);
-    // mezitím dopsané (save je async) nezahodit: reset a zavření jen když se koncept nezměnil
-    const same = D.draft() === sent.text && D.draftImgs() === sent.images && D.draftProj() === sent.project && D.draftRemind() === sent.remind;
-    if (same) {
-      clearMeta();
-      D.resetDraft();
-      api.close();
-    } else say(t("notes.editor.savedKept", "Uloženo — mezitím dopsaný text zůstal v konceptu."));
+  /** Uloží novou poznámku (společné jádro `saveDraft`); `pin` ji rovnou připne na plochu („Uložit a připnout“),
+   *  `closeAfter` = false nechá šuplík otevřený (zavolá ten, kdo chce psát dál). */
+  async function saveNew(pin: boolean, closeAfter = true) {
+    const r = await saveDraft(pin);
+    if (r?.reset && closeAfter) api.close();
   }
 
-  async function saveEdit(copy: boolean) {
+  /** true = uloženo (i když se mezitím otevřela jiná poznámka), false = nic se nezapsalo (konflikt / není co). */
+  async function saveEdit(copy: boolean): Promise<boolean> {
     const b = D.edBase();
-    if (!b) return;
+    if (!b) return false;
     const id = seq;
     const out = await api.noteSave(
       { path: b.path, expectedHash: D.edHash(), body: D.edText(), project: D.edProj() || null, kind: D.edKind(), title: D.edTitle().trim(), remind: D.edRemind() || null, images: imagesFor(D.edImgs(), D.edText()) },
       copy,
     );
-    if (id !== seq) return; // mezitím se otevřela jiná poznámka — uložená zůstává uložená, editor se nesahá
-    if (out?.outcome === "changed") return setConflict(true);
+    if (id !== seq) return true; // mezitím se otevřela jiná poznámka — uložená zůstává uložená, editor se nesahá
+    if (out?.outcome === "changed") return setConflict(true), false;
     clearMeta();
     D.resetEdit();
     say(copy ? t("notes.editor.savedCopy", "Uloženo jako nová poznámka vedle původní.") : t("notes.editor.saved", "Uloženo"));
     p.onLeave();
+    return true;
+  }
+
+  /** „Uložit a poslat“: uloží poznámku (novou i rozepsanou úpravu) a rovnou pošle zadání (`brief_send`). Šuplík se
+   *  nezavírá; nová poznámka se otevře jako úprava, ať je vidět stav a otázky (`BriefPanel`). Poslání, které selže
+   *  (MCP, klíč…), poznámku nezahodí — je uložená a jde poslat tlačítkem v panelu. */
+  async function saveSend() {
+    if (busy() || !ready() || !hasContent() || !sendOffer().show || sendOffer().block) return;
+    const wasNew = !editing();
+    setBusy(true);
+    try {
+      let path = D.edBase()?.path ?? "";
+      let open = false;
+      if (wasNew) {
+        const r = await saveDraft(false);
+        path = r?.path ?? "";
+        open = !!r?.reset; // dopsaný text mezitím = koncept zůstal, editor se nepřepíná
+      } else if (!(await guarded(() => saveEdit(false)))) return;
+      if (!path) return;
+      try {
+        await api.briefSend(path);
+        say(t("notes.brief.sent", "Zadání odesláno orchestrátorovi."));
+      } catch (e) {
+        say(briefError(e, t("notes.brief.oldCore", "Tuhle část Ledge ještě neumí — aktualizuj aplikaci."), errorText), true);
+      }
+      if (open) setEditPath(path);
+    } catch (e) {
+      sayError(e);
+    } finally {
+      setBusy(false);
+    }
   }
 
   /** Barva z menu ⋯: zapíše se rovnou do frontmatteru (rozepsaná úprava se nejdřív uloží). */
@@ -247,7 +292,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
     try {
       if (await D.keepMine()) setConflict(false);
     } catch (e) {
-      say(String(e), true);
+      sayError(e);
     }
   }
 
@@ -271,7 +316,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
       if (out?.outcome === "changed") setConflict(true);
       else if (out && D.edBase() === b) D.loadEditFrom(out.note);
     } catch (e) {
-      say(String(e), true);
+      sayError(e);
     }
   }
 
@@ -290,6 +335,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
   // (`focus_drawer`) přijde asynchronně a nesmí ho přebít
   const focus = () => !root?.contains(document.activeElement) && ta?.focus();
   onMount(() => {
+    void refreshKey();
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -326,13 +372,13 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
         </Show>
         <Show when={editing() && D.edBase()}>
           {(b) => (
-            <button class="icon-btn" classList={{ on: isPinned(p.s.pins, b().path) }} aria-pressed={isPinned(p.s.pins, b().path)} title={isPinned(p.s.pins, b().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.editorPin", "Připnout na plochu — lístek přes ostatní okna (uložené znění)")} onClick={() => togglePin(b().path)}>
+            <button class="icon-btn" classList={{ on: isPinned(p.s.pins, b().path) || hiddenUntil(p.s.pins, b().path) != null }} aria-pressed={isPinned(p.s.pins, b().path)} title={pinTitle(p.s.pins, b().path, Date.now(), t("notes.pin.editorPin", "Připnout na plochu — lístek přes ostatní okna (uložené znění)"))} onClick={() => togglePin(b().path, hiddenUntil(p.s.pins, b().path))}>
               <IconPin />
             </button>
           )}
         </Show>
         <Show when={editing() && D.edBase()}>
-          {(b) => <NoteMenu path={b().path} body={text} color={b().color} inherited={projectAccent(p.s, b().project)} onColor={pickColor} />}
+          {(b) => <NoteMenu path={b().path} body={text} title={b().title} remind={D.edRemind} color={b().color} inherited={projectAccent(p.s, b().project)} onColor={pickColor} />}
         </Show>
         <Show when={editing() && D.edBase()}>
           {(b) => (
@@ -360,7 +406,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
         <BriefPanel n={{ path: D.edBase()!.path, status: D.edBase()!.status, cost: D.edBase()!.cost, budget: D.edBase()!.budget, project: proj() || null }} body={text()} dirty={D.edDirty()} />
       </Show>
       <Show when={!editing() && kind() === "zadani"}>
-        <div class="hint">{t("notes.brief.saveHint", "Zadání ulož (Ctrl+Enter) — pak ho jde poslat orchestrátorovi.")}</div>
+        <div class="hint">{t("notes.brief.saveHint", "Zadání ulož (Ctrl+Enter), nebo rovnou „Uložit a poslat“ orchestrátorovi.")}</div>
       </Show>
       <Show when={preview()} fallback={
         <div class="note-textwrap">
@@ -386,7 +432,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
       }>
         <div class="note-preview">
           <Show when={text().trim()} fallback={<div class="empty">{t("notes.editor.emptyPreview", "Zatím prázdné.")}</div>}>
-            <Markdown body={text()} images={editing() ? D.edBase()?.imageData ?? [] : []} onToggle={toggleTask} onWiki={(n) => void wiki.follow(n)} onRef={copyRef} />
+            <Markdown body={text()} images={editing() ? D.edBase()?.imageData ?? [] : []} onToggle={toggleTask} onWiki={(n) => void wiki.follow(n)} onRef={(p, l) => void openRef(proj() || null, p, l)} />
           </Show>
         </div>
       </Show>
@@ -413,7 +459,7 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
           <span>{t("notes.editor.conflict", "Poznámka se mezitím změnila (lístek nebo druhé PC). Tvoje úprava zůstala tady.")}</span>
           <button class="mini" onClick={reload}>{t("notes.editor.reload", "Načíst znovu")}</button>
           <button class="mini" onClick={keepMine}>{t("notes.editor.keepMine", "Ponechat moje")}</button>
-          <button class="mini ok" onClick={() => guarded(() => saveEdit(true)).catch((e) => say(String(e), true))}>{t("notes.editor.saveCopy", "Uložit jako kopii")}</button>
+          <button class="mini ok" onClick={() => guarded(() => saveEdit(true)).catch((e) => sayError(e))}>{t("notes.editor.saveCopy", "Uložit jako kopii")}</button>
         </div>
       </Show>
       <Show when={D.parkedTop()}>
@@ -435,6 +481,10 @@ export default function NoteEditor(p: { s: Snapshot; view: View; onLeave: () => 
         </Show>
         <Show when={!editing()}>
           <button class="btn note-pinsave" disabled={busy() || !ready() || !hasContent()} title={t("notes.editor.savePinTitle", "Uloží poznámku a rovnou ji připne na plochu jako lístek")} onClick={() => save(true)}><IconPin /> {t("notes.editor.savePin", "Uložit a připnout")}</button>
+        </Show>
+        <Show when={sendOffer().show}>
+          <button class="btn" disabled={busy() || !ready() || !hasContent() || sendOffer().block !== null} title={sendOffer().block ? blockText(sendOffer().block!) : t("notes.editor.saveSendTitle", "Uloží zadání a rovnou ho pošle orchestrátorovi")} onClick={() => void saveSend()}>{t("notes.editor.saveSend", "Uložit a poslat")}</button>
+          <Show when={sendOffer().block}>{(b) => <span class="hint warn" role="status">{blockText(b())}</span>}</Show>
         </Show>
         <button class="btn pri" disabled={busy() || !ready() || !hasContent() || (editing() && !D.edDirty())} onClick={() => save()}>{t("notes.editor.save", "Uložit")}</button>
       </div>

@@ -8,25 +8,13 @@ import { api, type Snapshot } from "../api";
 import { t } from "../i18n";
 import { sayError } from "../ui/toast";
 import { drawerShown } from "../media/shown";
-import { Cover, IcNext, IcPause, IcPlay, IcPrev, control, isPlaying, useCover } from "../media/Player";
+import { Controls, Cover, useCover } from "../media/Player";
 import { throttle } from "../media/model";
 import { motionNow } from "../motion";
 import { reducedMotion } from "../layout/flip";
 import { volumeOf } from "./model";
 import { eqLit, knobAngle, nudge, solidOf } from "./look";
 import type { BarSection } from "./bar";
-
-function Controls(p: { m: NonNullable<Snapshot["personal"]["media"]>; big?: boolean }) {
-  return (
-    <div class="nb-ctl" classList={{ "nb-ctl-big": p.big }}>
-      <button class="nb-btn" disabled={!p.m.canPrev} aria-label={t("cards.notch.prev", "Předchozí")} onClick={() => control("prev")}><IcPrev /></button>
-      <button class="nb-btn nb-main" disabled={!p.m.canToggle} aria-label={isPlaying(p.m) ? t("cards.notch.pause", "Pozastavit") : t("cards.notch.play", "Přehrát")} onClick={() => control("toggle")}>
-        <Show when={isPlaying(p.m)} fallback={<IcPlay />}><IcPause /></Show>
-      </button>
-      <button class="nb-btn" disabled={!p.m.canNext} aria-label={t("cards.notch.next", "Další")} onClick={() => control("next")}><IcNext /></button>
-    </div>
-  );
-}
 
 export function Player(p: { s: Snapshot; sec: BarSection; design: string }) {
   const m = () => p.s.personal.media;
@@ -43,7 +31,7 @@ export function Player(p: { s: Snapshot; sec: BarSection; design: string }) {
               <div class="nb-pl nb-plc">
                 <b class="nb-title">{title()}</b>
                 <small class="nb-by">{mv().artist}</small>
-                <Controls m={mv()} big />
+                <Controls m={mv()} notch big />
               </div>
             </Match>
             <Match when={p.design === "marquee"}>
@@ -52,7 +40,7 @@ export function Player(p: { s: Snapshot; sec: BarSection; design: string }) {
                   <span>{title()}<Show when={mv().artist}> · {mv().artist}</Show></span>
                   <Show when={run()}><span aria-hidden="true">{title()}<Show when={mv().artist}> · {mv().artist}</Show></span></Show>
                 </div>
-                <Controls m={mv()} />
+                <Controls m={mv()} notch />
               </div>
             </Match>
             <Match when={true}>
@@ -60,7 +48,7 @@ export function Player(p: { s: Snapshot; sec: BarSection; design: string }) {
               <div class="nb-pl">
                 <b class="nb-title">{title()}</b>
                 <small class="nb-by">{mv().artist}</small>
-                <Controls m={mv()} />
+                <Controls m={mv()} notch />
               </div>
             </Match>
           </Switch>

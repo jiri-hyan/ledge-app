@@ -61,7 +61,7 @@ export interface CostsView {
   error: string | null;
   windowDays: number;
   /** `hours` = dnešek po hodinách a projektech (kolo 22, karta Claude dnes); starý snapshot bez pole = nic */
-  summary: { ranges: CostRange[]; days: CostDay[]; hours?: CostHourRow[]; floor?: CostFloor } | null;
+  summary: { ranges: CostRange[]; days: CostDay[]; hours?: CostHourRow[]; floor?: CostFloor; sessions?: import("../sessions/cost").SessCost[] } | null;
   pricesVerified: string;
   pricesSource: string;
 }
@@ -78,12 +78,41 @@ export function compact(n: number): { v: number; unit: "" | "k" | "M" | "G"; dig
 /** Desetiny u USD: pod 100 $ dvě (0,37 $), jinak celé. */
 export const usdDigits = (v: number) => (Math.abs(v) >= 100 ? 0 : 2);
 
+/** Zkrácený počet tokenů („3,4 M“): JEDINÝ formátovač (karta Claude, hrdina, kontext session). `f` = formát čísla
+ *  (UI dává `num` podle jazyka, test výchozí tečku); bez `f` `toFixed`. */
+export function tokText(n: number, f: (v: number, digits: number) => string = (v, d) => v.toFixed(d)): string {
+  const c = compact(n);
+  return `${f(c.v, c.digits)}${c.unit ? ` ${c.unit}` : ""}`;
+}
+
+/** Série útraty po dnech pro sloupce i sparkline — JEDINÁ definice (N5 / N7, kolo 34). Režim `cost`, když má cenu
+ *  aspoň jeden den okna (jinak `tokens`). `unknown[i]` = den má tokeny, ale žádná jejich cena není známá (jen neznámé
+ *  modely): v grafu je výška 0, ale není to „0 $“ — kdo hodnotu ukazuje, musí napsat „—“. Poslední `n` dní (bez `n` všechny). */
+export interface PriceSeries {
+  mode: "cost" | "tokens";
+  values: number[];
+  unknown: boolean[];
+}
+export function priceSeries(days: readonly CostDay[] | undefined, n?: number): PriceSeries {
+  const d = n == null ? [...(days ?? [])] : (days ?? []).slice(-n);
+  const mode = d.some((x) => x.cost != null && x.cost > 0) ? "cost" : "tokens";
+  const unknown = d.map((x) => mode === "cost" && x.cost == null && x.tokens > 0);
+  return { mode, values: d.map((x) => (mode === "cost" ? x.cost ?? 0 : x.tokens)), unknown };
+}
+
+/** Hodnoty série → výšky sloupců 0–1 (podle maxima; prázdná / nulová série = samé nuly, ne NaN). */
+export function normalize(values: readonly number[]): number[] {
+  const max = Math.max(0, ...values);
+  return values.map((v) => (max > 0 ? v / max : 0));
+}
+
 /** Výšky sloupců 0–1 podle ceny (bez ceny podle tokenů); prázdné okno = samé nuly. */
-export function bars(days: CostDay[]): number[] {
-  const priced = days.some((d) => d.cost != null && d.cost > 0);
-  const val = (d: CostDay) => (priced ? d.cost ?? 0 : d.tokens);
-  const max = Math.max(0, ...days.map(val));
-  return days.map((d) => (max > 0 ? val(d) / max : 0));
+export const bars = (days: CostDay[]): number[] => normalize(priceSeries(days).values);
+
+/** Text částky: bez ceny „—“; při tokenech bez ceny „≥ X“ (dolní odhad, nikdy vymyšlená cena). `fmt` formátuje číslo. */
+export function costText(cost: number | null | undefined, unpriced: number | undefined, fmt: (v: number) => string): string {
+  if (cost == null) return "—";
+  return `${Math.max(0, unpriced ?? 0) > 0 ? "≥ " : ""}${fmt(cost)}`;
 }
 
 /** Tokeny dne bez ceny (chybějící pole = 0). */
@@ -117,3 +146,20 @@ export function floorTrend(r: FloorRow): { dir: "up" | "down" | "flat"; abs: num
   if (abs < Math.max(1000, (r.prevMedian ?? 0) * 0.05)) return { dir: "flat", abs };
   return { dir: r.delta > 0 ? "up" : "down", abs };
 }
+
+/** Po kolika dnech od `VERIFIED` ceníku (Rust `usage/price.rs`) se ukáže varování, že odhad USD může být zastaralý (L235). */
+export const PRICE_STALE_DAYS = 60;
+
+/** Stáří ceníku ve dnech (`verified` = `YYYY-MM-DD`); neplatné datum = null (nic se nehlásí, nevymýšlí). */
+export function priceAgeDays(verified: string | null | undefined, nowMs: number): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(verified ?? "");
+  if (!m) return null;
+  const t0 = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  return Number.isFinite(t0) ? Math.max(0, Math.floor((nowMs - t0) / 86_400_000)) : null;
+}
+
+/** Stáří ceníku, když přesáhlo `PRICE_STALE_DAYS`, jinak null (varování se neukáže). */
+export const priceStaleDays = (verified: string | null | undefined, nowMs: number): number | null => {
+  const d = priceAgeDays(verified, nowMs);
+  return d != null && d > PRICE_STALE_DAYS ? d : null;
+};

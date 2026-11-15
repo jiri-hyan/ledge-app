@@ -96,7 +96,7 @@ pub fn wmo(code: i64, is_day: bool) -> (&'static str, &'static str) {
 
 /// Odpověď Open-Meteo → `Weather`. Chybová odpověď (`{"error":true,"reason":…}`) → Err s důvodem.
 pub fn parse(text: &str) -> Result<Weather, String> {
-    let v: Value = serde_json::from_str(text).map_err(|e| trf!("Open-Meteo: nečitelná odpověď ({e})", "Open-Meteo: unreadable answer ({e})"))?;
+    let v: Value = serde_json::from_str(text).map_err(|_| tr("Počasí se nepodařilo přečíst: nečitelná odpověď služby. Zkus to později.", "Couldn't read the weather: unreadable answer from the service. Try again later.").to_string())?;
     if v.get("error").and_then(Value::as_bool) == Some(true) {
         let reason = v.get("reason").and_then(Value::as_str).unwrap_or(tr("bez důvodu", "no reason given"));
         return Err(format!("Open-Meteo: {reason}"));
@@ -148,14 +148,8 @@ pub fn is_old(fetched_ms: Option<i64>, now: i64) -> bool {
     fetched_ms.is_none_or(|f| now - f >= MAX_AGE_MS)
 }
 
-/// Stáhnout? Ne během běžícího pokusu, ne dřív než `RETRY_MS` po posledním pokusu, jinak když
-/// data chybí nebo jsou starší než `MAX_AGE_MS`.
-pub fn needs_fetch(now: i64, fetched_ms: Option<i64>, attempt_ms: Option<i64>, loading: bool) -> bool {
-    if loading || attempt_ms.is_some_and(|a| now - a < RETRY_MS) {
-        return false;
-    }
-    fetched_ms.is_none_or(|f| now - f >= MAX_AGE_MS)
-}
+/// Politika obnovy (`netstate::needs_fetch`): data stará `MAX_AGE_MS`, po pokusu pauza `RETRY_MS` s backoffem.
+pub const POLICY: crate::netstate::Policy = crate::netstate::Policy { every: MAX_AGE_MS, retry: RETRY_MS };
 
 /// Stav karty: `unset` (místo nenastavené) · `ok` · `stale` (poslední dobrá data: poslední pokus
 /// selhal, nebo jsou starší 30 min) · `loading` (první stahování) · `unavailable` (nic dobrého
@@ -174,14 +168,14 @@ pub fn status(place_set: bool, has_data: bool, error: bool, loading: bool, old: 
 /// Jedno stažení (async, na runtime Tauri), timeout 5 s. Tělo se parsuje i u HTTP chyby — Open-Meteo
 /// v něm posílá důvod.
 pub async fn fetch(lat: f64, lon: f64) -> Result<Weather, String> {
-    let client = reqwest::Client::builder().timeout(TIMEOUT).build().map_err(|e| trf!("HTTP klient: {e}", "HTTP client: {e}"))?;
+    let client = crate::accounts::http::default_redirect()?;
     let net = |e: reqwest::Error| {
         if e.is_timeout() { tr("Open-Meteo neodpověděl do 5 s", "Open-Meteo didn't answer within 5 s").to_string() } else { crate::errors::net(tr("Open-Meteo nedostupné", "Open-Meteo unavailable"), &e) }
     };
-    let resp = client.get(url(lat, lon)).send().await.map_err(net)?;
+    let resp = crate::accounts::http::send(client.get(url(lat, lon)).timeout(TIMEOUT)).await.map_err(net)?;
     let status = resp.status();
     let text = resp.text().await.map_err(net)?;
-    parse(&text).map_err(|e| if status.is_success() { e } else { format!("{e} (HTTP {})", status.as_u16()) })
+    parse(&text).map_err(|e| if status.is_success() { e } else { trf!("Služba teď neodpovídá (kód {}). Zkus to později.", "The service isn't answering right now (code {}). Try again later.", status.as_u16()) })
 }
 
 // ---------- hledání města (Nastavení → Osobní → Počasí) ----------
@@ -232,7 +226,7 @@ pub fn geo_url(query: &str) -> String {
 /// Odpověď geocodingu → návrhy. Bez `results` (nic nenalezeno) = prázdný seznam; chybová odpověď → Err s důvodem;
 /// záznam bez názvu nebo souřadnic v platném rozsahu se přeskočí.
 pub fn parse_places(text: &str) -> Result<Vec<Place>, String> {
-    let v: Value = serde_json::from_str(text).map_err(|e| trf!("Hledání města: nečitelná odpověď ({e})", "City search: unreadable answer ({e})"))?;
+    let v: Value = serde_json::from_str(text).map_err(|_| tr("Hledání města se nepovedlo: nečitelná odpověď služby. Zkus to později.", "City search failed: unreadable answer from the service. Try again later.").to_string())?;
     if v.get("error").and_then(Value::as_bool) == Some(true) {
         let reason = v.get("reason").and_then(Value::as_str).unwrap_or(tr("bez důvodu", "no reason given"));
         return Err(format!("Open-Meteo: {reason}"));
@@ -256,14 +250,14 @@ pub fn parse_places(text: &str) -> Result<Vec<Place>, String> {
 /// Hledání města (async, timeout 5 s). Volá se jen na psaní v Nastavení; krátký dotaz nic nestahuje.
 pub async fn search_places(query: &str) -> Result<Vec<Place>, String> {
     let Some(q) = clean_query(query) else { return Ok(Vec::new()) };
-    let client = reqwest::Client::builder().timeout(TIMEOUT).build().map_err(|e| trf!("HTTP klient: {e}", "HTTP client: {e}"))?;
+    let client = crate::accounts::http::default_redirect()?;
     let net = |e: reqwest::Error| {
         if e.is_timeout() { tr("Hledání města neodpovědělo do 5 s", "City search didn't answer within 5 s").to_string() } else { crate::errors::net(tr("Hledání města nejde", "City search unavailable"), &e) }
     };
-    let resp = client.get(geo_url(&q)).send().await.map_err(net)?;
+    let resp = crate::accounts::http::send(client.get(geo_url(&q)).timeout(TIMEOUT)).await.map_err(net)?;
     let status = resp.status();
     let text = resp.text().await.map_err(net)?;
-    parse_places(&text).map_err(|e| if status.is_success() { e } else { format!("{e} (HTTP {})", status.as_u16()) })
+    parse_places(&text).map_err(|e| if status.is_success() { e } else { trf!("Služba teď neodpovídá (kód {}). Zkus to později.", "The service isn't answering right now (code {}). Try again later.", status.as_u16()) })
 }
 
 #[cfg(test)]
@@ -439,18 +433,20 @@ mod tests {
 
     #[test]
     fn fetch_policy() {
+        use crate::netstate::needs_fetch as nf;
         let now = 10_000_000_000;
+        let needs_fetch = |ok, at, loading| nf(&POLICY, loading_live(loading, at, now), ok, at, 0, now);
         // nic nestaženo → stáhnout
-        assert!(needs_fetch(now, None, None, false));
+        assert!(needs_fetch(None, None, false));
         // čerstvá data → ne; po 30 min → ano
-        assert!(!needs_fetch(now, Some(now - MAX_AGE_MS + 1), Some(now - MAX_AGE_MS + 1), false));
-        assert!(needs_fetch(now, Some(now - MAX_AGE_MS), Some(now - MAX_AGE_MS), false));
-        // běží pokus → ne
-        assert!(!needs_fetch(now, None, None, true));
+        assert!(!needs_fetch(Some(now - MAX_AGE_MS + 1), Some(now - MAX_AGE_MS + 1), false));
+        assert!(needs_fetch(Some(now - MAX_AGE_MS), Some(now - MAX_AGE_MS), false));
+        // běží pokus → ne (bez času pokusu watchdog loading neuzná → ale s časem ano)
+        assert!(!needs_fetch(None, Some(now - 1000), true));
         // chyba před chvílí → počkat RETRY_MS, pak znovu
-        assert!(!needs_fetch(now, None, Some(now - 1000), false));
-        assert!(needs_fetch(now, None, Some(now - RETRY_MS), false));
-        assert!(!needs_fetch(now, Some(now - 3_600_000), Some(now - 1000), false));
+        assert!(!needs_fetch(None, Some(now - 1000), false));
+        assert!(needs_fetch(None, Some(now - RETRY_MS), false));
+        assert!(!needs_fetch(Some(now - 3_600_000), Some(now - 1000), false));
     }
 
     #[test]

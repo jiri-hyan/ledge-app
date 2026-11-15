@@ -9,6 +9,7 @@ import { PREVIEW_STATES, type PreviewState } from "../appearanceModel";
 import type { Appearance, CustomTheme, HoverModeId, StripLookId } from "../../types";
 import type { PanelProps } from "../types";
 import { hit } from "../ctx";
+import { Seg as SegControl } from "../fields/controls";
 
 /** Stav panelu Vzhled pro jeho části: rozpracovaný vzhled, změna pole, rozmazání (`drawer.glass`). */
 export type Ap = {
@@ -24,16 +25,11 @@ export type Ap = {
 /** Kotva hledání je `id="f-<klíč>"`; tohle = krátké zvýraznění po skoku z hledání (jako `Row`). */
 export const lit = (id: string) => hit() === id;
 
+/** Přepínač pro panel Vzhled = `fields/controls.tsx::Seg` (jedna implementace: radio skupina, šipky, vzhled `st-seg`);
+ *  tady jen starší tvar volání (`value` / `set` / dvojice `[hodnota, popisek]`). */
 export function Seg<T extends string>(q: { label: string; value: T; options: [T, string][]; set: (v: T) => void }) {
-  return (
-    <div class="seg" role="radiogroup" aria-label={q.label}>
-      <For each={q.options}>
-        {([v, l]) => (
-          <button classList={{ on: q.value === v }} role="radio" aria-checked={q.value === v} onClick={() => q.set(v)}>{l}</button>
-        )}
-      </For>
-    </div>
-  );
+  const opts = () => q.options.map(([v, label]) => ({ v, label }));
+  return <SegControl label={q.label} value={q.value} onChange={q.set} options={opts()} />;
 }
 
 export function Slider(q: { label: string; hint?: string; anchor?: string; min: number; max: number; step: number; value: number; fmt: (v: number) => string; set: (v: number) => void }) {

@@ -26,5 +26,8 @@ registerDict("en", {
   "settings.mcp.rotated": "Key replaced",
   "settings.f.mcp.enabled": "Let Claude set up Ledge (MCP)",
   "settings.f.mcp.enabled.hint": "Claude may read and change Ledge's settings; it launches nothing and sends nothing anywhere. Off by default.",
+  "settings.f.mcp.readData": "Let Claude read Ledge's state",
+  "settings.f.mcp.readData.hint": "A read-only tool: Claude sessions, limits, today's calendar (titles and times), pending approvals (tool and project only), dev servers and their errors. No notes, mail, paths or commands; it approves and launches nothing. Works with the switch above. Off by default.",
+  "settings.f.mcp.readData.kw": "mcp claude read state sessions limits calendar dev servers errors api script tool",
   "settings.f.mcp.enabled.kw": "mcp claude server set up configure key tools",
 });

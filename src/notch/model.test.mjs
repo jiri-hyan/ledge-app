@@ -12,8 +12,7 @@ test("sekce jen z karet záložky a jen s daty; pořadí přehrávač | dny | sy
     ["nic nehraje = bez přehrávače, hlasitost zůstane", ["media", "clock"], { media: false, volume: true }, ["days", "volume"]],
     ["bez zvukového zařízení", ["media"], { media: true, volume: false }, ["player"]],
     ["karta Právě hraje bez dat = žádná sekce", ["media"], { media: false, volume: false }, []],
-    ["kalendář, Dnes, Týden a přepínače zůstávají kartami", ["calendar", "today", "week", "toggles", "notes"], all, []],
-    ["velké hodiny = dny a čas", ["bigclock"], all, ["days"]],
+    ["kalendář a rychlé dlaždice zůstávají kartami", ["calendar", "winquick", "notes"], all, []],
     ["prázdná záložka", [], all, []],
   ];
   for (const [name, cards, data, want] of cases) assert.deepEqual(notchSections(cards, data), want, name);
@@ -24,7 +23,7 @@ test("převzaté karty se pod lištou nekreslí; karta bez viditelné sekce zůs
   assert.deepEqual(takenCards(["media", "clock"], ["days"]), ["clock"], "media bez dat zůstane kartou (sama se skryje)");
   assert.deepEqual(takenCards(["media"], ["volume"]), ["media"], "stačí jedna sekce karty");
   assert.deepEqual(takenCards(["notes"], ["days"]), []);
-  assert.deepEqual(takenCards(["clock", "bigclock", "week"], ["days"]), ["clock", "bigclock"], "obě hodiny v jedné sekci dnů");
+  assert.deepEqual(takenCards(["clock", "calendar"], ["days"]), ["clock"], "Čas (i ve vzhledu Velké hodiny) je v sekci dnů");
 });
 
 test("pás dnů: pondělí až neděle, dnešek a víkend", () => {

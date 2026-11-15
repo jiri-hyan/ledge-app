@@ -6,6 +6,7 @@ import { useSettings } from "../settings/ctx";
 import { Toggle } from "../settings/fields/controls";
 import { Row } from "../settings/fields/Row";
 import { fieldLabel } from "../settings/labels";
+import { digestOn } from "./model";
 
 export default function SuggestSettings() {
   const c = useSettings();
@@ -18,6 +19,7 @@ export default function SuggestSettings() {
       <Row id="suggest.devServer"><Toggle path="suggest.devServer" label={fieldLabel("suggest.devServer")} /></Row>
       <Row id="suggest.github"><Toggle path="suggest.github" label={fieldLabel("suggest.github")} /></Row>
       <Row id="suggest.reminders"><Toggle path="suggest.reminders" label={fieldLabel("suggest.reminders")} /></Row>
+      <Row id="suggest.digest"><Toggle value={digestOn({ reminders: !!c.get("suggest.reminders"), digest: c.get("suggest.digest") })} onChange={(v) => c.set("suggest.digest", v)} label={fieldLabel("suggest.digest")} /></Row>
       <Row id="suggest.githubPulse"><Toggle path="suggest.githubPulse" label={fieldLabel("suggest.githubPulse")} /></Row>
     </>
   );

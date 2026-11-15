@@ -27,25 +27,32 @@ use serde_json::Value;
 pub const WORK: &str = "prace";
 pub const PERSONAL: &str = "osobni";
 /// Karty, které jde dát na záložku (zrcadlo `CARD_IDS` v `src/layout/model.ts`).
-pub const CARDS: [&str; 23] = [
-    "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today",
-    // kolo 22 (nové widgety, `src/board/`): Claude dnes, Týden, Velké hodiny, Rychlé přepínače — jen z katalogu
-    "usage", "week", "bigclock", "toggles", "winquick",
+pub const CARDS: [&str; 18] = [
+    "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "media", "github", "system", "mail",
+    // kolo 22 (nové widgety, `src/board/`): Claude dnes, Rychlé dlaždice Windows — jen z katalogu
+    "usage", "winquick",
     // kolo 23: Claude aktivita (fáze, soubor, poslední zpráva, schválení) — jen z katalogu
     "activity",
 ];
-/// Karty kola 22, které čtou kalendář (pás týdne ukazuje dnešní události) a zvuk (rychlé přepínače).
-pub const WEEK_CARD: &str = "week";
-pub const TOGGLES_CARD: &str = "toggles";
+/// Smazané karty (kolo 33: Dnes — má ji záložka Úkoly): ve starém souboru se při načtení tiše vynechají.
+pub const REMOVED_CARDS: [&str; 1] = ["today"];
+/// Sloučené karty (kolo 34, 22 → 18): (stará, nová, vzhled `design` nové karty). Stará karta ve starém souboru se při
+/// načtení PŘEVEDE na novou ([`merge_cards`]); `week` nese vlastní vzhled týdne (chybí = „strip“, [`WEEK_DEFAULT`]).
+/// Zrcadlo `MERGED_CARDS` v `src/layout/model.ts`.
+pub const MERGED_CARDS: [(&str, &str, Option<&str>); 4] = [("bigclock", "clock", Some("big")), ("week", "calendar", None), ("links", "actions", None), ("toggles", "winquick", Some(TOGGLES_DESIGN))];
+/// Vzhled karty Rychlé dlaždice Windows, který kreslí dřívější Rychlé přepínače (zvuk, mikrofon, hlasitost −/+, baterie).
+pub const TOGGLES_DESIGN: &str = "toggles";
+/// Výchozí vzhled dřívější karty Týden (pás dnů) — po sloučení je to volba vzhledu karty Kalendář, výchozí je seznam.
+pub const WEEK_DEFAULT: &str = "strip";
 /// Karta Rychlé dlaždice Windows (kolo 23, `winquick.rs`): jen v katalogu.
 pub const WINQUICK_CARD: &str = "winquick";
 /// Karta Claude aktivita (kolo 23, `claude/activity.rs`): jen v katalogu; na záložce zapne čtení poslední
 /// zprávy z konce přepisu při `Stop` (`Claude::set_activity_tail`).
 pub const ACTIVITY_CARD: &str = "activity";
-/// Karty, které potřebují zdroj nebo jsou nové funkce (GitHub, Systém, Pošta — přihlášený účet Microsoft; Claude dnes, Rychlé přepínače — kolo 22):
+/// Karty, které potřebují zdroj nebo jsou nové funkce (GitHub, Systém, Pošta — přihlášený účet Microsoft; Claude dnes, Rychlé dlaždice — kolo 22):
 /// uživatel je přidá z katalogu a MCP je jako „opt-in“ hlásí Claudovi. Ve výchozím rozložení nejsou
 /// (kromě nich ani Kalendář, Počasí, Claude, Repa… — viz [`clean_default`]); `Sections::default()` je má vypnuté.
-pub const OPT_IN: [&str; 7] = ["github", "system", "mail", "usage", "toggles", "winquick", "activity"];
+pub const OPT_IN: [&str; 6] = ["github", "system", "mail", "usage", "winquick", "activity"];
 /// Dynamická karta: id s prefixem (dnes jen widgety ze skriptů `widget:<soubor>`, `widgets/`).
 /// Validace hlídá jen tvar — soubor nemusí existovat (karta pak ukáže, že chybí). Katalog je nabízí
 /// podle toho, co je na disku (zrcadlo `isDynamic` v `src/layout/model.ts`).
@@ -205,7 +212,7 @@ pub struct LayoutConfig {
 /// (fixture `fixtures/layout-default.json` hlídají oba testy).
 pub fn clean_default() -> LayoutConfig {
     let mut personal = row(&["clock", "media"]);
-    personal.extend(row(&["notes", "links"]));
+    personal.extend(row(&["notes", "actions"]));
     LayoutConfig {
         pages: vec![
             LayoutPage { id: WORK.into(), cards: row(&["projects"]).into_iter().chain(row(&["notes"])).collect(), ..Default::default() },
@@ -318,12 +325,56 @@ pub fn apply_upgrades(l: &mut LayoutConfig) {
     }
 }
 
+/// Vynechá smazané karty ([`REMOVED_CARDS`]) ze všech záložek. Čistá funkce.
+pub fn drop_removed(l: &mut LayoutConfig) {
+    for p in &mut l.pages {
+        p.cards.retain(|c| !REMOVED_CARDS.contains(&c.id.as_str()));
+    }
+}
+
+/// Nová karta pro id ze starého souboru ([`MERGED_CARDS`]) a vzhled, který tím přibude (`week` = vlastní vzhled týdne).
+pub fn merged_target(id: &str) -> Option<(&'static str, Option<&'static str>)> {
+    MERGED_CARDS.iter().find(|(old, _, _)| *old == id).map(|(_, new, design)| (*new, *design))
+}
+
+/// Převede sloučené karty ([`MERGED_CARDS`]) na jejich nástupce na každé záložce: karta si nechá velikost, výšku
+/// a vzhled, jen dostane `look.design` (velké hodiny, týden, přepínače). Je-li nástupce na záložce už (nebo vznikl
+/// z dřívější karty), stará karta se zahodí — žádná dvojice. Idempotentní. Čistá funkce.
+pub fn merge_cards(l: &mut LayoutConfig) {
+    for p in &mut l.pages {
+        let orig = std::mem::take(&mut p.cards);
+        let has = |id: &str| orig.iter().any(|x| x.id == id);
+        for mut c in orig.clone() {
+            let Some((new, design)) = merged_target(&c.id) else {
+                p.cards.push(c);
+                continue;
+            };
+            let old = std::mem::replace(&mut c.id, new.to_string());
+            if has(new) {
+                continue; // nástupce už na záložce je
+            }
+            let design = if old == "week" { Some(c.look.as_ref().and_then(|k| k.design.clone()).unwrap_or_else(|| WEEK_DEFAULT.into())) } else { design.map(String::from) };
+            if let Some(d) = design {
+                c.look.get_or_insert_with(Default::default).design = Some(d);
+            }
+            p.cards.push(c);
+        }
+    }
+}
+
+/// Je na nějaké záložce karta Rychlé dlaždice Windows ve vzhledu Přepínače (zvuk, hlasitost, baterie)?
+pub fn toggles_placed(l: &LayoutConfig) -> bool {
+    l.pages.iter().flat_map(|p| &p.cards).any(|c| c.id == WINQUICK_CARD && c.look.as_ref().and_then(|k| k.design.as_deref()) == Some(TOGGLES_DESIGN))
+}
+
 /// Po `config::load`: soubor bez `layout` → převod ze starého tvaru; pak jednorázové úpravy
 /// ([`apply_upgrades`]). Nic se nezapisuje — změna přibude do souboru až s prvním uložením.
 pub fn upgrade_loaded(raw: &Value, cfg: &mut Config) {
     if raw.get("layout").is_none() {
         cfg.layout = from_legacy(raw);
     }
+    drop_removed(&mut cfg.layout);
+    merge_cards(&mut cfg.layout);
     apply_upgrades(&mut cfg.layout);
 }
 
@@ -343,9 +394,12 @@ pub fn derive(cfg: &mut Config) {
 /// `notch` = rozložení notch: vlastní lišta (`notchbar.rs`) zapne i zdroje svých sekcí (přehrávač, hlasitost, počasí, kalendář).
 fn section_on(l: &LayoutConfig, key: &str, notch: bool) -> Option<bool> {
     let bar = |need: &str| crate::notchbar::any_wants(l, notch, need);
-    // karta Dnes čte kalendář z paměti: i bez karty Kalendář musí být jeho zdroj zapnutý (jinak by `view` hlásil „off“)
     if key == "calendar" {
-        return Some(placed(l, "calendar") || placed(l, "today") || placed(l, WEEK_CARD) || bar("calendar"));
+        return Some(placed(l, "calendar") || bar("calendar"));
+    }
+    // dřívější karta Odkazy je od kola 34 součástí karty Odkazy a akce; pole `links` zůstává kvůli starším verzím
+    if key == "links" {
+        return Some(placed(l, "actions"));
     }
     if key == "weather" {
         return Some(placed(l, key) || bar("weather"));
@@ -414,9 +468,9 @@ pub fn page_has(l: &LayoutConfig, mode: &str, card: &str) -> bool {
     page(l, mode).is_some_and(|p| p.cards.iter().any(|c| c.id == card))
 }
 
-/// Je na právě viditelné záložce karta, která čte kalendář (Kalendář, nebo Dnes — ta ukazuje další schůzku)?
+/// Je na právě viditelné záložce karta, která čte kalendář (Kalendář; od kola 34 i Týden jako jeho vzhled)?
 pub fn page_has_calendar(l: &LayoutConfig, mode: &str) -> bool {
-    page_has(l, mode, "calendar") || page_has(l, mode, "today") || page_has(l, mode, WEEK_CARD)
+    page_has(l, mode, "calendar")
 }
 
 /// Název záložky pro proužek (ikona + název; vestavěná bez názvu podle jazyka).
@@ -540,12 +594,12 @@ mod tests {
         assert_eq!(d.pages.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), [WORK, PERSONAL]);
         let s = |v: &[(&str, CardSize)]| v.iter().map(|(a, b)| (a.to_string(), *b)).collect::<Vec<_>>();
         assert_eq!(shape(&d, WORK), s(&[("projects", Xl), ("notes", Xl)]));
-        assert_eq!(shape(&d, PERSONAL), s(&[("clock", M), ("media", M), ("notes", M), ("links", M)]));
+        assert_eq!(shape(&d, PERSONAL), s(&[("clock", M), ("media", M), ("notes", M), ("actions", M)]));
         assert!(d.pages.iter().flat_map(|p| &p.cards).all(|c| c.h.is_none() && c.tiles.is_none() && c.look.is_none()), "výška podle obsahu, výchozí dlaždice i vzhled");
         assert!(d.hidden_parts.is_empty());
         assert!(validate(&d).is_ok());
-        // karty bez zdroje (kalendář, pošta, GitHub, počasí bez místa) ani duplicitní akce ve výchozím rozložení nejsou
-        for c in ["calendar", "mail", "github", "system", "weather", "actions", "running", "repos", "claude", "shelf", "timer"] {
+        // karty bez zdroje (kalendář, pošta, GitHub, počasí bez místa) ve výchozím rozložení nejsou; Odkazy a akce jsou jen na Osobní
+        for c in ["calendar", "mail", "github", "system", "weather", "running", "repos", "claude", "shelf", "timer"] {
             assert!(!placed(&d, c), "{c} je jen v katalogu / přidá ho průvodce");
         }
         // zrcadlo `defaultLayout` v TS: stejný tvar ve fixture (druhá půlka testu je v `model.test.mjs`)
@@ -561,15 +615,69 @@ mod tests {
         let old = old_default();
         let mut cfg = Config::default();
         upgrade_loaded(&json!({}), &mut cfg);
-        assert_eq!(cfg.layout, old);
+        // jediná změna proti původnímu tvaru: Odkazy (kolo 34) splynuly s kartou Odkazy a akce, která tam už je
+        let mut merged = old.clone();
+        merge_cards(&mut merged);
+        assert_eq!(cfg.layout, merged);
         assert_eq!(ids(&old, WORK), ["projects", "actions", "shelf", "running", "claude", "repos", "notes"]);
         assert_eq!(ids(&old, PERSONAL).len(), 10);
+        assert_eq!(ids(&merged, PERSONAL).len(), 9);
         // soubor s vlastním `layout` se nemění ani o kartu
         let mut mine = Config::default();
         let raw = json!({"layout": serde_json::to_value(&old).unwrap()});
         mine.layout = serde_json::from_value(raw["layout"].clone()).unwrap();
         upgrade_loaded(&raw, &mut mine);
-        assert_eq!(mine.layout, old);
+        assert_eq!(mine.layout, merged);
+    }
+
+    /// Kolo 34 (22 → 18 karet): starý layout se sloučenými kartami se PŘEVEDE (ne zahodí) na nástupce se správným
+    /// vzhledem; je-li nástupce na záložce už, stará karta zmizí (žádná dvojice); idempotentní; i po uložení a načtení.
+    #[test]
+    fn merged_cards_are_converted_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let old = r#"{"layout":{"pages":[
+            {"id":"prace","name":"","cards":[{"id":"bigclock","size":"l","h":2,"look":{"accent":"blue"}},{"id":"week","size":"m","look":{"design":"month"}},{"id":"links","size":"s"},{"id":"toggles","size":"s"}]},
+            {"id":"osobni","name":"","cards":[{"id":"clock","size":"s"},{"id":"bigclock","size":"m"},{"id":"week","size":"m"},{"id":"calendar","size":"m"},{"id":"actions","size":"xl"},{"id":"links","size":"m"},{"id":"winquick","size":"m"},{"id":"toggles","size":"s"}]},
+            {"id":"hry","name":"Hry","cards":[{"id":"week","size":"s"},{"id":"toggles","size":"m","look":{"accent":"green"}}]}
+        ],"hiddenParts":[]},"drawer":{"dockCards":["week","bigclock","links"]}}"#;
+        std::fs::write(&path, old).unwrap();
+        let cfg = crate::config::load(&path).unwrap().unwrap();
+        let design = |page: &str, id: &str| cfg.layout.pages.iter().find(|p| p.id == page).unwrap().cards.iter().find(|c| c.id == id).and_then(|c| c.look.as_ref()).and_then(|k| k.design.clone());
+        // Práce: nic z nástupců tam nebylo → převedeno na místě, velikost / výška / vzhled zůstaly
+        assert_eq!(ids(&cfg.layout, WORK), ["clock", "calendar", "actions", "winquick"]);
+        assert_eq!(design(WORK, "clock").as_deref(), Some("big"));
+        assert_eq!(design(WORK, "calendar").as_deref(), Some("month"), "vlastní vzhled týdne se přenese");
+        assert_eq!(design(WORK, "actions"), None);
+        assert_eq!(design(WORK, "winquick").as_deref(), Some("toggles"));
+        let big = &cfg.layout.pages[0].cards[0];
+        assert_eq!((big.size, big.h, big.look.as_ref().unwrap().accent.as_deref()), (CardSize::L, Some(2), Some("blue")));
+        // Osobní: nástupci tam už jsou → staré karty zmizí, nic se nezdvojí a existujícím se vzhled nemění
+        assert_eq!(ids(&cfg.layout, PERSONAL), ["clock", "calendar", "actions", "winquick"]);
+        assert!(cfg.layout.pages[1].cards.iter().all(|c| c.look.is_none()));
+        // vlastní záložka: týden bez vzhledu = „strip“, přepínače si nechají akcent
+        assert_eq!(ids(&cfg.layout, "hry"), ["calendar", "winquick"]);
+        assert_eq!(design("hry", "calendar").as_deref(), Some(WEEK_DEFAULT));
+        let tg = cfg.layout.pages[2].cards[1].look.as_ref().unwrap();
+        assert_eq!((tg.accent.as_deref(), tg.design.as_deref()), (Some("green"), Some("toggles")));
+        assert!(validate(&cfg.layout).is_ok());
+        assert!(toggles_placed(&cfg.layout));
+        assert_eq!(crate::hovermode::dock_cards(&cfg.drawer.dock_cards), ["calendar", "clock", "actions"], "střední panel docku");
+        // zdroje: kalendář i hlasitost zůstávají zapnuté (Týden → Kalendář, Přepínače → Rychlé dlaždice)
+        assert!(cfg.drawer.sections.calendar && cfg.drawer.sections.links && crate::volume::allowed(&cfg));
+        assert!(page_has_calendar(&cfg.layout, WORK));
+        // idempotence a uložení bez starých id
+        let mut twice = cfg.layout.clone();
+        merge_cards(&mut twice);
+        assert_eq!(twice, cfg.layout);
+        crate::config::save(&path, &cfg).unwrap();
+        // `drawer.dockCards` se ukládá, jak je (převádí se při čtení) — kontroluje se jen rozložení
+        let text = serde_json::from_str::<Value>(&std::fs::read_to_string(&path).unwrap()).unwrap()["layout"].to_string();
+        for gone in ["\"id\":\"bigclock\"", "\"id\":\"week\"", "\"id\":\"toggles\"", "\"id\":\"links\""] {
+            assert!(!text.contains(gone), "{gone} zůstalo v uloženém souboru");
+        }
+        assert_eq!(crate::config::load(&path).unwrap().unwrap().layout, cfg.layout);
+        assert!(CARDS.len() == 18 && MERGED_CARDS.iter().all(|(old, new, _)| !CARDS.contains(old) && CARDS.contains(new)));
     }
 
     #[test]
@@ -651,13 +759,14 @@ mod tests {
             ("nesmysl v pořadí", json!({"appearance":{"cards":["repos","repos","pocasi",3]}}), vec!["projects", "actions", "shelf", "repos", "running", "claude", "notes"], Some(vec!["clock", "timer", "weather", "calendar", "media", "links", "actions", "shelf", "notes"]), vec![]),
         ];
         for (name, raw, work, personal, hidden) in cases {
-            let l = from_legacy(&raw);
+            let mut l = from_legacy(&raw);
             assert_eq!(ids(&l, WORK), work, "{name}: Práce");
             match personal {
                 Some(p) => assert_eq!(ids(&l, PERSONAL), p, "{name}: Osobní"),
                 None => assert!(l.pages.iter().all(|p| p.id != PERSONAL), "{name}: bez Osobní"),
             }
             assert_eq!(l.hidden_parts, hidden, "{name}: části");
+            merge_cards(&mut l); // `from_legacy` dává dřívější Odkazy; načtení je převede (kolo 34)
             assert!(validate(&l).is_ok(), "{name}: validní");
         }
     }
@@ -693,9 +802,10 @@ mod tests {
             ("výchozí", Box::new(|_| {}), vec![("weather", true), ("claudeCosts", true), ("nowPlaying", true), ("battery", true)]),
             ("bez počasí", Box::new(without("weather")), vec![("weather", false), ("calendar", true)]),
             ("bez kalendáře = zdroj vypnutý", Box::new(without("calendar")), vec![("calendar", false)]),
-            ("karta Dnes drží zdroj kalendáře zapnutý", Box::new(|l: &mut LayoutConfig| {
+            ("starý Týden = Kalendář drží zdroj zapnutý", Box::new(|l: &mut LayoutConfig| {
                 l.pages.iter_mut().for_each(|p| p.cards.retain(|c| c.id != "calendar"));
-                l.pages[1].cards.push(card("today", M));
+                l.pages[1].cards.push(card("week", M));
+                merge_cards(l);
             }), vec![("calendar", true)]),
             ("akce jen z jedné záložky pryč", Box::new(|l: &mut LayoutConfig| l.pages[0].cards.retain(|c| c.id != "actions")), vec![("actions", true)]),
             ("bez Clauda = i jeho části", Box::new(without("claude")), vec![("claude", false), ("claudeCosts", false), ("claudeLimits", false)]),
@@ -729,7 +839,7 @@ mod tests {
         // žádné pole drawer.sections nesmí zůstat „vlastní pravdou“ mimo layout
         let v = serde_json::to_value(crate::config::Sections::default()).unwrap();
         for k in v.as_object().unwrap().keys() {
-            assert!(CARDS.contains(&k.as_str()) || PARTS.iter().any(|(p, _)| p == k), "{k} chybí v CARDS / PARTS");
+            assert!(k == "links" || CARDS.contains(&k.as_str()) || PARTS.iter().any(|(p, _)| p == k), "{k} chybí v CARDS / PARTS"); // `links` = dřívější karta, od kola 34 odvozená z `actions`
         }
         for (_, parent) in PARTS {
             assert!(CARDS.contains(&parent), "{parent}");
@@ -970,6 +1080,22 @@ mod tests {
         assert_eq!(again.drawer.sections, cfg.drawer.sections);
     }
 
+    /// Kolo 33: starý config s kartou Dnes se načte bez chyby, karta se tiše vynechá (i po uložení a znovunačtení).
+    #[test]
+    fn removed_today_card_is_dropped_on_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let old = r#"{"layout":{"pages":[{"id":"prace","name":"","cards":[{"id":"today","size":"m"},{"id":"clock","size":"s"}]},{"id":"osobni","name":"","cards":[{"id":"notes","size":"m"},{"id":"today","size":"s"}]}],"hiddenParts":[]}}"#;
+        std::fs::write(&path, old).unwrap();
+        let cfg = crate::config::load(&path).unwrap().unwrap();
+        assert_eq!(ids(&cfg.layout, WORK), ["clock"]);
+        assert_eq!(ids(&cfg.layout, PERSONAL), ["notes"]);
+        assert!(validate(&cfg.layout).is_ok());
+        assert!(!CARDS.contains(&"today") && CARDS.len() == 18);
+        crate::config::save(&path, &cfg).unwrap();
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("\"today\""));
+    }
+
     /// Kolo 22: starý config (tvar z 0.8.0 — záložky s kartami, vzhledy, části, skryté části, úpravy) se načte
     /// a uloží beze změny (žádné `bento` ani nové klíče vzhledu); bento záložka a nové volby vzhledu tam a zpět.
     #[test]
@@ -1003,7 +1129,7 @@ mod tests {
     }
 
     /// Kolo 22: config tvaru 0.8.0 (rozložení s Osobní: Čas, Právě hraje, Kalendář) se načte beze změny —
-    /// nové karty se samy nepřidají a odvozené sekce zůstanou; nová karta Týden / Rychlé přepínače zapne jen svůj zdroj.
+    /// nové karty se samy nepřidají a odvozené sekce zůstanou; nová karta Kalendář / Rychlé dlaždice zapne jen svůj zdroj.
     #[test]
     fn round22_old_config_unchanged_and_new_cards_opt_in() {
         let dir = tempfile::tempdir().unwrap();
@@ -1011,7 +1137,7 @@ mod tests {
         let old = r#"{"layout":{"pages":[{"id":"prace","name":"","cards":[{"id":"projects","size":"xl"},{"id":"claude","size":"m"}]},{"id":"osobni","name":"","cards":[{"id":"projects","size":"xl"},{"id":"clock","size":"s"},{"id":"media","size":"m"}]}],"hiddenParts":["sound"],"upgrades":["personalProjects"]},"drawer":{"sections":{"calendar":false}}}"#;
         std::fs::write(&path, old).unwrap();
         let cfg = crate::config::load(&path).unwrap().unwrap();
-        for id in ["usage", "week", "bigclock", "toggles", "winquick", "activity"] {
+        for id in ["usage", "winquick", "activity"] {
             assert!(!placed(&cfg.layout, id), "{id} se nepřidá samo");
         }
         assert!(!cfg.drawer.sections.calendar && !cfg.drawer.sections.sound);
@@ -1019,10 +1145,10 @@ mod tests {
         crate::config::save(&path, &cfg).unwrap();
         let again = crate::config::load(&path).unwrap().unwrap();
         assert_eq!(again.layout, cfg.layout);
-        // přidaná karta Týden zapne čtení kalendáře, Rychlé přepínače zvuk
+        // přidaná karta Kalendář zapne čtení kalendáře, Rychlé dlaždice Windows (Přepínače) zvuk
         let mut with = cfg.clone();
-        with.layout.pages[1].cards.push(serde_json::from_str(r#"{"id":"week","size":"m"}"#).unwrap());
-        with.layout.pages[1].cards.push(serde_json::from_str(r#"{"id":"toggles","size":"s"}"#).unwrap());
+        with.layout.pages[1].cards.push(serde_json::from_str(r#"{"id":"calendar","size":"m","look":{"design":"strip"}}"#).unwrap());
+        with.layout.pages[1].cards.push(serde_json::from_str(r#"{"id":"winquick","size":"s","look":{"design":"toggles"}}"#).unwrap());
         derive(&mut with);
         assert!(with.drawer.sections.calendar && page_has_calendar(&with.layout, PERSONAL));
         assert!(crate::volume::allowed(&with) && !with.drawer.sections.sound, "zvuk pro přepínače, část karty Právě hraje dál skrytá");

@@ -183,11 +183,15 @@ pub enum Gate {
     DebugBuild,
     /// uvnitř balíčku MSIX (plné jméno) — zápis by šel do bubliny, Explorer by ho neviděl
     InPackage(String),
+    /// izolovaná instance pro QA (`qa.rs`) — registr je společný s nainstalovaným Ledge, nikdy
+    Isolated,
 }
 
 /// Politika „sáhnout do registru?“ — čistá funkce. Ladicí build vyhrává (testy nikdy nezapisují).
-pub fn gate(debug: bool, package: Option<&str>) -> Gate {
-    if debug {
+pub fn gate(debug: bool, package: Option<&str>, isolated: bool) -> Gate {
+    if isolated {
+        Gate::Isolated
+    } else if debug {
         Gate::DebugBuild
     } else if let Some(p) = package {
         Gate::InPackage(p.to_string())
@@ -202,9 +206,9 @@ pub fn apply(enabled: bool) -> Result<(), String> {
     let debug = cfg!(debug_assertions) || cfg!(test);
     // ladicí build ani balíček nezjišťuje (sonda by v testech zapsala do skutečného %LOCALAPPDATA%)
     let package = if debug { None } else { crate::pkgctx::current().map(|p| p.full.as_str()) };
-    match gate(debug, package) {
+    match gate(debug, package, crate::qa::isolated()) {
         Gate::Registry => {}
-        Gate::DebugBuild => return Ok(()),
+        Gate::DebugBuild | Gate::Isolated => return Ok(()),
         Gate::InPackage(p) => {
             crate::log(&format!("autostart: běží uvnitř balíčku {p} — Run nezapisuji ani nemažu (Explorer by ho neviděl)"));
             return Ok(());
@@ -353,14 +357,16 @@ mod tests {
     #[test]
     fn gate_table() {
         #[rustfmt::skip]
-        let cases: Vec<(&str, bool, Option<&str>, Gate)> = vec![
-            ("release mimo balíček",   false, None,                             Gate::Registry),
-            ("release v bublině",      false, Some("Claude_1_x64__pzs8sxrjxfjjc"), Gate::InPackage("Claude_1_x64__pzs8sxrjxfjjc".into())),
-            ("debug mimo",             true,  None,                             Gate::DebugBuild),
-            ("debug v bublině",        true,  Some("Claude_1_x64__p"),          Gate::DebugBuild),
+        let cases: Vec<(&str, bool, Option<&str>, bool, Gate)> = vec![
+            ("release mimo balíček",   false, None,                             false, Gate::Registry),
+            ("release v bublině",      false, Some("Claude_1_x64__pzs8sxrjxfjjc"), false, Gate::InPackage("Claude_1_x64__pzs8sxrjxfjjc".into())),
+            ("debug mimo",             true,  None,                             false, Gate::DebugBuild),
+            ("debug v bublině",        true,  Some("Claude_1_x64__p"),          false, Gate::DebugBuild),
+            ("izolace v release",      false, None,                             true,  Gate::Isolated),
+            ("izolace v bublině",      false, Some("Claude_1_x64__p"),          true,  Gate::Isolated),
         ];
-        for (name, debug, pkg, want) in cases {
-            assert_eq!(gate(debug, pkg), want, "{name}");
+        for (name, debug, pkg, iso, want) in cases {
+            assert_eq!(gate(debug, pkg, iso), want, "{name}");
         }
     }
 

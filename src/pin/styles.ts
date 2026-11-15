@@ -1,13 +1,13 @@
 // Styly lístku (Lístky 2.0) — čistá logika bez DOM (testy `styles.test.mjs`): galerie stylů a CSS proměnné
 // lístku z (styl, pozadí %, text %, barva). `classic` = původní tmavé sklo (`pinColors`), výchozí vzhled.
 // Rust `pins::PinStyle` má stejná id; neznámé = classic.
+import { clampNum as clamp } from "../pad.ts";
 import { pinColors, TEXT_MIN } from "./model.ts";
 
 export type PinStyleId = "classic" | "paper" | "glass" | "stripe" | "minimal" | "dark";
 export const PIN_STYLES: PinStyleId[] = ["classic", "paper", "glass", "stripe", "minimal", "dark"];
 export const isPinStyle = (s: unknown): s is PinStyleId => PIN_STYLES.includes(s as PinStyleId);
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(v) ? v : hi));
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Výchozí barva stylu bez vlastní barvy lístku (papír = žlutý, proužek = modrý). */

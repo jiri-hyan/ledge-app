@@ -11,6 +11,8 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
+/// Vlastní `User-Agent` GitHub API (sdílený klient má obecný `Ledge/verze`; hlavička per požadavek ho přebije).
+const UA: &str = concat!("Ledge/", env!("CARGO_PKG_VERSION"), " (+https://github.com/jiri-hyan/ledge-app)");
 const API_TIMEOUT: Duration = Duration::from_secs(20);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(300);
 /// Strop velikosti instalátoru (dnes ~3 MB) — nic většího se na disk nezapíše.
@@ -32,7 +34,7 @@ pub fn api_error(status: u16, rate_remaining: Option<&str>) -> String {
         403 | 429 if rate_remaining == Some("0") || status == 429 => tr("vyčerpaný limit GitHub API (60 dotazů/h) — zkusím to později", "GitHub API limit used up (60 requests/h) — I'll try later").into(),
         403 => tr("GitHub API odmítlo dotaz (HTTP 403)", "GitHub API refused the request (HTTP 403)").into(),
         s if s >= 500 => trf!("GitHub má potíže (HTTP {s})", "GitHub is having trouble (HTTP {s})"),
-        s => format!("GitHub API: HTTP {s}"),
+        s => trf!("GitHub vrátil neočekávanou odpověď (kód {s}) — zkus aktualizaci později", "GitHub returned an unexpected answer (code {s}) — try the update later"),
     }
 }
 
@@ -58,47 +60,51 @@ fn net_error(e: &reqwest::Error) -> String {
     }
 }
 
-fn client(timeout: Duration) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .user_agent(concat!("Ledge/", env!("CARGO_PKG_VERSION"), " (+https://github.com/jiri-hyan/ledge-app)"))
-        .timeout(timeout)
-        .build()
-        .map_err(|e| trf!("HTTP klient: {e}", "HTTP client: {e}"))
-}
-
 /// Future na runtime Tauri z vlastního vlákna (volající může být sám vlákno runtime).
 fn run<T: Send>(f: impl FnOnce() -> Result<T, String> + Send) -> Result<T, String> {
     std::thread::scope(|s| s.spawn(f).join().unwrap_or_else(|_| Err(tr("vlákno stahování spadlo", "the download thread crashed").into())))
 }
 
 /// JSON nejnovějšího vydání (bez předběžných a konceptů — to zaručuje `/releases/latest`).
-pub fn latest(repo: &str) -> Result<String, String> {
+pub fn latest(repo: &str) -> Result<String, GetErr> {
     release_json(api_url(repo))
 }
 
 /// JSON vydání s tagem `tag` (návrat k předchozí verzi, jen na klik).
 pub fn by_tag(repo: &str, tag: &str) -> Result<String, String> {
-    release_json(tag_url(repo, tag))
+    release_json(tag_url(repo, tag)).map_err(|e| e.msg)
 }
 
-fn release_json(url: String) -> Result<String, String> {
+/// Chyba dotazu na vydání; `transport` = nedošla odpověď serveru (spojení, termín, tělo), ne HTTP 4xx/5xx (L267).
+#[derive(Debug)]
+pub struct GetErr {
+    pub msg: String,
+    pub transport: bool,
+}
+
+fn release_json(url: String) -> Result<String, GetErr> {
+    let tr_err = |msg: String| GetErr { msg, transport: true };
     run(|| {
-        tauri::async_runtime::block_on(async {
-            let resp = client(API_TIMEOUT)?
+        Ok(tauri::async_runtime::block_on(async {
+            let req = crate::accounts::http::default_redirect().map_err(tr_err)?
                 .get(&url)
+                .timeout(API_TIMEOUT)
+                .header(reqwest::header::USER_AGENT, UA)
                 .header("Accept", "application/vnd.github+json")
-                .header("X-GitHub-Api-Version", "2022-11-28")
-                .send()
+                .header("X-GitHub-Api-Version", "2022-11-28");
+            let resp = crate::accounts::http::send(req)
                 .await
-                .map_err(|e| net_error(&e))?;
+                .map_err(|e| tr_err(net_error(&e)))?;
             let status = resp.status().as_u16();
             if status != 200 {
                 let rem = resp.headers().get("x-ratelimit-remaining").and_then(|v| v.to_str().ok()).map(str::to_string);
-                return Err(api_error(status, rem.as_deref()));
+                return Err(GetErr { msg: api_error(status, rem.as_deref()), transport: false });
             }
-            resp.text().await.map_err(|e| net_error(&e))
-        })
+            resp.text().await.map_err(|e| tr_err(net_error(&e)))
+        }))
     })
+    .map_err(|msg| GetErr { msg, transport: false })
+    .and_then(|r| r)
 }
 
 /// Průběh stahování: (staženo bajtů, celková velikost z `Content-Length`, když ji server řekl).
@@ -109,9 +115,10 @@ pub type Progress<'a> = &'a (dyn Fn(u64, Option<u64>) + Sync);
 pub fn download(url: &str, dest: &Path, progress: Progress) -> Result<(), String> {
     let res = run(|| {
         tauri::async_runtime::block_on(async {
-            let mut resp = client(DOWNLOAD_TIMEOUT)?.get(url).send().await.map_err(|e| net_error(&e))?;
+            let req = crate::accounts::http::default_redirect()?.get(url).timeout(DOWNLOAD_TIMEOUT).header(reqwest::header::USER_AGENT, UA);
+            let mut resp = crate::accounts::http::send(req).await.map_err(|e| net_error(&e))?;
             if !resp.status().is_success() {
-                return Err(trf!("stažení: HTTP {}", "download: HTTP {}", resp.status().as_u16()));
+                return Err(trf!("Stažení aktualizace selhalo (kód {}). Zkontroluj připojení a zkus to znovu.", "The update download failed (code {}). Check your connection and try again.", resp.status().as_u16()));
             }
             if resp.content_length().is_some_and(|n| n > MAX_SETUP_BYTES) {
                 return Err(tr("instalátor je podezřele velký — nestahuji", "the installer is suspiciously large — not downloading").into());

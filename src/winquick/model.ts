@@ -1,5 +1,6 @@
 // Čistá logika karty Rychlé dlaždice Windows (kolo 23, Rust `winquick.rs`): katalog dlaždic, přidání / odebrání / pořadí,
 // stav rádia. Bez DOM a bez volání jádra. Test `model.test.mjs`.
+import { baseName } from "../util/path.ts";
 
 /** Dlaždice, které karta umí (zrcadlo `winquick::TILE_IDS`; pořadí = výchozí podle užitku). */
 export const TILE_IDS = ["mic", "out", "term", "dir", "theme", "wifi", "bt", "set", "shot"] as const;
@@ -59,11 +60,8 @@ export function pinFolder(folders: readonly string[], path: string, max = 8): st
   return [...folders, p];
 }
 
-/** Poslední část cesty pro popisek složky. */
-export function baseName(path: string): string {
-  const parts = path.split(/[\\/]+/).filter(Boolean);
-  return parts[parts.length - 1] ?? path;
-}
+/** Poslední část cesty pro popisek složky — zdroj je `util/path.ts`. */
+export { baseName };
 
 export interface ShotView { name: string; path: string; count: number; thumb: string | null }
 

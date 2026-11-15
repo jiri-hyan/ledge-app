@@ -50,6 +50,7 @@ registerDict("en", {
   "sessions.limits.setup.install.yes": "Connect",
   "sessions.limits.setup.remove.yes": "Disconnect",
   "sessions.incident.lead": "Anthropic reports an incident",
+  "sessions.incident.age": "as of {n} min ago",
   "sessions.incident.open": "Open Anthropic's status page",
   "sessions.incident.more.one": "(+{n} more)",
   "sessions.incident.more.other": "(+{n} more)",

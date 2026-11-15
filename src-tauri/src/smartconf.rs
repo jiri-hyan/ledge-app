@@ -57,8 +57,6 @@ impl Default for IncidentsConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SmartConfig {
-    /// Alt+1…9 spustí N-tého zástupce a šipky procházejí zástupce, když má otevřený šuplík fokus. Výchozí false (zapíná člověk).
-    pub quick_keys: bool,
     /// Odkaz, soubor, složka nebo .exe přetažené na otevřený šuplík nabídnou nového zástupce. Výchozí false (zapíná člověk).
     pub drop_shortcut: bool,
     /// Kolečko myši nad záložkami šuplíku přepíná záložky. Výchozí false (zapíná člověk).
@@ -73,13 +71,12 @@ pub struct SmartConfig {
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SmartView {
-    pub quick_keys: bool,
     pub drop_shortcut: bool,
     pub tab_wheel: bool,
 }
 
 pub fn view(c: &SmartConfig) -> SmartView {
-    SmartView { quick_keys: c.quick_keys, drop_shortcut: c.drop_shortcut, tab_wheel: c.tab_wheel }
+    SmartView { drop_shortcut: c.drop_shortcut, tab_wheel: c.tab_wheel }
 }
 
 pub fn validate(c: &SmartConfig) -> Result<(), FieldError> {
@@ -103,20 +100,28 @@ mod tests {
         for src in ["{}", r#"{"smart":{}}"#, r#"{"smart":{"approvalSound":{},"incidents":{}}}"#] {
             let cfg: Config = serde_json::from_str(src).unwrap();
             let s = &cfg.smart;
-            assert!(!s.quick_keys && !s.drop_shortcut && !s.tab_wheel, "{src}: klávesy, přetažení a kolečko musí být vypnuté");
+            assert!(!s.drop_shortcut && !s.tab_wheel, "{src}: přetažení a kolečko musí být vypnuté");
             assert!(!s.approval_sound.enabled && !s.incidents.enabled, "{src}: zvuk a síť musí být vypnuté");
             assert_eq!((s.approval_sound.min_gap_s, s.incidents.every_min), (30, 10), "{src}");
         }
     }
 
     #[test]
+    fn removed_quick_keys_key_is_tolerated() {
+        // kolo 33: `quickKeys` zrušeno (Alt+1…9 je vždy zapnuto); starý config s klíčem se načte beze změny ostatního
+        let cfg: Config = serde_json::from_str(r#"{"smart":{"quickKeys":false,"tabWheel":true}}"#).unwrap();
+        assert!(cfg.smart.tab_wheel && !cfg.smart.drop_shortcut);
+        assert!(!serde_json::to_string(&cfg.smart).unwrap().contains("quickKeys"));
+    }
+
+    #[test]
     fn roundtrip_and_schema() {
         let cfg: Config = serde_json::from_str(r#"{"smart":{"tabWheel":true,"approvalSound":{"enabled":true,"minGapS":60},"incidents":{"enabled":true,"everyMin":15}}}"#).unwrap();
-        assert!(cfg.smart.tab_wheel && !cfg.smart.quick_keys);
+        assert!(cfg.smart.tab_wheel && !cfg.smart.drop_shortcut);
         let back = serde_json::to_string(&cfg.smart).unwrap();
         assert!(back.contains(r#""approvalSound":{"enabled":true,"minGapS":60}"#), "{back}");
         let schema = crate::config::schema_json();
-        for key in ["quickKeys", "dropShortcut", "tabWheel", "approvalSound", "minGapS", "incidents", "everyMin"] {
+        for key in ["dropShortcut", "tabWheel", "approvalSound", "minGapS", "incidents", "everyMin"] {
             assert!(schema.contains(key), "{key}");
         }
     }

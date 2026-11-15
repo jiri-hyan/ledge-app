@@ -9,7 +9,7 @@ Nastavení → Šuplík a karty → Otevírání a klávesy (klávesy, přetaže
 |---|---|---|
 | `src-tauri/src/smartconf.rs` | sekce `smart`: tři přepínače UI (výchozí VYPNUTO od kola 21, zapíná je člověk), zvuk a incidenty (výchozí VYPNUTO), meze, validace, pohled pro snapshot | `SmartConfig` `SoundConfig` `IncidentsConfig` `SmartView` `view` `validate` `GAP_MIN_S` `EVERY_MIN` |
 | `src-tauri/src/approvalsound.rs` | tiché pípnutí (`MessageBeep`) u nového schválení / otázky Clauda; čisté rozhodnutí `decide` (vypnuto, mrtvý Ledge, QUNS, šuplík otevřený, terminál / Claude v popředí, odstup); volá `attention::on_change` | `decide` `Gate` `quiet_app` `on_needs_input` `QUIET_APPS` |
-| `src-tauri/src/incidents.rs` | stav incidentů z `status.anthropic.com` (Statuspage JSON): `parse` nejzávažnějšího probíhajícího, `clean` cizího textu (řídicí i formátovací znaky Cf pryč), `redirect_ok`, `due` (interval i po chybě), `retry_floor_ok` (spodní mez 60 s mezi pokusy i po změně volby), `maybe_refresh` z `emit` / otevření šuplíku / změny záložky, `on_config`; test nad `fixtures/statuspage-unresolved.json` | `parse` `Incident` `clean` `is_format_char` `redirect_ok` `due` `retry_floor_ok` `maybe_refresh` `on_config` `view` `URL` |
+| `src-tauri/src/incidents.rs` | stav incidentů z `status.anthropic.com` (Statuspage JSON): `parse` nejzávažnějšího probíhajícího, `clean` cizího textu (řídicí i formátovací znaky Cf pryč), `redirect_ok`, `due` (interval i po chybě), `retry_floor_ok` (spodní mez 60 s mezi pokusy i po změně volby), `visible` (stáří `ok_ms`, skrytí po `2 × everyMin`), `maybe_refresh` z `emit` / otevření šuplíku / změny záložky, `on_config`; test nad fixture | `parse` `Incident` `clean` `is_format_char` `redirect_ok` `due` `retry_floor_ok` `maybe_refresh` `on_config` `view` `URL` |
 | `src-tauri/src/dataexport.rs` | export útrat a limitů do CSV / Markdownu z pohledů držených v paměti (`costslive::view`, `limitslive::view`); `csv_cell` (uvozovky, ochrana před vzorci i po úvodních mezerách), prázdné = neznámé | `render` `Format` `csv_cell` `has_data` |
 | `src-tauri/src/commands/smart.rs` | Tauri příkaz `export_usage(format)`: dialog Uložit jako (rodič = šuplík) + zápis | `export_usage` |
 | `src-tauri/src/shelf/shortcut.rs` | přetažení na OTEVŘENÝ šuplík: `target_for` (zavřený = přihrádka, otevřený naplno = nový zástupce — zóny se nekryjí), `judge` / `classify` puštěných dat (soubor / složka / `.exe` / web; příkaz nikdy; `.lnk` `.url` `.bat` `.cmd` a vše mimo `personal::FILE_ALLOW` = `Verdict::Refuse` s větou, událost `drop-refused`), `Payload` | `target_for` `Kind` `judge` `Verdict` `classify` `Payload` `is_web_url` |
@@ -20,7 +20,7 @@ Nastavení → Šuplík a karty → Otevírání a klávesy (klávesy, přetaže
 | `src/layout/tabwheel.ts` | čistá logika kolečka nad záložkami (součet, odstup, bez zalamování); zapojení v `layout/Tabs.tsx` `onWheel` | `wheelStep` `nextTab` `wheelAllowed` `pxOf` |
 | `src/actions/dropshortcut.ts` · `dropstate.ts` · `DropNew.tsx` | nový zástupce z přetaženého: čistý návrh akce (`draftFrom`, `readPayload`, `visibility` = uvidí se na záložce?), signál návrhu, panel s `ActionEditor` (líný chunk); zapíše až „Přidat“ | `draftFrom` `readPayload` `visibility` `hostCards` · `offerDrop` `dropped` · `DropNew` |
 | `src/exports/model.ts` · `usage.ts` | `canExport`, položky „Exportovat…“ v ⋯ karty Claude (`MainPage` → `extra`) | `canExport` · `exportMenuItems` `exportUsage` |
-| `src/limits/incident.ts` | popisky incidentu (stav, závažnost), řádek v `limits/LimitsRow.tsx` `IncidentLine` | `statusText` `severity` `shown` `STATUS_URL` |
+| `src/limits/incident.ts` | popisky incidentu (stav, závažnost), řádek v `limits/LimitsRow.tsx` `IncidentLine` | `statusText` `severity` `shown` `ageMin` `staleMin` `STATUS_URL` |
 | `src/i18n/en-smart.ts` | angličtina `actions.drop.*`, `sessions.export.*` (incidenty v `en-limits.ts`, volby v `settings/en.ts`) | |
 
 ## Toky
@@ -41,7 +41,7 @@ Nastavení → Šuplík a karty → Otevírání a klávesy (klávesy, přetaže
 - Přihrádka (zavřený proužek) a nový zástupce (otevřený šuplík) se vybírají STAVEM šuplíku, ne polohou — nikdy nejsou aktivní zároveň.
   Vlastní tah karet v šuplíku (pointer události) cíl nezapne: vyžaduje vjezd s drženým tlačítkem a popředí jiné aplikace.
 - Z puštěného nikdy nevznikne `command`; `.exe` je `app` s předvyplněným „ptát se před spuštěním“; nic se nespustí ani neuloží bez Přidat.
-- Incident: text je cizí (ořez, bez řídicích znaků, jen jako text); chyba sítě nic nehlásí v UI (starý údaj zůstane, důvod do logu).
+- Incident: text je cizí (ořez, bez řídicích znaků, jen jako text); chyba sítě nic nehlásí; starý údaj zůstane jen do `ttlMin` (2 × interval), po půl prahu UI připíše „údaj před N min“, pak se skryje (důvod do logu).
 - V `quick/quick.css` nesmí být CSS třídy (jen `data-qn`), jinak kolize s vlastníky tříd (`cssClasses.test.mjs`).
 
 ## Testy

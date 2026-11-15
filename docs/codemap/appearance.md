@@ -1,6 +1,6 @@
 # Codemapa: vzhled a animace (`appearance`)
 
-Styly, motivy, akcent, pozadí šuplíku (kolo 25), písmo, materiál, rozložení a šířka, animace, vzhled proužku. Config `appearance` ([config-behavior.md](../agents/config-behavior.md) → Vzhled) …
+Styly, motivy, akcent, pozadí, písmo, materiál, rozložení, šířka, animace, proužek. Config `appearance` ([config-behavior.md](../agents/config-behavior.md) → Vzhled) …
 
 Detail (toky, invarianty, testy, co nečíst, historie): [appearance-detail.md](appearance-detail.md).
 
@@ -9,11 +9,11 @@ Detail (toky, invarianty, testy, co nečíst, historie): [appearance-detail.md](
 | `src-tauri/src/appearance.rs` | struktura configu, výchozí hodnoty, validace (jen nová pole), testy (i starý … | `AppearanceConfig` `Theme` |
 | `src-tauri/src/appearance/pages.rs` | vzhled záložek (`appearance.pages` = … | `PageLook` `CustomTheme` |
 | `src-tauri/src/appearance/look.rs` | složky stylu bez barev: písmo, materiál, rozložení (+ `Notch` s pevnou šířkou … | `FontLook` `Material` `Layout` |
-| `src-tauri/src/appearance/size.rs` | kolo 23, velikost otevřeného šuplíku (`appearance.size` = … | `SizeConfig` `PageSize` |
+| `src-tauri/src/appearance/size.rs` | velikost šuplíku (`appearance.size`) … | `SizeConfig` `PageSize` |
 | `src-tauri/src/appearance/stripdeco.rs` | ozdoby proužku podle `strip.style`: okraj, okraj v akcentu, tvrdý / měkký stín … | `strip_deco` `StripDeco` |
 | `src-tauri/src/appearance/motion.rs` | pohyb okna šuplíku z `motion` (none nebo systémové „omezit pohyb“ = 0 ms, jinak … | `drawer_anim_ms` `anim_ms_now` |
 | `src-tauri/src/appearance/geom.rs` | čistá geometrie a barvy pro Rust: osa Ledge u hrany, šířka (předvolba stylu / … | `anchor_c2` `span_x` |
-| `strip.rs` (`draw`) | kreslí podle `StripModel.{style, metrics, palette, line, axis2, pulse}` + … | `StripModel` `pulse_now` |
+| `stripclassic.rs` (`draw`) | kreslí podle `StripModel.{style, metrics, palette, line, axis2, pulse}` + … | `StripModel` `pulse_now` |
 | `stripview.rs` (`refresh_strip`) | naplní vzhled modelu z configu; u `strip.look` ≠ `classic` i … | `look_facts` |
 | `src-tauri/src/looks/mod.rs` | styly zavřeného Ledge (`strip.look`): `Look` (id = kontrakt s … | `Look` `Facts` `Show` `Part` |
 | `src-tauri/src/looks/facts.rs` · `frame.rs` | převody stavu jádra (časovač, právě hraje, limit 5h a týden, baterie, počasí z … | `timer_fact` `music_fact` |
@@ -24,36 +24,38 @@ Detail (toky, invarianty, testy, co nečíst, historie): [appearance-detail.md](
 | `src/strip/looks.ts` · `strip/en.ts` | jediný seznam stylů pro Nastavení (`STRIP_LOOKS` = `{ id, key, cs, en, desc }` … | `STRIP_LOOKS` `STRIP_LOOK_IDS` |
 | `src/strip/compose.ts` · `compose.test.mjs` | vlastní vzhled pro Nastavení: `COMPOSE_SHAPES` / `COMPOSE_ITEMS` / … | `composeOf` `normCompose` |
 | `drawer.rs` | `set_anchor` + `place` (x z `anchor_c2`/`span_x`); šířku dostává oříznutou | `Drawer::set_anchor` |
-| `drawer/resize.rs` | kolo 23, `Drawer::resize`: otevřený Full na velikost z `appearance.size` … | `Drawer::resize` |
+| `drawer/resize.rs` | `Drawer::resize` na `appearance.size` … | `Drawer::resize` |
 | `threads/ui.rs` | před každým `UiCmd`: `set_anchor`, šířka = `geom::drawer_width_for` (vlastní … |  |
 | `threads/hover.rs` | zóna = `looks::frame::zone`: podle skutečného obdélníku proužku (linka / lišta … |  |
 | `src-tauri/src/threads/pointer.rs` | pojistky hoveru (kolo 22): `cursor_visible` (skrytý = `flags == 0` … | `cursor_visible` |
 | `settings.rs` (`apply_config`) | změna `appearance` → událost `appearance` do šuplíku; proužek přes `mark_dirty` |  |
 | `src/theme/looks.ts` | tabulka stylů a jejich složek jako čistá data … | `STYLES` `STYLE_IDS` `styleOf` |
-| `src/notch/{NotchBar,BarPanel,barThumbs,SecMedia,SecTime,SecSystem,SecInfo}.tsx` · `src/notch/{model,bar,designs,look,barState,en}.ts` · `notch.css` · `src-tauri/src/notchbar.rs` | lišta notche (`notchBar`) … | `barPlan` |
+| `src/notch/{NotchBar,BarPanel,barThumbs,SecMedia,SecTime,SecSystem,SecInfo}.tsx` · `src/notch/{model,bar,designs,look,barState,sysRows,en}.ts` · `notch.css` · `src-tauri/src/notchbar.rs` | lišta notche … | `barPlan` |
 | `src/theme/styles.ts` | výběr stylu: hodnoty stylu do vzhledu / celého configu, které složky se od … | `withStyle` `configWithStyle` |
 | `src/theme/openAnim.ts` · `springs.ts` | plán otevření / zavření podle stylu animace (clip-path morf, „z výřezu“ přes … | `openPlan` `closePlan` `Geo` |
-| `src-tauri/src/appearance/backdrop.rs` · `src/theme/{backdrop,backdropPresets,backdropLive,backdropLoop}.ts` · `src/theme/BackdropLayer.tsx` | kolo 25, pozadí šuplíku: gradienty, závoj podle kontrastu, živá pozadí jen při otevření … | `BackdropConfig` `veilFor` `drawMode` |
+| `src-tauri/src/appearance/backdrop.rs` · `src/theme/{backdrop,backdropPresets,backdropLive,backdropLoop}.ts` · `src/theme/BackdropLayer.tsx` | pozadí šuplíku (kolo 25) … | `BackdropConfig` `veilFor` `drawMode` |
 | `src/settings/panels/{AppearanceBackdrop,GradientEditor,AppearanceAccent}.tsx` · `en-backdrop.ts` | Studio: galerie pozadí, editor vlastního gradientu, gradientní akcent … | `AppearanceBackdrop` |
-| `src/theme/themes.ts` | 16 motivů jako úplné sady tokenů (`COLOR_KEYS`); `dark` = `styles.css` … | `THEMES` `THEME_IDS` |
-| `src/theme/contrast.ts` | kontrast textu (WCAG) — jedna implementace pro test motivů i živou kontrolu v … | `textProblems` `contrast` |
+| `src-tauri/src/appearance/auto.rs` · `src-tauri/src/winlook.rs` · `src/theme/auto.ts` · `src/settings/panels/AppearanceAuto.tsx` | Podle Windows | `resolveAuto` |
+| `src/theme/themes.ts` | 26 motivů, úplné sady tokenů (`COLOR_KEYS`); `dark` = `styles.css` | `THEMES` `THEME_IDS` |
+| `src/theme/themeGroups.ts` | skupiny motivů (`group` v `palettes.json`) | `THEME_GROUPS` `themesIn` |
+| `src/theme/contrast.ts` | kontrast textu (WCAG), `onAccent` = `--on-accent` | `textProblems` `contrast` `onAccent` |
 | `src/theme/customThemes.ts` | vlastní motivy (čistě): `resolveCustom` složí úplné tokeny (vrstvy z `base`, u … | `CUSTOM_KEYS` `resolveCustom` |
 | `src/theme/pages.ts` | vzhled záložek (čistě): `effectiveAppearance(a, pageId)` = celek + přepis … | `effectiveAppearance` |
-| `src/theme/size.ts` | kolo 23, čistá logika velikosti šuplíku (zrcadlo `appearance/size.rs`) … | `normalizeSize` `sizeFor` |
+| `src/theme/size.ts` | logika velikosti šuplíku (zrcadlo `size.rs`) … | `normalizeSize` `sizeFor` |
 | `src/theme/appearance.ts` | čistá logika: proměnné (+ `lookVars`), normalizace (vč … | `appearanceVars` |
 | `src/theme/apply.ts` · `label.ts` | DOM: proměnné na `<html>` (staré smaže) … | `applyAppearance` |
 | `src/motion.ts` | styl/rychlost mění jen parametry pružin a délky … | `setMotion` `motionNow` `dur` |
 | `src/App.tsx` (`prepare`/`play`/`closing`) | přehraje `openPlan`/`closePlan` na `.shell` … | `geo` `settle` |
 | `src/settings/panels/Appearance.tsx` | jeden krok Vzhledu jako otázka Studia (`AppearanceStep step=closed|hover|open|motion`); rozbalené Doladit drží modul | `AppearanceStep` `AppearancePanel` |
 | `panels/AppearanceClosed.tsx` · `StripSettings.tsx` | krok Zavřený: galerie 15 vzhledů `strip.look` + dlaždice „Vlastní“ … | `AppearanceClosed` `normLook` |
-| `panels/ComposeEditor.tsx` · `ComposeDeco.tsx` · `ComposeText.tsx` · `compose.css` · `previews/ComposePreview.tsx` | krok Zavřený, kolo 23: dlaždice „Vlastní“ pod galerií (`AppearanceClosed` … | `ComposeEditor` |
+| `panels/ComposeEditor.tsx` · `ComposeDeco.tsx` · `ComposeText.tsx` · `compose.css` · `previews/ComposePreview.tsx` | krok Zavřený: dlaždice „Vlastní“ (`AppearanceClosed` … | `ComposeEditor` |
 | `panels/AppearanceHover.tsx` | krok Po najetí: 3 dlaždice `drawer.hover` (data `src/hover/modes.ts` od J) s … | `AppearanceHover` `normHover` |
 | `panels/AppearanceOpen.tsx` · `AppearanceStyles.tsx` · `AppearanceLayout.tsx` | krok Otevřený: galerie stylů (živé miniatury, najetí = dočasný náhled přes … | `AppearanceOpen` |
-| `panels/AppearanceOpen.tsx` `SizeTable` | kolo 23, krok Otevřený (pod Šířkou a hustotou) → „Velikost otevřeného Ledge“ … | `SizeTable` |
+| `panels/AppearanceOpen.tsx` `SizeTable` | krok Otevřený → „Velikost otevřeného Ledge“ … | `SizeTable` |
 | `panels/AppearanceThemes.tsx` | Barvy: galerie vestavěných i vlastních motivů (vzorníky, najetí = náhled) … | `AppearanceThemes` |
 | `panels/AppearancePages.tsx` | Vzhled záložek: řádek na záložku z `layout.pages` (`pageName`) … | `AppearancePages` |
 | `panels/AppearanceMotion.tsx` · `apUi.tsx` · `appearance.css` · `en-look.ts` | krok Pohyb (9 ukázek, hraje jen po kliku, rychlost … | `AppearanceMotion` `Ap` `Seg` |
-| `src/settings/previews/{HoverPreview,MonitorPreview,StripLookPreview}.tsx` (`previews.css`, `en.ts`) | HTML náhledy (prefix `apv-`): zavřený Ledge na „horní hraně monitoru“ a po … | `StripLookPreview` |
+| `src/settings/previews/{HoverPreview,MonitorPreview,StripLookPreview}.tsx` | HTML náhledy (prefix `apv-`): zavřený Ledge na „horní hraně monitoru“ a po … | `StripLookPreview` |
 | `src/layout/CardLook.tsx` (`CardLookPanel`, líný chunk; stav v `lookState.ts`) | jediný panel vzhledu karty (⋯ → Vzhled karty…) … | `CardLookPanel` `openCardLook` |
 | `src/palette/styles.ts` | paleta Ctrl+K: „Styl: …“ → `configWithStyle` → `save_config` | `styleItems` |
 

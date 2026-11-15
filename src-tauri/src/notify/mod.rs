@@ -170,7 +170,7 @@ fn cursor_on_strip_monitor() -> bool {
 fn peek_shows_attention() -> bool {
     use crate::drawer::View;
     let c = core();
-    c.claude.attention() && !c.dead() && matches!(c.drawer.view(), View::Hidden | View::Peek)
+    c.claude.attention() && !c.dead_surface() && matches!(c.drawer.view(), View::Hidden | View::Peek)
 }
 
 /// Odešli oznámení. Volá se až PO bráně `attention::signal` (ta vrátila true).
@@ -249,7 +249,7 @@ pub(crate) fn stage(stage: bool, drawer_open: bool) -> Option<Rgba> {
 /// Ukázka ze Studia (tlačítko „Vyzkoušet“): hned v proužku, se smyšleným obsahem; tlačítko jen zavře.
 pub(crate) fn preview(kind: Kind, style: Option<NotchStyle>) -> Result<(), String> {
     let c = core();
-    if c.dead() {
+    if c.dead_surface() {
         return Err(tr("Ledge je teď ztlumený (hra přes celou obrazovku nebo herní režim).", "Ledge is muted right now (fullscreen game or game mode).").into());
     }
     if !STAGE.load(std::sync::atomic::Ordering::Relaxed) {
@@ -290,7 +290,7 @@ pub(crate) fn owns_pointer(x: i32, y: i32) -> bool {
             if let Some(l) = m.notice.as_mut() {
                 let keep_from = choreo::OPEN_MS + l.hold.saturating_sub(HOVER_KEEP.as_millis() as u64);
                 if l.elapsed() > keep_from {
-                    l.start = Instant::now() - Duration::from_millis(keep_from);
+                    l.start = crate::guard::ago(Duration::from_millis(keep_from));
                 }
             }
         });
@@ -328,7 +328,7 @@ pub(crate) fn click(x: i32, y: i32) {
             // hned do fáze zavírání
             let close_at = choreo::OPEN_MS + l.hold;
             if l.elapsed() < close_at {
-                l.start = Instant::now() - Duration::from_millis(close_at);
+                l.start = crate::guard::ago(Duration::from_millis(close_at));
             }
         }
     });

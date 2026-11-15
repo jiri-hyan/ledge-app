@@ -113,7 +113,13 @@ pub(crate) fn pin_init(window: WebviewWindow) -> Result<PinInit, String> {
     let prefs = win::prefs_of(&label).unwrap_or_default();
     let cfg = core().cfg.read().clone();
     let key = cfg.hotkeys.note_passthrough.trim().to_string();
-    let key_ok = !key.is_empty() && crate::hotkeys::is_registered(&key);
+    let (open, through) = (win::any_open(), win::any_through());
+    let live = crate::config::passthrough_key_live(cfg.hotkeys.enabled, open, through);
+    // plán po zapnutí průchozího režimu: zkratka je v sadě a systém ji přečte
+    let planned = !key.is_empty()
+        && crate::hotkeys::parse_shortcut(&key).is_some()
+        && crate::config::active_hotkeys_pins(&cfg, false, true, true).iter().any(|(a, _)| *a == "notePassthrough");
+    let key_ok = crate::config::passthrough_key_ok(live, !key.is_empty() && crate::hotkeys::is_registered(&key), planned);
     Ok(PinInit { path, prefs, key, key_ok, hint_seen: win::hint_seen(), lang: cfg.ui.lang, fresh: win::take_fresh(&label), tag_colors: cfg.notes.tag_colors.clone(), projects: cfg.projects.iter().map(|p| (p.id.clone(), p.name.clone())).collect(), project_colors: project_colors(&cfg.projects) })
 }
 
@@ -176,6 +182,18 @@ pub(crate) fn pin_hide(window: WebviewWindow, until: String) -> Result<(), Strin
     let at = notes::parse_time(until.trim()).ok_or_else(|| trf!("Neplatné datum „{until}“.", "Invalid date “{until}”."))?;
     win::hide(&label, at.timestamp_millis())?;
     mark_dirty();
+    Ok(())
+}
+
+/// Okno lístku: výslovný klik do lístku → okno smí přijmout klávesnici (jinak NOACTIVATE, `winstyle.rs`);
+/// po ztrátě fokusu se zase zamkne. Průchozí lístek se neaktivuje.
+#[tauri::command(async)]
+pub(crate) fn pin_activate(window: WebviewWindow) -> Result<(), String> {
+    let label = pin_label(&window)?;
+    if win::prefs_of(&label).is_some_and(|p| p.through) {
+        return Ok(());
+    }
+    win::activate(&window);
     Ok(())
 }
 

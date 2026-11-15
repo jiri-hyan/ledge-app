@@ -63,7 +63,7 @@ pub fn git_files(dir: &Path) -> Vec<String> {
     let out = std::process::Command::new("git")
         .args(["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
         .current_dir(dir)
-        .creation_flags(0x0800_0000)
+        .creation_flags(crate::procman::CREATE_NO_WINDOW)
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .output();

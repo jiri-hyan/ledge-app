@@ -64,12 +64,12 @@ fn changed() {
 
 #[tauri::command(async)]
 pub(crate) fn brief_send(path: String) -> Result<(), String> {
-    launch(&path, false)
+    launch(&path, false, false)
 }
 
 #[tauri::command(async)]
 pub(crate) fn brief_resume(path: String) -> Result<(), String> {
-    launch(&path, true)
+    launch(&path, true, false)
 }
 
 #[tauri::command]
@@ -92,7 +92,23 @@ pub(crate) fn brief_stop(path: String) -> Result<(), String> {
     Ok(())
 }
 
-fn launch(path: &str, resume: bool) -> Result<(), String> {
+/// Po odpovědi člověka na otázku (`note_answer`): je-li zapnuté `claude.brief.autoResume` a odpověď byla poslední
+/// (`plan::auto_ok`), zadání pokračuje samo. Chyba (klíč, MCP, vyčerpaný strop) = zapíše se do Logu a zůstane
+/// tlačítko Pokračovat; odpověď tím nikdy nepadne.
+pub(crate) fn after_answer(path: &str) {
+    let Some(root) = notes_root() else { return };
+    let enabled = core().cfg.read().claude.brief.auto_resume;
+    let Ok(info) = note::load(&root, Path::new(path)) else { return };
+    if !plan::auto_ok(&info, enabled) {
+        return;
+    }
+    if let Err(e) = launch(path, true, true) {
+        let _ = note::log(&root, Path::new(path), &format!("Samo pokračovat nejde: {e}"), &crate::notes::now_local());
+        changed();
+    }
+}
+
+fn launch(path: &str, resume: bool, auto: bool) -> Result<(), String> {
     // dva rychlé kliky nesmí projít kontrolou „neběží“ oba
     static LAUNCH: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
     let _one = LAUNCH.lock();
@@ -130,6 +146,9 @@ fn launch(path: &str, resume: bool) -> Result<(), String> {
     let now = crate::notes::now_local();
     let budget = format!("{}", p.budget);
     note::meta(&root, &note_path, &[("status", Some("running")), ("session", Some(&session)), ("model", Some(&p.model)), ("budget", Some(&budget))], &now)?;
+    if auto {
+        let _ = note::log(&root, &note_path, &format!("Pokračuje samo po odpovědi (strop ${:.2}, zbývá ${:.2}).", p.budget, p.left), &now);
+    }
     let start = proc::Start {
         real: info.real.clone(),
         exe,

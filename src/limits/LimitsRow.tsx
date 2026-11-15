@@ -7,7 +7,7 @@ import { dayNames, fmtClock } from "../format";
 import { t, tp } from "../i18n";
 import { bar, left, level, otherDay, pctText, resetHint, winState, type LimitWindow } from "./model";
 import { paceOf, paceTip } from "./pace";
-import { severity, shown, statusText, STATUS_URL } from "./incident";
+import { severity, shown, staleMin, statusText, STATUS_URL } from "./incident";
 import { api } from "../api";
 import "./limits.css";
 import { gotoSettingsPanel } from "../palette/goto";
@@ -89,15 +89,16 @@ function LimitBar(p: { label: string; w: LimitWindow | null; lv: LimitsView; now
 }
 
 /** Probíhající incident Anthropicu (jen s volbou `smart.incidents` a skutečným incidentem; jinak nic). */
-function IncidentLine(p: { s: Snapshot }) {
+function IncidentLine(p: { s: Snapshot; now: number }) {
   return (
-    <Show when={shown(p.s.incident) ? p.s.incident : null}>
+    <Show when={shown(p.s.incident, p.now) ? p.s.incident : null}>
       {(i) => (
         <button class="lim-inc" data-sev={severity(i().impact)} title={t("sessions.incident.open", "Otevřít stránku stavu Anthropicu")} onClick={() => void api.openUrl(STATUS_URL)}>
           <span class="lim-inc-dot" aria-hidden="true" />
           <span class="lim-inc-text">
             {t("sessions.incident.lead", "Anthropic hlásí incident")}: {i().name} · {statusText(i().status)}
             <Show when={i().more > 0}> {tp("sessions.incident.more", i().more, ["(+{n} další)", "(+{n} další)", "(+{n} dalších)"])}</Show>
+            <Show when={staleMin(i(), p.now) !== null}> · {t("sessions.incident.age", "údaj před {n} min", { n: staleMin(i(), p.now)! })}</Show>
           </span>
         </button>
       )}
@@ -115,7 +116,7 @@ export default function LimitsRow(p: { s: Snapshot; now: number; onSettings: () 
   };
   return (
     <>
-    <IncidentLine s={p.s} />
+    <IncidentLine s={p.s} now={p.now} />
     <Show when={lv()}>
       {(l) => (
         <Show when={l().at != null} fallback={<>

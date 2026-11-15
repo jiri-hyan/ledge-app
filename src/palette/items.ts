@@ -19,7 +19,7 @@ import { pageName } from "../layout/text";
 import { placeOf } from "../projects/model";
 import { restartProject, startProject, stopAll } from "../projects/state";
 import { styleItems } from "./styles";
-import { isPinned, newPin, throughAll, throughLabel, togglePin } from "../notes/pins";
+import { hiddenUntil, isPinned, newPin, throughAll, throughLabel, togglePin } from "../notes/pins";
 import { deskItems } from "../desk/palette";
 
 export type Section = "action" | "project" | "note" | "claude" | "settings" | "app" | "script" | "windows" | "calc" | "convert" | "emoji" | "clip";
@@ -69,7 +69,26 @@ const LIVE = ["ready", "running", "starting", "preparing"];
 const report = (p: Promise<unknown>, ok?: (v: any) => string) =>
   p.then((v) => ok && say(ok(v)), sayError);
 
-export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
+/**
+ * Řádky poznámek (otevřít + připnout / odepnout na plochu, 2 na poznámku z `note_list`). Zvlášť od `buildItems`, aby se
+ * při změně procesů / akcí nepřestavovaly stovky objektů — Palette je drží ve vlastním memu (čte jen `notesEnabled`,
+ * `projects` a `pins`).
+ */
+export function noteItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
+  if (!s.notesEnabled) return [];
+  const out: PItem[] = [];
+  for (const n of notes) {
+    const proj = n.project ? (s.projects.find((x) => x.id === n.project)?.name ?? n.project) : "";
+    const name = n.title || t("palette.note.untitled", "(bez názvu)");
+    out.push({ id: `note:${n.path}`, section: "note", order: 5, title: name, sub: [proj, n.kind, n.done ? t("palette.note.done", "hotovo") : ""].filter(Boolean).join(" · "), run: () => nav.onOpenNote(n) });
+    const pinned = isPinned(s.pins, n.path);
+    const hid = hiddenUntil(s.pins, n.path);
+    out.push({ id: `pin:${n.path}`, section: "note", order: 6, title: hid != null ? t("palette.pin.showNow", "Ukázat schovaný lístek hned: {name}", { name }) : pinned ? t("palette.pin.unpin", "Odepnout z plochy: {name}", { name }) : t("palette.pin.pin", "Připnout na plochu: {name}", { name }), keywords: "listek plocha pripnout odepnout schovany ukazat sticky", run: () => togglePin(n.path, hid) });
+  }
+  return out;
+}
+
+export function buildItems(s: Snapshot, nav: Nav): PItem[] {
   const out: PItem[] = [];
   const add = (x: PItem) => out.push(x);
 
@@ -107,13 +126,6 @@ export function buildItems(s: Snapshot, notes: NoteView[], nav: Nav): PItem[] {
     // lístky na plochu (`notes/pins.ts`): nový, připnout / odepnout poznámku, průchozí režim
     add({ id: "pin:new", section: "note", order: 0, title: t("palette.pin.new", "Nový lístek na plochu"), sub: t("palette.pin.newSub", "Poznámka přes ostatní okna — checklist k QA, Ctrl+V vloží snímek"), keywords: "listek plocha pripnout sticky overlay qa checklist navrchu", run: () => newPin() });
     if (s.pins?.open.length) add({ id: "pin:through", section: "note", order: 1, title: throughLabel(s), keywords: "listky pruchozi mys click through klikat skrz", run: () => throughAll() });
-    for (const n of notes) {
-      const proj = n.project ? (s.projects.find((x) => x.id === n.project)?.name ?? n.project) : "";
-      add({ id: `note:${n.path}`, section: "note", order: 5, title: n.title || t("palette.note.untitled", "(bez názvu)"), sub: [proj, n.kind, n.done ? t("palette.note.done", "hotovo") : ""].filter(Boolean).join(" · "), run: () => nav.onOpenNote(n) });
-      const name = n.title || t("palette.note.untitled", "(bez názvu)");
-      const pinned = isPinned(s.pins, n.path);
-      add({ id: `pin:${n.path}`, section: "note", order: 6, title: pinned ? t("palette.pin.unpin", "Odepnout z plochy: {name}", { name }) : t("palette.pin.pin", "Připnout na plochu: {name}", { name }), keywords: "listek plocha pripnout odepnout sticky", run: () => togglePin(n.path) });
-    }
   }
 
   if (s.claudeEnabled) {

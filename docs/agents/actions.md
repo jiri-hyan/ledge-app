@@ -29,8 +29,8 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   `group`, `confirm` (ptát se před každým spuštěním), `showOn` (`work`/`personal`/`both`), `look`
   (vlastní vzhled dlaždice — stejný tvar jako u projektů výš; přebije `icon`).
   Výchozí hodnoty se do souboru nepíšou. `id` = a–z, 0–9, `-`, `_`, jednoznačné; nejvýš 64 akcí.
-- **Agent smí akce přidávat a měnit** (web, složka, soubor, aplikace bez argumentů se spouští hned).
-  **Příkaz a aplikace s argumenty se bez souhlasu člověka vždy ptají** — souhlas uděluje jen člověk
+- **Agent smí akce přidávat a měnit** (web, složka a soubor se spouští hned).
+  **Příkaz a aplikace (i bez argumentů) se bez souhlasu člověka vždy ptají** — souhlas uděluje jen člověk
   zaškrtnutím v Nastavení a ukládá se mimo config (`%LOCALAPPDATA%\Ledge\actions-consent.json`, otisk
   přesného příkazu). Ten soubor nikdy nezapisuj; změna cíle/argumentů/složky souhlas zneplatní.
 - Favicon se stáhne jednou (při přidání akce, `%LOCALAPPDATA%\Ledge\icons\<host>.png`, neúspěch
@@ -41,7 +41,7 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   normální okno s rámem pod proužkem u kurzoru (fokus dostane — je to výslovný klik); druhý klik okno jen
   přenese dopředu (nezavře — rozehraná hudba / rozepsaný mail). Křížek okno **zničí** (žádné skrývání,
   žádný časovač; zavřené okno nic nestojí). Okno sdílí se šuplíkem proces prohlížeče WebView2 i data dir
-  (`%LOCALAPPDATA%\cz.hyan.ledge\EBWebView`), takže přihlášení přežije zavření. Stránka nemá žádné IPC
+  (`%LOCALAPPDATA%\app.ledge.desktop\EBWebView`, název podle `identifier`; od 0.16.0 se profil starého identifikátoru jednou zkopíruje, viz `install.md`), takže přihlášení přežije zavření. Stránka nemá žádné IPC
   (okno `web-<id>` není v capabilities, vzdálený původ Tauri odmítne), navigace mimo http/https se zahodí,
   `window.open` / odkazy do nového okna jdou do výchozího prohlížeče. Poloha a velikost per akce v
   `%LOCALAPPDATA%\Ledge\web-panels.json` (zapíše se při zavření; změna `width`/`height` ji zahodí). Ve
@@ -57,7 +57,7 @@ Dlaždice na jedno kliknutí (karta „Rychlé akce“ na Práci i Osobní) a po
   `url`, `.exe` → `app`, dokument z allowlistu → `file`, jinak `folder`), `showOn: "personal"`. Cíl, který
   už má akce viditelná na Osobní, se jen odebere. Převod je idempotentní a beze ztráty: odkaz, který by
   jako akce neprošel validací (relativní cesta, plný seznam 64 akcí), **zůstane** v `personal.links`
-  (karta Odkazy ho ukáže pod akcemi, Nastavení ho nabídne k opravě). Na disk se nový tvar zapíše až
+  (karta Odkazy a akce ho ukáže pod akcemi, Nastavení ho nabídne k opravě). Na disk se nový tvar zapíše až
   příštím uložením. Nové odkazy do `personal.links` nepiš.
 
 ### Skripty (Script Commands)
@@ -101,6 +101,8 @@ Get-ChildItem $env:TEMP | Where-Object LastWriteTime -lt (Get-Date).AddDays(-$Da
   soubor nad 1 MB se nespustí.
 
 ### Widgety ze skriptů
+
+(Bez skriptu: šablona `*.kit.json`, viz „Šablonový widget“ níž.)
 
 Jako xbar / SwiftBar / Übersicht: soubor ve složce widgetů (`.ps1`, `.cmd`/`.bat`, `.py`, `.js`/`.mjs`,
 `.exe`) s hlavičkou `@ledge.widget` vypíše na stdout data → Ledge z nich nakreslí **kartu** (`widget:<soubor>`
@@ -148,6 +150,33 @@ mapa kódu `docs/codemap/widgets.md`.
   kurz ČNB (ps1 + py, síť www.cnb.cz), počasí jinde přes Open-Meteo (ps1 + py), Docker, GitHub CI přes `gh`,
   ping (ps1 + py), síť a VPN, místo na disku (ps1 + py), uptime (ps1 + py), odpočet (ps1 + py, py = textový
   formát). Kopie do složky nikdy nepřepíše existující soubor a sama se nespustí.
+
+#### Šablonový widget (`*.kit.json`)
+
+Soubor `<jméno>.kit.json` ve složce widgetů; bez procesu, bez souhlasu, bez hlavičky. Karta `widget:<jméno>.kit.json`.
+Agent ho smí psát volně (nic nespouští), jen drž limity: ≤ 16 KB, ≤ 12 řádků, ≤ 6 tlačítek, texty ≤ 120 znaků.
+
+```json
+{ "kit": 1, "title": "Claude kokpit", "icon": "◐",
+  "rows": [
+    { "bar": "limits.five.pct", "label": "5 h", "tone": { "over": [[80, "amber"], [95, "red"]] } },
+    { "text": "Čeká: {waiting.count}", "tone": { "over": [[1, "red"]] }, "open": "drawer:claude" },
+    { "text": "Dnes {costs.today|usd}", "copy": "{costs.today}" } ],
+  "buttons": [ { "label": "Build", "action": "build-ledge" } ] }
+```
+
+- `kit` = 1 a `title` jsou povinné; `rows` pole (řádek má `text` a/nebo `bar` = cesta zdroje průběhu, `label`, `tone`).
+  `tone.over` = až 4 dvojice `[práh, tón]`, tón `ok|amber|red|dim` (žádný hex). Neznámé klíče se ignorují,
+  špatný řádek / tlačítko se zahodí s poznámkou (karta ji ukáže), rozbitý JSON = karta s chybou.
+- Text smí mít `{zdroj}` / `{zdroj|formát}`; které zdroje a formáty existují, určuje UI (`src/widgetkit/sources.ts`),
+  neznámý zdroj = prázdno, ne divadlo.
+- Pravdivost: co zdroj neví, ukáže „—“, nikdy 0 ani starý údaj. `limits.*.pct` jen z čerstvého vzorku (starší než
+  `staleMs`, okno po resetu nebo bez dat = „—“), `costs.*` jen při `state` ok, `procs.count` bez dat „—“. Kit na ploše
+  dostane data jen skupin, které jeho zdroje potřebují (`widgetkit/needs.rs`); `waiting.count` je skutečný počet.
+- Akce (nejvýš jedna na řádek / tlačítko): `open` (cesta, nebo `drawer:<karta>`) · `url` (http/https) · `copy` (≤ 4 KB) ·
+  `action` (id z tvých rychlých akcí; `confirm` a souhlas příkazů drží `actions.rs`). `run` skriptu ne.
+- Mapa kódu: `docs/codemap/widgetkit.md`.
+
 - Tauri: `widgets_list`, `widget_consent(id, confirmed)`, `widget_refresh`, `widget_output`, `widget_edit`
   (sloveso `edit`, jinak Poznámkový blok — nikdy „otevřít“, to by `.py` spustilo), `widgets_open_dir`,
   `widget_templates`, `widget_install(file)`, `widget_click(id, index, label)`.

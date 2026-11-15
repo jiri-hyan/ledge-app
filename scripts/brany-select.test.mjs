@@ -21,8 +21,9 @@ test("selectGates: tabulka výběru", () => {
     [[], []],
     [["src/App.tsx"], ["tsc", "ui"]],
     [["src/a.css", "scripts/x.mjs"], ["tsc", "ui"]],
-    [["src-tauri/src/lib.rs"], ["test", "clippy"]],
-    [["src-tauri/src/lib.rs", "src-tauri/src/a.rs"], ["test", "clippy"]],
+    [["src-tauri/src/lib.rs"], ["test", "clippy", "ui"]],
+    [["src-tauri/src/lib.rs", "src-tauri/src/a.rs"], ["test", "clippy", "ui"]],
+    [["src-tauri/capabilities/main.json"], ["test", "clippy", "ui"]], // J1: ipc-window-acl.test.mjs čte capabilities
     [["src/App.tsx", "src-tauri/src/lib.rs"], ["test", "clippy", "tsc", "ui"]],
     [["package.json"], ["test", "clippy", "tsc", "ui"]],
     [["src-tauri/Cargo.lock"], ["test", "clippy", "tsc", "ui"]],
@@ -33,7 +34,7 @@ test("selectGates: tabulka výběru", () => {
     [["docs/a.md", "src-tauri/src/lib.rs"], ["test", "clippy", "ui"]],
     [[".github/workflows/ci.yml"], []],
     [[".github/workflows/ci.yml", "src/a.ts"], ["tsc", "ui"]],
-  ]) assert.deepEqual(selectGates(files).gates, gates, files.join(" "));
+  ]) assert.deepEqual(selectGates(files).gates, files.length ? ["denylist", ...gates] : gates, files.join(" ")); // denylist je levná a běží vždy
 });
 
 test("selectGates: vždy vysvětlí proč", () => {

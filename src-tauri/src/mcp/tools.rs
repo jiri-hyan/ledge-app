@@ -5,7 +5,7 @@
 
 use super::rpc::{self, RpcErr};
 use super::undo::{self, Entry};
-use super::{Host, Server, edit, look, notes, schema};
+use super::{Host, Server, edit, look, notes, read, schema};
 use crate::actions::Action;
 use crate::config::{Config, Project};
 use crate::i18n::tr;
@@ -149,6 +149,9 @@ fn id_only() -> Value {
 pub const TOOLS: &[Tool] = &[
     Tool { name: "ledge_status", write: false, input: no_args,
         desc: "Read Ledge's current state: version, MCP on/off, counts of tiles, quick actions and tabs, design style and theme, strip style, language, drawer open, undo_last depth. Call this first." },
+    Tool { name: "live_state", write: false,
+        input: || json!({ "type": "object", "properties": { "part": { "type": "string", "enum": read::PARTS } }, "additionalProperties": false }),
+        desc: "Read what Ledge knows right now, read-only: Claude sessions (project, status, since, uncommitted/unpushed counts, activity phase), 5h/7d limits, today's calendar (titles and times), pending approvals (tool and project only), running dev servers with masked error lines, counts of briefs waiting for you. No notes, paths, commands or mail. Cannot approve or run anything. part = one section; off unless the user allows it in Ledge Settings." },
     Tool { name: "apps_discover", write: false,
         input: || json!({ "type": "object", "properties": { "repos": { "type": "boolean", "description": "Also scan the user's folders for git repositories and suggest project shortcuts (default true)." } }, "additionalProperties": false }),
         desc: "List what the user has on this PC, read-only: Start menu apps (name and target .exe), Store apps such as Notepad (source \"store\", aumid instead of exe) and git repos in the usual folders with a project suggestion (kind, run, port). alreadyInLedge (only when true) = Ledge shows it already. For tiles_add and actions_add. Takes a few seconds." },
@@ -265,6 +268,7 @@ impl rpc::Tools for Handler<'_> {
         Value::Array(
             TOOLS
                 .iter()
+                .filter(|t| self.visible(t.name))
                 .map(|t| {
                     // `destructiveHint` platí jen pro zapisující nástroje (u čtecích by jen zabíral místo v kontextu)
                     let mut ann = json!({ "readOnlyHint": !t.write, "openWorldHint": false });
@@ -281,6 +285,9 @@ impl rpc::Tools for Handler<'_> {
         if !TOOLS.iter().any(|t| t.name == name) {
             return Err(RpcErr(rpc::INVALID_PARAMS, format!("Unknown tool: {name}")));
         }
+        if !self.visible(name) {
+            return Ok(result(tr("Čtení stavu je vypnuté. Zapni ho v Ledge Nastavení → Claude → Claude (MCP).", "Reading state is off. Turn it on in Ledge Settings → Claude → Claude (MCP).").into(), true));
+        }
         Ok(match self.run(name, args) {
             Ok(text) => result(text, false),
             Err(e) => result(e, true),
@@ -293,10 +300,16 @@ impl rpc::Tools for Handler<'_> {
 }
 
 impl Handler<'_> {
+    /// `live_state` je vidět a volatelný jen s volbou `mcp.readData` (výchozí vypnuto); ostatní nástroje vždy.
+    fn visible(&self, name: &str) -> bool {
+        name != "live_state" || self.host.config().mcp.read_data
+    }
+
     fn run(&self, name: &str, args: &Value) -> Result<String, String> {
         let host = self.host;
         match name {
             "ledge_status" => Ok(pretty(&self.status())),
+            "live_state" => Ok(pretty(&read::build(&host.live_raw(), args.get("part").and_then(Value::as_str))?)),
             "apps_discover" => Ok(pretty(&host.discover(args.get("repos").and_then(Value::as_bool).unwrap_or(true)))),
             "tiles_list" => Ok(pretty(&edit::tiles_list(&host.config()))),
             "tiles_add" => self.write(&["/projects"], |c| edit::tile_add(c, args, host)),

@@ -131,11 +131,32 @@ fn interval(cfg: &UpdateConfig) -> Duration {
 
 /// Kdy proběhne další automatická kontrola. `None` = vypnuto (vlákno spí, dokud nepřijde zpráva).
 /// Termín v minulosti (zapnuto po dlouhé pauze, změna repa) = hned. Čistá funkce.
-pub fn next_check(enabled: bool, start: Instant, last: Option<Instant>, every: Duration) -> Option<Instant> {
+///
+/// Po neúspěšné kontrole (`fails` > 0 po sobě) se nečeká celý `every`, ale `retry_delay` (offline start po
+/// přihlášení by jinak znamenal další pokus až za 6 h).
+pub fn next_check(enabled: bool, start: Instant, last: Option<Instant>, every: Duration, fails: u32) -> Option<Instant> {
     enabled.then(|| match last {
-        Some(l) => l + every,
+        Some(l) => l + retry_delay(fails, every),
         None => start + FIRST_CHECK,
     })
+}
+
+/// Odstup další kontroly po `fails` neúspěších po sobě: 0 = běžný `every`; pak 5 → 15 → 60 min, nikdy víc než `every`.
+pub fn retry_delay(fails: u32, every: Duration) -> Duration {
+    let mins = match fails {
+        0 => return every,
+        1 => 5,
+        2 => 15,
+        _ => 60,
+    };
+    Duration::from_secs(mins * 60).min(every)
+}
+
+/// Co zůstane ve stavu po kontrole. `net_failed` = nepodařilo se spojit / stáhnout (NE verdikt „nelze ověřit“
+/// o stažené verzi). Selhání nepřepíše dřívější `Dostupna` (banner nesmí zmizet kvůli výpadku Wi-Fi), a v takovém
+/// případě se neposouvá ani `checked_ms` (poctivě: poslední ÚSPĚŠNÁ kontrola). Vrací `(ponechat_předchozí, status)`.
+pub fn merge_status(prev: &Status, new: Status, net_failed: bool) -> (bool, Status) {
+    if net_failed && matches!(prev, Status::Dostupna { .. }) { (true, prev.clone()) } else { (false, new) }
 }
 
 use crate::util::now_ms_i64 as now_ms;
@@ -156,6 +177,7 @@ fn ver_of(v: Version) -> String {
 impl Updater {
     /// `root` = cache instalátorů (`<local>/updates`; úklid a `seen.json` až ve vlákně `update`).
     pub fn start(cfg: UpdateConfig, root: PathBuf, notify: Notify) -> Self {
+        let cfg = UpdateConfig { check: cfg.check && !crate::qa::isolated(), ..cfg }; // izolovaná instance (QA) bez automatických kontrol
         let st = Arc::new(Mutex::new(State::new(&cfg, root)));
         let (tx, rx) = mpsc::channel();
         let (st2, n2) = (st.clone(), notify.clone());
@@ -164,6 +186,7 @@ impl Updater {
     }
 
     pub fn set_config(&self, cfg: UpdateConfig) {
+        let cfg = UpdateConfig { check: cfg.check && !crate::qa::isolated(), ..cfg };
         {
             let mut s = self.st.lock();
             if s.repo != cfg.repo {
@@ -230,6 +253,9 @@ impl Updater {
     /// (pak spustí `installed_exe`). Při `Ok` musí volající Ledge ukončit. Blokuje (případné stažení) —
     /// volat mimo UI vlákno. Chyba stažení jde do `fetch` („Zkusit znovu“), chyba spuštění do `install_error`.
     pub fn install(&self, installed_exe: &Path) -> Result<String, String> {
+        if crate::qa::isolated() {
+            return Err(crate::i18n::tr("Izolovaná instance (QA) nic neinstaluje.", "The isolated (QA) instance installs nothing.").into());
+        }
         let (rel, repo, root) = {
             let mut s = self.st.lock();
             if s.installing {
@@ -261,6 +287,9 @@ impl Updater {
     /// Spustí ověřený instalátor předchozí verze: z cache, jinak ho stáhne z vydání `v<předchozí>` téhož
     /// repa se stejným ověřením. Při `Ok` musí volající Ledge ukončit. Blokuje — volat mimo UI vlákno.
     pub fn rollback(&self, installed_exe: &Path) -> Result<String, String> {
+        if crate::qa::isolated() {
+            return Err(crate::i18n::tr("Izolovaná instance (QA) nic neinstaluje.", "The isolated (QA) instance installs nothing.").into());
+        }
         let (plan, repo, root, seen) = {
             let mut s = self.st.lock();
             if s.installing {
@@ -444,10 +473,11 @@ fn housekeeping(st: &Mutex<State>) {
 fn worker(rx: mpsc::Receiver<Msg>, st: Arc<Mutex<State>>, notify: Notify, mut cfg: UpdateConfig) {
     let start = Instant::now();
     let mut last: Option<Instant> = None;
+    let mut fails = 0u32;
     housekeeping(&st);
     notify();
     loop {
-        let due = next_check(cfg.check, start, last, interval(&cfg));
+        let due = next_check(cfg.check, start, last, interval(&cfg), fails);
         let msg = match due {
             Some(t) => match rx.recv_timeout(t.saturating_duration_since(Instant::now())) {
                 Ok(m) => Some(m),
@@ -463,6 +493,7 @@ fn worker(rx: mpsc::Receiver<Msg>, st: Arc<Mutex<State>>, notify: Notify, mut cf
             Some(Msg::Config(c)) => {
                 if c.repo != cfg.repo {
                     last = None;
+                    fails = 0;
                 }
                 cfg = c;
                 continue;
@@ -473,7 +504,7 @@ fn worker(rx: mpsc::Receiver<Msg>, st: Arc<Mutex<State>>, notify: Notify, mut cf
             }
             Some(Msg::Check) | None => {}
         }
-        run_check(&cfg.repo, &st, &notify);
+        fails = if run_check(&cfg.repo, &st, &notify) { 0 } else { fails.saturating_add(1) };
         last = Some(Instant::now());
         // „Zkontrolovat teď“ naklikané během kontroly = jedna kontrola; změny configu se nezahodí
         let mut retry = false;
@@ -482,6 +513,7 @@ fn worker(rx: mpsc::Receiver<Msg>, st: Arc<Mutex<State>>, notify: Notify, mut cf
                 Msg::Config(c) => {
                     if c.repo != cfg.repo {
                         last = None;
+                        fails = 0;
                     }
                     cfg = c;
                 }
@@ -494,11 +526,19 @@ fn worker(rx: mpsc::Receiver<Msg>, st: Arc<Mutex<State>>, notify: Notify, mut cf
     }
 }
 
-fn run_check(repo: &str, st: &Mutex<State>, notify: &Notify) {
+/// Síť selhala = chyba dotazu bez odpovědi serveru (spojení / timeout); HTTP 403/404 ne.
+fn net_failed(res: &Result<String, crate::updatenet::GetErr>) -> bool {
+    res.as_ref().is_err_and(|e| e.transport)
+}
+
+/// Jedna kontrola; `true` = dotaz na vydání se podařil (verdikt „nelze ověřit“ je také odpověď), `false` = síť / chyba.
+fn run_check(repo: &str, st: &Mutex<State>, notify: &Notify) -> bool {
     st.lock().checking = true;
     notify();
     let res = fetch_release(repo);
-    let (status, release) = match res.map(|json| evaluate(&json, CURRENT)) {
+    // jen výpadek spojení / timeout; HTTP 403/404 je verdikt serveru, banner „Dostupná“ po něm nezůstává (L267)
+    let net_failed = net_failed(&res);
+    let (status, release) = match res.map(|json| evaluate(&json, CURRENT)).map_err(|e| e.msg) {
         Ok(Verdict::Current) => (Status::Aktualni, None),
         Ok(Verdict::Available(r)) => (
             Status::Dostupna { verze: r.version.clone(), poznamky: r.notes.clone(), publikovano: r.published.clone() },
@@ -511,16 +551,20 @@ fn run_check(repo: &str, st: &Mutex<State>, notify: &Notify) {
         let mut s = st.lock();
         // repo se mezitím změnilo → výsledek patří starému, zahodit
         if s.repo == repo {
-            if s.release.as_ref().map(|r| &r.tag) != release.as_ref().map(|r| &r.tag) {
-                reset_fetch(&mut s);
+            let (keep, status) = merge_status(&s.status, status, net_failed);
+            if !keep {
+                if s.release.as_ref().map(|r| &r.tag) != release.as_ref().map(|r| &r.tag) {
+                    reset_fetch(&mut s);
+                }
+                s.status = status;
+                s.release = release;
+                s.checked_ms = Some(now_ms());
             }
-            s.status = status;
-            s.release = release;
-            s.checked_ms = Some(now_ms());
         }
         s.checking = false;
     }
     notify();
+    !net_failed
 }
 
 #[cfg(test)]
@@ -532,13 +576,53 @@ mod tests {
     fn schedule_first_after_60s_then_interval_never_when_off() {
         let t0 = Instant::now();
         let h6 = Duration::from_secs(6 * 3600);
-        assert_eq!(next_check(true, t0, None, h6), Some(t0 + FIRST_CHECK));
+        assert_eq!(next_check(true, t0, None, h6, 0), Some(t0 + FIRST_CHECK));
         let l = t0 + Duration::from_secs(100);
-        assert_eq!(next_check(true, t0, Some(l), h6), Some(l + h6));
-        assert_eq!(next_check(false, t0, Some(l), h6), None);
-        assert_eq!(next_check(false, t0, None, h6), None);
+        assert_eq!(next_check(true, t0, Some(l), h6, 0), Some(l + h6));
+        assert_eq!(next_check(true, t0, Some(l), h6, 1), Some(l + Duration::from_secs(300)));
+        assert_eq!(next_check(false, t0, Some(l), h6, 0), None);
+        assert_eq!(next_check(false, t0, None, h6, 0), None);
         let c = crate::config::UpdateConfig { interval_h: 0, ..Default::default() };
         assert_eq!(interval(&c), Duration::from_secs(3600)); // nevalidní config nikdy nevede k busy loopu
+    }
+
+    #[test]
+    fn retry_delay_table() {
+        let m = |x: u64| Duration::from_secs(x * 60);
+        // (neúspěchy po sobě, interval, čekání)
+        let cases = [(0, m(360), m(360)), (1, m(360), m(5)), (2, m(360), m(15)), (3, m(360), m(60)), (50, m(360), m(60)), (1, m(60), m(5)), (3, m(60), m(60)), (2, m(10), m(10))];
+        for (fails, every, want) in cases {
+            assert_eq!(retry_delay(fails, every), want, "fails {fails}, every {every:?}");
+        }
+    }
+
+    #[test]
+    fn failed_check_keeps_available() {
+        let avail = Status::Dostupna { verze: "0.3.0".into(), poznamky: "x".into(), publikovano: "p".into() };
+        let err = || Status::NelzeOverit { duvod: "offline".into() };
+        let ok = Status::Aktualni;
+        // (předchozí, nový, síť selhala, ponechat?)
+        let cases = [
+            ("chyba sítě po Dostupna", avail.clone(), err(), true, true),
+            ("chyba sítě po Aktualni", ok.clone(), err(), true, false),
+            ("chyba sítě po Neovereno", Status::Neovereno, err(), true, false),
+            ("verdikt nelze ověřit se přijme", avail.clone(), err(), false, false),
+            ("úspěšná kontrola přepíše", avail.clone(), ok, false, false),
+        ];
+        for (name, prev, new, failed, keep) in cases {
+            let (k, st) = merge_status(&prev, new.clone(), failed);
+            assert_eq!(k, keep, "{name}");
+            assert_eq!(st, if keep { prev } else { new }, "{name}");
+        }
+    }
+
+    #[test]
+    fn net_failed_only_for_transport_errors() {
+        use crate::updatenet::GetErr;
+        let e = |transport| Err(GetErr { msg: "x".into(), transport });
+        assert!(net_failed(&e(true)));
+        assert!(!net_failed(&e(false)), "HTTP 403/404 je verdikt serveru");
+        assert!(!net_failed(&Ok("{}".into())));
     }
 
     #[test]
@@ -693,7 +777,7 @@ mod tests {
         assert!(with(r#"{"update":{"intervalH":48}}"#).is_ok());
         assert!(with(r#"{"update":{"intervalH":0}}"#).unwrap_err().contains("1–48"));
         assert!(with(r#"{"update":{"intervalH":49}}"#).is_err());
-        for bad in ["", "ledge", "a/b/c", "/ledge", "jiri-hyan/", "jiri hyan/ledge", "a/..", "https://github.com/jiri-hyan/ledge-app"] {
+        for bad in ["", "ledge", "a/b/c", "/ledge", "acme/", "acme corp/ledge", "a/..", "https://github.com/acme/ledge-app"] {
             assert!(with(&format!(r#"{{"update":{{"repo":"{bad}"}}}}"#)).is_err(), "{bad}");
         }
         assert!(with(r#"{"update":{"repo":"Some_Org/repo.name-2"}}"#).is_ok());

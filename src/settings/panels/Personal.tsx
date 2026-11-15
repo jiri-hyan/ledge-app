@@ -11,7 +11,7 @@ import { For, Show, type JSX } from "solid-js";
 import { t } from "../../i18n";
 import { gotoSettingsPanel } from "../../palette/goto";
 import { useSettings } from "../ctx";
-import { Num, Select, Text, Toggle } from "../fields/controls";
+import { Num, Select, Text } from "../fields/controls";
 import { Advanced } from "../fields/Advanced";
 import { Group, openGroup } from "../fields/Group";
 import { FieldErr, PanelHead, Row, Section } from "../fields/Row";
@@ -96,7 +96,6 @@ function TimerRows() {
           }}
         />
       </Row>
-      <Row id="timer.toast"><Toggle path="timer.toast" label={fieldLabel("timer.toast")} /></Row>
     </>
   );
 }

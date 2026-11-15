@@ -92,7 +92,6 @@ export default function BehaviorPanel(_p: PanelProps) {
         </Section>
 
         <Section title={t("settings.smart.title", "Klávesnice, myš a přetahování")} desc={t("settings.smart.desc", "Rychlejší ovládání otevřeného šuplíku. Nic z toho se nestane mimo šuplík.")}>
-          <Row id="smart.quickKeys"><Toggle path="smart.quickKeys" label={fieldLabel("smart.quickKeys")} /></Row>
           <Row id="smart.dropShortcut"><Toggle path="smart.dropShortcut" label={fieldLabel("smart.dropShortcut")} /></Row>
           <Row id="smart.tabWheel"><Toggle path="smart.tabWheel" label={fieldLabel("smart.tabWheel")} /></Row>
         </Section>

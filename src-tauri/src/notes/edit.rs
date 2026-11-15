@@ -382,7 +382,7 @@ pub fn tag_counts(all: &[NoteView]) -> Vec<(String, usize)> {
 // ---------- rozepsaná úprava ----------
 
 /// Rozepsaná úprava existující poznámky (`<root>\.draft\edit.json`) — přežije zavření šuplíku
-/// (Win+Shift+S ukradne fokus) i zrušení WebView. Nové obrázky se do ní neukládají.
+/// (Win+Shift+S ukradne fokus) i zrušení WebView. Nese i nadpis (`title`); nové obrázky se do ní neukládají.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct EditDraft {
@@ -393,6 +393,9 @@ pub struct EditDraft {
     pub project: String,
     pub kind: String,
     pub remind: String,
+    /// vlastní nadpis (`title:`); `None` = nadpis z disku (starší `edit.json` ho nemá)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 const EDIT_DRAFT: &str = "edit.json";
@@ -541,6 +544,8 @@ mod tests {
             cost: None,
             budget: None,
             model: None,
+            items: Default::default(),
+            due_ms: None,
         };
         let all: Vec<NoteView> = (0..35).map(|i| mk(i, i >= 30)).collect();
         let open = query(&all, &NoteQuery { limit: Some(8), ..Default::default() }, 0);
@@ -717,6 +722,8 @@ mod tests {
             cost: None,
             budget: None,
             model: None,
+            items: Default::default(),
+            due_ms: None,
         };
         let all = [
             mk("nova", "napad", Some("a"), None, false),
@@ -753,6 +760,12 @@ mod tests {
         let d = EditDraft { path: "C:\\n\\a.md".into(), hash: "ab".into(), text: "x".into(), ..Default::default() };
         edit_draft_save(root.path(), Some(&d)).unwrap();
         assert_eq!(edit_draft_load(root.path()), Some(d));
+        // nadpis přežije; starší edit.json bez `title` se načte jako None (nadpis z disku)
+        let d = EditDraft { path: "C:\\n\\a.md".into(), hash: "ab".into(), text: "x".into(), title: Some("Nový nadpis".into()), ..Default::default() };
+        edit_draft_save(root.path(), Some(&d)).unwrap();
+        assert_eq!(edit_draft_load(root.path()), Some(d));
+        std::fs::write(root.path().join(".draft").join(EDIT_DRAFT), br#"{"path":"C:\\n\\a.md","hash":"ab","text":"x"}"#).unwrap();
+        assert_eq!(edit_draft_load(root.path()).unwrap().title, None);
         // koncept nové poznámky edit.json nesmaže a naopak
         draft_save_meta(root.path(), &DraftMeta { text: "nová".into(), ..Default::default() }).unwrap();
         draft_clear(root.path()).unwrap();

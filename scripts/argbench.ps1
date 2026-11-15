@@ -1,6 +1,7 @@
 # Porovná paměť WebView2 šuplíku pro různé argumenty Chromia (release build, šuplík otevřen a zavřen).
 # Argumenty se předávají přes WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, takže není potřeba rekompilace.
 param([string]$Exe = "$PSScriptRoot\..\src-tauri\target\release\ledge.exe")
+. "$PSScriptRoot\ledgeapi.ps1"; $auth = Get-LedgeAuth
 $base = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-features=NetworkServiceInProcess2 --disable-background-networking --disable-component-update --disable-sync --disable-default-apps --no-first-run --disable-breakpad --renderer-process-limit=1 --disable-gpu-shader-disk-cache --disable-gpu --in-process-gpu"
 $variants = [ordered]@{
   # = BROWSER_ARGS v drawer.rs
@@ -15,16 +16,16 @@ foreach ($k in $variants.Keys) {
   Start-Process $Exe
   Start-Sleep 3
   $sw = [Diagnostics.Stopwatch]::StartNew()
-  Invoke-RestMethod -Method Post http://127.0.0.1:47800/ctl/open -Body '{}' | Out-Null
-  do { Start-Sleep -Milliseconds 100; $d = (Invoke-RestMethod http://127.0.0.1:47800/status).drawer } until ($d.lastOpenMs -gt 0 -or $sw.ElapsedMilliseconds -gt 20000)
+  Invoke-RestMethod -Headers $auth -Method Post http://127.0.0.1:47800/ctl/open -Body '{}' | Out-Null
+  do { Start-Sleep -Milliseconds 100; $d = (Invoke-RestMethod -Headers $auth http://127.0.0.1:47800/status).drawer } until ($d.lastOpenMs -gt 0 -or $sw.ElapsedMilliseconds -gt 20000)
   $cold = $d.lastOpenMs
   Start-Sleep 1
-  Invoke-RestMethod -Method Post http://127.0.0.1:47800/ctl/close -Body '{}' | Out-Null
+  Invoke-RestMethod -Headers $auth -Method Post http://127.0.0.1:47800/ctl/close -Body '{}' | Out-Null
   Start-Sleep 1
-  Invoke-RestMethod -Method Post http://127.0.0.1:47800/ctl/open -Body '{}' | Out-Null
+  Invoke-RestMethod -Headers $auth -Method Post http://127.0.0.1:47800/ctl/open -Body '{}' | Out-Null
   Start-Sleep -Milliseconds 600
-  $warm = (Invoke-RestMethod http://127.0.0.1:47800/status).drawer.lastOpenMs
-  Invoke-RestMethod -Method Post http://127.0.0.1:47800/ctl/close -Body '{}' | Out-Null
+  $warm = (Invoke-RestMethod -Headers $auth http://127.0.0.1:47800/status).drawer.lastOpenMs
+  Invoke-RestMethod -Headers $auth -Method Post http://127.0.0.1:47800/ctl/close -Body '{}' | Out-Null
   Start-Sleep 6
   $main = Get-Process ledge | Select-Object -First 1
   $all = Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId

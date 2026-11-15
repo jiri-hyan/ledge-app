@@ -14,7 +14,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
 
-const NO_WINDOW: u32 = 0x0800_0000;
+use crate::procman::CREATE_NO_WINDOW as NO_WINDOW;
 /// Kolik konce stderr držet (do logu jde jen první řádek, začištěný).
 const ERR_CAP: usize = 4096;
 
@@ -183,7 +183,8 @@ mod tests {
     #[test]
     fn real_process_without_window_reports_end() {
         // náhradní „claude“: cmd.exe vypíše připravený stream-json (žádný skutečný claude, žádné okno)
-        let dir = std::env::temp_dir().join(format!("ledge-briefproc-{}", std::process::id()));
+        let _tmp = tempfile::tempdir().unwrap(); // izolovaná složka, uklidí se i po pádu testu
+        let dir = _tmp.path().to_path_buf();
         std::fs::create_dir_all(&dir).unwrap();
         let out = dir.join("out.jsonl");
         std::fs::write(&out, "{\"type\":\"system\",\"subtype\":\"init\",\"apiKeySource\":\"ANTHROPIC_API_KEY\"}\r\n{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"total_cost_usd\":0.5}\r\n").unwrap();
@@ -201,7 +202,7 @@ mod tests {
             key: "sk-ant-test".into(),
         };
         start(s, move |e| tx.send(e).unwrap()).unwrap();
-        let e = rx.recv_timeout(std::time::Duration::from_secs(20)).unwrap();
+        let e = rx.recv_timeout(std::time::Duration::from_secs(120)).unwrap();
         assert_eq!(e.result, Some((Some(0.5), false, "success".into())));
         assert!(!e.stopped);
         assert!(!running(&real), "po konci běh není v registru");

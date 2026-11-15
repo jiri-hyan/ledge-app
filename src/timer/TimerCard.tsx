@@ -6,7 +6,7 @@ import { createEffect, createSignal, For, on, Show, type JSX } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { t } from "../i18n";
 import { sayError } from "../ui/toast";
-import { elapsedMs, fmtDuration, leftMs, parseMinutes, presetsOf, progress, type TimerOp, type TimerState } from "./model";
+import { elapsedMs, fmtTimer, leftMs, parseMinutes, presetsOf, progress, type TimerOp, type TimerState } from "./model";
 import "./timer.css";
 
 /** Akce časovače (karta i paleta). Vrátí nový stav, chyba = hláška. */
@@ -51,7 +51,7 @@ export default function TimerCard(p: { s: Snapshot; now: number; menu?: JSX.Elem
               <div class="tm-cd" classList={{ "tm-done": c().state === "done" }}>
                 <div class="tm-big" role="timer" aria-live="off">
                   <Show when={c().state !== "done"} fallback={t("cards.timer.done", "Čas vypršel")}>
-                    {fmtDuration(leftMs(c(), p.now), true)}
+                    {fmtTimer(leftMs(c(), p.now), true)}
                     <Show when={c().state === "paused"}><span class="tm-tag">{t("cards.timer.paused", "pauza")}</span></Show>
                   </Show>
                 </div>
@@ -92,7 +92,7 @@ export default function TimerCard(p: { s: Snapshot; now: number; menu?: JSX.Elem
 
         <div class="tm-sw">
           <span class="tm-label">{t("cards.timer.stopwatch", "Stopky")}</span>
-          <span class="tm-sw-time">{sw() ? fmtDuration(elapsedMs(sw()!, p.now)) : "0:00"}</span>
+          <span class="tm-sw-time">{sw() ? fmtTimer(elapsedMs(sw()!, p.now)) : "0:00"}</span>
           <Show
             when={sw()?.state === "running"}
             fallback={<button class="mini" onClick={() => void run({ op: "swStart" })}>{sw() ? t("cards.timer.resume", "Pokračovat") : t("cards.timer.swStart", "Start")}</button>}

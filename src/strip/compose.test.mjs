@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { STRIP_LOOK_IDS } from "./looks.ts";
 import {
-  COMPOSE_ITEMS, COMPOSE_SHAPES, normText, setPieceLook, setText, DEFAULT_COMPOSE, DESIGN_IDS, ITEM_STYLES, MAX_PIECES, MAX_ZONE, W_MAX, W_MIN,
+  COMPOSE_ITEMS, COMPOSE_SHAPES, HEAT_ITEMS, normText, setPieceLook, setText, DEFAULT_COMPOSE, DESIGN_IDS, ITEM_STYLES, MAX_PIECES, MAX_ZONE, W_MAX, W_MIN,
   composeOf, designOf, mirrorSlots, sameCompose, setPieceColor, stylesFor, drawKind, hRange, hasItem, normCompose, putPiece, removePiece, setAllStyles, setStyle, shiftPiece, total, whereIs, withShape,
 } from "./compose.ts";
 
@@ -27,7 +27,7 @@ test("look → compose: každý z 15 hotových vzhledů má předvolbu", () => {
     ticker: "island 230×28 r100 |  | claude:text,limit5h:text,music:text,timer:text |  rotate",
     minimum: "capsule 112×26 r100 | battery:icon |  | time:text",
     trio: "capsule 280×32 r60 | weather:text | time:text | cpu:text",
-    rings: "capsule 250×36 r60 | limit5h:ring | time:text | limitWeek:ring",
+    rings: "capsule 330×36 r60 | limit5h:ringText | time:text | limitWeek:ringText",
   };
   const looks = STRIP_LOOK_IDS.filter((x) => x !== "custom");
   assert.equal(looks.length, 15);
@@ -169,6 +169,14 @@ test("kolo 25: výzdoba, barvy dílů, styly podle položky, designové předvol
   assert.equal(red.center[0].color, "#ff0000");
   assert.ok(!("color" in setPieceColor(red, "time", "").center[0]));
   assert.ok(!("color" in DEFAULT_COMPOSE.center[0]), "vstup netknutý");
+  // kolo 33: `heat` jen jako barva dílu (podklad / text ho nepřijmou), `ringText` jen u položek s podílem
+  assert.equal(setPieceColor(DEFAULT_COMPOSE, "time", " HEAT ").center[0].color, "heat");
+  assert.ok(!("bg" in setPieceLook(DEFAULT_COMPOSE, "time", { bg: "heat" }).center[0]));
+  assert.equal(normCompose({ left: [{ item: "limit5h", style: "ringText", color: "heat" }] }).left[0].color, "heat");
+  for (const it of ["limit5h", "limitWeek", "cpu", "memory", "gpu", "battery"]) assert.ok(stylesFor(it).includes("ringText"), it);
+  for (const it of ["time", "claude", "music", "weather"]) assert.ok(!stylesFor(it).includes("ringText"), it);
+  assert.equal(drawKind("limit5h", "ringText", true), "ringText");
+  assert.equal(drawKind("battery", "ringText", false), "icon");
   // průběh jen s historií (CPU / paměť), Claude styly jen Claude
   for (const [item, has, not] of [["cpu", "spark", "dotPct"], ["memory", "spark", "ring5h"], ["claude", "dotPct", "spark"], ["limit5h", "bar", "spark"], ["weather", "iconText", "spark"]]) {
     assert.ok(stylesFor(item).includes(has), `${item} ${has}`);
@@ -237,4 +245,12 @@ test("písmo a vlastní vzhled dílu (kolo 27)", () => {
   act = setPieceLook(act, "claude", { onlyActive: false });
   assert.equal(act.left[0].onlyActive, undefined);
   assert.ok(!("onlyActive" in act.left[0]));
+});
+
+test("HEAT_ITEMS: položky se smysluplnou škálou „podle hodnoty“ = Rust compose::heat_pct (N2)", () => {
+  const rs = readFileSync(new URL("../../src-tauri/src/looks/compose.rs", import.meta.url), "utf8");
+  const line = /\/\/ HEAT-ITEMS: (.+)/.exec(rs)[1].trim().split(/\s+/);
+  assert.deepEqual([...HEAT_ITEMS], line);
+  for (const id of HEAT_ITEMS) assert.ok(COMPOSE_ITEMS.includes(id), id);
+  for (const id of ["music", "timer", "time"]) assert.ok(!HEAT_ITEMS.includes(id), `${id} bez heat`);
 });

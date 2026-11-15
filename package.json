@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "test": "cd src-tauri && cargo test",
+    "qa": "node scripts/qa.mjs",
     "test:ui": "node --experimental-strip-types --test \"src/**/*.test.mjs\" \"scripts/**/*.test.mjs\""
   },
   "license": "MIT",

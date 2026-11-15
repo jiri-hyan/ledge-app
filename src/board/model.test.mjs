@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/board/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { barHeights, calState, heat, hourRows, hourSpan, hoursMax, isToday, lastDays, localDate, stepVolume, sumDays, todayLeft, usageState, weekStrip } from "./model.ts";
+import { calAge, calState, heat, hourRows, hourSpan, hoursMax, isToday, lastDays, localDate, stepVolume, sumDays, todayLeft, usageState, weekStrip } from "./model.ts";
 
 // 2026-10-21 (středa) 14:30 místního času
 const NOW = new Date(2026, 9, 21, 14, 30).getTime();
@@ -24,12 +24,6 @@ test("útrata: posledních n dní, součet, cena jen s cenou", () => {
     [[{ ...day("a", 3, 1), unpriced: 2 }, { ...day("b", 4, null), unpriced: 4 }, day("c", 1, 0.5)], { tokens: 8, cost: 1.5, unpriced: 6 }],
   ];
   for (const [input, want] of cases) assert.deepEqual(sumDays(input), want);
-});
-
-test("sloupce: podle ceny, bez ceny podle tokenů, prázdné = nuly", () => {
-  assert.deepEqual(barHeights([day("a", 1, 1), day("b", 9, 2)]), [0.5, 1]);
-  assert.deepEqual(barHeights([day("a", 1, null), day("b", 4, null)]), [0.25, 1]);
-  assert.deepEqual(barHeights([day("a", 0, null), day("b", 0, 0)]), [0, 0]);
 });
 
 test("stav karty Claude dnes", () => {
@@ -96,6 +90,16 @@ test("kalendář: stav a zbytek dneška", () => {
     [{ status: "ok", days: [] }, "ok"],
   ];
   for (const [c, want] of cases) assert.equal(calState(c), want, JSON.stringify(c));
+  // stáří: jen u „stale“, nejstarší ze zapnutých kalendářů
+  const c = (enabled, fetchedMs) => ({ enabled, fetchedMs });
+  const age = [
+    [undefined, null],
+    [{ status: "ok", calendars: [c(true, 5)] }, null],
+    [{ status: "stale", calendars: [c(true, 50), c(true, 20), c(false, 1)] }, 20],
+    [{ status: "stale", calendars: [c(true, null)] }, null],
+    [{ status: "stale", calendars: [] }, null],
+  ];
+  for (const [x, want] of age) assert.equal(calAge(x), want, JSON.stringify(x));
   const it = (title, start, end, allDay = false) => ({ title, start, end, allDay });
   const h = 3_600_000;
   const cal = { status: "ok", days: [{ kind: "today", items: [it("Ráno", NOW - 5 * h, NOW - 4 * h), it("Teď", NOW - h, NOW + h), it("Svátek", 0, 1, true), it("Večer", NOW + 4 * h, NOW + 5 * h), it("Pozdě", NOW + 6 * h, NOW + 7 * h)] }] };

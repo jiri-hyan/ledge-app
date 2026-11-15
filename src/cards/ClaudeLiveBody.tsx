@@ -5,7 +5,7 @@ import { createSignal, For, Show } from "solid-js";
 import { api, type SessionView } from "../api";
 import { ago } from "../format";
 import { t } from "../i18n";
-import { say } from "../ui/toast";
+import { say, sayError } from "../ui/toast";
 import { clipMessage, doneAt, doneList, elapsed, fileParts, openWork, pickWorking, stripIndex, STRIP, workingList } from "./claudeLive";
 
 const PHASE: Record<string, () => string> = {
@@ -22,7 +22,7 @@ async function openSession(ss: SessionView) {
   try {
     await api.sessionOpen(ss.id);
   } catch (e) {
-    say(String(e), true);
+    sayError(e);
   }
 }
 

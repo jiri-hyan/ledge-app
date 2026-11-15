@@ -2,13 +2,16 @@
 // text, průběh, položky s barvou a klikem), poctivý stav (souhlas, chyba s výstupem, chybějící soubor,
 // stará data) a ⋯ s „Obnovit teď“, „Upravit skript“, „Zobrazit výstup“ a „V proužku“. Data jsou jen
 // ze snapshotu (`Snapshot.widgets`) — spouští je Rust (`widgets/live.rs`), jen když je karta vidět.
-import { createSignal, For, Show, type JSX } from "solid-js";
+import { createMemo, createSignal, For, Show, type JSX } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { ago } from "../format";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { say, sayError } from "../ui/toast";
 import type { CardMenuItem } from "../cards/CardMenu";
-import type { WidgetItem, WidgetView } from "../types";
+import type { WidgetData, WidgetItem, WidgetView } from "../types";
+import { kitClick } from "../widgetkit/click";
+import { resolve } from "../widgetkit/model";
 import { widgetsApi } from "./api";
 import { intervalParts, isStale, itemKind, progressPct, toneVar, widgetFile, withStripItem } from "./model";
 import "./widgets.css";
@@ -35,6 +38,15 @@ const KIND_HINT: Record<string, () => string> = {
   copy: () => t("cards.widget.item.copy", "Zkopírovat do schránky"),
   run: () => t("cards.widget.item.run", "Spustit skript"),
 };
+
+/** Nápověda ke kliku na položku (widgetkit: akce a šuplík mají vlastní). */
+function hintOf(i: WidgetItem): string {
+  const k = itemKind(i);
+  if (!k) return "";
+  if (i.kit?.type === "action") return t("cards.widgetkit.hint.action", "Spustit akci");
+  if (i.kit?.type === "drawer") return t("cards.widgetkit.hint.drawer", "Otevřít šuplík");
+  return KIND_HINT[k]();
+}
 
 export function intervalText(s: number): string {
   const x = intervalParts(s);
@@ -77,6 +89,17 @@ export function WidgetConsent(p: { v: WidgetView }) {
 export default function WidgetCard(p: { s: Snapshot; id: string; now: number; menu: (extra: CardMenuItem[]) => JSX.Element }) {
   const v = (): WidgetView | null => p.s.widgets?.find((w) => w.id === p.id) ?? null;
   const [out, setOut] = createSignal<string | null>(null);
+  // widgetkit (`*.kit.json`): data se počítají tady ze snapshotu (žádný skript, žádný časovač); přepočet při změně
+  // snapshotu a po minutě (hodiny, odpočty), ne při každém tiku `now`.
+  const minute = createMemo(() => Math.floor(p.now / 60_000) * 60_000);
+  const kit = createMemo((): WidgetData | null => {
+    const sp = v()?.spec;
+    if (!sp) return null;
+    const d = resolve(sp, p.s, minute());
+    const notes = [...(v()?.notes ?? []), ...(d.notes ?? [])];
+    return { ...d, notes: notes.length ? notes : undefined };
+  });
+  const dataOf = (): WidgetData | null => kit() ?? v()?.data ?? null;
   const inStrip = () => !!v()?.inStrip;
 
   const showOutput = async () => {
@@ -92,6 +115,7 @@ export default function WidgetCard(p: { s: Snapshot; id: string; now: number; me
   const edit = () => void widgetsApi.edit(p.id).catch(sayError);
   const click = async (i: WidgetItem, index: number) => {
     if (!itemKind(i)) return;
+    if (i.kit) return void kitClick(i.kit, p.s);
     try {
       const msg = await widgetsApi.click(p.id, index, i.label);
       if (msg) say(msg);
@@ -118,8 +142,8 @@ export default function WidgetCard(p: { s: Snapshot; id: string; now: number; me
     <div class="card wg" data-anim data-status={v()?.status ?? "idle"}>
       <h4>
         <Show when={v()?.icon}>{(ic) => <span class="wg-ico" aria-hidden="true">{ic()}</span>}</Show>
-        {v()?.data?.title ?? v()?.title ?? widgetFile(p.id) ?? p.id}
-        <Show when={v()?.data?.badge}>{(b) => <span class="pill b wg-badge" style={{ color: toneVar(v()?.data?.color) }}>{b()}</span>}</Show>
+        {dataOf()?.title ?? v()?.title ?? widgetFile(p.id) ?? p.id}
+        <Show when={dataOf()?.badge}>{(b) => <span class="pill b wg-badge" style={{ color: toneVar(dataOf()?.color) }}>{b()}</span>}</Show>
         <Show when={v()?.running}><span class="n wg-spin" title={t("cards.widget.running", "Běží…")}>⟳</span></Show>
         {p.menu(extra())}
       </h4>
@@ -127,7 +151,7 @@ export default function WidgetCard(p: { s: Snapshot; id: string; now: number; me
         {(w) => (
           <>
             <Show when={w().status === "off"}>
-              <div class="empty">{t("cards.widget.off", "Widgety jsou vypnuté (Nastavení → Projekty, akce a odkazy → Widgety).")}</div>
+              <div class="empty">{t("cards.widget.off", "Widgety jsou vypnuté ({path}).", { path: settingsPath("akce", "widgets") })}</div>
             </Show>
             <Show when={w().status === "missing"}>
               <div class="empty">{t("cards.widget.missing", "Soubor {file} ve složce widgetů není — přejmenovaný nebo smazaný. Kartu odebereš přes ⋯.", { file: w().file })}</div>
@@ -145,10 +169,10 @@ export default function WidgetCard(p: { s: Snapshot; id: string; now: number; me
                 <Show when={w().hasOutput}><button class="mini" onClick={() => void showOutput()}>{out() !== null ? t("cards.widget.menu.hideOutput", "Skrýt výstup") : t("cards.widget.menu.output", "Zobrazit výstup")}</button></Show>
               </div>
             </Show>
-            <Show when={!w().data && (w().status === "idle" || w().status === "loading")}>
+            <Show when={!dataOf() && (w().status === "idle" || w().status === "loading")}>
               <div class="empty">{w().running ? t("cards.widget.loading", "Spouštím skript…") : t("cards.widget.idle", "Zatím neběžel — spustí se, když je karta vidět.")}</div>
             </Show>
-            <Show when={w().status !== "consent" && w().status !== "problem" ? w().data : null}>
+            <Show when={w().status !== "consent" && w().status !== "problem" ? dataOf() : null}>
               {(d) => (
                 <>
                   <Show when={d().text}>{(x) => <div class="wg-text">{x()}</div>}</Show>
@@ -162,11 +186,12 @@ export default function WidgetCard(p: { s: Snapshot; id: string; now: number; me
                       <For each={d().items}>
                         {(i, idx) => (
                           <Show when={!i.sep} fallback={<hr class="wg-sep" />}>
-                            <button class="row wg-item" classList={{ "wg-click": !!itemKind(i) }} disabled={!itemKind(i)} title={itemKind(i) ? KIND_HINT[itemKind(i)!]() : ""} onClick={() => void click(i, idx())}>
+                            <button class="row wg-item" classList={{ "wg-click": !!itemKind(i) }} disabled={!itemKind(i)} title={hintOf(i)} onClick={() => void click(i, idx())}>
                               <Show when={i.icon} fallback={<span class="wg-dot" style={{ background: toneVar(i.color) ?? "transparent" }} />}>
                                 <span class="wg-ico" aria-hidden="true">{i.icon}</span>
                               </Show>
                               <span class="grow wg-label">{i.label}</span>
+                              <Show when={i.bar != null}><span class="wg-mini" aria-hidden="true"><span style={{ width: `${progressPct(i.bar)}%`, background: toneVar(i.color) }} /></span></Show>
                               <Show when={i.value}><span class="wg-value" style={{ color: toneVar(i.color) }}>{i.value}</span></Show>
                             </button>
                           </Show>

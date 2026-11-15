@@ -9,6 +9,7 @@ import { IconShield } from "../icons";
 import { fmtClock } from "../format";
 import { say, sayError } from "../ui/toast";
 import { t, tp } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { bubble } from "../pkgctx/BubbleNotice";
 import ReleaseNotes from "../update/ReleaseNotes";
 import { action, mb, progressPct } from "../update/model";
@@ -52,7 +53,7 @@ export default function UpdatePanel(p: { u: UpdateView; onClose: () => void }) {
             <h4>{t("cards.update.whatsNew", "Co je nového ve verzi {v}", { v: w().verze })}</h4>
             <ReleaseNotes md={w().poznamky} />
             <div class="upd-bar">
-              <span class="msg">{t("cards.update.whatsNewHint", "Poznámky najdeš i v Nastavení → Aktualizace.")}</span>
+              <span class="msg">{t("cards.update.whatsNewHint", "Poznámky najdeš i v {path}.", { path: settingsPath("aplikace", "updates") })}</span>
               <button class="btn pri" onClick={read}>{t("cards.update.gotIt", "Rozumím")}</button>
             </div>
           </div>

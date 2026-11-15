@@ -1,6 +1,6 @@
 //! HTTP most na 127.0.0.1 (`tiny_http`): `POST /permission`, `POST /question`, `POST /plan`, `POST /event`, `GET /status`,
 //! `POST /ctl/<příkaz>`, `/mcp` (MCP server, `crate::mcp`). Odmítá prohlížeč (`Origin`) a cizí `Host`, hook bez
-//! platného klíče nedostane rozhodnutí (`hook_admitted`). Každý
+//! platného klíče nedostane rozhodnutí (`hook_admitted`), `/status` a `/ctl/*` bez klíče dostanou 401 (`control_admitted`). Každý
 //! požadavek ve vlastním vlákně včetně čtení těla; logiku dělá `Claude` (`mod.rs`) a `mcp::handle_http`, tady je jen
 //! směrování a odpovědi.
 
@@ -8,6 +8,7 @@ use super::{Claude, rules};
 use serde_json::{Value, json};
 use std::io::Read;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Strop těla požadavku mimo `/mcp` (ten má `crate::mcp::MAX_BODY`).
 const MAX_BODY: u64 = 1 << 20;
@@ -19,6 +20,41 @@ const MAX_DECLARED_BODY: usize = 64 << 20;
 /// Přesahuje deklarovaná délka těla `MAX_DECLARED_BODY`? Bez hlavičky (`None`) ne.
 fn declared_body_too_big(len: Option<usize>) -> bool {
     len.is_some_and(|n| n > MAX_DECLARED_BODY)
+}
+
+/// Strop souběžně obsluhovaných požadavků (vláken spojení). Schválení čeká desítky sekund a hooky jdou z více
+/// sessions naráz, proto štědře; stovky pomalých spojení lokálního procesu tím ale nevyčerpají vlákna (N1).
+/// `tiny_http` 0.12 nedává přístup k soketu, takže read/write timeout nejde nastavit — omezuje se počet.
+const MAX_CONNECTIONS: usize = 64;
+
+/// Souběžná zavírání přes-stropových spojení (odpověď 503 v samostatném vlákně); nad ně se spojení nechá uniknout.
+const MAX_CLOSING: usize = 8;
+
+static ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static CLOSING: AtomicUsize = AtomicUsize::new(0);
+
+/// Obsazený slot spojení; uvolní se při zániku (i při pádu vlákna).
+struct Slot<'a>(&'a AtomicUsize);
+
+impl<'a> Slot<'a> {
+    fn take(counter: &'a AtomicUsize, max: usize) -> Option<Self> {
+        let mut cur = counter.load(Ordering::Relaxed);
+        loop {
+            if cur >= max {
+                return None;
+            }
+            match counter.compare_exchange_weak(cur, cur + 1, Ordering::AcqRel, Ordering::Relaxed) {
+                Ok(_) => return Some(Slot(counter)),
+                Err(now) => cur = now,
+            }
+        }
+    }
+}
+
+impl Drop for Slot<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
 }
 
 fn header<'a>(req: &'a tiny_http::Request, name: &str) -> Option<&'a str> {
@@ -74,6 +110,14 @@ fn hook_admitted(path: &str, authorization: Option<&str>, key: Option<&str>) -> 
     }
 }
 
+/// Pustit ovládání dál (`GET /status`, `POST /ctl/*`)? Jen s platným klíčem hooků (L7): jinak by na loopbacku
+/// mohl kterýkoli místní proces spouštět a zastavovat projekty a číst stav. Na rozdíl od hooků dostane volající
+/// 401, ne prázdnou 200 — skript má vědět, proč se nic nestalo. Ostatní cesty se tu neřeší.
+fn control_admitted(method: &str, path: &str, authorization: Option<&str>, key: Option<&str>) -> bool {
+    let control = (method == "GET" && path == "/status") || (method == "POST" && path.starts_with("/ctl/"));
+    !control || key_valid(authorization, key)
+}
+
 /// Jednou za běh do logu: rozhodování bez klíče vypadá jako „karta se neukázala“. Klíč se sem nedostane.
 fn note_keyless(path: &str, authorization: Option<&str>) {
     #[cfg(not(test))]
@@ -115,16 +159,37 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
                     std::mem::forget(req);
                     continue;
                 }
+                // Přes strop souběžných spojení: odpověď 503 a zavření v krátkém vlákně (omezeno `MAX_CLOSING`, aby
+                // pomalý klient nezablokoval příjem); nad to se spojení nechá uniknout jako obří tělo (L170).
+                // Legitimní hooky strop nedosáhnou.
+                let Some(slot) = Slot::take(&ACTIVE, MAX_CONNECTIONS) else {
+                    match Slot::take(&CLOSING, MAX_CLOSING) {
+                        Some(closing) => {
+                            std::thread::spawn(move || {
+                                let _closing = closing;
+                                respond(req, 503, "{}".into());
+                            });
+                        }
+                        None => std::mem::forget(req),
+                    }
+                    continue;
+                };
                 // Odmítnutí jde do vlákna jako ostatní: zánik `Request` čte zbytek těla, což u pomalého
                 // klienta nemá termín a příjmové vlákno by stálo.
                 // prohlížeč (i DNS rebinding) sem nesmí
                 if header(&req, "Origin").is_some() {
-                    std::thread::spawn(move || respond(req, 403, "{}".into()));
+                    std::thread::spawn(move || {
+                        let _slot = slot;
+                        respond(req, 403, "{}".into());
+                    });
                     continue;
                 }
                 // chybějící Host: prohlížeč ho posílá vždy, takže to rebinding není (viz `host_allowed`)
                 if !header(&req, "Host").is_none_or(host_allowed) {
-                    std::thread::spawn(move || respond(req, 403, "{}".into()));
+                    std::thread::spawn(move || {
+                        let _slot = slot;
+                        respond(req, 403, "{}".into());
+                    });
                     continue;
                 }
                 let url = req.url().to_string();
@@ -136,6 +201,7 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
                     let mcp = mcp.clone();
                     let mut req = req;
                     std::thread::spawn(move || {
+                        let _slot = slot;
                         let mut raw = Vec::new();
                         if method == "POST" {
                             let _ = req.as_reader().take(crate::mcp::MAX_BODY as u64 + 1).read_to_end(&mut raw);
@@ -158,6 +224,11 @@ pub fn serve(port: u16, claude: Claude, extra: Arc<dyn Fn() -> Value + Send + Sy
                 // každý požadavek ve vlastním vlákně — schválení může čekat desítky sekund
                 let mut req = req;
                 std::thread::spawn(move || {
+                    let _slot = slot;
+                    if !control_admitted(&method, &url, auth.as_deref(), hook_key().as_deref()) {
+                        respond(req, 401, json!({ "error": "chybí nebo nesedí klíč (Authorization: Bearer <klíč hooků>)" }).to_string());
+                        return;
+                    }
                     if method == "POST" && !hook_admitted(&url, auth.as_deref(), hook_key().as_deref()) {
                         note_keyless(&url, auth.as_deref());
                         respond(req, 200, String::new());
@@ -273,6 +344,43 @@ mod tests {
         }
     }
 
+    /// L7: `/status` a `/ctl/*` jen s klíčem hooků (401 jinak); hooky a jiné cesty se nemění.
+    #[test]
+    fn control_admitted_table() {
+        let good = format!("Bearer {KEY}");
+        let good = Some(good.as_str());
+        for (m, path, auth, key, want) in [
+            ("GET", "/status", good, Some(KEY), true),
+            ("GET", "/status", None, Some(KEY), false),
+            ("GET", "/status", Some("Bearer jiny"), Some(KEY), false),
+            ("GET", "/status", good, None, false),
+            ("POST", "/ctl/launch", good, Some(KEY), true),
+            ("POST", "/ctl/launch", None, Some(KEY), false),
+            ("POST", "/ctl/stop", Some(KEY), Some(KEY), false),
+            ("POST", "/ctl/reload", None, None, false),
+            ("POST", "/event", None, Some(KEY), true),
+            ("POST", "/neni", None, None, true),
+        ] {
+            assert_eq!(control_admitted(m, path, auth, key), want, "{m} {path} {auth:?} {key:?}");
+        }
+    }
+
+    /// Přes celý server: bez klíče 401, s klíčem 200.
+    #[test]
+    fn ctl_and_status_need_key() {
+        use std::io::{Read, Write};
+        let (_c, port) = bridge(5000);
+        for extra in ["", BAD_KEY] {
+            assert_eq!(send(port, "/ctl/launch", r#"{"id":"x"}"#, extra).0, 401, "{extra}");
+        }
+        assert_eq!(post(port, "/ctl/reload", "{}", false).0, 200);
+        let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        write!(s, "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n").unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        assert!(out.starts_with("HTTP/1.1 401"), "{out}");
+    }
+
     const BAD_KEY: &str = "Authorization: Bearer jiny\r\n";
 
     /// Bez platného klíče žádná karta, žádné čekání a prázdné tělo: terminál se zeptá sám.
@@ -313,7 +421,7 @@ mod tests {
             std::thread::sleep(Duration::from_millis(5));
         }
         let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
-        write!(s, "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n").unwrap();
+        write!(s, "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {KEY}\r\nConnection: close\r\n\r\n").unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         assert!(out.contains("echo Bearer ***"), "{out}");
@@ -357,7 +465,7 @@ mod tests {
         use std::io::{Read, Write};
         let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
         let h = host.map(|h| format!("Host: {h}\r\n")).unwrap_or_default();
-        write!(s, "GET /status HTTP/1.1\r\n{h}Connection: close\r\n\r\n").unwrap();
+        write!(s, "GET /status HTTP/1.1\r\n{h}Authorization: Bearer {KEY}\r\nConnection: close\r\n\r\n").unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         out[9..12].parse().unwrap()
@@ -416,6 +524,21 @@ mod tests {
         }
     }
 
+    /// Strop spojení: nad `max` se slot nedá, po zániku slotu se uvolní.
+    #[test]
+    fn connection_slots_are_capped_and_released() {
+        let n = AtomicUsize::new(0);
+        let a = Slot::take(&n, 2).unwrap();
+        let b = Slot::take(&n, 2).unwrap();
+        assert!(Slot::take(&n, 2).is_none());
+        drop(a);
+        let c = Slot::take(&n, 2).unwrap();
+        assert!(Slot::take(&n, 2).is_none());
+        drop((b, c));
+        assert_eq!(n.load(Ordering::Relaxed), 0);
+        assert!(Slot::take(&n, 0).is_none());
+    }
+
     /// Hranice zahazování obřího `Content-Length`.
     #[test]
     fn declared_body_too_big_table() {
@@ -430,12 +553,12 @@ mod tests {
         use std::io::{Read, Write};
         let (_c, port) = bridge(5000);
         let mut evil = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
-        write!(evil, "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Length: 1000000000000\r\n\r\n").unwrap();
+        write!(evil, "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {KEY}\r\nContent-Length: 1000000000000\r\n\r\n").unwrap();
         evil.flush().unwrap();
         std::thread::sleep(Duration::from_millis(100));
         let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
         s.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
-        write!(s, "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n").unwrap();
+        write!(s, "GET /status HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {KEY}\r\nConnection: close\r\n\r\n").unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         assert!(out.starts_with("HTTP/1.1 200"), "{out}");

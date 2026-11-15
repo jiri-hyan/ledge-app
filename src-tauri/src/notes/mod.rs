@@ -47,12 +47,17 @@ pub mod links;
 pub mod openwith;
 pub mod pdf;
 pub mod md;
+pub mod briefwait;
 mod md_list;
 pub mod meta;
 mod recycle;
 mod reminders;
 pub mod search;
 mod store;
+pub mod taskindex;
+pub mod taskline;
+pub mod taskquick;
+pub mod taskwrite;
 #[cfg(test)]
 mod testkit;
 pub mod when;
@@ -65,6 +70,7 @@ pub use sections::{Question, add_questions, answer, log_append};
 pub use recycle::recycle;
 pub use reminders::*;
 pub use store::*;
+pub use taskindex::{DueCounts, TaskItem, TaskList, TaskQuery};
 
 use crate::i18n::tr;
 use chrono::{DateTime, Duration as ChronoDuration, FixedOffset, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};

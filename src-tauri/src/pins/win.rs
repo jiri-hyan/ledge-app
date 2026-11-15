@@ -14,13 +14,14 @@
 //!   „Schovat do…“ (`hide`): jediný termín `next_deadline` čte vlákno `emit`, které se v něm probudí a
 //!   zavolá `tick` — žádný vlastní časovač.
 
+use crate::qa::QaDataDir as _;
 use super::*;
 use crate::i18n::tr;
 use crate::state::{core, log, mark_dirty};
 use crate::threads::notes_watch::notes_root;
 use parking_lot::Mutex;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -29,11 +30,9 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, Physical
 static STATE: Mutex<Option<PinsFile>> = Mutex::new(None);
 /// Kanál vlákna `pins-save` (vznikne s prvním zápisem).
 static SAVER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
-/// Poslední známé „lístky ustupují“ (`pins_yield`: herní režim / hra, ne prohlížeč ve F11) — lístky
-/// přestanou být navrchu.
-static DEAD: AtomicBool = AtomicBool::new(false);
-/// Poslední známé okno přes celý monitor (zapisuje vlákno `hover`, `set_fs_kind`).
-static FS_KIND: AtomicU8 = AtomicU8::new(0);
+/// Lístky (label), které teď ustupují hře na SVÉM monitoru (`pins_yield`: herní režim / hra, ne prohlížeč
+/// ve F11) — přestaly být navrchu. Povrch per monitor: hra na jiném monitoru lístek nechá.
+static YIELDED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// Obnova po startu čeká na konec fullscreenu / herního režimu.
 static RESTORE_PENDING: AtomicBool = AtomicBool::new(false);
 /// Dvojklik na „Připnout“ = dvě volání naráz → druhé počká a okno už najde.
@@ -47,6 +46,8 @@ static DISPLACED: Mutex<Vec<(String, (i32, i32))>> = Mutex::new(Vec::new());
 const SAVE_DELAY: Duration = Duration::from_millis(400);
 /// Nejbližší „vynoř se“ schovaného lístku (ms epochy, 0 = žádný) — vlákno `emit` jen čte číslo.
 static NEXT_UNHIDE: AtomicI64 = AtomicI64::new(0);
+/// Neúspěšné pokusy o vynoření schovaných lístků (politika v `unhide::after_attempt`).
+static TRIES: Mutex<unhide::Tries> = Mutex::new(unhide::Tries::new());
 
 fn set_displaced(label: &str, pos: Option<(i32, i32)>) {
     let mut d = DISPLACED.lock();
@@ -106,6 +107,18 @@ fn windows() -> Vec<(String, WebviewWindow)> {
 
 /// Jazyk rozhraní se změnil: otevřené lístky ho dostanou událostí `pin-lang` (bez ní by ho znaly jen z `pin_init`).
 pub(crate) fn on_config(old: &crate::config::Config, new: &crate::config::Config) {
+    // poznámky vypnuté = lístky pryč (stav v souboru zůstane); zapnuté = zpět jako po startu
+    let plan = unhide::config_plan(old.notes.enabled, new.notes.enabled);
+    if plan.close_all {
+        for (l, w) in windows() {
+            set_displaced(&l, None);
+            let _ = w.destroy();
+        }
+        changed_set();
+    }
+    if plan.restore {
+        std::thread::spawn(restore_all);
+    }
     if old.ui.lang != new.ui.lang {
         for (l, w) in windows() {
             let _ = w.emit_to(l.as_str(), "pin-lang", new.ui.lang);
@@ -115,6 +128,19 @@ pub(crate) fn on_config(old: &crate::config::Config, new: &crate::config::Config
 
 pub(crate) fn any_open() -> bool {
     crate::state::CORE.get().is_some_and(|c| c.app.webview_windows().keys().any(|l| l.starts_with(LABEL_PREFIX)))
+}
+
+/// Je aspoň jeden otevřený lístek průchozí? (`hotkeys::sync_hotkeys`: zkratka průchozího režimu při vypnutých zkratkách)
+pub(crate) fn any_through() -> bool {
+    let open: Vec<String> = windows().into_iter().map(|(l, _)| l).collect();
+    with(|s| s.pins.iter().any(|p| p.prefs.through && open.contains(&label_for(&p.path))))
+}
+
+/// Počty pro `/status.qa`: otevřené lístky a z nich průchozí.
+pub(crate) fn counts() -> (usize, usize) {
+    let open: Vec<String> = windows().into_iter().map(|(l, _)| l).collect();
+    let through = with(|s| s.pins.iter().filter(|p| p.prefs.through && open.contains(&label_for(&p.path))).count());
+    (open.len(), through)
 }
 
 /// Cesta poznámky otevřeného lístku.
@@ -157,6 +183,8 @@ pub(crate) fn set_hint_seen() {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PinsView {
     pub open: Vec<PinRef>,
+    /// schované do času („Schovat do…“): připnuté bez okna, vrátí se samy (`pins::unhide`)
+    pub hidden: Vec<unhide::HiddenRef>,
     /// zkratka průchozího režimu (`hotkeys.notePassthrough`), prázdná = žádná
     pub key: String,
 }
@@ -178,10 +206,11 @@ pub(crate) fn view(key: &str) -> PinsView {
         .as_ref()
         .map(|s| s.pins.iter().filter(|p| labels.contains(&label_for(&p.path))).map(|p| PinRef { path: p.path.clone(), through: p.prefs.through }).collect())
         .unwrap_or_default();
-    PinsView { open, key: key.to_string() }
+    let hidden = g.as_ref().map(|s| unhide::hidden_refs(&s.pins, |p| labels.contains(&label_for(p)))).unwrap_or_default();
+    PinsView { open, hidden, key: key.to_string() }
 }
 
-/// Po otevření prvního / zavření posledního lístku: zkratka průchozího režimu se (od)registruje,
+/// Po otevření / zavření lístku a přepnutí průchozího režimu: zkratka průchozího režimu se (od)registruje,
 /// šuplík dostane nový stav. Mimo vlákno událostí okna (registrace zkratek tam nepatří).
 fn changed_set() {
     std::thread::spawn(|| {
@@ -195,11 +224,8 @@ pub(crate) fn fallback() -> (Mon, i32) {
     let c = core();
     let mon = c.monitor();
     let scale = mon.dpi as f64 / 96.0;
-    let r = Area::from(mon.rect);
     let work = Area::from(mon.work);
-    let strip_h = c.strip_logical(&mon).1;
-    let gap = ((r.t + ((strip_h + 12.0) * scale).round() as i32) - work.t).max((12.0 * scale).round() as i32);
-    (Mon { work, scale }, gap)
+    (Mon { work, scale }, c.below_strip(&mon, 12.0))
 }
 
 pub(crate) fn monitors() -> Vec<Mon> {
@@ -225,7 +251,7 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
     let label = label_for(path);
     if let Some(w) = app().get_webview_window(&label) {
         if focus {
-            let _ = w.set_focus();
+            activate(&w);
         }
         return Ok(());
     }
@@ -252,13 +278,16 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
         .resizable(resizable(&pin.prefs))
         .min_inner_size(MIN_W, if pin.prefs.collapsed { BAR_H } else { MIN_H })
         .inner_size(place.w as f64 / fb.scale, place.h as f64 / fb.scale)
-        .position(place.x as f64 / fb.scale, place.y as f64 / fb.scale)
+        .position(crate::qa::park_x(place.x) as f64 / fb.scale, place.y as f64 / fb.scale)
         // stejné argumenty + výchozí data dir jako šuplík → jeden proces prohlížeče
-        .additional_browser_args(crate::drawer::BROWSER_ARGS)
+        .additional_browser_args(crate::qa::browser_args())
+        .qa_data_dir()
         .disable_drag_drop_handler()
         .build()
         .map_err(|e| crate::errors::any(crate::i18n::tr("Lístek se neotevřel", "The sticky didn't open"), &e))?;
-    let _ = w.set_position(PhysicalPosition::new(place.x, place.y));
+    // bez aktivace od vzniku (nezávisle na pořadí volání tao); psát jde po výslovném kliku (`activate`)
+    set_no_activate(&w, true);
+    let _ = w.set_position(PhysicalPosition::new(crate::qa::park_x(place.x), place.y));
     let _ = w.set_size(PhysicalSize::new(place.w, place.h));
     apply(&w, &pin.prefs);
     if away {
@@ -272,11 +301,37 @@ pub(crate) fn open(path: &str, focus: bool) -> Result<(), String> {
     watch(&w, &label);
     if focus {
         FRESH.lock().push(label.clone());
-        let _ = w.set_focus();
+        activate(&w);
     }
     persist();
     changed_set();
     Ok(())
+}
+
+fn hwnd(w: &WebviewWindow) -> Option<windows::Win32::Foundation::HWND> {
+    w.hwnd().ok().map(|h| windows::Win32::Foundation::HWND(h.0 as *mut _))
+}
+
+/// Lístek nebere fokus (`on`), dokud ho uživatel výslovně neklikne (`activate`); po ztrátě fokusu zase `on`.
+fn set_no_activate(w: &WebviewWindow, on: bool) {
+    if let Some(h) = hwnd(w) {
+        if on {
+            crate::winstyle::apply_profile(h, crate::winstyle::Win::Pin);
+        } else {
+            crate::winstyle::no_activate(h, false);
+        }
+    }
+}
+
+/// Výslovný klik / nový lístek: odebrat NOACTIVATE a předat okně klávesnici.
+pub(crate) fn activate(w: &WebviewWindow) {
+    set_no_activate(w, false);
+    if let Some(h) = hwnd(w) {
+        unsafe {
+            let _ = windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow(h);
+        }
+    }
+    let _ = w.set_focus();
 }
 
 fn resizable(p: &PinPrefs) -> bool {
@@ -285,7 +340,9 @@ fn resizable(p: &PinPrefs) -> bool {
 
 /// Volby → okno (bez velikosti; sbalení řeší `set`).
 fn apply(w: &WebviewWindow, p: &PinPrefs) {
-    let _ = w.set_always_on_top(p.on_top && !DEAD.load(Ordering::Relaxed));
+    let y = crate::state::CORE.get().is_some_and(|c| yielding_win(c, w));
+    mark_yield(w.label(), y);
+    let _ = w.set_always_on_top(p.on_top && !y);
     let _ = w.set_resizable(resizable(p));
     let _ = w.set_ignore_cursor_events(p.through);
     // průchozí lístek nesmí dostat fokus (Alt+Tab, klik do jeho místa jde na stránku pod ním)
@@ -296,6 +353,7 @@ fn apply(w: &WebviewWindow, p: &PinPrefs) {
 fn watch(w: &WebviewWindow, label: &str) {
     let (label, win) = (label.to_string(), w.clone());
     w.on_window_event(move |e| match e {
+        tauri::WindowEvent::Focused(false) => set_no_activate(&win, true),
         tauri::WindowEvent::Moved(p) => moved(&label, &win, p.x, p.y),
         tauri::WindowEvent::Resized(sz) => {
             let scale = win.scale_factor().unwrap_or(1.0).max(0.1);
@@ -345,6 +403,14 @@ fn moved(label: &str, win: &WebviewWindow, x: i32, y: i32) {
         Some(home::MoveVerdict::Away) => set_displaced(label, Some((x, y))),
         Some(home::MoveVerdict::Ignore) | None => {}
     }
+    // lístek přetažený na monitor s hrou ustoupí hned (ne až při další změně mapy fullscreenu) a naopak
+    if let Some(c) = crate::state::CORE.get()
+        && let y = yielding_win(c, win)
+        && mark_yield(label, y)
+        && let Some(p) = prefs_of(label)
+    {
+        let _ = win.set_always_on_top(p.on_top && !y);
+    }
 }
 
 /// Uživatel tahá lístek za lištu (`pin_drag`): kde ho pustí, tam je nový domov — i když byl mimo domov
@@ -387,7 +453,7 @@ pub(crate) fn on_monitors() {
         let place = restore(&pin, &mons, &fb, gap, i);
         set_displaced(&label, None);
         if let Some(w) = app().get_webview_window(&label) {
-            let _ = w.set_position(PhysicalPosition::new(place.x, place.y));
+            let _ = w.set_position(PhysicalPosition::new(crate::qa::park_x(place.x), place.y));
             let _ = w.set_size(PhysicalSize::new(place.w, place.h));
         }
     }
@@ -438,7 +504,8 @@ pub(crate) fn set(label: &str, patch: &PinPatch) -> Result<PinPrefs, String> {
     let _ = w.emit_to(label, "pin-prefs", new);
     persist();
     if old.through != new.through {
-        mark_dirty();
+        // průchozí režim rozhoduje, jestli se zkratka (při vypnutých zkratkách) drží → sync mimo tento handler
+        changed_set();
     }
     Ok(new)
 }
@@ -501,8 +568,21 @@ pub(crate) fn tick(now_ms: i64) {
     NEXT_UNHIDE.store(0, Ordering::Relaxed);
     std::thread::spawn(move || {
         for p in due {
-            if let Err(e) = open(&p, false) {
-                log(&format!("lístek {p}: {e}"));
+            let r = open(&p, false);
+            // hra mezitím začala: není to selhání, vrátí ho obnova po konci hry
+            if r.is_err() && crate::state::CORE.get().is_some_and(|c| yielding(c)) {
+                RESTORE_PENDING.store(true, Ordering::Relaxed);
+                continue;
+            }
+            let tries = TRIES.lock().get(&p);
+            let v = unhide::after_attempt(r.is_ok(), tries, crate::state::now_ms());
+            TRIES.lock().set(&p, if matches!(v, unhide::Verdict::Retry { .. }) { tries + 1 } else { 0 });
+            with(|s| unhide::apply_verdict(s, &p, v, crate::state::now_ms()));
+            let e = r.err().unwrap_or_default();
+            match v {
+                unhide::Verdict::Retry { log: true, .. } => log(&format!("lístek {p}: {e} (zkusím znovu)")),
+                unhide::Verdict::GiveUp => log(&format!("lístek {p}: {e} (vzdáno, odepnuto)")),
+                _ => {}
             }
         }
         persist();
@@ -521,7 +601,7 @@ pub(crate) fn toggle_through_all() -> Option<bool> {
     if open.is_empty() {
         return None;
     }
-    let any = with(|s| s.pins.iter().any(|p| p.prefs.through && open.contains(&label_for(&p.path))));
+    let any = any_through();
     let patch = PinPatch { through: Some(!any), ..Default::default() };
     for l in &open {
         if let Err(e) = set(l, &patch) {
@@ -531,39 +611,37 @@ pub(crate) fn toggle_through_all() -> Option<bool> {
     Some(!any)
 }
 
-pub(crate) const KINDS: [FsKind; 5] = [FsKind::None, FsKind::Exclusive, FsKind::CoverBrowser, FsKind::CoverOwn, FsKind::CoverOther];
-
-/// Zapíše, co leží přes monitor; vrací, jestli se to změnilo (pak má volající zavolat `sync_dead`).
-pub(crate) fn set_fs_kind(k: FsKind) -> bool {
-    let v = KINDS.iter().position(|x| *x == k).unwrap_or(0) as u8;
-    FS_KIND.swap(v, Ordering::Relaxed) != v
+/// Mají teď lístky na monitoru proužku ustoupit (herní režim, hra / prezentace přes celou obrazovku)?
+/// Prohlížeč ve F11 ne. Rozhoduje o otevření nového lístku a obnově po startu.
+pub(crate) fn yielding(c: &crate::state::Core) -> bool {
+    super::yielding_at(c, None)
 }
 
-/// Mají teď lístky ustoupit (herní režim, hra / prezentace přes celou obrazovku)? Prohlížeč ve F11 ne.
-pub(crate) fn yielding(c: &crate::state::Core) -> bool {
-    let kind = KINDS.get(FS_KIND.load(Ordering::Relaxed) as usize).copied().unwrap_or(FsKind::None);
-    // `fullscreen` je pravda o monitoru; druh doplňuje jen to, co leží přes něj
-    let kind = if c.fullscreen.load(Ordering::Relaxed) { kind } else { FsKind::None };
-    pins_yield(c.game_mode.load(Ordering::SeqCst), kind)
+/// Má ustoupit lístek `w` — podle monitoru, na kterém právě leží.
+fn yielding_win(c: &crate::state::Core, w: &WebviewWindow) -> bool {
+    super::yielding_at(c, crate::screen::monitor_of_window(w))
+}
+
+/// Zapíše, že lístek `label` ustupuje / už ne; vrací, jestli se to změnilo.
+fn mark_yield(label: &str, y: bool) -> bool {
+    super::mark_yield(&YIELDED, label, y)
 }
 
 /// Fullscreen / herní režim / okno v popředí přes celý monitor se změnilo (vlákno `hover`,
-/// `gamemode::set`): lístky „Vždy navrchu“ ustoupí hře a pak se vrátí (prohlížeč ve F11 je nechá);
-/// obnova po startu, která čekala, doběhne.
+/// `gamemode::set`): lístky „Vždy navrchu“ ustoupí hře na jejím monitoru a pak se vrátí (prohlížeč ve F11
+/// je nechá); obnova po startu, která čekala, doběhne.
 pub(crate) fn sync_dead() {
     let Some(c) = crate::state::CORE.get() else { return };
-    let dead = yielding(c);
-    let was = DEAD.swap(dead, Ordering::Relaxed);
-    // i beze změny stavu: Ledge mohl startovat ve hře / herním režimu (`DEAD` je zpočátku false) a obnova čeká
-    let plan = dead_plan(was, dead, RESTORE_PENDING.load(Ordering::Relaxed));
-    if plan.retop {
-        for (l, w) in windows() {
-            if let Some(p) = prefs_of(&l) {
-                let _ = w.set_always_on_top(p.on_top && !dead);
-            }
+    for (l, w) in windows() {
+        let y = yielding_win(c, &w);
+        if mark_yield(&l, y)
+            && let Some(p) = prefs_of(&l)
+        {
+            let _ = w.set_always_on_top(p.on_top && !y);
         }
     }
-    if plan.restore && RESTORE_PENDING.swap(false, Ordering::Relaxed) {
+    // i beze změny stavu: Ledge mohl startovat ve hře / herním režimu a obnova čeká
+    if dead_plan(RESTORE_PENDING.load(Ordering::Relaxed), yielding(c)).restore && RESTORE_PENDING.swap(false, Ordering::Relaxed) {
         std::thread::spawn(restore_all);
     }
 }

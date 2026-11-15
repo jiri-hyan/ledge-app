@@ -53,6 +53,8 @@ struct FeedState {
     error: Option<String>,
     /// nápověda pro UI bez chyby (`HINT_OUTLOOK_CLOSED`)
     hint: Option<&'static str>,
+    /// neúspěchy za sebou → backoff (`netstate`)
+    fails: crate::netstate::Fails,
 }
 
 #[derive(Default, PartialEq)]
@@ -89,13 +91,9 @@ pub fn is_old(fetched_ms: Option<i64>, now: i64) -> bool {
     fetched_ms.is_none_or(|f| now - f >= MAX_AGE_MS)
 }
 
-/// Stáhnout? Ne během pokusu, ne dřív než `RETRY_MS` po posledním, jinak když data chybí / jsou stará.
-pub fn needs_fetch(now: i64, fetched_ms: Option<i64>, attempt_ms: Option<i64>, loading: bool) -> bool {
-    if loading_live(loading, attempt_ms, now) || attempt_ms.is_some_and(|a| now - a < RETRY_MS) {
-        return false;
-    }
-    is_old(fetched_ms, now)
-}
+/// Politika obnovy (`netstate::needs_fetch`): data stará `MAX_AGE_MS`, po pokusu pauza `RETRY_MS` s backoffem.
+/// Sdílí ji účty (`accounts/calsync.rs`).
+pub const POLICY: crate::netstate::Policy = crate::netstate::Policy { every: MAX_AGE_MS, retry: RETRY_MS };
 
 /// Stav jednoho kalendáře: ok · stale (data jsou, ale stará nebo poslední pokus selhal) · loading ·
 /// unavailable (nic dobrého) · idle (ještě nestaženo).
@@ -209,22 +207,20 @@ fn net_error(e: reqwest::Error) -> String {
 
 async fn download(url: &str) -> Result<Vec<u8>, String> {
     // přesměrování jen na https a nejvýš 5×
-    let policy = reqwest::redirect::Policy::custom(|a| {
-        if a.url().scheme() != "https" {
-            a.error("redirect away from https")
-        } else if a.previous().len() >= 5 {
-            a.stop()
-        } else {
-            a.follow()
-        }
-    });
-    let client = reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .redirect(policy)
-        .user_agent(concat!("Ledge/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|e| trf!("HTTP klient: {}", "HTTP client: {}", e.without_url()))?;
-    let mut resp = client.get(url).header(reqwest::header::ACCEPT, "text/calendar, */*;q=0.5").send().await.map_err(net_error)?;
+    static CLIENT: crate::accounts::http::Slot = crate::accounts::http::Slot::new();
+    let client = crate::accounts::http::shared(&CLIENT, || {
+        reqwest::redirect::Policy::custom(|a| {
+            if a.url().scheme() != "https" {
+                a.error("redirect away from https")
+            } else if a.previous().len() >= 5 {
+                a.stop()
+            } else {
+                a.follow()
+            }
+        })
+    })?;
+    let req = client.get(url).timeout(TIMEOUT).header(reqwest::header::ACCEPT, "text/calendar, */*;q=0.5");
+    let mut resp = crate::accounts::http::send(req).await.map_err(net_error)?;
     let status = resp.status();
     if !status.is_success() {
         log(&format!("kalendář: HTTP {}", status.as_u16()));
@@ -323,9 +319,11 @@ pub(crate) fn maybe_refresh(opening: bool) {
             if st.loading && !loading_live(st.loading, st.attempt_ms, now) {
                 st.loading = false;
                 st.error = Some(stuck().into());
+                st.fails.fail();
                 dirty = true;
             }
-            if needs_fetch(now, st.fetched_ms, st.attempt_ms, st.loading) && bgfetch::gate(mode, now, st.attempt_ms) {
+            let busy = loading_live(st.loading, st.attempt_ms, now);
+            if crate::netstate::needs_fetch(&POLICY, busy, st.fetched_ms, st.attempt_ms, st.fails.count(), now) && bgfetch::gate(mode, now, st.attempt_ms) {
                 st.attempt_ms = Some(now);
                 if matches!(u, Target::OutlookLocal) && !outlook_up {
                     dirty |= st.hint != Some(HINT_OUTLOOK_CLOSED);
@@ -352,6 +350,17 @@ pub(crate) fn maybe_refresh(opening: bool) {
     }
 }
 
+/// „Zkusit znovu“ na kartě Kalendář: u kalendářů, které naposledy selhaly, zruší odstup po neúspěchu (`RETRY_MS`)
+/// a hned stáhne. Úspěšné a právě načítané se nedotkne.
+pub(crate) fn retry_failed() {
+    with(|l| {
+        for st in l.feeds.values_mut().filter(|s| s.error.is_some() && !s.loading) {
+            st.attempt_ms = None;
+        }
+    });
+    maybe_refresh(true);
+}
+
 /// Výsledek pokusu `attempt` do stavu (starší pokus, který mezitím odepsal watchdog, se zahodí).
 fn store(k: &str, attempt: i64, res: Result<Parsed, String>) {
     let ok = res.is_ok();
@@ -366,8 +375,12 @@ fn store(k: &str, attempt: i64, res: Result<Parsed, String>) {
                 (st.occs, st.events, st.name) = (p.occs, p.events, p.name);
                 st.fetched_ms = Some(now_ms());
                 (st.error, st.hint) = (None, None);
+                st.fails.ok();
             }
-            Err(e) => st.error = Some(e),
+            Err(e) => {
+                st.error = Some(e);
+                st.fails.fail();
+            }
         }
     });
     if ok {
@@ -594,14 +607,15 @@ mod tests {
     #[test]
     fn fetch_policy() {
         let now = 10_000_000_000;
-        assert!(needs_fetch(now, None, None, false));
-        assert!(!needs_fetch(now, Some(now - MAX_AGE_MS + 1), Some(now - MAX_AGE_MS + 1), false));
-        assert!(needs_fetch(now, Some(now - MAX_AGE_MS), Some(now - MAX_AGE_MS), false));
-        assert!(!needs_fetch(now, None, Some(now - 1000), true));
+        let needs_fetch = |ok, at, loading| crate::netstate::needs_fetch(&POLICY, loading_live(loading, at, now), ok, at, 0, now);
+        assert!(needs_fetch(None, None, false));
+        assert!(!needs_fetch(Some(now - MAX_AGE_MS + 1), Some(now - MAX_AGE_MS + 1), false));
+        assert!(needs_fetch(Some(now - MAX_AGE_MS), Some(now - MAX_AGE_MS), false));
+        assert!(!needs_fetch(None, Some(now - 1000), true));
         // zaseklý pokus (déle než 2× timeout) už nebrání novému
-        assert!(needs_fetch(now, None, Some(now - RETRY_MS), true));
-        assert!(!needs_fetch(now, None, Some(now - 1000), false));
-        assert!(needs_fetch(now, None, Some(now - RETRY_MS), false));
+        assert!(needs_fetch(None, Some(now - RETRY_MS), true));
+        assert!(!needs_fetch(None, Some(now - 1000), false));
+        assert!(needs_fetch(None, Some(now - RETRY_MS), false));
         assert!(loading_live(true, Some(now - 29_999), now));
         assert!(!loading_live(true, Some(now - 30_000), now));
         assert!(!loading_live(false, Some(now), now));

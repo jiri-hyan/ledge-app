@@ -2,6 +2,9 @@
 //   node --experimental-strip-types --test src/ui/errortext.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { humanError, looksTechnical } from "./errortext.ts";
 
 test("co vypadá technicky", () => {
@@ -32,4 +35,32 @@ test("humanError: prázdné, technické a lidské", () => {
   assert.equal(humanError(new Error("bind failed (os error 10048)"), g, t), t);
   assert.equal(humanError('{"message":"x"}', g, t), t);
   assert.equal(humanError("Soubor nejde uložit.", g, t), "Soubor nejde uložit.");
+});
+
+// Pojistka: chyby jdou přes `sayError`/`errorText` (humanError), ne `say(String(e), true)`.
+test("v src není say(String(e)", () => {
+  const bad = [];
+  const walk = (d) => {
+    for (const x of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, x.name);
+      if (x.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(x.name) && /\bsay\(\s*String\(/.test(readFileSync(p, "utf8"))) bad.push(p);
+    }
+  };
+  walk(fileURLToPath(new URL("..", import.meta.url)));
+  assert.deepEqual(bad, [], "místo say(String(e), true) použij sayError(e)");
+});
+
+// Pojistka 2: chyba nejde do UI jako `String(e)` (obchází `looksTechnical`); povoleno jen v `errorline.ts` (zápis do logu).
+test("v src není String(e) mimo errorline.ts", () => {
+  const bad = [];
+  const walk = (d) => {
+    for (const x of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, x.name);
+      if (x.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(x.name) && x.name !== "errorline.ts" && /\bString\(\s*(e|err|error)\s*\)/.test(readFileSync(p, "utf8"))) bad.push(p);
+    }
+  };
+  walk(fileURLToPath(new URL("..", import.meta.url)));
+  assert.deepEqual(bad, [], "místo String(e) použij errorText(e) z ui/toast");
 });

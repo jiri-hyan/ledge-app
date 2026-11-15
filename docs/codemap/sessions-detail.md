@@ -21,7 +21,7 @@ Nastavení umí zapojit hooky Ledge do `~/.claude/settings.json`. Návod pro už
 | `src-tauri/src/claude/preview.rs` | náhled změny Edit/Write: čtení souboru s limitem a termínem (jen při příchodu žádosti), sestavení | `for_request`, `build`, `Preview`, `Shown`, `Disk`, `read_capped`, `read_with_deadline`, `READ_MAX`, `READ_WAIT`, `NEW_HEAD` |
 | `src-tauri/src/claude/plan.rs` | review plánu ExitPlanMode: plán z `tool_input.plan`/`planFilePath`, titulek, akce → rozhodnutí podle cesty | `TOOL`, `for_request`, `from_request`, `parse`, `title`, `Plan`, `Via` (`Permission`/`PreToolUse`), `Mode`, `resolve(allow, extra, via)`, `allow_mode`, `return_message`, `PLAN_MAX` |
 | `src-tauri/src/claude/planhook.rs` | plán přes `PreToolUse(ExitPlanMode)` → `/plan`: karta, tvar odpovědi, deduplikace s `PermissionRequest` | `Claude::handle_plan`, `body` (allow + `updatedInput` / deny + `permissionDecisionReason` / `None`), `key`, `tool_use_id`, `same_card`, `duplicate`, `Released`, `take_released`, `remember`, `RELEASED_MS` |
-| `src-tauri/src/claude/bridge.rs` | HTTP most 127.0.0.1 (`/permission`, `/question`, `/plan`, `/event`, `/status`, `/ctl`) | `serve`, `Ctl`, `respond`, `header` |
+| `src-tauri/src/claude/bridge.rs` | HTTP most 127.0.0.1 (`/permission`, `/question`, `/plan`, `/event`, `/status`, `/ctl`); `/status` a `/ctl/*` chtějí klíč hooků (401, L7; skripty `scripts/ledgeapi.ps1`) | `serve`, `Ctl`, `control_admitted`, `hook_admitted`, `respond`, `header` |
 | `src-tauri/src/claude/questions.rs` | otázky Clauda (AskUserQuestion): parsování, odpovědi, držení po úsecích (`unseen::step`) | `parse`, `build_answers`, `answer_body`, `MULTI_SEP`, `on_event`, `Claude::{handle_question, answer_question, release_question, questions, question_log, attention, set_question_hold}`, `Ask` (`seen_at`, `released_unseen` jen jádro), `Reply`, deník `QuestionLog` (`push_log`, `MAX_LOG` 20, jen paměť → `Snapshot.questionLog`) |
 | `src-tauri/src/claude/unseen.rs` | pojistka neviděné otázky (`claude.questionUnseenS`): co dělá vlákno hooku, brána potvrzení, puštění do Claude + deník `releasedUnseen` | `step`, `Step`, `seen_counts`, `clamp_s`, `released_detail`, `DEFAULT_S`, `MIN_S`, `Claude::{question_seen, set_question_unseen, release_unseen}` · příkaz `question_seen` (`commands/sessions.rs`) |
 | `src-tauri/src/attention.rs` (část) | otázka čeká se zavřeným šuplíkem → puls po `REPULSE_MS`; peek po konci hry / herního režimu (volá vlákno `emit`) | `repulse_due`, `next_repulse`, `revive_peek`, `catch_up`, `next_deadline` |
@@ -39,8 +39,8 @@ Nastavení umí zapojit hooky Ledge do `~/.claude/settings.json`. Návod pro už
 | `src/questions/` (`QuestionCard.tsx` · `model.ts` · `seen.ts`) | otázka jako chat (peek `cards/Peek.tsx` + pod session) · čistá logika · potvrzení „zobrazeno“ · sekce Otázky Clauda v panelu Claude `settings/panels/Questions.tsx` (vč. pojistky `claude.questionUnseenS` a deníku posledních otázek) | `QuestionCard` · `model.ts` (`pick`, `toggleOther`, `answered`, `toReply`, `keyTarget`, `instant`, `shouldReportSeen`) · `seen.ts` (`useReportSeen`: IntersectionObserver + `media/shown.ts` `drawerShown`) |
 | `src/settings/panels/Claude.tsx` | sekce Claude Code (Studio → Claude) | `HooksSetup` |
 | `src/types/claude.ts` · `src/api.ts` | typy · volání | `SessionView`, `HooksStatus`, `Pending.always`/`preview`/`plan`/`via`, `PendingVia`, `PermAlways`, `PermDest`, `DecideExtra` (`mode`, `inClaude`), `EditPreview`, `DiffLine`, `PlanView`, `PlanMode` · `api.decide(id, allow, extra?)`, `api.sessionOpen`, `api.hooks*` |
-| `src-tauri/src/briefrun/` (`mod.rs` · `args.rs` · `stream.rs` · `plan.rs` · `key.rs` · `note.rs` · `proc.rs`) | zadání z poznámky přes API klíč (`claude -p` stream-json v cwd projektu): argumenty a env (klíč jen v env), parser výstupu a náklad, zda spustit, klíč `Ledge/anthropic`, metadata a `## Log` poznámky (tenký adaptér nad `notes::ops` a `notes::sections::questions`), proces v Job Objectu s pojistkou zdroje klíče | `Brief`, `build_args`, `build_env`, `mcp_config`, `user_line`, `first_message`, `resume_message`, `ROLE`, `NOTE_TOOLS`, `uuid_v4`, `clean_model` · `parse_line`, `Event`, `wrong_source`, `next_cost`, `parse_version`, `Ended`, `finish`, `redact` · `plan`, `Plan`, `Env` · `key::{valid, decode, get, set, clear}` · `note::{load, Info, info_from, meta, log, open_questions}` · `proc::{start, Start, stop, stop_all, running, read_events}` |
-| `src-tauri/src/commands/brief.rs` | Tauri příkazy zadání a API klíče (kontrakt `src/api.ts`) | `brief_send(path)`, `brief_resume(path)`, `brief_stop(path)`, `apikey_set(key)`, `apikey_status`, `apikey_clear` |
+| `src-tauri/src/briefrun/` (`mod.rs` · `args.rs` · `stream.rs` · `plan.rs` · `key.rs` · `note.rs` · `proc.rs`) | zadání z poznámky přes API klíč (`claude -p` stream-json v cwd projektu): argumenty a env (klíč jen v env), parser výstupu a náklad, zda spustit, klíč `Ledge/anthropic`, metadata a `## Log` poznámky (tenký adaptér nad `notes::ops` a `notes::sections::questions`), proces v Job Objectu s pojistkou zdroje klíče | `Brief`, `build_args`, `build_env`, `mcp_config`, `user_line`, `first_message`, `resume_message`, `ROLE`, `NOTE_TOOLS`, `uuid_v4`, `clean_model` · `parse_line`, `Event`, `wrong_source`, `next_cost`, `parse_version`, `Ended`, `finish`, `redact` · `plan`, `Plan`, `Env`, `auto_ok` (samo pokračovat po odpovědi jen u `waiting` bez otevřené otázky; strop $ hlídá `plan`) · `key::{valid, decode, get, set, clear}` · `note::{load, Info, info_from, meta, log, open_questions}` · `proc::{start, Start, stop, stop_all, running, read_events}` |
+| `src-tauri/src/commands/brief.rs` | Tauri příkazy zadání a API klíče (kontrakt `src/api.ts`) | `brief_send(path)`, `brief_resume(path)`, `after_answer(path)` (volá `note_answer`; `claude.brief.autoResume`, výchozí vypnuto; zapíše „Pokračuje samo po odpovědi“ do Logu), `brief_stop(path)`, `apikey_set(key)`, `apikey_status`, `apikey_clear` |
 
 ## Tok dat
 
@@ -163,10 +163,20 @@ stavu, id, argumenty, attach, `--bg`, výpis, úklid výstupu, nalezení `claude
 metaznaků, plán pushe, blokace, texty, výběr), `sessiongit::tests` (git nad tempdir: diffy, commit jen výběru + doslovné
 pathspecy, chyba hooku, přejmenování, push -u / push / pull --ff-only s bare remotem, zahození, worktree bez force),
 `src/sessions/git.test.mjs`,
-`claude::bridge::tests` (HTTP, blokace `Stop`, `/question`, `/plan` + deduplikace, Vždy povolit + důvod zamítnutí end-to-end), `claude::hygiene::tests` (git; pomůcky v `claude/testkit.rs`).
+`claude::bridge::tests` (HTTP, blokace `Stop`, `/question`, `/plan` + deduplikace, Vždy povolit + důvod zamítnutí end-to-end), `claude::hygiene::tests` (git; pomůcky v `claude/testkit.rs`); deterministické: termíny gitu `Claude::patient`, výstup gitu se po exitu nezahazuje, ani když čtecí vlákna roury doběhnou po `PIPE_GRACE` — `gitinfo::tests::capture_keeps_output_when_readers_are_slower_than_grace`, L334).
 Žádný test nesahá na skutečné `~/.claude` ani nespouští `claude`.
 
 ## Co nečíst
 
 `edge.rs`, `rawpush.rs`, `strip.rs`, `weather.rs`, `personal.rs`, `migrate.rs`, `notesync/`,
 `update.rs`; `claude/hygiene.rs` + `claude/paths.rs` (hlídač gitu) — pro session nepotřebné.
+
+## Důvod konce session (k34, V1)
+
+`SessionEnd.reason` z hooku → `claude/activity.rs` `end_reason` (malá písmena `a-z_-`, ≤ 32 znaků, jinak `None`) → `Session.end_reason` (nuluje se při dalším hooku, resume) → `sessions::Row.end_reason` (jen u `ended`) → `SessionView.endReason`. Čte ho chip `claudeSince` ([suggest.md](suggest.md)).
+
+## Pravdivost stavů (k34, L233/L234/L237)
+
+- Skládání „čeká“: stav z živého seznamu agentů + registru (`agent_status`: registr s novějším `status_at` přebije) → hook-Waiting ho přebije JEN když `hook_waiting_fresh(h.updated_at, reg.status_at)` (Esc po zamítnutí neposílá `Stop`; starší hook nesmí držet „čeká“). `merge` v `sessions.rs`, test `hook_waiting_fresh_table`.
+- Chip „Claude od posledně“ (`suggest/since.ts`): `failed` jen u session, která už nepracuje (`status !== "working"`) — chyba nástroje uprostřed práce není selhání session.
+- Zkratka schválit/zamítnout (`hotkeys.rs` → `Claude::decide_sole`): rozhodne jen při právě jedné čekající žádosti (`sole_id`); víc žádostí = otevře šuplík, ať člověk vybere. `decide(None)` zůstává „nejstarší“ jen pro testy.

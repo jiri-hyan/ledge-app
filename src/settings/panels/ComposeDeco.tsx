@@ -6,7 +6,7 @@ import { For, Show, createSignal } from "solid-js";
 import { t } from "../../i18n";
 import type { Appearance } from "../../types";
 import {
-  COMPOSE_SEPS, DESIGN_IDS, FILL_DIRS, FILL_KINDS,
+  COMPOSE_SEPS, DESIGN_IDS, FILL_DIRS, FILL_KINDS, HEAT_ITEMS,
   type ComposeItem, type ComposeSep, type DesignId, type FillKind, type ItemStyle, type Piece, type StripCompose,
   designOf, sameCompose, setPieceColor, setStyle, stylesFor,
 } from "../../strip/compose";
@@ -179,6 +179,7 @@ export function PieceTools(q: Q & { p: Piece; styleName: Record<ItemStyle, () =>
         onChange={(e) => q.commit(setPieceColor(q.c, item(), e.currentTarget.value === "#" ? "#ff8800" : e.currentTarget.value))}>
         <option value="">{t("appearance.compose.colorAuto", "Podle hodnoty")}</option>
         <option value="accent">{t("appearance.compose.colorAccent", "Akcent")}</option>
+        <Show when={HEAT_ITEMS.includes(item()) || col() === "heat"}><option value="heat">{t("appearance.compose.colorHeat", "Podle hodnoty (zelená → červená)")}</option></Show>
         <option value="#">{t("appearance.compose.colorCustom", "Vlastní")}</option>
       </select>
       <Show when={col().startsWith("#")}>

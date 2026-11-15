@@ -3,6 +3,7 @@
 // (`costslive` → `Snapshot.costs`, ODHAD v cenách API = „odvozené“), kalendář z cache (`calendar::live`), hlasitost
 // z Core Audio (`volume.rs`, „oficiální“ = hlásí ho systém). Co zdroj nemá, je prázdné — nic se nedopočítává.
 import type { CostDay, CostHourRow, CostsView } from "../costs/model.ts";
+import { oldestFetchedMs } from "../calendar/model.ts";
 import type { CalendarItem, CalendarView } from "../types/calendar.ts";
 
 /** Původ čísla (vzor Codenotch): hlásí ho přímo zdroj (systém, Claude Code), nebo ho Ledge odvodil / odhadl. */
@@ -67,14 +68,6 @@ export function hourSpan(rows: HourRow[], nowHour: number): [number, number] {
   return [Math.max(0, from), Math.min(23, to)];
 }
 
-/** Výšky sloupců 0–1 podle ceny (bez ceny podle tokenů) — stejné pravidlo jako sekce v kartě Claude. */
-export function barHeights(days: CostDay[]): number[] {
-  const priced = days.some((d) => d.cost != null && d.cost > 0);
-  const val = (d: CostDay) => (priced ? d.cost ?? 0 : d.tokens);
-  const max = Math.max(0, ...days.map(val));
-  return days.map((d) => (max > 0 ? val(d) / max : 0));
-}
-
 /** Stav karty Claude dnes podle přehledu: vypnuto, počítá se poprvé, chyba, hotovo. */
 export function usageState(v: CostsView | null | undefined): "off" | "first" | "error" | "ok" {
   if (!v || v.state === "off") return "off";
@@ -116,6 +109,12 @@ export function calState(cal?: CalendarView | null): "none" | "loading" | "unava
   if (cal.status === "unavailable") return "unavailable";
   if (cal.status === "loading" || cal.status === "idle") return cal.days.length ? "ok" : "loading";
   return "ok";
+}
+
+/** Stáří dat kalendáře (ms stažení nejstaršího zapnutého), když je `stale` — selhal poslední pokus nebo jsou data
+ *  starší než 15 min (i z cache na disku); čerstvá data a bez stažení = null (Týden pak nic nepřipisuje). */
+export function calAge(cal?: CalendarView | null): number | null {
+  return cal?.status === "stale" ? oldestFetchedMs(cal.calendars) : null;
 }
 
 /** Dnešní události, které ještě neskončily (celodenní první), nejvýš `max`. */

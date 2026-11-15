@@ -243,3 +243,34 @@ fn status_redacts_message_and_full_path() {
     assert_eq!(v[0]["activity"]["file"], "a.rs");
     assert!(!text.contains("tajná") && !text.contains("uzivatel") && !text.contains("transcript"), "{text}");
 }
+
+#[test]
+fn end_reason_cleans_session_end_reason() {
+    for (raw, want) in [
+        ("prompt_input_exit", Some("prompt_input_exit")),
+        (" Logout ", Some("logout")),
+        ("clear", Some("clear")),
+        ("", None),
+        ("   ", None),
+        ("<b>x</b>", None),
+        ("с кирилицей", None),
+    ] {
+        assert_eq!(activity::end_reason(raw).as_deref(), want, "{raw:?}");
+    }
+    assert_eq!(activity::end_reason(&"a".repeat(80)).map(|r| r.len()), Some(32));
+}
+
+#[test]
+fn session_end_stores_reason_and_resume_clears_it() {
+    let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1)).inline();
+    c.handle_event(&json!({"hook_event_name":"UserPromptSubmit","session_id":"a","cwd":"C:/r","prompt":"x"}));
+    c.handle_event(&json!({"hook_event_name":"PostToolUse","session_id":"a","tool_name":"Write","tool_input":{"file_path":"C:/r/zz-neexistuje.txt"}}));
+    assert_eq!(c.sessions().iter().find(|s| s.id == "a").unwrap().end_reason, None);
+    // bez nedokončené práce se session po SessionEnd rovnou odebere, důvod proto čteme jen u té, co zůstala
+    c.handle_event(&json!({"hook_event_name":"SessionEnd","session_id":"a","reason":"logout"}));
+    if let Some(s) = c.sessions().iter().find(|s| s.id == "a") {
+        assert_eq!((s.ended, s.end_reason.as_deref()), (true, Some("logout")));
+        c.handle_event(&json!({"hook_event_name":"UserPromptSubmit","session_id":"a","prompt":"dál"}));
+        assert_eq!(c.sessions().iter().find(|s| s.id == "a").unwrap().end_reason, None);
+    }
+}

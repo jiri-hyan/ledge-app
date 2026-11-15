@@ -4,9 +4,11 @@
 import { createEffect, createSignal, onCleanup, Show, type Accessor, type JSX } from "solid-js";
 import { api, type MediaAction, type MediaRepeat, type MediaTimeline, type MediaView } from "../api";
 import { sayError } from "../ui/toast";
+import { memoLru } from "../ui/lru";
+import { covers } from "./covers";
 import { t } from "../i18n";
 import { drawerShown } from "./shown";
-import { fmtDuration, fraction, live, nextRepeat, nextTickIn, seekKey, seekTarget, shownPosition } from "./timeline";
+import { fmtTrackTime, fraction, live, nextRepeat, nextTickIn, seekKey, seekTarget, shownPosition } from "./timeline";
 
 const svg = { viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true } as const;
 const stroke = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 1.9, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": true } as const;
@@ -21,7 +23,16 @@ const IcRepeat = () => <svg {...stroke}><path d="M5 11V9.5A2.5 2.5 0 0 1 7.5 7H1
 export const control = (a: MediaAction) => void api.mediaControl(a).catch(sayError);
 export const isPlaying = (m: MediaView) => m.status === "playing";
 
-/** Obal na `coverKey` — jedna data URL na kartu (velký obal ji použije dvakrát, ale načte jednou). */
+/** Sdílená cache obalů: až 5 míst (karta, kompakt, ostrov, dock, sekce) bere týž `coverKey` → jedno IPC `media_cover`. */
+const COVER_CACHE_MAX = 3;
+const coverOf = (k: string) => {
+  const p = memoLru(covers, k, (x) => api.mediaCover(x).then((u) => u ?? null), COVER_CACHE_MAX);
+  // „zatím bez obalu“ se nepamatuje (mohl by dorazit později pod stejným klíčem)
+  void p.then((u) => u === null && covers.get(k) === p && covers.delete(k), () => {});
+  return p;
+};
+
+/** Obal na `coverKey` — jedna data URL na klíč pro všechna místa (velký obal ji použije dvakrát, ale načte jednou). */
 export function useCover(key: Accessor<string | null>): Accessor<string | null> {
   const [url, setUrl] = createSignal<string | null>(null);
   createEffect(() => {
@@ -30,7 +41,7 @@ export function useCover(key: Accessor<string | null>): Accessor<string | null> 
     if (!k) return;
     let ok = true;
     onCleanup(() => (ok = false));
-    void api.mediaCover(k).then((u) => ok && setUrl(u ?? null), () => {});
+    void coverOf(k).then((u) => ok && setUrl(u), () => {});
   });
   return url;
 }
@@ -82,7 +93,7 @@ export function Progress(p: { m: MediaView; tl: MediaTimeline; times?: boolean; 
     setSeek({ ms, at: Date.now() });
     control({ seek: ms });
   };
-  const label = () => t("cards.media.position", "{pos} z {len}", { pos: fmtDuration(shown()), len: fmtDuration(p.tl.durationMs) });
+  const label = () => t("cards.media.position", "{pos} z {len}", { pos: fmtTrackTime(shown()), len: fmtTrackTime(p.tl.durationMs) });
   return (
     <div class="med-prog" classList={{ "med-prog-thin": p.thin }}>
       <div
@@ -123,8 +134,8 @@ export function Progress(p: { m: MediaView; tl: MediaTimeline; times?: boolean; 
       </div>
       <Show when={p.times}>
         <div class="med-times">
-          <span>{fmtDuration(shown())}</span>
-          <span>{fmtDuration(p.tl.durationMs)}</span>
+          <span>{fmtTrackTime(shown())}</span>
+          <span>{fmtTrackTime(p.tl.durationMs)}</span>
         </div>
       </Show>
     </div>
@@ -134,7 +145,7 @@ export function Progress(p: { m: MediaView; tl: MediaTimeline; times?: boolean; 
 /** Jen čas „1:42“ (vzhled Jen v proužku) — tiká stejně jako lišta. */
 export function TimeText(p: { m: MediaView; tl: MediaTimeline }) {
   const pos = usePosition(() => p.m, () => p.tl, () => null);
-  return <span class="med-clock">{fmtDuration(pos())}</span>;
+  return <span class="med-clock">{fmtTrackTime(pos())}</span>;
 }
 
 function ModeButton(p: { on: boolean; label: string; badge?: string; onClick: () => void; children: JSX.Element }) {
@@ -153,23 +164,23 @@ const repeatLabel = (r: MediaRepeat) =>
  * Předchozí / přehrát-pauza / další; `modes` = i náhodně a opakovat (jen když je zdroj hlásí — jinak se
  * tlačítka neukážou).
  */
-export function Controls(p: { m: MediaView; modes?: boolean; tight?: boolean }) {
+export function Controls(p: { m: MediaView; modes?: boolean; tight?: boolean; notch?: boolean; big?: boolean }) {
   const playing = () => isPlaying(p.m);
   const playLabel = () => (playing() ? t("cards.media.pause", "Pozastavit") : t("cards.media.play", "Přehrát"));
   return (
-    <div class="med-ctl" classList={{ "med-ctl-tight": p.tight }}>
+    <div class={p.notch ? "nb-ctl" : "med-ctl"} classList={{ "med-ctl-tight": p.tight, "nb-ctl-big": p.notch && p.big }}>
       <Show when={p.modes && typeof p.m.shuffle === "boolean"}>
         <ModeButton on={!!p.m.shuffle} label={p.m.shuffle ? t("cards.media.shuffleOn", "Náhodně: zapnuto") : t("cards.media.shuffleOff", "Náhodně: vypnuto")} onClick={() => control({ shuffle: !p.m.shuffle })}>
           <IcShuffle />
         </ModeButton>
       </Show>
-      <button class="mini med-ico" disabled={!p.m.canPrev} title={t("cards.media.prev", "Předchozí")} aria-label={t("cards.media.prev", "Předchozí")} onClick={() => control("prev")}>
+      <button class={p.notch ? "nb-btn" : "mini med-ico"} disabled={!p.m.canPrev} title={t("cards.media.prev", "Předchozí")} aria-label={t("cards.media.prev", "Předchozí")} onClick={() => control("prev")}>
         <IcPrev />
       </button>
-      <button class="mini med-ico med-play" disabled={!p.m.canToggle} title={playLabel()} aria-label={playLabel()} onClick={() => control("toggle")}>
+      <button class={p.notch ? "nb-btn nb-main" : "mini med-ico med-play"} disabled={!p.m.canToggle} title={playLabel()} aria-label={playLabel()} onClick={() => control("toggle")}>
         <Show when={playing()} fallback={<IcPlay />}><IcPause /></Show>
       </button>
-      <button class="mini med-ico" disabled={!p.m.canNext} title={t("cards.media.next", "Další")} aria-label={t("cards.media.next", "Další")} onClick={() => control("next")}>
+      <button class={p.notch ? "nb-btn" : "mini med-ico"} disabled={!p.m.canNext} title={t("cards.media.next", "Další")} aria-label={t("cards.media.next", "Další")} onClick={() => control("next")}>
         <IcNext />
       </button>
       <Show when={p.modes && p.m.repeat}>

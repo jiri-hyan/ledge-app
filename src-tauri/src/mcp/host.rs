@@ -38,6 +38,25 @@ impl Host for LiveHost {
         core().cfg.read().clone()
     }
 
+    /// Surová data pro `live_state`; zúžení dělá `read::build`. Jen paměť (snapshotové zdroje), žádné I/O ani cizí zámky navíc.
+    fn live_raw(&self) -> Value {
+        let c = core();
+        let cfg = c.cfg.read().clone();
+        let projects: Vec<(String, String, String)> = cfg.projects.iter().filter(|p| p.enabled).filter_map(|p| Some((p.id.clone(), p.name.clone(), c.project_dir(p)?.to_string_lossy().into_owned()))).collect();
+        let dirs: Vec<(String, String)> = projects.iter().map(|(id, _, d)| (id.clone(), d.clone())).collect();
+        let sessions = crate::snapshot::session_rows(&dirs, &|id| projects.iter().find(|p| p.0 == id).map(|p| p.1.clone()));
+        let agenda: Vec<Value> = crate::calendar::live::view(&cfg, crate::state::now_ms()).days.into_iter().filter(|d| d.kind == "today").flat_map(|d| d.items).map(|i| json!(i)).collect();
+        let briefs = if cfg.notes.enabled { crate::notes::briefwait::brief_waiting(&c.notes.lock().all) } else { Default::default() };
+        json!({
+            "sessions": sessions,
+            "approvals": { "pending": c.claude.pending(), "questions": c.claude.questions().len() },
+            "limits": crate::limitslive::view(),
+            "agenda": agenda,
+            "devServers": c.procs.snapshot(),
+            "briefs": briefs,
+        })
+    }
+
     fn save(&self, cfg: Config) -> Result<(), String> {
         // přesně tlačítko Uložit v Nastavení: `config::save` (validace, atomický zápis) + `apply_config`
         crate::commands::config::save_config_inner(cfg)?;
@@ -55,7 +74,7 @@ impl Host for LiveHost {
 
     fn open_drawer(&self, tab: Option<&str>) -> Result<String, String> {
         let c = core();
-        if c.dead() {
+        if c.dead_surface() {
             return Err(tr("Ledge je teď schovaný (hra na celé obrazovce nebo herní režim) — šuplík se neotevře.", "Ledge is hidden right now (a fullscreen game or game mode) — the drawer won't open.").into());
         }
         let mut on = String::new();

@@ -47,6 +47,8 @@
   /* text na ploše barvy --t1 (.btn.pri) a její hover */
   --on-light: #111;
   --pri-hover: #fff;
+  /* text na ploše akcentu (počítá apply.ts z --accent; černá/bílá ≥ 4,5:1) */
+  --on-accent: #000;
   --white: #fff;
   /* černá kresba na světlém podkladu zástupce s vlastní barvou (`tilelook`, kontrast ≥ 4.5:1) */
   --black: #000;

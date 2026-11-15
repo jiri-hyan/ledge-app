@@ -36,7 +36,6 @@
 .st-sec-aside { margin-left: auto; }
 .st-sec-desc { margin-top: 3px; color: var(--t3); font-size: var(--fs-sm); }
 /* podnadpis skupiny řádků v sekci (Karty na hlavní stránce: Práce / Osobní / V kartě Claude) */
-.st-group-h { margin-top: var(--s3); color: var(--t2); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; }
 
 /* Řádek volby: popisek vlevo, ovládání vpravo — a když se vedle sebe nevejdou (dlouhý přepínač, úzké okno),
    ovládání se zalomí POD popisek (flex-wrap), nikdy nezmáčkne popisek do úzkého sloupce ani nepřeteče kartu.

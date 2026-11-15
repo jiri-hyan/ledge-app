@@ -3,6 +3,7 @@
 // V klidu se neptá na nic; souřadnice zůstávají vidět v „Pokročilé“ (`Personal.tsx`). Logika `cityModel.ts`.
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { t } from "../../i18n";
+import { errorText } from "../../ui/toast";
 import { useSettings } from "../ctx";
 import { GEO_DEBOUNCE_MS, geoQuery, placeLabel, placeToWeather, type Place } from "../cityModel";
 import { geoSearch } from "../geoApi";
@@ -34,7 +35,7 @@ export function CityPicker() {
         const list = await geoSearch(q);
         if (mine === seq) setFound(list);
       } catch (e) {
-        if (mine === seq) setErr(typeof e === "string" ? e : e instanceof Error ? e.message : String(e));
+        if (mine === seq) setErr(errorText(e));
       } finally {
         if (mine === seq) setBusy(false);
       }

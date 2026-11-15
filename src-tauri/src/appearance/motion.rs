@@ -127,7 +127,8 @@ mod tests {
 
     #[test]
     fn old_key_is_read_through_load_and_never_written() {
-        let dir = std::env::temp_dir().join(format!("ledge-motion-{}", std::process::id()));
+        let _tmp = tempfile::tempdir().unwrap(); // izolovaná složka, uklidí se i po pádu testu
+        let dir = _tmp.path().to_path_buf();
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("config.json");
         std::fs::write(&path, r#"{"drawer":{"animationMs":0,"width":1200}}"#).unwrap();

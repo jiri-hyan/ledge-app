@@ -44,7 +44,7 @@ pub fn known_dir(key: &str) -> Option<PathBuf> {
 
 // ---------- motiv ----------
 
-const PERSONALIZE: &str = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+pub(crate) const PERSONALIZE: &str = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
 pub struct RegTheme;
 
@@ -55,6 +55,9 @@ impl ThemeStore for RegTheme {
     }
 
     fn set(&mut self, light: bool) -> Result<(), String> {
+        if crate::qa::isolated() {
+            return Err(crate::i18n::tr("Izolovaná instance (QA) nepřepíná motiv Windows.", "The isolated (QA) instance doesn't switch the Windows theme.").into());
+        }
         let err = |e: std::io::Error| crate::errors::any(tr("Motiv Windows nejde přepnout", "Can't switch the Windows theme"), &e);
         let k = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
             .open_subkey_with_flags(PERSONALIZE, winreg::enums::KEY_SET_VALUE)

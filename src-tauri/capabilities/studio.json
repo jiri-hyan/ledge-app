@@ -38,6 +38,7 @@
     "allow-desk-unpin",
     "allow-geo-search",
     "allow-get-config",
+    "allow-win-look",
     "allow-get-state",
     "allow-hooks-install",
     "allow-hooks-remove",
@@ -63,6 +64,9 @@
     "allow-open-url",
     "allow-notify-preview",
     "allow-edge-try",
+    "allow-monitors-list",
+    "allow-ext-status",
+    "allow-ext-wall-bg",
     "allow-pick-path",
     "allow-pick-save",
     "allow-pkg-context",
@@ -96,6 +100,11 @@
     "allow-win-settings-open",
     "allow-apikey-clear",
     "allow-apikey-set",
-    "allow-apikey-status"
+    "allow-apikey-status",
+    "allow-connector-clear-key",
+    "allow-connector-preview",
+    "allow-connector-send",
+    "allow-connector-set-key",
+    "allow-connector-state"
   ]
 }

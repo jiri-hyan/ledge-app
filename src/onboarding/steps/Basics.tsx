@@ -2,8 +2,9 @@
 // sekce Vzhled) a Hotovo (souhrn uloženého + jak šuplík otevřít podle `drawer.trigger`).
 import { For, Show } from "solid-js";
 import { t } from "../../i18n";
+import { settingsPath } from "../../settings/path";
 import { doneRows, estimateMinutes } from "../logic";
-import { chooseLang, setWiz, steps, wiz } from "../store";
+import { chooseLang, claudeInstalled, setWiz, steps, wiz } from "../store";
 import { THEMES, type ThemeId } from "../../theme/themes";
 import { savedAppearance, scopeStyle } from "../../theme/apply";
 
@@ -50,7 +51,7 @@ export function LookStep() {
     <div class="ob-center">
       <div class="ob-lead">
         <h3>{t("onboarding.look.title", "Vzhled")}</h3>
-        <p>{t("onboarding.look.lead", "Vyber si motiv. Jak vypadá zavřený Ledge, co se stane po najetí myší, šířku a animace vybereš z obrázků v Nastavení → Vzhled (nebo Začínáme → Vyber si vzhled).")}</p>
+        <p>{t("onboarding.look.lead", "Vyber si motiv. Jak vypadá zavřený Ledge, co se stane po najetí myší, šířku a animace vybereš z obrázků v {path}.", { path: settingsPath("vzhled") })}</p>
       </div>
       <div class="ob-themes">
         <For each={wiz.themes}>
@@ -81,7 +82,7 @@ function openTip(trigger: string): string {
     case "dwell":
       return t("onboarding.done.tipDwell", "Šuplík otevřeš tak, že myš chvíli podržíš na proužku nahoře uprostřed.");
     case "off":
-      return t("onboarding.done.tipOff", "Otevírání myší je vypnuté — šuplík otevřeš zkratkou (Nastavení → Šuplík a karty → Otevírání a klávesy).");
+      return t("onboarding.done.tipOff", "Otevírání myší je vypnuté — šuplík otevřeš zkratkou ({path}).", { path: settingsPath("chovani") });
     default:
       return t("onboarding.done.tipHover", "Šuplík otevřeš najetím myší na proužek nahoře uprostřed obrazovky.");
   }
@@ -124,7 +125,14 @@ export function DoneStep() {
       <ul class="ob-bullets">
         <li>{t("onboarding.done.tipTray", "Ikonka Ledge v oznamovací oblasti (vedle hodin) šuplík otevře a Ledge tam i ukončíš.")}</li>
         <li>{t("onboarding.done.tipLayout", "Uprav si šuplík — ✎ v hlavičce: přetáhni karty, změň jejich velikost, přidej je z katalogu nebo si založ vlastní záložku.")}</li>
-        <li>{t("onboarding.done.tipAgain", "Průvodce kdykoli znovu: Nastavení → Aplikace → Jazyk a průvodce. Všechno ostatní najdeš tamtéž.")}</li>
+        <li>{t("onboarding.done.tipPalette", "Ctrl+K — hledat a spouštět vše (projekty, poznámky, volby Nastavení); napiš „?“ a uvidíš všechny klávesy.")}</li>
+        <Show when={wiz.autostart}>
+          <li>{t("onboarding.done.tipAutostart", "Ledge se spouští s Windows — vypneš to v: {path}.", { path: settingsPath("spousteni") })}</li>
+        </Show>
+        <Show when={wiz.claudeState === "ready" && !claudeInstalled()}>
+          <li>{t("onboarding.done.tipNoClaude", "Claude Code jsem nenašel — až ho nainstaluješ, Ledge ukáže jeho session (kartu Claude přidáš z katalogu přes ✎).")}</li>
+        </Show>
+        <li>{t("onboarding.done.tipAgain", "Průvodce kdykoli znovu: {path}. Všechno ostatní najdeš tamtéž.", { path: settingsPath("zaciname") })}</li>
       </ul>
     </div>
   );

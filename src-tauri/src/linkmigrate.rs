@@ -120,8 +120,8 @@ mod tests {
         "weather": { "lat": 50.08, "lon": 14.42, "label": "Praha" },
         "links": [
           { "name": "Mapy", "target": "https://mapy.cz" },
-          { "name": "Fotky", "target": "C:\\Users\\jiri\\Pictures" },
-          { "name": "Nákup", "target": "C:\\Users\\jiri\\nakup.txt" },
+          { "name": "Fotky", "target": "C:\\Users\\demo\\Pictures" },
+          { "name": "Nákup", "target": "C:\\Users\\demo\\nakup.txt" },
           { "name": "Kalkulačka", "target": "calc.exe" },
           { "name": "Gmail", "target": "https://mail.google.com" },
           { "name": "Relativní", "target": "Dokumenty\\x" }
@@ -150,8 +150,8 @@ mod tests {
                 (s("mapy"), s("Mapy práce"), ActionKind::Url, ShowOn::Work, s("https://mapy.cz")),
                 // „Mapy“ na Práci nestačí → nová akce s jiným id; Gmail už na Osobní je → nevznikne znovu
                 (s("mapy-2"), s("Mapy"), ActionKind::Url, ShowOn::Personal, s("https://mapy.cz")),
-                (s("fotky"), s("Fotky"), ActionKind::Folder, ShowOn::Personal, s(r"C:\Users\jiri\Pictures")),
-                (s("nakup"), s("Nákup"), ActionKind::File, ShowOn::Personal, s(r"C:\Users\jiri\nakup.txt")),
+                (s("fotky"), s("Fotky"), ActionKind::Folder, ShowOn::Personal, s(r"C:\Users\demo\Pictures")),
+                (s("nakup"), s("Nákup"), ActionKind::File, ShowOn::Personal, s(r"C:\Users\demo\nakup.txt")),
                 (s("kalkulacka"), s("Kalkulačka"), ActionKind::App, ShowOn::Personal, s("calc.exe")),
             ]
         );

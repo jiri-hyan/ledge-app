@@ -28,7 +28,7 @@ fn loop_passes_replies_and_skips_notifications() {
 
 #[test]
 fn failures_become_jsonrpc_errors_with_the_same_id() {
-    for (f, needle) in [(Fail::NotRunning, "Ledge neběží"), (Fail::Disabled, "Nastavení → Claude (MCP)"), (Fail::BadKey, "Klíč"), (Fail::Other(500), "500")] {
+    for (f, needle) in [(Fail::NotRunning, "Ledge neběží"), (Fail::Disabled, "Nastavení → Claude → Claude (MCP)"), (Fail::BadKey, "Klíč"), (Fail::Other(500), "500")] {
         let mut out = Vec::new();
         let input = "{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"initialize\",\"params\":{}}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n[{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"ping\"},{\"jsonrpc\":\"2.0\",\"method\":\"x\"}]\n";
         run(Cursor::new(input), &mut out, &|_: &str| Post::Fail(f)).unwrap();
@@ -102,7 +102,7 @@ fn real_pipes() {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        .creation_flags(0x0800_0000)
+        .creation_flags(crate::procman::CREATE_NO_WINDOW)
         .spawn()
         .unwrap();
     let mut sin = child.stdin.take().unwrap();

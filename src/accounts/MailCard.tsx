@@ -5,12 +5,13 @@ import { For, Show, type JSX } from "solid-js";
 import { api, type MailItem, type Snapshot } from "../api";
 import { ago, fmtClock } from "../format";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { gotoSettingsPanel } from "../palette/goto";
 import { sayError } from "../ui/toast";
 import { safeLink, unreadBadge } from "./model";
 import "./accounts.css";
 
-/** Nastavení → Účty (přihlášení účtu Microsoft). */
+/** Nastavení → Obsah karet → Pokročilé (přihlášení účtu Microsoft). */
 export function openAccountsSettings(onSettings: () => void) {
   onSettings();
   gotoSettingsPanel("f-accounts.microsoft");
@@ -53,7 +54,7 @@ export default function MailCard(p: { s: Snapshot; now: number; onSettings: () =
       <Show when={status() !== "unset" && status() !== "off"} fallback={
         <div class="empty mail-empty">
           {status() === "off"
-            ? t("cards.mail.off", "Pošta je v Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé vypnutá.")
+            ? t("cards.mail.off", "Pošta je v {path} vypnutá.", { path: settingsPath("osobni", "calendars", "accounts") })
             : t("cards.mail.unset", "Přihlas účet Microsoft (Outlook) a uvidíš tu počet nepřečtených a nejnovější předměty. Ledge čte jen hlavičky zpráv a nic nikam neposílá.")}
           <button class="mini ok" onClick={() => openAccountsSettings(p.onSettings)}>{t("cards.mail.connect", "Nastavit účet…")}</button>
         </div>

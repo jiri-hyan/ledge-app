@@ -114,7 +114,8 @@ mod tests {
 
     #[test]
     fn meta_and_log_write_only_their_place() {
-        let dir = std::env::temp_dir().join(format!("ledge-briefnote-{}", std::process::id()));
+        let _tmp = tempfile::tempdir().unwrap(); // izolovaná složka, uklidí se i po pádu testu
+        let dir = _tmp.path().to_path_buf();
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("app")).unwrap();
         let p = dir.join("app").join("z.md");

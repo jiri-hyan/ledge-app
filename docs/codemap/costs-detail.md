@@ -11,14 +11,14 @@ dnech. Zdroj = lokální transcripty Claude Code `~/.claude/projects/<slug>/**/*
 |---|---|---|
 | `src-tauri/src/usage/parse.rs` | řádek JSONL → záznam (součty tokenů nasycené, ne přetékající) (jen `type:"assistant"` s `message.usage`), předfiltr bajtů, klíč deduplikace, `cwd` z libovolného řádku | `parse_line`, `Rec`, `Tokens`, `maybe_usage`, `fnv`, `iso_ms`, `line_cwd` |
 | `src-tauri/src/usage/price.rs` | ceník USD / 1M tokenů jako data (datum ověření + zdroj), kanonické id modelu, pásma (Haiku 5.5 > 100k, fast, `inference_geo: us`), cena | `MODELS`, `VERIFIED`, `SOURCE`, `canonical`, `lookup`, `tier`, `cost`, `display`, `TIER_*`, `LONG_PROMPT` |
-| `src-tauri/src/usage/index.rs` | inkrementální index na disku: výpis souborů, čtení od offsetu po celých řádcích (řádek nad `MAX_LINE` = 8 MB se přeskočí bez načtení do paměti), dedup, agregace den × cwd × model × pásmo a (kolo 22) dnešek + včerejšek po místních hodinách × cwd (`hours`, verze 2 = jednou přepočet), uložení | `Index`, `Index::update`, `Index::add`, `list_files`, `Found`, `Window`, `Stats`, `FileEntry`, `Key`, `HourKey`, `HOUR_DAYS`, `MAX_LINE`, `Sum`, `load`, `save`, `encode_seen`, `decode_seen`, `VERSION` |
+| `src-tauri/src/usage/index.rs` | inkrementální index na disku: výpis souborů, čtení od offsetu po celých řádcích (řádek nad `MAX_LINE` = 8 MB se přeskočí bez načtení do paměti), dedup, agregace den × cwd × model × pásmo a (kolo 22) dnešek + včerejšek po místních hodinách × cwd (`hours`, verze 2 = jednou přepočet) a (kolo 34, H6) součty po souboru `FileEntry.ses`/`span`/`partial` pro cenu session (verze 3 = jednou přepočet), uložení | `Index`, `Index::update`, `Index::add`, `list_files`, `Found`, `Window`, `Stats`, `FileEntry`, `Key`, `HourKey`, `HOUR_DAYS`, `MAX_LINE`, `Sum`, `load`, `save`, `encode_seen`, `decode_seen`, `VERSION` |
 | `src-tauri/src/usage/floor.rs` | (kolo 23, E3) podlaha nové relace/agenta: první usage souboru (`First`, doplňuje `index::read_file`; starý index `fill` jen čtením začátku), typ agenta z `agent-*.meta.json`, medián 7 dní + trend, `Floor` do `Summary.floor` | `First`, `first_of`, `fill`, `scan_head`, `agent_type`, `clean_type`, `is_subagent`, `med`, `build`, `Floor`, `FloorRow`, `MIN_TREND`, `ROWS` |
 | `src-tauri/src/ctxsize.rs` | (kolo 23, E1) kontext živé session: poslední usage v konci transcriptu (`transcript_path` z hooku), poměr k prvnímu volání, úrovně 250 k / 350 k, cache podle mtime+délky (15 s), povolené cesty; příkaz `session_context` (`commands/sessions.rs`) | `Ctx`, `level`, `ratio`, `context`, `last_usage`, `read_context`, `for_path`, `allowed`, `WARN`, `HIGH`, `THROTTLE_MS` |
 | `src-tauri/src/usage/view.rs` | index → přehled (rozsahy, top projekty/modely + „ostatní“, dny, dnešek po hodinách a projektech `hours` pro kartu Claude dnes) | `build`, `Summary`, `Range`, `Line`, `Day`, `HourRow`, `hour_rows`, `Split`, `TOP`, `date_of` |
 | `src-tauri/src/costslive.rs` | za běhu: žádost s omezením, vlákno s nízkou prioritou, průběh, přehled v paměti, projekt z `cwd`; kolo 22: kdo přehled chce (`wanted`: sekce v kartě Claude nebo karta Claude dnes `USAGE_CARD`), místní hodina pro časovou osu, widget na ploše (`request_desk` 1× / `DESK_EVERY`, `desk_view`) — [board.md](board.md) | `request`, `view`, `CostsView`, `compute`, `project_name`, `local_day`, `local_hour`, `wanted`, `request_desk`, `desk_view`, `THROTTLE`, `DESK_EVERY` |
 | `src-tauri/src/commands/costs.rs` | Tauri příkaz | `costs_refresh` |
 | lepidlo | `lib.rs` (`mod usage`, `mod costslive`, registrace `costs_refresh`), `snapshot.rs` (`Snapshot.costs`), `config/*` (`ClaudeConfig.costs`), `Cargo.toml` (`memchr`, už ve stromu přes regex) | |
-| `src/costs/model.ts` | čistá logika UI + typy zrcadla (`CostsView`) — test `model.test.mjs` | `compact`, `usdDigits`, `bars`, `share`, `progressPct`, `pickRange`, `floorTrend` (kolo 23: podlaha) |
+| `src/costs/model.ts` | čistá logika UI + typy zrcadla (`CostsView`) — test `model.test.mjs` | `compact`, `usdDigits`, `priceSeries` (JEDINÁ série cena/tokeny pro sloupce i sparkline; `unknown[i]` = den jen s nenacenými tokeny → „—“, ne 0 $), `normalize`, `bars`, `costText` („—“ / „≥ X“ pro řádky, rozsahy i dny), `tokText` (jediný formátovač tokenů: karta, hrdina, kontext), `share`, `progressPct`, `pickRange`, `floorTrend` (kolo 23: podlaha) |
 | `src/sessions/ctx.ts` · `ContextBar.tsx` · `ctx.css` · `src/i18n/en-ctx.ts` | pruh kontextu pod živou session (kolo 23, E1; `ClaudeSessions.tsx` `SessionRow`, `claude.contextBar`) — test `ctx.test.mjs`; angličtina i pro podlahu (`sessions.costs.floor*`) | `ctxFill`, `ctxTicks`, `showRatio`, `showTip`, `sameCtx`, `ContextBar`, `api.sessionContext` |
 | `src/costs/CostsSection.tsx` · `costs.css` | sekce v kartě Claude (`ClaudeSessions.tsx` dole), rozbalení a rozsah v `localStorage` (jen pohodlí) · styly `cost-*` | `CostsSection`, `usd`, `tok` |
 | `src/i18n/en-costs.ts` | angličtina, klíče `sessions.costs.*` (Nastavení: `settings.f.claude.costs` v `settings/en.ts`, `settings.claude.costs` v `settings/panels/en.ts`) | |
@@ -45,7 +45,7 @@ podle `cwd` → `Live.summary` → `Snapshot.costs` → `CostsSection`. Vlákno 
   okno = celý index od nuly (`Stats.rebuilt`). Smazaný soubor jen vypadne z indexu, jeho dny zůstanou.
 - **Deduplikace:** jedna odpověď API se v JSONL opakuje (každý blok obsahu = řádek se stejnou usage; resume/fork
   kopíruje historii do nového souboru) → klíč FNV-1a z `requestId` + `message.id`, množina přes všechny soubory
-  v okně (`Index.seen`, 12 B / odpověď na disku). Počítá se první výskyt (jako `token-audit.py` ve WorkSpace).
+  v okně (`Index.seen`, 12 B / odpověď na disku). Počítá se první výskyt.
   Bez dedupu ~4× přepočet.
 - **Den = místní půlnoc** podle `timestamp` záznamu (`costslive::local_day`); `cwd` záznamu, jinak poslední
   `cwd` souboru. Projekt: `notes::project_for_cwd` (hranice komponenty), worktree → hlavní checkout
@@ -83,3 +83,14 @@ změna okna, uložení/načtení, rozbité soubory), `usage::view::tests` (rozsa
   po běhu se uvolní. 172 097 odpovědí + 168 632 duplicit (~2×). UI mezitím ukazuje „počítám… N %“.
 - **Inkrement hned potom:** 0,55 s zdi, 0,22 s CPU (465 ms výpis složek, 6 otevřených souborů, 0,8 MB).
 - Index na disku: `usage-index.json` 947 kB + `usage-index.seen` 2 065 kB.
+
+## Cena session (kolo 34, H6)
+- Žádný nový polling ani čtení: součty po session se přičítají při běžném čtení souboru (`index::read_file` → `sess::note`,
+  1× `canonical` + `tier` + hledání v ≤ 3 prvcích na NOVĚ započtenou odpověď; duplikáty se nepočítají). Index se
+  načítá jen ve vlákně `costslive` a po běhu se uvolní; v paměti zůstane `Summary.sessions` (≤ 40 řádků, ~ 4 kB).
+- Index verze 3 = po aktualizaci jednou přepočet od nuly (jako u verze 2). Disk: ~ +100–150 B na soubor.
+- `costslive::wanted` teď dostává `drawer.sections.claude` (karta Claude viditelná), ne jen sekci útraty: cena u
+  session potřebuje index i se sbalenou sekcí. UI žádá přepočet v `ClaudeSessions.tsx` při změně session (Rust ≤ 1× / 60 s).
+- Definice KPI: odhad v cenách API od startu session včetně subagentů, jen odpovědi v okně 30 dní (`partial` = „≥“).
+  Tempo (USD/h) a „kdy skončí“ záměrně nejsou: žádný zdroj doby aktivní práce / konce.
+- Pravdivost (k34, L235/L236): `costs/model.ts` `priceStaleDays` (ceník `VERIFIED` starší než `PRICE_STALE_DAYS` = 60 dní → poznámka v kartě Útrata a v Nastavení › Claude; neplatné datum = nic). Tooltip „tokenů“ definuje součet (vstup + výstup + cache zápis + čtení) a „7 dní“ = kalendářní dny včetně dneška. Pruh kontextu: rysky 250/350 k jsou pevné hranice Ledge, ne okno modelu (tabulka cen okno modelu nenese — nevymýšlí se).

@@ -17,12 +17,13 @@ import { notesApi } from "./api";
 import { lang, t, tp } from "../i18n";
 import { groupByOf, groupNotes, groupStyleOf, type Group } from "./group";
 import { headlineParts, shortDate } from "./headline";
-import { kanbanSplit, notesDesign } from "./noteDesigns";
+import { groupCount, kanbanCount, kanbanSplit, notesDesign } from "./noteDesigns";
 import { IconPin } from "../pin/icons";
-import { isPinned, newPin, togglePin } from "./pins";
+import { backLabel, hiddenUntil, isPinned, newPin, pinTitle, togglePin } from "./pins";
 import { completeNote, unarchiveNote } from "./lifecycle";
 import { IconCheck, IconUnarchive } from "./lifeicons";
 import RowMenu from "./RowMenu";
+import TasksView from "./TasksView";
 import { say, sayError } from "../ui/toast";
 import { bentoLines, heroOf, TEMPLATES } from "./bento";
 import { tx } from "../layout/text";
@@ -79,7 +80,8 @@ export function NoteRow(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: 
         <button class="note-act note-act-copy" title={t("notes.row.copy", "Kopírovat text")} aria-label={t("notes.row.copy", "Kopírovat text")} onClick={() => void copyNote(n().path)}><IconCopy /></button>
       </Show>
       <Show when={!p.archived}>
-        <button class="note-pin" classList={{ on: isPinned(p.s.pins, n().path) }} aria-pressed={isPinned(p.s.pins, n().path)} title={isPinned(p.s.pins, n().path) ? t("notes.pin.rowUnpin", "Odepnout z plochy") : t("notes.pin.rowPin", "Připnout na plochu — lístek přes ostatní okna")} onClick={() => togglePin(n().path)}><IconPin /></button>
+        <Show when={hiddenUntil(p.s.pins, n().path)}>{(h) => <span class="pill n" title={pinTitle(p.s.pins, n().path, p.now, "")}>{backLabel(h(), p.now)}</span>}</Show>
+        <button class="note-pin" classList={{ on: isPinned(p.s.pins, n().path) || hiddenUntil(p.s.pins, n().path) != null }} aria-pressed={isPinned(p.s.pins, n().path)} title={pinTitle(p.s.pins, n().path, p.now, t("notes.pin.rowPin", "Připnout na plochu — lístek přes ostatní okna"))} onClick={() => togglePin(n().path, hiddenUntil(p.s.pins, n().path))}><IconPin /></button>
       </Show>
       <RowMenu n={n()} archived={!!p.archived} inherited={projectAccent(p.s, n().project)} />
     </div>
@@ -95,13 +97,16 @@ function TimelineItem(p: { s: Snapshot; n: NoteView; now: number; onOpen: (n: No
       <span class="note-tl-dot" aria-hidden="true" />
       <button class="note-tl-body" title={t("notes.row.edit", "Upravit v Ledge")} onClick={() => p.onOpen(p.n)}>
         <span class="note-tl-title">{p.n.title || t("notes.imageOnly", "(jen obrázek)")}</span>
-        <span class="note-tl-sub">{p.n.project ? `${projName(p.s, p.n.project)} · ` : ""}{ago(p.n.createdMs, p.now)}</span>
+        <span class="note-tl-sub">{p.n.project ? `${projName(p.s, p.n.project)} · ` : ""}{ago(p.n.createdMs, p.now)}<BriefChip n={p.n} /></span>
       </button>
     </div>
   );
 }
 
-export type Tab = { id: string; label: string; count: number; color?: string; icon?: string };
+export type Tab = { id: string; label: string; count: number; color?: string; icon?: string; /** tooltip (definice čísla) */ tip?: string };
+
+/** Speciální záložka „Úkoly“ (`TasksView`) — není kategorie, její id nesmí do dotazu na poznámky. */
+export const TASKS_TAB = "_tasks";
 
 /** Záložky: Vše + kategorie z configu s aspoň jednou nehotovou + neznámé kategorie (jako text). */
 export function tabsOf(s: Snapshot): Tab[] {
@@ -111,7 +116,9 @@ export function tabsOf(s: Snapshot): Tab[] {
   const unknown = Object.keys(counts)
     .filter((id) => counts[id] > 0 && !s.noteKinds.some((k) => k.id === id))
     .map((id) => ({ id, label: kindOf(s.noteKinds, id).label, count: counts[id] }));
-  return [{ id: "all", label: t("notes.tabs.all", "Vše"), count: all }, ...known, ...unknown];
+  const due = (s.notesTaskCounts?.overdue ?? 0) + (s.notesTaskCounts?.today ?? 0);
+  const tasks: Tab[] = all > 0 ? [{ id: TASKS_TAB, label: t("notes.tabs.tasks", "Úkoly"), count: due, tip: t("notes.tabs.tasksTip", "Otevřené body s termínem do konce dneška (po termínu + dnes)") }] : [];
+  return [{ id: "all", label: t("notes.tabs.all", "Vše"), count: all }, ...tasks, ...known, ...unknown];
 }
 
 export function Tabs(p: { tabs: Tab[]; value: string; onChange: (id: string) => void }) {
@@ -119,10 +126,10 @@ export function Tabs(p: { tabs: Tab[]; value: string; onChange: (id: string) => 
     <div class="note-tabs" role="tablist">
       <For each={p.tabs}>
         {(tb) => (
-          <button class="note-tab" classList={{ on: tb.id === p.value }} role="tab" aria-selected={tb.id === p.value} style={tb.color ? { "--k": tb.color } : undefined} onClick={() => p.onChange(tb.id)}>
+          <button class="note-tab" classList={{ on: tb.id === p.value }} role="tab" aria-selected={tb.id === p.value} style={tb.color ? { "--k": tb.color } : undefined} title={tb.tip} onClick={() => p.onChange(tb.id)}>
             <Show when={tb.icon !== undefined}><KindIcon icon={tb.icon!} /></Show>
             {tb.label}
-            <span class="cnt">{tb.count}</span>
+            <Show when={tb.count > 0}><span class="cnt">{tb.count}</span></Show>
           </button>
         )}
       </For>
@@ -171,15 +178,18 @@ export function NotesCard(p: {
   const tagList = () => (tags.latest ?? []).slice(0, 8);
   // vybraný štítek, který už žádná nehotová poznámka nemá → bez filtru
   const tag = () => (tagFilter() && (tags.latest ?? []).some((x) => x.tag === tagFilter()) ? tagFilter() : null);
-  const filtered = () => cur() !== "all" || !!tag();
+  /** kategorie pro dotazy: „Vše“ i záložka Úkoly = žádná */
+  const curKind = () => (cur() === "all" || cur() === TASKS_TAB ? null : cur());
+  const tasksTab = () => cur() === TASKS_TAB;
+  const filtered = () => curKind() !== null || !!tag();
   const [picked] = createResource(
-    () => (filtered() ? { kind: cur() === "all" ? null : cur(), tag: tag(), rev: p.s.notesRev } : null),
+    () => (filtered() ? { kind: curKind(), tag: tag(), rev: p.s.notesRev } : null),
     (k) => quiet(api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }), null, "noteQuery"),
   );
   const items = () => (p.personal ? p.s.personal.notes : !filtered() ? p.s.notes : picked.latest?.notes ?? []);
   const moreCount = () => (p.personal ? p.s.personal.notesMore : !filtered() ? p.s.notesMore : Math.max(0, (picked.latest?.total ?? 0) - items().length));
   const open = () => (p.personal ? items().filter((n) => !n.done).length : tabs().find((tb) => tb.id === cur())?.count ?? 0);
-  const newKind = () => (cur() === "all" ? undefined : cur());
+  const newKind = () => curKind() ?? undefined;
 
   const by = () => groupByOf(p.groupBy);
   const gstyle = () => groupStyleOf(p.groupStyle);
@@ -197,17 +207,17 @@ export function NotesCard(p: {
   // Kanban: hotové poznámky karta jinak nedrží, proto vlastní dotaz s `includeDone` (jen ve vzhledu Kanban)
   // dva dotazy, každý s vlastním stropem: mnoho otevřených nesmí vytlačit hotové
   const [kanRes] = createResource(
-    () => (design() === "kanban" && !p.personal ? { kind: cur() === "all" ? null : cur(), tag: tag(), rev: p.s.notesRev } : null),
+    () => (design() === "kanban" && !p.personal ? { kind: curKind(), tag: tag(), rev: p.s.notesRev } : null),
     async (k) => {
       const [open, done] = await Promise.all([
         quiet(api.noteQuery({ kind: k.kind, tag: k.tag, limit: CARD_ROWS }), null, "noteQuery"),
         quiet(api.noteQuery({ kind: k.kind, tag: k.tag, onlyDone: true, limit: CARD_ROWS }), null, "noteQuery"),
       ]);
-      return { open: open?.notes ?? [], done: done?.notes ?? [] };
+      return { open: open?.notes ?? [], done: done?.notes ?? [], openTotal: open?.total ?? null, doneTotal: done?.total ?? null };
     },
   );
   const kan = () => {
-    if (p.personal || !kanRes.latest) return kanbanSplit(items());
+    if (p.personal || !kanRes.latest) return { ...kanbanSplit(items()), openTotal: null, doneTotal: null };
     return kanRes.latest;
   };
 
@@ -239,6 +249,7 @@ export function NotesCard(p: {
       <Show when={tabs().length > 2}>
         <Tabs tabs={tabs()} value={cur()} onChange={setTab} />
       </Show>
+      <Show when={tasksTab()} fallback={<>
       <Show when={tagList().length}>
         <div class="note-tagbar" role="group" aria-label={t("notes.card.tagFilter", "Filtr podle štítku")}>
           <For each={tagList()}>
@@ -264,7 +275,7 @@ export function NotesCard(p: {
               <span class="note-bento-head">
                 <span class="note-bento-tag">{isPinned(p.s.pins, h().path) ? t("notes.bento.pinned", "Připnutá na ploše") : t("notes.bento.latest", "Nejnovější")}</span>
                 <span class="note-bento-title">{h().title || t("notes.imageOnly", "(jen obrázek)")}</span>
-                <span class="note-bento-sub">{projName(p.s, h().project)} · {ago(h().createdMs, p.now)}</span>
+                <span class="note-bento-sub">{projName(p.s, h().project)} · {ago(h().createdMs, p.now)}<BriefChip n={h()} /></span>
               </span>
               <span class="note-bento-preview">
                 <Show when={bentoLines(heroDetail()?.body).length} fallback={<span class="note-bento-muted">{t("notes.bento.emptyBody", "(bez textu)")}</span>}>
@@ -292,10 +303,10 @@ export function NotesCard(p: {
         <Switch>
           <Match when={design() === "kanban" && items().length > 0}>
             <div class="note-kanban">
-              <For each={[[t("notes.kanban.open", "Otevřené"), kan().open], [t("notes.kanban.done", "Hotové"), kan().done]] as [string, NoteView[]][]}>
-                {([label, rows]) => (
+              <For each={[[t("notes.kanban.open", "Otevřené"), kan().open, kan().openTotal], [t("notes.kanban.done", "Hotové"), kan().done, kan().doneTotal]] as [string, NoteView[], number | null][]}>
+                {([label, rows, total]) => (
                   <section class="note-kcol">
-                    <div class="note-group-head"><span class="note-group-label">{label}</span><span class="note-group-n">{rows.length}</span></div>
+                    <div class="note-group-head"><span class="note-group-label">{label}</span><span class="note-group-n" title={total != null && total > rows.length ? t("notes.count.of", "Zobrazeno {shown} z {total}", { shown: rows.length, total }) : undefined}>{kanbanCount(rows.length, total)}</span></div>
                     <div class="note-list" data-view="list">
                       <For each={rows} fallback={<div class="note-kempty">—</div>}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
                     </div>
@@ -314,7 +325,7 @@ export function NotesCard(p: {
               <For each={groups()}>
                 {(g) => (
                   <section class="note-group">
-                    <div class="note-group-head"><span class="note-group-label">{g.label}</span><span class="note-group-n">{g.items.length}</span></div>
+                    <div class="note-group-head"><span class="note-group-label">{g.label}</span><span class="note-group-n" title={moreCount() > 0 ? t("notes.count.atLeast", "Aspoň {n} — karta ukazuje jen část poznámek ({more} dalších)", { n: g.items.length, more: moreCount() }) : undefined}>{groupCount(g.items.length, moreCount() > 0)}</span></div>
                     <div class="note-list" data-view={listView()}>
                       <For each={g.items}>{(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} />}</For>
                     </div>
@@ -335,6 +346,9 @@ export function NotesCard(p: {
       </Show>
       <Show when={!p.personal && p.s.notesArchived > 0}>
         <button class="mini note-more-btn" title={t("notes.card.archiveTitle", "Archivované poznámky — jdou vrátit nebo smazat")} onClick={() => { setPageArchive(true); p.onAll(); }}>{t("notes.card.archive", "Archiv ({n})", { n: p.s.notesArchived })}</button>
+      </Show>
+      </>}>
+        <TasksView s={p.s} now={p.now} onOpen={p.onOpen} />
       </Show>
       <Show when={syncLabel(p.s, p.now)}>
         {(l) => <div style={{ "margin-top": "6px" }}><span class={`pill ${l()[0]}`} title={l()[2]}>{l()[1]}</span></div>}

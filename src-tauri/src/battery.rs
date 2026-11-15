@@ -59,8 +59,8 @@ static WANTED: Mutex<bool> = Mutex::new(false);
 // ---------- čistá logika ----------
 
 pub(crate) fn allowed(cfg: &Config) -> bool {
-    // baterii ukazuje i karta Rychlé přepínače (kolo 22)
-    cfg.modes.personal_enabled && (cfg.drawer.sections.battery || crate::layout::placed(&cfg.layout, crate::layout::TOGGLES_CARD))
+    // baterii ukazuje i karta Rychlé dlaždice Windows ve vzhledu Přepínače (kolo 22; od kola 34 sloučená karta)
+    cfg.modes.personal_enabled && (cfg.drawer.sections.battery || crate::layout::toggles_placed(&cfg.layout))
 }
 
 /// Má stroj systémovou baterii? (desktop hlásí `BatteryFlag` 128)

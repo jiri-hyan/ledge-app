@@ -40,13 +40,14 @@ pub struct CalendarFeed {
     pub account: String,
     /// Připomínka schůzky: kolik minut před začátkem (0 = vypnuto, nejvýš 120). Výchozí 5.
     pub remind_min: u32,
-    /// K připomínce i oznámení Windows s tlačítkem Připojit (výchozí vypnuto).
+    /// K připomínce i oznámení Windows s tlačítkem Připojit (výchozí zapnuto; přijde jen u schůzky s ověřeným
+    /// odkazem — bez něj by jen opakovalo proužek, viz `remind::toast_wanted`).
     pub remind_toast: bool,
 }
 
 impl Default for CalendarFeed {
     fn default() -> Self {
-        Self { name: String::new(), url: String::new(), color: None, enabled: true, source: SourceKind::Ics, account: String::new(), remind_min: DEFAULT_REMIND_MIN, remind_toast: false }
+        Self { name: String::new(), url: String::new(), color: None, enabled: true, source: SourceKind::Ics, account: String::new(), remind_min: DEFAULT_REMIND_MIN, remind_toast: true }
     }
 }
 
@@ -206,9 +207,9 @@ mod tests {
         // starý config bez pole `enabled` = zapnuto
         let c: CalendarFeed = serde_json::from_str(r#"{"name":"A","url":"https://x.cz/a.ics"}"#).unwrap();
         assert!(c.enabled && c.color.is_none());
-        // starý config (vlna 5) bez zdroje a připomínky: ICS, připomínka 5 min, bez toastu
+        // starý config (vlna 5) bez zdroje a připomínky: ICS, připomínka 5 min, toast (od kola 33 výchozí)
         let old: CalendarFeed = serde_json::from_str(r##"{"name":"Práce","url":"https://outlook.office365.com/owa/calendar/a/b/calendar.ics","color":"#60a5fa","enabled":false}"##).unwrap();
-        assert_eq!((old.source, old.remind_min, old.remind_toast, old.enabled, old.account.as_str()), (SourceKind::Ics, DEFAULT_REMIND_MIN, false, false, ""));
+        assert_eq!((old.source, old.remind_min, old.remind_toast, old.enabled, old.account.as_str()), (SourceKind::Ics, DEFAULT_REMIND_MIN, true, false, ""));
         let o: CalendarFeed = serde_json::from_str(r#"{"source":"outlook-local","remindMin":0,"remindToast":true}"#).unwrap();
         assert_eq!((o.source, o.remind_min, o.remind_toast), (SourceKind::OutlookLocal, 0, true));
         assert_eq!(serde_json::to_value(&o).unwrap()["source"], "outlook-local");

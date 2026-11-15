@@ -10,6 +10,7 @@ import { createSignal, For, Show } from "solid-js";
 import { api } from "../api";
 import { gotoSettingsPanel } from "../palette/goto";
 import { t } from "../i18n";
+import { errorText } from "../ui/toast";
 import { offerUndo, useSettings } from "../settings/ctx";
 import { Select, Text, Toggle } from "../settings/fields/controls";
 import { FieldErr } from "../settings/fields/Row";
@@ -35,7 +36,6 @@ function problemText(p: UrlProblem): string {
   }
 }
 
-const errText = (e: unknown) => (typeof e === "string" ? e : e instanceof Error ? e.message : String(e));
 
 /** Rozbalovací návod: kde najít tajnou adresu ve formátu iCal. */
 function Help() {
@@ -85,7 +85,7 @@ function Remind(p: { i: number; feed: Feed }) {
         onChange={(v) => c.set(at("remindMin"), Number(v))}
       />
       <Show when={on()}>
-        <span class="cal-set-lbl" title={t("settings.calendar.remind.toastHint", "Kromě proužku i oznámení Windows s tlačítkem Připojit (ne ve hře ani při Nerušit).")}>
+        <span class="cal-set-lbl" title={t("settings.calendar.remind.toastHint", "Kromě proužku i oznámení Windows s tlačítkem Připojit — jen u schůzky s odkazem (ne ve hře ani při Nerušit).")}>
           {t("settings.calendar.remind.toast", "i oznámením")}
         </span>
         <Toggle path={at("remindToast")} label={t("settings.calendar.remind.toast", "i oznámením")} />
@@ -132,13 +132,13 @@ export default function CalendarSettings() {
     setMsg(null);
     try {
       const r = await api.calendarTest(n.url);
-      const feed: Feed = { name: r?.name ?? "", url: n.url, color: nextColor(list().map((f) => f.color)), enabled: true, remindMin: DEFAULT_REMIND, remindToast: false };
+      const feed: Feed = { name: r?.name ?? "", url: n.url, color: nextColor(list().map((f) => f.color)), enabled: true, remindMin: DEFAULT_REMIND, remindToast: true };
       c.update("personal.calendars", (l: Feed[] | undefined) => [...(l ?? []), feed]);
       setUrl("");
       setPick(null);
       setMsg({ text: t("settings.calendar.added", "Přidáno: {name} — nejbližších 14 dní: {n} událostí.", { name: feed.name || domainOf(n.url), n: r?.upcoming ?? 0 }), err: false });
     } catch (e) {
-      setMsg({ text: errText(e), err: true });
+      setMsg({ text: errorText(e), err: true });
     } finally {
       setBusy(false);
     }
@@ -162,7 +162,7 @@ export default function CalendarSettings() {
       const r = await api.calendarTest(list()[i].url);
       setRowMsg({ i, m: { text: t("settings.calendar.tested", "Funguje — {all} událostí, nejbližších 14 dní: {n}.", { all: r?.events ?? 0, n: r?.upcoming ?? 0 }), err: false } });
     } catch (e) {
-      setRowMsg({ i, m: { text: errText(e), err: true } });
+      setRowMsg({ i, m: { text: errorText(e), err: true } });
     } finally {
       setTesting(null);
     }
@@ -174,7 +174,7 @@ export default function CalendarSettings() {
       const n = await api.calendarOutlookLoad();
       setRowMsg({ i, m: { text: t("settings.calendar.outlook.loaded", "Funguje — nejbližších 14 dní: {n} událostí.", { n: n ?? 0 }), err: false } });
     } catch (e) {
-      setRowMsg({ i, m: { text: errText(e), err: true } });
+      setRowMsg({ i, m: { text: errorText(e), err: true } });
     } finally {
       setTesting(null);
     }

@@ -25,6 +25,7 @@ export const EMPTY_SNAPSHOT: Snapshot = {
   remindersCount: 0,
   noteKinds: [],
   notesKindCounts: {},
+  notesTaskCounts: { overdue: 0, today: 0 },
   notesRev: 0,
   notesArchived: 0,
   personal: { weather: { status: "idle", label: "", fahrenheit: false, data: null, fetchedMs: null, error: null, loading: false }, links: [], notes: [], notesMore: 0, media: null, volume: null, battery: null },

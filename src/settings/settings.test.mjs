@@ -233,6 +233,7 @@ test("chyba pole → panel (nejdelší prefix vyhrává)", () => {
     ["drawer.glass", "vzhled"],
     ["drawer.width", "vzhled"],
     ["drawer.hover", "vzhled"],
+    ["drawer.dockCards", "vzhled"],
     ["drawer.hoverExpandMs", "vzhled"],
     ["strip.look", "vzhled"],
     ["drawer.widthX", "chovani"],

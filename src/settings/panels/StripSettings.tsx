@@ -4,7 +4,9 @@
 // Leží v kroku Zavřený v Základním (`AppearanceClosed.tsx`, kolo 21 — není to technika) hned pod pozicí
 // a velikostí; tvar, linka a krytí jsou v Pokročilé téhož kroku — celý proužek je tak na jednom místě. Widgety ze skriptů
 // (`widget:<soubor>`, `widgets/`) jsou v seznamu za vestavěnými položkami.
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createResource, createSignal, For, onMount, Show } from "solid-js";
+import { api } from "../../api";
+import { quiet as quietCall } from "../../uiErrors";
 import { t } from "../../i18n";
 import { useSettings } from "../ctx";
 import { Seg, Select, Text, Toggle } from "../fields/controls";
@@ -13,7 +15,7 @@ import { SortList } from "../fields/SortList";
 import { fieldLabel } from "../labels";
 import { moveItem } from "../model";
 import { LOOK_HIDEABLE, lookOf, withLookShown } from "../../strip/looks";
-import { clipCustom, COLOR_VAR, CUSTOM_MAX, customLen, previewSegments, QUIETABLE, STRIP_COLORS, withColor, withQuiet, type StripColorId } from "../strip";
+import { clipCustom, COLOR_VAR, monitorOptions, type MonitorInfo, CUSTOM_MAX, customLen, previewSegments, QUIETABLE, STRIP_COLORS, withColor, withQuiet, type StripColorId } from "../strip";
 import { isWidgetId, stripWidgetIds, widgetFile } from "../../widgets/model";
 import { loadWidgets, widgetInfo, widgetsListing } from "../../widgets/registry";
 
@@ -74,6 +76,8 @@ const quietable = (id: string) => QUIETABLE.includes(id) || isWidgetId(id);
 
 export default function StripSettings() {
   const c = useSettings();
+  // připojené monitory pro volbu `strip.monitor` (výčet jednou při otevření panelu; IPC selže = jen Hlavní / Všechny)
+  const [monitors] = createResource(() => quietCall(api.monitorsList(), [] as MonitorInfo[], "monitorsList"));
   // zapnuté v pořadí z configu, pak vypnuté
   onMount(() => void loadWidgets().catch(() => null));
   const stripAll = () => {
@@ -183,10 +187,12 @@ export default function StripSettings() {
         <Select
           path="strip.monitor"
           label={fieldLabel("strip.monitor")}
-          options={[
-            { v: "primary", label: t("settings.drawer.monitor.primary", "Hlavní") },
-            ...[0, 1, 2, 3].map((i) => ({ v: String(i), label: t("settings.drawer.monitor.n", "Monitor {n}", { n: i + 1 }) })),
-          ]}
+          options={monitorOptions(monitors() ?? [], c.cfg.strip.monitor ?? "primary", {
+            primary: t("settings.drawer.monitor.primary", "Hlavní"),
+            all: t("settings.strip.monitor.all", "Všechny (na ostatních tečka)"),
+            dev: (m) => t("settings.strip.monitor.dev", "Monitor {n} · {w}×{h}", { n: m.n, w: m.w, h: m.h }),
+            gone: t("settings.strip.monitor.gone", "Nepřipojený monitor"),
+          })}
         />
       </Row>
     </>

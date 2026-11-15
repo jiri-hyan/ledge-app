@@ -43,6 +43,14 @@ pub fn pct_text(p: f64) -> String {
     format!("{:.0} %", p.round().clamp(0.0, 100.0))
 }
 
+/// „42 %“ z procent LIMITU: dolů, ať 99,6 % nevypadá jako 100 (tj. „100 %“ = skutečně vyčerpáno). Jedno pravidlo
+/// s TS `limits/model.ts` `pctText` (karta, hrdina, hover, proužek, prstenec, díly vlastního vzhledu); zátěž (CPU,
+/// RAM, baterie) zůstává u `pct_text` (zaokrouhleno). Ořez 0–100, NaN = 0 %.
+pub fn pct_floor_text(p: f64) -> String {
+    let p = if p.is_nan() { 0.0 } else { p };
+    format!("{:.0} %", p.floor().clamp(0.0, 100.0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,6 +95,14 @@ mod tests {
     fn pct_saturates() {
         for (n, t, want) in [(0, 0, 0), (5, 0, 0), (0, 10, 0), (5, 10, 50), (10, 10, 100), (30, 10, 100), (1, 3, 33), (u64::MAX, u64::MAX, 100)] {
             assert_eq!(pct(n, t), want, "{n}/{t}");
+        }
+    }
+
+    #[test]
+    fn pct_floor_text_table() {
+        // limit: dolů — 99,6 % není „100 %“ (zrcadlo TS `pctText`, test `limits/model.test.mjs`)
+        for (p, want) in [(0.0, "0 %"), (41.6, "41 %"), (42.0, "42 %"), (99.5, "99 %"), (99.99, "99 %"), (100.0, "100 %"), (250.0, "100 %"), (-3.0, "0 %"), (f64::NAN, "0 %")] {
+            assert_eq!(pct_floor_text(p), want, "{p}");
         }
     }
 

@@ -10,9 +10,10 @@
 //! Horní rohy jsou vždy schované nad okrajem obrazovky → panel vypadá přilepený k hraně.
 //!
 //! Pohledy (`View`): Hidden, Peek (schválení / připomínka), Full (celý šuplík) a náhledy po najetí
-//! Compact / Island (`drawer.hover`, čisté rozhodování v `hovermode.rs`). Přechody mezi nimi jdou stejným
+//! Island (`drawer.hover`, čisté rozhodování v `hovermode.rs`). Přechody mezi nimi jdou stejným
 //! morfem (výchozí tvar = předchozí pohled). Fokus bere jen Full otevřený zkratkou / výslovný klik.
 
+use crate::qa::QaDataDir as _;
 use crate::appearance::{StripPosition, geom};
 use crate::drawerfit;
 use crate::hovermode::{self, SmallSizes};
@@ -51,17 +52,28 @@ pub enum View {
     /// malý pruh se schválením pro Claude
     Peek,
     Full,
-    /// po najetí (`drawer.hover: "compact"`): malý panel s tím nejdůležitějším (`src/hover/Compact.tsx`)
-    Compact,
     /// po najetí (`drawer.hover: "island"`): kapsle s jedním děním (`src/hover/Island.tsx`)
     Island,
+    /// střední panel z docku (L147): ~1/3 monitoru, max 3 karty (`drawer.dockCards`, `src/hover/Mid.tsx`)
+    Mid,
 }
 
 impl View {
     /// Otevřený panel u horní hrany (celý šuplík nebo náhled po najetí): kryje proužek, zavírá ho
     /// odjetí myši (otevřený najetím) a s čekajícím Claudem se stáhne do peeku (`hovermode::after_close`).
     pub fn covers_strip(self) -> bool {
-        matches!(self, View::Full | View::Compact | View::Island)
+        matches!(self, View::Full | View::Island | View::Mid)
+    }
+
+    /// Pohled kreslí karty ze snapshotu (celý šuplík, střední panel): při otevření se obnoví jejich data.
+    pub fn has_cards(self) -> bool {
+        matches!(self, View::Full | View::Mid)
+    }
+
+    /// Schování tohoto pohledu zapíše `hidden_at_ms` (chip „Claude od posledně“): jen plný šuplík a
+    /// střední panel; odjezd myši z docku / ostrůvku / peeku ne (L174).
+    pub fn records_hide(self) -> bool {
+        self.has_cards()
     }
 }
 
@@ -71,6 +83,8 @@ pub enum Opener {
     Hotkey,
     /// otevřeno přes /ctl — bez fokusu a bez samozavírání (skripty, Claude, testy)
     Remote,
+    /// upevněno 📌 (dok): jako `Remote` (neodjede, nezavře blur) a okno smí být aktivní — píše se do něj
+    Pinned,
 }
 
 /// Zpráva pro frontend: kam se má panel přetvarovat a odkud.
@@ -87,8 +101,14 @@ pub struct ViewMsg {
     pub to_h: f64,
     /// strop výšky obsahu na tomhle monitoru (logické px, bez přesahu) — nad ním posouvá frontend
     pub max_h: f64,
-    /// náhled po najetí (Compact / Island): po kolika ms setrvání se rozbalí celý šuplík, 0 = jen klikem
+    /// náhled po najetí (Island): po kolika ms setrvání se rozbalí celý šuplík, 0 = jen klikem
     pub expand_ms: u64,
+    /// `drawer.hover == dock` (L130): `view: island` kreslí dok místo ostrůvku — frontend nečte config při každém vstupu
+    pub dock: bool,
+    /// karty středního panelu (`drawer.dockCards` po ověření, `hovermode::dock_cards`)
+    pub dock_cards: Vec<String>,
+    /// okno je upevněné 📌 (`Opener::Pinned`): frontend si podle toho drží tlačítko (jinak by ho každé `view` shodilo)
+    pub pinned: bool,
 }
 
 /// Měření plynulosti animace z frontendu (requestAnimationFrame).
@@ -111,10 +131,14 @@ struct St {
     full_h: f64,
     /// žádost frontendu o širší Full (Nastavení), 0 = šířka z configu (`drawerfit::fit_full`)
     full_w: f64,
-    /// peek, kompaktní náhled, ostrůvek (`hovermode::SmallSizes`)
+    /// peek, ostrůvek / dok, střední panel (`hovermode::SmallSizes`)
     small: SmallSizes,
     /// `drawer.hoverExpandMs` (oříznuté) — jde frontendu ve `ViewMsg`
     expand_ms: u64,
+    /// `drawer.hover == dock` (`set_hover_mode`), jde frontendu ve `ViewMsg`
+    dock: bool,
+    /// `drawer.dockCards` (ověřené), jde frontendu ve `ViewMsg`
+    dock_cards: Vec<String>,
     rect: RECT,
     last_blur: Option<Instant>,
     /// frontend má posluchače a stav
@@ -122,6 +146,8 @@ struct St {
     prepared: bool,
     closed: bool,
     hidden_since: Instant,
+    /// wall-clock ms posledního výslovného schování (`hide`); `None` = od startu ještě neschovaný (chip „Claude od posledně“)
+    hidden_at_ms: Option<u64>,
     acrylic: bool,
     /// kolik ms trvalo poslední otevření (vč. případného studeného startu) — měření, ne odhad
     last_open_ms: u64,
@@ -160,12 +186,15 @@ impl Drawer {
                 full_w: 0.0,
                 small: SmallSizes::default(),
                 expand_ms: hovermode::EXPAND_MS,
+                dock: false,
+                dock_cards: hovermode::dock_cards(&[]),
                 rect: RECT::default(),
                 last_blur: None,
                 ready: false,
                 prepared: false,
                 closed: false,
                 hidden_since: Instant::now(),
+                hidden_at_ms: None,
                 acrylic: false,
                 last_open_ms: 0,
                 last_open_cold: false,
@@ -226,7 +255,8 @@ impl Drawer {
             .resizable(false)
             .shadow(false)
             .disable_drag_drop_handler()
-            .additional_browser_args(BROWSER_ARGS)
+            .additional_browser_args(crate::qa::browser_args())
+            .qa_data_dir()
             .build();
         crate::log(&format!("drawer: build done ok={}", built.is_ok()));
         let Ok(w) = built else { return false };
@@ -241,6 +271,17 @@ impl Drawer {
         let acrylic = self.st.lock().acrylic;
         self.init(acrylic);
         true
+    }
+
+    /// Jak dlouho je šuplík schovaný (s); `None` = je vidět.
+    pub fn hidden_secs(&self) -> Option<u64> {
+        let s = self.st.lock();
+        (s.view == View::Hidden).then(|| s.hidden_since.elapsed().as_secs())
+    }
+
+    /// Kdy (wall-clock ms) se šuplík naposledy schoval; `None` = ještě ne.
+    pub fn hidden_at_ms(&self) -> Option<u64> {
+        self.st.lock().hidden_at_ms
     }
 
     /// Po delší nečinnosti okno zrušit úplně — WebView2 i jeho procesy zmizí.
@@ -300,10 +341,7 @@ impl Drawer {
     fn init(&self, acrylic: bool) {
         let Some(w) = self.window() else { return };
         if let Some(h) = hwnd_of(&w) {
-            unsafe {
-                let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
-                SetWindowLongPtrW(h, GWL_EXSTYLE, ex | (WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0) as isize);
-            }
+            crate::winstyle::no_activate(h, true);
         }
         self.set_glass(acrylic);
     }
@@ -398,6 +436,7 @@ impl Drawer {
         match view {
             View::Full => drawerfit::fit_full(s.full_w, width, s.full_h, lim),
             View::Hidden => (0.0, 0.0),
+            View::Mid => s.small.get(View::Mid).map_or((0.0, 0.0), |sz| hovermode::fit_mid(sz.1, lim.max_w, lim.max_h)),
             small => s.small.get(small).map_or((0.0, 0.0), |sz| hovermode::fit_small(small, sz, width, lim.max_h)),
         }
     }
@@ -431,7 +470,12 @@ impl Drawer {
         let from = self.view();
         if from == view {
             if opener == Opener::Hotkey {
-                self.st.lock().opener = Opener::Hotkey;
+                let mut s = self.st.lock();
+                // zkratka na upevněný dok: fokus ano, upevnění zůstává
+                if s.opener != Opener::Pinned {
+                    s.opener = Opener::Hotkey;
+                }
+                drop(s);
                 self.focus();
             }
             return;
@@ -454,12 +498,12 @@ impl Drawer {
         let morph = self.morph() && animate_ms > 0;
         let (to_w, to_h) = self.logical_size(view, width, mon);
         let max_h = drawerfit::limits(mon.rect, mon.work, mon.dpi).max_h;
-        let expand_ms = {
+        let (expand_ms, dock, dock_cards, pinned) = {
             let mut s = self.st.lock();
             s.prepared = false;
-            s.expand_ms
+            (s.expand_ms, s.dock, s.dock_cards.clone(), s.opener == Opener::Pinned)
         };
-        let _ = self.app.emit_to(LABEL, "view", ViewMsg { view, morph, from_w, from_h, to_w, to_h, max_h, expand_ms });
+        let _ = self.app.emit_to(LABEL, "view", ViewMsg { view, morph, from_w, from_h, to_w, to_h, max_h, expand_ms, dock, dock_cards, pinned });
         if morph {
             // frontend se složí do tvaru proužku dřív, než okno uvidíš → žádné probliknutí
             self.wait_flag(|s| s.prepared, Duration::from_millis(250));
@@ -490,12 +534,42 @@ impl Drawer {
             if s.view == View::Hidden {
                 return;
             }
-            if s.opener != Opener::Hotkey {
-                s.focus_restore = Some(s.opener);
+            // upevněný dok zůstane upevněný (klik do poznámky jen aktivuje okno)
+            if s.opener != Opener::Pinned {
+                if s.opener != Opener::Hotkey {
+                    s.focus_restore = Some(s.opener);
+                }
+                s.opener = Opener::Hotkey;
             }
-            s.opener = Opener::Hotkey;
         }
         self.focus();
+    }
+
+    /// 📌 v docku (`drawer_pin`): upevnit — odjetí myši ani blur dok nezavřou, okno smí být aktivní
+    /// (`place` NOACTIVATE nevrací). `false` = uvolnit zpět na zavírání odjetím myši. Bez otevřeného okna nic.
+    pub fn pin(&self, on: bool) {
+        let mut s = self.st.lock();
+        if s.view == View::Hidden {
+            return;
+        }
+        if on {
+            s.opener = Opener::Pinned;
+            s.focus_restore = None;
+        } else if s.opener == Opener::Pinned {
+            s.opener = Opener::Hover;
+        }
+    }
+
+    /// `drawer.dockCards` (ověřené `hovermode::dock_cards`) — vlákno `ui` z configu.
+    pub fn set_dock_cards(&self, cards: Vec<String>) {
+        self.st.lock().dock_cards = cards;
+    }
+
+    /// `drawer.hover` se změnil: dok má jinou výchozí velikost než ostrůvek (`SmallSizes::set_mode`).
+    pub fn set_hover_mode(&self, mode: hovermode::HoverMode) {
+        let mut s = self.st.lock();
+        s.small.set_mode(mode);
+        s.dock = mode == hovermode::HoverMode::Dock;
     }
 
     /// Odchod ze stránky poznámky (Zpět, uložení, Esc bez zavření): vrátit opener z doby před
@@ -513,8 +587,7 @@ impl Drawer {
             unsafe {
                 // zkratkou otevřený šuplík má dostat klávesnici; odkud fokus bereme, si zapamatovat
                 crate::focusreturn::remember();
-                let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
-                SetWindowLongPtrW(h, GWL_EXSTYLE, ex & !(WS_EX_NOACTIVATE.0 as isize));
+                crate::winstyle::no_activate(h, false);
                 let _ = SetForegroundWindow(h);
             }
         }
@@ -531,7 +604,7 @@ impl Drawer {
         // osa velkého šuplíku (střed / u levé / u pravé hrany) — proužek leží na stejné (`stripview`)
         let full = (width * scale).round() as i32;
         let c2 = geom::anchor_c2(mon.rect.left, mon.rect.right, full, self.st.lock().anchor, mon.dpi);
-        (geom::span_x(c2, pw), mon.rect.top - overlap, pw, ph)
+        (crate::qa::park_x(geom::span_x(c2, pw)), mon.rect.top - overlap, pw, ph)
     }
 
     /// Okno na cílové místo a velikost (bez animace okna). `reveal` = zároveň ukázat.
@@ -545,9 +618,8 @@ impl Drawer {
             crate::state::log(&format!("drawer: okno Full {pw}×{ph} (full_h {full_h:.0}, max_h {max_h:.0}, dpi {})", mon.dpi));
         }
         unsafe {
-            if self.opener() != Opener::Hotkey {
-                let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
-                SetWindowLongPtrW(h, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE.0 as isize);
+            if !matches!(self.opener(), Opener::Hotkey | Opener::Pinned) {
+                crate::winstyle::no_activate(h, true);
             }
             let _ = SetWindowPos(h, Some(HWND_TOPMOST), x, y, pw, ph, SWP_NOACTIVATE);
             if reveal && !IsWindowVisible(h).as_bool() {
@@ -581,6 +653,7 @@ impl Drawer {
             return;
         }
         let morph = self.morph() && animate_ms > 0;
+        let was = self.view();
         {
             let mut s = self.st.lock();
             s.view = View::Hidden;
@@ -594,7 +667,7 @@ impl Drawer {
             let _ = self.app.emit_to(
                 LABEL,
                 "closing",
-                ViewMsg { view: View::Hidden, morph: true, from_w: 0.0, from_h: 0.0, to_w: strip.0, to_h: strip.1, max_h: 0.0, expand_ms: 0 },
+                ViewMsg { view: View::Hidden, morph: true, from_w: 0.0, from_h: 0.0, to_w: strip.0, to_h: strip.1, max_h: 0.0, expand_ms: 0, dock: false, dock_cards: Vec::new(), pinned: false },
             );
             // stažení do proužku; pojistka, kdyby frontend neodpověděl
             self.wait_flag(|s| s.closed, Duration::from_millis(600));
@@ -602,7 +675,7 @@ impl Drawer {
                 let _ = ShowWindow(h, SW_HIDE);
             }
         } else {
-            let _ = self.app.emit_to(LABEL, "view", ViewMsg { view: View::Hidden, morph: false, from_w: 0.0, from_h: 0.0, to_w: 0.0, to_h: 0.0, max_h: 0.0, expand_ms: 0 });
+            let _ = self.app.emit_to(LABEL, "view", ViewMsg { view: View::Hidden, morph: false, from_w: 0.0, from_h: 0.0, to_w: 0.0, to_h: 0.0, max_h: 0.0, expand_ms: 0, dock: false, dock_cards: Vec::new(), pinned: false });
             unsafe {
                 let mut r = RECT::default();
                 let _ = GetWindowRect(h, &mut r);
@@ -617,6 +690,9 @@ impl Drawer {
             let mut s = self.st.lock();
             s.rect = RECT::default();
             s.hidden_since = Instant::now();
+            if was.records_hide() {
+                s.hidden_at_ms = Some(crate::util::now_ms());
+            }
             // příště se otevírá hlavní stránka — ne v šířce Nastavení
             s.full_w = 0.0;
         }
@@ -643,5 +719,23 @@ fn animate(h: HWND, x: i32, from: i32, to: i32, ms: u64) {
             break;
         }
         std::thread::sleep(Duration::from_millis(8));
+    }
+}
+
+#[cfg(test)]
+mod hide_tests {
+    use super::View;
+
+    #[test]
+    fn hide_records_only_full_and_mid() {
+        for (v, want) in [
+            (View::Full, true),
+            (View::Mid, true),
+            (View::Island, false),
+            (View::Peek, false),
+            (View::Hidden, false),
+        ] {
+            assert_eq!(v.records_hide(), want, "{v:?}");
+        }
     }
 }

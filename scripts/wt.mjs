@@ -1,5 +1,6 @@
 // Worktree stavitelů jedním příkazem (místo opsaného postupu v CLAUDE.md a předávkách).
-//   node scripts/wt.mjs new <oblast> <kolo>   → větev k<kolo>/<oblast>, worktree ../ledge-wt-<oblast>, junction node_modules,
+//   node scripts/wt.mjs new <oblast> <kolo>   → větev k<kolo>/<oblast>, worktree .claude/worktrees/<oblast> (UVNITŘ repa — pravidlo
+//                                               šéfa 13. 11.: Dev Drive, žádné složky na ploše), junction node_modules,
 //                                               kopie dist (bez ní neprojde tauri::generate_context!), zapne git rerere
 //   node scripts/wt.mjs rm <oblast>           → odpojí junction (obsah cíle NEMAŽE), git worktree remove (bez --force),
 //                                               větev jen `git branch -d` (nesloučenou ponechá)
@@ -18,7 +19,7 @@ const SAFE = /^[a-z0-9][a-z0-9-]*$/
 export function planNames(oblast, kolo) {
   if (!SAFE.test(oblast ?? '')) throw new Error(`neplatná oblast "${oblast}" (malá písmena, číslice, pomlčka)`)
   if (!/^\d+[a-z]?$/.test(String(kolo ?? ''))) throw new Error(`neplatné kolo "${kolo}" (např. 29)`)
-  return { branch: `k${kolo}/${oblast}`, dirName: `ledge-wt-${oblast}` }
+  return { branch: `k${kolo}/${oblast}`, dirName: oblast }
 }
 
 /** Je cesta symlink/junction (ne skutečná složka)? Junction na Windows hlásí lstat.isSymbolicLink(). */
@@ -48,9 +49,19 @@ export function mainRootOf(cwd) {
   return path.resolve(first.slice(9))
 }
 
+/** Worktree žije uvnitř master složky (`.claude/worktrees/`, gitignorované) — na stejném disku jako repo. */
+export function worktreeDir(mainRoot, dirName) {
+  return path.resolve(mainRoot, '.claude', 'worktrees', dirName)
+}
+
+/** Starší umístění vedle repa (`../ledge-wt-<oblast>`) — jen pro `rm` worktree založených před 13. 11. */
+export function legacyWorktreeDir(mainRoot, oblast) {
+  return path.resolve(mainRoot, '..', `ledge-wt-${oblast}`)
+}
+
 export function newWorktree(mainRoot, oblast, kolo, base = 'main') {
   const { branch, dirName } = planNames(oblast, kolo)
-  const wt = path.resolve(mainRoot, '..', dirName)
+  const wt = worktreeDir(mainRoot, dirName)
   if (fs.existsSync(wt)) throw new Error(`${wt} už existuje`)
   gitIn(mainRoot, ['config', 'rerere.enabled', 'true']) // idempotentní, sdílené všemi worktree
   gitIn(mainRoot, ['worktree', 'add', '-b', branch, wt, base])
@@ -64,7 +75,8 @@ export function newWorktree(mainRoot, oblast, kolo, base = 'main') {
 
 export function removeWorktree(mainRoot, oblast) {
   const { dirName } = planNames(oblast, '0')
-  const wt = path.resolve(mainRoot, '..', dirName)
+  let wt = worktreeDir(mainRoot, dirName)
+  if (!fs.existsSync(wt) && fs.existsSync(legacyWorktreeDir(mainRoot, oblast))) wt = legacyWorktreeDir(mainRoot, oblast)
   if (!fs.existsSync(wt)) throw new Error(`${wt} neexistuje`)
   const dirty = gitIn(wt, ['status', '--porcelain'])
   if (dirty) throw new Error(`worktree není čistý, odmítám:\n${dirty.split(/\r?\n/).slice(0, 10).join('\n')}`)

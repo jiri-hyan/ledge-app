@@ -131,11 +131,11 @@ pub fn store(dir: &Path, key: &str, png: Option<&[u8]>) {
     let _ = std::fs::create_dir_all(dir);
     match png {
         Some(b) => {
-            let _ = std::fs::write(dir.join(format!("{key}.png")), b);
+            let _ = crate::fsx::write_atomic_dir(&dir.join(format!("{key}.png")), b);
             let _ = std::fs::remove_file(dir.join(format!("{key}.miss")));
         }
         None => {
-            let _ = std::fs::write(dir.join(format!("{key}.miss")), b"");
+            let _ = crate::fsx::write_atomic_dir(&dir.join(format!("{key}.miss")), b"");
         }
     }
 }
@@ -171,7 +171,8 @@ pub fn local(spec: &Spec) -> Option<(&'static str, Vec<u8>)> {
 
 /// Stáhne nejvýš `limit` bajtů (víc = `None`, ne useknutý soubor).
 async fn get_limited(client: &reqwest::Client, url: &str, limit: usize) -> Option<Vec<u8>> {
-    let mut resp = client.get(url).send().await.ok()?;
+    let req = client.get(url).timeout(NET_TIMEOUT);
+    let mut resp = crate::accounts::http::send(req).await.ok()?;
     if !resp.status().is_success() || resp.content_length().is_some_and(|n| n > limit as u64) {
         return None;
     }
@@ -188,12 +189,8 @@ async fn get_limited(client: &reqwest::Client, url: &str, limit: usize) -> Optio
 /// Favicon webu jako PNG: HTML úvodní stránky → `<link rel=icon>` kandidáti → `/favicon.ico`.
 /// Každý požadavek s termínem 5 s, stažené soubory se stropem.
 pub async fn fetch_favicon(origin: &str) -> Option<Vec<u8>> {
-    let client = reqwest::Client::builder()
-        .timeout(NET_TIMEOUT)
-        .redirect(reqwest::redirect::Policy::limited(5))
-        .user_agent(concat!("Ledge/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .ok()?;
+    static CLIENT: crate::accounts::http::Slot = crate::accounts::http::Slot::new();
+    let client = crate::accounts::http::shared(&CLIENT, || reqwest::redirect::Policy::limited(5)).ok()?;
     let links = match get_limited(&client, &format!("{origin}/"), MAX_HTML).await {
         Some(html) => icons::icon_links(&String::from_utf8_lossy(&html)),
         None => Vec::new(),

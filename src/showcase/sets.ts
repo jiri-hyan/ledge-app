@@ -109,7 +109,7 @@ export function buildSet(id: SetId, now: number): SetData {
         hiddenParts: [],
         pages: [
           { id: "prace", name: "Práce", bento: true, cards: [card("projects", "l", { h: 1 }), card("calendar", "s", { h: 2 }), card("notes", "l", { h: 2 }), card("weather", "s", { h: 1 }), card("clock", "s", { h: 1 })] },
-          { id: "hudba", name: "Hudba", icon: "🎵", bento: true, cards: [card("media", "m", { h: 2 }), card("clock", "s", { h: 1 }), card("weather", "s", { h: 1 }), card("links", "m", { h: 1 }), card("calendar", "m", { h: 1 })] },
+          { id: "hudba", name: "Hudba", icon: "🎵", bento: true, cards: [card("media", "m", { h: 2 }), card("clock", "s", { h: 1 }), card("weather", "s", { h: 1 }), card("actions", "m", { h: 1 }), card("calendar", "m", { h: 1 })] },
           { id: "plan", name: "Plán", icon: "📚", cards: [card("calendar", "xl"), card("notes", "l")] },
         ],
       },
@@ -162,7 +162,7 @@ export function buildSet(id: SetId, now: number): SetData {
       hiddenParts: [],
       pages: [
         { id: "prace", name: "Práce", cards: [card("claude", "l"), card("projects", "l"), card("repos", "m"), card("notes", "m")] },
-        { id: "osobni", name: "Osobní", cards: [card("clock", "m"), card("weather", "m"), card("media", "m"), card("calendar", "l"), card("links", "m"), card("notes", "m")] },
+        { id: "osobni", name: "Osobní", cards: [card("clock", "m"), card("weather", "m"), card("media", "m"), card("calendar", "l"), card("actions", "m"), card("notes", "m")] },
       ],
     },
     snap: {

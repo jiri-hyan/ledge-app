@@ -28,6 +28,7 @@ export const ANCHOR_STEP: Record<string, StepId | null> = {
   "timer.strip": "closed",
   "strip.monitor": "closed",
   "drawer.hover": "hover",
+  "drawer.dockCards": "hover",
   "drawer.hoverExpandMs": "hover",
   "appearance.style": "open",
   "appearance.layout": "open",

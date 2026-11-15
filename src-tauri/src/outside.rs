@@ -29,7 +29,7 @@ pub const TASK_RELAUNCH: &str = "Ledge-outside-relaunch";
 pub const TASK_UPDATE: &str = "Ledge-outside-update";
 /// Jak dlouho po `Run` čekat, že úloha opravdu naběhla (pak se smaže, nebo selže → záloha přes Explorer).
 const START_WAIT: Duration = Duration::from_secs(5);
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+use crate::procman::CREATE_NO_WINDOW;
 
 /// Co s úlohou po spuštění.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,7 +192,7 @@ mod tests {
             ("", ""),
             (r"C:\Users\x\ledge.exe", r"C:\Users\x\ledge.exe"),
             ("a&b<c>d\"e'f", "a&amp;b&lt;c&gt;d&quot;e&apos;f"),
-            ("Jiří", "Jiří"),
+            ("Tomáš", "Tomáš"),
         ];
         for (inp, want) in cases {
             assert_eq!(xml_escape(inp), want, "{inp}");

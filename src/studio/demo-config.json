@@ -51,6 +51,7 @@
     "closeDelayMs": 350,
     "hover": "full",
     "hoverExpandMs": 1200,
+    "dockCards": ["notes", "calendar", "claude"],
     "width": 1080,
     "glass": "solid",
     "sections": {
@@ -282,6 +283,7 @@
     "devServer": true,
     "github": true,
     "reminders": true,
+    "digest": true,
     "githubPulse": true
   },
   "github": {
@@ -364,7 +366,6 @@
     "snap": true
   },
   "smart": {
-    "quickKeys": false,
     "dropShortcut": false,
     "tabWheel": false,
     "approvalSound": {

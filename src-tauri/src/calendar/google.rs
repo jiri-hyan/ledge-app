@@ -5,6 +5,7 @@
 
 use super::conf::CalendarFeed;
 use super::graph::{https_only, join_of};
+use super::people::{self, Crowd};
 use super::source::{Event, Source, SourceInfo, Window};
 use super::{MAX_OCCS, clip, ms};
 use crate::accounts::{GCAL, Provider, oauth::enc, session};
@@ -56,6 +57,35 @@ struct GEvent {
     hangout_link: Option<String>,
     #[serde(default)]
     conference_data: Option<Conf>,
+    /// účastníci (L85); odmítnutí „já“ událost skryje
+    #[serde(default)]
+    attendees: Vec<Attendee>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct Attendee {
+    #[serde(default, rename = "self")]
+    is_self: bool,
+    #[serde(default)]
+    response_status: String,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    email: Option<String>,
+    /// místnost / zařízení — nekreslí se
+    #[serde(default)]
+    resource: bool,
+}
+
+/// Účastníci bez odmítnutých a místností (L85).
+fn crowd(a: Vec<Attendee>) -> Crowd {
+    Crowd::of(a.into_iter().filter(|a| !a.resource).filter_map(|a| people::person(a.display_name.as_deref().unwrap_or(""), a.email.as_deref().unwrap_or(""), &a.response_status)))
+}
+
+/// Odmítnutá pozvánka (`attendees[self].responseStatus == declined`) se nezobrazuje ani nepřipomíná.
+fn declined(a: &[Attendee]) -> bool {
+    a.iter().any(|a| a.is_self && a.response_status == "declined")
 }
 
 #[derive(Deserialize)]
@@ -78,7 +108,7 @@ pub fn events_url(cal: &str, w: Window, page: Option<&str>) -> String {
         enc(cal),
         enc(&rfc3339(w.from)),
         enc(&rfc3339(w.to)),
-        enc("items(status,summary,location,start,end,hangoutLink,conferenceData/entryPoints),nextPageToken")
+        enc("items(status,summary,location,start,end,hangoutLink,conferenceData/entryPoints,attendees(self,responseStatus,displayName,email,resource)),nextPageToken")
     );
     if let Some(p) = page {
         u.push_str(&format!("&pageToken={}", enc(p)));
@@ -94,20 +124,21 @@ fn date_ms(s: &str) -> Option<i64> {
 pub fn parse(body: &[u8]) -> Result<(Vec<Event>, Option<String>), String> {
     let p: Page = serde_json::from_slice(body).map_err(|_| crate::i18n::tr("Kalendář Google vrátil nečitelná data.", "The Google calendar returned unreadable data.").to_string())?;
     let mut out = Vec::new();
-    for e in p.items.into_iter().filter(|e| e.status != "cancelled") {
+    for e in p.items.into_iter().filter(|e| e.status != "cancelled" && !declined(&e.attendees)) {
         let title = clip(e.summary.as_deref().unwrap_or(""), 120);
         let location = clip(e.location.as_deref().unwrap_or("").lines().find(|l| !l.trim().is_empty()).unwrap_or(""), 120);
         let video = e.conference_data.unwrap_or_default().entry_points.into_iter().find(|x| x.entry_point_type == "video").and_then(|x| x.uri);
         let join = join_of(https_only(e.hangout_link).or_else(|| https_only(video)), &location);
+        let people = crowd(e.attendees);
         let ev = match (&e.start, &e.end) {
             (GTime { date: Some(s), .. }, GTime { date: Some(en), .. }) => {
                 let (Some(s), Some(en)) = (date_ms(s), date_ms(en)) else { continue };
-                Event { start: s, end: en.max(s + 86_400_000), all_day: true, title, location, join, tz_guess: false }
+                Event { start: s, end: en.max(s + 86_400_000), all_day: true, title, location, join, tz_guess: false, people }
             }
             (GTime { date_time: Some(s), .. }, GTime { date_time: Some(en), .. }) => {
                 let (Ok(s), Ok(en)) = (DateTime::parse_from_rfc3339(s.trim()), DateTime::parse_from_rfc3339(en.trim())) else { continue };
                 let (s, en) = (s.timestamp_millis(), en.timestamp_millis());
-                Event { start: s, end: en.max(s), all_day: false, title, location, join, tz_guess: false }
+                Event { start: s, end: en.max(s), all_day: false, title, location, join, tz_guess: false, people }
             }
             _ => continue,
         };
@@ -244,6 +275,34 @@ mod tests {
         assert_eq!(parse(br#"{"items":[],"nextPageToken":""}"#).unwrap().1, None);
     }
 
+    #[test]
+    fn attendees_from_sample() {
+        use crate::calendar::people::Resp;
+        let (evs, _) = parse(include_bytes!("../fixtures/google-events.json")).unwrap();
+        // odmítnutý a místnost pryč; bez jména jen e-mail (malým písmem)
+        let got: Vec<(&str, &str, Resp)> = evs[0].people.list.iter().map(|p| (p.name.as_str(), p.email.as_str(), p.resp)).collect();
+        assert_eq!(got, [("Jana Nováková", "jana@example.com", Resp::Accepted), ("", "petr@example.com", Resp::Pending), ("Eva Černá", "eva@example.com", Resp::Tentative)]);
+        assert!(evs[1].people.is_empty());
+    }
+
+    #[test]
+    fn declined_invites_are_skipped() {
+        let ev = |att: &str| format!(r#"{{"items":[{{"summary":"A","attendees":{att},"start":{{"dateTime":"2026-10-19T10:00:00+02:00"}},"end":{{"dateTime":"2026-10-19T11:00:00+02:00"}}}}]}}"#);
+        // (attendees, zůstane?) — rozhoduje jen záznam „self“, odmítnutí jiných účastníků ne
+        for (att, kept) in [
+            (r#"[{"self":true,"responseStatus":"declined"}]"#, false),
+            (r#"[{"self":true,"responseStatus":"accepted"}]"#, true),
+            (r#"[{"self":true,"responseStatus":"needsAction"}]"#, true),
+            (r#"[{"self":true,"responseStatus":"tentative"}]"#, true),
+            (r#"[{"responseStatus":"declined"}]"#, true),
+            (r#"[{"responseStatus":"declined"},{"self":true,"responseStatus":"declined"}]"#, false),
+            ("[]", true),
+        ] {
+            assert_eq!(parse(ev(att).as_bytes()).unwrap().0.len(), usize::from(kept), "{att}");
+        }
+        assert!(parse(br#"{"items":[{"summary":"B","start":{"dateTime":"2026-10-19T10:00:00+02:00"},"end":{"dateTime":"2026-10-19T11:00:00+02:00"}}]}"#).unwrap().0.len() == 1);
+        assert!(events_url("primary", Window { now: 0, from: 0, to: 1 }, None).contains("attendees"));
+    }
     #[test]
     fn calendar_list_primary_first() {
         let b = r##"{"items":[{"id":"x@group.calendar.google.com","summary":"Rodina","backgroundColor":"#9fe1e7"},{"id":"jana@example.com","summary":"jana@example.com","summaryOverride":"Já","backgroundColor":"#4986e7","primary":true},{"id":"","summary":"bez id"},{"id":"cz.czech#holiday@group.v.calendar.google.com","summary":"Státní svátky","backgroundColor":"nesmysl"}]}"##.as_bytes();

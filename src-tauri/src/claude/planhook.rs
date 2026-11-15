@@ -96,8 +96,8 @@ pub fn body(d: &Decision, input: &Value) -> Option<String> {
     let out = |v: Value| Some(json!({ "hookSpecificOutput": v }).to_string());
     match d {
         Decision::Allow => out(json!({"hookEventName": "PreToolUse", "permissionDecision": "allow", "updatedInput": input})),
-        Decision::Deny => out(json!({"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Zamítnuto v Ledge."})),
-        Decision::DenyWith(r) => out(json!({"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": format!("Zamítnuto v Ledge: {r}")})),
+        Decision::Deny => out(json!({"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": crate::i18n::tr("Zamítnuto v Ledge.", "Denied in Ledge.")})),
+        Decision::DenyWith(r) => out(json!({"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": trf!("Zamítnuto v Ledge: {r}", "Denied in Ledge: {r}")})),
         Decision::ReturnPlan(r) => out(json!({"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": plan::return_message(r)})),
         Decision::AllowMode(_) | Decision::AllowAlways(_) | Decision::Pass => None,
     }

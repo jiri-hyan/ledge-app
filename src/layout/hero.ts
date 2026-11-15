@@ -5,9 +5,10 @@
 // Kolo 25: karta Claude ukáže VŽDY to, co si šéf zvolil (limit 5 h / týden / útrata); chybí-li zdroj, vrátí prázdný
 // stav `empty` (nadpis + proč) — dřív tiše spadla na útratu a nešlo poznat, že limity chybí.
 import { left, pctText, winState, type LimitWindow } from "../limits/model.ts";
-import { compact, dayUnpriced, usdDigits, type CostDay } from "../costs/model.ts";
+import { dayUnpriced, priceSeries, tokText, usdDigits, type CostDay } from "../costs/model.ts";
 import { isToday } from "../board/model.ts";
 import { tempIn, tempUnit } from "../cards/temp.ts";
+import { weatherAge } from "../cards/weatherAge.ts";
 
 export type Text = readonly [string, string];
 export type HeroFacts = {
@@ -45,21 +46,14 @@ export type HeroInput = {
   questions?: readonly unknown[];
   limits?: { at: number | null; staleMs: number; fiveHour: LimitWindow | null; sevenDay?: LimitWindow | null; statusLine?: string; history5h?: [number, number][]; desktop?: string; fetch?: string } | null;
   costs?: { summary: { days: CostDay[] } | null } | null;
-  personal?: { weather?: { status: string; label: string; fahrenheit?: boolean; data: { temp: number; min: number | null; max: number | null } | null } | null } | null;
+  personal?: { weather?: { status: string; label: string; fahrenheit?: boolean; data: { temp: number; min: number | null; max: number | null } | null; fetchedMs?: number | null } | null } | null;
 };
 
 /** Dny útraty pro sparkline: cena, když ji má aspoň jeden den, jinak tokeny (poslední `n` dní). */
-export function costSeries(days: readonly CostDay[] | undefined, n = 14): number[] {
-  const d = (days ?? []).slice(-n);
-  const priced = d.some((x) => x.cost != null && x.cost > 0);
-  return d.map((x) => (priced ? x.cost ?? 0 : x.tokens));
-}
+export const costSeries = (days: readonly CostDay[] | undefined, n = 14): number[] => priceSeries(days, n).values;
 
-/** Počet tokenů zkráceně („1.5 k“) bez závislosti na UI (jen pro druhý řádek hrdiny). */
-export function tokText(n: number): string {
-  const c = compact(n);
-  return `${c.digits ? c.v.toFixed(c.digits) : Math.round(c.v)}${c.unit ? ` ${c.unit}` : ""}`;
-}
+/** Tokeny zkráceně („1.5 k“) pro druhý řádek hrdiny — společný formátovač `costs/model.ts`. */
+export { tokText };
 
 /** Co je hrdina karty Claude: limit 5 h (výchozí), týdenní limit, útrata dnes. */
 export type ClaudePick = "5h" | "week" | "spend";
@@ -134,7 +128,7 @@ function spendFacts(s: HeroInput, now: number, series: number[]): HeroFacts {
       seriesLabel: series.length >= 2 ? { text: ["cards.hero.seriesSpend", "Útrata po dnech, posledních {n} dní; poslední sloupec = dnešek do teď (nedokončený)"] as Text, vars: { n: series.length } } : undefined,
     };
   }
-  return emptyFacts(label, ["cards.hero.noSpend", "Útrata dnes zatím není"], ["cards.hero.why.spend", "Přehled útraty ještě nemá dnešek s cenou — zapni a nech dopočítat v Nastavení → Claude → Útrata."]);
+  return emptyFacts(label, ["cards.hero.noSpend", "Útrata dnes zatím není"], ["cards.hero.why.spend", "Přehled útraty ještě nemá dnešek s cenou — zapni a nech dopočítat v Nastavení → Claude → Hodnota v cenách API."]);
 }
 
 /** Hrdina karty Claude podle volby; čekající schválení / otázka = null (tlačítka musí být vidět). Bez dat NIKDY jiné
@@ -147,12 +141,15 @@ function claude(s: HeroInput, now: number, pick: ClaudePick): HeroFacts | null {
   return limitFacts(s, now, s.limits?.fiveHour, ["cards.hero.limit5h", "Limit Claude 5 h"], (s.limits?.history5h ?? []).map((p) => p[1]));
 }
 
-function weather(s: HeroInput): HeroFacts | null {
+/** „Venku“: ≥ 3 h staré (nebo bez času stažení) = prázdno; 30 min až 3 h nebo `stale` = podřádek „stará data“ místo rozsahu. */
+function weather(s: HeroInput, now: number): HeroFacts | null {
   const w = s.personal?.weather;
   const d = w?.data;
   if (!w || !d || !Number.isFinite(d.temp) || (w.status !== "ok" && w.status !== "stale")) return null;
+  const age = weatherAge(w, now);
+  if (age === "gone") return null;
   const range = d.min != null && d.max != null ? { text: ["cards.hero.minmax", "dnes {min}° až {max}°"] as Text, vars: { min: Math.round(tempIn(d.min, w.fahrenheit)), max: Math.round(tempIn(d.max, w.fahrenheit)) } } : undefined;
-  return { value: Math.round(tempIn(d.temp, w.fahrenheit)), digits: 0, unit: tempUnit(w.fahrenheit), label: ["cards.hero.weather", "Venku"], sub: range };
+  return { value: Math.round(tempIn(d.temp, w.fahrenheit)), digits: 0, unit: tempUnit(w.fahrenheit), label: ["cards.hero.weather", "Venku"], sub: age === "old" ? { text: ["cards.hero.weatherOld", "stará data"] as Text } : range };
 }
 
 /** Hrdina karty `cardId` ze snapshotu; `null` = karta bez hrdiny / bez skutečného čísla (kreslí se jako dřív). */
@@ -161,7 +158,7 @@ export function heroFacts(cardId: string, s: HeroInput, now: number, pick: Claud
     case "claude":
       return claude(s, now, pick);
     case "weather":
-      return weather(s);
+      return weather(s, now);
     default:
       return null;
   }

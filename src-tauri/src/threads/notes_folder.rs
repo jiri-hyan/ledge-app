@@ -159,10 +159,10 @@ fn watch(link: &folder_sync::LinkRun) -> Option<notify::RecommendedWatcher> {
 pub(crate) fn spawn_notes_folder() {
     let (tx, rx) = mpsc::channel();
     let _ = TX.set(Mutex::new(tx));
-    std::thread::Builder::new().name("notes-folder".into()).spawn(move || run_loop(rx)).ok();
+    std::thread::Builder::new().name("notes-folder".into()).spawn(move || crate::guard::guarded("notes-folder", crate::guard::CAP, || run_loop(&rx))).ok();
 }
 
-fn run_loop(rx: mpsc::Receiver<Msg>) {
+fn run_loop(rx: &mpsc::Receiver<Msg>) {
     let mut watcher: Option<(std::path::PathBuf, notify::RecommendedWatcher)> = None;
     let mut last_run: Option<Instant> = None;
     // termín příštího běhu + kdy se čeká nejdéle (debounce s horním mezníkem)

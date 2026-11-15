@@ -18,10 +18,13 @@ pub mod ics;
 pub mod live;
 pub mod meeting;
 pub mod outlook;
+pub mod people;
 pub mod remind;
 pub mod source;
+pub mod span;
 pub mod tz;
 pub mod view;
+pub mod write;
 
 use chrono::{DateTime, Duration, NaiveDateTime};
 use ics::{Dt, Event};
@@ -56,6 +59,9 @@ pub struct Occ {
     /// odkaz „Připojit“ (Teams, Meet, Zoom, Webex, Jitsi — `meeting.rs`); stará cache bez pole = žádný
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub join: Option<meeting::Join>,
+    /// účastníci (L85): jména / e-maily bez odmítnutých; prázdní = zdroj je nevrací (stará cache také)
+    #[serde(default, skip_serializing_if = "people::Crowd::is_empty")]
+    pub people: people::Crowd,
 }
 
 #[derive(Debug)]
@@ -102,7 +108,7 @@ pub fn collect(bytes: &[u8], now_ms: i64, local: &dyn LocalTz) -> Result<Parsed,
         }
     }
     let mut out = Vec::new();
-    for e in feed.events.iter().filter(|e| !e.cancelled) {
+    for e in feed.events.iter().filter(|e| !e.cancelled && !ics::declined_by_owner(e, &feed.name)) {
         let master = e.recurrence_id.is_none();
         let skip = if master { replaced.get(e.uid.as_str()).map(Vec::as_slice).unwrap_or_default() } else { &[] };
         expand_event(e, master, skip, &zones, (ws, we), &mut out);
@@ -121,6 +127,7 @@ fn expand_event(e: &Event, recurring: bool, skip: &[&Dt], zones: &Zones, (ws, we
     let title = clip(&e.summary, MAX_TITLE);
     let location = clip(e.location.lines().find(|l| !l.trim().is_empty()).unwrap_or(""), MAX_LOCATION);
     let join = e.join.as_ref().map(|(_, j)| j.clone());
+    let people = people::Crowd::of(e.attendees.iter().cloned());
     let mut keep = None;
     let (tz, local_start) = zones.resolve(start, &mut keep);
     let until = |u: &expand::Until| match u {
@@ -151,7 +158,7 @@ fn expand_event(e: &Event, recurring: bool, skip: &[&Dt], zones: &Zones, (ws, we
         for s in starts.into_iter().filter(|s| !gone.contains(&s.date())) {
             let en = s + dur;
             if en > ws && s < we {
-                out.push(Occ { start: ms(s), end: ms(en), all_day: true, title: title.clone(), location: location.clone(), tz_guess: false, join: join.clone() });
+                out.push(Occ { start: ms(s), end: ms(en), all_day: true, title: title.clone(), location: location.clone(), tz_guess: false, join: join.clone(), people: people.clone() });
             }
         }
         return;
@@ -186,7 +193,7 @@ fn expand_event(e: &Event, recurring: bool, skip: &[&Dt], zones: &Zones, (ws, we
         }
         let en = s + dur;
         if en.max(s + Duration::seconds(1)) > ws && s < we {
-            out.push(Occ { start: ms(s), end: ms(en), all_day: false, title: title.clone(), location: location.clone(), tz_guess: tz.guess(), join: join.clone() });
+            out.push(Occ { start: ms(s), end: ms(en), all_day: false, title: title.clone(), location: location.clone(), tz_guess: tz.guess(), join: join.clone(), people: people.clone() });
         }
     }
 }

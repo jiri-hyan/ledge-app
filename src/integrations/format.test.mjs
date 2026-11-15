@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/integrations/format.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CI_TONE, HISTORY, countText, diskLoad, diskOn, diskUsed, fmtPct, fmtRate, fmtSize, isoMs, loadOf, sparkPoints, toggleDisk } from "./format.ts";
+import { CI_TONE, HISTORY, countText, diskLoad, diskOn, diskUsed, fmtPct, fmtRate, fmtSize, isoMs, loadOf, historyPoints, toggleDisk } from "./format.ts";
 
 const GB = 1024 ** 3;
 
@@ -54,24 +54,24 @@ test("fmtPct: celá čísla, bez vzorku pomlčka", () => {
   assert.equal(fmtPct(null), "–");
 });
 
-test("sparkPoints: nejnovější vpravo, růst zprava, strop osy", () => {
-  assert.equal(sparkPoints([], 120, 30, 100), "");
-  assert.equal(sparkPoints([50], 120, 30, 100), "", "jeden vzorek nic nenakreslí");
-  const p = sparkPoints([0, 100], 118, 30, 100).split(" ");
+test("historyPoints: nejnovější vpravo, růst zprava, strop osy", () => {
+  assert.equal(historyPoints([], 120, 30, 100), "");
+  assert.equal(historyPoints([50], 120, 30, 100), "", "jeden vzorek nic nenakreslí");
+  const p = historyPoints([0, 100], 118, 30, 100).split(" ");
   assert.equal(p.length, 2);
   assert.equal(p[1], "118,1", "poslední vzorek na pravém okraji, 100 % nahoře (1 px okraj)");
   assert.equal(p[0], `${(118 - 118 / (HISTORY - 1)).toFixed(2).replace(/\.?0+$/, "")},29`, "0 % dole");
   // plný graf začíná na levém okraji
   const full = Array.from({ length: HISTORY }, (_, i) => i);
-  assert.equal(sparkPoints(full, 118, 30).split(" ")[0].startsWith("0,"), true);
+  assert.equal(historyPoints(full, 118, 30).split(" ")[0].startsWith("0,"), true);
   // starší než HISTORY se zahodí
-  assert.equal(sparkPoints(Array.from({ length: HISTORY + 20 }, () => 1), 118, 30, 1).split(" ").length, HISTORY);
+  assert.equal(historyPoints(Array.from({ length: HISTORY + 20 }, () => 1), 118, 30, 1).split(" ").length, HISTORY);
   // automatický strop: největší hodnota, nejméně floor
-  assert.equal(sparkPoints([0, 5], 118, 30, undefined, 10).split(" ")[1], "118,15", "5 z floor 10 = půl výšky");
-  assert.equal(sparkPoints([0, 500], 118, 30).split(" ")[1], "118,1", "bez stropu je maximum nahoře");
+  assert.equal(historyPoints([0, 5], 118, 30, undefined, 10).split(" ")[1], "118,15", "5 z floor 10 = půl výšky");
+  assert.equal(historyPoints([0, 500], 118, 30).split(" ")[1], "118,1", "bez stropu je maximum nahoře");
   // hodnota nad stropem se ořízne, NaN se přeskočí
-  assert.equal(sparkPoints([0, 250], 118, 30, 100).split(" ")[1], "118,1");
-  assert.equal(sparkPoints([10, NaN, 20], 118, 30, 100).split(" ").length, 2);
+  assert.equal(historyPoints([0, 250], 118, 30, 100).split(" ")[1], "118,1");
+  assert.equal(historyPoints([10, NaN, 20], 118, 30, 100).split(" ").length, 2);
 });
 
 test("úrovně: CPU / paměť od 75 a 90 %, disk podle volného místa", () => {

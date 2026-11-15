@@ -12,7 +12,13 @@ export interface WidgetItem {
   action?: WidgetAct;
   /** oddělovač */
   sep?: boolean;
+  /** widgetkit: průběh 0–1 vedle štítku (jen z `resolve`, ne z výstupu skriptu) */
+  bar?: number;
+  /** widgetkit: akce z bílé listiny (jen z `resolve`; klik řeší UI, ne `widget_click`) */
+  kit?: KitAct;
 }
+/** Akce položky widgetkitu po rozřešení šablon (`widgetkit/model.ts`). */
+export type KitAct = { type: "open"; path: string } | { type: "url"; url: string } | { type: "copy"; text: string } | { type: "action"; id: string } | { type: "drawer"; card: string };
 /** Co widget vypsal (Rust `widgets::output::WidgetData`). */
 export interface WidgetData {
   title: string | null;
@@ -27,7 +33,34 @@ export interface WidgetData {
   notes?: string[];
 }
 export type WidgetStatus = "off" | "missing" | "problem" | "consent" | "loading" | "error" | "ok" | "idle";
-export type WidgetKind = "powershell" | "cmd" | "python" | "node" | "exe";
+export type WidgetKind = "powershell" | "cmd" | "python" | "node" | "exe" | "kit";
+/** Šablonový widget `*.kit.json` (Rust `widgetkit::spec`): barva podle prahu. */
+export type KitTone = "ok" | "amber" | "red" | "dim";
+/** Řádek šablony; zdroje `{cesta}` rozhoduje UI (`widgetkit/sources.ts`), Rust jen syntaxi. */
+export interface KitRow {
+  text?: string;
+  bar?: string;
+  label?: string;
+  tone?: { over: [number, KitTone][] };
+  open?: string;
+  url?: string;
+  copy?: string;
+  action?: string;
+}
+export interface KitButton {
+  label: string;
+  open?: string;
+  url?: string;
+  copy?: string;
+  action?: string;
+}
+export interface KitSpec {
+  kit: 1;
+  title: string;
+  icon?: string;
+  rows: KitRow[];
+  buttons?: KitButton[];
+}
 /** Widget pro UI (Rust `widgets::live::WidgetView`). */
 export interface WidgetView {
   /** `widget:<soubor>` — id karty i položky proužku */
@@ -49,6 +82,10 @@ export interface WidgetView {
   hasOutput: boolean;
   /** je položkou proužku (`strip.items`) */
   inStrip: boolean;
+  /** `*.kit.json`: ověřená šablona (UI z ní počítá `WidgetData`) */
+  spec?: KitSpec;
+  /** poznámky z načtení šablony (ořezané / zahozené) */
+  notes?: string[];
 }
 /** `widgets_list`: co je ve složce widgetů (katalog, Nastavení). */
 export interface WidgetsListing {

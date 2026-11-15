@@ -39,3 +39,7 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: numb
   };
   return d;
 }
+
+/** Čas zaokrouhlený dolů na celou minutu (ms). Karty, které ukazují nejvýš minuty („před 5 min“, odpočet, reset),
+ *  čtou tohle místo sekundového `now` (`clock.ts`) — přes `createMemo` se jejich výpočty pustí 1× za minutu. */
+export const minuteOf = (ms: number): number => Math.floor(ms / 60_000) * 60_000;

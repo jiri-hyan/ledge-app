@@ -168,9 +168,12 @@ pub fn sort_candidates(v: &mut [Candidate]) {
     });
 }
 
+/// Termín `git log` pro datum commitu. V testech velkorysý: pod zátěží stroje by 4 s dávalo `None` a falešný FAIL.
+const COMMIT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(if cfg!(test) { 120 } else { 4 });
+
 /// Datum posledního commitu (unix s) — git bez okna s termínem; jen na výslovné otevření výběru.
 pub fn last_commit(dir: &Path) -> Option<i64> {
-    let out = crate::gitinfo::run(dir, &["log", "-1", "--format=%ct"], std::time::Instant::now() + std::time::Duration::from_secs(4))?;
+    let out = crate::gitinfo::run(dir, &["log", "-1", "--format=%ct"], std::time::Instant::now() + COMMIT_DEADLINE)?;
     out.trim().parse().ok()
 }
 
@@ -272,7 +275,8 @@ mod tests {
 
     #[test]
     fn main_checkout_maps_subdir_and_ignores_plain_repo() {
-        let t = std::env::temp_dir().join(format!("ledge-wt-{}", std::process::id()));
+        let _tmp = tempfile::tempdir().unwrap(); // izolovaná složka, uklidí se i po pádu testu
+        let t = _tmp.path().to_path_buf();
         let _ = std::fs::remove_dir_all(&t);
         let main = t.join("repo");
         std::fs::create_dir_all(main.join(".git").join("worktrees").join("wt")).unwrap();
@@ -400,26 +404,45 @@ mod tests {
         assert_eq!(place_of(None, false, &[]), (Place::None, None));
     }
 
+    /// Skutečný git v izolaci: prázdný globální config, bez systémového, bez podpisu a hooků — commit se nesmí
+    /// zablokovat nastavením stroje a datum je zadané, takže se ověří přesná hodnota. Bez gitu test hlasitě
+    /// přeskočí (eprintln), ale jen když `git --version` neprojde; jakákoli další chyba je assert.
     #[test]
     fn last_commit_of_real_repo_and_non_repo() {
+        use crate::gitinfo::run_env;
+        use std::time::{Duration, Instant};
         let t = tempfile::tempdir().unwrap();
         assert_eq!(last_commit(t.path()), None);
         let dir = t.path().join("r");
         std::fs::create_dir_all(&dir).unwrap();
-        let git = |args: &[&str]| crate::gitinfo::run(&dir, args, std::time::Instant::now() + std::time::Duration::from_secs(20));
-        if git(&["init", "-q"]).is_none() {
-            return; // git na stroji není — zbytek nejde ověřit
+        let cfg = t.path().join("prazdny.gitconfig");
+        std::fs::write(&cfg, "").unwrap();
+        let cfg = cfg.to_string_lossy().into_owned();
+        let env: [(&str, &str); 6] = [
+            ("GIT_CONFIG_GLOBAL", &cfg),
+            ("GIT_CONFIG_NOSYSTEM", "1"),
+            ("GIT_TERMINAL_PROMPT", "0"),
+            ("GIT_AUTHOR_DATE", "2020-01-01T00:00:00Z"),
+            ("GIT_COMMITTER_DATE", "2020-01-01T00:00:00Z"),
+            ("GIT_COMMITTER_NAME", "Test"),
+        ];
+        let git = |args: &[&str]| {
+            let o = run_env(&dir, args, &env, Instant::now() + Duration::from_secs(120)).unwrap_or_else(|e| panic!("git {args:?}: {e:?}"));
+            assert!(o.success, "git {args:?}: {}", o.stderr);
+        };
+        if run_env(&dir, &["--version"], &[], Instant::now() + Duration::from_secs(120)).map(|o| o.success) != Ok(true) {
+            eprintln!("PŘESKOČENO: git na stroji není — last_commit se neověřil");
+            return;
         }
+        git(&["init", "-q"]);
         std::fs::write(dir.join("a.txt"), "x").unwrap();
-        git(&["add", "a.txt"]).unwrap();
-        if git(&["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "x"]).is_none() {
-            return; // globální nastavení gitu commit nepustí (podpis, hooky) — datum nejde ověřit
-        }
-        // committer date = teď, stačí, že je to rozumné číslo
-        let ts = last_commit(&dir).expect("datum commitu");
-        assert!(ts > 1_600_000_000, "{ts}");
+        git(&["add", "a.txt"]);
+        git(&["-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=NUL", "commit", "-q", "-m", "x"]);
+        // 2020-01-01T00:00:00Z = 1577836800
+        assert_eq!(last_commit(&dir), Some(1_577_836_800));
         let v = candidates_dated(&[t.path().to_path_buf(), dir.clone()]);
-        assert_eq!(v[0].path, dir.to_string_lossy());
+        assert_eq!(v[0].path, dir.to_string_lossy(), "repo s commitem před složkou bez gitu");
+        assert_eq!(v[0].last_commit, Some(1_577_836_800));
         assert_eq!(v[1].last_commit, None);
     }
 

@@ -17,6 +17,8 @@ export interface DetectedProject {
   notes: string[];
 }
 export interface RepoCandidate { path: string; name: string; remote?: string }
+/** Monitor pro volbu `strip.monitor` (`stripset::monitors_list`): `id` je stabilní `dev:<zařízení>;<š>x<v>@<x>,<y>`. */
+export interface MonitorInfo { id: string; n: number; w: number; h: number; primary: boolean }
 export interface AppInfo { version: string; configPath: string; configDir: string; logPath: string }
 export type PickKind = "folder" | "file" | "exe" | "image" | "json";
 

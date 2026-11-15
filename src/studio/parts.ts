@@ -25,7 +25,7 @@ export const PARTS: readonly Part[] = [
   {
     id: "otevirani", n: 2, icon: "open", name: ["settings.studio.p.otevirani", "Otevírání"], line: ["settings.studio.p.otevirani.line", "Jak se šuplík otevře a zase zavře — myší, klávesou nebo paletou."],
     questions: [
-      { block: "hover", primary: true, q: ["settings.studio.q.hover", "Co se stane, když najedeš myší k hraně?"], sub: ["settings.studio.q.hover.sub", "Celý šuplík, kompaktní náhled, nebo roztažený ostrůvek."] },
+      { block: "hover", primary: true, q: ["settings.studio.q.hover", "Co se stane, když najedeš myší k hraně?"], sub: ["settings.studio.q.hover.sub", "Celý šuplík, roztažený ostrůvek, nebo dok."] },
       { block: "chovani", primary: true, q: ["settings.studio.q.behavior", "Jak ho otevřeš a zavřeš?"], sub: ["settings.studio.q.behavior.sub", "Spouštěč u hrany, prodlevy, klávesové zkratky a paleta."] },
     ],
   },
@@ -89,6 +89,7 @@ export const VZHLED_PREFIX_STEP: readonly { prefix: string; step: StepId }[] = [
   { prefix: "strip", step: "closed" },
   { prefix: "timer.strip", step: "closed" },
   { prefix: "drawer.hover", step: "hover" },
+  { prefix: "drawer.dockCards", step: "hover" },
   { prefix: "drawer.hoverExpandMs", step: "hover" },
   { prefix: "drawer.width", step: "open" },
   { prefix: "drawer.glass", step: "open" },

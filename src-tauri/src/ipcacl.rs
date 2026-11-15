@@ -88,26 +88,26 @@ mod tests {
         "note_archive", "note_delete", "note_delete_undo", "note_done", "note_draft_clear", "note_draft_load", "note_draft_save",
         "note_edit_draft_load", "note_edit_draft_save", "note_export", "note_link_create", "note_link_resolve", "note_link_suggest",
         "note_open", "note_open_with", "note_open_with_apps", "note_read", "note_render", "note_save", "note_set_meta",
-        "note_suggest_remind", "note_task_set", "note_toggle_task", "note_unarchive", "open_url", "pin_drag", "pin_edit_in_ledge", "pin_hide",
-        "pin_hint_seen", "pin_init", "pin_look_all", "pin_open", "pin_set", "pin_unpin", "ui_log",
+        "note_suggest_remind", "note_task_set", "note_toggle_task", "note_unarchive", "open_url", "pin_activate", "pin_drag", "pin_edit_in_ledge", "pin_hide",
+        "pin_hint_seen", "pin_init", "pin_look_all", "pin_open", "pin_set", "pin_unpin", "project_open_file", "ui_log",
     ];
     /// Co smí widget na ploše: `desk_*` svého okna, kliky / výstup / obnovení widgetu (bez souhlasu — ten jen
     /// v šuplíku), karta Běží (stop, logy, zavřít hlášku), Agenda (připojit se, Outlook), vzhled (čtení configu).
     const DESK_WINDOW: &[&str] = &[
         "anim_stats", "calendar_join", "calendar_outlook_load", "desk_drag", "desk_init", "desk_menu", "desk_open_drawer", "desk_set",
         "desk_unpin", "dismiss", "get_config", "logs", "open_url", "stop", "ui_log", "widget_click", "widget_edit", "widget_output",
-        "widget_refresh", "widgets_list",
+        "widget_refresh", "widgets_list", "win_look",
     ];
 
     /// Co smí Ledge Studio: config (číst, ověřit, zapsat, výchozí, export / import), dialogy a příkazy panelů
     /// Nastavení; okenní tlačítka `studio_win`. Ne: fokus a velikost šuplíku, spouštění projektů z karet, `pin_*`, `desk_drag`.
     const STUDIO_WINDOW: &[&str] = &[
         "account_cancel", "account_connect", "account_disconnect", "account_google_calendars", "accounts_status", "apikey_clear",
-        "apikey_set", "apikey_status",
+        "apikey_set", "apikey_status", "connector_clear_key", "connector_preview", "connector_send", "connector_set_key", "connector_state",
         "action_check", "action_consent", "action_icon", "action_icon_refresh", "anim_stats", "app_info",
         "calendar_outlook_load", "calendar_outlook_probe", "calendar_test", "check_config", "clip_apps", "clip_clear",
         "clip_enable", "config_defaults", "config_export", "config_import_preview", "desk_hide_all", "desk_pin",
-        "desk_profile_apply", "desk_profile_delete", "desk_profile_save", "desk_set", "desk_unpin", "edge_try", "geo_search",
+        "desk_profile_apply", "desk_profile_delete", "desk_profile_save", "desk_set", "desk_unpin", "edge_try", "monitors_list", "ext_status", "ext_wall_bg", "geo_search",
         "get_config", "get_state", "hooks_install", "hooks_remove", "hooks_status", "hotkeys_taken", "launcher_catalog_read",
         "launcher_import_check", "logo_preview", "look_image", "look_image_add", "mcp_reveal_key", "mcp_rotate_key",
         "mcp_set_enabled", "mcp_state", "note_folder_check", "note_folder_clear_conflicts", "note_folder_sync_now",
@@ -117,7 +117,7 @@ mod tests {
         "statusline_install", "statusline_remove", "statusline_status", "studio_win", "system_view",
         "ui_log", "update_check_now", "update_install", "update_rollback", "widget_consent", "widget_edit", "widget_install", "widget_refresh",
         "widget_templates", "widgets_list", "widgets_open_dir",
-        "win_settings_open",
+        "win_look", "win_settings_open",
     ];
 
     #[test]
@@ -230,6 +230,8 @@ mod tests {
             ("studio", "update_install", true),
             ("studio", "repos_rescan", true),
             ("studio", "system_view", true),
+            ("studio", "ext_status", true),
+            ("studio", "ext_wall_bg", true),
             ("studio", "widget_edit", true),
             ("studio", "widget_refresh", true),
             ("studio", "focus_drawer", false),

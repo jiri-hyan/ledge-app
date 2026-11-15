@@ -3,16 +3,18 @@
 
 import { createSignal } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
-import { say } from "../ui/toast";
+import { say, sayError } from "../ui/toast";
 import { t } from "../i18n";
 import { PROJECT_ACCENT_PLACEHOLDER } from "./meta";
 
 /** Předvyplnění nové poznámky (dlaždice projektu, tlačítko na záložce). */
-export type NotePreset = { project?: string; remind?: boolean; kind?: string };
+export type NotePreset = { project?: string; remind?: boolean; kind?: string; /** hotové tělo (dev chyba → zadání); vyplní jen prázdný koncept */ body?: string };
 export const [notePreset, setNotePreset] = createSignal<NotePreset | null>(null);
 
 /** Upravovaná poznámka (cesta) — null = nová poznámka. */
 export const [editPath, setEditPath] = createSignal<string | null>(null);
+/** Řádek těla (od 0), na který má editor po otevření skočit (klik na úkol v záložce Úkoly); editor ho jednou spotřebuje. */
+export const [editLine, setEditLine] = createSignal<number | null>(null);
 /** Filtr projektu stránky Poznámky: "*" = všechny, "" = bez projektu, jinak id. */
 export const [pageProject, setPageProject] = createSignal("*");
 /** Stránka Poznámky ukazuje Archiv (poznámky z `_archiv`) místo aktivních. */
@@ -74,7 +76,7 @@ export async function setDone(n: NoteView, done: boolean) {
   try {
     await api.noteDone(path, done);
   } catch (e) {
-    say(String(e), true);
+    sayError(e);
   } finally {
     const next = new Set(doneBusy());
     next.delete(path);
@@ -87,11 +89,23 @@ export async function openExternal(path: string) {
   try {
     await api.noteOpen(path);
   } catch (e) {
-    say(String(e), true);
+    sayError(e);
   }
 }
 
-/** Klik na `@cesta[:řádek]` v náhledu: v appce zatím není otevření souboru projektu (jen poznámek), proto se cesta zkopíruje. */
+/** Klik na `@cesta[:řádek]` v náhledu: soubor projektu se otevře výchozí aplikací (Rust hlídá, že cesta zůstane
+ *  ve složce projektu); bez projektu nebo když soubor nejde otevřít se cesta jen zkopíruje (původní chování). */
+export async function openRef(project: string | null | undefined, path: string, line: number | null) {
+  if (project) {
+    try {
+      await api.projectOpenFile(project, path);
+      return;
+    } catch { /* mimo projekt / neexistuje → kopie níž */ }
+  }
+  await copyRef(path, line);
+}
+
+/** Zkopíruje `@cesta[:řádek]` do schránky (záloha `openRef`). */
 export async function copyRef(path: string, line: number | null) {
   const txt = line === null ? path : `${path}:${line}`;
   try {

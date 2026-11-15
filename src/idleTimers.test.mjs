@@ -11,9 +11,9 @@ import { fileURLToPath } from "node:url";
 const SRC = fileURLToPath(new URL(".", import.meta.url));
 
 // soubor → proč smí mít setInterval
+// (jediné sekundové hodiny; odpočet otázky Clauda a ostatní sekundová místa čtou sdílené `now` z `clock.ts`)
 const ALLOWED = {
   "App.tsx": "hodiny v hlavičce; vzniká jen při viditelném šuplíku (efekt s `view() === \"hidden\"` → return)",
-  "questions/QuestionCard.tsx": "odpočet otázky Clauda; komponenta existuje jen, dokud je otázka na kartě",
 };
 
 function walk(dir) {
@@ -36,4 +36,9 @@ test("hodiny v App.tsx tikají jen při viditelném šuplíku", () => {
   const effect = /createEffect\(\(\) => \{\s*if \(view\(\) === "hidden"\) return;[\s\S]*?setInterval\([\s\S]*?clearInterval/.exec(src);
   assert.ok(effect, "setInterval v App.tsx musí být v efektu, který se při skrytém šuplíku vrátí před založením časovače");
   assert.equal(src.match(/setInterval\s*\(/g).length, 1, "v App.tsx je jediný časovač");
+});
+
+test("visibilitychange poslouchá jen media/shown.ts (ostatní čtou drawerShown)", () => {
+  const found = sources.filter((p) => /addEventListener\(\s*["']visibilitychange["']/.test(readFileSync(p, "utf8"))).map(posix);
+  assert.deepEqual(found, ["media/shown.ts"], "„šuplík je vidět“ = drawerShown() (media/shown.ts); nový posluchač nepřidávej");
 });

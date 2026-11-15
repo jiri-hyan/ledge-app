@@ -36,14 +36,14 @@ fn with<R>(f: impl FnOnce(&mut Live) -> R) -> R {
 
 fn enabled() -> bool {
     let cfg = core().cfg.read();
-    wanted(cfg.claude.costs, cfg.drawer.sections.claude && cfg.drawer.sections.claude_costs, crate::layout::placed(&cfg.layout, USAGE_CARD))
+    wanted(cfg.claude.costs, cfg.drawer.sections.claude, crate::layout::placed(&cfg.layout, USAGE_CARD))
 }
 
 /// Karta „Claude dnes“ (`board/`, kolo 22) čte tentýž přehled.
 pub(crate) const USAGE_CARD: &str = "usage";
 
-/// Indexovat na žádost šuplíku? Vypnutá útrata = nikdy; jinak když přehled někdo ukazuje: sekce v kartě
-/// Claude nebo karta „Claude dnes“ na některé záložce. Skryté obojí = nic se nečte (widget na ploše má
+/// Indexovat na žádost šuplíku? Vypnutá útrata = nikdy; jinak když přehled někdo ukazuje: karta Claude
+/// (cena u session + sekce útraty, kolo 34) nebo karta „Claude dnes“ na některé záložce. Skryté obojí = nic se nečte (widget na ploše má
 /// vlastní cestu `request_desk`). Čistá funkce.
 pub(crate) fn wanted(costs_on: bool, claude_section: bool, usage_card: bool) -> bool {
     costs_on && (claude_section || usage_card)

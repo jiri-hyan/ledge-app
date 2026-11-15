@@ -11,8 +11,9 @@
 //! - Geometrie z událostí `Moved` / `Resized`; zápis `desk.json` se zpožděním ve vlákně `desk-save`, které
 //!   spí na kanálu; po přesunu přichycení k okrajům (`snap`), až když je pustěné tlačítko myši.
 //! - Odpojený monitor: okno stojí na monitoru proužku (`DISPLACED`), domov v souboru zůstane; po připojení
-//!   (`on_monitors` z vlákna `hover`, které monitory stejně čte co 3 s) se vrátí domů.
+//!   (`on_monitors` z vlákna `hover` po události zobrazení — `state::display_event` — a po změně rect, work nebo DPI) se vrátí domů.
 
+use crate::qa::QaDataDir as _;
 use super::*;
 use super::save;
 use crate::i18n::tr;
@@ -20,16 +21,14 @@ use crate::state::{core, log, mark_dirty};
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 /// Stav widgetů v paměti (načte se při první potřebě).
 pub(super) static STATE: Mutex<Option<DeskFile>> = Mutex::new(None);
-/// Poslední známé „ustoupit hře“ (`pins::pins_yield`).
-static YIELD: AtomicBool = AtomicBool::new(false);
-/// Co leží přes monitor (zapisuje vlákno `hover`, stejná hodnota jako u lístků).
-static FS_KIND: AtomicU8 = AtomicU8::new(0);
+/// Widgety (label), které teď ustupují hře na SVÉM monitoru (`pins::pins_yield`).
+static YIELDED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// Všechny widgety schované (paleta / Nastavení) — jen do konce běhu.
 static HIDDEN_ALL: AtomicBool = AtomicBool::new(false);
 static RESTORE_PENDING: AtomicBool = AtomicBool::new(false);
@@ -115,21 +114,26 @@ fn dormant(w: &WebviewWindow, sleep: bool) {
     });
 }
 
-const KINDS: [pins::FsKind; 5] = [pins::FsKind::None, pins::FsKind::Exclusive, pins::FsKind::CoverBrowser, pins::FsKind::CoverOwn, pins::FsKind::CoverOther];
-
-/// Vlákno `hover`: co leží přes monitor (stejně jako `pins::win::set_fs_kind`).
-pub(crate) fn set_fs_kind(k: pins::FsKind) {
-    let v = KINDS.iter().position(|x| *x == k).unwrap_or(0) as u8;
-    FS_KIND.store(v, Ordering::Relaxed);
+/// Mají widgety na monitoru proužku ustoupit hře? Stejné pravidlo jako lístky (`pins::pins_yield`): herní
+/// režim, D3D fullscreen, okno jiné aplikace přes celý monitor; prohlížeč ve F11 a vlastní okno ne.
+/// Rozhoduje o připnutí nového widgetu, obnově po startu a profilu.
+fn yielding() -> bool {
+    crate::state::CORE.get().is_some_and(|c| pins::yielding_at(c, None))
 }
 
-/// Mají widgety ustoupit hře? Stejné pravidlo jako lístky (`pins::pins_yield`): herní režim, D3D
-/// fullscreen, okno jiné aplikace přes celý monitor; prohlížeč ve F11 a vlastní okno ne.
-fn yielding() -> bool {
-    let Some(c) = crate::state::CORE.get() else { return false };
-    let kind = KINDS.get(FS_KIND.load(Ordering::Relaxed) as usize).copied().unwrap_or(pins::FsKind::None);
-    let kind = if c.fullscreen.load(Ordering::Relaxed) { kind } else { pins::FsKind::None };
-    pins::pins_yield(c.game_mode.load(Ordering::SeqCst), kind)
+/// Ustupuje hře widget na monitoru `handle` (`None` = monitor proužku)?
+fn yielding_on(handle: Option<isize>) -> bool {
+    crate::state::CORE.get().is_some_and(|c| pins::yielding_at(c, handle))
+}
+
+/// Ustupuje hře okno widgetu — podle monitoru, na kterém právě leží.
+fn yielding_win(win: &WebviewWindow) -> bool {
+    yielding_on(crate::screen::monitor_of_window(win))
+}
+
+/// Zapíše, že widget `label` ustupuje / už ne; vrací, jestli se to změnilo.
+fn mark_yield(label: &str, y: bool) -> bool {
+    pins::mark_yield(&YIELDED, label, y)
 }
 
 /// Volby → okno (bez polohy).
@@ -218,12 +222,13 @@ pub(crate) fn open(id: &str) -> Result<(), String> {
         return Ok(());
     }
     let w = widget(id).ok_or_else(|| tr("Widget už není na ploše.", "The widget is no longer on the desktop."))?;
-    let y = yielding();
-    let visible = shown(&w, y, HIDDEN_ALL.load(Ordering::Relaxed));
     let index = windows().len();
     let (fb, gap) = fallback();
     let mons = monitors();
     let (place, away) = plan_place(&w, &mons, &fb, gap, index);
+    // hra na monitoru, kam widget míří, ho schová; hra jinde ne
+    let y = crate::state::CORE.get().is_some_and(|c| (c.fullscreen.load(Ordering::Relaxed) || c.game_mode.load(Ordering::SeqCst)) && yielding_on(Some(c.handle_at(place.x, place.y))));
+    let visible = shown(&w, y, HIDDEN_ALL.load(Ordering::Relaxed));
     let win = WebviewWindowBuilder::new(app(), &label, WebviewUrl::App("desk.html".into()))
         .title(title_of(&w))
         .visible(visible)
@@ -237,14 +242,19 @@ pub(crate) fn open(id: &str) -> Result<(), String> {
         .resizable(movable(&w))
         .min_inner_size(MIN_W, MIN_H)
         .inner_size(place.w as f64 / fb.scale, place.h as f64 / fb.scale)
-        .position(place.x as f64 / fb.scale, place.y as f64 / fb.scale)
+        .position(crate::qa::park_x(place.x) as f64 / fb.scale, place.y as f64 / fb.scale)
         // stejné argumenty + výchozí data dir jako šuplík → jeden proces prohlížeče i renderer
-        .additional_browser_args(crate::drawer::BROWSER_ARGS)
+        .additional_browser_args(crate::qa::browser_args())
+        .qa_data_dir()
         .disable_drag_drop_handler()
         .build()
         .map_err(|e| crate::errors::any(tr("Widget se neotevřel", "The widget didn't open"), &e))?;
-    let _ = win.set_position(PhysicalPosition::new(place.x, place.y));
+    if let Ok(h) = win.hwnd() {
+        crate::winstyle::apply_profile(windows::Win32::Foundation::HWND(h.0 as *mut _), crate::winstyle::Win::Desk);
+    }
+    let _ = win.set_position(PhysicalPosition::new(crate::qa::park_x(place.x), place.y));
     let _ = win.set_size(PhysicalSize::new(place.w, place.h));
+    mark_yield(&label, y);
     apply(&win, &w, y);
     if away {
         displaced(|d| d.insert(id.to_string(), (place.x, place.y)));
@@ -334,6 +344,10 @@ fn moved(id: &str, x: i32, y: i32) {
         }
     });
     save::mark_moved(id);
+    // widget přetažený na monitor s hrou ustoupí hned (ne až při další změně mapy fullscreenu) a naopak
+    if let Some(win) = app().get_webview_window(&label_for(id)) {
+        refresh_window(&label_for(id), &win, true);
+    }
 }
 
 /// Volby (⋯) se nevejdou do malého widgetu: okno se na dobu voleb zvětší (neuloží se) a pak vrátí.
@@ -389,7 +403,8 @@ pub(crate) fn set(id: &str, patch: &Patch) -> Result<DeskWidget, String> {
             let (w, h) = new.size_now();
             let _ = win.set_size(tauri::LogicalSize::new(w, h));
         }
-        let y = yielding();
+        let y = yielding_win(&win);
+        mark_yield(&label, y);
         apply(&win, &new, y);
         let vis = shown(&new, y, HIDDEN_ALL.load(Ordering::Relaxed));
         if vis != shown(&old, y, HIDDEN_ALL.load(Ordering::Relaxed)) {
@@ -408,26 +423,34 @@ pub(crate) fn set(id: &str, patch: &Patch) -> Result<DeskWidget, String> {
 pub(crate) fn hide_all(hide: Option<bool>) -> bool {
     let now = hide.unwrap_or(!HIDDEN_ALL.load(Ordering::Relaxed));
     HIDDEN_ALL.store(now, Ordering::Relaxed);
-    refresh_visibility();
+    refresh_visibility(false);
     mark_dirty();
     now
 }
 
-/// Projde okna a srovná viditelnost a vrstvu se stavem hry / „schovat vše“.
-fn refresh_visibility() {
-    let y = yielding();
-    let all = HIDDEN_ALL.load(Ordering::Relaxed);
+/// Projde okna a srovná viditelnost a vrstvu se stavem hry (na monitoru okna) / „schovat vše“.
+/// `only_changed`: jen okna, kterým se změnilo „ustupuje hře“ (jinak by `apply` zbytečně přepínal vrstvy).
+fn refresh_visibility(only_changed: bool) {
     for (l, win) in windows() {
-        let Some(w) = id_of(&l).and_then(widget) else { continue };
-        let vis = shown(&w, y, all);
-        let was = SHOWN.lock().contains(&l);
-        apply(&win, &w, y);
-        if vis != was {
-            set_visible(&win, vis);
-            mark_shown(&l, vis);
-        }
+        refresh_window(&l, &win, only_changed);
     }
     super::live::invalidate();
+}
+
+/// Srovná viditelnost a vrstvu jednoho widgetu (`refresh_visibility` pro jedno okno; `moved` po přesunu).
+fn refresh_window(l: &str, win: &WebviewWindow, only_changed: bool) {
+    let Some(w) = id_of(l).and_then(widget) else { return };
+    let y = yielding_win(win);
+    if !mark_yield(l, y) && only_changed {
+        return;
+    }
+    let vis = shown(&w, y, HIDDEN_ALL.load(Ordering::Relaxed));
+    let was = SHOWN.lock().iter().any(|x| x == l);
+    apply(win, &w, y);
+    if vis != was {
+        set_visible(win, vis);
+        mark_shown(l, vis);
+    }
 }
 
 /// Fullscreen / herní režim se změnil (vlákno `hover`, `gamemode::set`): widgety se schovají / vrátí.
@@ -435,12 +458,9 @@ pub(crate) fn sync_yield() {
     if crate::state::CORE.get().is_none() {
         return;
     }
-    let y = yielding();
-    if YIELD.swap(y, Ordering::Relaxed) != y {
-        refresh_visibility();
-    }
-    // i beze změny: Ledge mohl startovat v herním režimu (YIELD je zpočátku false) a obnova čeká
-    if !y && RESTORE_PENDING.swap(false, Ordering::Relaxed) {
+    refresh_visibility(true);
+    // i beze změny: Ledge mohl startovat v herním režimu a obnova čeká
+    if !yielding() && RESTORE_PENDING.swap(false, Ordering::Relaxed) {
         std::thread::spawn(restore_all);
     }
 }
@@ -485,7 +505,7 @@ pub(crate) fn on_monitors() {
         let (place, _) = plan_place(&w, &mons, &fb, 0, 0);
         displaced(|d| d.remove(&id));
         if let Some(win) = app().get_webview_window(&label_for(&id)) {
-            let _ = win.set_position(PhysicalPosition::new(place.x, place.y));
+            let _ = win.set_position(PhysicalPosition::new(crate::qa::park_x(place.x), place.y));
             let _ = win.set_size(PhysicalSize::new(place.w, place.h));
         }
     }
@@ -517,13 +537,14 @@ pub(crate) fn profile_apply(name: &str) -> Result<(), String> {
     }
     let mons = monitors();
     let (fb, gap) = fallback();
-    let y = yielding();
     for (i, id) in diff.keep.iter().enumerate() {
         let (Some(w), Some(win)) = (widget(id), app().get_webview_window(&label_for(id))) else { continue };
         let (place, away) = plan_place(&w, &mons, &fb, gap, i);
         displaced(|d| if away { d.insert(id.clone(), (place.x, place.y)); } else { d.remove(id); });
-        let _ = win.set_position(PhysicalPosition::new(place.x, place.y));
+        let _ = win.set_position(PhysicalPosition::new(crate::qa::park_x(place.x), place.y));
         let _ = win.set_size(PhysicalSize::new(place.w, place.h));
+        let y = yielding_win(&win);
+        mark_yield(&label_for(id), y);
         apply(&win, &w, y);
         let _ = win.emit_to(label_for(id).as_str(), "desk-prefs", &w);
     }

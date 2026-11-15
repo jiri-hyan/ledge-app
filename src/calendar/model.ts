@@ -6,6 +6,13 @@
 /** Barvy přiřazované novým kalendářům postupně (stejná paleta jako vzorky v Nastavení). */
 export const CAL_COLORS = ["#60a5fa", "#4ade80", "#fbbf24", "#f472b6", "#a78bfa", "#2dd4bf", "#fb923c", "#f87171"] as const;
 
+/** Nejstarší stažení mezi zapnutými kalendáři (ms) — stáří dat karty je stáří nejméně čerstvého; žádné = null. */
+export function oldestFetchedMs(cals: readonly { enabled: boolean; fetchedMs: number | null }[] | null | undefined): number | null {
+  let old: number | null = null;
+  for (const c of cals ?? []) if (c.enabled && c.fetchedMs != null && (old === null || c.fetchedMs < old)) old = c.fetchedMs;
+  return old;
+}
+
 /** Barva kalendáře: z configu, jinak podle pořadí. */
 export const calColor = (color: string | null | undefined, index: number): string =>
   color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : CAL_COLORS[((index % CAL_COLORS.length) + CAL_COLORS.length) % CAL_COLORS.length];
@@ -106,13 +113,6 @@ export function placeLabel(it: { location: string; join?: { url: string } | null
 export const joinable = (it: { end: number; start: number; join?: { url: string } | null }, now: number): boolean =>
   !!it.join?.url && now < Math.max(it.end, it.start + 60_000);
 
-/** Za kolik minut začne (zaokrouhleno nahoru), když je to do `within` minut; jinak null. */
-export function startsIn(it: { start: number; allDay: boolean }, now: number, within = 15): number | null {
-  if (it.allDay || it.start <= now) return null;
-  const m = Math.ceil((it.start - now) / 60_000);
-  return m <= within ? m : null;
-}
-
 /** Volby připomínky (minuty předem; 0 = nepřipomínat). Hodnota z configu mimo nabídku se přidá. */
 export const REMIND_MINUTES = [0, 1, 5, 10, 15, 30] as const;
 export function remindOptions(cur: number | null | undefined): number[] {
@@ -127,4 +127,83 @@ export const remindOf = (f: { remindMin?: number | null } | null | undefined): n
   typeof f?.remindMin === "number" ? f.remindMin : DEFAULT_REMIND;
 
 /** Nový kalendář „Outlook v tomto PC“ (bez adresy). */
-export const outlookFeed = (color: string) => ({ name: "", url: "", color, enabled: true, source: "outlook-local" as const, remindMin: DEFAULT_REMIND, remindToast: false });
+export const outlookFeed = (color: string) => ({ name: "", url: "", color, enabled: true, source: "outlook-local" as const, remindMin: DEFAULT_REMIND, remindToast: true });
+
+// --- kolo 33 (L85): délka schůzky a účastníci ---
+
+/** Minuty čitelně: „45 min“, „2 h“, „2 h 10 min“ (jednotky jsou stejné česky i anglicky). */
+export function minLabel(n: number): string {
+  const m = Math.max(0, Math.round(n));
+  if (m < 60) return `${m} min`;
+  return m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.floor(m / 60)} h`;
+}
+
+/** Jak dlouho schůzka trvá / za jak dlouho začne, spočítané z `start/end/now` (zrcadlo Rust `calendar/span.rs`, tabulka hranic je stejná; žádný vlastní časovač —
+ *  překresluje se s hodinami aplikace). `before` jen do `within` minut před začátkem; celodenní, nulová
+ *  a skončená = null. Konec přes půlnoc nevadí (absolutní ms). */
+export type MeetingSpan = { phase: "before"; startsIn: number; total: number } | { phase: "running"; run: number; left: number; total: number };
+export function meetingSpan(it: { start: number; end: number; allDay: boolean }, now: number, within = 60): MeetingSpan | null {
+  if (it.allDay || it.end <= it.start || now >= it.end) return null;
+  const total = Math.round((it.end - it.start) / 60_000);
+  if (now < it.start) {
+    const startsIn = Math.ceil((it.start - now) / 60_000);
+    return startsIn <= within ? { phase: "before", startsIn, total } : null;
+  }
+  return { phase: "running", run: Math.floor((now - it.start) / 60_000), left: Math.max(1, Math.ceil((it.end - now) / 60_000)), total };
+}
+
+export interface CalendarPerson {
+  name: string;
+  email: string;
+  resp: "pending" | "accepted" | "tentative";
+}
+
+/** Písmena jména bez závorek („Jan Novák (Externí)“) a titulů v čárce; „Příjmení, Jméno“ se otočí. */
+function nameWords(name: string): string[] {
+  let n = name.replace(/\([^)]*\)/g, " ").trim();
+  const comma = n.split(",");
+  if (comma.length === 2 && comma[0].trim() && comma[1].trim()) n = `${comma[1]} ${comma[0]}`;
+  return n.split(/[\s ]+/).filter((w) => /\p{L}/u.test(w));
+}
+const firstLetter = (w: string): string => (w.match(/\p{L}/u)?.[0] ?? "").toLocaleUpperCase("cs");
+
+/** Iniciály: jméno → první písmeno prvního a posledního slova („Tomáš Hora“ → „JH“, „Žofie“ → „Ž“,
+ *  „Hora, Tomáš“ → „JH“); bez jména e-mail → první písmeno před @; nic použitelného → "". */
+export function initials(name: string, email = ""): string {
+  const w = nameWords(name);
+  if (w.length) return w.length === 1 ? firstLetter(w[0]) : firstLetter(w[0]) + firstLetter(w[w.length - 1]);
+  const local = email.split("@")[0] ?? "";
+  return firstLetter(local);
+}
+
+/** Stabilní barva avataru z klíče (e-mail, jinak jméno) — z palety akcentů kalendářů, stejný člověk = stejná barva. */
+export function avatarColor(key: string): string {
+  let h = 2166136261;
+  for (const c of key.toLowerCase()) h = Math.imul(h ^ c.codePointAt(0)!, 16777619) >>> 0;
+  return CAL_COLORS[h % CAL_COLORS.length];
+}
+
+export interface Avatar {
+  initials: string;
+  color: string;
+  /** jméno (a e-mail) pro tooltip */
+  label: string;
+  tentative: boolean;
+}
+
+/** Avatary řady: nejvýš `max`, zbytek (včetně `more` z Rustu) jako „+N“; stejný člověk (e-mail / jméno) jen jednou,
+ *  bez použitelných iniciál se nekreslí. Bez účastníků (zdroj je nevrací) = prázdné → nic se nekreslí. */
+export function avatarRow(people: { list?: readonly CalendarPerson[]; more?: number } | null | undefined, max = 4): { shown: Avatar[]; more: number; names: string } {
+  const seen = new Set<string>();
+  const all: Avatar[] = [];
+  for (const p of people?.list ?? []) {
+    const key = (p.email || p.name).trim().toLowerCase();
+    const ini = initials(p.name, p.email);
+    if (!key || !ini || seen.has(key)) continue;
+    seen.add(key);
+    all.push({ initials: ini, color: avatarColor(key), label: p.name && p.email ? `${p.name} <${p.email}>` : p.name || p.email, tentative: p.resp === "tentative" });
+  }
+  const shown = all.slice(0, max);
+  const more = all.length - shown.length + (people?.more ?? 0);
+  return { shown, more, names: all.map((a) => a.label).join("\n") };
+}

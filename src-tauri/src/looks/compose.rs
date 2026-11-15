@@ -98,6 +98,8 @@ pub enum PieceStyle {
     DotPct,
     // Claude: prstenec 5h v barvě stavu
     Ring5h,
+    // kolo 33: prstenec a vedle něj hodnota („82 %“, limit týdne „7d 92 %“)
+    RingText,
 }
 
 // Velikost jednoho dílu vůči písmu proužku (kolo 27)
@@ -276,7 +278,7 @@ impl Compose {
                 if seen.len() < MAX_PIECES && out.len() < MAX_ZONE && !seen.contains(&p.item) {
                     seen.push(p.item);
                     out.push(Piece {
-                        color: composedeco::norm_piece_color(&p.color),
+                        color: composedeco::norm_piece_tint(&p.color),
                         bg: composedeco::norm_piece_color(&p.bg),
                         ink: composedeco::norm_piece_color(&p.ink),
                         ..p.clone()
@@ -337,6 +339,7 @@ pub struct Val {
     pub event: bool,
 }
 
+use crate::util::pct_floor_text as pct_floor;
 use crate::util::pct_text as pct;
 fn frac(p: f64) -> f32 {
     (p / 100.0).clamp(0.0, 1.0) as f32
@@ -346,6 +349,10 @@ fn val0(glyph: Option<Glyph>, color: Rgba, text: String) -> Val {
 }
 fn share(label: &str, p: Option<f64>, color: Rgba) -> Option<Val> {
     p.map(|p| Val { num: Some(format!("{:.0}", p.round())), frac: Some(frac(p)), short: Some(pct(p)), ..val0(None, color, format!("{label} {}", pct(p))) })
+}
+/// Podíl LIMITU: totéž co `share`, ale procento dolů (`util::pct_floor_text`) — 99,6 % není „100“.
+fn share_limit(label: &str, p: Option<f64>, color: Rgba) -> Option<Val> {
+    p.map(|p| Val { num: Some(format!("{:.0}", p.floor().clamp(0.0, 100.0))), frac: Some(frac(p)), short: Some(pct_floor(p)), ..val0(None, color, format!("{label} {}", pct_floor(p))) })
 }
 
 /// Co položka teď ukazuje.
@@ -365,8 +372,8 @@ pub fn value(item: PieceItem, f: &Facts) -> Option<Val> {
         } else {
             val0(Some(Glyph::Claude), Rgba::DIM, tr("Klid", "Idle").into())
         }),
-        PieceItem::Limit5h => share("5h", f.limit5h, f.limit5h.map(|p| capsule::ring_color(p, f.accent)).unwrap_or(f.accent)),
-        PieceItem::LimitWeek => share(tr("Týden", "Week"), f.limit7d, f.limit7d.map(|p| capsule::ring_color(p, f.accent)).unwrap_or(f.accent)),
+        PieceItem::Limit5h => share_limit("5h", f.limit5h, f.limit5h.map(|p| capsule::ring_color(p, f.accent)).unwrap_or(f.accent)),
+        PieceItem::LimitWeek => share_limit(tr("Týden", "Week"), f.limit7d, f.limit7d.map(|p| capsule::ring_color(p, f.accent)).unwrap_or(f.accent)),
         PieceItem::Music => f.music.as_ref().map(|m| Val { frac: m.progress, event: true, ..val0(Some(Glyph::Music), MUSIC, m.text.clone()) }),
         PieceItem::Timer => f.timer.as_ref().map(|t| Val {
             num: t.minutes.map(|m| m.to_string()),
@@ -474,10 +481,10 @@ pub fn is_active(item: PieceItem, f: &Facts) -> bool {
         PieceItem::Servers => f.servers > 0 || f.server_failed,
         PieceItem::Repos => f.repos > 0,
         PieceItem::Cpu => f.cpu.is_some_and(|p| p >= 50.0),
-        PieceItem::Memory => f.mem.is_some_and(|p| p >= 75.0),
+        PieceItem::Memory => f.mem.is_some_and(|p| p >= capsule::WARN_PCT),
         PieceItem::Gpu => f.gpu.is_some_and(|p| p >= 40.0),
-        PieceItem::Limit5h => f.limit5h.is_some_and(|p| p >= 70.0),
-        PieceItem::LimitWeek => f.limit7d.is_some_and(|p| p >= 70.0),
+        PieceItem::Limit5h => f.limit5h.is_some_and(|p| p >= capsule::WARN_PCT),
+        PieceItem::LimitWeek => f.limit7d.is_some_and(|p| p >= capsule::WARN_PCT),
         PieceItem::Battery => f.battery.is_some_and(|b| b.charging || b.percent <= 30),
         PieceItem::Time | PieceItem::Date | PieceItem::Weather => true,
     }
@@ -492,11 +499,28 @@ pub fn parts(p: Piece, f: &Facts) -> Vec<Part> {
     let out = parts_raw(&p, f);
     let out = match piece_color(&p.color, f) {
         Some(c) => recolor(out, c),
+        // `heat`: celý díl v barvě podle hodnoty (bez podílu nebo u druhu bez smyslu škály = beze změny, žádná vymyšlená barva)
+        None if p.color == "heat" => match value(p.item, f).and_then(|v| v.frac).and_then(|x| heat_pct(p.item, f, x as f64 * 100.0)) {
+            Some(h) => recolor(out, capsule::heat(h)),
+            None => out,
+        },
         None => out,
     };
     match piece_color(&p.ink, f) {
         Some(c) => ink(out, c),
         None => out,
+    }
+}
+
+/// Směr škály `heat` podle druhu hodnoty (N2, kolo 34): zátěž a limit = víc je hůř (hodnota se přenese); baterie
+/// opačně (nabitá zelená, vybitá červená, při nabíjení zelená); hudba, časovač a ostatní „průběhy“ nejsou zátěž → None
+/// (díl zůstane ve své barvě). Zrcadlo: `src/strip/compose.ts` `HEAT_ITEMS` (test čte řádek `HEAT-ITEMS` níž).
+// HEAT-ITEMS: cpu memory gpu limit5h limitWeek battery
+pub fn heat_pct(item: PieceItem, f: &Facts, pct: f64) -> Option<f64> {
+    match item {
+        PieceItem::Cpu | PieceItem::Memory | PieceItem::Gpu | PieceItem::Limit5h | PieceItem::LimitWeek => Some(pct),
+        PieceItem::Battery => f.battery.map(|b| if b.charging { 0.0 } else { 100.0 - pct }),
+        _ => None,
     }
 }
 
@@ -515,7 +539,7 @@ fn parts_raw(p: &Piece, f: &Facts) -> Vec<Part> {
     let Some(v) = value(p.item, f) else {
         // limit bez dat: prstenec / graf = prázdná dráha (žádné vymyšlené %), jinak nic
         return match p.style {
-            PieceStyle::Ring | PieceStyle::Ring5h if limit => vec![Part::Ring { fill: None, color: IDLE }],
+            PieceStyle::Ring | PieceStyle::Ring5h | PieceStyle::RingText if limit => vec![Part::Ring { fill: None, color: IDLE }],
             _ => vec![],
         };
     };
@@ -577,7 +601,7 @@ fn parts_raw(p: &Piece, f: &Facts) -> Vec<Part> {
             }
         }
         PieceStyle::DotPct => {
-            let rest = if claude { f.limit5h.map(pct) } else { Some(v.short.clone().unwrap_or_else(|| v.text.clone())) };
+            let rest = if claude { f.limit5h.map(pct_floor) } else { Some(v.short.clone().unwrap_or_else(|| v.text.clone())) };
             let mut out = vec![dot(&v)];
             out.extend(rest.filter(|t| !t.is_empty()).map(|t| word(t, if claude { Rgba::TEXT } else { v.color })));
             out
@@ -586,6 +610,15 @@ fn parts_raw(p: &Piece, f: &Facts) -> Vec<Part> {
             let color = if v.event { v.color } else { f.limit5h.map(|p| capsule::ring_color(p, f.accent)).unwrap_or(IDLE) };
             vec![Part::Ring { fill: f.limit5h.map(frac), color }]
         }
+        // prstenec + hodnota vedle; bez podílu spadne jako `Ring` na ikonu (limit bez dat řeší začátek funkce)
+        PieceStyle::RingText => match v.frac {
+            Some(x) => {
+                let short = v.short.clone().unwrap_or_else(|| v.text.clone());
+                let label = if p.item == PieceItem::LimitWeek { format!("7d {short}") } else { short };
+                vec![Part::Ring { fill: Some(x), color: v.color }, word(label, Rgba::TEXT)]
+            }
+            None => icon(&v, false),
+        },
         PieceStyle::Icon => icon(&v, false),
         PieceStyle::Badge => icon(&v, true),
         PieceStyle::Text => txt(&v),

@@ -17,6 +17,7 @@
 //!   `BUDGET`. Převod položek je čistá funkce `to_occ` (testy); COM vrstva jen čte hodnoty.
 
 use super::meeting::{self, RANK_DESCRIPTION, RANK_LOCATION};
+use super::people;
 use super::source::{Event, Window};
 use super::tz::{LocalTz, SystemLocal};
 use super::{MAX_LOCATION, MAX_OCCS, MAX_TITLE, Occ, clip, ms, naive};
@@ -30,6 +31,8 @@ const BUDGET: std::time::Duration = std::time::Duration::from_secs(8);
 const MAX_BODY: usize = 64 * 1024;
 /// `MeetingStatus`: olMeetingCanceled, olMeetingReceivedAndCanceled
 const CANCELLED: [i32; 2] = [5, 7];
+/// `ResponseStatus`: olResponseDeclined (odmítnutá pozvánka se nezobrazuje ani nepřipomíná)
+const RESPONSE_DECLINED: i32 = 4;
 /// `olFolderCalendar`
 const FOLDER_CALENDAR: i32 = 9;
 
@@ -62,13 +65,17 @@ pub struct RawItem {
     pub end_utc: Option<f64>,
     pub location: String,
     pub meeting_status: i32,
+    /// `ResponseStatus` (4 = odmítnuto)
+    pub response_status: i32,
     /// text pozvánky — jen při `IsTrusted`, jinak prázdný
     pub body: String,
+    /// `RequiredAttendees` + `OptionalAttendees` („Jan Novák; Eva Svobodová“) — jen při `IsTrusted`, jinak prázdné
+    pub attendees: String,
 }
 
 /// Položka → výskyt (stejný tvar jako z ICS). Zrušená / bez času = `None`.
 pub fn to_occ(r: &RawItem, local: &dyn LocalTz) -> Option<Occ> {
-    if CANCELLED.contains(&r.meeting_status) {
+    if CANCELLED.contains(&r.meeting_status) || r.response_status == RESPONSE_DECLINED {
         return None;
     }
     let mut join = None;
@@ -80,19 +87,20 @@ pub fn to_occ(r: &RawItem, local: &dyn LocalTz) -> Option<Occ> {
     let title = clip(&r.subject, MAX_TITLE);
     let location = clip(r.location.lines().find(|l| !l.trim().is_empty()).unwrap_or(""), MAX_LOCATION);
     let join = join.map(|(_, j)| j);
+    let people = people::Crowd::of(people::from_names(&r.attendees));
     if r.all_day {
         // celodenní: místní data (půlnoc jako UTC, stejně jako ICS), konec výlučně
         let s = naive_from_ole(r.start)?.date();
         let e = naive_from_ole(r.end).map(|t| t.date()).filter(|e| *e > s).unwrap_or(s + Duration::days(1));
         let mid = |d: NaiveDate| ms(d.and_time(NaiveTime::MIN));
-        return Some(Occ { start: mid(s), end: mid(e), all_day: true, title, location, tz_guess: false, join });
+        return Some(Occ { start: mid(s), end: mid(e), all_day: true, title, location, tz_guess: false, join, people });
     }
     let utc = |u: Option<f64>, l: f64| -> Option<NaiveDateTime> {
         u.and_then(naive_from_ole).or_else(|| naive_from_ole(l).map(|t| t - Duration::seconds(local.offset_local(t) as i64)))
     };
     let s = utc(r.start_utc, r.start)?;
     let e = utc(r.end_utc, r.end).filter(|e| *e >= s).unwrap_or(s);
-    Some(Occ { start: ms(s), end: ms(e), all_day: false, title, location, tz_guess: false, join })
+    Some(Occ { start: ms(s), end: ms(e), all_day: false, title, location, tz_guess: false, join, people })
 }
 
 /// Filtr `Items.Restrict`: položky, které okno aspoň částečně překrývají (data v místním formátu).
@@ -291,8 +299,11 @@ fn read_item(it: &com::Disp, trusted: bool) -> RawItem {
         end_utc: f("EndUTC"),
         location: s("Location"),
         meeting_status: it.get("MeetingStatus").ok().and_then(|v| v.i32()).unwrap_or(0),
+        response_status: it.get("ResponseStatus").ok().and_then(|v| v.i32()).unwrap_or(0),
         // Body hlídá ochrana objektového modelu — jen když Outlook volajícímu věří (bez výzvy)
         body: if trusted { s("Body") } else { String::new() },
+        // účastníky hlídá totéž (RequiredAttendees / OptionalAttendees) — jen jména, bez e-mailů a odpovědí
+        attendees: if trusted { [s("RequiredAttendees"), s("OptionalAttendees")].join(";") } else { String::new() },
     }
 }
 
@@ -388,6 +399,8 @@ mod tests {
             ("celodenní bez konce = jeden den", RawItem { all_day: true, start: ole(dt(2026, 10, 20, 0, 0)), end: -1.0, ..base.clone() }, Some((dt(2026, 10, 20, 0, 0), dt(2026, 10, 21, 0, 0), true, "Porada", "", None))),
             ("zrušená", RawItem { meeting_status: 5, ..base.clone() }, None),
             ("zrušená přijatá", RawItem { meeting_status: 7, ..base.clone() }, None),
+            ("odmítnutá pozvánka", RawItem { response_status: 4, ..base.clone() }, None),
+            ("přijatá pozvánka zůstává", RawItem { response_status: 3, ..base.clone() }, Some((dt(2026, 10, 19, 7, 0), dt(2026, 10, 19, 8, 0), false, "Porada", "", None))),
             ("bez začátku", RawItem { start: -1.0, start_utc: None, ..base.clone() }, None),
             ("konec před začátkem = nulová", RawItem { end_utc: Some(ole(dt(2026, 10, 19, 6, 0))), ..base.clone() }, Some((dt(2026, 10, 19, 7, 0), dt(2026, 10, 19, 7, 0), false, "Porada", "", None))),
             (
@@ -410,6 +423,16 @@ mod tests {
             let got = to_occ(&raw, &tz);
             let got = got.as_ref().map(|o| (naive(o.start), naive(o.end), o.all_day, o.title.as_str(), o.location.as_str(), o.join.as_ref().map(|j| j.provider)));
             assert_eq!(got, want, "{name}");
+        }
+    }
+
+    #[test]
+    fn attendees_only_when_trusted_names() {
+        let base = RawItem { subject: "Porada".into(), start: 46_314.375, end: 46_314.4, ..RawItem::default() };
+        // (RequiredAttendees; OptionalAttendees, počet jmen) — Outlook bez důvěry attendees nedá (prázdné) → žádné avatary
+        for (raw, want) in [("", 0), ("Jan Novák; Eva Svobodová;Pavel", 3), ("Jan Novák;;Jan Novák", 1)] {
+            let o = to_occ(&RawItem { attendees: raw.into(), ..base.clone() }, &SystemLocal).unwrap();
+            assert_eq!(o.people.list.len(), want, "{raw}");
         }
     }
 

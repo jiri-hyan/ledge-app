@@ -76,11 +76,17 @@ test("Claude: volba hrdiny — týden a útrata dnes", () => {
 });
 
 test("Počasí: teplota a dnešní rozsah", () => {
-  const w = (data, status = "ok") => ({ personal: { weather: { status, label: "Brno", data } } });
+  const w = (data, status = "ok", fetchedMs = NOW - 60_000) => ({ personal: { weather: { status, label: "Brno", data, fetchedMs } } });
   assert.deepEqual(heroFacts("weather", w({ temp: 12.6, min: 4.4, max: 15.5 }), NOW), {
     value: 13, digits: 0, unit: "°C", label: ["cards.hero.weather", "Venku"], sub: { text: ["cards.hero.minmax", "dnes {min}° až {max}°"], vars: { min: 4, max: 16 } },
   });
-  assert.equal(heroFacts("weather", w({ temp: -2, min: null, max: null }, "stale"), NOW).sub, undefined);
+  assert.equal(heroFacts("weather", w({ temp: -2, min: null, max: null }), NOW).sub, undefined);
+  // stará data (stale / ≥ 30 min) nesou značku, ≥ 3 h nebo bez času stažení nic
+  const old = { text: ["cards.hero.weatherOld", "stará data"] };
+  assert.deepEqual(heroFacts("weather", w({ temp: -2, min: 1, max: 2 }, "stale"), NOW).sub, old);
+  assert.deepEqual(heroFacts("weather", w({ temp: -2, min: 1, max: 2 }, "ok", NOW - 31 * 60_000), NOW).sub, old);
+  assert.equal(heroFacts("weather", w({ temp: -2, min: 1, max: 2 }, "ok", NOW - 3 * 3_600_000), NOW), null);
+  assert.equal(heroFacts("weather", w({ temp: -2, min: 1, max: 2 }, "ok", null), NOW), null);
   assert.equal(heroFacts("weather", w({ temp: NaN, min: null, max: null }), NOW), null);
 });
 

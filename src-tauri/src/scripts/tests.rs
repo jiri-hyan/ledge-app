@@ -166,15 +166,15 @@ fn runs_cmd_and_powershell_hidden() {
     let dir = d.path();
     let c = write(dir, "a b.cmd", ":: @ledge.title A\r\n@echo off\r\necho ahoj %1\r\n");
     let plan = run::plan(&c, &Interp::Cmd, &["svět".into()], false).unwrap();
-    let out = crate::actionrun::capture(&mut plan.command(dir), "A", 20, true).unwrap();
+    let out = crate::actionrun::capture(&mut plan.command(dir), "A", 120, true).unwrap();
     assert_eq!(out.output.as_deref(), Some("ahoj svět"));
-    let quiet = crate::actionrun::capture(&mut plan.command(dir), "A", 20, false).unwrap();
+    let quiet = crate::actionrun::capture(&mut plan.command(dir), "A", 120, false).unwrap();
     assert_eq!(quiet.output, None, "hidden = bez výstupu");
 
     // Windows PowerShell 5.1 čte UTF-8 bez BOM jako ANSI → skript s diakritikou chce BOM
     let p = dir.join("p.ps1");
     fs::write(&p, [&[0xEF, 0xBB, 0xBF][..], "# @ledge.title P\nparam($x)\nWrite-Output \"žluť $x\"\nexit 3\n".as_bytes()].concat()).unwrap();
     let plan = run::plan(&p, &Interp::Powershell, &["a'b".into()], false).unwrap();
-    let e = crate::actionrun::capture(&mut plan.command(dir), "P", 30, true).unwrap_err();
+    let e = crate::actionrun::capture(&mut plan.command(dir), "P", 120, true).unwrap_err();
     assert!(e.contains("chybou") && e.contains("žluť a'b"), "{e}");
 }

@@ -38,3 +38,11 @@ test("debounce: flush provede čekající volání hned, jinak nic; cancel ho za
   assert.equal(d.pending, false);
   mock.timers.reset();
 });
+
+test("minuteOf: dolů na celou minutu, stejná minuta = stejná hodnota", async () => {
+  const { minuteOf } = await import("./time.ts");
+  assert.equal(minuteOf(0), 0);
+  assert.equal(minuteOf(59_999), 0);
+  assert.equal(minuteOf(60_000), 60_000);
+  assert.equal(minuteOf(1_700_000_123_456), 1_700_000_100_000);
+});

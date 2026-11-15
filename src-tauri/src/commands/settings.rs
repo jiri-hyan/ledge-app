@@ -173,7 +173,7 @@ fn catalog_file_ok(path: &Path, meta: &std::fs::Metadata) -> Result<(), String> 
 #[tauri::command(async)]
 pub(crate) fn launcher_catalog_read(path: String) -> Result<serde_json::Value, String> {
     if !take_picked(&PICKED_JSON, Path::new(&path)) {
-        return Err(tr("Katalog vyber znovu v dialogu (Nastavení → Projekty → Z Launcheru…).", "Pick the catalog again in the dialog (Settings → Projects → From Launcher…).").into());
+        return Err(tr("Katalog vyber znovu v dialogu (Nastavení → Projekty, odkazy a akce → Z Launcheru…).", "Pick the catalog again in the dialog (Settings → Projects, links and actions → From Launcher…).").into());
     }
     read_catalog(Path::new(&path))
 }

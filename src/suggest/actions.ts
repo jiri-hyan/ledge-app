@@ -1,11 +1,15 @@
 // Akce chipů pruhu návrhů (s vedlejším účinkem — čistá logika je v `model.ts`): uložit adresu jako odkaz
 // (akce typu web v configu), adresu do poznámky a poznámku ze schůzky. Vše na výslovný klik.
 import { createSignal } from "solid-js";
-import { api } from "../api";
+import { api, type Snapshot } from "../api";
+import type { NotePreset } from "../notes/store";
+import { BRIEF_KIND } from "../notes/kinds";
+import { uptime } from "../format";
+import { devBriefBody } from "./devbrief";
 import { slugId } from "../actions/model";
 import { t } from "../i18n";
 import { say, sayError } from "../ui/toast";
-import { dismiss, hostOf, meetingNoteText, type Dismissed, type Meeting } from "./model";
+import { dismiss, hostOf, meetingNoteText, type Dismissed, type Meeting, type Suggestion } from "./model";
 
 /** Zavřené návrhy (klíč → do kdy), jen v paměti — po restartu Ledge se zeptá znovu. */
 const [dismissed, setDismissed] = createSignal<Dismissed>(new Map());
@@ -58,4 +62,40 @@ export async function meetingToNote(m: Pick<Meeting, "title" | "start">): Promis
     sayError(e);
     return false;
   }
+}
+
+/** Dev chyba → předvyplnění nového zadání (druh `zadani`, projekt, tělo z balíčku kontextu). Jen z toho, co Ledge ví
+ *  (proces, projekt + git); nic se neposílá — „Uložit a poslat“ je výslovný klik v editoru. null = proces už neběží. */
+export function devErrorPreset(s: Snapshot, c: Pick<Suggestion, "proc" | "url" | "detail">, now = Date.now()): NotePreset | null {
+  const proc = s.procs.find((x) => x.id === c.proc);
+  if (!proc) return null;
+  const proj = s.projects.find((x) => x.id === proc.id);
+  const body = devBriefBody(
+    {
+      project: proj?.name ?? proc.id,
+      url: c.url ?? null,
+      branch: proj?.git?.branch ?? null,
+      dirty: proj?.git ? proj.git.dirty : null,
+      cmd: proc.cmd ?? null,
+      uptime: uptime(proc.readyAt ?? proc.startedAt, now),
+      errors: proc.errors,
+      lines: proc.errorLines ?? [],
+    },
+    {
+      title: t("cards.suggest.devBrief.title", "Chyba dev serveru"),
+      project: t("cards.suggest.devBrief.project", "Projekt"),
+      url: t("cards.suggest.devBrief.url", "URL"),
+      branch: t("cards.suggest.devBrief.branch", "Větev"),
+      dirty: (n) => t("cards.suggest.devBrief.dirty", "{n} neuložených změn", { n }),
+      cmd: t("cards.suggest.devBrief.cmd", "Příkaz"),
+      uptime: t("cards.suggest.devBrief.uptime", "Běží"),
+      errors: t("cards.suggest.devBrief.errors", "Chyb ve výstupu"),
+      output: t("cards.suggest.devBrief.output", "Výstup"),
+      steps: t("cards.suggest.devBrief.steps", "Kroky"),
+      expected: t("cards.suggest.devBrief.expected", "Čekal jsem"),
+      happened: t("cards.suggest.devBrief.happened", "Stalo se"),
+      task: t("cards.suggest.devBrief.task", "Najít příčinu chyby a opravit ji"),
+    },
+  );
+  return { project: proj?.id ?? "", kind: BRIEF_KIND, body };
 }

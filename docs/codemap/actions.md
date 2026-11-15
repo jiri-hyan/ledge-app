@@ -1,6 +1,6 @@
 # Codemapa: rychlé akce a paleta příkazů
 
-Config `actions` → karta „Rychlé akce“, karta „Odkazy“ (akce, které jen otevírají), panel Nastavení „akce“ (Projekty, akce a odkazy) a paleta (`Ctrl+K` / 🔍). Formát pro agenty: [agents/actions.md](../agents/actions.md) → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
+Config `actions` → karta „Odkazy a akce“ (i akce, které jen otevírají; od kola 34 jediná karta, dřívější Odkazy sloučené), panel Nastavení „akce“ (Projekty, akce a odkazy) a paleta (`Ctrl+K` / 🔍). Formát pro agenty: [agents/actions.md](../agents/actions.md) → „Rychlé akce“. Cituj symbolem, ne číslem řádku.
 
 Detail (toky, invarianty, testy, co nečíst, historie): [actions-detail.md](actions-detail.md).
 
@@ -15,13 +15,13 @@ Detail (toky, invarianty, testy, co nečíst, historie): [actions-detail.md](act
 | `src-tauri/src/commands/actions.rs` | Tauri příkazy | `run_action` `action_icon` `action_icon_refresh` `action_consent` `action_check` |
 | `src-tauri/src/iconimg.rs` | + ikona souboru/složky ze shellu (48 px) | `shell_png` |
 | `src/actions/api.ts` | invoke, cache ikon podle `iconKey`, spuštění s potvrzením a výsledkem | `actionsApi`, `actionIconSrc`, `runAction`, `isBusy`, `lastResult` |
-| `src/actions/model.ts` | čistá logika UI | `slugId` `moveItem` `guessKind` `LINK_KINDS` `isLink` `onPage` `linkActions` |
+| `src/actions/model.ts` | čistá logika UI | `slugId` `moveItem` `guessKind` `LINK_KINDS` `isLink` `onPage` |
 | `src/actions/ui.tsx` | ikona/monogram, potvrzení v šuplíku, výstup příkazu | `ActionIcon` `askConfirm` `ConfirmAction` `answerConfirm` `confirmPending` `LastOutput` |
 | `src/ui/iconTone.ts` | tón ikony (čistá `toneOf` z pixelů, `measureTone` 1× na URL přes 16×16 canvas, `useTone`): tmavá/světlá kresba na průhledném → třída `tone-dark`/`tone-light` … | `toneOf`, `measureTone`, `useTone`, `Tone` |
 | `src/actions/ActionEditor.tsx` · `src/settings/panels/Actions.tsx` | editor akce · sekce „Akce a odkazy“ (jeden seznam, `SortList` tah + Alt+šipky, Vrátit) | `ActionEditor`, `kindLabel` · `ActionsPanel` |
-| `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku; `skipLinks` = na záložce s kartou Odkazy bez odkazů) | `ActionsCard` |
-| `src/cards/LinksCard.tsx` | karta Odkazy: `linkActions` záložky (favicon `ActionIcon`, klik `runAction`) + nepřevedené `personal.links` postaru (`openLink`) | `LinksCard` |
+| `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku; od kola 34 i odkazy a nepřevedené `personal.links` postaru, dřív karta Odkazy) | `ActionsCard` |
 | `src-tauri/src/linkmigrate.rs` | `personal.links` → akce při načtení configu a při `save_config` (idempotentní, co neprojde validací, zůstane odkazem) | `migrate`, `guess_kind` |
+| `src/palette/confirmkey.ts` | Enter v potvrzení: bez repeatu, po 400 ms | `confirmEnterOk` |
 | `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné + frecency (četnost × čerstvost, poločas 7 dní, `Usage` v `localStorage` `ledge.palette.usage`, strop bonusu 30 … | `fold` `score` `segments` `rank` `pushRecent` `frecency` `bumpUsage` `cleanUsage` |
 | `src/palette/notehits.ts` | poznámky nalezené podle OBSAHU (`note_search`, po 180 ms ticha od 2 znaků): úryvek jako druhý řádek poznámky v paletě, starší poznámky se přidají … | `mergeNoteHits`, `NoteHit` |
 | `src-tauri/src/scripts/mod.rs` | Script Commands: config `scripts`, složka (`resolve_dir_with`), sken bez watcheru (stat + jen změněné, strop 200, 1 MB), pohled pro UI, stav v paměti | `ScriptsConfig` `scan_dir` `load_one` `Scan` `Script` `fingerprint` `confirm_text` |
@@ -41,6 +41,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [actions-detail.md](act
 | `src/palette/compact.ts` | kompaktní paleta (`palette.compact`): co ukázat pod polem podle režimu a dotazu, šipky (rozbalit ↓ / sbalit ↑) | `shown`, `visible`, `arrow`, `Shown`, `Fold` |
 | `src-tauri/src/paletteconf.rs` | sekce configu `palette` → `Snapshot.palette_compact` (`paletteCompact`) | `PaletteConfig` |
 | `src/palette/timer.ts` | příkazy časovače: „Časovač N min“ z předvoleb, pauza / pokračovat / +5 min / zrušit podle stavu, stopky; přes `timer/TimerCard.timerDo` | `timerItems` |
+| `src/palette/typeto.ts` `live.ts` `media.ts` `meet.ts` `decide.ts` `tasks.ts` | psaní otevře paletu · hudba · Připojit · Povolit/Zamítnout · `x:` úkoly (detail) | `typeToPalette` `liveItems` |
 | `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems` `PItem` `Nav` `Palette` `lazyViews.tsx` `IconSearch` `icons.tsx` |
 | `src/types/actions.ts` | typy + `Snapshot.actions`/`scripts`/`paletteWinSettings` | `ActionCfg`, `ActionView`, `ScriptView`, `ScriptsListing`, `ActionOutcome` |
 

@@ -18,6 +18,9 @@ Fixture: jen smyšlená jména a `example.com`; v Tauri se demo nikdy nezapne (`
 | `src/showcase/stage.tsx` · `stage.css` | scéna: tapeta, proužek (`StripLookPreview`), iframe šuplíku / Studia; scény drawer · closed · open · studio · pair · strip | `Strip` `Drawer` `ClosedGallery` `OpenGallery` `PairScene` `StripScene` |
 | `scripts/showcase/stage.html` | vstup scény pro Vite (`/scripts/showcase/stage.html?scene=…`) | |
 | `scripts/showcase/shoot.mjs` | spustí Vite na volném portu, Edge (`channel: "msedge"`), nasnímá / nahraje vše ze `shots.mjs`, zabalí; `browser.close()` ve `finally` | |
+| `scripts/showcase/pw.mjs` | sdílený `loadPlaywright(root)` (shoot.mjs, qa.mjs) | `loadPlaywright` |
+| `scripts/qa.mjs` | QA před vydáním (L295, L296): izolovaná instance (`LEDGE_ISOLATED`, `LEDGE_CDP_PORT`) v sandboxu, CDP + `/status.qa`, zpráva PASS/FAIL/SKIP; `node scripts/qa.mjs [--only] [--list] [--keep]`, kód 0/1/2 (2 i při WebView2 s `--user-data-dir` mimo sandbox, `checkDataDir`) | |
+| `scripts/qa/lib.mjs` · `scenarios.mjs` · `run.mjs` · `migrace.mjs` · `upgrade.mjs` | čisté funkce (`rawKeys`, fixture, verdikt, zpráva) · scénáře `supik` `listky-l260` `kit` `hudba` `nastaveni` + `konzole` · I/O (pojistky, sandbox, start, API, CDP; `ticho.ps1` `hraje.ps1`; `upgrade` = 2 binárky po sobě, `--old-exe`); test `scripts/qa.test.mjs` | `rawKeys` `checkField` `settleStep` `dataDirVerdict` `RUNNERS` `makeSandbox` |
 | `scripts/showcase/shots.mjs` | seznam snímků a GIFů (`SHOTS`): scéna, velikost, cíl v `docs/screenshots`, `docs/media`, `site/img`, `site/media` | `SHOTS` |
 | `scripts/showcase/pack.py` | komprese: PNG (paleta), WebP, GIF z framů (ffmpeg od Playwrightu GIF neumí), Pillow | |
 | `src/api.ts` | `emitDemo` — sběrnice událostí jen pro demo (mimo Tauri; `on` na ni poslouchá jen s demo hostitelem) | `emitDemo` `setDemoHost` |

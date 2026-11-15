@@ -79,8 +79,7 @@ pub(crate) fn load(dir: &Path) -> bool {
 pub(crate) fn save(dir: &Path, on: bool) -> std::io::Result<()> {
     let p = path_in(dir);
     if on {
-        std::fs::create_dir_all(dir)?;
-        std::fs::write(p, b"{\n  \"on\": true\n}\n")
+        crate::fsx::write_atomic_dir(&p, b"{\n  \"on\": true\n}\n")
     } else {
         match std::fs::remove_file(p) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
@@ -99,12 +98,13 @@ pub(crate) fn set(on: bool) {
     if let Err(e) = save(&crate::config::config_dir(), on) {
         log(&format!("herní režim: stav nejde uložit: {e}"));
     }
-    if on {
+    if on && crate::hovermode::closes(c.drawer.opener(), crate::hovermode::CloseCause::GameMode) {
         c.send_ui(UiCmd::Hide);
     }
     crate::stripview::refresh_strip();
     crate::pins::win::sync_dead();
     crate::desk::win::sync_yield();
+    crate::ext::on_dead_changed();
     // vypnutí → emit vlákno dožene peek připomínek a stav
     mark_dirty();
 }

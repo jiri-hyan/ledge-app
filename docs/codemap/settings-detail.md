@@ -4,11 +4,11 @@
 
 Nastavení zůstává v **rozšířeném šuplíku** (ne samostatné okno): žádná nová oprávnění ani další WebView (paměť),
 sdílený rozpracovaný config i skoky z karet beze změny; větší (`widen.ts` `SETTINGS_WIDE` 1280, výška pevná
-`min(860px, strop − hlavička)` v `settings.css` `.st`). Navigace = **sekce** (`settings/structure.ts` `SECTIONS`:
+`min(860px, strop − hlavička)` v `settings.css` `.st`). Navigace = **sekce** (dřív `structure.ts`, ten zanikl; dnes plochý `PANEL_META` a části Studia v `studio/parts.ts`; starší popis:
 Doporučené · Vzhled · Šuplík a karty · Claude · Projekty a akce · Poznámky a lístky · Na ploše · Aplikace),
 sekce s víc stránkami je rozbalí pod sebou (Šuplík a karty = Záložky a karty · Otevírání a klávesy · Obsah karet;
 Aplikace = Jazyk a průvodce · Spouštění a hry · Záloha a verze). Stránka = panel z registru (níž). **Navštívené stránky žijí dál
-skryté** (`Settings.tsx` `visited` + `hidden`, čistá `structure.ts` `withVisited`) — přepnutí nic nezničí ani
+skryté** (`Settings.tsx` `visited` + `hidden`, čistý `withVisited`) — přepnutí nic nezničí ani
 znovu nenačte, posuv každé stránky se pamatuje. Přepínač **Základní / Pokročilé** (`settings/mode.ts`,
 localStorage `ledge.settings.mode`): v Základním jsou oddíly „Pokročilé“ (`fields/Advanced.tsx`, `panels/apUi.tsx`
 `Advanced`, atribut `data-adv`) skryté úplně, kromě `basic` oddílů a oddílu, na který vedl skok; pod stránkou
@@ -25,7 +25,9 @@ guard `placement.test.mjs` (každý klíč z Rust struktur má místo, nebo `NO_
 Čti tohle místo celých souborů. Cituj symbolem, ne číslem řádku. Sekce jiných oblastí (Vzhled, akce,
 otázky Clauda, rozložení, schránka, přehrávač, kalendář) jen skládají panely — jejich mapy jsou u nich.
 
-## Stránky (panely; id v `registry.ts` `PANEL_META`, komponenta v `catalog.ts` `COMPONENTS`, sekce v `structure.ts`)
+**Rozpočet složitosti:** počet voleb = záznamů `FIELDS` v `labels.ts` (180, práh `MAX_FIELDS` 181 v `placement.test.mjs`; nová volba shodí test). **Cesty v hláškách:** `settingsPath` + `path.test.mjs` (stará jména „Šuplík a karty“, „Útrata“, „Osobní“ test odmítne).
+
+## Stránky (panely; id v `registry.ts` `PANEL_META`, komponenta v `catalog.ts` `COMPONENTS`)
 
 | id | stránka | skládá (soubory) |
 |---|---|---|
@@ -33,7 +35,7 @@ otázky Clauda, rozložení, schránka, přehrávač, kalendář) jen skládají
 | `zaciname` | Jazyk a průvodce (dřív Začínáme) | `panels/Start.tsx` — jazyk (`ui.lang`, první řádek), „Spustit průvodce znovu“ (`onboarding.wizard` → `startWizard`), „Upravit šuplík“, klávesy a gesta; tipy a novinky jsou jen v Doporučených |
 | `spousteni` | Spouštění a hry (kolo 21; dřív konec Chování) | `panels/Startup.tsx` — `autostart` + `pkgctx/BubbleNotice.tsx`, „Šetřit paměť“ (`drawer.keepWarmS`), hry přes celou obrazovku, herní režim (zkratka herního režimu zůstává v Otevírání a klávesy) |
 | `suplik` | Záložky a karty | `panels/Drawer.tsx` → `layout/LayoutEditor.tsx` (záložky, karty, části karet, „Upravit přímo v šuplíku“), přihrádka |
-| `vzhled` | Vzhled | `panels/Appearance.tsx` (4 kroky) → `AppearanceClosed.tsx` (+ `StripSettings.tsx` „Co proužek ukazuje“ v Základním; v Pokročilé tvar, linka, krytí), `AppearanceHover.tsx` (v Pokročilé `drawer.hoverExpandMs`), `AppearanceOpen.tsx` (+ `AppearanceStyles`, `AppearanceLayout`), `AppearanceMotion.tsx`; náhledy `settings/previews/*` — mapa [appearance.md](appearance.md) |
+| `vzhled` | Vzhled | `panels/Appearance.tsx` (4 kroky) → `AppearanceClosed.tsx` (+ `StripSettings.tsx` „Co proužek ukazuje“ v Základním; v Pokročilé tvar, linka, krytí), `AppearanceHover.tsx` (u docku výběr karet středního panelu `drawer.dockCards`, v Pokročilé `drawer.hoverExpandMs`), `AppearanceOpen.tsx` (+ `AppearanceStyles`, `AppearanceLayout`), `AppearanceMotion.tsx`; náhledy `settings/previews/*` — mapa [appearance.md](appearance.md) |
 | `akce` | Projekty, akce a odkazy | `panels/ProjectsActions.tsx` — skupiny (`Group`): Projekty (`Projects.tsx`, hlavička s přidáním; +`ProjectEditor` = `panels/ProjectEditor.tsx`; tlačítko Z Launcheru… = `settings/launcherImport.ts`) a Odkazy a akce (`Actions.tsx`; jeden seznam, odkaz = akce, `SortList`) otevřené; sbalené Upozornění na neuloženou práci (`GitAlerts`: `gitAlerts.enabled`, ztišená repa s Odztišit) a Složky s repy (`Roots`); `LegacyLinks.tsx` (jen nepřevedené `personal.links`); v **Pokročilé**: `actions/ScriptsSettings.tsx` + `widgets/WidgetsSettings.tsx` |
 | `claude` | Claude | `panels/Claude.tsx` (`HooksSetup`, sekce „API klíč pro zadání“ = `panels/ApiKey.tsx` → `apikey_set` / `apikey_status` / `apikey_clear`, klíč jen ve Správci pověření, ACL i ve `studio.json`; port `claude.port` v **Pokročilé**) + `../mcp/McpSettings.tsx` (Claude (MCP), přepínač hned; Claude Desktop, záloha přes http a výměna klíče v inline **Pokročilé** — [mcp.md](mcp.md)) + `panels/Questions.tsx` (otázky Clauda, `claude.questionHoldS`) |
 | `osobni` | Obsah karet (dřív Osobní) | `panels/Personal.tsx`: PO KARTÁCH — skupina (`Group`) na kartu, nahoře karty z rozložení (otevřené), pak ostatní karty a funkce bez karty (sbalené; `personalModel.ts` `splitPersonal`); Počasí s polem Město (`panels/CityPicker.tsx` → `geoApi.ts` → Rust `geo_search`, logika `cityModel.ts`; souřadnice v **Pokročilé**) + `calendar/CalendarSettings` (ICS první), pod ním **Pokročilé: připojit účet Microsoft / Google** = `accounts/AccountsSettings` ([accounts.md](accounts.md)), `media/MediaSettings`, časovač, `cliphist/ClipSettings` (jen řádky, nadpis dává skupina), `integrations/IntegrationsSettings` (GitHub, Systém — [integrations.md](integrations.md)) |
@@ -53,6 +55,7 @@ staré názvy jsou v `kw` (hledání je najde).
 | `src/settings/widthOverride.ts` · `src/ConfigNotice.tsx` | co přebíjí předvolbu šířky (notch / tažení; zrcadlo `sized_width`) + test `widthOverride.test.mjs` · banner kopie rozbitého configu (Obnovit) a varování o rozsazích | `widthOverride` `clearDragWidth` `ConfigNotice` |
 | `src/settings/searchModel.ts` | chytré hledání: synonyma cs/en, klíč configu (i camelCase část), překlep ≤ 1 od 5 znaků, položky jen pro klíč — test `searchModel.test.mjs` | `smartSearch` `SYNONYMS` `synonymsOf` `keyWords` `nearlyEqual` |
 | `src/settings/ctx.ts` | rozpracovaný config (store na úrovni modulu), `base`, chyba, hit, Vrátit, úkoly po uložení, kontext pro pole | `cfg` `loadBase` `adoptBase` (změna zvenku sloučená s draftem, `mcp/merge.ts`) `discard` `setCfg` `makeCtx` `useSettings` `offerUndo` `afterSave` `runAfterSave` `dirty` `active` |
+| `src/settings/path.ts` | `settingsPath("osobni", "calendars")` → „Nastavení → Obsah karet → Kalendáře“ (cs/en z `PANEL_META` + `SECTIONS`); do hlášek místo literálu — guard `path.test.mjs` (každé „Nastavení → …“ v `src` i Rustu míří na existující stránku / sekci; neznámé = soubor:řádek) | `settingsPath` `SECTIONS` |
 | `src/settings/registry.ts` · `catalog.ts` · `labels.ts` | stránky bez komponent (názvy, kw — čte i paleta) a staré id · stránky s komponentami + položky hledání (volby s klíčem a štítkem Pokročilé, prefixy klíčů) · popisky voleb (JEDINÝ zdroj pro `Row` i hledání; i volby panelu Vzhled), texty datových párů | `PANEL_META` `PANEL_ALIASES` · `PANELS` `searchItems` · `FIELDS` `fieldLabel` `fieldHint` `fieldKw` `fieldCs` `fieldAnchor` `tr` |
 | `src/settings/en.ts` · `panels/en.ts` | angličtina (`registerDict`, líně načítá `src/i18n/dicts.ts`): skořápka, nav, volby `settings.f.<id>`/`.hint`/`.kw`, sekce configu · texty panelů (vč. `appearance.*`, `actions.panel.*`, `questions.panel.*`); Průvodce má `settings.welcome.*` v `onboarding/en.ts` | |
 | `src/settings/model.ts` | čistá logika: hledání bez diakritiky (`search` = prosté, skořápka používá `searchModel.smartSearch`), cesty, chyba→stránka (`placement.ts`: `drawer` → Otevírání, `drawer.glass`/`drawer.width`/`strip` → Vzhled, `personal.links` → akce, `desk` → Na ploše), skok odjinud (`resolveTarget`: id panelu / staré id / kotva `f-<pole>`), přesuny, zkratky, porovnání | `search` `highlight` `panelForField` `resolveTarget` `moveItem` `dropIndex` `normalizeHotkey` `hotkeyFromEvent` `hotkeyCollisions` `canon` `cleanDraft` `inRoots` `relativeTo` |
@@ -126,7 +129,7 @@ staré názvy jsou v `kw` (hledání je najde).
 - HTML5 drag&drop v okně Tauri nefunguje (chytá ho přetahování souborů) → `SortList` přes pointer.
 - **Každá volba na jednom místě.** Vzhled šuplíku (pozadí/akryl `drawer.glass`, šířka `drawer.width`,
   animace `appearance.motion`) a CELÝ proužek (styl, pozice, krytí, položky, barvy, vlastní text, monitor)
-  jsou JEN v panelu Vzhled (i `drawer.hoverExpandMs`, krok Po najetí → Pokročilé); otevírání (spouštěč,
+  jsou JEN v panelu Vzhled (i `drawer.hoverExpandMs`, krok Po najetí → Pokročilé, a `drawer.dockCards` = karty středního panelu docku, krok Po najetí); otevírání (spouštěč,
   prodlevy, zkratky, paleta, `drawer.barWindows`) JEN v Otevírání a klávesy; autostart, `drawer.keepWarmS`,
   hry a herní režim JEN v Aplikace → Spouštění a hry. „Šetřit paměť“ = `drawer.keepWarmS` (uvolnění paměti
   WebView), ne animace. Odkazy = akce (jeden seznam, `actions/model.ts` `isLink`); `personal.links` jen

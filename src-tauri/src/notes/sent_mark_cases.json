@@ -1,0 +1,61 @@
+{
+  "_doc": "Značka odeslaného bodu `SENT_MARK = \"↳ [\"`: Rust (`connector/tests.rs`) i TS (`src/notes/taskline.test.mjs`) čtou tutéž tabulku. marked = řádky (po ořezu), které značku mají; plain = které ne; bodies = tělo poznámky a `sent` pro každý otevřený bod v pořadí.",
+  "marked": [
+    "↳ [Demo](https://example.test/x)",
+    "↳ [Úkol] t1",
+    "↳ [Cokoli](https://example.test/?tab=tasks&task=a)",
+    "↳ [",
+    "↳ [Demo]",
+    "↳ [](u)"
+  ],
+  "plain": [
+    "↳ text",
+    "[x]",
+    "↳",
+    "",
+    "- [ ] ↳ [Demo]",
+    "text ↳ [Demo]",
+    "↳[Demo]",
+    "📤"
+  ],
+  "bodies": [
+    {
+      "body": "- [ ] A\n  ↳ [Demo](https://example.test/x)\n- [ ] B\n",
+      "sent": [
+        true,
+        false
+      ]
+    },
+    {
+      "body": "- [ ] A\n  ![s](./a.png)\n  ↳ [Demo] t1\n",
+      "sent": [
+        true
+      ]
+    },
+    {
+      "body": "- [ ] A\n  ↳ [Úkol]\n",
+      "sent": [
+        true
+      ]
+    },
+    {
+      "body": "- [ ] A\n\n  ↳ [Demo](https://example.test/x)\n",
+      "sent": [
+        false
+      ]
+    },
+    {
+      "body": "- [ ] A\n  ↳ text\n- [ ] B\n  [x] odkaz\n",
+      "sent": [
+        false,
+        false
+      ]
+    },
+    {
+      "body": "1. [ ] A\n   ↳ [Demo](https://example.test/x)\n",
+      "sent": [
+        true
+      ]
+    }
+  ]
+}

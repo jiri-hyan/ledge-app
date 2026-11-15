@@ -164,7 +164,11 @@ pub(crate) fn refresh_strip() {
         }
         parts.push((item.clone(), segs));
     }
-    let look = &cfg.appearance;
+    // „Podle Windows“: motiv / akcent podle stavu Windows (jinak přímo uložený vzhled, bez kopie)
+    crate::winlook::sync(cfg.appearance.auto.watching());
+    let win = if cfg.appearance.auto.watching() { crate::winlook::current() } else { Default::default() };
+    let look_eff = crate::appearance::auto::resolve(&cfg.appearance, &win);
+    let look = &*look_eff;
     let palette = crate::appearance::pages::palette_for(look);
     let accent = geom::parse_hex(&look.accent).unwrap_or(palette.accent[0]);
     let mut segs = stripconf::compose(parts, &cfg.strip, ambient.is_some() || due_count > 0, |c| geom::readable(c.base(accent), &palette));
@@ -181,7 +185,7 @@ pub(crate) fn refresh_strip() {
         segs.insert(at, seg(text.clone(), Rgba::BLUE, Some(Rgba::BLUE), true, true));
     }
     // mrtvý Ledge (fullscreen hra nebo herní režim) = proužek pryč
-    let dead = c.dead();
+    let dead = c.dead_surface();
     let drawer_open = c.drawer.view() != View::Hidden;
     // nad taby prohlížeče proužek ustoupí na tenkou linku, dokud nepřijde událost
     let retreat = c.bar_window.load(Ordering::Relaxed) && ambient.is_none();
@@ -217,6 +221,16 @@ pub(crate) fn refresh_strip() {
     let pulse = attention::pulse();
     // Notch (`notify`): smí vyjet i z proužku skrytého v klidu, ne však přes šuplík, ve hře ani vypnutý
     let stage = !dead && !drawer_open && (cfg.strip.enabled || ambient.is_some());
+    // tečky na dalších monitorech (`strip.monitor = all`, `stripset`): monitory z cache (mimo `all` bez volání OS), osa podle monitoru
+    let dots: Vec<_> = crate::stripset::secondary_monitors(&cfg.strip.monitor)
+        .into_iter()
+        .map(|m| (m, geom::axis2_for(&cfg, m.rect.left, m.rect.right, m.dpi)))
+        .collect();
+    let dot_view = crate::stripset::DotView {
+        visible: !dead && (cfg.strip.enabled || ambient.is_some()),
+        line_only: !cfg.strip.enabled,
+        metrics: geom::strip_metrics(crate::appearance::StripStyle::Dot, look.strip.size),
+    };
     drop(cfg);
     let missed = crate::notify::stage(stage, drawer_open);
     if wants_battery {
@@ -245,6 +259,9 @@ pub(crate) fn refresh_strip() {
         m.missed = missed;
         m.fx_calm = fx_calm;
     });
+    // vedlejší proužky: vznik / zánik podle monitorů, nový model (překreslí se jen při změně); bez `all` jen no-op
+    let main = c.strip.model.lock().clone();
+    crate::stripset::apply(&main, &dots, &dot_view);
 }
 
 /// Co se děje — pro styly zavřeného Ledge (`looks::Facts`). Jen paměť jádra, jako zbytek `refresh_strip`.

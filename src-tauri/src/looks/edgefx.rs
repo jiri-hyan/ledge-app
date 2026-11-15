@@ -18,8 +18,8 @@ pub const LIGHT_PX: f32 = 14.0;
 pub const SWEEP_MS: u64 = 1200;
 /// Jak dlouho hraje „Vyzkoušet“ z editoru (ms).
 pub const TRY_MS: u64 = 4000;
-/// Od kolika % limitu (5h nebo týden) je stav „limit“.
-pub const LIMIT_AT: f64 = 80.0;
+/// Od kolika % limitu (5h nebo týden) je stav „limit“ — jedna tabulka prahů (`capsule::WARN_PCT`).
+pub const LIMIT_AT: f64 = super::capsule::WARN_PCT;
 
 /// Stav Clauda pro živou hranu (pořadí priority: čeká > hotovo > limit > pracuje > klid).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -58,7 +58,7 @@ pub struct EdgeLive {
     pub work: Edge,
     pub wait: Edge,
     pub done: Edge,
-    // limit 5h nebo týdne od 80 %
+    // limit 5h nebo týdne od `LIMIT_AT` (jantar limitu)
     pub limit: Edge,
 }
 
@@ -338,8 +338,8 @@ mod tests {
             (1, 1, 0, Some(90.0), LiveState::Wait, true),
             (0, 1, 1, None, LiveState::Done, true),
             (0, 1, 0, Some(85.0), LiveState::Limit, true),
-            (0, 0, 0, Some(80.0), LiveState::Limit, false),
-            (0, 0, 0, Some(79.9), LiveState::Idle, false),
+            (0, 0, 0, Some(75.0), LiveState::Limit, false),
+            (0, 0, 0, Some(74.9), LiveState::Idle, false),
         ] {
             let (st, frac, b) = live_state(&facts(w, k, d, l));
             assert_eq!((st, b), (want, busy), "{w} {k} {d} {l:?}");

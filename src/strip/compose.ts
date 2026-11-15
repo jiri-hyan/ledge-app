@@ -10,10 +10,11 @@ export type ComposeShape = (typeof COMPOSE_SHAPES)[number];
 /** Jen položky se skutečným zdrojem v Rustu (`looks::Facts`). */
 export const COMPOSE_ITEMS = ["time", "date", "claude", "limit5h", "limitWeek", "music", "timer", "cpu", "memory", "gpu", "battery", "weather", "servers", "repos", "activity"] as const;
 export type ComposeItem = (typeof COMPOSE_ITEMS)[number];
-export const ITEM_STYLES = ["icon", "badge", "text", "ring", "graph", "dot", "iconText", "bar", "spark", "chip", "dotPct", "ring5h"] as const;
+export const ITEM_STYLES = ["icon", "badge", "text", "ring", "graph", "dot", "iconText", "bar", "spark", "chip", "dotPct", "ring5h", "ringText"] as const;
 export type ItemStyle = (typeof ITEM_STYLES)[number];
 // hrana a její živé efekty (kolo 28) žijí v `edgefx.ts`
 import { DEFAULT_DECO, DEFAULT_LIVE, type ComposeDeco, normDeco } from "./edgefx.ts";
+import { clampInt } from "../pad.ts";
 export { COMPOSE_EDGES, EDGE_LENS, DEFAULT_DECO, edgeColor, type ComposeEdge, type ComposeDeco } from "./edgefx.ts";
 export const FILL_KINDS = ["black", "glass", "tint", "gradient", "none"] as const;
 export type FillKind = (typeof FILL_KINDS)[number];
@@ -72,16 +73,16 @@ const isHex = (s: unknown): s is string => typeof s === "string" && /^#[0-9a-fA-
 const hex = (s: unknown) => (isHex(s) ? s.trim().toLowerCase() : "");
 /** Barva dílu jako Rust `norm_piece_color`: "" (podle hodnoty) | accent | #rrggbb. */
 export const pieceColor = (s: unknown) => (typeof s === "string" && s.trim().toLowerCase() === "accent" ? "accent" : hex(s));
+/** Barva celého dílu = `pieceColor` + `heat` (zelená → červená podle hodnoty); Rust `norm_piece_tint`. Podklad a text `heat` neumí. */
+export const tintColor = (s: unknown) => (typeof s === "string" && s.trim().toLowerCase() === "heat" ? "heat" : pieceColor(s));
+/** Položky, u kterých dává „podle hodnoty“ smysl (zátěž a limit: víc = hůř; baterie opačně). Zrcadlo Rust `compose::heat_pct`. */
+export const HEAT_ITEMS: readonly string[] = ["cpu", "memory", "gpu", "limit5h", "limitWeek", "battery"];
 export const H_MIN = 18;
 export const H_MAX = 52;
 export const LINE_H_MIN = 2;
 export const LINE_H_MAX = 10;
 
 export const hRange = (shape: ComposeShape): [number, number] => (shape === "line" ? [LINE_H_MIN, LINE_H_MAX] : [H_MIN, H_MAX]);
-const clamp = (v: unknown, a: number, b: number, d: number) => {
-  const n = typeof v === "number" && Number.isFinite(v) ? Math.round(v) : d;
-  return Math.min(b, Math.max(a, n));
-};
 
 /** „claude:icon“ / „time:chip:#ff8800“ → položka (styl chybí = ikona, barva chybí = podle hodnoty). */
 function mkPiece(s: string): Piece {
@@ -110,7 +111,7 @@ const PRESETS: Record<string, StripCompose> = {
   ticker: mk("island", 230, 28, 100, [], ["claude:text", "limit5h:text", "music:text", "timer:text"], [], { rotate: true }),
   minimum: mk("capsule", 112, 26, 100, ["battery:icon"], [], ["time:text"]),
   trio: mk("capsule", 280, 32, 60, ["weather:text"], ["time:text"], ["cpu:text"]),
-  rings: mk("capsule", 250, 36, 60, ["limit5h:ring"], ["time:text"], ["limitWeek:ring"]),
+  rings: mk("capsule", 330, 36, 60, ["limit5h:ringText:heat"], ["time:text"], ["limitWeek:ringText:heat"]),
 };
 
 /** Přidá dílům vlastní vzhled (`size` / `bg` / `ink`) podle položky — jen pro zápis předvoleb. */
@@ -187,7 +188,7 @@ export function normCompose(raw: unknown): StripCompose {
       seen.add(item);
       const st = (p as Piece).style;
       const x: Piece = { item, style: ITEM_STYLES.includes(st) ? st : "icon" };
-      const col = pieceColor((p as Piece).color);
+      const col = tintColor((p as Piece).color);
       if (col) x.color = col;
       const sz = (p as Piece).size;
       if (sz === "small" || sz === "large") x.size = sz;
@@ -209,9 +210,9 @@ export function normCompose(raw: unknown): StripCompose {
   if (!left.length && !center.length && !right.length) center.push({ item: "claude", style: "icon" });
   return {
     shape,
-    width: clamp(r.width, W_MIN, W_MAX, d.width),
-    height: clamp(r.height, h0, h1, d.height),
-    round: clamp(r.round, 0, 100, d.round),
+    width: clampInt(r.width, W_MIN, W_MAX, d.width),
+    height: clampInt(r.height, h0, h1, d.height),
+    round: clampInt(r.round, 0, 100, d.round),
     left,
     center,
     right,
@@ -265,12 +266,12 @@ const ITEM_ALLOWED_STYLES: Record<ComposeItem, readonly ItemStyle[]> = {
   activity: ["icon", "badge", "text", "dot", "iconText", "chip"],
   servers: ["icon", "badge", "text", "dot", "iconText", "chip"],
   repos: ["icon", "badge", "text", "dot", "iconText", "chip"],
-  cpu: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "spark", "chip"],
-  memory: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "spark", "chip"],
-  gpu: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "spark", "chip"],
-  limit5h: ["text", "ring", "graph", "dot", "bar", "chip"],
-  limitWeek: ["text", "ring", "graph", "dot", "bar", "chip"],
-  battery: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "chip"],
+  cpu: ["icon", "badge", "text", "ring", "ringText", "graph", "iconText", "bar", "spark", "chip"],
+  memory: ["icon", "badge", "text", "ring", "ringText", "graph", "iconText", "bar", "spark", "chip"],
+  gpu: ["icon", "badge", "text", "ring", "ringText", "graph", "iconText", "bar", "spark", "chip"],
+  limit5h: ["text", "ring", "ringText", "graph", "dot", "bar", "chip"],
+  limitWeek: ["text", "ring", "ringText", "graph", "dot", "bar", "chip"],
+  battery: ["icon", "badge", "text", "ring", "ringText", "graph", "iconText", "bar", "chip"],
   timer: ["icon", "badge", "text", "ring", "graph", "iconText", "bar", "chip"],
   music: ["icon", "text", "graph", "dot", "iconText", "bar", "chip"],
 };
@@ -280,7 +281,7 @@ export function stylesFor(item: ComposeItem): ItemStyle[] {
 }
 export function setPieceColor(c: StripCompose, item: ComposeItem, color: string): StripCompose {
   const x = clone(c);
-  const col = pieceColor(color);
+  const col = tintColor(color);
   for (const s of SLOTS)
     x[s] = x[s].map((p) => {
       if (p.item !== item) return p;
@@ -343,10 +344,11 @@ export function shiftPiece(c: StripCompose, item: ComposeItem, dir: -1 | 1): Str
 
 /** Co se skutečně nakreslí: prstenec / graf bez podílu spadne na ikonu (jen Claude má prázdný prstenec; aktivita je odhad, podíl nemá).
  *  Zrcadlí Rust `compose::parts`. */
-export type DrawKind = "icon" | "badge" | "text" | "dot" | "ring" | "meter" | "iconText" | "under" | "spark" | "dotPct";
+export type DrawKind = "icon" | "badge" | "text" | "dot" | "ring" | "meter" | "iconText" | "under" | "spark" | "dotPct" | "ringText";
 export function drawKind(item: ComposeItem, style: ItemStyle, hasFrac: boolean): DrawKind {
   if (style === "ring") return hasFrac || item === "claude" ? "ring" : "icon";
   if (style === "ring5h") return item === "claude" || hasFrac ? "ring" : "icon";
+  if (style === "ringText") return hasFrac ? "ringText" : "icon";
   if (style === "graph") return hasFrac ? "meter" : "icon";
   if (style === "chip") return "iconText";
   if (style === "bar") return hasFrac ? "under" : "text";

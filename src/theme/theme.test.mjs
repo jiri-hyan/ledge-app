@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { THEMES, THEME_IDS, COLOR_KEYS } from "./themes.ts";
 import { textProblems } from "./contrast.ts";
+import PAL from "./palettes.json" with { type: "json" };
 import {
   DEFAULT_APPEARANCE, accentPair, appearanceVars, effectiveMotion, hexToHsl, normalizeAppearance, springPreset, stripShape,
 } from "./appearance.ts";
@@ -24,6 +25,20 @@ test("motiv dark = tokeny ze styles.css (výchozí vzhled se nezmění)", () => 
     assert.equal(THEMES.dark.vars[k], v, `--${k}`);
   }
   assert.equal(THEMES.dark.vars.focus, cssVar("blue"));
+});
+
+test("palettes.json = jediný zdroj barev: každý motiv má řádek, tón a akcent z něj, proužek je úplný", () => {
+  assert.deepEqual(Object.keys(PAL).sort(), [...THEME_IDS].sort());
+  for (const id of THEME_IDS) {
+    const p = PAL[id];
+    assert.equal(THEMES[id].light, p.light, id);
+    assert.equal(THEMES[id].vars.accent, p.accent[0], id);
+    assert.equal(THEMES[id].vars["accent-2"], p.accent[1], id);
+    assert.ok(p.accent.length >= 2 && p.accent.every((c) => /^#[0-9a-f]{6}$/.test(c)), `${id}: akcent`);
+    for (const [k, n] of [["top", 3], ["bottom", 3], ["edge", 4], ["edgeHot", 4]]) {
+      assert.ok(p[k].length === n && p[k].every((x) => x >= 0 && x <= 1), `${id}: ${k}`);
+    }
+  }
 });
 
 test("každý motiv má všechny barevné klíče", () => {
@@ -290,4 +305,77 @@ test("výkon (software render WebView2): bloky stylů ve styles.css bez filtru, 
   // přechod barev při přepnutí záložky: jen barvy, nikdy transform / filtr, a jen po dobu atributu
   const shift = css.match(/html\[data-look-shift\][^{]*\{[^}]*\}/)[0];
   assert.ok(/background-color[^;]*border-color[^;]*color/.test(shift) && !/transform|filter|box-shadow/.test(shift), shift);
+});
+
+// ---------- tabulka kontrastu WCAG pro VŠECHNY motivy (kolo 34) ----------
+// text (t1–t3) na pozadí i na `raised` ≥ 4.5:1, oba akcenty na pozadí ≥ 3:1 (grafický prvek); palety kola 34
+// mají navíc oba akcenty ≥ 4.5:1 (mohou být text). Brutal akcent 2: 1.21 → 3.06, Pastel akcent 2: 1.63 → 3.14 (kolo 34).
+import { contrast, parseColor } from "./contrast.ts";
+const NEW_PALETTES = ["sunset", "forest", "ocean", "rose", "dusk", "cyber", "sand", "mint", "slate", "contrastLight"];
+const ratio = (a, b) => contrast(parseColor(a), parseColor(b));
+
+test("kontrast WCAG: text ≥ 4.5 na pozadí i raised, akcent ≥ 3 na pozadí (všechny motivy)", () => {
+  for (const id of THEME_IDS) {
+    const v = THEMES[id].vars;
+    const bg = `rgb(${v.bg.split(" ").join(",")})`;
+    for (const k of ["t1", "t2", "t3"]) {
+      assert.ok(ratio(v[k], bg) >= 4.5, `${id}: ${k} na bg ${ratio(v[k], bg).toFixed(2)}`);
+      assert.ok(ratio(v[k], v.raised) >= 4.5, `${id}: ${k} na raised ${ratio(v[k], v.raised).toFixed(2)}`);
+    }
+    assert.ok(ratio(v.accent, bg) >= 3, `${id}: akcent ${ratio(v.accent, bg).toFixed(2)}`);
+    assert.ok(ratio(v["accent-2"], bg) >= 3, `${id}: akcent 2 ${ratio(v["accent-2"], bg).toFixed(2)}`);
+  }
+});
+
+test("palety kola 34: oba akcenty ≥ 4.5:1 na pozadí, tón odpovídá pozadí", () => {
+  for (const id of NEW_PALETTES) {
+    assert.ok(THEME_IDS.includes(id), id);
+    const v = THEMES[id].vars;
+    const bg = `rgb(${v.bg.split(" ").join(",")})`;
+    for (const k of ["accent", "accent-2"]) assert.ok(ratio(v[k], bg) >= 4.5, `${id}: ${k} ${ratio(v[k], bg).toFixed(2)}`);
+    assert.equal(THEMES[id].light, ratio("#ffffff", bg) < 3, `${id}: tón`);
+  }
+});
+
+// ---------- skupiny motivů (Nastavení → Vzhled): data u palety, odpovídají jasu pozadí ----------
+import { THEME_GROUPS, bgLuminance, groupFitsLuminance, groupOf, themesIn } from "./themeGroups.ts";
+import { THEME_IDS as ALL_IDS } from "./themes.ts";
+
+test("skupiny motivů: každý motiv právě v jedné skupině, skupina sedí na jas pozadí", () => {
+  const seen = THEME_GROUPS.flatMap((g) => themesIn(g.id));
+  assert.equal(seen.length, ALL_IDS.length);
+  assert.equal(new Set(seen).size, ALL_IDS.length);
+  for (const id of ALL_IDS) {
+    const g = groupOf(id);
+    assert.ok(THEME_GROUPS.some((x) => x.id === g), `${id}: neznámá skupina ${g}`);
+    assert.ok(groupFitsLuminance(g, bgLuminance(id)), `${id}: skupina ${g} nesedí na jas ${bgLuminance(id).toFixed(3)}`);
+    if (g !== "contrast") assert.equal(g === "light", THEMES[id].light, `${id}: skupina vs. light`);
+  }
+  assert.deepEqual(themesIn("contrast").sort(), ["contrast", "contrastLight"]);
+});
+
+test("groupFitsLuminance: hranice", () => {
+  assert.ok(groupFitsLuminance("dark", 0.05) && !groupFitsLuminance("dark", 0.5));
+  assert.ok(groupFitsLuminance("light", 0.9) && !groupFitsLuminance("light", 0.1));
+  assert.ok(groupFitsLuminance("contrast", 0) && groupFitsLuminance("contrast", 1) && !groupFitsLuminance("contrast", 0.5));
+});
+
+// ---------- text na akcentu (`--on-accent`, L192) ----------
+import { onAccent } from "./contrast.ts";
+const PAL_ACCENTS = Object.entries(PAL).flatMap(([id, p]) => (p.accent ?? []).map((c, i) => [`${id}#${i}`, c]));
+
+test("on-accent: text na akcentu ≥ 4.5:1 pro oba akcenty všech palet a všechny motivy", () => {
+  assert.ok(PAL_ACCENTS.length >= 52, `palet s akcentem: ${PAL_ACCENTS.length}`);
+  for (const [id, c] of PAL_ACCENTS) assert.ok(ratio(onAccent(c), c) >= 4.5, `${id} ${c}: ${ratio(onAccent(c), c).toFixed(2)}`);
+  for (const id of THEME_IDS) {
+    const v = appearanceVars({ ...DEFAULT_APPEARANCE, theme: id });
+    assert.ok(ratio(v["on-accent"], v.accent) >= 4.5, `${id}: ${ratio(v["on-accent"], v.accent).toFixed(2)}`);
+  }
+});
+
+test("on-accent: vlastní akcent, krajní barvy a špatný vstup", () => {
+  assert.equal(onAccent("#ffffff"), "#000000");
+  assert.equal(onAccent("#000000"), "#ffffff");
+  assert.equal(appearanceVars({ ...DEFAULT_APPEARANCE, accent: "#22C55E" })["on-accent"], "#000000");
+  assert.throws(() => onAccent("zelená"));
 });

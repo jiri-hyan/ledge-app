@@ -127,7 +127,9 @@ registerDict("en", {
   "settings.strip.item.waiting": "How many Claude sessions wait for you",
   "settings.drawer.gameMode.on": "Turn on",
   "settings.drawer.monitor.primary": "Primary",
-  "settings.drawer.monitor.n": "Monitor {n}",
+  "settings.strip.monitor.all": "All (a dot on the others)",
+  "settings.strip.monitor.dev": "Monitor {n} · {w}×{h}",
+  "settings.strip.monitor.gone": "Disconnected monitor",
   "settings.drawer.bar.trigger": "How to open the drawer there",
   "settings.drawer.bar.push": "Only by pushing against the top edge",
   "settings.drawer.bar.hover": "Same as elsewhere",
@@ -146,7 +148,6 @@ registerDict("en", {
   // Vzhled a animace
   "appearance.state.saved": "Matches the saved look.",
   "appearance.state.dirty": "Preview — save or discard in the bar below.",
-  "appearance.theme.title": "Theme",
   "appearance.theme.dark": "Dark",
   "appearance.theme.midnight": "Midnight",
   "appearance.theme.graphite": "Graphite",

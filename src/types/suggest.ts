@@ -7,6 +7,8 @@ export interface SuggestOn {
   devServer: boolean;
   github: boolean;
   reminders: boolean;
+  /** zadání čeká · ranní shrnutí · Dnes · Claude od posledně; chybí / null = platí `reminders` (`digestOn`) */
+  digest?: boolean | null;
   githubPulse: boolean;
 }
 

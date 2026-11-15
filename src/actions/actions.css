@@ -36,11 +36,9 @@
 .act-list { display: flex; flex-direction: column; }
 .act-row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-radius: var(--r-sm); font-size: var(--fs-body); min-width: 0; }
 .act-row + .act-row { border-top: 1px solid var(--line-soft); }
-.act-row.drag-over { background: var(--card-2); }
 .act-row.dragging { opacity: 0.4; }
 .act-row .grow { flex: 1; min-width: 0; }
 .act-row .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.act-handle { cursor: grab; color: var(--t3); padding: 0 2px; font-size: calc(14px * var(--fz)); user-select: none; }
 .act-row .r { display: flex; gap: var(--s1); flex-shrink: 0; }
 .act-note { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-md); color: var(--t2); background: var(--well); border-radius: var(--r-md); padding: var(--s2) 10px; margin: 6px 0; }
 .act-note .grow { flex: 1; }

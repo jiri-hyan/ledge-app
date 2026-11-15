@@ -8,6 +8,9 @@ use std::time::{Duration, Instant};
 
 /// Termín jednoho volání `gh`.
 pub const TIMEOUT: Duration = Duration::from_secs(15);
+/// Kratší termín pro tiché obnovení z plánovače proužku (vlákno `integrations` sdílí se vzorkováním Systému; ruční
+/// obnovení a karta mají celých 15 s).
+pub const AUTO_TIMEOUT: Duration = Duration::from_secs(8);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GhErr {
@@ -36,7 +39,7 @@ pub fn classify(stderr: &str) -> GhErr {
 }
 
 /// Spustí `gh <args>` a vrátí stdout. `Err(Missing)` bez spuštění, když `gh.exe` nenajdeme.
-pub fn run(args: &[&str]) -> Result<String, GhErr> {
+pub fn run(args: &[&str], timeout: Duration) -> Result<String, GhErr> {
     let exe = crate::update::gh_exe().ok_or(GhErr::Missing)?;
     let mut cmd = Command::new(exe);
     cmd.args(args)
@@ -45,7 +48,7 @@ pub fn run(args: &[&str]) -> Result<String, GhErr> {
         .env("GH_NO_UPDATE_NOTIFIER", "1")
         .env("GH_SPINNER_DISABLED", "1")
         .env("NO_COLOR", "1");
-    match gitinfo::capture(&mut cmd, None, true, Instant::now() + TIMEOUT) {
+    match gitinfo::capture(&mut cmd, None, true, Instant::now() + timeout) {
         Ok(o) if o.success => Ok(o.stdout),
         Ok(o) => Err(classify(&o.stderr)),
         Err(RunError::Timeout) => Err(GhErr::Offline),

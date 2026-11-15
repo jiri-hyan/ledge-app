@@ -1,11 +1,12 @@
 // Nové sekce lišty notche (kolo 27) z EXISTUJÍCÍCH dat, bez nové sítě: Limit Claude (stejný zdroj a prázdný stav
 // jako hrdina karty Claude — `layout/hero.ts`, „Limity zatím nejsou“ s důvodem), Počasí (snapshot jako karta
-// Počasí) a Příští schůzka (kalendář v paměti jako karta Dnes / Týden). Co zdroj nedal, ukáže prázdný stav.
+// Počasí) a Příští schůzka (kalendář v paměti jako karta Kalendář / Týden). Co zdroj nedal, ukáže prázdný stav.
 import { For, Match, Show, Switch } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { sayError } from "../ui/toast";
 import type { CalendarItem, CalendarView } from "../types/calendar";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { num } from "../format";
 import { heroFacts, type HeroFacts } from "../layout/hero";
 import { tx } from "../layout/text";
@@ -87,8 +88,8 @@ export function Limits(p: { s: Snapshot; now: number; sec: BarSection; design: s
   );
 }
 
-export function WeatherSec(p: { s: Snapshot; sec: BarSection; design: string }) {
-  const w = () => weatherNow(p.s.personal.weather);
+export function WeatherSec(p: { s: Snapshot; now: number; sec: BarSection; design: string }) {
+  const w = () => weatherNow(p.s.personal.weather, p.now);
   const f = () => p.s.personal.weather?.fahrenheit;
   const deg = (c: number) => `${num(Math.round(tempIn(c, f())))}°`;
   return (
@@ -97,7 +98,7 @@ export function WeatherSec(p: { s: Snapshot; sec: BarSection; design: string }) 
         when={w()}
         fallback={
           <small class="nb-empty">
-            {p.s.personal.weather?.status === "unset" ? t("cards.notch.wxUnset", "Místo pro počasí není nastavené (Nastavení → Osobní).") : t("cards.notch.wxNone", "Počasí zatím není.")}
+            {p.s.personal.weather?.status === "unset" ? t("cards.notch.wxUnset", "Místo pro počasí není nastavené ({path}).", { path: settingsPath("osobni") }) : t("cards.notch.wxNone", "Počasí zatím není.")}
           </small>
         }
       >
@@ -152,7 +153,7 @@ export function MeetLine(p: { it: CalendarItem; cal: CalendarView | null | undef
 /** Prázdný stav kalendáře (žádný zdroj / načítá / nedostupný / volno). */
 export function calEmpty(cal: CalendarView | null | undefined): string {
   const st = calState(cal);
-  if (st === "none") return t("cards.notch.calNone", "Kalendář není nastavený (Nastavení → Kalendář).");
+  if (st === "none") return t("cards.notch.calNone", "Kalendář není nastavený ({path}).", { path: settingsPath("osobni", "calendars") });
   if (st === "loading") return t("cards.notch.calLoading", "Načítám kalendář…");
   if (st === "unavailable") return t("cards.notch.calErr", "Kalendář teď není dostupný.");
   return t("cards.notch.calFree", "Dnes ani zítra žádná schůzka.");

@@ -1,7 +1,7 @@
 //! Připomínka schůzky: `remindMin` minut před začátkem (výchozí 5, 0 = vypnuto, per kalendář) se
 //! v proužku objeví „📅 Standup za 5 min“ (modře, ambientně — i s vypnutým proužkem, jako připomínka
 //! poznámky), proužek blikne / pulsne (`attention::signal`, událost `Meeting` — priorita mezi „čeká na
-//! tebe“ a „hotovo“) a volitelně (`remindToast`) přijde toast Windows s tlačítkem **Připojit**.
+//! tebe“ a „hotovo“) a volitelně (`remindToast`) přijde toast Windows s tlačítkem **Připojit** (výchozí zapnuto, jen u schůzky s odkazem — `toast_wanted`).
 //!
 //! Žádný polling: emit vlákno dostane jen termín (`next_deadline` → `next_alarm`: začátek okna
 //! připomínky, začátek schůzky, konec „začíná“), mezitím se proužek přepočítá s minutovými hodinami.
@@ -103,6 +103,12 @@ pub fn toast_text(s: &Soon, now: i64, local: &dyn LocalTz) -> (String, String) {
     (title, format!("{name} · {}", hm(s.start, local)))
 }
 
+/// Toast jen když je zapnutý u kalendáře A schůzka má odkaz: Připojit je jeho smysl (1 klik místo cesty přes
+/// šuplík); bez odkazu by jen opakoval blikající proužek.
+pub fn toast_wanted(feed_toast: bool, join: Option<&Join>) -> bool {
+    feed_toast && join.is_some()
+}
+
 /// Klíč ohlášené připomínky (kalendář, začátek, název).
 type Key = (usize, i64, String);
 
@@ -140,7 +146,7 @@ pub(crate) fn tick(now: i64) {
         let act = live::with_reminders(&feeds, |occs| active(occs, now));
         let mut g = FIRED.lock();
         fresh(act, g.get_or_insert_with(HashSet::new), now).into_iter().map(|s| {
-            let toast = cfg.personal.calendars.get(s.cal).is_some_and(|f| f.remind_toast);
+            let toast = toast_wanted(cfg.personal.calendars.get(s.cal).is_some_and(|f| f.remind_toast), s.join.as_ref());
             (s, toast)
         }).collect()
     };
@@ -173,13 +179,22 @@ pub fn notice(s: &Soon, title: String, body: String) -> crate::notify::Notice {
     }
 }
 
-/// Text proužku pro nejbližší schůzku v okně připomínky (jen paměť; volá `stripview` pod zámkem configu).
+/// Text proužku pro nejbližší schůzku v okně připomínky; jinak (L85) běžící schůzka „zbývá 12 min“ nebo ta,
+/// co začne do `span::STRIP_BEFORE_MIN` („za 8 min“). Jen paměť; volá `stripview` pod zámkem configu.
 pub(crate) fn strip_now(cfg: &Config, now: i64) -> Option<String> {
     let feeds = live::reminder_feeds(cfg);
     if feeds.is_empty() {
         return None;
     }
-    live::with_reminders(&feeds, |occs| active(occs, now).first().map(|s| strip_text(s, now)))
+    live::with_reminders(&feeds, |occs| {
+        active(occs, now).first().map(|s| strip_text(s, now)).or_else(|| span_text(occs.iter().map(|(_, o, _)| *o), now))
+    })
+}
+
+/// „📅 Standup · zbývá 12 min“ (`span::pick`); bez schůzky v okně `None` (žádné divadlo).
+pub fn span_text<'a>(occs: impl IntoIterator<Item = &'a Occ>, now: i64) -> Option<String> {
+    let (o, s) = super::span::pick(occs, now)?;
+    Some(format!("📅 {} · {}", short(&o.title), super::span::tail(s)))
 }
 
 #[cfg(test)]
@@ -195,6 +210,28 @@ mod tests {
 
     fn occ(title: &str, start: i64) -> Occ {
         Occ { start, end: start + 30 * MIN, title: title.into(), ..Occ::default() }
+    }
+
+    #[test]
+    fn span_text_table() {
+        let run = Occ { start: T - 10 * MIN, end: T + 12 * MIN, title: "Retro".into(), ..Occ::default() };
+        let soon = occ("Standup", T + 8 * MIN);
+        let day = Occ { all_day: true, start: T - MIN, end: T + 24 * 60 * MIN, ..occ("Svátek", T) };
+        assert_eq!(span_text([&run], T).as_deref(), Some("📅 Retro · zbývá 12 min"));
+        assert_eq!(span_text([&soon], T).as_deref(), Some("📅 Standup · za 8 min"));
+        assert_eq!(span_text([&soon, &run], T).as_deref(), Some("📅 Retro · zbývá 12 min"), "běžící má přednost");
+        assert_eq!(span_text([&occ("Pozdě", T + 11 * MIN)], T), None);
+        assert_eq!(span_text([&day], T), None, "celodenní nic");
+        assert_eq!(span_text([], T), None);
+    }
+
+    #[test]
+    fn toast_only_with_join_and_feed_switch() {
+        let j = Join { provider: Provider::Zoom, url: "https://example.com/j/1".into() };
+        // (zapnuto u kalendáře, odkaz, toast?)
+        for (on, join, want) in [(true, Some(&j), true), (true, None, false), (false, Some(&j), false), (false, None, false)] {
+            assert_eq!(toast_wanted(on, join), want, "{on} {}", join.is_some());
+        }
     }
 
     #[test]

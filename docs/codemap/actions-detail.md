@@ -16,12 +16,11 @@ agenty: [agents/actions.md](../agents/actions.md) → „Rychlé akce“. Cituj 
 | `src-tauri/src/commands/actions.rs` | Tauri příkazy | `run_action`, `action_icon`, `action_icon_refresh`, `action_consent`, `action_check`, `pick_path` |
 | `src-tauri/src/iconimg.rs` | + ikona souboru/složky ze shellu (48 px) | `shell_png` |
 | `src/actions/api.ts` | invoke, cache ikon podle `iconKey`, spuštění s potvrzením a výsledkem | `actionsApi`, `actionIconSrc`, `runAction`, `isBusy`, `lastResult` |
-| `src/actions/model.ts` | čistá logika UI | `slugId`, `moveItem`, `guessKind`, `LINK_KINDS`, `isLink`, `onPage`, `linkActions`, `visibleGroups`, `cleanAction`, `draftError`, `WEB_SIZE` |
+| `src/actions/model.ts` | čistá logika UI | `slugId`, `moveItem`, `guessKind`, `LINK_KINDS`, `isLink`, `onPage`, `visibleGroups`, `cleanAction`, `draftError`, `WEB_SIZE` |
 | `src/actions/ui.tsx` | ikona/monogram, potvrzení v šuplíku, výstup příkazu | `ActionIcon`, `askConfirm`, `ConfirmAction`, `answerConfirm`, `confirmPending`, `LastOutput` |
 | `src/ui/iconTone.ts` | tón ikony (čistá `toneOf` z pixelů, `measureTone` 1× na URL přes 16×16 canvas, `useTone`): tmavá/světlá kresba na průhledném → třída `tone-dark`/`tone-light`; CSS ji podloží barvou textu jen při stejném tónu jako motiv (`:root[data-scheme]`) — ikony akcí (`.act-img`) i loga v Nastavení (`.st-logo`); test `iconTone.test.mjs` | `toneOf`, `measureTone`, `useTone`, `Tone` |
 | `src/actions/ActionEditor.tsx` · `src/settings/panels/Actions.tsx` | editor akce · sekce „Akce a odkazy“ (jeden seznam, `SortList` tah + Alt+šipky, Vrátit) | `ActionEditor`, `kindLabel` · `ActionsPanel` |
 | `src/cards/ActionsCard.tsx` | karta (Práce bez akcí se neukáže, Osobní ukáže pozvánku; `skipLinks` = na záložce s kartou Odkazy bez odkazů) | `ActionsCard` |
-| `src/cards/LinksCard.tsx` | karta Odkazy: `linkActions` záložky (favicon `ActionIcon`, klik `runAction`) + nepřevedené `personal.links` postaru (`openLink`) | `LinksCard` |
 | `src-tauri/src/linkmigrate.rs` | `personal.links` → akce při načtení configu a při `save_config` (idempotentní, co neprojde validací, zůstane odkazem) | `migrate`, `guess_kind` |
 | `src/palette/search.ts` | čisté hledání: bez diakritiky, fuzzy, zvýraznění, nedávné + frecency (četnost × čerstvost, poločas 7 dní, `Usage` v `localStorage` `ledge.palette.usage`, strop bonusu 30 — řadí mezi podobnými, jasně lepší shodu nepřebije) | `fold`, `score`, `segments`, `rank`, `pushRecent`, `frecency`, `bumpUsage`, `cleanUsage`, `frecencyBonus` |
 | `src/palette/notehits.ts` | poznámky nalezené podle OBSAHU (`note_search`, po 180 ms ticha od 2 znaků): úryvek jako druhý řádek poznámky v paletě, starší poznámky se přidají; `keywords` = dotaz (hledání titulku a podtitulku řadí `rank`) | `mergeNoteHits`, `NoteHit` |
@@ -42,7 +41,14 @@ agenty: [agents/actions.md](../agents/actions.md) → „Rychlé akce“. Cituj 
 | `src/palette/compact.ts` | kompaktní paleta (`palette.compact`): co ukázat pod polem podle režimu a dotazu, šipky (rozbalit ↓ / sbalit ↑) | `shown`, `visible`, `arrow`, `Shown`, `Fold` |
 | `src-tauri/src/paletteconf.rs` | sekce configu `palette` → `Snapshot.palette_compact` (`paletteCompact`) | `PaletteConfig` |
 | `src/palette/timer.ts` | příkazy časovače: „Časovač N min“ z předvoleb, pauza / pokračovat / +5 min / zrušit podle stavu, stopky; přes `timer/TimerCard.timerDo` | `timerItems` |
-| `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems`, `PItem`, `Nav` · `Palette` (líný chunk, `lazyViews.tsx`; lupa `IconSearch` je v `icons.tsx`) · `gotoSettingsPanel`, `settingsTarget` |
+| `src/palette/typeto.ts` | „psaní otevře paletu“: tisknutelný znak při fokusu na holém `body` (ne pole / select / `contenteditable` / tlačítko, bez Ctrl/Alt/Meta, ne mezera a 1–9 = záložky) → paleta s tímto znakem (`App.tsx` `key` → `openPalette(false, znak)` → `Palette initial`); `isTextTarget` hlídá i klávesy 1–9 | `typeToPalette`, `isTextTarget` |
+| `src/palette/live.ts` | zapojení položek závislých na dotazu / živých datech na `api` (stejná volání jako tlačítka karet), do `items` v `Palette.tsx` | `liveItems` |
+| `src/palette/media.ts` | hudba a hlasitost: Přehrát/Pauza, Další, Předchozí podle `canToggle/canNext/canPrev`, Hlasitost ±10, Ztlumit, „hlasitost 40“; jen s daty z `personal.media` / `personal.volume`; akce vložené (`MediaIO`) | `mediaItems`, `volumeQuery` |
+| `src/palette/meet.ts` | „Připojit: <schůzka>" jen pro dnešní události s odkazem, které neskončily (`calendar/model.ts` `joinable`); `api.calendarJoin` jako tlačítko karty | `meetItems` |
+| `src/palette/decide.ts` | Povolit / Zamítnout Clauda: řádky jen při čekající žádosti A dotazu začínajícím slovesem (≥ 2 znaky); bez psaní nikdy; Enter = `api.decide(id, allow)` jako `DecideButtons` — žádný automat, žádná obchvatná cesta | `decideItems`, `decideWanted` |
+| `src/palette/tasks.ts` | `x:` → „Odškrtnout: <úkol>": otevřené `- [ ]` z indexu v paměti jádra (`note_tasks` jednou při vstupu do `x:`, žádné čtení poznámek; `note_read` + kontrola řádku `lineStillTask` až při odškrtnutí) → `note_toggle_task`; příkaz „Odškrtnout úkol…" přepne dotaz | `taskQuery`, `matchTasks`, `lineStillTask`, `taskItems`, `taskCommand` |
+| `src/palette/confirmkey.ts` | Enter v potvrzení akce potvrdí jen bez `e.repeat` a po 400 ms od zobrazení (`confirmEnterOk`, `actions/ui.tsx` `confirmShownAt`) | `confirmEnterOk` |
+| `src/palette/items.ts` · `Palette.tsx` · `goto.ts` | položky ze snapshotu · UI palety · skok na panel Nastavení | `buildItems` (statické), `noteItems` (2 řádky na poznámku, vlastní memo), `PItem`, `Nav` · `Palette` (líný chunk, `lazyViews.tsx`; lupa `IconSearch` je v `icons.tsx`) · `gotoSettingsPanel`, `settingsTarget` |
 | `src/types/actions.ts` | typy + `Snapshot.actions`/`scripts`/`paletteWinSettings` | `ActionCfg`, `ActionView`, `ScriptView`, `ScriptsListing`, `ActionOutcome` |
 
 Lepidlo: `config/*` (`Config.actions` + `validate`), `snapshot.rs` (`Snapshot.actions`),
@@ -149,7 +155,7 @@ capabilities), `actionrun::tests` (`resolve`, `shell_cmd`, `tail`, souhlasy v te
 `iconimg::tests::shell_icon_for_folder_and_file`. Frontend:
 `node --experimental-strip-types --test src/palette/search.test.mjs` (search + model, 12 testů),
 `src/actions/webpanel.test.mjs` (okno s webem: `draftError`, `cleanAction`),
-`src/palette/notehits.test.mjs` (zásahy v těle), frecency v `search.test.mjs`,
+`src/palette/notehits.test.mjs` (zásahy v těle), `typeto` / `media` / `meet` / `decide` / `tasks` `.test.mjs` (tabulky L89), frecency v `search.test.mjs`,
 `src/palette/compact.test.mjs` (kompaktní režim: `shown`/`visible`/`arrow`, tabulky),
 `src/palette/winsettings.test.mjs` (tabulka proti dokumentaci, tvar cílů, hledání CZ/EN),
 `calc.test.mjs` (výrazy, nevalidní → null, bez eval, formát cs/en), `units.test.mjs` (převody, ne-převody,

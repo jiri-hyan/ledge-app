@@ -129,7 +129,9 @@ pub enum Outcome {
     Expired,
     /// Anthropic brzdí (429)
     Busy,
-    /// síť, 5xx, nečekaná odpověď
+    /// síť nedostupná (spojení / termín selhal — typicky krátce po probuzení): krátký odstup s backoffem
+    Offline,
+    /// 5xx, nečekaná odpověď
     Error,
 }
 
@@ -140,14 +142,16 @@ impl Outcome {
             Outcome::Ok => "ok",
             Outcome::NoLogin => "noLogin",
             Outcome::Expired => "expired",
-            Outcome::Busy | Outcome::Error => "error",
+            Outcome::Busy | Outcome::Error | Outcome::Offline => "error",
         }
     }
 
-    /// Odstup dalšího pokusu (ms) po tomhle výsledku; `every_ms` = běžný interval.
-    pub fn next_after_ms(self, every_ms: i64) -> i64 {
+    /// Odstup dalšího pokusu (ms) po tomhle výsledku; `every_ms` = běžný interval, `fails` = neúspěchy sítě za sebou
+    /// (`netstate::Fails::count`; jen `Offline`: 2 → 4 → 8 → 15 min místo slepých 15 min).
+    pub fn next_after_ms(self, every_ms: i64, fails: u32) -> i64 {
         match self {
             Outcome::Ok => every_ms,
+            Outcome::Offline => crate::netstate::backoff_ms(fails, 2 * 60_000, crate::netstate::BACKOFF_CAP_MS),
             Outcome::Error => every_ms.max(15 * 60_000),
             Outcome::NoLogin | Outcome::Expired | Outcome::Busy => every_ms.max(30 * 60_000),
         }
@@ -172,6 +176,8 @@ pub fn due(now: i64, attempt: Option<i64>, loading: bool, wait_ms: i64, newest_a
     }
     match attempt {
         None => true,
+        // hodiny šly zpět: pokus z budoucnosti je neznámý, ne „ještě ne“ (`netstate`)
+        Some(a) if a > now + 5_000 => true,
         Some(a) if loading && now - a < 30_000 => false,
         Some(a) => now - a >= wait_ms,
     }
@@ -299,9 +305,13 @@ mod tests {
         assert_eq!(outcome_of_status(500), Outcome::Error);
         assert_eq!(outcome_of_status(302), Outcome::Error, "přesměrování se nesleduje");
         let e = 10 * 60_000;
-        assert_eq!(Outcome::Ok.next_after_ms(e), e);
-        assert_eq!(Outcome::Expired.next_after_ms(e), 30 * 60_000);
-        assert_eq!(Outcome::Error.next_after_ms(e), 15 * 60_000);
+        assert_eq!(Outcome::Ok.next_after_ms(e, 0), e);
+        assert_eq!(Outcome::Expired.next_after_ms(e, 0), 30 * 60_000);
+        assert_eq!(Outcome::Error.next_after_ms(e, 5), 15 * 60_000);
+        // offline: 2 → 2 → 4 → 8 → 15 min (strop), nikdy slepých 15 min hned po prvním výpadku
+        let offline: Vec<i64> = [0, 1, 2, 3, 4, 9].iter().map(|&f| Outcome::Offline.next_after_ms(e, f) / 60_000).collect();
+        assert_eq!(offline, [2, 2, 4, 8, 15, 15]);
+        assert_eq!(Outcome::Offline.key(), "error");
         // (attempt, loading, wait, newest) → due
         let cases: &[DueCase] = &[
             (None, false, e, None, true),
@@ -312,6 +322,7 @@ mod tests {
             (Some(NOW - e + 1), false, e, None, false),
             (Some(NOW - e), false, e, None, true),
             (Some(NOW - 20 * 60_000), false, 30 * 60_000, None, false), // po 401 delší odstup
+            (Some(NOW + 3_600_000), false, e, None, true), // hodiny šly zpět
         ];
         for &(a, l, w, n, want) in cases {
             assert_eq!(due(NOW, a, l, w, n, e), want, "{a:?} {l} {w} {n:?}");

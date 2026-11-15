@@ -28,7 +28,7 @@ session Claude Code se schvalováním, otázkami a limity, které vyřídíš be
 
 ## Proč Ledge
 
-Ledge staví jeden vývojář pro svou každodenní práci na Windows s Claude Code a sdílí ho jako open source
+Ledge je stavěný pro každodenní práci na Windows s Claude Code a sdílí ho jako open source
 (MIT). Nesnaží se sedět každému hned po instalaci: má hodně nastavení, a když ti pořád nesedí,
 [forkni si ho a uprav podle sebe](#uprav-si-ho).
 

@@ -46,10 +46,10 @@
 .bd-dnum { font: 600 clamp(var(--fs-body), 3.4cqi, 22px) var(--display); font-variant-numeric: tabular-nums; color: var(--t1); }
 .bd-weekend .bd-dnum, .bd-weekend .bd-dow { color: var(--rose, var(--red)); }
 .bd-today { background: var(--accent); }
-.bd-today .bd-dnum, .bd-today .bd-dow { color: var(--on-accent, #fff); }
+.bd-today .bd-dnum, .bd-today .bd-dow { color: var(--on-accent); }
 .bd-dot { display: block; width: 4px; height: 4px; border-radius: 50%; background: transparent; }
 .bd-dot.on { background: var(--t2); }
-.bd-today .bd-dot.on { background: var(--on-accent, #fff); }
+.bd-today .bd-dot.on { background: var(--on-accent); }
 .bd-evs { display: flex; flex-direction: column; gap: 2px; margin-top: var(--s2); }
 .bd-ev { display: grid; grid-template-columns: 4.2em minmax(0, 1fr); gap: var(--s2); font: var(--fs-xs) var(--sans); color: var(--t2); }
 .bd-ev.on { color: var(--t1); }
@@ -74,8 +74,8 @@
 .bd-mon-cell { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px 0 3px; border-radius: var(--r-sm); font: 600 clamp(var(--fs-xs), 3cqi, 17px) var(--display); font-variant-numeric: tabular-nums; color: var(--t1); }
 .bd-mon-cell.out { color: var(--t3); opacity: 0.55; }
 .bd-mon-cell.bd-weekend { color: var(--rose, var(--red)); }
-.bd-mon-cell.bd-today { color: var(--on-accent, #fff); }
-.bd-mon-cell.bd-today .bd-dot.on { background: var(--on-accent, #fff); }
+.bd-mon-cell.bd-today { color: var(--on-accent); }
+.bd-mon-cell.bd-today .bd-dot.on { background: var(--on-accent); }
 .bd-tear { text-align: center; padding: 2px 0; }
 .bd-tear-top { font: 650 clamp(12px, 3.6cqi, 18px) var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
 .bd-tear-day { font: 700 clamp(60px, 30cqi, 130px)/1 var(--display); letter-spacing: -0.04em; font-variant-numeric: tabular-nums; color: var(--t1); }
@@ -83,7 +83,7 @@
 .bd-tear-left { margin-top: var(--s2); font: var(--fs-xs) var(--sans); color: var(--t3); }
 .bd-tl-axis { position: relative; height: calc(var(--lanes, 1) * 24px + 4px); margin-top: var(--s2); border-radius: var(--r-sm); background: var(--well); overflow: hidden; }
 .bd-tl-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--card); opacity: 0.9; }
-.bd-tl-blk { position: absolute; display: flex; align-items: center; min-width: 4px; margin-top: 2px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 55%, var(--well)); color: var(--on-accent, #fff); font: 600 var(--fs-2xs) var(--sans); overflow: hidden; white-space: nowrap; }
+.bd-tl-blk { position: absolute; display: flex; align-items: center; min-width: 4px; margin-top: 2px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 55%, var(--well)); color: var(--t1); font: 600 var(--fs-2xs) var(--sans); overflow: hidden; white-space: nowrap; }
 .bd-tl-blk.on { background: var(--accent); }
 .bd-tl-blk span { overflow: hidden; text-overflow: ellipsis; }
 .bd-tl-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--red); }

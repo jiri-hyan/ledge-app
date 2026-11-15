@@ -22,12 +22,13 @@ pub struct HotkeyConfig {
     pub note: String,
     /// Herní režim zapnout / vypnout (`gamemode.rs`). Prázdné = bez zkratky. Funguje i v herním režimu.
     pub game_mode: String,
-    /// Lístky na plochu (`pins/`): průchozí režim u všech lístků zapnout / vypnout. Výjimka z
-    /// `enabled`: registruje se, JEN když je na ploše aspoň jeden lístek, i s vypnutými zkratkami —
-    /// na průchozí lístek nejde kliknout, tohle je cesta ven. Prázdné = bez zkratky (zbývá Ctrl+K).
+    /// Lístky na plochu (`pins/`): průchozí režim u všech lístků zapnout / vypnout. Zapnuté zkratky:
+    /// registruje se, když je na ploše aspoň jeden lístek. Vypnuté zkratky (`enabled`): registruje se
+    /// JEN po dobu, kdy je aspoň jeden lístek průchozí — na průchozí lístek nejde kliknout, tohle je
+    /// cesta ven (`passthrough_key_live`). Prázdné = bez zkratky (zbývá Ctrl+K).
     pub note_passthrough: String,
     /// Rychlý nový lístek na plochu (nová poznámka rovnou v lístku, s fokusem). Výchozí prázdné = bez
-    /// zkratky. Jako `notePassthrough` platí i s vypnutými zkratkami (`enabled`), jen se zapnutými
+    /// zkratky. Platí i s vypnutými zkratkami (`enabled`), jen se zapnutými
     /// poznámkami; v herním režimu / hře přes celou obrazovku nedělá nic.
     pub note_pin: String,
 }
@@ -113,11 +114,25 @@ pub fn active_hotkeys(cfg: &Config, approve: bool) -> Vec<(&'static str, String)
         .collect()
 }
 
-/// `active_hotkeys` + zkratka průchozího režimu lístků, když je na ploše aspoň jeden lístek
-/// (`pins_open`) — i s `hotkeys.enabled = false` (jediná cesta z průchozího lístku myší nevede) — a
-/// zkratka „Nový lístek“ (`notePin`), je-li vyplněná (výchozí prázdná), taky bez ohledu na `enabled`.
+/// Má být zkratka průchozího režimu lístků živá? Zapnuté zkratky: když je lístek na ploše (`pins_open`).
+/// Vypnuté: jen když je aspoň jeden lístek skutečně průchozí (`pins_through`) — jediná cesta z průchozího
+/// lístku myší nevede, jinak by AltGr+P zbytečně zabíral uživateli, který zkratky vypnul.
+pub fn passthrough_key_live(enabled: bool, pins_open: bool, pins_through: bool) -> bool {
+    pins_open && (enabled || pins_through)
+}
+
+/// Bude zkratka průchozího režimu fungovat (UI lístku: nápověda před prvním zapnutím)? Je-li živá už teď
+/// (`live_now`), rozhoduje skutečná registrace (obsazená jinou aplikací = ne); jinak (vypnuté zkratky,
+/// lístek neprůchozí) jde o plán po zapnutí průchozího režimu (`planned_when_through`: neprázdná, čitelná,
+/// poznámky zapnuté, bez kolize). Mezera: zkratku obsazenou cizí aplikací poznáme až po zapnutí průchozího režimu.
+pub fn passthrough_key_ok(live_now: bool, registered: bool, planned_when_through: bool) -> bool {
+    if live_now { registered } else { planned_when_through }
+}
+
+/// `active_hotkeys` + zkratka průchozího režimu lístků (`passthrough_key_live`) a zkratka „Nový lístek“
+/// (`notePin`), je-li vyplněná (výchozí prázdná), ta bez ohledu na `enabled`.
 /// Stejnou zkratku jako jiná registrovaná akce nepřidá (kolizi hlásí validace jen se zapnutými zkratkami).
-pub fn active_hotkeys_pins(cfg: &Config, approve: bool, pins_open: bool) -> Vec<(&'static str, String)> {
+pub fn active_hotkeys_pins(cfg: &Config, approve: bool, pins_open: bool, pins_through: bool) -> Vec<(&'static str, String)> {
     let mut v = active_hotkeys(cfg, approve);
     let mut add = |action: &'static str, k: &str, on: bool| {
         let k = k.trim();
@@ -125,7 +140,7 @@ pub fn active_hotkeys_pins(cfg: &Config, approve: bool, pins_open: bool) -> Vec<
             v.push((action, k.to_string()));
         }
     };
-    add("notePassthrough", &cfg.hotkeys.note_passthrough, pins_open);
+    add("notePassthrough", &cfg.hotkeys.note_passthrough, passthrough_key_live(cfg.hotkeys.enabled, pins_open, pins_through));
     add("notePin", &cfg.hotkeys.note_pin, true);
     v
 }

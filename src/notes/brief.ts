@@ -3,31 +3,32 @@
 // Řádky se počítají od 0 v těle bez frontmatteru (stejně jako `note_toggle_task`).
 
 import type { ImageIn } from "../types";
+import { splitEvidence, taskLineOf } from "./taskline.ts";
 export type TaskState = "open" | "review" | "done";
 export type BriefStatus = "draft" | "ready" | "running" | "waiting" | "review" | "done";
 
 export interface TaskImage { line: number; caption: string; src: string }
 export interface BriefTask { line: number; indent: number; state: TaskState; text: string; evidence: string | null; images: TaskImage[] }
 
-const TASK = /^(\s*)(?:[-*+]|\d+[.)]) \[([ xX~])\](?: (.*))?$/;
 const IMAGE = /^(\s+)!\[([^\]]*)\]\(([^)\s]+)\)\s*$/;
-const EVIDENCE = /\s+[—–-]\s*důkaz:\s*(.*)$/i;
 
 /** Body se stavem, důkazem (`— důkaz: X`) a snímky odsazenými pod bodem. */
 export function parseTasks(body: string): BriefTask[] {
   const lines = body.split("\n");
   const out: BriefTask[] = [];
+  let code = false;
   for (let i = 0; i < lines.length; i++) {
-    const m = TASK.exec(lines[i]);
+    // bloky kódu se přeskočí jako v Rustu (`md::task_lines`), CR řádku se ořízne
+    if (/^\s*(\`\`\`|~~~)/.test(lines[i])) { code = !code; continue; }
+    const m = code ? null : taskLineOf(lines[i].replace(/\r$/, ""));
     if (!m) continue;
-    const raw = m[3] ?? "";
-    const ev = EVIDENCE.exec(raw);
+    const [text, evidence] = splitEvidence(m.rest);
     const task: BriefTask = {
       line: i,
-      indent: m[1].length,
-      state: m[2] === "~" ? "review" : m[2] === " " ? "open" : "done",
-      text: ev ? raw.slice(0, ev.index) : raw,
-      evidence: ev ? ev[1].trim() || null : null,
+      indent: m.indent,
+      state: m.state === "proposed" ? "review" : m.state,
+      text,
+      evidence,
       images: [],
     };
     for (let j = i + 1; j < lines.length; j++) {
@@ -87,14 +88,17 @@ export function logLines(body: string): string[] {
 }
 
 export type SendBlock = "project" | "key" | "goal" | "state";
-/** Co smí tlačítko: poslat (draft/ready/nic), pokračovat (waiting + vše zodpovězeno), zastavit (running). */
-export type BriefAction = { kind: "send"; block: SendBlock | null } | { kind: "resume"; block: "answers" | null } | { kind: "stop" } | { kind: "none" };
+export type ResumeBlock = "answers" | "review";
+/** Co smí tlačítko: poslat (draft/ready/nic), pokračovat (waiting + vše zodpovězeno; review + žádný bod `[~]`
+ *  nečeká na potvrzení), zastavit (running); `done` = nic. */
+export type BriefAction = { kind: "send"; block: SendBlock | null } | { kind: "resume"; block: ResumeBlock | null } | { kind: "stop" } | { kind: "none" };
 
 export function briefAction(n: { status?: BriefStatus | null; project: string | null; body: string }, hasKey: boolean | undefined): BriefAction {
   const s = n.status;
   if (s === "running") return { kind: "stop" };
   if (s === "waiting") return { kind: "resume", block: allAnswered(parseQuestions(n.body)) ? null : "answers" };
-  if (s === "review" || s === "done") return { kind: "none" };
+  if (s === "review") return { kind: "resume", block: reviewCount(parseTasks(n.body)) > 0 ? "review" : null };
+  if (s === "done") return { kind: "none" };
   const goal = n.body.split("\n").find((l) => l.trim() !== "" && !H2.test(l));
   const block: SendBlock | null = !n.project ? "project" : !goal ? "goal" : hasKey === false ? "key" : null;
   return { kind: "send", block };
@@ -102,6 +106,18 @@ export function briefAction(n: { status?: BriefStatus | null; project: string | 
 
 /** Počet bodů čekajících na potvrzení. */
 export const reviewCount = (ts: BriefTask[]) => ts.filter((t) => t.state === "review").length;
+
+/** Potvrzení bodu `line` dokončí zadání: stav je `review` a po potvrzení je každý bod `[x]` (aspoň jeden bod).
+ *  Jedna pravda o `done`: nastaví ho člověk posledním Potvrdit (`noteSetStatus`), Claude ho nastavit nesmí. */
+export const completesBrief = (status: BriefStatus | null | undefined, ts: BriefTask[], line: number) =>
+  status === "review" && ts.length > 0 && ts.some((t) => t.line === line && t.state === "review") && ts.every((t) => t.line === line || t.state === "done");
+
+/** „Uložit a poslat“ v editoru: nabídka jen u zadání, které jde poslat (`send`); u existující poznámky bez
+ *  rozepsané úpravy ji nahrazuje tlačítko panelu. `block` = proč je zatím šedá. */
+export function saveSendOffer(n: { brief: boolean; editing: boolean; dirty: boolean; status?: BriefStatus | null; project: string | null; body: string }, hasKey: boolean | undefined): { show: boolean; block: SendBlock | null } {
+  const a = briefAction({ status: n.status, project: n.project, body: n.body }, hasKey);
+  return { show: n.brief && a.kind === "send" && (!n.editing || n.dirty), block: a.kind === "send" ? a.block : null };
+}
 
 /** `$1.23`, `$1.23 / $5.00`, jen limit `limit $5.00`; nic z reálných polí = null. */
 export function costText(cost?: number | null, budget?: number | null): string | null {
@@ -184,9 +200,8 @@ export function resolveAnchor(body: string, a: Anchor | null | undefined): numbe
 export const cleanCaption = (s: string) => s.replace(/[\r\n]+/g, " ").replace(/[\][]/g, "").trim();
 
 /** Chyba příkazu zadání lidsky: starší jádro příkaz nezná → vysvětlení místo cizího textu Tauri. */
-export function briefError(e: unknown, unknown: string): string {
-  const s = String(e);
-  return /not found|nenalezen|unknown command/i.test(s) ? unknown : s;
+export function briefError(e: unknown, unknown: string, human: (e: unknown) => string = (x) => `${x}`): string {
+  return /not found|nenalezen|unknown command/i.test(`${e}`) ? unknown : human(e);
 }
 
 /** Snímek pro `note_create` / `note_save` (Rust `ImageIn`): bez popisku i kotvy holé PNG, jinak `{ png, caption?, anchorLine? }`. */

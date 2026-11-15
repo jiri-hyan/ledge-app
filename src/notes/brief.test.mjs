@@ -1,7 +1,7 @@
 // Zadání (`brief.ts`): body [ ] / [~] / [x], snímky, otázky, akce tlačítka, náklad, @ odkazy, kotva snímku.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allAnswered, anchorAt, applyAt, atToken, briefAction, cleanCaption, costText, logLines, parseQuestions, parseTasks, resolveAnchor, splitAtRefs, taskLine } from "./brief.ts";
+import { allAnswered, anchorAt, applyAt, atToken, briefAction, cleanCaption, completesBrief, costText, saveSendOffer, logLines, parseQuestions, parseTasks, resolveAnchor, splitAtRefs, taskLine } from "./brief.ts";
 
 const BODY = [
   "Přidat export do CSV",
@@ -69,10 +69,53 @@ test("briefAction: stavy a důvody blokace", () => {
     [n({ status: "running" }), true, { kind: "stop" }],
     [n({ status: "waiting", body: BODY }), true, { kind: "resume", block: "answers" }],
     [n({ status: "waiting", body: "x\n## Otázky\n- ❓ a\n  - ↳ b" }), true, { kind: "resume", block: null }],
-    [n({ status: "review" }), true, { kind: "none" }],
+    [n({ status: "review" }), true, { kind: "resume", block: null }], // po Vrátit (žádné [~]) jde Pokračovat
+    [n({ status: "review", body: BODY }), true, { kind: "resume", block: "review" }], // [~] čeká na potvrzení
+    [n({ status: "review", body: "cíl\n- [x] a" }), undefined, { kind: "resume", block: null }],
     [n({ status: "done" }), true, { kind: "none" }],
+    [n({ status: "done", body: BODY }), true, { kind: "none" }],
   ];
   for (const [note, key, want] of cases) assert.deepEqual(briefAction(note, key), want);
+});
+
+test("completesBrief: jen poslední Potvrdit v review dokončí zadání", () => {
+  const ts = (body) => parseTasks(body);
+  const one = ts("cíl\n- [~] a — důkaz: x");
+  const two = ts("cíl\n- [~] a\n- [~] b");
+  const mixed = ts("cíl\n- [x] a\n- [~] b");
+  const open = ts("cíl\n- [ ] a\n- [~] b");
+  const cases = [
+    ["review", one, 1, true],
+    ["review", mixed, 2, true],
+    ["review", two, 1, false], // druhý bod ještě čeká
+    ["review", open, 2, false], // jeden se vrátil / zůstal otevřený
+    ["review", one, 5, false], // řádek není bod ke kontrole
+    ["review", [], 0, false],
+    ["review", mixed, 1, false], // `[x]` už potvrzený, ne ke kontrole
+    ["waiting", one, 1, false],
+    ["running", one, 1, false],
+    ["done", one, 1, false],
+    [undefined, one, 1, false],
+  ];
+  for (const [st, tasks, line, want] of cases) assert.equal(completesBrief(st, tasks, line), want, `${st} ${line}`);
+});
+
+test("saveSendOffer: Uložit a poslat jen u zadání, které jde poslat", () => {
+  const n = (o) => ({ brief: true, editing: false, dirty: false, project: "app", body: "cíl", ...o });
+  const cases = [
+    [n({}), true, { show: true, block: null }],
+    [n({}), undefined, { show: true, block: null }],
+    [n({ project: null }), true, { show: true, block: "project" }],
+    [n({ body: "" }), true, { show: true, block: "goal" }],
+    [n({}), false, { show: true, block: "key" }],
+    [n({ brief: false }), true, { show: false, block: null }], // obyčejná poznámka
+    [n({ editing: true, status: "draft" }), true, { show: false, block: null }], // bez úpravy stačí tlačítko panelu
+    [n({ editing: true, dirty: true, status: "draft" }), true, { show: true, block: null }],
+    [n({ editing: true, dirty: true, status: "running" }), true, { show: false, block: null }],
+    [n({ editing: true, dirty: true, status: "waiting" }), true, { show: false, block: null }], // tam je Pokračovat
+    [n({ editing: true, dirty: true, status: "done" }), true, { show: false, block: null }],
+  ];
+  for (const [note, key, want] of cases) assert.deepEqual(saveSendOffer(note, key), want, JSON.stringify(note));
 });
 
 test("costText: jen skutečná pole", () => {

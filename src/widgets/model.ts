@@ -38,7 +38,9 @@ export function intervalParts(s: number): { n: number; unit: "s" | "min" | "h" }
 
 export type ItemKind = "url" | "open" | "copy" | "run" | null;
 /** Co udělá klik na položku (null = nic, jen text). */
-export const itemKind = (i: WidgetItem): ItemKind => (i.sep ? null : i.url ? "url" : (i.action?.type ?? null));
+export const itemKind = (i: WidgetItem): ItemKind => (i.sep ? null : i.kit ? KIT_KIND[i.kit.type] : i.url ? "url" : (i.action?.type ?? null));
+/** widgetkit: druh akce → druh pro nápovědu a klik (`action` = spuštění uložené akce, `drawer` = otevření šuplíku). */
+const KIT_KIND = { url: "url", open: "open", copy: "copy", action: "run", drawer: "open" } as const;
 
 /** Průběh 0–1 → celá procenta (null = bez průběhu). */
 export const progressPct = (p: number | null | undefined): number | null => (typeof p === "number" && Number.isFinite(p) ? Math.round(Math.min(1, Math.max(0, p)) * 100) : null);

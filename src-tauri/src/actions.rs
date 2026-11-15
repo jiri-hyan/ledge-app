@@ -140,13 +140,14 @@ impl Default for Action {
 }
 
 impl Action {
-    /// Spouští kód s argumenty (příkaz, aplikace s `args`) — bez uloženého souhlasu se potvrzuje.
+    /// Spouští kód (příkaz, aplikace — i bez `args`: `.exe` mohl Claude sám zapsat do projektu, N4) — bez uloženého
+    /// souhlasu se potvrzuje. Soubor je omezený allowlistem přípon (`personal::FILE_ALLOW`), proto souhlas nechce.
     pub fn risky(&self) -> bool {
-        self.kind == ActionKind::Command || (self.kind == ActionKind::App && !self.args.is_empty())
+        matches!(self.kind, ActionKind::Command | ActionKind::App)
     }
 }
 
-fn valid_id(id: &str) -> bool {
+pub fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
@@ -417,7 +418,8 @@ mod tests {
             (cmd.clone(), false, true),
             (cmd.clone(), true, false),
             (Action { confirm: true, ..cmd }, true, true),
-            (act(ActionKind::App, r"C:\a.exe"), false, false),
+            (act(ActionKind::App, r"C:\a.exe"), false, true), // N4: i bez argumentů
+            (act(ActionKind::App, r"C:\a.exe"), true, false),
             (app_args.clone(), false, true),
             (app_args, true, false),
         ];
@@ -505,6 +507,23 @@ mod tests {
         assert_eq!((w.kind, w.width, w.height), (ActionKind::Web, Some(420), None));
         assert_eq!(serde_json::to_value(&w).unwrap(), serde_json::json!({ "id": "yt", "label": "YT Music", "kind": "web", "target": "https://music.youtube.com", "width": 420 }));
         assert!(!w.risky() && !needs_confirm(&w, false));
+    }
+
+    /// N4: souhlas chtějí příkaz i aplikace (s argumenty i bez), ostatní druhy ne.
+    #[test]
+    fn risky_kinds_table() {
+        for (kind, args, risky) in [
+            (ActionKind::Command, vec![], true),
+            (ActionKind::App, vec![], true),
+            (ActionKind::App, vec!["-x".to_string()], true),
+            (ActionKind::File, vec![], false),
+            (ActionKind::Folder, vec![], false),
+            (ActionKind::Url, vec![], false),
+            (ActionKind::Web, vec![], false),
+        ] {
+            let a = Action { kind, args, ..Action::default() };
+            assert_eq!(a.risky(), risky, "{:?}", a.kind);
+        }
     }
 
     /// Starý config bez `actions` platí beze změny; špatná akce shodí validaci celého configu.

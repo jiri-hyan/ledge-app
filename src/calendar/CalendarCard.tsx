@@ -8,9 +8,10 @@ import { createSignal, For, Show, type JSX } from "solid-js";
 import { api, type CalendarDay, type CalendarItem, type Snapshot } from "../api";
 import { ago, fmtDate } from "../format";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { gotoSettingsPanel } from "../palette/goto";
 import { say, sayError } from "../ui/toast";
-import { calColor, joinable, placeLabel, providerName, startsIn, timeLabel, withCalendar } from "./model";
+import { avatarRow, calColor, joinable, meetingSpan, minLabel, oldestFetchedMs, placeLabel, providerName, timeLabel, withCalendar } from "./model";
 import "./calendar.css";
 
 /** Nastavení → Obsah karet → Kalendáře (přidání, úpravy). */
@@ -19,7 +20,7 @@ export function openCalendarSettings(onSettings: () => void) {
   gotoSettingsPanel("f-personal.calendars");
 }
 
-/** w8: Q — zdroj z účtu (Microsoft / Google) se vypíná v Nastavení → Účty, ne v `personal.calendars`. */
+/** w8: Q — zdroj z účtu (Microsoft / Google) se vypíná v Nastavení → Obsah karet → Pokročilé, ne v `personal.calendars`. */
 function openAccountSettings(onSettings: () => void, account: "microsoft" | "google") {
   onSettings();
   gotoSettingsPanel(account === "microsoft" ? "f-accounts.microsoft" : "f-accounts.google");
@@ -73,7 +74,17 @@ async function loadOutlook(setBusy: (b: boolean) => void) {
 function Row(p: { it: CalendarItem; day: string; color: string; now: number }) {
   const time = () => timeLabel(p.it, p.day);
   const place = () => placeLabel(p.it);
-  const soon = () => startsIn(p.it, p.now);
+  /** délka: před schůzkou „za 8 min · 30 min“ (do hodiny), během „běží 35 min · zbývá 12 min“; z hodin aplikace, bez časovače */
+  const span = () => meetingSpan(p.it, p.now);
+  const crowd = () => avatarRow(p.it.people);
+  const running = () => {
+    const s = span();
+    return s?.phase === "running" ? s : null;
+  };
+  const before = () => {
+    const s = span();
+    return s?.phase === "before" ? s : null;
+  };
   return (
     <div class="row cal-row">
       <span class="cal-dot" style={{ background: p.color }} aria-hidden="true" />
@@ -84,8 +95,19 @@ function Row(p: { it: CalendarItem; day: string; color: string; now: number }) {
       <div class="grow">
         <div class="name" classList={{ "cal-now": p.it.ongoing }}>{p.it.title || t("cards.calendar.untitled", "(bez názvu)")}</div>
         <Show when={place()}><div class="sub" title={place()}>{place()}</div></Show>
+        <Show when={running() || crowd().shown.length > 0}>
+          <div class="cal-span">
+            <Show when={running()}>{(r) => <span class="cal-span-run">{t("cards.calendar.spanRunning", "běží {run} · zbývá {left}", { run: minLabel(r().run), left: minLabel(r().left) })}</span>}</Show>
+            <Show when={crowd().shown.length > 0}>
+              <span class="cal-people" title={crowd().names}>
+                <For each={crowd().shown}>{(a) => <span class="cal-av" classList={{ "cal-av-tent": a.tentative }} style={{ background: a.color }} aria-label={a.label}>{a.initials}</span>}</For>
+                <Show when={crowd().more > 0}><span class="cal-av cal-av-more">{t("cards.calendar.morePeople", "+{n}", { n: crowd().more })}</span></Show>
+              </span>
+            </Show>
+          </div>
+        </Show>
       </div>
-      <Show when={soon()}>{(m) => <span class="pill b">{t("cards.calendar.soon", "za {n} min", { n: m() })}</span>}</Show>
+      <Show when={before()}>{(b) => <span class="pill b">{t("cards.calendar.spanBefore", "za {in} · {total}", { in: minLabel(b().startsIn), total: minLabel(b().total) })}</span>}</Show>
       <Show when={p.it.ongoing}><span class="pill g">{t("cards.calendar.ongoing", "teď")}</span></Show>
       <Show when={joinable(p.it, p.now) ? p.it.join : null}>
         {(j) => (
@@ -129,6 +151,10 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
             {status() === "loading" ? t("cards.calendar.loading", "Načítám kalendář…")
               : status() === "unavailable" ? t("cards.calendar.unavailable", "Kalendář se nepodařilo načíst.")
               : t("cards.calendar.notYet", "Kalendář se načte při otevření záložky.")}
+            <Show when={status() === "unavailable"}>
+              <Show when={problems()[0]?.error}>{(e) => <div class="sub err">{e()}</div>}</Show>
+              <Show when={!p.readOnly}><button class="mini" onClick={() => void api.retryOnline().catch(sayError)}>{t("ui.boundary.retry", "Zkusit znovu")}</button></Show>
+            </Show>
           </div>
         }>
           <Show when={lead()}>{(l) => <div class="cal-lead">{l()}</div>}</Show>
@@ -167,7 +193,7 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
                 title={p.readOnly
                   ? t("cards.calendar.chipDesk", "{name} — zapneš nebo vypneš v Nastavení Ledge", { name: c.name })
                   : c.account
-                  ? t("cards.calendar.chipAccount", "{name} ({domain}) — účet nastavíš v Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé", { name: c.name, domain: c.domain })
+                  ? t("cards.calendar.chipAccount", "{name} ({domain}) — účet nastavíš v {path}", { name: c.name, domain: c.domain, path: settingsPath("osobni", "calendars", "accounts") })
                   : c.enabled
                   ? c.domain
                     ? t("cards.calendar.chipOff", "{name} ({domain}) — kliknutím vypneš", { name: c.name, domain: c.domain })
@@ -183,8 +209,8 @@ export default function CalendarCard(p: { s: Snapshot; now: number; onSettings: 
           <Show when={status() === "stale" && fetched()}>
             <span class="pill a" title={problems().length ? "" : t("cards.calendar.oldTitle", "Data jsou starší než 15 minut.")}>{t("cards.calendar.old", "stará data")}</span>
           </Show>
-          <Show when={cals().find((c) => c.fetchedMs)}>
-            {(c) => <span class="cal-meta">{v()?.loading ? t("cards.calendar.refreshing", "obnovuji…") : t("cards.calendar.fetched", "staženo {ago}", { ago: ago(c().fetchedMs!, p.now) })}</span>}
+          <Show when={oldestFetchedMs(cals())}>
+            {(f) => <span class="cal-meta">{v()?.loading ? t("cards.calendar.refreshing", "obnovuji…") : t("cards.calendar.fetched", "staženo {ago}", { ago: ago(f(), p.now) })}</span>}
           </Show>
         </div>
       </Show>

@@ -16,7 +16,7 @@ prázdné). Návod pro uživatele [`docs/ucty.md`](../ucty.md), config `accounts
 | `http.rs` | reqwest bez přesměrování, 15 s, 2 MB, chyby sítě a API lidsky | `post_form`, `get`, `api_error`, `net_error` |
 | `session.rs` | připojení (prohlížeč → loopback → výměna kódu → profil → Správce pověření), access token v paměti s obnovou (serializovaná na účet), odhlášení + revokace, stav pro UI | `connect`, `cancel`, `disconnect`, `access_token`, `api_get`, `connected`, `status`, `AccountView` |
 | `calsync.rs` | kalendáře účtů v kartě Kalendář: politika ICS (`needs_fetch`), vlastní vlákno přes `calendar::source::Source`, zdroje jako `CalInfo` za odkazy ICS | `maybe_refresh`, `infos`, `source`, `forget`, `on_config`, `next_deadline`, `block_on` |
-| `mail.rs` | pošta Microsoft: nepřečtené + 5 hlaviček, obnova (karta 2 min / proužek 5 min), karta, segment proužku | `maybe_refresh`, `view`, `MailView`, `strip_segment`, `due`, `cadence`, `parse_folder`, `parse_messages`, `web_of` |
+| `mail.rs` | pošta Microsoft: nepřečtené + 5 hlaviček, obnova (karta 2 min / proužek 5 min), karta, segment proužku (jen z čerstvého stažení: `strip_unread` skryje po chybě / > 10 min) | `maybe_refresh`, `view`, `MailView`, `strip_segment`, `strip_unread`, `due`, `cadence`, `parse_folder`, `parse_messages`, `web_of` |
 
 Adaptéry kalendáře (worker Q, v oblasti kalendáře): `calendar/graph.rs` (`/me/calendarView`, UTC, celodenní
 podle data, `onlineMeeting.joinUrl`, další stránky jen na Graph), `calendar/google.rs` (`events` se

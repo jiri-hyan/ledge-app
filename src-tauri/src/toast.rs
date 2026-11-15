@@ -7,11 +7,9 @@
 
 use crate::state::log;
 
-/// Přijímá Windows právě oznámení? (`SHQueryUserNotificationState` = ACCEPTS_NOTIFICATIONS; hra,
-/// prezentace, „nerušit“ i celoobrazovková appka = ne.)
+/// Přijímá Windows právě oznámení? (čte `screen::accepts_notifications`, jediné místo QUNS.)
 pub(crate) fn accepts_notifications() -> bool {
-    use windows::Win32::UI::Shell::{QUNS_ACCEPTS_NOTIFICATIONS, SHQueryUserNotificationState};
-    unsafe { SHQueryUserNotificationState() }.is_ok_and(|s| s == QUNS_ACCEPTS_NOTIFICATIONS)
+    crate::screen::accepts_notifications()
 }
 
 /// Text do XML (toast šablona).
@@ -61,6 +59,13 @@ fn show_now(app_id: &str, xml: &str) -> windows::core::Result<()> {
 /// Pošle toast na pozadí (krátké vlákno, nečeká se na něj).
 pub(crate) fn show(app_id: &str, title: String, body: String) {
     show_xml(app_id, toast_xml(&title, &body));
+}
+
+/// Toast hned a ve volajícím vlákně — pro proces, který se bezprostředně ukončí (vlákno by nestihlo odeslat).
+pub(crate) fn show_blocking(app_id: &str, title: &str, body: &str) {
+    if let Err(e) = show_now(app_id, &toast_xml(title, body)) {
+        log(&format!("toast: {e}"));
+    }
 }
 
 /// Hotové XML (`toast_xml_actions`) na pozadí.

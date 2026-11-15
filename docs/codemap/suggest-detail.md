@@ -11,11 +11,11 @@ Cituj symbolem, ne číslem řádku.
 
 | soubor | odpovědnost | klíčové symboly |
 |---|---|---|
-| `src-tauri/src/suggest/conf.rs` | config `suggest` — `clipboard` (výchozí **vypnuto**: čte obsah schránky a potřebuje zapnutou historii), `devServer`, `github`, `reminders`, `githubPulse` (výchozí zapnuto) | `SuggestConfig` |
+| `src-tauri/src/suggest/conf.rs` | config `suggest` — `clipboard` (výchozí **vypnuto**: čte obsah schránky a potřebuje zapnutou historii), `devServer`, `github`, `reminders`, `digest` (zadání / ranní shrnutí / Dnes / Claude od posledně), `githubPulse` (výchozí zapnuto) | `SuggestConfig` |
 | `src-tauri/src/suggest/mod.rs` | snapshot `suggest`: zapnuté zdroje + GitHub z paměti (`github::cached_prs`, jen `Status::Ok`, nikdy dotaz na síť): `refs` (PR k revizi a spadlé CI na mých PR, bez konceptů a bez neověřené adresy), `view`, `on_github_refreshed` (→ `mark_dirty`), `reset_github` | `SuggestView` `GithubRefs` `PrRef` `refs` `view` `on_github_refreshed` `reset_github` |
 | `src-tauri/src/suggest/pulse.rs` | puls proužku u GitHubu: čisté `observe` / `transitions` (nové PR k revizi, nově spadlé CI; první načtení jen založí paměť), `Dedup` (stejná událost nejvýš 1× za 30 min), `on_refreshed` → `attention::signal` | `GhSeen` `transitions` `Dedup` `on_refreshed` `reset` |
 | `src/suggest/model.ts` | čistá logika (test `model.test.mjs`): `pick(input, dismissed, now)` — pořadí připomínka · schůzka (Připojit 10 min před začátkem do konce, jen s `join`) / poznámka ze schůzky (do 15 min po konci) · spadlé CI · PR k revizi · dev server · schránka, jeden chip na druh (`more` = další téhož druhu), strop `MAX_CHIPS`; `dismiss` / `isDismissed` (24 h, v paměti), `clipUrl` (nejnovější položka historie schránky = jedna celá adresa, ≤ 30 min), `isKnown` / `knownLinks` / `normUrl` (adresa už mezi odkazy), `devUrl` (jen loopback), `sameSuggestions` (tik času chipy nepřekreslí) | `pick` `dismiss` `clipUrl` `isKnown` `knownLinks` `normUrl` `devUrl` `sameSuggestions` `MAX_CHIPS` `DISMISS_MS` |
-| `src/suggest/SuggestBar.tsx` | pruh: schránku čte (`clip_list`) jen se zapnutým zdrojem a na událost `cliphist`; akce chipů (otevřít poznámku → `nav.onOpen`, PR → `github_open`, dev server → `open_url`, uložit odkaz, do poznámky); × zavře na 24 h | `SuggestBar` |
+| `src/suggest/SuggestBar.tsx` | pruh: schránku čte (`clip_list`) jen se zapnutým zdrojem a na událost `cliphist`; akce chipů (otevřít poznámku → `nav.onOpen`, PR → `github_open`, dev server → `open_url`, dev s chybami → „Chyba → zadání“ (`actions.ts` `devErrorPreset` → `nav.onNew(preset)`), uložit odkaz, do poznámky); × zavře na 24 h | `SuggestBar` |
 | `src/suggest/actions.ts` | zavřené návrhy (signál v paměti), `saveLink` (nová akce `url` v configu, `get_config` → `save_config`), `urlToNote` (`note_create`) | `closeSuggestion` `saveLink` `urlToNote` `meetingToNote` |
 | `src/suggest/SuggestSettings.tsx` · `suggest.css` · `src/i18n/en-suggest.ts` | přepínače zdrojů v Nastavení → Šuplík a karty → Obsah karet · styly (`sg-*`) · angličtina `cards.suggest.*`, `settings.suggest.*`, `settings.f.suggest.*` | `SuggestSettings` |
 | `src/types/suggest.ts` | zrcadlo `SuggestConfig` / `SuggestView` | |
@@ -25,26 +25,9 @@ Lepidlo: `config/mod.rs` (`Config.suggest`), `snapshot.rs` (`suggest: suggest::v
 `attention.rs` (`Event::GithubCi` / `GithubReview`), `MainPage.tsx` (`<SuggestBar />` nad mřížkou),
 `settings/{labels.ts,panels/Personal.tsx}`, `i18n/dicts.ts`, `types/{index,snapshot}.ts`.
 
-## Karta Dnes (`today`)
-
-Karta z katalogu (ve výchozím rozložení není, průvodce ji nepřidává) — řádky jen z dat, která snapshot už má, žádný dotaz:
-další schůzka dnes (`personal.calendar`, **Připojit** jen s ověřeným `join` → `api.calendarJoin`), připomínky do konce dneška
-(`notes` + `reminders`, klik = otevřít poznámku), PR k revizi (`suggest.github`, čerstvé ≤ `GH_FRESH_MS`, klik = `githubOpen`)
-a reset 5h limitu (`limits`, čerstvý vzorek od `LIMIT_FROM_PCT` = 50 %). Řádek bez dat se nekreslí; bez řádků se nekreslí
-ani karta (`Facts.today` v `layout/model.ts` `shownCards`), v režimu úprav ukáže, co sem patří.
-
-| soubor | odpovědnost | klíčové symboly |
-|---|---|---|
-| `src/cards/today.ts` (+ `today.test.mjs`) | čistá logika: `todayRows(input, now)` v pořadí schůzka · připomínky · PR · limit, `sameRows` (tik času nepřekreslí) | `todayRows` `nextMeeting` `dueReminders` `reviewRow` `limitRow` `endOfDay` `sameRows` `LIMIT_FROM_PCT` |
-| `src/cards/TodayCard.tsx` · `today.css` | karta (třídy `td-*`), `todayInput` ze snapshotu, `useTodayRows` (memo, počítá se jen na záložce s kartou) | `TodayCard` `useTodayRows` `todayInput` |
-
-Napojení: `layout.rs` `CARDS` + `page_has_calendar` (karta Dnes čte kalendář: `section_on("calendar")` je zapnuté i jen s kartou Dnes,
-`calendar::live::card_visible` a `accounts::calsync` hledají kalendář i na ní), `layout/model.ts` `CARD_IDS`/`CARD_INFO`,
-`MainPage.tsx` (`facts.today`, větev `today`). Angličtina `cards.today.*` v `i18n/en-suggest.ts`.
-
 ## Zdroje chipů (odkud a kdy)
 
-- **Schůzka** (`meeting`, `meetingNote`; vypíná je přepínač připomínek) — dnešní události `personal.calendar` s ověřeným `join`, bez celodenních
+- **Schůzka** (`meeting`, `meetingNote`; nezávisí na `suggest.reminders` (L102; vypíná je kalendář nebo jeho `remindMin`)) — dnešní události `personal.calendar` s ověřeným `join`, bez celodenních
   (`currentMeetings`). Kalendář skončené události ze zobrazení hned vyřadí, proto `SuggestBar` schůzky s odkazem pamatuje v paměti
   (`trackMeetings`, 15 min po konci) — poznámku ze schůzky nabídne jen u schůzky, kterou šuplík za běhu aspoň jednou viděl.
   „Připojit“ = `api.calendarJoin` (Rust znovu ověří); „Poznámka ze schůzky“ = `meetingToNote` (`note_create`, titulek
@@ -61,6 +44,15 @@ Napojení: `layout.rs` `CARDS` + `page_has_calendar` (karta Dnes čte kalendář
   http(s) čerstvá ≤ 30 min a není mezi odkazy (akce `url` / `web`, starší `personal.links`). Bez zapnuté historie
   schránky nic (žádný vlastní poslech schránky).
 
+## V1 „Pruh ví“: chipy `briefWaiting` a `claudeSince` (kolo 34)
+
+- Pořadí `pickAll` (L175, k34): zadání čeká na mě · schůzka · připomínka · Dnes · poznámka ze schůzky · Claude od posledně · ranní shrnutí · CI · PR · dev · schránka. KAŽDÝ druh `SuggestKind` má řádek v `hover/priority.ts` `PRIORITY` / `KIND_PRIO` (typ `Record<SuggestKind, Prio>` + `priority.test.mjs` selže na druhu bez řádku); nový druh chipu = řádek tam. Schůzka je před připomínkou (za 10 min je naléhavější než splatná poznámka).
+- Ranní shrnutí (H5): viz `morning.ts`. Výchozí zapnuto (jen složení existujících dat, jednou denně, jde zavřít, při prázdných zdrojích se neukáže; vypíná ho `suggest.digest` (L193; dřív sdílený `reminders`)). Známé omezení: `drawerHiddenAt` se nuluje každým schováním vč. hover doku (viz audit U, nález 1), takže po hover-peeku ráno shrnutí nenabídne.
+- `briefWaiting`: Rust `notes/briefwait.rs` `brief_waiting(all)` přes všechny nehotové poznámky (`status: waiting` = otázka, `review` = kontrola; `done` se nepočítá) → `Snapshot.briefWaiting` (`waiting`, `review`, `first`). Klik = otevřít poznámku (skok na sekci Otázky není).
+- `claudeSince`: vstup `Snapshot.sessions` + `Snapshot.drawerHiddenAt` (Rust `drawer.rs` `hidden_at_ms`, nastaví se při `hide`; `null` = od startu neschován → jen čekající, nic „od posledně“). Klíč dismiss `claude-since:<hiddenAt>`. Klik = `session_open` první čekající / s chybou / doběhlé, kterou jde otevřít.
+- `endReason` = `SessionEnd.reason` z hooku (`claude/activity.rs` `end_reason`, `Session.end_reason` → `Row.end_reason`); text `label.ts` `endReasonLabel`, neznámý / `other` = nic (žádné „spadla“). Session bez nedokončené práce se po `SessionEnd` odebere, důvod proto vidí jen skončené session, které v kartě zůstaly.
+- Gating: `briefWaiting`, ranní shrnutí, `today` a `claudeSince` pod `suggest.digest` (L193; chybí-li klíč, platí `reminders` — `digestOn`), `reminder` pod `suggest.reminders`; `claudeSince` jen se `claudeEnabled`, `briefWaiting` jen s poznámkami. Žádný časovač ani nová hranice `nextChange`.
+
 ## Puls proužku (GitHub)
 
 `github::refresh` → `suggest::on_github_refreshed` → `pulse::on_refreshed`: porovná množiny PR (k revizi, spadlé CI)
@@ -76,3 +68,9 @@ Priorita při souběhu (`Event::rank`): čeká Claude > schůzka > spadlé CI > 
 Rust: `suggest` (`refs_table`, výchozí pohled vypnutého GitHubu), `suggest::conf` (výchozí hodnoty, starý config),
 `suggest::pulse` (tabulka přechodů, dedup, rozhodnutí o pulsu), `attention` (priorita nových událostí). UI:
 `src/suggest/model.test.mjs`. Živé chování (chipy v šuplíku, puls po `gh` obnově) jen ručně.
+
+## Dev chyba → zadání (V3, kolo 34)
+
+- Jádro: `procman/errline.rs` drží posledních ≤ 8 chybových řádků (maskované `mask_secrets`: `?token=`, `Bearer`, `KEY=…`, heslo v URL, tvary GitHub/sk-/AKIA/JWT; ≤ 1024 znaků; za chybou ≤ 3 rámce stacku, do počtu `errors` nejdou). `ProcView.errorLines` jen při `errors > 0`; `cmd` je maskovaný taky. `looks_like_error` = token `error`/`*Error`/`ERR!`/`✘`/`failed to`/`EADDRINUSE`, ne cesta (`error-boundary.tsx`) ani „0 errors“.
+- `model.ts` `pick`: dev proces s `errors > 0` dostane chip i po `DEV_FRESH_MS`; klíč `dev:<id>:<port>:<readyAt>:<errors>` (zavřený se vrátí jen při nových chybách); `Suggestion.errors` / `proc`.
+- Tlačítko „Chyba → zadání“ (jen s `notesEnabled`): `actions.ts` `devErrorPreset` složí `NotePreset {project, kind: "zadani", body}` (`devbrief.ts` `devBriefBody`, test `devbrief.test.mjs`) a otevře editor (`NotesNav.onNew(preset)` → `NoteEditor.applyPreset`, tělo jen do prázdného konceptu). Odeslání = výslovný klik „Uložit a poslat“ (V2), žádné automatické.

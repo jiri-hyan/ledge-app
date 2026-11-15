@@ -2,13 +2,30 @@
 // vyhlazení čar grafů, úhly ručiček, otočné kolečko a sloupky hlasitosti, textový pruh htop, příští schůzka a
 // počasí z existujících dat. Nic se nevymýšlí: bez vzorků / dat vrací null a sekce ukáže prázdný stav.
 // Bez DOM, bez `t()` (test `look.test.mjs`).
+import { FULL_PCT, WARN_PCT } from "../charts/thresholds.ts";
 import { sparkPoints, type Pt } from "../charts/geom.ts";
 import { nextEvents } from "../board/weekModel.ts";
+import { weatherAge } from "../cards/weatherAge.ts";
 import type { CalendarItem, CalendarView } from "../types/calendar.ts";
 
-/** Barva podle zátěže (stejné prahy jako `integrations/format.ts` `loadOf`: 75 % jantar, 90 % červená). */
+/** Prahy „zelená → jantar → červená“: JEDNA tabulka s Rustem (`looks/capsule.rs` `WARN_PCT` / `FULL_PCT`, test `look.test.mjs`)
+ *  a `integrations/format.ts` `loadOf`. */
+export const HEAT_WARN = WARN_PCT;
+export const HEAT_FULL = FULL_PCT;
+/** Kotvy spojité barvy (sRGB 0–1) = Rust `Rgba::GREEN` / `AMBER` / `RED`. */
+const HEAT_RGB = { green: [0.29, 0.87, 0.5], amber: [0.98, 0.75, 0.14], red: [0.97, 0.44, 0.44] } as const;
+
+/** Barva podle zátěže (diskrétně): `var(--green)` do 75 %, `var(--amber)` od 75 %, `var(--red)` od 90 %. */
 export const loadColor = (pct: number | null | undefined): string =>
-  pct == null || !Number.isFinite(pct) ? "var(--green)" : pct >= 90 ? "var(--red)" : pct >= 75 ? "var(--amber)" : "var(--green)";
+  pct == null || !Number.isFinite(pct) ? "var(--green)" : pct >= HEAT_FULL ? "var(--red)" : pct >= HEAT_WARN ? "var(--amber)" : "var(--green)";
+
+/** Spojitá barva `#rrggbb` podle hodnoty (zrcadlo Rust `capsule::heat`): zelená → jantar v `HEAT_WARN` → červená ve `HEAT_FULL`. */
+export function heatHex(pct: number | null | undefined): string {
+  const mix = (a: readonly number[], b: readonly number[], t: number) => a.map((x, i) => x * (1 - t) + b[i] * t);
+  const p = pct == null || !Number.isFinite(pct) ? 0 : pct;
+  const c = p <= 0 ? HEAT_RGB.green : p < HEAT_WARN ? mix(HEAT_RGB.green, HEAT_RGB.amber, p / HEAT_WARN) : p < HEAT_FULL ? mix(HEAT_RGB.amber, HEAT_RGB.red, (p - HEAT_WARN) / (HEAT_FULL - HEAT_WARN)) : HEAT_RGB.red;
+  return "#" + c.map((x) => Math.round(x * 255).toString(16).padStart(2, "0")).join("");
+}
 
 /** Výplň prvku sekce: plná barva (CSS), nebo přechod (`gradient` — komponenta kreslí SVG / CSS přechod). */
 export type Paint = { kind: "solid"; css: string } | { kind: "gradient" };
@@ -97,10 +114,12 @@ export function nextMeeting(cal: CalendarView | null | undefined, now: number): 
 }
 
 /** Počasí pro sekci: teplota, min / max dne a poloha teploty na pruhu dne (0–1), jen z platných dat. */
-export type WeatherIn = { status: string; label: string; data: { temp: number; min: number | null; max: number | null; desc: string; icon: string } | null } | null | undefined;
-export function weatherNow(w: WeatherIn): { temp: number; min: number | null; max: number | null; desc: string; icon: string; label: string; pos: number | null } | null {
+export type WeatherIn = { status: string; label: string; fetchedMs?: number | null; data: { temp: number; min: number | null; max: number | null; desc: string; icon: string } | null } | null | undefined;
+/** `now` zadané = počasí ≥ 3 h staré (nebo bez času stažení) se neukáže (`cards/weatherAge.ts`); bez `now` se věk nehlídá. */
+export function weatherNow(w: WeatherIn, now?: number): { temp: number; min: number | null; max: number | null; desc: string; icon: string; label: string; pos: number | null } | null {
   const d = w?.data;
   if (!w || !d || !Number.isFinite(d.temp) || (w.status !== "ok" && w.status !== "stale")) return null;
+  if (now !== undefined && weatherAge(w, now) === "gone") return null;
   const pos = d.min != null && d.max != null && d.max > d.min ? Math.max(0, Math.min(1, (d.temp - d.min) / (d.max - d.min))) : null;
   return { temp: d.temp, min: d.min, max: d.max, desc: d.desc, icon: d.icon, label: w.label, pos };
 }

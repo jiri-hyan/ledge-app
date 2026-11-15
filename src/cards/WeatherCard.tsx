@@ -2,13 +2,16 @@
 // (nenastaveno / nedostupné / stará data s časem) — nic se nedopočítává. Vzhledy (kolo 25, `weatherDesigns.ts`):
 // klasické (výchozí, beze změny), Živá obloha, Teploměr dne, Plakát, Křivka, Pět dní, Oblouk slunce.
 import { Match, Show, Switch, type JSX } from "solid-js";
-import { type Snapshot } from "../api";
+import { api, type Snapshot } from "../api";
+import { sayError } from "../ui/toast";
 import { ago, num } from "../format";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { drawerShown } from "../media/shown";
 import { gotoSettingsPanel } from "../palette/goto";
 import type { Weather } from "../types/personal";
 import { tempIn } from "./temp";
+import { weatherAge } from "./weatherAge";
 import { weatherDesign } from "./weatherDesigns";
 import { PosterBody, SkyBg, SkyBody, ThermoBody } from "./weatherViews";
 import { ArcBody, CurveBody, WeekBody } from "./weatherViews2";
@@ -16,7 +19,6 @@ import "./personal.css";
 import "./weather.css";
 
 /** Totéž jako `weather::MAX_AGE_MS` v Rustu. */
-const WX_MAX_AGE_MS = 30 * 60 * 1000;
 
 /** `current.time` z Open-Meteo („2026-10-16T07:00“, místní čas místa) → „7:00“, jiný den „15. 10. 7:00“. */
 function observedLabel(iso: string, now: number): string {
@@ -37,18 +39,19 @@ export default function WeatherCard(p: { s: Snapshot; now: number; onSettings: (
   const w = () => p.s.personal.weather;
   const design = () => weatherDesign(p.design);
   // Rust posílá stav jen při změně — stáří dopočítat i z tiku, ať „ok“ nezůstane viset jako čerstvé
-  const old = () => w().status === "stale" || (w().fetchedMs != null && p.now - w().fetchedMs! >= WX_MAX_AGE_MS);
+  const old = () => w().status === "stale" || (w().fetchedMs != null && weatherAge(w(), p.now) !== "fresh");
   return (
     <div class="card wx-card" data-anim data-wx={design()} classList={{ "wx-live": drawerShown() }}>
       <Show when={design() === "sky" && w().data}>{(d) => <SkyBg code={d().code} isDay={d().isDay} />}</Show>
       <h4><span class="ic" style="background:var(--blue)" />{t("cards.weather.title", "Počasí")} <span class="n">{w().label}</span>{p.menu}</h4>
       <Show when={w().data} fallback={
         <Show when={w().status !== "unset"} fallback={
-          <div class="empty">{t("cards.weather.unset", "Vyber město v Nastavení → Šuplík a karty → Obsah karet. Bez něj se nic nestahuje.")} <button class="mini" onClick={() => { p.onSettings(); gotoSettingsPanel("f-personal.weather"); }}>{t("cards.weather.setPlace", "Nastavit místo…")}</button></div>
+          <div class="empty">{t("cards.weather.unset", "Vyber město v {path}. Bez něj se nic nestahuje.", { path: settingsPath("osobni") })} <button class="mini" onClick={() => { p.onSettings(); gotoSettingsPanel("f-personal.weather"); }}>{t("cards.weather.setPlace", "Nastavit místo…")}</button></div>
         }>
           <Show when={w().status === "unavailable"} fallback={<div class="empty">{w().loading ? t("cards.weather.loading", "Načítám počasí…") : t("cards.weather.notYet", "Počasí zatím nenačteno — stáhne se při otevření.")}</div>}>
             <div class="empty">{t("cards.weather.unavailable", "Počasí je nedostupné.")}</div>
             <Show when={w().error}>{(e) => <div class="sub err">{e()}</div>}</Show>
+            <button class="mini" onClick={() => void api.retryOnline().catch(sayError)}>{t("ui.boundary.retry", "Zkusit znovu")}</button>
           </Show>
         </Show>
       }>

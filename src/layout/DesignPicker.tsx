@@ -33,7 +33,7 @@ const THUMBS: Record<string, () => JSX.Element> = {
 const C = (cx: number, cy: number, r: number, o = 1) => <circle cx={cx} cy={cy} r={r} fill="currentColor" opacity={o} />;
 const SUN = (cx: number, cy: number) => <>{C(cx, cy, 3.2)}<path d={`M${cx} ${cy - 6} V${cy - 4.6} M${cx - 6} ${cy} H${cx - 4.6} M${cx + 4.6} ${cy} H${cx + 6} M${cx - 4.2} ${cy - 4.2} L${cx - 3.2} ${cy - 3.2} M${cx + 3.2} ${cy - 3.2} L${cx + 4.2} ${cy - 4.2}`} stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></>;
 const CLOUD = (x: number, y: number, o = 1) => <path d={`M${x} ${y + 6} a3.6 3.6 0 0 1 1-7 a5 5 0 0 1 9.4 1.2 a3 3 0 0 1 .6 5.8 Z`} fill="currentColor" opacity={o} />;
-/** Náhledy karet Počasí a Týden (klíč `card:id`; id `classic` / `week` / `rings` se mezi kartami opakují). */
+/** Náhledy karet Počasí, Kalendář (vzhledy Týdne), Čas a Rychlé dlaždice (klíč `card:id`; id `classic` / `week` / `rings` se mezi kartami opakují). */
 const CARD_THUMBS: Record<string, () => JSX.Element> = {
   "weather:classic": () => <>{SUN(9, 8)}{R(18, 4, 19, 4)}{R(18, 11, 12, 2.5, 0.5)}{R(3, 18, 34, 3, 0.35)}</>,
   "weather:sky": () => <><rect x="2" y="2" width="36" height="20" rx="3" fill="currentColor" opacity="0.18" />{CLOUD(6, 5)}{CLOUD(21, 10, 0.55)}{C(32, 6, 1, 0.9)}{C(28, 4, 0.7, 0.6)}<path d="M9 19 l-1 2 M14 19 l-1 2 M25 19 l-1 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.7" /></>,
@@ -42,12 +42,17 @@ const CARD_THUMBS: Record<string, () => JSX.Element> = {
   "weather:curve": () => <>{R(5, 15, 3, 6, 0.35)}{R(11, 17, 3, 4, 0.35)}{R(17, 13, 3, 8, 0.35)}{R(23, 18, 3, 3, 0.35)}{R(29, 16, 3, 5, 0.35)}{P("M3 12 C9 4 14 4 20 8 S31 12 37 5")}</>,
   "weather:week": () => <>{[3, 8, 13, 18].map((y, i) => <>{R(3, y, 7, 2.2, 0.6)}{R(14 + i * 2, y, 14 - i, 2.2, 0.25)}{R(17 + i * 2, y, 6, 2.2)}</>)}</>,
   "weather:arc": () => <>{P("M4 20 A16 16 0 0 1 36 20", { opacity: 0.3, "stroke-dasharray": "2 3" })}{C(12, 9.6, 3)}{R(2, 20.5, 36, 1.4, 0.4)}</>,
-  "week:strip": () => <>{R(3, 3, 14, 3)}{[0, 1, 2, 3, 4, 5, 6].map((i) => R(3 + i * 5, 10, 4, 7, i === 2 ? 1 : 0.35))}{R(3, 20, 30, 2, 0.4)}</>,
-  "week:month": () => <>{[0, 1, 2, 3, 4].map((r) => [0, 1, 2, 3, 4, 5, 6].map((c) => C(6 + c * 4.6, 4.5 + r * 4.3, r === 2 && c === 3 ? 1.7 : 1, (r + c) % 4 === 0 ? 1 : 0.35)))}</>,
-  "week:tearoff": () => <>{R(9, 2, 22, 4, 0.5)}<rect x="9" y="7" width="22" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />{R(15, 11, 10, 6)}</>,
-  "week:timeline": () => <>{R(3, 11, 34, 1.6, 0.35)}{R(6, 5, 9, 5)}{R(18, 14, 11, 5, 0.6)}{R(31, 5, 5, 5, 0.4)}<path d="M23 3 V21" stroke="currentColor" stroke-width="1.4" /></>,
-  "week:dial": () => <><circle cx="20" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3" /><path d="M20 12 L20 2.5 A9.5 9.5 0 0 1 27.4 6 Z" fill="currentColor" opacity="0.8" /><path d="M20 12 L14 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></>,
-  "week:agenda": () => <>{[3, 9, 15].map((y, i) => <>{C(5, y + 1.5, 1.5, 1 - i * 0.25)}{R(10, y, 20 - i * 3, 3, 0.8 - i * 0.2)}{R(32, y, 5, 3, 0.35)}</>)}{R(3, 21, 34, 1.5, 0.3)}</>,
+  "calendar:list": () => <>{[3, 9, 15].map((y, i) => <>{R(3, y, 7, 3, 0.9 - i * 0.25)}{R(13, y, 24 - i * 4, 3, 0.7 - i * 0.2)}</>)}{R(3, 20, 34, 1.5, 0.3)}</>,
+  "clock:classic": () => <>{R(3, 3, 14, 2.5, 0.5)}{R(3, 8, 26, 8)}{R(3, 19, 18, 2, 0.4)}</>,
+  "clock:big": () => <>{R(3, 3, 34, 12)}{R(10, 18, 20, 3, 0.4)}</>,
+  "winquick:tiles": () => <>{[0, 1, 2, 3].map((i) => R(3 + i * 9.3, 4, 8, 10, i === 0 ? 1 : 0.4))}{R(3, 17, 34, 3, 0.25)}</>,
+  "winquick:toggles": () => <>{R(3, 3, 16, 9)}{R(21, 3, 16, 9, 0.5)}{R(3, 16, 5, 5, 0.6)}{R(10, 17.5, 20, 2, 0.35)}{R(32, 16, 5, 5, 0.6)}</>,
+  "calendar:strip": () => <>{R(3, 3, 14, 3)}{[0, 1, 2, 3, 4, 5, 6].map((i) => R(3 + i * 5, 10, 4, 7, i === 2 ? 1 : 0.35))}{R(3, 20, 30, 2, 0.4)}</>,
+  "calendar:month": () => <>{[0, 1, 2, 3, 4].map((r) => [0, 1, 2, 3, 4, 5, 6].map((c) => C(6 + c * 4.6, 4.5 + r * 4.3, r === 2 && c === 3 ? 1.7 : 1, (r + c) % 4 === 0 ? 1 : 0.35)))}</>,
+  "calendar:tearoff": () => <>{R(9, 2, 22, 4, 0.5)}<rect x="9" y="7" width="22" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" />{R(15, 11, 10, 6)}</>,
+  "calendar:timeline": () => <>{R(3, 11, 34, 1.6, 0.35)}{R(6, 5, 9, 5)}{R(18, 14, 11, 5, 0.6)}{R(31, 5, 5, 5, 0.4)}<path d="M23 3 V21" stroke="currentColor" stroke-width="1.4" /></>,
+  "calendar:dial": () => <><circle cx="20" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2" opacity="0.3" /><path d="M20 12 L20 2.5 A9.5 9.5 0 0 1 27.4 6 Z" fill="currentColor" opacity="0.8" /><path d="M20 12 L14 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></>,
+  "calendar:agenda": () => <>{[3, 9, 15].map((y, i) => <>{C(5, y + 1.5, 1.5, 1 - i * 0.25)}{R(10, y, 20 - i * 3, 3, 0.8 - i * 0.2)}{R(32, y, 5, 3, 0.35)}</>)}{R(3, 21, 34, 1.5, 0.3)}</>,
   "notes:list": () => <>{[3, 9, 15].map((y, i) => <>{R(3, y, 3, 3, 0.9 - i * 0.2)}{R(9, y, 26 - i * 4, 2.2, 0.8 - i * 0.2)}{R(9, y + 3, 14, 1.4, 0.3)}</>)}</>,
   "notes:compact": () => <>{[2, 6.5, 11, 15.5, 20].map((y, i) => R(3, y, 34 - (i % 3) * 6, 2.2, 0.8 - i * 0.1))}</>,
   "notes:cards": () => <>{[0, 1].map((r) => [0, 1, 2].map((c) => <rect x={3 + c * 11.7} y={3 + r * 10} width="10" height="8.5" rx="1.5" fill="currentColor" opacity={0.25 + ((r + c) % 3) * 0.2} />))}</>,

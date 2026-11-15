@@ -25,7 +25,7 @@ registerDict("en", {
   "cards.widget.missing": "The file {file} isn't in the widgets folder — renamed or deleted. Remove the card via ⋯.",
   "cards.widget.noOutput": "The widget hasn't printed anything yet.",
   "cards.widget.notes": "Some of the output couldn't be used",
-  "cards.widget.off": "Widgets are off (Settings → Projects, actions and links → Widgets).",
+  "cards.widget.off": "Widgets are off ({path}).",
   "cards.widget.running": "Running…",
   "cards.widget.stale": "old data",
   "cards.widget.stripOff": "The widget is no longer in the strip.",
@@ -34,7 +34,7 @@ registerDict("en", {
   "cards.widget.waiting": "Loading the widget…",
   // katalog karet a proužek
   "cards.layout.catalog.widgets": "Widgets from scripts",
-  "cards.layout.catalog.noWidgets": "No other widget. Add examples (CNB exchange rate, Docker, GitHub CI, disk…) in Settings → Projects, actions and links → Widgets.",
+  "cards.layout.catalog.noWidgets": "No other widget. Add examples (CNB exchange rate, Docker, GitHub CI, disk…) in {path}.",
   "cards.layout.desc.widget": "A widget from a script in the widgets folder",
   "settings.strip.item.widget": "Widget: {name}",
   // Nastavení

@@ -39,11 +39,13 @@ struct State {
     outcome: Option<Outcome>,
     /// odstup dalšího pokusu po posledním výsledku
     wait_ms: i64,
+    /// neúspěchy sítě za sebou → backoff `Outcome::Offline` (`netstate`)
+    fails: crate::netstate::Fails,
     /// soubor přihlášení při neúspěchu přihlášení: změní se (nové přihlášení) = zkusit hned
     creds_key: FileKey,
 }
 
-static STATE: Mutex<State> = Mutex::new(State { attempt: None, last_ms: None, loading: false, outcome: None, wait_ms: EVERY_MS, creds_key: None });
+static STATE: Mutex<State> = Mutex::new(State { attempt: None, last_ms: None, loading: false, outcome: None, wait_ms: EVERY_MS, fails: crate::netstate::Fails::NEW, creds_key: None });
 
 fn creds_path() -> Option<std::path::PathBuf> {
     crate::dirs::claude_dir().map(|d| d.join(".credentials.json"))
@@ -94,6 +96,10 @@ pub(crate) fn maybe_refresh(opening: bool) {
         if matches!(st.outcome, Some(Outcome::Expired | Outcome::NoLogin)) && st.last_ms.is_none_or(|l| now - l >= crate::incidents::MIN_RETRY_MS) && creds_key() != st.creds_key {
             st.attempt = None;
         }
+        // po probuzení / návratu sítě (`netstate` epocha) se odstup po výpadku počítá znovu od základu
+        if st.outcome == Some(Outcome::Offline) {
+            st.wait_ms = Outcome::Offline.next_after_ms(EVERY_MS, st.fails.count());
+        }
         if !limitsrc::due(now, st.attempt, st.loading, st.wait_ms, newest, EVERY_MS) || !crate::incidents::retry_floor_ok(now, st.last_ms) {
             return;
         }
@@ -109,7 +115,12 @@ pub(crate) fn maybe_refresh(opening: bool) {
                 return; // novější pokus nebo vypnuto
             }
             st.loading = false;
-            st.wait_ms = out.next_after_ms(EVERY_MS);
+            match out {
+                Outcome::Ok => st.fails.ok(),
+                Outcome::Offline | Outcome::Error => st.fails.fail(),
+                _ => {}
+            }
+            st.wait_ms = out.next_after_ms(EVERY_MS, st.fails.count());
             st.creds_key = if matches!(out, Outcome::Expired | Outcome::NoLogin) { creds_key() } else { None };
             if st.outcome != Some(out) && out != Outcome::Ok {
                 log(&format!("limity (Anthropic): {}", out.key()));
@@ -175,27 +186,24 @@ async fn fetch(now: i64) -> Outcome {
 }
 
 async fn get(token: String) -> Result<String, Outcome> {
-    let client = reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .redirect(reqwest::redirect::Policy::none())
-        .user_agent(concat!("Ledge/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|_| Outcome::Error)?;
+    let client = crate::accounts::http::no_redirect().map_err(|_| Outcome::Error)?;
     let mut auth = reqwest::header::HeaderValue::from_str(&format!("Bearer {token}")).map_err(|_| Outcome::NoLogin)?;
     drop(token);
     auth.set_sensitive(true);
     let req = client
         .get(URL)
+        .timeout(TIMEOUT)
         .header(reqwest::header::AUTHORIZATION, auth)
         .header("anthropic-beta", BETA)
         .header(reqwest::header::ACCEPT, "application/json");
-    let mut resp = req.send().await.map_err(|_| Outcome::Error)?;
+    // žádné spojení / termín (síť dole, po probuzení ještě nenaběhla) není chyba serveru → `Offline`, krátký odstup
+    let mut resp = crate::accounts::http::send(req).await.map_err(|e| if e.is_connect() || e.is_timeout() { Outcome::Offline } else { Outcome::Error })?;
     let out = limitsrc::outcome_of_status(resp.status().as_u16());
     if out != Outcome::Ok {
         return Err(out);
     }
     let mut buf = Vec::new();
-    while let Some(chunk) = resp.chunk().await.map_err(|_| Outcome::Error)? {
+    while let Some(chunk) = resp.chunk().await.map_err(|e| if e.is_timeout() { Outcome::Offline } else { Outcome::Error })? {
         buf.extend_from_slice(&chunk);
         if buf.len() > MAX_BODY {
             return Err(Outcome::Error);

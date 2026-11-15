@@ -85,7 +85,7 @@ test("selektor zástupců sedí s kartami: třídy v komponentách existují", (
   const sel = read("./quick.ts").match(/QUICK_SELECTOR = "([^"]+)"/)[1];
   const classes = [...sel.matchAll(/\.([a-z-]+)/g)].map((m) => m[1]).filter((c) => c !== "deck");
   assert.deepEqual([...classes].sort(), ["act-tile", "link-row", "proj-hit"]);
-  const files = { "proj-hit": "../cards/ProjectTile.tsx", "act-tile": "../cards/ActionsCard.tsx", "link-row": "../cards/LinksCard.tsx" };
+  const files = { "proj-hit": "../cards/ProjectTile.tsx", "act-tile": "../cards/ActionsCard.tsx", "link-row": "../cards/ActionsCard.tsx" };
   for (const c of classes) assert.ok(read(files[c]).includes(c), c);
   assert.ok(read("../layout/Deck.tsx").includes('"deck'), "mřížka karet je .deck");
 });

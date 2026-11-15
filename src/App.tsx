@@ -1,14 +1,15 @@
 // Skořápka šuplíku: drží snapshot (`api.on("state")` → store → stránky), stránky a navigaci, morf
 // proužek ⇄ šuplík (`prepare` / `play` / `closing` + `motion.ts`, měřeno v `drawer.anim`), hlášení
 // výšky obsahu (`report`) a fokus (jen výslovný klik → `focusDrawer`, odchod → `releaseFocus`). Malé
-// pohledy (peek, náhled po najetí `compact` / `island`) kreslí `hover/SmallView.tsx` stejným morfem.
+// pohledy (peek, náhled po najetí `island` / `dock`) kreslí `hover/SmallView.tsx` stejným morfem.
 // Vzhled (motiv, animace) aplikuje `theme/apply.ts` (`initAppearance` v onMount).
 // Karty jsou v `cards/`, hlavní stránka v `MainPage.tsx`, poznámky v `notes/`. Nastavení, průvodce, paleta, Poznámky a
-// panel „Nová verze“ jsou líné chunky (`lazyViews.tsx`), přednačtené v klidu po prvním otevření šuplíku.
+// panel „Nová verze“ jsou líné chunky (`lazyViews.tsx`); v klidu po prvním otevření se přednačte jen paleta a Poznámky, zbytek až při potřebě.
 // loader anglických slovníků (líný chunk, jen pro jazyk ≠ cs) dřív než cokoli, co volá setLang()
 import "./i18n/load";
+import { now, setNow } from "./clock";
 import Backdrop from "./theme/BackdropLayer";
-import { createSignal, Show, onMount, onCleanup, createEffect, on as onChange } from "solid-js";
+import { createSignal, createMemo, Show, onMount, onCleanup, createEffect, on as onChange } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { api, on, type Snapshot, type View, type ViewMsg, type NoteView } from "./api";
 import { IconShield } from "./icons";
@@ -21,31 +22,39 @@ import { wantWidth } from "./settings/widen";
 import MainPage from "./MainPage";
 import Head from "./cards/Head";
 import SmallView from "./hover/SmallView";
+import Mid from "./hover/Mid";
+import { dockMode } from "./hover/dockmode";
 import { isHoverView, smallWidth } from "./hover/model";
 import { asPage, typing, type Page } from "./nav";
+import { DORMANT_AFTER_MS, isDormant } from "./dormant";
+import { dropLogos } from "./logos";
+import { dropCovers } from "./media/covers";
 import { EMPTY_SNAPSHOT } from "./snapshot";
 import { Toast, say } from "./ui/toast";
 import { ConfigNotice } from "./ConfigNotice";
 import UndoBar from "./notes/UndoBar";
+import { isTextTarget, typeToPalette } from "./palette/typeto";
 import { gotoSettingsPanel, openSettings, setStudioFallback } from "./palette/goto";
 import { checkFirstRun, startWizard, wizardOpen } from "./onboarding/state";
 import { askEdit, beginEdit, cancelEdit, catalogOpen, draft, editAsk, editing, escEdit, resumeEdit, setCatalogOpen, setEditPage } from "./layout/edit";
 import { normalizeLayout } from "./layout/model";
-import { NoteEditor, NotesPage, Palette, Settings, UpdatePanel, Wizard, preloadViews } from "./lazyViews";
+import { NoteEditor, NotesPage, Palette, Settings, UpdatePanel, Wizard, lazyCardIds, preloadCards, preloadEditViews, preloadUpdatePanel, preloadViews } from "./lazyViews";
 import { installQuickKeys } from "./quick/quick";
 import "./quick/quick.css";
 import { clearDrop, offerDrop } from "./actions/dropstate";
 import { mainHeight } from "./layout/drawerSize";
 import { contentHeight } from "./theme/size";
 import Boundary from "./ui/Boundary";
+import "./widgetkit/clickFull";
 
 export default function App() {
   const [s, setS] = createStore<Snapshot>(structuredClone(EMPTY_SNAPSHOT));
   const [view, setView] = createSignal<View>("hidden");
-  /** náhled po najetí (compact / island): za kolik ms se sám rozbalí — z `view` (`drawer.hoverExpandMs`) */
+  /** náhled po najetí (island / dok): za kolik ms se sám rozbalí — z `view` (`drawer.hoverExpandMs`) */
   const [expandMs, setExpandMs] = createSignal(0);
+  /** karty středního panelu z docku (`drawer.dockCards`, ověřené v Rustu) — z `view` */
+  const [dockCards, setDockCards] = createSignal<string[]>([]);
   const [page, setPage] = createSignal<Page>("main");
-  const [now, setNow] = createSignal(Date.now());
   /** panel „Nová verze“ (poznámky k vydání + Instalovat) — otevírá chip v hlavičce */
   const [updOpen, setUpdOpen] = createSignal(false);
   let panel!: HTMLDivElement;
@@ -76,13 +85,15 @@ export default function App() {
     setPage("notes");
     api.focusDrawer();
   }
-  const notesNav = { onNew: (kind?: string) => startNote(kind ? { kind } : null), onOpen: editNote, onAll: allNotes };
+  const notesNav = { onNew: (kind?: string | NotePreset) => startNote(typeof kind === "string" ? (kind ? { kind } : null) : (kind ?? null)), onOpen: editNote, onAll: allNotes };
+  // ve středním panelu (L147) stránky poznámek / nastavení nejsou: karta přepne stránku a panel se rozbalí do celého šuplíku
+  const midNav = { onNew: (kind?: string | NotePreset) => { notesNav.onNew(kind); void api.expandDrawer(); }, onOpen: (n: NoteView) => { notesNav.onOpen(n); void api.expandDrawer(); }, onAll: (personal?: boolean) => { notesNav.onAll(personal); void api.expandDrawer(); } };
 
   // ---------- paleta příkazů (Ctrl+K s fokusem, 🔍 klikem — jen klik si bere fokus) ----------
-  const [palette, setPalette] = createSignal<{ took: boolean } | null>(null);
-  const openPalette = (click: boolean) => {
+  const [palette, setPalette] = createSignal<{ took: boolean; q?: string } | null>(null);
+  const openPalette = (click: boolean, q?: string) => {
     if (click) api.focusDrawer();
-    setPalette({ took: click });
+    setPalette({ took: click, q });
   };
   const closePalette = () => {
     if (palette()?.took) api.releaseFocus();
@@ -112,6 +123,7 @@ export default function App() {
   function prepare(msg: ViewMsg) {
     const fromVisible = view() !== "hidden";
     setExpandMs(msg.expandMs ?? 0);
+    setDockCards(msg.dockCards ?? []);
     setView(msg.view);
     if (msg.view === "hidden") {
       // skrytí bez morfu (bez `closing`) — příště začít na hlavní stránce
@@ -130,6 +142,9 @@ export default function App() {
       pending = plan;
       api.animAck("prepared");
     } else {
+      // bez plánu morfu: `closing` nechal na `[data-anim]` animace `fill: "forwards"` (opacity 0) — bez zrušení by po doběhu
+      // naskočení vrátily obsah zpět na průhledný (animace „none“ / otevření bez morfu)
+      preHide(content);
       revealContent(content, 40);
       if (msg.morph) api.animAck("prepared");
     }
@@ -211,20 +226,27 @@ export default function App() {
       if (e.key === "Escape") {
         if (page() === "settings" || page() === "notes") setPage("main");
         else api.close();
-      } else if (!e.ctrlKey && !e.altKey && !["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement).tagName)) {
+      } else if (!e.ctrlKey && !e.altKey && !isTextTarget(e.target as HTMLElement)) {
         // 1–9 = záložka v pořadí z `layout` (v úpravách jen rozpracovaná)
         const n = Number(e.key);
         if (Number.isInteger(n) && n >= 1 && n <= 9) {
           const pg = (draft() ?? normalizeLayout(s.layout)).pages[n - 1];
           if (pg && editing()) setEditPage(pg.id);
           else if (pg) void api.setMode(pg.id);
+        } else if (!palette() && !editing() && page() === "main" && view() === "full") {
+          // psaní v šuplíku s fokusem na těle = rovnou do palety (bez Ctrl+K)
+          const ch = typeToPalette(e, e.target as HTMLElement);
+          if (ch) {
+            e.preventDefault();
+            openPalette(false, ch);
+          }
         }
       }
     };
     window.addEventListener("keydown", key);
     onCleanup(() => window.removeEventListener("keydown", key));
-    // Alt+1…9 = N-tý zástupce, šipky mezi zástupci (`quick/`, volba `smart.quickKeys`)
-    onCleanup(installQuickKeys(() => ({ enabled: s.smart?.quickKeys ?? false, page: page(), editing: editing(), paletteOpen: !!palette() })));
+    // Alt+1…9 = N-tý zástupce, šipky mezi zástupci (`quick/`, vždy zapnuto od kola 33)
+    onCleanup(installQuickKeys(() => ({ enabled: true, page: page(), editing: editing(), paletteOpen: !!palette() })));
 
     // reflektor pod kurzorem pro karty a dlaždice (jen CSS proměnné, žádný re-render)
     const spot = (e: PointerEvent) => {
@@ -250,7 +272,7 @@ export default function App() {
     if (!content || view() === "hidden") return;
     const v = view();
     const h = contentHeight(content.getBoundingClientRect().height, content.offsetHeight) - OVERLAP;
-    api.reportSize(v, smallWidth(v) ?? wantWidth(page()), h, v === "full" && h < 300 && h !== lowLogged ? lowDiag() : undefined);
+    api.reportSize(v, smallWidth(v, dockMode() === true) ?? wantWidth(page()), h, v === "full" && h < 300 && h !== lowLogged ? lowDiag() : undefined);
     if (v === "full" && h < 300) lowLogged = h;
   }
   // diagnostika „uříznutého šuplíku“ (0.11.x): co přesně určilo nízkou výšku → řádek v ledge.log
@@ -270,6 +292,17 @@ export default function App() {
     onCleanup(() => clearInterval(tick));
   });
   createEffect(onChange([view, page], () => queueMicrotask(report)));
+  // skrytý déle než `DORMANT_AFTER_MS` → strom v `.content` se odmontuje (`dormant.ts`); jednorázový časovač při přechodu
+  // do `hidden`, zrušený návratem (žádné periodické buzení). Návrat = `hiddenLong` false ještě v téže synchronní dávce jako `setView`.
+  const [hiddenLong, setHiddenLong] = createSignal(false);
+  createEffect(() => {
+    if (view() !== "hidden") return setHiddenLong(false);
+    const t = window.setTimeout(() => setHiddenLong(true), DORMANT_AFTER_MS);
+    onCleanup(() => clearTimeout(t));
+  });
+  const dormant = () => isDormant({ view: view(), page: page(), editing: editing(), hiddenLong: hiddenLong() });
+  // odmontovaný strom už loga nepotřebuje — uvolnit data URL (příští zobrazení je vyžádá znovu)
+  createEffect(() => dormant() && (dropLogos(), dropCovers()));
   createEffect(onChange(view, (v) => v === "hidden" && setPalette(null), { defer: true }));
   // zavřený šuplík rozpracované úpravy rozložení NEzahodí (draft i Zpět žijí v `edit.ts`); po znovuotevření
   // fokus zpět + připomínka. Výslovný odchod na jinou stránku je zahodí.
@@ -289,6 +322,12 @@ export default function App() {
   // líné pohledy (Nastavení, paleta…) se přednačtou až po prvním zobrazení šuplíku, v klidu
   createEffect(() => view() === "full" && preloadViews());
   createEffect(() => view() === "full" && wizardOpen() && setPage("welcome"));
+  // chunky lazy karet, které rozložení opravdu obsahuje (ostatní se nenačtou vůbec); klíč = seznam id, takže se to spustí jen při změně skladby
+  const cardKey = createMemo(() => lazyCardIds(normalizeLayout(s.layout).pages.flatMap((pg) => pg.cards.map((c) => c.id))).join(","), "", { equals: (a, b) => a === b });
+  createEffect(() => preloadCards(cardKey().split(",").filter(Boolean)));
+  // katalog a vzhled karty (úpravy) a panel „Nová verze“: chunk až při potřebě, ne spolu s ostatními v klidu
+  createEffect(() => editing() && preloadEditViews());
+  createEffect(() => (s.update.state === "dostupna" || s.update.whatsNew?.unread) && preloadUpdatePanel());
   // z poznámky zpět na šuplík (Zpět, uložení, Esc) → opener jako před `focusDrawer`
   createEffect(onChange(page, (pg, prev) => prev && typing(prev) && !typing(pg) && view() !== "hidden" && api.releaseFocus(), { defer: true }));
 
@@ -297,11 +336,13 @@ export default function App() {
       <Backdrop open={() => view() === "full"} />
       <div ref={content} style={{ "padding-top": `${OVERLAP}px` }}>
         <Show when={view() === "peek" || isHoverView(view())} fallback={
-          <div class="content" style={{ height: page() === "main" ? mainHeight() : undefined }}>
+          <Show when={view() === "mid"} fallback={
+          <div class="content" style={{ height: page() === "main" && !dormant() ? mainHeight() : undefined }}>
+            <Show when={!dormant()}>
             <Show when={page() !== "welcome"}>
               <Head s={s} now={now()} page={page()} onNote={() => startNote()} onSettings={() => (page() === "settings" ? setPage("main") : openSettings())} onBack={() => setPage(page() === "note" ? returnTo() : "main")} onUpdate={() => setUpdOpen(!updOpen())} onPalette={() => (palette() ? closePalette() : openPalette(true))} />
             </Show>
-            <Show when={palette()}>{(pl) => <Palette s={s} took={pl().took} nav={palNav} onClose={() => setPalette(null)} />}</Show>
+            <Show when={palette()}>{(pl) => <Palette s={s} took={pl().took} initial={pl().q} nav={palNav} onClose={() => setPalette(null)} />}</Show>
             <Show when={s.cfgError}>
               <div class="banner" data-anim><IconShield /> <span>{s.cfgError}</span></div>
             </Show>
@@ -316,7 +357,11 @@ export default function App() {
             <Show when={page() === "welcome"}><Wizard onExit={() => setPage("main")} /></Show>
             <Show when={page() === "notes"}><NotesPage s={s} now={now()} onOpen={editNote} onNew={notesNav.onNew} /></Show>
             </Boundary>
+            </Show>
           </div>
+          }>
+            <Mid s={s} now={now()} cards={dockCards()} nav={midNav} onNote={(pr) => { startNote(pr ?? null); void api.expandDrawer(); }} onSettings={() => { openSettings(); void api.expandDrawer(); }} />
+          </Show>
         }>
           <SmallView view={view()} s={s} now={now()} expandMs={expandMs()} />
         </Show>

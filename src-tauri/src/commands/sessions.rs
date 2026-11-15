@@ -63,7 +63,7 @@ pub(crate) fn question_release(id: u64) -> bool {
 #[tauri::command]
 pub(crate) fn question_seen(id: u64) -> bool {
     let c = core();
-    crate::claude::unseen::seen_counts(c.drawer.view() != crate::drawer::View::Hidden, c.dead()) && c.claude.question_seen(id)
+    crate::claude::unseen::seen_counts(c.drawer.view() != crate::drawer::View::Hidden, c.dead_surface()) && c.claude.question_seen(id)
 }
 
 #[tauri::command(async)]

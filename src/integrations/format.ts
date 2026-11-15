@@ -1,6 +1,7 @@
 // Čistá logika karet Systém a GitHub (bez importů za běhu — test `format.test.mjs`): velikosti a rychlosti
 // sítě v čitelných jednotkách, body sparklinu, úroveň vytížení, výběr disků a stav CI/revize u PR.
 // Čísla se formátují předanou funkcí `f(value, digits)` (UI dává `num` podle jazyka, test výchozí tečku).
+import { FULL_PCT, WARN_PCT } from "../charts/thresholds.ts";
 
 export type NetUnit = "bytes" | "bits";
 export type Fmt = (v: number, digits: number) => string;
@@ -57,7 +58,7 @@ export const HISTORY = 60;
 /** Body `polyline` pro sparkline v poli `w × h`: nejnovější vzorek vpravo, stará data se zleva nedoplňují
  *  (graf roste zprava). `max` = strop osy (u procent 100); bez něj největší hodnota, nejméně `floor`.
  *  Méně než 2 vzorky = prázdné (nic se nekreslí). Svislý okraj 1 px, ať čára nezmizí na hraně. */
-export function sparkPoints(values: readonly number[], w: number, h: number, max?: number, floor = 1): string {
+export function historyPoints(values: readonly number[], w: number, h: number, max?: number, floor = 1): string {
   const v = values.slice(-HISTORY).filter((x) => Number.isFinite(x));
   if (v.length < 2) return "";
   const top = max ?? Math.max(floor, ...v);
@@ -74,7 +75,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export type Load = "ok" | "warm" | "hot";
 /** Úroveň vytížení (CPU, paměť) podle procent: od 75 % žlutá, od 90 % červená (shodně s proužkem). */
-export const loadOf = (pct: number | null | undefined): Load => (pct == null ? "ok" : pct >= 90 ? "hot" : pct >= 75 ? "warm" : "ok");
+export const loadOf = (pct: number | null | undefined): Load => (pct == null ? "ok" : pct >= FULL_PCT ? "hot" : pct >= WARN_PCT ? "warm" : "ok");
 
 /** Úroveň zaplnění disku: červená, když zbývá míň než 10 % (nebo 10 GB), žlutá pod 20 %. */
 export function diskLoad(free: number, total: number): Load {

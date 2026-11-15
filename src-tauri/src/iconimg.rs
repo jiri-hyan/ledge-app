@@ -78,6 +78,61 @@ pub(crate) fn decode_bgra(bytes: &[u8], max_px: u64) -> Option<(u32, u32, Vec<u8
     run().ok()
 }
 
+/// Fotka libovolného formátu, který umí WIC → JPEG zmenšený do `max`×`max` (poměr stran se zachová, nikdy
+/// nezvětšuje). Vstup nad `MAX_PHOTO_PX` pixelů = `None` (bomba v dekodéru). Pro pozadí tapety (`ext/wall/bg.rs`).
+pub fn to_jpeg(bytes: &[u8], max: u32) -> Option<Vec<u8>> {
+    let _com = Com::init();
+    let run = || -> Result<Vec<u8>> {
+        let f = factory()?;
+        unsafe {
+            let stream = f.CreateStream()?;
+            stream.InitializeFromMemory(bytes)?;
+            let dec = f.CreateDecoderFromStream(&stream, std::ptr::null(), WICDecodeMetadataCacheOnDemand)?;
+            let frame: IWICBitmapSource = dec.GetFrame(0)?.cast()?;
+            let (mut w, mut h) = (0, 0);
+            frame.GetSize(&mut w, &mut h)?;
+            if w == 0 || h == 0 || w as u64 * h as u64 > MAX_PHOTO_PX {
+                return Err(Error::from(E_FAIL));
+            }
+            let (tw, th) = fit(w, h, max);
+            let src: IWICBitmapSource = if (tw, th) == (w, h) {
+                frame
+            } else {
+                let scaler = f.CreateBitmapScaler()?;
+                scaler.Initialize(&frame, tw, th, WICBitmapInterpolationModeFant)?;
+                scaler.cast()?
+            };
+            // JPEG nemá alfu: převod na BGR ji zahodí
+            let bgr = convert(&f, &src, &GUID_WICPixelFormat24bppBGR)?;
+            let out = CreateStreamOnHGlobal(HGLOBAL::default(), true)?;
+            let enc = f.CreateEncoder(&GUID_ContainerFormatJpeg, std::ptr::null())?;
+            enc.Initialize(&out, WICBitmapEncoderNoCache)?;
+            let (mut fr, mut props) = (None, None);
+            enc.CreateNewFrame(&mut fr, &mut props)?;
+            let fr = fr.ok_or_else(|| Error::from(E_FAIL))?;
+            fr.Initialize(props.as_ref())?;
+            fr.SetSize(tw, th)?;
+            let mut fmt = GUID_WICPixelFormat24bppBGR;
+            fr.SetPixelFormat(&mut fmt)?;
+            fr.WriteSource(&bgr, std::ptr::null())?;
+            fr.Commit()?;
+            enc.Commit()?;
+            let mut len = 0u64;
+            out.Seek(0, STREAM_SEEK_END, Some(&mut len))?;
+            out.Seek(0, STREAM_SEEK_SET, None)?;
+            let mut buf = vec![0u8; len as usize];
+            let mut read = 0u32;
+            out.Read(buf.as_mut_ptr().cast(), len as u32, Some(&mut read)).ok()?;
+            buf.truncate(read as usize);
+            Ok(buf)
+        }
+    };
+    run().ok()
+}
+
+/// Strop pixelů vstupní fotky (~100 Mpx) — víc dekodér nedostane.
+pub const MAX_PHOTO_PX: u64 = 100_000_000;
+
 fn decode_largest(bytes: &[u8]) -> Result<Vec<u8>> {
     let f = factory()?;
     unsafe {

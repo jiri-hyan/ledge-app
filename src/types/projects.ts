@@ -1,5 +1,5 @@
-/** `compact` / `island` = náhled po najetí (`drawer.hover`, `src/hover/*`, Rust `hovermode.rs`) */
-export type View = "hidden" | "peek" | "full" | "compact" | "island";
+/** `compact` / `island` = náhled po najetí (`drawer.hover = "dock"` kreslí `island`) (`drawer.hover`, `src/hover/*`, Rust `hovermode.rs`) */
+export type View = "hidden" | "peek" | "full" | "island" | "mid";
 
 export interface ViewMsg {
   view: View;
@@ -12,6 +12,12 @@ export interface ViewMsg {
   maxH: number;
   /** náhled po najetí: po kolika ms setrvání rozbalit celý šuplík (`drawer.hoverExpandMs`), 0 = jen klikem; chybí = staré jádro */
   expandMs?: number;
+  /** karty středního panelu (`drawer.dockCards` po ověření v Rustu); chybí = staré jádro */
+  dockCards?: string[];
+  /** okno je upevněné 📌 (`Opener::Pinned`) — stav tlačítka v docku / středním panelu; chybí = staré jádro (neupevněné) */
+  pinned?: boolean;
+  /** `drawer.hover == dock` (L130): `island` kreslí dok (jádro posílá pole vždy) */
+  dock: boolean;
 }
 export type Phase = "preparing" | "starting" | "ready" | "running" | "exited" | "failed";
 
@@ -82,6 +88,8 @@ export interface ProcView {
   message: string | null;
   lastLine: string | null;
   errors: number;
+  /** posledních ≤ 8 chybových řádků (maskované tajné údaje) + krátký stack; jen při `errors > 0` */
+  errorLines?: string[];
   /** odkud a co běží (složka, příkaz s portem / exe) */
   cwd?: string | null;
   cmd?: string | null;

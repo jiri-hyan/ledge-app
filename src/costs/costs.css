@@ -20,6 +20,8 @@
 .cost-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
 .cost-bar { display: block; width: 100%; min-height: 1px; border-radius: 2px 2px 0 0; background: var(--violet); transition: height var(--dur-3) var(--ease); }
 .cost-bar.dim { opacity: 0.35; }
+/* den jen s nenacenými tokeny: cena neznámá (ne 0 $) — proužek místo sloupce */
+.cost-bar.unk { height: 6px !important; background: repeating-linear-gradient(45deg, var(--violet) 0 2px, transparent 2px 4px); }
 .cost-h { font: 700 var(--fs-2xs) var(--sans); color: var(--t3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: var(--s1); }
 .cost-line { display: grid; grid-template-columns: minmax(0, 1fr) 3.5em 4.2em 4.6em; align-items: center; gap: var(--s2); font: var(--fs-xs) var(--mono); color: var(--t2); }
 .cost-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--sans); }

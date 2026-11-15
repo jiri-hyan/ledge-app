@@ -2,7 +2,8 @@
 //   node --experimental-strip-types --test src/notch/look.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chartPaths, eqLit, handAngles, htopBar, knobAngle, lastBars, loadColor, nextMeeting, nudge, paintOf, smoothPath, weatherNow, weightPx } from "./look.ts";
+import { readFileSync } from "node:fs";
+import { HEAT_FULL, HEAT_WARN, heatHex, chartPaths, eqLit, handAngles, htopBar, knobAngle, lastBars, loadColor, nextMeeting, nudge, paintOf, smoothPath, weatherNow, weightPx } from "./look.ts";
 
 test("barva: akcent, zátěž, přechod, hex", () => {
   const cases = [
@@ -10,6 +11,8 @@ test("barva: akcent, zátěž, přechod, hex", () => {
     ["accent", 99, { kind: "solid", css: "var(--accent)" }],
     ["load", 20, { kind: "solid", css: "var(--green)" }],
     ["load", 80, { kind: "solid", css: "var(--amber)" }],
+    ["load", 74, { kind: "solid", css: "var(--green)" }],
+    ["load", 90, { kind: "solid", css: "var(--red)" }],
     ["load", 95, { kind: "solid", css: "var(--red)" }],
     ["gradient", 10, { kind: "gradient" }],
     ["#112233", 10, { kind: "solid", css: "#112233" }],
@@ -53,6 +56,11 @@ test("příští schůzka: jen s časem, neskončená; bez kalendáře null", ()
 
 test("počasí: jen platná data, poloha na pruhu dne", () => {
   const w = (status, data) => ({ status, label: "app", data });
+  // věk: bez `now` se nehlídá; s `now` ≥ 3 h nebo bez času stažení = nic
+  const d0 = { temp: 5, min: 0, max: 10, desc: "", icon: "" };
+  assert.equal(weatherNow({ status: "ok", label: "", data: d0, fetchedMs: 0 }, 3 * 3_600_000), null);
+  assert.equal(weatherNow({ status: "ok", label: "", data: d0, fetchedMs: 1 }, 3 * 3_600_000 - 1)?.temp, 5);
+  assert.equal(weatherNow({ status: "ok", label: "", data: d0 }, 1000), null);
   assert.equal(weatherNow(null), null);
   assert.equal(weatherNow(w("unset", null)), null);
   assert.equal(weatherNow(w("unavailable", { temp: 5, min: 0, max: 10, desc: "", icon: "" })), null);
@@ -64,4 +72,15 @@ test("tečky pod dnem: počet událostí, strop, bez kalendáře 0", async () =>
   const { dotsOf } = await import("./look.ts");
   const cal = { status: "ok", calendars: [], days: [{ kind: "today", date: "2026-04-10", items: [1, 2, 3, 4, 5] }, { kind: "tomorrow", date: "2026-04-11", items: [1] }] };
   assert.deepEqual([dotsOf(cal, "2026-04-10"), dotsOf(cal, "2026-04-11"), dotsOf(cal, "2026-04-12"), dotsOf(null, "2026-04-10")], [3, 1, 0, 0]);
+});
+
+test("heat: prahy = Rust capsule.rs (jedna pravda) a pevné body spojité barvy", () => {
+  const rs = readFileSync(new URL("../../src-tauri/src/looks/capsule.rs", import.meta.url), "utf8");
+  assert.equal(Number(/pub const WARN_PCT: f64 = ([\d.]+);/.exec(rs)[1]), HEAT_WARN);
+  assert.equal(Number(/pub const FULL_PCT: f64 = ([\d.]+);/.exec(rs)[1]), HEAT_FULL);
+  // loadOf / level čtou tutéž tabulku: `charts/thresholds.test.mjs`
+  // kotvy: 0 zelená (#4ade80), 75 jantar (#fabf24), od 90 červená (#f77070); střed zelená→jantar; nesmysl = zelená
+  for (const [p, want] of [[0, "#4ade80"], [null, "#4ade80"], [NaN, "#4ade80"], [-3, "#4ade80"], [75, "#fabf24"], [90, "#f77070"], [100, "#f77070"], [250, "#f77070"], [37.5, "#a2cf52"]])
+    assert.equal(heatHex(p), want, String(p));
+  assert.ok(parseInt(heatHex(60).slice(1, 3), 16) < parseInt(heatHex(70).slice(1, 3), 16), "červená složka roste");
 });

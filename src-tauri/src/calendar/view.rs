@@ -22,6 +22,9 @@ pub struct Item {
     pub tz_guess: bool,
     /// odkaz „Připojit“ (`meeting::Join`), `null` = událost žádný nemá
     pub join: Option<super::meeting::Join>,
+    /// účastníci (L85); prázdní se neserializují — UI avatary nekreslí
+    #[serde(skip_serializing_if = "super::people::Crowd::is_empty")]
+    pub people: super::people::Crowd,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -86,6 +89,7 @@ pub fn pick(occs: &[(usize, &Occ)], now: i64, local: &dyn LocalTz, max_rows: usi
                 ongoing: !o.all_day && o.start <= now && now < eff_end(o),
                 tz_guess: o.tz_guess,
                 join: o.join.clone(),
+                people: o.people.clone(),
             })
             .collect();
         v.sort_by(|a, b| (!a.all_day, a.start, &a.title, a.cal).cmp(&(!b.all_day, b.start, &b.title, b.cal)));

@@ -20,7 +20,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   sloupce a mezery karet; `notch` = **široký notch** z kola 22: šuplík v pevné šířce 720 px bez ohledu na `width`,
   nahoře lišta sekcí z karet záložky — přehrávač (karta `media`, jen když něco hraje) | dny týdne s velkým měsícem
   a časem (karta `clock`) | systém s mini grafy (karta `system`, vzorek po 2 s jen s otevřeným šuplíkem) |
-  svislá hlasitost (karta `media`; velké hodiny `bigclock` = dny); ostatní karty pod lištou ve 2 sloupcích; v režimu úprav běžná mřížka), `width` (`custom` = `drawer.width` | `narrow` 820 | `medium` 1080 | `wide` 1440 |
+  svislá hlasitost (karta `media`; karta `clock` (i ve vzhledu Velké hodiny) = dny); ostatní karty pod lištou ve 2 sloupcích; v režimu úprav běžná mřížka), `width` (`custom` = `drawer.width` | `narrow` 820 | `medium` 1080 | `wide` 1440 |
   `full` = celá šířka monitoru). Další motivy: `terminal`, `paper`, `neon`, `brutal`, `pastel`; animace navíc
   `bounce`, `fade`, `notch`; tvary proužku navíc `term`, `tag`, `glow`, `block`, `drop`. Systémové „omezit
   pohyb“ (Windows → Efekty animace) vypíná animace i vysunutí okna. Tabulka stylů: `src/theme/looks.ts`.
@@ -47,6 +47,10 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   stops 2–5 × { c: #rrggbb, p: 0–100 } }`. `accent2` = druhá barva gradientního akcentu `#rrggbb` (s `accent`), `accentFromBackdrop`
   = akcent z barev vybraného gradientu (výchozí vypnuto). Pod kartami se podle kontrastu přidá ztmavovací závoj. Starý config
   pole nemá a vypadá stejně; výchozí hodnoty se nezapisují.
+- `appearance.auto` (kolo 34, motiv „Podle Windows“): `{ on, light, dark, accent }` — `on` přepíná motiv podle `AppsUseLightTheme`
+  (`light` = motiv při světlém Windows, výchozí `light`; `dark` = při tmavém, výchozí `dark`; vlastní motiv se pak ignoruje),
+  `accent` = akcent z akcentové barvy Windows (přebije `accent`, `accent2` i akcent z pozadí). Výchozí vypnuto a nezapisuje se;
+  změnu Windows zachytí událost registru (bez pollingu), jen když je `on` nebo `accent` zapnuté. MCP pole nemění.
   **Hlavička šuplíku (kolo 27):** `head` = `{ order, hidden, clock, showDate, chips, showZero }` — `order` = pořadí dílů zleva z `clock` /
   `chips` / `tabs` / `edit` / `note` / `search` / `settings` / `close` (chybějící se přidají na konec v dnešním pořadí, `close` je vždy poslední,
   prázdné = dnešní pořadí); `hidden` = vypnuté díly (`settings` a `close` vypnout nejde, config s nimi v `hidden` se odmítne; stejně tak
@@ -64,18 +68,19 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   popředí a to okno ještě existuje; spuštění akce nebo projektu fokus nechá novému oknu.
   `hotkeys.gameMode` (výchozí prázdné = bez zkratky) přepíná herní režim a platí i v něm.
   `hotkeys.notePassthrough` (výchozí `Ctrl+Alt+P`, prázdné = bez zkratky) přepne průchozí režim u všech
-  lístků na ploše — **výjimka z `enabled`**: registruje se jen, když je na ploše aspoň jeden lístek, i se
-  zkratkami vypnutými (na průchozí lístek nejde kliknout). Kolize se hlásí jen při `enabled: true`.
+  lístků na ploše — **výjimka z `enabled`**: se zapnutými zkratkami se registruje, když je na ploše aspoň jeden
+  lístek; se zkratkami vypnutými jen po dobu, kdy je některý lístek průchozí (na ten nejde kliknout, zkratka je
+  cesta ven; jinak zůstává volná). Kolize se hlásí jen při `enabled: true`.
   `hotkeys.notePin` (výchozí prázdné = vypnuto) = rychlý nový lístek na plochu (nová poznámka rovnou v lístku
-  s fokusem); jako `notePassthrough` platí i s `hotkeys.enabled: false`, jen se zapnutými poznámkami, a ve hře /
+  s fokusem); platí i s `hotkeys.enabled: false`, jen se zapnutými poznámkami, a ve hře /
   herním režimu nic neudělá.
 - **Rychlé dlaždice Windows** (`winquick`, kolo 23; karta jen v katalogu, Upravit dlaždice přímo na kartě) — `winquick.tiles` (které dlaždice a v jakém
   pořadí: `mic`, `out`, `term`, `dir`, `theme`, `wifi`, `bt`, `set`, `shot`; výchozí všechny, neznámé se zahodí), `winquick.outputSwitch` (výchozí `false`:
   dlaždice výstupu v Rychlých dlaždicích přepne zařízení jedním klikem (`wq_output_set`); bez volby jen otevře Nastavení zvuku. Menu výstupu v kartě Právě hraje/Zvuk je vždy a volbě nepodléhá: jde přes `volume_set_device`),
   `winquick.folders` (připnuté složky, absolutní cesty, nejvýš 8; Stažené, Plocha a Dokumenty jsou vždy). Chybějící sekce = výchozí stav.
 - **Chytřejší šuplík** (`smart`, kolo 20; Nastavení → Šuplík a karty → Otevírání a klávesy a Claude) — všechno jsou volby, chybějící sekce
-  = dnešní chování (od opravy v kole 21 jsou `quickKeys`, `dropShortcut` i `tabWheel` ve výchozím stavu VYPNUTÉ a zapíná je člověk):
-  `smart.quickKeys` (výchozí `false`): má-li otevřený šuplík fokus, `Alt+1…9` spustí N-tého zástupce na záložce
+  = dnešní chování (od opravy v kole 21 jsou `dropShortcut` i `tabWheel` ve výchozím stavu VYPNUTÉ a zapíná je člověk):
+  Klávesy v šuplíku (bývalá volba `smart.quickKeys`, od kola 33 vždy zapnuto; starý klíč `quickKeys` v configu se ignoruje): má-li otevřený šuplík fokus, `Alt+1…9` spustí N-tého zástupce na záložce
   (dlaždice projektu, rychlá akce, odkaz; čísla se ukážou při držení Alt), šipky procházejí zástupce, Enter spustí;
   nic mimo šuplík, ne v úpravách a ne s paletou. `smart.dropShortcut` (výchozí `false`): odkaz, soubor, složka nebo
   `.exe` puštěné na OTEVŘENÝ šuplík otevřou editor akce s návrhem — nic se neuloží ani nespustí, dokud člověk
@@ -113,11 +118,11 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   animace Windows = jen statické bliknutí linky). `claude.toast: true` (výchozí `false`) navíc pošle
   oznámení Windows: bez fokusu, nikdy ve fullscreen hře, v herním režimu, při „nerušit“ (QUNS) ani při
   otevřeném šuplíku; stejná session + událost nejvýš 1× za 30 s. Toast potřebuje nainstalovaný Ledge
-  (AppUserModelID `cz.hyan.ledge` ze zástupce ve Startu), jinak ho Windows zahodí (chyba v logu).
+  (AppUserModelID = `identifier` aplikace, `app.ledge.desktop`, ze zástupce ve Startu), jinak ho Windows zahodí (chyba v logu).
   Dokud otázka Clauda čeká a šuplík je zavřený, puls se opakuje po 10 s (jen po tu dobu, v klidu nic).
   Přišla-li otázka / schválení ve fullscreen hře nebo herním režimu, peek vyjede po návratu.
 - **Oznámení — Notch** (`notify`, kolo 26, modul `src-tauri/src/notify/`) — KDE a JAK se oznámení ukáže; ZDA
-  rozhodují dál vypínače událostí (`claude.toast` pro Čeká, `claude.toastDone` pro Hotovo — `null`/chybí = řídí se `claude.toast`, `claude.limitsAlert`, `timer.toast`,
+  rozhodují dál vypínače událostí (v Nastavení sloučené se stylem do jednoho Selectu Vypnuto / styl, config na disku se nemění: `claude.toast` pro Čeká, `claude.toastDone` pro Hotovo — `null`/chybí = řídí se `claude.toast`, `claude.limitsAlert`, `timer.toast`,
   `personal.calendars[].remindToast`) a brána hry / „nerušit“ / šuplíku naplno (`attention::signal`).
   `notify.surface` (výchozí `notch` — VĚDOMÁ změna výchozího chování v kole 26: proužek nahoře se rozbalí a ukáže
   obsah; `toast` = jen Windows toast jako dřív), `notify.fallbackToast` (výchozí `true`: toast, když proužek
@@ -191,7 +196,7 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   odkazy, nabídne „Uložit odkaz / Do poznámky“), `devServer` (`true`: krátce po naběhnutí dev serveru z Ledge
   „Otevřít localhost:PORT“), `github` (`true`: PR čekající na tvoji revizi / spadlé CI na tvém PR „Otevřít PR #N“,
   jen se zapnutým `github.enabled` a z dat, která už Ledge načetl), `reminders` (`true`: připomínka po termínu
-  „Otevřít poznámku“), `githubPulse` (`true`: krátký puls proužku, když nové PR čeká na revizi nebo spadne CI na tvém PR;
+  „Otevřít poznámku“), `digest` (`true`: zadání čeká na mě, ranní shrnutí, „Dnes“ a „Claude od posledně“; dřív je vypínala `reminders`; klíč chybí → platí `reminders`, tedy kdo měl připomínky vypnuté, zůstane bez přehledu; Nastavení zapíše explicitní bool), `githubPulse` (`true`: krátký puls proužku, když nové PR čeká na revizi nebo spadne CI na tvém PR;
   jen se zapnutým GitHubem, ve fullscreen hře nic, bez toastu a fokusu). Mapa `docs/codemap/suggest.md`.
 - **Skripty** — sekce `scripts` (Nastavení → Projekty, akce a odkazy → Skripty): `enabled` (výchozí `true`, ale nic
   se neukáže, dokud složka neexistuje), `dir` (chybí = `%USERPROFILE%\Ledge\scripts`, `%PROMĚNNÉ%` se
@@ -203,5 +208,16 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   config bez `widgets` = výchozí. Formát viz „Widgety ze skriptů“ níže a `docs/widgets.md`.
 - **Claude (MCP)** — sekce `mcp` (Nastavení → Claude → Claude (MCP), přepínač platí hned): `enabled` (výchozí
   **`false`** → `/mcp` vrací 404). Zapnutí vytvoří klíč (32 B) ve Správci pověření Windows `Ledge/mcp` — klíč
-  nikdy není v configu ani v logu. Starý config bez `mcp` = vypnuto. Co MCP umí: „MCP server (`/mcp`)“ níže.
+  nikdy není v configu ani v logu. `readData` (výchozí **`false`**; platí jen s `enabled`) = čtecí nástroj `live_state`, bez něj není ani v `tools/list`. Starý config bez `mcp` = vypnuto. Co MCP umí: „MCP server (`/mcp`)“ níže.
+- **Propojená aplikace** — sekce `connector` (Nastavení → Claude → Propojená aplikace; Ledge je tu klient cizího MCP serveru):
+  `url` (adresa jejího MCP serveru, `https://…`, `http://` jen pro 127.0.0.1; server musí nabízet nástroje `create_task`,
+  `create_note`, `list_team_members` a `create_event` v očekávaném tvaru, jiné servery zatím nefungují), `appUrl` (adresa webu pro odkaz na úkol v poznámce)
+  a `name` (zobrazovaný název v menu a v dialogu, ořízne se). Všechny tři mají výchozí **`""`**; prázdná `url` = funkce není
+  nastavená, „Poslat do …“ vede do Nastavení. Klíč (16–256 znaků bez mezer) je ve Správci pověření Windows `Ledge/connector`,
+  nikdy v configu ani v logu. Starý config bez `connector` = nenastaveno. „Poslat do …“ (⋯ u poznámky) nic neodešle bez Odeslat v náhledu.
+- **Rozšíření** — klíč `extensions` (pole ID, výchozí **`[]`** = nic neběží; zatím známé `wall` = živá tapeta, tělo
+  přijde s dalším kolem): `ledge.exe --ext <id>` jako dítě Ledge, které spouští a hlídá supervisor v `src-tauri/src/ext/`
+  (restart po pádu 2 s / 10 s / 60 s, pak „selhalo“; ve hře pauza). Neznámé ID se ignoruje, starý config bez klíče = `[]`.
+  Nastavení samotných rozšíření NENÍ v `config.json`, ale v `%LOCALAPPDATA%\Ledge\ext\<id>.json` (jen tento PC).
+  Zapíná se v Nastavení → Spouštění a hry (blok Rozšíření: stav, změřená RAM a CPU). Kontrakt (NDJSON po stdin/stdout) viz `docs/codemap/ext.md`.
 

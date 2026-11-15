@@ -53,7 +53,8 @@ test("šablony: 6–9 dlaždic, existující karty bez opakování, největší 
   }
   // hrdina jen u karet, které ho umí
   for (const t of TEMPLATES) for (const c of templateCards(t)) if (c.look?.hero) assert.ok(heroable(c.id), c.id);
-  assert.equal(templateOf("minimal").cards[0].id, "bigclock");
+  assert.equal(templateOf("minimal").cards[0].id, "clock");
+  assert.equal(templateOf("minimal").cards[0].look.design, "big");
   assert.equal(templateOf("nic"), undefined);
 });
 

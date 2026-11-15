@@ -7,15 +7,12 @@ import { createEffect, createSignal, on, Show } from "solid-js";
 import { api, type SessionView, type Snapshot } from "../api";
 import { num } from "../format";
 import { t } from "../i18n";
-import { compact } from "../costs/model";
+import { tokText } from "../costs/model";
 import { ctxFill, ctxTicks, sameCtx, showRatio, showTip, type CtxView } from "./ctx";
 import "./ctx.css";
 
 /** „182 k“ / „1,2 M“ (bez slova „tokenů“) */
-const kt = (n: number) => {
-  const c = compact(n);
-  return `${num(c.v, c.digits)}${c.unit ? ` ${c.unit}` : ""}`;
-};
+const kt = (n: number) => tokText(n, num);
 
 export default function ContextBar(p: { ss: SessionView; s: Snapshot; now: number }) {
   const [ctx, setCtx] = createSignal<CtxView | null>(null);
@@ -40,7 +37,7 @@ export default function ContextBar(p: { ss: SessionView; s: Snapshot; now: numbe
               class="ctx-track"
               role="img"
               aria-label={t("sessions.ctx.aria", "Kontext session: {n} tokenů", { n: num(c().tokens) })}
-              title={t("sessions.ctx.tip", "Kontext posledního volání: {n} tokenů (vstup + zápis cache + čtení cache). Rysky: 250 k a 350 k.", { n: num(c().tokens) })}
+              title={t("sessions.ctx.tip", "Kontext posledního volání: {n} tokenů (vstup + zápis cache + čtení cache). Rysky 250 k a 350 k jsou pevné hranice Ledge, ne okno modelu; plný pruh = 400 k.", { n: num(c().tokens) })}
             >
               <span class="ctx-fill" style={{ width: `${ctxFill(c().tokens) * 100}%` }} />
               {ctxTicks().map((x) => <span class="ctx-tick" style={{ left: `${x * 100}%` }} />)}

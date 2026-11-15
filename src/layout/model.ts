@@ -12,18 +12,50 @@ import { normalizeCardLook, type CardLook } from "./look.ts";
 import { pruneSizePages } from "../theme/size.ts";
 import { normalizeFolders, type TileFolder } from "./folders.ts";
 import { cloneBar, normalizeNotchBar, type NotchBar } from "../notch/bar.ts";
+import { weekDesign } from "../board/weekDesigns.ts";
 
 
 export const CARD_IDS = [
-  "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today",
-  // kolo 22 (nové widgety, `src/board/`) — jen z katalogu, výchozí rozložení beze změny
-  "usage", "week", "bigclock", "toggles",
+  "projects", "running", "claude", "repos", "notes", "actions", "shelf", "clock", "timer", "weather", "calendar", "media", "github", "system", "mail",
+  // kolo 22 (nový widget, `src/board/`) — jen z katalogu, výchozí rozložení beze změny
+  "usage",
   // kolo 23 (`src/winquick/`) — jen z katalogu
   "winquick",
   // kolo 23: Claude aktivita (`src/sessions/ActivityCard.tsx`) — jen z katalogu
   "activity",
 ] as const;
 export type BuiltinCardId = (typeof CARD_IDS)[number];
+/** Sloučené karty (kolo 34, 22 → 18; zrcadlo Rust `layout::MERGED_CARDS`): stará karta ve starém uloženém rozložení se
+ *  PŘEVEDE na nástupce — velké hodiny = Čas ve vzhledu `big`, Týden = Kalendář s vlastním vzhledem týdne (`strip`, když
+ *  žádný neměl), Odkazy = Odkazy a akce (ty odkazy ukazují taky), Rychlé přepínače = Rychlé dlaždice Windows ve vzhledu
+ *  `toggles`. Je-li nástupce na záložce už, stará karta zmizí (žádná dvojice). */
+export const MERGED_CARDS: Readonly<Record<string, { to: BuiltinCardId; design?: string }>> = {
+  bigclock: { to: "clock", design: "big" },
+  week: { to: "calendar" },
+  links: { to: "actions" },
+  toggles: { to: "winquick", design: "toggles" },
+};
+/** Nástupce sloučené karty (id ze starého configu); jiné id = `undefined`. */
+export const mergedOf = (id: unknown): { to: BuiltinCardId; design?: string } | undefined =>
+  typeof id === "string" && Object.prototype.hasOwnProperty.call(MERGED_CARDS, id) ? MERGED_CARDS[id] : undefined;
+/** Karty jedné záložky ze starého tvaru: sloučené karty převést na nástupce (viz [`MERGED_CARDS`]). Čistá funkce na syrových datech. */
+export function mergeCards(raw: readonly unknown[]): unknown[] {
+  const ids = new Set(raw.map((c) => (c as any)?.id));
+  const out: unknown[] = [];
+  for (const c of raw) {
+    const m = mergedOf((c as any)?.id);
+    if (!m) {
+      out.push(c);
+      continue;
+    }
+    if (ids.has(m.to)) continue;
+    const look: Record<string, unknown> = { ...((c as any).look && typeof (c as any).look === "object" ? (c as any).look : {}) };
+    const design = (c as any).id === "week" ? weekDesign(typeof look.design === "string" ? look.design : undefined) : m.design;
+    if (design) look.design = design;
+    out.push({ ...(c as object), id: m.to, look });
+  }
+  return out;
+}
 /** Dynamická karta: widget ze skriptu (`widget:<soubor>`). */
 export type DynCardId = `widget:${string}`;
 export type CardId = BuiltinCardId | DynCardId;
@@ -97,25 +129,19 @@ export const CARD_INFO: Record<BuiltinCardId, { name: Text; desc: Text; size: Ca
   notes: { name: ["cards.layout.card.notes", "Poznámky"], desc: ["cards.layout.desc.notes", "Poslední poznámky a připomínky na dnes"], size: "xl" },
   actions: { name: ["cards.layout.card.actions", "Odkazy a akce"], desc: ["cards.layout.desc.actions", "Weby, složky, aplikace a příkazy na jedno kliknutí"], size: "xl" },
   shelf: { name: ["cards.layout.card.shelf", "Přihrádka"], desc: ["cards.layout.desc.shelf", "Soubory přetažené na proužek; prázdná se neukáže"], size: "xl" },
-  clock: { name: ["cards.layout.card.clock", "Čas"], desc: ["cards.layout.desc.clock", "Velké hodiny s týdnem, na notebooku i baterie"], size: "s" },
+  clock: { name: ["cards.layout.card.clock", "Čas"], desc: ["cards.layout.desc.clock", "Velké hodiny s týdnem, na notebooku i baterie; jako Velké hodiny jen čas obřími číslicemi"], size: "s" },
   timer: { name: ["cards.layout.card.timer", "Časovač"], desc: ["cards.layout.desc.timer", "Odpočet a stopky"], size: "s" },
   weather: { name: ["cards.layout.card.weather", "Počasí"], desc: ["cards.layout.desc.weather", "Teplota a výhled; stahuje se, jen když je vidět"], size: "s" },
-  calendar: { name: ["cards.layout.card.calendar", "Kalendář"], desc: ["cards.layout.desc.calendar", "Dnes a zítra z odkazu ICS (Google, Outlook)"], size: "s" },
-  links: { name: ["cards.layout.card.links", "Odkazy"], desc: ["cards.layout.desc.links", "Weby, složky a soubory z tvých akcí, s ikonou webu"], size: "m" },
+  calendar: { name: ["cards.layout.card.calendar", "Kalendář"], desc: ["cards.layout.desc.calendar", "Dnes a zítra z odkazu ICS (Google, Outlook); vzhledem Týden, měsíc, osa dne nebo ciferník"], size: "s" },
   media: { name: ["cards.layout.card.media", "Právě hraje"], desc: ["cards.layout.desc.media", "Skladba nebo video z libovolné aplikace a hlasitost"], size: "m" },
   github: { name: ["cards.layout.card.github", "GitHub"], desc: ["cards.layout.desc.github", "PR k revizi, tvoje PR s CI a notifikace z přihlášeného gh (výchozí vypnuto)"], size: "m" },
   system: { name: ["cards.layout.card.system", "Systém"], desc: ["cards.layout.desc.system", "CPU, paměť, disky a síť s malými grafy; měří jen když je vidět"], size: "m" },
   // výchozí nepřidaná (Rust `layout::OPT_IN`) — potřebuje přihlášený účet Microsoft
   mail: { name: ["cards.layout.card.mail", "Pošta"], desc: ["cards.layout.desc.mail", "Nepřečtené a nejnovější předměty z Outlooku (účet Microsoft)"], size: "m" },
-  // jen z katalogu (výchozí rozložení ji nemá); bez dat se nekreslí (`Facts.today`)
-  today: { name: ["cards.layout.card.today", "Dnes"], desc: ["cards.layout.desc.today", "Další schůzka, připomínky na dnes, PR k revizi a reset limitu Claude — jen to, co dnes něco znamená"], size: "m" },
-  // kolo 22 (nové widgety, `src/board/`)
+  // kolo 22 (nový widget, `src/board/`)
   usage: { name: ["cards.layout.card.usage", "Claude dnes"], desc: ["cards.layout.desc.usage", "Útrata a tokeny dnes a za 7 dní a časová osa dneška po projektech (odhad z transcriptů). Čte místní záznamy Claude Code na tomto počítači."], size: "m" },
-  week: { name: ["cards.layout.card.week", "Týden"], desc: ["cards.layout.desc.week", "Velký měsíc a čas, pás dnů s dneškem a dnešní události z kalendáře"], size: "m" },
-  bigclock: { name: ["cards.layout.card.bigclock", "Velké hodiny"], desc: ["cards.layout.desc.bigclock", "Čas obřími číslicemi a pod ním datum"], size: "s" },
-  toggles: { name: ["cards.layout.card.toggles", "Rychlé přepínače"], desc: ["cards.layout.desc.toggles", "Ztlumit zvuk a mikrofon, hlasitost − / + a baterie"], size: "s" },
   activity: { name: ["cards.layout.card.activity", "Claude aktivita"], desc: ["cards.layout.desc.activity", "Co Claude právě dělá v každé session: fáze (odhad podle posledního nástroje), soubor, poslední zpráva a schválení"], size: "m" },
-  winquick: { name: ["cards.layout.card.winquick", "Rychlé dlaždice Windows"], desc: ["cards.layout.desc.winquick", "Dlaždice, které si vybereš sám: mikrofon, výstup zvuku, terminál ve složce projektu, složky, motiv Windows, Wi-Fi / Bluetooth, Nastavení a poslední snímek obrazovky"], size: "m" },
+  winquick: { name: ["cards.layout.card.winquick", "Rychlé dlaždice Windows"], desc: ["cards.layout.desc.winquick", "Dlaždice, které si vybereš sám: mikrofon, výstup zvuku, terminál ve složce projektu, složky, motiv Windows, Wi-Fi / Bluetooth, Nastavení a poslední snímek obrazovky; vzhledem Přepínače zvuk, mikrofon, hlasitost a baterie"], size: "m" },
 };
 export const PART_INFO: Record<PartKey, Text> = {
   claudeLimits: ["cards.layout.part.claudeLimits", "Limity 5h / týden"],
@@ -141,12 +167,12 @@ const card = (id: CardId, size: CardSize = defaultSize(id)): LayoutCard => ({ id
 
 /** Výchozí rozložení NOVÉHO configu = čistý začátek (zrcadlo `layout::clean_default`; oba testy čtou
  *  `src-tauri/src/fixtures/layout-default.json`): Práce = Projekty + Poznámky (Claude a Repa přidá průvodce
- *  podle detekce), Osobní = Čas, Právě hraje, Poznámky, Odkazy. Karty bez zdroje jsou jen v katalogu. */
+ *  podle detekce), Osobní = Čas, Právě hraje, Poznámky, Odkazy a akce. Karty bez zdroje jsou jen v katalogu. */
 export function defaultLayout(): Layout {
   return {
     pages: [
       { id: WORK, name: "", cards: [card("projects", "xl"), card("notes", "xl")] },
-      { id: PERSONAL, name: "", cards: [card("clock", "m"), card("media", "m"), card("notes", "m"), card("links", "m")] },
+      { id: PERSONAL, name: "", cards: [card("clock", "m"), card("media", "m"), card("notes", "m"), card("actions", "m")] },
     ],
     hiddenParts: [],
     upgrades: [UP_PERSONAL_PROJECTS],
@@ -179,7 +205,7 @@ export function normalizeLayout(raw: unknown): Layout {
     const x = p as Record<string, unknown>;
     if (pages.some((q) => q.id === x.id)) continue;
     const cards: LayoutCard[] = [];
-    for (const c of Array.isArray(x.cards) ? x.cards : []) {
+    for (const c of mergeCards(Array.isArray(x.cards) ? x.cards : [])) {
       const id = (c as any)?.id;
       if (!isCard(id) || cards.some((k) => k.id === id)) continue;
       const out: LayoutCard = { id, size: isSize((c as any).size) ? (c as any).size : defaultSize(id) };
@@ -491,8 +517,6 @@ export type Facts = {
   shelf: boolean;
   /** karta Právě hraje má co ukázat (skladbu nebo hlasitost) */
   media: boolean;
-  /** karta Dnes má aspoň jeden řádek (`cards/today.ts` `todayRows`) */
-  today: boolean;
 };
 
 /** Karty záložky, které teď něco ukážou, v pořadí záložky. Prázdné akce zvou k přidání mimo Práci. */
@@ -508,8 +532,6 @@ export function shownCards(p: LayoutPage, f: Facts): LayoutCard[] {
         return f.shelf;
       case "media":
         return f.media;
-      case "today":
-        return f.today;
       case "notes":
         return f.notesEnabled;
       default:

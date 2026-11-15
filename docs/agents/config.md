@@ -93,8 +93,7 @@ Typické úpravy:
   složka / příkaz → dlaždice zčervená, pod ní krátká chyba + poslední řádky logu, Zobrazit log, Změnit
   složku…, Zkusit znovu. Windows oznámení jen když šuplík není otevřený (a ne ve fullscreen hře).
 - **Zastavit server** jde: ■ v akcích dlaždice, pilulka „N běží“ v hlavičce (klik = seznam se Stop / Restart /
-  Otevřít / Log, „Zastavit všechny“), kompaktní náhled po najetí (`drawer.hover: "compact"`; proužek sám je
-  průchozí pro myš), paleta Ctrl+K („Zastavit …“, „Restartovat …“, „Zastavit všechny servery“), karta Běží,
+  Otevřít / Log, „Zastavit všechny“), paleta Ctrl+K („Zastavit …“, „Restartovat …“, „Zastavit všechny servery“), karta Běží,
   `POST /ctl/stop`. Stop = celý strom (Job Object). Port projektu, který drží proces, jenž Ledge
   nespustil, pilulka jen ukáže — ukončí ho až po potvrzení (jen ten jeden PID, ověřený těsně před tím).
 - **Projekt, který na tomhle PC není** (dlaždice „nenalezeno“), má v rychlých akcích **Naklonovat**:

@@ -6,9 +6,11 @@ import { createEffect, For, on, Show, type JSX } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { ago } from "../format";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { dayTip, tok, usd, usdDay } from "../costs/CostsSection";
+import { bars } from "../costs/model";
 import { progressPct } from "../costs/model";
-import { barHeights, heat, hourRows, hourSpan, hoursMax, isToday, lastDays, sumDays, usageState } from "./model";
+import { heat, hourRows, hourSpan, hoursMax, isToday, lastDays, sumDays, usageState } from "./model";
 import { originText } from "./text";
 import Bars from "../charts/Bars";
 import "./board.css";
@@ -29,7 +31,7 @@ export default function UsageCard(p: { s: Snapshot; now: number; menu?: JSX.Elem
   const today = () => week()[week().length - 1] ?? null;
   const fresh = () => isToday(cv(), p.now);
   const weekSum = () => sumDays(week());
-  const heights = () => barHeights(week());
+  const heights = () => bars(week());
   const rows = () => (fresh() ? hourRows(cv()) : []);
   const max = () => hoursMax(rows());
   const span = () => hourSpan(rows(), new Date(p.now).getHours());
@@ -50,7 +52,7 @@ export default function UsageCard(p: { s: Snapshot; now: number; menu?: JSX.Elem
       </h4>
       <Show when={state() !== "off"} fallback={
         <div class="empty">
-          {t("cards.board.usage.off", "Útrata Claude je vypnutá (Nastavení → Claude → Útrata).")}
+          {t("cards.board.usage.off", "Útrata Claude je vypnutá ({path}).", { path: settingsPath("claude", "costs") })}
           <Show when={p.onSettings}><button class="mini" onClick={() => p.onSettings?.()}>{t("cards.board.settings", "Nastavení")}</button></Show>
         </div>
       }>

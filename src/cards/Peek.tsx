@@ -35,9 +35,8 @@ export function DecideButtons(p: { pd: Pending }) {
   );
 }
 
-/** První čekající schválení (s náhledem diffu / plánu), jinak otázka Clauda; nic = nic. `stack` = tlačítka
- *  pod textem (úzký kompaktní náhled, `hover/hover.css` `.hov-stack`). */
-export function Approval(p: { s: Snapshot; stack?: boolean }) {
+/** První čekající schválení (s náhledem diffu / plánu), jinak otázka Clauda; nic = nic. */
+export function Approval(p: { s: Snapshot }) {
   const first = () => p.s.pending[0];
   const more = () => p.s.pending.length + p.s.questions.length - 1;
   const question = () => (first() ? undefined : p.s.questions[0]);
@@ -48,7 +47,7 @@ export function Approval(p: { s: Snapshot; stack?: boolean }) {
       </Show>
     }>
       {(pd) => (
-        <div class="peek" classList={{ "hov-stack": !!p.stack }} data-anim>
+        <div class="peek" data-anim>
           <div class="ico"><IconShield /></div>
           <div class="tx">
             <b>{t("cards.peek.waiting", "Claude čeká · {where}", { where: pendingWhere(p.s, pd()) })}{more() > 0 ? ` (+${more()})` : ""}</b>

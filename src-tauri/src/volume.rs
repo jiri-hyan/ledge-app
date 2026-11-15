@@ -64,9 +64,11 @@ enum Msg {
 struct Live {
     tx: Option<Sender<Msg>>,
     wanted: bool,
+    /// `release` vlákno uvolnilo — `resume` ho vrátí při dalším zobrazení karet
+    released: bool,
 }
 
-static LIVE: Mutex<Live> = Mutex::new(Live { tx: None, wanted: false });
+static LIVE: Mutex<Live> = Mutex::new(Live { tx: None, wanted: false, released: false });
 static VIEW: Mutex<Option<VolumeView>> = Mutex::new(None);
 
 /// `PKEY_Device_FriendlyName` (functiondiscoverykeys) — bez další feature crate `windows`.
@@ -94,7 +96,7 @@ unsafe trait IPolicyConfig: windows::core::IUnknown {
 
 pub(crate) fn allowed(cfg: &Config) -> bool {
     // hlasitost a mikrofon ukazuje i karta Rychlé přepínače (kolo 22, `src/board/TogglesCard.tsx`)
-    cfg.modes.personal_enabled && (cfg.drawer.sections.sound || crate::layout::placed(&cfg.layout, crate::layout::TOGGLES_CARD) || crate::layout::placed(&cfg.layout, crate::layout::WINQUICK_CARD))
+    cfg.modes.personal_enabled && (cfg.drawer.sections.sound || crate::layout::placed(&cfg.layout, crate::layout::WINQUICK_CARD))
 }
 
 /// Skalár Core Audio (0.0–1.0) → procenta 0–100 (zaokrouhleno; mimo rozsah / NaN oříznuto).
@@ -120,8 +122,30 @@ pub(crate) fn ensure() {
     let ok = allowed(&core().cfg.read());
     let mut l = LIVE.lock();
     l.wanted = true;
+    l.released = false;
     if ok && l.tx.is_none() {
         l.tx = spawn();
+    }
+}
+
+/// Šuplík znovu s kartami po `release` (mimo dok): vrátit odběry (viz `media::resume`).
+pub(crate) fn resume() {
+    if LIVE.lock().released {
+        ensure();
+    }
+}
+
+/// Šuplík schovaný dost dlouho (`media::release_due`): zrušit odběry Core Audio; další zobrazení `ensure` / `resume`.
+pub(crate) fn release() {
+    let mut l = LIVE.lock();
+    if l.wanted {
+        l.wanted = false;
+        l.released = true;
+        if let Some(tx) = l.tx.take() {
+            let _ = tx.send(Msg::Stop);
+            drop(l);
+            set_view(None);
+        }
     }
 }
 
@@ -153,7 +177,7 @@ pub(crate) fn mute(muted: bool) -> Result<(), String> {
 
 /// Ovládání zvuku jen se zapnutou kartou Zvuk na záložce Osobní (`allowed`) — jinak ani mikrofon, ani výstup.
 fn gate() -> Result<(), String> {
-    if allowed(&core().cfg.read()) { Ok(()) } else { Err(tr("Karta Zvuk je vypnutá (Nastavení → Osobní).", "The Sound card is turned off (Settings → Personal).").into()) }
+    if allowed(&core().cfg.read()) { Ok(()) } else { Err(tr("Karta Zvuk je vypnutá (Nastavení → Obsah karet).", "The Sound card is turned off (Settings → Card contents).").into()) }
 }
 
 /// Výchozí mikrofon (vstup pro komunikaci, jinak pro multimédia).
@@ -499,9 +523,9 @@ mod tests {
         assert!(allowed(&on));
         let off: Config = serde_json::from_str(r#"{"drawer":{"sections":{"sound":false}}}"#).unwrap();
         assert!(!allowed(&off));
-        // bez karty Právě hraje, ale s kartou Rychlé přepínače = zvuk se čte
+        // bez karty Právě hraje, ale s kartou Rychlé dlaždice Windows (i ve vzhledu Přepínače) = zvuk se čte
         let mut toggles = off.clone();
-        toggles.layout.pages[0].cards.push(serde_json::from_str(r#"{"id":"toggles","size":"s"}"#).unwrap());
+        toggles.layout.pages[0].cards.push(serde_json::from_str(r#"{"id":"winquick","size":"s","look":{"design":"toggles"}}"#).unwrap());
         assert!(allowed(&toggles));
     }
 }

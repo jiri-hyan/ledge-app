@@ -99,3 +99,10 @@ import { outputPickerShown } from "./model.ts";
 test("menu výstupu v kartě Zvuk: viditelné jen s >1 zařízením", () => {
   for (const [n, want] of [[0, false], [1, false], [2, true], [5, true]]) assert.equal(outputPickerShown(n), want, String(n));
 });
+
+import { shownStatus } from "./model.ts";
+test("shownStatus: jedna definice pro ostrůvek, dok a paletu", () => {
+  for (const [m, want] of [[null, null], [undefined, null], [{ status: "playing" }, "playing"], [{ status: "paused" }, "paused"], [{ status: "changing" }, "paused"], [{ status: "stopped" }, null], [{ status: "?" }, null]]) {
+    assert.equal(shownStatus(m), want, JSON.stringify(m));
+  }
+});

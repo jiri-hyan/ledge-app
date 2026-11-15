@@ -51,11 +51,9 @@ export function kindsOfCard(card: string): string[] {
     case "running":
       return ["dev"];
     case "calendar":
-      return ["agenda"];
-    // kolo 22
-    case "week":
-      return ["week"];
-    case "bigclock":
+      return ["agenda", "week"];
+    // kolo 22 (kolo 34: Týden a Velké hodiny jsou vzhledy karet Kalendář a Čas)
+    case "clock":
       return ["clock"];
     case "usage":
       return ["usage"];
@@ -98,7 +96,10 @@ export function deskSnapshot(d: DeskData | null): Snapshot {
     claudeEnabled: d?.claudeEnabled ?? false,
     limits: d?.limits,
     sessions: d?.working ? [{ status: "working" }] : [],
-    procs: d?.procs ?? [],
+    // bez dat žádné `procs` (kit pak ukáže „—“, ne nepravdivou 0); `Running` si prázdný seznam dosadí sám (views.tsx)
+    ...(d?.procs ? { procs: d.procs } : {}),
+    // čekající na člověka: schvalování + otázky (widgetkit `waiting.count` čte `pending` + `questions`)
+    ...(d?.waiting ? { waitingTotal: d.waitingTotal ?? d.waiting.length, pending: d.waiting.filter((w) => w.kind === "approve"), questions: d.waiting.filter((w) => w.kind === "question") } : {}),
     projects: (d?.projects ?? []).map((p) => ({ id: p.id, name: p.name })),
     personal: { calendar: d?.calendar },
     costs: d?.costs,

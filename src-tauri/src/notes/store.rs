@@ -60,6 +60,12 @@ pub struct NoteView {
     pub budget: Option<f64>,
     /// model (`model:`): `sonnet|opus|haiku`
     pub model: Option<String>,
+    /// otevřené a navržené body s termínem a prioritou (`taskindex::index`); jen v paměti, do snapshotu nejde
+    #[serde(skip)]
+    pub items: std::sync::Arc<[super::TaskItem]>,
+    /// nejbližší termín otevřeného bodu (ms) — `reminders::eff_remind_ms`
+    #[serde(skip)]
+    pub due_ms: Option<i64>,
 }
 
 /// Vlastní nadpis z frontmatteru (`title:`): oříznutý, nejvýš 120 znaků, prázdný = žádný.
@@ -98,7 +104,7 @@ pub fn parse_note(path: &Path, text: &str, folder_project: Option<&str>, fallbac
         None => folder_project.filter(|f| *f != GENERAL).map(str::to_string),
     };
     let done = get(&front, "done").is_some_and(|d| matches!(d.to_ascii_lowercase().as_str(), "true" | "yes" | "ano" | "1"));
-    let tasks = md::tasks(edit::body_view(body).1);
+    let idx = super::taskindex::index(edit::body_view(body).1);
     NoteView {
         path: path.to_string_lossy().into_owned(),
         project,
@@ -112,8 +118,8 @@ pub fn parse_note(path: &Path, text: &str, folder_project: Option<&str>, fallbac
         images: md::image_count(body),
         kind: get(&front, "kind").map(|k| k.trim().to_string()).filter(|k| !k.is_empty()).unwrap_or_else(|| DEFAULT_KIND.into()),
         updated: get(&front, "updated").and_then(|s| parse_time(&s)).as_ref().map(iso),
-        tasks_done: tasks.iter().filter(|t| t.1).count(),
-        tasks_total: tasks.len(),
+        tasks_done: idx.done,
+        tasks_total: idx.total,
         color: super::meta::color_of(&front),
         tags: super::meta::tags_of(&front, body),
         status: one_of(get(&front, "status"), &STATUSES),
@@ -121,6 +127,8 @@ pub fn parse_note(path: &Path, text: &str, folder_project: Option<&str>, fallbac
         cost: money(get(&front, "cost")),
         budget: money(get(&front, "budget")),
         model: one_of(get(&front, "model"), &MODELS),
+        items: idx.items,
+        due_ms: idx.next_due_ms,
     }
 }
 

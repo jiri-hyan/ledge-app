@@ -32,10 +32,10 @@ pub fn plan(info: &Info, resume: bool, env: &Env) -> Result<Plan, String> {
         return Err(tr("Zadání nemá projekt — vyber ho v poznámce (session poběží v jeho složce).", "The brief has no project — pick one in the note (the session runs in its folder).").into());
     }
     if !env.mcp_enabled {
-        return Err(tr("Zapni MCP v Nastavení → Claude → MCP — session přes něj čte zadání a zapisuje otázky.", "Turn on MCP in Settings → Claude → MCP — the session reads the brief and writes questions through it.").into());
+        return Err(tr("Zapni MCP v Nastavení → Claude → Claude (MCP) — session přes něj čte zadání a zapisuje otázky.", "Turn on MCP in Settings → Claude → Claude (MCP) — the session reads the brief and writes questions through it.").into());
     }
     if !env.has_key {
-        return Err(tr("Chybí API klíč — ulož ho v Nastavení → Claude → API klíč.", "No API key — save it in Settings → Claude → API key.").into());
+        return Err(tr("Chybí API klíč — ulož ho v Nastavení → Claude → API klíč pro zadání.", "No API key — save it in Settings → Claude → API key for briefs.").into());
     }
     let status = info.status.as_deref().unwrap_or("draft");
     let resume_session = if resume {
@@ -64,6 +64,13 @@ pub fn plan(info: &Info, resume: bool, env: &Env) -> Result<Plan, String> {
         ));
     }
     Ok(Plan { model, budget, left, resume_session })
+}
+
+/// Smí zadání po odpovědi pokračovat samo (`claude.brief.autoResume`)? Jen když je volba zapnutá, zadání
+/// čeká (`waiting`) a žádná otázka nezůstala bez odpovědi (tahle odpověď byla poslední). `done` / `running` /
+/// `review` / `draft` ne. Strop $ hlídá až `plan` (`left ≥ MIN_LEFT`) — tady se nic neschvaluje, jen se pošle další krok.
+pub fn auto_ok(info: &Info, enabled: bool) -> bool {
+    enabled && info.status.as_deref() == Some("waiting") && !info.open_questions
 }
 
 #[cfg(test)]
@@ -101,6 +108,32 @@ mod tests {
         err(&info(Some("done")), false, &env(), "hotové");
         err(&Info { cost: 2.0, ..info(None) }, false, &env(), "vyčerpaný");
         err(&Info { model: Some("-x".into()), ..info(None) }, false, &env(), "model");
+    }
+
+    #[test]
+    fn auto_ok_table() {
+        let w = |st: Option<&str>, open: bool| Info { open_questions: open, ..info(st) };
+        for (i, enabled, want) in [
+            (w(Some("waiting"), false), true, true),
+            (w(Some("waiting"), true), true, false), // jiná otázka ještě čeká
+            (w(Some("waiting"), false), false, false), // volba vypnutá
+            (w(Some("done"), false), true, false),
+            (w(Some("running"), false), true, false),
+            (w(Some("review"), false), true, false), // ke kontrole = rozhoduje člověk
+            (w(Some("draft"), false), true, false),
+            (w(None, false), true, false),
+        ] {
+            assert_eq!(auto_ok(&i, enabled), want, "{:?} {enabled}", i.status);
+        }
+    }
+
+    #[test]
+    fn auto_resume_still_stopped_by_budget() {
+        let spent = Info { cost: 2.0, ..info(Some("waiting")) };
+        assert!(auto_ok(&spent, true));
+        assert!(plan(&spent, true, &env()).unwrap_err().contains("vyčerpaný"));
+        let left = Info { cost: 1.5, ..info(Some("waiting")) };
+        assert!((plan(&left, true, &env()).unwrap().left - 0.5).abs() < 1e-9);
     }
 
     #[test]

@@ -7,6 +7,7 @@ import { t } from "../../i18n";
 import { sayError } from "../../ui/toast";
 import { useSettings } from "../ctx";
 import { normHex } from "../model";
+import { radioKeyDown, tabStop } from "./radioKeys";
 
 type Bind<T> = { path?: string; value?: T; onChange?: (v: T) => void };
 
@@ -39,19 +40,11 @@ export type Opt<T> = { v: T; label: string; hint?: string };
 /** Segmenty (2–4 volby): radio skupina, šipky mezi volbami. */
 export function Seg<T extends string | number>(p: Bind<T> & { options: Opt<T>[]; label: string }) {
   const b = bind(p);
-  const key = (e: KeyboardEvent, i: number) => {
-    const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    if (!d) return;
-    e.preventDefault();
-    const n = p.options[(i + d + p.options.length) % p.options.length];
-    b.put(n.v);
-    ((e.currentTarget as HTMLElement).parentElement?.children[p.options.indexOf(n)] as HTMLElement | undefined)?.focus();
-  };
   return (
-    <div class="st-seg" role="radiogroup" aria-label={p.label}>
+    <div class="st-seg" role="radiogroup" aria-label={p.label} onKeyDown={(e) => radioKeyDown(e)}>
       <For each={p.options}>
         {(o, i) => (
-          <button role="radio" aria-checked={b.get() === o.v} tabIndex={b.get() === o.v ? 0 : -1} classList={{ on: b.get() === o.v }} title={o.hint} onClick={() => b.put(o.v)} onKeyDown={(e) => key(e, i())}>
+          <button role="radio" aria-checked={b.get() === o.v} tabIndex={tabStop(i(), p.options.findIndex((x) => x.v === b.get()))} classList={{ on: b.get() === o.v }} title={o.hint} onClick={() => b.put(o.v)}>
             {o.label}
           </button>
         )}

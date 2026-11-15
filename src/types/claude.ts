@@ -84,6 +84,8 @@ export interface SessionView {
   unpushed: number;
   /** session skončila, drží se jen kvůli nedokončené práci */
   ended: boolean;
+  /** proč session skončila: `reason` z hooku `SessionEnd` (`clear`, `logout`, `prompt_input_exit`, `other`…); jen u `ended`, jinak null/chybí */
+  endReason?: string | null;
   subagents: { running: SubagentRun[]; done: SubagentDone[] };
   canOpen: boolean;
   /** co udělá klik (nebo proč nejde) */
@@ -140,7 +142,7 @@ export interface HooksStatus {
 
 // --- zadání přes API (kolo 19) ---
 /** Zrcadlo `config::BriefConfig` (`claude.brief`): výchozí model a strop $ zadání; poznámka je může přebít. */
-export interface BriefConfig { model: string; budgetUsd: number }
+export interface BriefConfig { model: string; budgetUsd: number; /** po odpovědi na poslední otázku samo pokračovat (výchozí false) */ autoResume: boolean }
 
 // --- questions ---
 /** Možnost otázky Clauda (`AskUserQuestion`); `preview` = volitelný náhled (text/markup od Clauda). */

@@ -14,6 +14,7 @@
 //!
 //! Pozice a velikost per akce v `%LOCALAPPDATA%\Ledge\web-panels.json` (zápis jen při zavření).
 
+use crate::qa::QaDataDir as _;
 use crate::actionrun::{self, Outcome};
 use crate::actions::{Action, ActionKind};
 use crate::i18n::tr;
@@ -164,10 +165,7 @@ pub fn save(path: &Path, id: &str, g: Geom, keep: &[String]) -> std::io::Result<
     let mut all = load(path);
     all.insert(id.to_string(), g);
     all.retain(|k, _| keep.iter().any(|x| x == k));
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    std::fs::write(path, serde_json::to_string_pretty(&all).unwrap_or_default())
+    crate::fsx::write_atomic_dir(path, serde_json::to_string_pretty(&all).unwrap_or_default().as_bytes())
 }
 
 // ---------- okno ----------
@@ -177,7 +175,7 @@ pub fn save(path: &Path, id: &str, g: Geom, keep: &[String]) -> std::io::Result<
 /// zahodilo rozehranou hudbu nebo rozepsaný mail; zavírá se křížkem okna.
 pub fn open(app: &AppHandle, a: &Action, url: &str) -> Result<Outcome, String> {
     let c = crate::state::core();
-    if c.dead() {
+    if c.dead_surface() {
         return Err(trf!("{}: hra / herní režim — okno se teď neotevře.", "{}: game / game mode — the window won't open now.", a.label));
     }
     let url = check_url(url).map_err(|e| crate::errors::prefixed(&a.label, &e))?;
@@ -186,7 +184,9 @@ pub fn open(app: &AppHandle, a: &Action, url: &str) -> Result<Outcome, String> {
     if let Some(w) = app.get_webview_window(&lbl) {
         let _ = w.unminimize();
         let _ = w.show();
-        let _ = w.set_focus();
+        if !crate::qa::isolated() {
+            let _ = w.set_focus(); // QA: parkované okno fokus nebere
+        }
         return Ok(Outcome { message: trf!("{} — okno je vpředu", "{} — window brought to front", a.label), output: None, hide: true });
     }
     let want = size(a);
@@ -197,21 +197,20 @@ pub fn open(app: &AppHandle, a: &Action, url: &str) -> Result<Outcome, String> {
     let geom = saved.unwrap_or_else(|| {
         let r = Area::from(mon.rect);
         let cursor = crate::screen::cursor().filter(|p| (r.l..r.r).contains(&p.x) && (r.t..r.b).contains(&p.y)).map(|p| p.x);
-        let strip_h = c.strip_logical(&mon).1;
         let work = Area::from(mon.work);
         // proužek je u horní hrany monitoru; pod ním (a pod hlavním panelem nahoře) mezera
-        let gap = ((r.t + ((strip_h + MARGIN) * scale).round() as i32) - work.t).max((MARGIN * scale).round() as i32);
-        place(want, scale, work, cursor, gap)
+        place(want, scale, work, cursor, c.below_strip(&mon, MARGIN))
     });
     let browser = app.clone();
     let w = WebviewWindowBuilder::new(app, &lbl, WebviewUrl::External(url))
         .title(a.label.trim())
         .visible(false)
-        .focused(true)
+        .focused(!crate::qa::isolated())
         .resizable(true)
         .min_inner_size(MIN_W as f64, MIN_H as f64)
         // stejné argumenty + výchozí data dir jako šuplík → jeden proces prohlížeče, sdílené cookies
-        .additional_browser_args(crate::drawer::BROWSER_ARGS)
+        .additional_browser_args(crate::qa::browser_args())
+        .qa_data_dir()
         // soubory se přetahují do stránky (příloha v Gmailu), ne do Tauri
         .disable_drag_drop_handler()
         .on_navigation(nav_allowed)
@@ -224,10 +223,12 @@ pub fn open(app: &AppHandle, a: &Action, url: &str) -> Result<Outcome, String> {
         .build()
         .map_err(|e| crate::errors::any(&a.label, &e))?;
     guard_frames(&w);
-    let _ = w.set_position(PhysicalPosition::new(geom.x, geom.y));
+    let _ = w.set_position(PhysicalPosition::new(crate::qa::park_x(geom.x), geom.y));
     let _ = w.set_size(PhysicalSize::new(geom.w, geom.h));
     let _ = w.show();
-    let _ = w.set_focus();
+    if !crate::qa::isolated() {
+        let _ = w.set_focus(); // QA: parkované okno fokus nebere
+    }
     let (id, win) = (a.id.clone(), w.clone());
     w.on_window_event(move |e| {
         if let tauri::WindowEvent::CloseRequested { .. } = e {

@@ -1,0 +1,21 @@
+/* Záložka Úkoly (`TasksView.tsx`): svislý seznam sekcí; barvy jen z tokenů. */
+.tk { display: flex; flex-direction: column; gap: var(--s3); }
+.tk-sec { display: flex; flex-direction: column; gap: 2px; }
+.tk-sec[data-tone="late"] .note-group-label { color: var(--red); }
+.tk-row { display: flex; align-items: center; gap: var(--s2); min-height: 32px; padding: 2px 4px; border-radius: var(--r-xs); }
+.tk-row:hover { background: var(--card-2); }
+.tk-check { flex: none; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--line-2); background: transparent; }
+.tk-check:hover:not(:disabled) { border-color: var(--blue); background: color-mix(in srgb, var(--blue) 18%, transparent); }
+.tk-check:disabled { opacity: 0.4; border-style: dashed; }
+.tk-body { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; gap: 1px; }
+.tk-static { cursor: default; }
+.tk-text { font-size: calc(13px * var(--fz)); color: var(--t1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-sub { font-size: var(--fs-2xs); color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-prio { color: var(--amber); margin-right: 5px; }
+.tk-wait .tk-text { color: var(--t2); }
+.tk-chip { flex: none; height: 20px; padding: 0 8px; border-radius: 10px; font: 600 var(--fs-2xs) var(--mono); color: var(--t2); background: var(--card); border: 1px solid var(--line-2); display: inline-flex; align-items: center; }
+.tk-chip[data-tone="late"] { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); }
+.tk-chip[data-tone="now"] { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
+.tk-time { flex: none; width: 44px; font: 600 var(--fs-2xs) var(--mono); color: var(--t3); text-align: center; }
+.tk-time.tk-now { color: var(--green); }
+.tk-more { padding: 0 4px; font-size: var(--fs-2xs); color: var(--t3); }

@@ -2,10 +2,11 @@
 //! v okně karty (opakování rozbalí Graph sám), časy v UTC (`Prefer: outlook.timezone="UTC"`), odkaz
 //! na schůzku z `onlineMeeting.joinUrl` (ověřený jako u ICS — `meeting::classify`). Přihlášení a token:
 //! `accounts::session`. Zapojení: `source::adapter` (`personal.calendars[].source = "graph"`) a
-//! `accounts::calsync` (kalendář zapnutý v Nastavení → Účty).
+//! `accounts::calsync` (kalendář zapnutý v Nastavení → Obsah karet → Pokročilé).
 
 use super::conf::CalendarFeed;
 use super::meeting::{self, Join};
+use super::people::{self, Crowd};
 use super::source::{Event, Source, SourceInfo, Window};
 use super::tz::{LocalTz, SystemLocal};
 use super::{MAX_OCCS, clip, ms};
@@ -40,6 +41,45 @@ struct GOnline {
     join_url: Option<String>,
 }
 
+#[derive(Deserialize, Default)]
+struct GResponse {
+    #[serde(default)]
+    response: String,
+}
+
+/// Odmítnutá pozvánka (Graph `responseStatus.response == declined`) se nezobrazuje ani nepřipomíná.
+fn declined(r: &Option<GResponse>) -> bool {
+    r.as_ref().is_some_and(|r| r.response.eq_ignore_ascii_case("declined"))
+}
+
+#[derive(Deserialize, Default)]
+struct GMail {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    address: Option<String>,
+}
+
+/// Účastník (`attendees[]`): `type` required / optional / resource (místnost se nekreslí), `status.response`.
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct GAttendee {
+    #[serde(default, rename = "type")]
+    kind: String,
+    #[serde(default)]
+    status: Option<GResponse>,
+    #[serde(default)]
+    email_address: Option<GMail>,
+}
+
+/// Účastníci bez odmítnutých a místností (L85).
+fn crowd(a: Vec<GAttendee>) -> Crowd {
+    Crowd::of(a.into_iter().filter(|a| !a.kind.eq_ignore_ascii_case("resource")).filter_map(|a| {
+        let m = a.email_address.unwrap_or_default();
+        people::person(m.name.as_deref().unwrap_or(""), m.address.as_deref().unwrap_or(""), a.status.as_ref().map_or("", |r| r.response.as_str()))
+    }))
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GEvent {
@@ -49,6 +89,9 @@ struct GEvent {
     is_all_day: bool,
     #[serde(default)]
     is_cancelled: bool,
+    /// odpověď uživatele na pozvánku (`response`: `declined` = odmítnuto)
+    #[serde(default)]
+    response_status: Option<GResponse>,
     #[serde(default)]
     start: GDate,
     #[serde(default)]
@@ -59,6 +102,8 @@ struct GEvent {
     online_meeting: Option<GOnline>,
     #[serde(default)]
     online_meeting_url: Option<String>,
+    #[serde(default)]
+    attendees: Vec<GAttendee>,
 }
 
 #[derive(Deserialize)]
@@ -76,7 +121,7 @@ fn iso(ms: i64) -> String {
 /// První stránka `/me/calendarView` pro okno.
 pub fn view_url(w: Window) -> String {
     format!(
-        "{GRAPH}/me/calendarView?startDateTime={}&endDateTime={}&$top=100&$orderby=start/dateTime&$select=subject,start,end,isAllDay,isCancelled,location,onlineMeeting,onlineMeetingUrl",
+        "{GRAPH}/me/calendarView?startDateTime={}&endDateTime={}&$top=100&$orderby=start/dateTime&$select=subject,start,end,isAllDay,isCancelled,responseStatus,location,onlineMeeting,onlineMeetingUrl,attendees",
         iso(w.from),
         iso(w.to)
     )
@@ -119,18 +164,19 @@ fn all_day_date(d: &GDate, local: &dyn LocalTz) -> Option<NaiveDateTime> {
 pub fn parse(body: &[u8], local: &dyn LocalTz) -> Result<(Vec<Event>, Option<String>), String> {
     let p: Page = serde_json::from_slice(body).map_err(|_| crate::i18n::tr("Kalendář Microsoft vrátil nečitelná data.", "The Microsoft calendar returned unreadable data.").to_string())?;
     let mut out = Vec::new();
-    for e in p.value.into_iter().filter(|e| !e.is_cancelled) {
+    for e in p.value.into_iter().filter(|e| !e.is_cancelled && !declined(&e.response_status)) {
         let title = clip(e.subject.as_deref().unwrap_or(""), 120);
         let location = clip(e.location.and_then(|l| l.display_name).as_deref().unwrap_or(""), 120);
         let url = https_only(e.online_meeting.and_then(|o| o.join_url)).or_else(|| https_only(e.online_meeting_url));
         let join = join_of(url, &location);
+        let people = crowd(e.attendees);
         let ev = if e.is_all_day {
             let (Some(s), Some(en)) = (all_day_date(&e.start, local), all_day_date(&e.end, local)) else { continue };
             let en = en.max(s + Duration::days(1));
-            Event { start: ms(s), end: ms(en), all_day: true, title, location, join, tz_guess: false }
+            Event { start: ms(s), end: ms(en), all_day: true, title, location, join, tz_guess: false, people }
         } else {
             let (Some((s, g1)), Some((en, g2))) = (to_utc(&e.start, local), to_utc(&e.end, local)) else { continue };
-            Event { start: s, end: en.max(s), all_day: false, title, location, join, tz_guess: g1 || g2 }
+            Event { start: s, end: en.max(s), all_day: false, title, location, join, tz_guess: g1 || g2, people }
         };
         out.push(ev);
     }
@@ -155,7 +201,7 @@ pub async fn fetch(w: Window) -> Result<Vec<Event>, String> {
     Ok(all)
 }
 
-/// Adaptér pro `source::adapter` (`source = "graph"`): účet je jeden (přihlášený v Nastavení → Účty).
+/// Adaptér pro `source::adapter` (`source = "graph"`): účet je jeden (přihlášený v Nastavení → Obsah karet → Pokročilé).
 pub fn adapter(_feed: &CalendarFeed, w: Window) -> Result<Vec<Event>, String> {
     crate::accounts::calsync::block_on(fetch(w))
 }
@@ -212,6 +258,18 @@ mod tests {
     }
 
     #[test]
+    fn attendees_from_sample() {
+        use crate::calendar::people::Resp;
+        let (evs, _) = parse(include_bytes!("../fixtures/graph-calendarview.json"), &SystemLocal).unwrap();
+        // odmítnutý a místnost pryč; e-mail malým písmem; organizátor = přijato
+        let got: Vec<(&str, &str, Resp)> = evs[0].people.list.iter().map(|p| (p.name.as_str(), p.email.as_str(), p.resp)).collect();
+        assert_eq!(got, [("Tomáš Hora", "tomas@contoso.com", Resp::Accepted), ("Žofie Řezníčková", "zofie@contoso.com", Resp::Accepted), ("", "pavel@contoso.com", Resp::Pending)]);
+        // událost bez attendees = prázdný seznam (avatary se nekreslí)
+        assert!(evs[1].people.is_empty());
+        assert!(view_url(Window { now: 0, from: 0, to: 1 }).contains("attendees"));
+    }
+
+    #[test]
     fn next_link_only_to_graph_and_bad_data() {
         let b = br#"{"value":[],"@odata.nextLink":"https://evil.example.com/steal"}"#;
         assert_eq!(parse(b, &SystemLocal).unwrap().1, None);
@@ -221,6 +279,19 @@ mod tests {
         assert!(parse(b, &SystemLocal).unwrap().0.is_empty());
         assert_eq!(https_only(Some("http://x.cz".into())), None);
         assert_eq!(https_only(Some(" https://x.cz/a ".into())).as_deref(), Some("https://x.cz/a"));
+    }
+
+    #[test]
+    fn declined_invites_are_skipped() {
+        let ev = |resp: &str| format!(r#"{{"value":[{{"subject":"A","responseStatus":{{"response":"{resp}"}},"start":{{"dateTime":"2026-10-19T07:00:00","timeZone":"UTC"}},"end":{{"dateTime":"2026-10-19T08:00:00","timeZone":"UTC"}}}}]}}"#);
+        // (odpověď, zůstane?) — organizátor/přijato/zatím bez odpovědi zůstávají, odmítnuto mizí
+        for (resp, kept) in [("declined", false), ("Declined", false), ("accepted", true), ("tentativelyAccepted", true), ("organizer", true), ("none", true), ("notResponded", true)] {
+            assert_eq!(parse(ev(resp).as_bytes(), &SystemLocal).unwrap().0.len(), usize::from(kept), "{resp}");
+        }
+        // bez responseStatus (staré odpovědi, fixture) zůstává
+        let b = br#"{"value":[{"subject":"B","start":{"dateTime":"2026-10-19T07:00:00","timeZone":"UTC"},"end":{"dateTime":"2026-10-19T08:00:00","timeZone":"UTC"}}]}"#;
+        assert_eq!(parse(b, &SystemLocal).unwrap().0.len(), 1);
+        assert!(view_url(Window { now: 0, from: 0, to: 1 }).contains("responseStatus"));
     }
 
     #[test]

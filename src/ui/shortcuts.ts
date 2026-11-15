@@ -24,6 +24,7 @@ export const SHORTCUT_GROUPS: readonly { id: ShortcutGroup; key: string; cs: str
 export const SHORTCUTS: readonly Shortcut[] = [
   { group: "drawer", keys: "", key: "ui.keys.hover", cs: "Najetí myší k hornímu okraji obrazovky otevře šuplík, odjetí ho zavře." },
   { group: "drawer", keys: "Ctrl+K", key: "ui.keys.palette", cs: "Paleta příkazů: projekty, akce, poznámky, volby Nastavení, výpočty a převody. Napiš „?“ a najdeš tuhle nápovědu." },
+  { group: "drawer", keys: "", key: "ui.keys.typeTo", cs: "V šuplíku s fokusem stačí začít psát: paleta se otevře s napsaným znakem. Ukáže i hudbu a hlasitost (hlasitost 40), „Připojit“ ke schůzce, „x:“ odškrtne úkol a „povolit“ / „zamítnout“ vyřídí čekající žádost Clauda (Enter)." },
   { group: "drawer", keys: "Esc", key: "ui.keys.esc", cs: "Zavře paletu; jinak zruší úpravy šuplíku, vrátí na hlavní stránku a nakonec zavře šuplík." },
   { group: "drawer", keys: "1–9", key: "ui.keys.tabs", cs: "Přepne na záložku podle pořadí (mimo pole pro psaní)." },
   { group: "drawer", keys: "Alt+1…9", key: "ui.keys.quick", cs: "Spustí N-tého zástupce na záložce (čísla se ukážou při držení Alt). Šipky procházejí zástupce, Enter spustí vybraného; funguje jen v šuplíku, který má fokus." },

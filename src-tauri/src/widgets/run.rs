@@ -18,6 +18,9 @@ const KEEP_OUTPUT: usize = 32 * 1024;
 /// Příkaz pro widget (nespouští).
 pub fn command(w: &Widget, m: &WidgetMeta, path_var: &std::ffi::OsStr) -> Result<Command, String> {
     let dir = w.path.parent().map(|d| d.to_path_buf()).unwrap_or_default();
+    if w.kind == super::meta::Kind::Kit {
+        return Err(tr("šablona se nespouští", "a template is never run").into());
+    }
     match w.kind.lang() {
         None => {
             let mut cmd = Command::new(&w.path);
@@ -56,7 +59,7 @@ pub fn execute(cmd: &mut Command, timeout_s: u32) -> Result<Ran, (Fail, Option<R
             if ran.stdout.len() > MAX_OUTPUT {
                 Err((Fail::TooBig, None))
             } else if !out.success {
-                Err((Fail::Exit(crate::actionrun::tail(&ran.stdout, &ran.stderr)), Some(ran)))
+                Err((Fail::Exit(first_error_line(&ran.stdout, &ran.stderr)), Some(ran)))
             } else {
                 Ok(ran)
             }
@@ -64,6 +67,13 @@ pub fn execute(cmd: &mut Command, timeout_s: u32) -> Result<Ran, (Fail, Option<R
         Err(RunError::Timeout) => Err((Fail::Timeout(timeout_s), None)),
         Err(RunError::Spawn(e)) => Err((Fail::Spawn(e), None)),
     }
+}
+
+/// Příčina chyby do hlášky: první neprázdný řádek stderr (u PowerShellu je příčina nahoře, dole je
+/// `CategoryInfo` / `FullyQualifiedErrorId`), bez stderr poslední neprázdný řádek stdout (L242).
+pub(super) fn first_error_line(stdout: &str, stderr: &str) -> String {
+    let non_empty = |s: &str| s.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string);
+    non_empty(stderr).or_else(|| stdout.lines().map(str::trim).rev().find(|l| !l.is_empty()).map(str::to_string)).unwrap_or_default()
 }
 
 /// Lidská hláška do karty.
@@ -93,4 +103,24 @@ pub fn keep(r: &Ran) -> String {
         s.push('…');
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::first_error_line;
+
+    #[test]
+    fn error_line_table() {
+        let ps = "\r\nNelze najít soubor 'x.txt'.\r\nAt C: w a.ps1:3 char:1\r\n+ Get-Content x.txt\r\n    + CategoryInfo          : ObjectNotFound\r\n    + FullyQualifiedErrorId : PathNotFound\r\n";
+        let cases = [
+            ("", ps, "Nelze najít soubor 'x.txt'."),
+            ("řádek 1\nposlední\n\n", "", "poslední"),
+            ("výstup\n", "  chyba  \nvíc\n", "chyba"),
+            ("", "\n\n", ""),
+            ("", "", ""),
+        ];
+        for (out, err, want) in cases {
+            assert_eq!(first_error_line(out, err), want, "{err:?}");
+        }
+    }
 }

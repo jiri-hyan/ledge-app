@@ -9,20 +9,22 @@ Tento přehled je zkrácený; plná verze je v [README-detail.md](README-detail.
 | oblast | mapa | klíčová slova (soubory) |
 |---|---|---|
 | Claude session, subagenti, otevření, hooky | [sessions.md](sessions.md) | `sessions.rs` `sessionlive.rs` `winfocus.rs` `subagents.rs` `hooksetup.rs` `claude/*` `src/ClaudeSessions.tsx` |
-| Limity Claude 5h / týden: wrapper stavového řádku, zapojení, připomínka resetu | [limits.md](limits.md) | `limits.rs` `limitslive.rs` `statusline.rs` `statuslinesetup.rs` `commands/limits.rs` `src/limits/*` |
+| Limity Claude 5h / týden, stavový řádek, připomínka resetu | [limits.md](limits.md) | `limits.rs` `limitslive.rs` `statusline.rs` `statuslinesetup.rs` `commands/limits.rs` `src/limits/*` |
 | Útrata Claude (odhad v cenách API): transcripty, inkrementální index, ceník, sekce v kartě … | [costs.md](costs.md) | `usage/*` `costslive.rs` `commands/costs.rs` `src/costs/*` |
 | Poznámky, kategorie, Markdown, výběry, Splnit · Archivovat · Smazat (Koš + Zpět), lístky … | [notes.md](notes.md) | `notes/*` `commands/noteslife.rs` `notesync/*` `pins/*` `src/notes/*` `src/pin/*` |
-| Projekty, loga, klonování, výkon snapshotu, vzhled jednotlivých zástupců (ikona, barva … | [projects-icons-perf.md](projects-icons-perf.md) | `icons.rs` `iconimg.rs` `cloning.rs` `resolve.rs` `tilelook.rs` `src/logos.ts` `src/tilelook/*` |
+| Projekty, loga, klonování, výkon snapshotu, … | [projects-icons-perf.md](projects-icons-perf.md) | `icons.rs` `iconimg.rs` `cloning.rs` `resolve.rs` `tilelook.rs` `src/logos.ts` `src/tilelook/*` |
 | Nastavení: shell, panely, záloha, dialogy, strop výšky šuplíku | [settings.md](settings.md) | `src/Settings.tsx` `src/settings/*` `src/fit.ts` `configerr.rs` `configio.rs` `projectdetect.rs` |
 | Rozložení šuplíku: záložky (i vlastní), karty se šířkou a výškou (tah za okraj, ⋯), řada … | [layout.md](layout.md) | `layout.rs` `tilelook.rs` `src/layout/*` `src/cards/CardMenu.tsx` |
-| Vlastní SVG grafy: sparkline, prstenec, sloupce, pás (heat), číslo jako hrdina — bez … | [charts.md](charts.md) | `src/charts/*` |
+| Vlastní SVG grafy: sparkline, prstenec, sloupce, číslo jako hrdina — bez … | [charts.md](charts.md) | `src/charts/*` |
 | Showcase | [showcase.md](showcase.md) | `src/showcase/*` |
-| Frontend (UI): skořápka, stránky, karty, náhled po najetí, morf, styly | [ui.md](ui.md) | `src/App.tsx` `src/MainPage.tsx` `src/cards/*` `src/hover/*` `src/api.ts` `src/types.ts` `src/motion.ts` |
+| Frontend (UI): skořápka, stránky, karty, morf, styly | [ui.md](ui.md) | `src/App.tsx` `src/MainPage.tsx` `src/cards/*` `src/api.ts` `src/types.ts` `src/motion.ts` |
+| Náhled po najetí: peek, ostrůvek, dok, panel | [hover.md](hover.md) | `src/hover/*` `hovermode.rs` `threads/hover.rs` |
 | Rychlé akce a odkazy (config `actions`, odkaz = akce, převod `personal.links`, spouštění … | [actions.md](actions.md) | `actions.rs` `actionrun.rs` `actionicons.rs` `actionstate.rs` `src/actions/*` `src/palette/*` |
-| Widgety na ploše („Na plochu“): karta Ledge jako okno na ploše / druhém monitoru, vrstvy … | [desk.md](desk.md) | `desk/*` `commands/desk.rs` `desk.html` `src/desk/*` |
-| Widgety ze skriptů (jako xbar): složka `@ledge.widget`, parser JSON / textu, plánovač … | [widgets.md](widgets.md) | `widgets/*` `commands/widgets.rs` `src/widgets/*` |
-| Vzhled a animace: design styly (tabulka, písmo, materiál, rozložení, šířka), motivy … | [appearance.md](appearance.md) | `appearance.rs` `appearance/{geom,look,stripdeco,motion}.rs` `looks/*` `stripdraw.rs` `threads/pointer.rs` |
-| Průvodce prvním spuštěním, čistý config nového uživatele, krok „Claude“ (návod pro Clauda … | [onboarding.md](onboarding.md) | `onboarding/*` `uiconf.rs` `commands/onboarding.rs` `src/onboarding/*` `src/settings/panels/Start.tsx` |
+| Widgety na ploše („Na plochu“): karta jako okno, vrstvy … | [desk.md](desk.md) | `desk/*` `commands/desk.rs` `desk.html` `src/desk/*` |
+| Widgety ze skriptů (xbar), parser, plánovač … | [widgets.md](widgets.md) | `widgets/*` `commands/widgets.rs` `src/widgets/*` |
+| Šablonový widget `*.kit.json` | [widgetkit.md](widgetkit.md) | `widgetkit/*` |
+| Vzhled a animace: design styly (tabulka, písmo, … | [appearance.md](appearance.md) | `appearance.rs` `appearance/{geom,look,stripdeco,motion}.rs` `looks/*` `stripdraw.rs` `threads/pointer.rs` |
+| Průvodce prvním spuštěním, čistý config nového … | [onboarding.md](onboarding.md) | `onboarding/*` `uiconf.rs` `commands/onboarding.rs` `src/onboarding/*` `src/settings/panels/Start.tsx` |
 | Přihrádka na soubory: tah na proužek (OLE cíl), `shelf.json`, schránka, tah ven, karta | [shelf.md](shelf.md) | `shelf/*` `commands/shelf.rs` `src/shelf/*` |
 | Historie schránky v paletě (`v:`): listener událostmi, filtr hesel a tokenů, připnuté … | [clipboard.md](clipboard.md) | `cliphist/*` `commands/cliphist.rs` `src/cliphist/*` |
 | Osobní: kalendář — zdroje (ICS, Outlook v PC, místo pro účty), parser, opakování, pásma … | [calendar.md](calendar.md) | `calendar/*` `commands/calendar.rs` `src/calendar/*` |
@@ -31,13 +33,14 @@ Tento přehled je zkrácený; plná verze je v [README-detail.md](README-detail.
 | Kontextové návrhy: pruh nahoře v šuplíku (max 3 chipy z reálných událostí: připomínka, PR … | [suggest.md](suggest.md) | `suggest/*` `attention.rs` `src/suggest/*` `src/types/suggest.ts` |
 | Integrace: karta GitHub (`gh`, PR k revizi / vlastní PR s CI / notifikace), karta Systém … | [integrations.md](integrations.md) | `github/*` `sysmon/*` `integrations.rs` `commands/integrations.rs` `src/integrations/*` |
 | MCP server pro Clauda: `/mcp` na mostu, JSON-RPC, nástroje (zástupci, akce, rozložení … | [mcp.md](mcp.md) | `mcp/*` `commands/mcp.rs` `src/mcp/*` |
-| Chytřejší šuplík: Alt+1…9 a šipky, přetažení odkazu / souboru na otevřený šuplík = nový … | [smart.md](smart.md) | `smartconf.rs` `approvalsound.rs` `incidents.rs` `dataexport.rs` `commands/smart.rs` `shelf/shortcut.rs` |
-| Nové widgety kola 22: Claude dnes (útrata + časová osa po hodinách), Týden (pás dnů + … | [board.md](board.md) | `src/board/*` `usage/index.rs` `hours` `usage/view.rs` `hour_rows` `costslive.rs` `wanted` `request_desk` |
+| Poslat do propojené aplikace: poznámka / body `- [ ]` jako poznámka či úkoly … | [connector.md](connector.md) | `connector/*` `commands/connector.rs` `src/connector/*` |
+| Chytřejší šuplík: Alt+1…9 a šipky, přetažení odkazu … | [smart.md](smart.md) | `smartconf.rs` `approvalsound.rs` `incidents.rs` `dataexport.rs` `commands/smart.rs` `shelf/shortcut.rs` |
+| Nové widgety kola 22: Claude dnes (útrata + … | [board.md](board.md) | `src/board/*` `usage/index.rs` `hours` `usage/view.rs` `hour_rows` `costslive.rs` `wanted` `request_desk` |
 | Karta Rychlé dlaždice Windows: mikrofon, výstup zvuku, terminál ve složce projektu … | [winquick.md](winquick.md) | `winquick.rs` `winquickwin.rs` `commands/winquick.rs` `winsettings.rs` `src/winquick/*` |
+| Rozšíření `--ext <id>`: supervisor, NDJSON | [ext.md](ext.md) | `ext/*` |
 | Jádro: stav, vlákna, příkazy, okna (vč. náhledu po najetí `drawer.hover`), proužek … | [core.md](core.md) | `lib.rs` `state.rs` `snapshot.rs` `threads/*` `commands/*` `drawer.rs` `hovermode.rs` `strip.rs` `edge.rs` |
 
-Mimo mapy: [`AGENTS.md`](../../AGENTS.md) = rozcestník k `docs/agents/*.md` (config, formát poznámek, lokální API,
-MCP, instalace, pravidla) — čti jen potřebný soubor.
+Mimo mapy: [`AGENTS.md`](../../AGENTS.md) = rozcestník k `docs/agents/*.md` — čti jen potřebný soubor.
 
 ## Najdi symbol
 
@@ -58,12 +61,12 @@ Mapy hlídají testy v `test:ui` (`node scripts/codemap-lint.mjs` vypíše všec
 
 ```
 node scripts/brany.mjs            # test, clippy, tsc, ui, build — řádek na bránu; razítko `.brany-ok` (--force), padlý test 1× znovu = FLAKY
-node scripts/brany.mjs --changed  # jen to, co změněné soubory vyžadují (src → tsc ui; src-tauri → test clippy; docs → ui)
+node scripts/brany.mjs --changed  # jen to, co změněné soubory vyžadují (src → tsc ui; src-tauri → test clippy ui; docs → ui)
 node scripts/wt.mjs new|rm|prune  # worktree stavitele (junction, dist, rerere), úklid, stará incremental cache
 node scripts/codemap-lint.mjs --fix  # u mapy nad 8 KB navrhne řádky k přesunu do -detail
 ```
 
-Pomocníci: `scripts/brany-lib.mjs` (razítko, flaky), `scripts/codemap-suggest.mjs` (návrh přesunu). Ručně: `cargo test`, `pnpm test:ui`.
+Pomocníci: `scripts/brany-lib.mjs` (razítko), `scripts/codemap-suggest.mjs` (přesun), `scripts/premerge.mjs` (kolize před mergem).
 
 Těžké běhy na sdíleném stroji přes frontu (`node %USERPROFILE%\.devtools\fronta.mjs --auto -- …`),
 paralelní workeři se sdíleným `CARGO_TARGET_DIR=…/src-tauri/target-agents`.

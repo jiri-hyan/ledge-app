@@ -1,6 +1,6 @@
 import type { ActionView, ScriptView } from "./actions";
 import type { Ask, HooksStatus, LimitsView, Pending, QuestionLog, SessionView } from "./claude";
-import type { NoteKind, NoteView, NotesFolderView, NotesSyncView, PinsView } from "./notes";
+import type { BriefWaiting, NoteKind, NoteView, NotesFolderView, NotesSyncView, PinsView } from "./notes";
 import type { PersonalView } from "./personal";
 import type { ProcView, ProjectView, View } from "./projects";
 import type { UpdateView } from "./settings";
@@ -19,11 +19,14 @@ export interface Incident {
   impact: "minor" | "major" | "critical" | "none";
   /** kolik dalších probíhajících incidentů je kromě tohoto */
   more: number;
+  /** kdy se údaj naposledy ÚSPĚŠNĚ stáhl (ms) */
+  okMs: number;
+  /** po kolika minutách od `okMs` se skryje (`2 × smart.incidents.everyMin`) */
+  ttlMin: number;
 }
 
-/** `smart.*` pro UI: klávesy Alt+1…9 a šipky, přetažení na šuplík, kolečko nad záložkami (`smartconf.rs`). */
+/** `smart.*` pro UI: přetažení na šuplík, kolečko nad záložkami (`smartconf.rs`). */
 export interface SmartView {
-  quickKeys: boolean;
   dropShortcut: boolean;
   tabWheel: boolean;
 }
@@ -34,6 +37,8 @@ export interface Snapshot {
   /** zastaralé — vždy true, záložky řídí `layout` */
   personalEnabled: boolean;
   view: View;
+  /** kdy se šuplík naposledy schoval (wall-clock ms), null = od startu ještě ne; chybí = starší jádro */
+  drawerHiddenAt?: number | null;
   cfgError: string | null;
   /** kopie rozbitého configu z posledního zápisu (Obnovit) a varování o hodnotách mimo rozsah; chybí = nic */
   configNotice?: { warnings: string[]; backup: string | null; restorable?: boolean };
@@ -67,6 +72,10 @@ export interface Snapshot {
   /** kategorie z configu (pořadí záložek) a počty nehotových podle `kind` */
   noteKinds: NoteKind[];
   notesKindCounts: Record<string, number>;
+  /** otevřené body s termínem do konce dneška (štítek záložky Úkoly = overdue + today) */
+  notesTaskCounts: { overdue: number; today: number };
+  /** zadání čekající na člověka (Rust `notes/briefwait.rs`); chybí = starší jádro */
+  briefWaiting?: BriefWaiting;
   /** roste s každým přenačtením poznámek */
   notesRev: number;
   /** kolik poznámek je v archivu (`_archiv`) */

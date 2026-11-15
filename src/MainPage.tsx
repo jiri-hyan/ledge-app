@@ -8,7 +8,7 @@
 // Vlna 8 P: vzhled karty (⋯ → „Vzhled karty…“, panel `layout/CardLook.tsx` pod mřížkou, varianty zobrazení
 // karet `viewOf`) a vzhled zástupců (pravý klik → `tilelook/TileMenu.tsx`).
 // Dynamické karty (widgety ze skriptů `widget:<soubor>`) kreslí `widgets/WidgetCard.tsx` z `Snapshot.widgets`.
-import { createEffect, createMemo, on as onChange, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, For, on as onChange, onCleanup, onMount, Show, type JSX } from "solid-js";
 import { api, type Snapshot } from "./api";
 import type { NotesNav } from "./nav";
 import ClaudeSessions, { ClaudeInbox } from "./ClaudeSessions";
@@ -17,42 +17,31 @@ import { pinMenuItems } from "./notes/pins";
 import { exportMenuItems } from "./exports/usage";
 import type { NotePreset } from "./notes/store";
 import Projects from "./cards/Projects";
+import { minuteOf } from "./util/time";
 import Running from "./cards/Running";
 import Repos from "./cards/Repos";
 import ClockCard from "./cards/ClockCard";
 import TimerCard from "./timer/TimerCard";
-import WeatherCard from "./cards/WeatherCard";
-import CalendarCard from "./calendar/CalendarCard";
-import MailCard from "./accounts/MailCard";
-import TodayCard, { useTodayRows } from "./cards/TodayCard";
-import LinksCard from "./cards/LinksCard";
 import MediaCard, { PersonalLive } from "./media/MediaCard";
 import ActionsCard from "./cards/ActionsCard";
-import GithubCard from "./integrations/GithubCard";
-import SystemCard from "./integrations/SystemCard";
 import ShelfCard, { shelfShown } from "./shelf/ShelfCard";
 import BgLaunch from "./sessions/BgLaunch";
 import CardMenu, { HiddenNotice } from "./cards/CardMenu";
 import { dropped } from "./actions/dropstate";
 import TileOptions from "./cards/TileOptions";
-import Tour from "./layout/Tour";
-import HoldTip from "./layout/HoldTip";
 import { closeCardLook, lookFor, target as cardLookTarget } from "./layout/lookState";
 import { viewOf } from "./layout/look";
-import { designOf } from "./layout/designs";
-import ClaudeDesign, { isClaudeDesign } from "./cards/ClaudeDesign";
+import { designOf, isClaudeDesign } from "./layout/designs";
 import TileMenu, { openTileMenu } from "./tilelook/TileMenu";
 import { gotoSettingsPanel } from "./palette/goto";
 import { closeLook } from "./tilelook/state";
 import { setActivePage } from "./theme/apply";
-import ResizeHandles from "./layout/ResizeHandles";
 import { setSizeTab } from "./layout/drawerSize";
 import { CLAUDE_PARTS, sectionOn } from "./cards/sections";
-import { isLink, visibleGroups } from "./actions/model";
+import { visibleGroups } from "./actions/model";
 import { lastResult } from "./actions/api";
 import Deck from "./layout/Deck";
-import { CardLookPanel, Catalog, DropNew } from "./lazyViews";
-import EditBar from "./layout/EditBar";
+import { UsageCard, TogglesCard, WinQuickCard, WeekCard, BigClockCard, CalendarCard, CardLookPanel, Catalog, ClaudeDesign, DropNew, EditBar, GithubCard, HoldTip, MailCard, ResizeHandles, SystemCard, Tour, WeatherCard } from "./lazyViews";
 import { beginEdit, catalogOpen, draft, editing, editPage, saveLayout, setCatalogOpen } from "./layout/edit";
 import { pageName } from "./layout/text";
 import { LIMIT_CARDS, limitOf, normalizeLayout, pageHas, sameLayout, pageKind, pageOf, setTiles, shownCards, tilesOf, type CardId, type CardSize, type PartKey } from "./layout/model";
@@ -67,16 +56,14 @@ import SuggestBar from "./suggest/SuggestBar";
 import NotchBar, { NotchBarEdit } from "./notch/NotchBar";
 import { barPlan } from "./notch/bar";
 import { layoutNow } from "./theme/apply";
-import UsageCard from "./board/UsageCard";
-import WeekCard from "./board/WeekCard";
-import BigClockCard from "./board/BigClockCard";
-import TogglesCard from "./board/TogglesCard";
-import WinQuickCard from "./winquick/WinQuickCard";
 import ActivityCard from "./sessions/ActivityCard";
 import { activityApproves, inboxShown } from "./sessions/activity";
 import Boundary from "./ui/Boundary";
 
-export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void }) {
+/** `mid` = střední panel z docku (`hover/Mid.tsx`, L147): místo mřížky záložky jen tyhle karty (až 3, bez ⋯ menu a úprav), tytéž komponenty. */
+export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?: NotePreset) => void; nav: NotesNav; onSettings: () => void; mid?: readonly string[] }) {
+  // karty bez sekund (kalendář, týden, pošta, počasí, GitHub, využití, hero) počítají jen po minutě; sekundová `p.now` zůstává hodinám, časovači, Claude a poznámkám
+  const nowMin = createMemo(() => minuteOf(p.now));
   // stejné rozložení = stejný objekt (nový snapshot karty nepřestaví)
   const saved = createMemo(() => normalizeLayout(p.s.layout), undefined, { equals: sameLayout });
   const layout = () => draft() ?? saved();
@@ -84,16 +71,10 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   const kind = () => pageKind(page().id);
   const on = (k: Parameters<typeof sectionOn>[1]) => sectionOn(p.s.sections, k);
   const has = (id: CardId) => pageHas(page(), id);
-  // karta Dnes se nekreslí bez řádků (schůzka, připomínky, PR, limit) — počítá se jen na záložce, kde je.
-  // MUSÍ být před `facts`/`notch`: memo `notch` se v rozložení notch vyhodnotí hned při vzniku stránky a
-  // pozdější `const` by spadl (TDZ) — návrat z rychlé poznámky pak nefungoval (0.11.x).
-  const todayRows = useTodayRows(() => p.s, () => p.now, () => has("today"));
   const facts = () => ({
-    today: todayRows().length > 0,
     procs: p.s.procs.length,
     notesEnabled: p.s.notesEnabled,
-    // odkazy (akce, které jen otevírají) ukazuje na záložce s kartou Odkazy jen ona
-    actions: visibleGroups([...(p.s.actions ?? []).filter((a) => !(has("links") && isLink(a))), ...(p.s.scripts ?? [])], page().id).reduce((n, g) => n + g.items.length, 0),
+    actions: visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], page().id).reduce((n, g) => n + g.items.length, 0),
     scriptOut: !!lastResult()?.id.startsWith("script:"),
     shelf: shelfShown(),
     media: !!((on("nowPlaying") && p.s.personal.media) || (on("sound") && p.s.personal.volume) || (on("favorites") && p.s.personal.mediaLook?.favorites?.length)),
@@ -132,7 +113,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
   onMount(() => {
     const onContext = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
-      if (!el?.closest(".deck, .content") || el.closest(".card, button, a, input, textarea, select, .proj")) return;
+      if (p.mid || !el?.closest(".deck, .content") || el.closest(".card, button, a, input, textarea, select, .proj")) return;
       openTileMenu(e, [
         { text: t("cards.deck.menuEdit", "Upravit rozložení"), run: () => edit() },
         { text: t("cards.deck.menuAdd", "Přidat kartu…"), run: () => edit(true) },
@@ -148,7 +129,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     void closeLook(true, editing());
     void closeCardLook(true);
   }, { defer: true }));
-  const menu = (card: CardId, parts: PartKey[] = []) => (
+  const menu = (card: CardId, parts: PartKey[] = []) => p.mid ? null : (
     <CardMenu card={card} page={page().id} bento={!!page().bento} parts={parts} size={cardOf(card)?.size} h={cardOf(card)?.h} outcome={outcome(card)} limit={LIMIT_CARDS.includes(card) ? limitOf(cardOf(card)) : undefined} look={cardOf(card)?.look} cfgError={p.s.cfgError} onEdit={() => edit()} extra={card === "notes" ? pinMenuItems(p.s) : card === "claude" ? exportMenuItems(p.s) : undefined}>
       <Show when={card === "projects"}>
         <TileOptions page={page().id} tiles={tiles()} projects={p.s.projects} cfgError={p.s.cfgError} />
@@ -202,40 +183,45 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
         // Osobní = obecné poznámky; Práce a vlastní záložky = po projektech (reaktivně — karta zůstává při přepnutí záložky)
         return <Show when={kind() === "personal"} fallback={<NotesCard s={p.s} now={p.now} design={design("notes")} groupBy={noteLook()?.groupBy} groupStyle={noteLook()?.groupStyle} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll()} menu={menu("notes")} />}><NotesCard s={p.s} now={p.now} design={design("notes")} groupBy={noteLook()?.groupBy} groupStyle={noteLook()?.groupStyle} onNew={p.nav.onNew} onOpen={p.nav.onOpen} onAll={() => p.nav.onAll(true)} personal menu={menu("notes")} /></Show>;
       case "actions":
-        return <ActionsCard s={p.s} view={view("actions")} onSettings={p.onSettings} wide skipLinks={has("links")} menu={menu("actions")} />;
+        return <ActionsCard s={p.s} view={view("actions")} onSettings={p.onSettings} wide menu={menu("actions")} />;
       case "shelf":
         return <ShelfCard wide menu={menu("shelf")} />;
       case "clock":
-        return <ClockCard now={p.now} battery={battery()} hideBattery={!on("battery")} menu={menu("clock", battery() ? ["battery"] : [])} />;
+        // vzhled „Velké hodiny“ (kolo 34: dřívější karta `bigclock`): jen čas obřími číslicemi, bez baterie
+        return (
+          <Show when={design("clock") === "big"} fallback={<ClockCard now={p.now} battery={battery()} hideBattery={!on("battery")} menu={menu("clock", battery() ? ["battery"] : [])} />}>
+            <BigClockCard now={p.now} menu={menu("clock")} />
+          </Show>
+        );
       case "timer":
         return <TimerCard s={p.s} now={p.now} menu={menu("timer")} />;
       case "weather":
-        return <WeatherCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("weather")} design={design("weather")} />;
+        return <WeatherCard s={p.s} now={nowMin()} onSettings={p.onSettings} menu={menu("weather")} design={design("weather")} />;
       case "calendar":
-        return <CalendarCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("calendar")} />;
-      case "links":
-        return <LinksCard s={p.s} mode={page().id} onSettings={p.onSettings} menu={menu("links")} />;
-      case "today":
-        return <TodayCard s={p.s} now={p.now} nav={p.nav} menu={menu("today")} />;
+        // vzhledy z Týdne (kolo 34: dřívější karta `week`): pás dnů, měsíc, osa dne, ciferník …
+        return (
+          <Show when={design("calendar") !== "list"} fallback={<CalendarCard s={p.s} now={nowMin()} onSettings={p.onSettings} menu={menu("calendar")} />}>
+            <WeekCard s={p.s} now={nowMin()} onSettings={p.onSettings} menu={menu("calendar")} design={design("calendar")} />
+          </Show>
+        );
       case "mail":
-        return <MailCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("mail")} />;
+        return <MailCard s={p.s} now={nowMin()} onSettings={p.onSettings} menu={menu("mail")} />;
       case "media":
         return <MediaCard s={p.s} menu={menu("media", mediaParts())} />;
       case "github":
-        return <GithubCard now={p.now} cfgError={p.s.cfgError} menu={menu("github")} />;
+        return <GithubCard now={nowMin()} cfgError={p.s.cfgError} menu={menu("github")} />;
       case "system":
         return <SystemCard menu={menu("system")} design={design("system")} />;
       // kolo 22 (nové widgety, `src/board/`)
       case "usage":
-        return <UsageCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("usage")} />;
-      case "week":
-        return <WeekCard s={p.s} now={p.now} onSettings={p.onSettings} menu={menu("week")} design={design("week")} />;
-      case "bigclock":
-        return <BigClockCard now={p.now} menu={menu("bigclock")} />;
-      case "toggles":
-        return <TogglesCard s={p.s} menu={menu("toggles")} />;
+        return <UsageCard s={p.s} now={nowMin()} onSettings={p.onSettings} menu={menu("usage")} />;
       case "winquick":
-        return <WinQuickCard s={p.s} menu={menu("winquick")} />;
+        // vzhled „Přepínače“ (kolo 34: dřívější karta `toggles`): zvuk, mikrofon, hlasitost −/+, baterie
+        return (
+          <Show when={design("winquick") === "toggles"} fallback={<WinQuickCard s={p.s} menu={menu("winquick")} />}>
+            <TogglesCard s={p.s} menu={menu("winquick")} />
+          </Show>
+        );
       case "activity":
         return <ActivityCard s={p.s} now={p.now} approvals={activityApproves(has)} menu={menu("activity")} />;
       default:
@@ -244,13 +230,26 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
     }
   };
 
+  if (p.mid) {
+    const ids = () => p.mid as readonly CardId[];
+    return (
+      <>
+        <Show when={inboxShown<string>((id) => p.mid!.includes(id))}><ClaudeInbox s={p.s} /></Show>
+        <Show when={ids().some((id) => id === "media" || id === "clock" || id === "winquick")}><PersonalLive /></Show>
+        <div class="mid-deck">
+          <For each={ids()}>{(id) => <div class="deck-item mid-item" data-size="l" data-card={id}>{card(id)}</div>}</For>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <Show when={editing()}><EditBar /><ResizeHandles /></Show>
       <Show when={inboxShown(has)}><ClaudeInbox s={p.s} /></Show>
       <BgLaunch s={p.s} />
       {/* odběry Právě hraje / hlasitost / baterie startují líně, jen když je karta na otevřené záložce */}
-      <Show when={has("media") || has("clock") || has("toggles") || has("winquick") || notch().sections.some((x) => x.id === "player" || x.id === "volume")}><PersonalLive /></Show>
+      <Show when={has("media") || has("clock") || has("winquick") || notch().sections.some((x) => x.id === "player" || x.id === "volume")}><PersonalLive /></Show>
       {/* kontextový pruh při práci Clauda / pádu serveru na jiné záložce */}
       <Show when={ctxTab()}>
         {(ct) => (
@@ -276,7 +275,7 @@ export default function MainPage(p: { s: Snapshot; now: number; onNote: (preset?
       >
         <NotchBarEdit s={p.s} now={p.now} page={page()} />
       </Show>
-      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} notched={(id) => notch().taken.includes(id)} render={card} begin={() => edit()} hero={{ facts: (id) => heroFacts(id, p.s, p.now), render: (id, f) => <HeroCard id={id} facts={f()} menu={menu(id)} /> }} />
+      <Deck page={page()} layout={layout()} editing={editing()} shown={shows} notched={(id) => notch().taken.includes(id)} render={card} begin={() => edit()} hero={{ facts: (id) => heroFacts(id, p.s, nowMin()), render: (id, f) => <HeroCard id={id} facts={f()} menu={menu(id)} /> }} />
       <Show when={cardLookTarget()?.page === page().id}><CardLookPanel page={page().id} s={p.s} /></Show>
       <TileMenu />
       <Show when={editing() && catalogOpen()}><Catalog layout={layout()} /></Show>

@@ -7,6 +7,9 @@ import { t } from "../i18n";
 import { Confirm } from "../ui/Confirm";
 import { Advanced } from "../settings/fields/Advanced";
 import { Row, Section } from "../settings/fields/Row";
+import { Text, Toggle } from "../settings/fields/controls";
+import ConnectorKey from "../connector/ConnectorKey";
+import { CONNECTOR_DEFAULT } from "../types/connector";
 import { useSettings } from "../settings/ctx";
 import { fieldLabel } from "../settings/labels";
 import { say, sayError } from "../ui/toast";
@@ -59,6 +62,7 @@ export function McpSettings() {
     }
   }
   return (
+    <>
     <Section
       title={t("settings.mcp.title", "Claude (MCP)")}
       desc={t("settings.mcp.desc", "Claude Code nebo Claude Desktop může Ledge nastavit za tebe: přidá aplikace, weby, odkazy a akce, které používáš, upraví záložky, karty a vzhled. Smí jen číst a měnit nastavení Ledge — nic nespouští a nic neposílá ven (jen tento počítač). Každou změnu vrátíš.")}
@@ -80,6 +84,9 @@ export function McpSettings() {
             <Show when={!c.cfg.claude?.enabled}>
               <small class="st-note">{t("settings.mcp.bridgeOff", "Schvalování z Ledge (výš) je vypnuté — bez něj MCP neběží. Zapni ho a ulož.")}</small>
             </Show>
+            <Row id="mcp.readData">
+              <Toggle path="mcp.readData" label={fieldLabel("mcp.readData")} />
+            </Row>
             <Row id="mcp.cli" stack label={t("settings.mcp.cli", "Připojit Claude Code")} hint={t("settings.mcp.cli.hint", "Spusť jednou v terminálu. Klíč si Ledge předá sám, v příkazu není.")}>
               <div class="st-status">
                 <code class="mono grow">{s().cliCommand}</code>
@@ -121,5 +128,22 @@ export function McpSettings() {
         )}
       </Show>
     </Section>
+    <Section
+      title={t("settings.connector.title", "Propojená aplikace")}
+      desc={t("settings.connector.desc", "Tady je Ledge klient MCP serveru cizí aplikace (sekce Claude (MCP) výše je opačný směr: Ledge jako server pro Clauda). Poznámku nebo její body „- [ ]“ pošleš jedním klikem (⋯ u poznámky → Poslat do …): jako poznámku, nebo jako úkoly s řešitelem a prioritou. Zadej adresu serveru a klíč; bez nich se nic neposílá. Server musí nabízet nástroje create_task, create_note, list_team_members a create_event v očekávaném tvaru; jiné servery zatím nefungují.")}
+    >
+      <Row id="connector.key" stack>
+        <ConnectorKey />
+      </Row>
+      <Advanced id="claude.connector" inline hint={t("settings.connector.adv.hint", "Adresa a název propojené aplikace")}>
+        <Row id="connector.url" stack>
+          <Text path="connector.url" label={fieldLabel("connector.url")} placeholder="https://…" mono grow />
+        </Row>
+        <Row id="connector.name" stack>
+          <Text path="connector.name" label={fieldLabel("connector.name")} placeholder={CONNECTOR_DEFAULT.name} grow />
+        </Row>
+      </Advanced>
+    </Section>
+    </>
   );
 }

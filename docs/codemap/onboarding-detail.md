@@ -49,6 +49,7 @@ se na ní neukazuje), `nav.ts` (`Page` + `typing` obsahují `welcome`).
    Krok Hotovo ukáže jen nenulové řádky (motiv jménem z `THEMES`), jinak jednu větu.
 
 ## Invarianty a pasti
+- Průvodce sám NIC skrytého nezapisuje: autostart (config `autostart: true` ze startu), zkratky a paletu Ctrl+K jen oznámí v Hotovo (`wiz.autostart`, `tipPalette`); chybějící Claude Code řekne řádkem `tipNoClaude` místo mizejícího kroku.
 
 - **Kompatibilita:** chybějící `onboarding` = `done: true`; čistý config se ukládá celý (vč. `done:false`).
   Starý config bez `notes.sync.remote` → `origin` pracovní kopie poznámek (`resolve::read_origin`), bez

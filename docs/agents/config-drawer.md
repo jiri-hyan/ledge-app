@@ -27,6 +27,11 @@ Zdroj: `src-tauri/src/config/drawer.rs`. Uložení se projeví hned (config se s
   - `pushMs` (300, min. 100) — záložní pravidlo, kde tlak měřit nejde (tablet, vzdálená plocha): jak dlouho
     souvisle stát na horní hraně.
 
+- `drawer.dockCards` — dok (`drawer.hover = dock`): karty středního panelu, který se otevře klikem do docku nebo
+  setrváním (`hoverExpandMs`) — pole až 3 id vestavěných karet (výchozí `["notes", "calendar", "claude"]`). Neznámá id
+  a opakování se vynechají, víc než 3 se ořízne, prázdné = výchozí (`hovermode::dock_cards`). Střední panel je široký
+  ~1/3 monitoru (520–760 px), z něj „▾ celý šuplík“ otevře plný šuplík. Nastavení → Vzhled → Po najetí.
+
 Další klíče `drawer` (`hover`, `hoverExpandMs`, `width`, `glass`, `sections`) jsou v
 [config-layout.md](config-layout.md) a [config-behavior.md](config-behavior.md).
 

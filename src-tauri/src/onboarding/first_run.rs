@@ -63,7 +63,7 @@ pub fn schedule() {
             for _ in 0..=MAX_RETRIES {
                 let c = core();
                 let done = c.cfg.read().onboarding.done;
-                match should_open(done, was_shown(&dir), c.dead(), c.drawer.view() != View::Hidden) {
+                match should_open(done, was_shown(&dir), c.dead_surface(), c.drawer.view() != View::Hidden) {
                     Verdict::Open => {
                         if let Err(e) = mark_shown(&dir) {
                             log(&format!("první spuštění: značka nejde uložit: {e}"));

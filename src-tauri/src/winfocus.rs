@@ -156,7 +156,7 @@ pub fn switch_to(pid: u32, desktop: bool) -> Result<(), String> {
 /// Spustí `claude --resume` v novém okně: Windows Terminal, bez něj `cmd /c start`.
 pub fn launch(cwd: &str, id: &str) -> Result<(), String> {
     const DETACHED: u32 = 0x0000_0008;
-    const NO_WINDOW: u32 = 0x0800_0000;
+    use crate::procman::CREATE_NO_WINDOW as NO_WINDOW;
     if !std::path::Path::new(cwd).is_dir() {
         return Err(trf!("Složka session neexistuje: {cwd}", "The session folder doesn't exist: {cwd}"));
     }

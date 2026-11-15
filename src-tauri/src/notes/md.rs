@@ -23,7 +23,7 @@ pub fn esc(s: &str) -> String {
     o
 }
 
-pub(super) fn is_fence(line: &str) -> bool {
+pub fn is_fence(line: &str) -> bool {
     let t = line.trim_start();
     t.starts_with("```") || t.starts_with("~~~")
 }
@@ -92,27 +92,25 @@ pub(super) fn task_state(rest: &str) -> Option<(TaskState, &str)> {
     (after.is_empty() || after.starts_with(' ')).then(|| (state, after.trim_start()))
 }
 
-/// `[ ] text` / `[x] text` → (hotovo?, text); navržený `[~]` se pro odškrtávání bere jako nehotový.
-fn task_box(rest: &str) -> Option<(bool, &str)> {
-    task_state(rest).map(|(s, t)| (s == TaskState::Done, t))
+/// Body `- [ ]` / `- [~]` / `- [x]` v těle: (řádek od 0, stav, text za značkou). Bloky kódu se přeskočí;
+/// řádky se dělí po newline, CR se ořízne. Jediné místo v Rustu, které pozná řádek úkolu (`tasks`, `taskindex::index`); TS zrcadlo `taskLineOf` (`src/notes/taskline.ts`, sdílená tabulka `taskitem_cases.json`).
+pub(super) fn task_lines(body: &str) -> impl Iterator<Item = (usize, TaskState, &str)> {
+    let mut code = false;
+    body.split('\n').map(|l| l.trim_end_matches('\r')).enumerate().filter_map(move |(i, line)| {
+        if is_fence(line) {
+            code = !code;
+            return None;
+        }
+        if code {
+            return None;
+        }
+        list_item(line).and_then(|(_, _, r)| task_state(r)).map(|(s, t)| (i, s, t))
+    })
 }
 
 /// Úkoly v těle: (řádek od 0, hotovo?). Bloky kódu se přeskočí.
 pub fn tasks(body: &str) -> Vec<(usize, bool)> {
-    let mut out = Vec::new();
-    let mut code = false;
-    for (i, line) in body.split('\n').map(|l| l.trim_end_matches('\r')).enumerate() {
-        if is_fence(line) {
-            code = !code;
-            continue;
-        }
-        if !code
-            && let Some((checked, _)) = list_item(line).and_then(|(_, _, r)| task_box(r))
-        {
-            out.push((i, checked));
-        }
-    }
-    out
+    task_lines(body).map(|(i, s, _)| (i, s == TaskState::Done)).collect()
 }
 
 /// Nastaví úkol na řádku `line` (od 0) na `checked`. Řádek, který úkolem není, = chyba.
@@ -342,7 +340,7 @@ pub fn plain(line: &str) -> String {
     t = t.trim_start_matches('#').trim_start();
     if let Some((_, _, rest)) = list_item(t) {
         t = rest;
-        if let Some((_, r)) = task_box(t) {
+        if let Some((_, r)) = task_state(t) {
             t = r;
         }
     }

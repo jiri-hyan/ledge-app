@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  CARD_IDS, CARD_INFO, DEFAULT_TILES, MAX_PAGES, PARTS, PART_INFO, QUICK_HEIGHTS, UP_PERSONAL_PROJECTS, addCard, addPage, catalog, clone, defaultLayout,
+  CARD_IDS, CARD_INFO, DEFAULT_TILES, MAX_PAGES, PARTS, PART_INFO, QUICK_HEIGHTS, UP_PERSONAL_PROJECTS, addCard, addPage, catalog, clone, defaultLayout, mergeCards, MERGED_CARDS,
   gridDropIndex, pageMoveBlock, moveCard, movePage, moveToPage, nextHeight, nextSize, normalizeLayout, normalizeTiles, pageIdFor, pageKind, pageNameError, pageOf,
   removeCard, removePage, renamePage, restoreCard, restorePage, sameLayout, setHeight, setPartHidden, setSize, setTiles, showProject, shownCards, tilesOf,
   visibleProjects, withLayout, BODY, CARD_SLOTS, movePart, moveToNewPage, orderParts, partsOf, setParts, slotsOf,
@@ -26,9 +26,9 @@ test("zrcadlo Rustu: karty a části jako v layout.rs", () => {
   const fx = JSON.parse(readFileSync(new URL("../../src-tauri/src/fixtures/layout-default.json", import.meta.url), "utf8"));
   assert.deepEqual(d.pages.map((p) => [p.id, p.cards.map((c) => `${c.id}:${c.size}`)]), fx.pages.map((p) => [p.id, p.cards.map((c) => `${c.id}:${c.size}`)]));
   assert.deepEqual(d.pages[0].cards.map((c) => c.id), ["projects", "notes"], "čistý začátek: Práce jen Projekty + Poznámky");
-  assert.deepEqual(d.pages[1].cards.map((c) => c.id), ["clock", "media", "notes", "links"]);
-  const none = ["calendar", "mail", "github", "system", "weather", "actions", "today"];
-  assert.ok(d.pages.every((p) => p.cards.every((c) => !none.includes(c.id))), "karty bez zdroje a duplicitní akce jen v katalogu");
+  assert.deepEqual(d.pages[1].cards.map((c) => c.id), ["clock", "media", "notes", "actions"]);
+  const none = ["calendar", "mail", "github", "system", "weather"];
+  assert.ok(d.pages.every((p) => p.cards.every((c) => !none.includes(c.id))), "karty bez zdroje jen v katalogu");
   assert.deepEqual(d.upgrades, fx.upgrades);
   assert.deepEqual(d.upgrades, [UP_PERSONAL_PROJECTS], "výchozí = jednorázové úpravy už hotové");
   const up = src.match(/pub const UP_PERSONAL_PROJECTS: &str = "([A-Za-z]+)"/)[1];
@@ -39,6 +39,27 @@ test("zrcadlo Rustu: karty a části jako v layout.rs", () => {
   for (const k of Object.keys(PARTS)) assert.ok(PART_INFO[k], k);
 });
 
+test("kolo 34: sloučené karty (22 → 18) se při čtení převedou na nástupce, ne zahodí", () => {
+  assert.equal(CARD_IDS.length, 18);
+  assert.ok(Object.entries(MERGED_CARDS).every(([old, m]) => !CARD_IDS.includes(old) && CARD_IDS.includes(m.to)));
+  const L = (...cards) => ({ pages: [{ id: "prace", name: "", cards }], hiddenParts: [] });
+  const cases = [
+    ["velké hodiny → Čas ve vzhledu big (velikost, výška a akcent zůstanou)", [{ id: "bigclock", size: "l", h: 2, look: { accent: "blue" } }], [{ id: "clock", size: "l", h: 2, look: { accent: "blue", design: "big" } }]],
+    ["Týden bez vzhledu → Kalendář strip", [{ id: "week", size: "m" }], [{ id: "calendar", size: "m", look: { design: "strip" } }]],
+    ["Týden s vlastním vzhledem ho přenese", [{ id: "week", size: "m", look: { design: "dial" } }], [{ id: "calendar", size: "m", look: { design: "dial" } }]],
+    ["Týden s neznámým vzhledem → strip", [{ id: "week", size: "m", look: { design: "x" } }], [{ id: "calendar", size: "m", look: { design: "strip" } }]],
+    ["Odkazy → Odkazy a akce", [{ id: "links", size: "s" }], [{ id: "actions", size: "s" }]],
+    ["Přepínače → Rychlé dlaždice ve vzhledu toggles", [{ id: "toggles", size: "s" }], [{ id: "winquick", size: "s", look: { design: "toggles" } }]],
+    ["nástupce už je → stará karta zmizí (i když je před ním)", [{ id: "bigclock", size: "m" }, { id: "clock", size: "s" }, { id: "links", size: "m" }, { id: "actions", size: "xl" }], [{ id: "clock", size: "s" }, { id: "actions", size: "xl" }]],
+    ["Týden vedle Kalendáře se nezdvojí a Kalendář si nechá vzhled", [{ id: "calendar", size: "m" }, { id: "week", size: "l", look: { design: "month" } }], [{ id: "calendar", size: "m" }]],
+  ];
+  for (const [name, cards, want] of cases) assert.deepEqual(normalizeLayout(L(...cards)).pages[0].cards, want, name);
+  // idempotence: převedené rozložení se znovu nemění
+  const once = normalizeLayout(L({ id: "week", size: "m" }, { id: "toggles", size: "s" }, { id: "bigclock", size: "s" }));
+  assert.deepEqual(normalizeLayout(once), once);
+  assert.deepEqual(mergeCards([{ id: "notes" }, 3, null]), [{ id: "notes" }, 3, null], "ostatní beze změny");
+});
+
 test("normalizace: obranné čtení", () => {
   const cases = [
     ["nic", undefined, defaultLayout()],
@@ -46,7 +67,12 @@ test("normalizace: obranné čtení", () => {
     [
       "neznámé pryč",
       { pages: [{ id: "a", name: "A", icon: "🎮", cards: [{ id: "clock", size: "xl" }, { id: "pocasi" }, { id: "clock", size: "s" }, { id: "links", size: "huge" }] }, { id: "a" }, { name: "bez id" }], hiddenParts: ["sound", "git", "sound", 3] },
-      { pages: [{ id: "a", name: "A", icon: "🎮", cards: [{ id: "clock", size: "xl" }, { id: "links", size: "m" }] }], hiddenParts: ["sound"] },
+      { pages: [{ id: "a", name: "A", icon: "🎮", cards: [{ id: "clock", size: "xl" }, { id: "actions", size: "xl" }] }], hiddenParts: ["sound"] },
+    ],
+    [
+      "smazaná karta Dnes (kolo 33) se tiše vynechá, zbytek zůstane",
+      { pages: [{ id: "prace", name: "", cards: [{ id: "today", size: "m" }, { id: "clock", size: "s" }] }, { id: "osobni", name: "", cards: [{ id: "notes", size: "m" }, { id: "today", size: "s", h: 2 }] }], hiddenParts: [] },
+      { pages: [{ id: "prace", name: "", cards: [{ id: "clock", size: "s" }] }, { id: "osobni", name: "", cards: [{ id: "notes", size: "m" }] }], hiddenParts: [] },
     ],
   ];
   for (const [name, raw, want] of cases) assert.deepEqual(normalizeLayout(raw), want, name);
@@ -90,9 +116,9 @@ test("karty: přesun, velikost, odebrat + Vrátit, přidat, na jinou záložku",
 
 test("katalog: co na záložce není a kde to je", () => {
   const d = fullLayout();
-  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "links", "media", "github", "system", "mail", "today", "usage", "week", "bigclock", "toggles", "winquick", "activity"]);
+  assert.deepEqual(catalog(d, "prace").map((x) => x.id), ["clock", "timer", "weather", "calendar", "media", "github", "system", "mail", "usage", "winquick", "activity"]);
   // GitHub, Systém a Pošta jsou v katalogu, ale na žádné záložce (výchozí rozložení se nemění)
-  assert.deepEqual(catalog(d, "prace").filter((x) => ["github", "system", "mail", "today"].includes(x.id)).map((x) => x.on), [[], [], [], []]);
+  assert.deepEqual(catalog(d, "prace").filter((x) => ["github", "system", "mail"].includes(x.id)).map((x) => x.on), [[], [], []]);
   assert.deepEqual(catalog(d, "osobni").find((x) => x.id === "mail").on, []);
   assert.deepEqual(catalog(d, "prace").find((x) => x.id === "weather").on, ["osobni"]);
   const hidden = removeCard(removeCard(d, "prace", "notes").layout, "osobni", "notes").layout;
@@ -141,12 +167,9 @@ test("co stránka ukáže: karty bez dat se schovají samy", () => {
     [pageOf(d, "prace"), f(), ["projects", "claude", "repos", "notes"]],
     [pageOf(d, "prace"), f({ procs: 1, actions: 2, shelf: true }), ["projects", "actions", "shelf", "running", "claude", "repos", "notes"]],
     [pageOf(d, "prace"), f({ scriptOut: true, notesEnabled: false }), ["projects", "actions", "claude", "repos"]],
-    [pageOf(d, "osobni"), f(), ["projects", "clock", "timer", "weather", "calendar", "links", "actions", "notes"]],
-    [pageOf(d, "osobni"), f({ media: true }), ["projects", "clock", "timer", "weather", "calendar", "media", "links", "actions", "notes"]],
+    [pageOf(d, "osobni"), f(), ["projects", "clock", "timer", "weather", "calendar", "actions", "notes"]],
+    [pageOf(d, "osobni"), f({ media: true }), ["projects", "clock", "timer", "weather", "calendar", "media", "actions", "notes"]],
     [custom, f(), ["actions"]],
-    // karta Dnes bez řádků se nekreslí, s řádkem ano
-    [{ id: "x", name: "X", cards: [{ id: "today", size: "m" }, { id: "clock", size: "s" }] }, f(), ["clock"]],
-    [{ id: "x", name: "X", cards: [{ id: "today", size: "m" }, { id: "clock", size: "s" }] }, f({ today: true }), ["today", "clock"]],
   ];
   for (const [p, facts, want] of cases) assert.deepEqual(shownCards(p, facts).map((c) => c.id), want, `${p.id} ${JSON.stringify(facts)}`);
 });

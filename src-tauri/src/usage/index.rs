@@ -11,14 +11,16 @@
 use super::floor;
 use super::parse::{self, Tokens};
 use super::price;
+use super::sess;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-/// Verze formátu indexu — jiná na disku = přepočet od nuly. 2 = přibyly hodiny (`hours`, kolo 22):
+/// Verze formátu indexu — jiná na disku = přepočet od nuly. 3 = přibyly součty po session (`sess.rs`, kolo 34).
+/// 2 = přibyly hodiny (`hours`, kolo 22):
 /// starý index je nemá, takže dnešní časová osa by byla neúplná → raději jednou přepočítat.
-pub const VERSION: u32 = 2;
+pub const VERSION: u32 = 3;
 /// Kolik dní zpět (včetně dneška) se drží po hodinách — dnešek + včerejšek (přes půlnoc), víc karta neukazuje.
 pub const HOUR_DAYS: i32 = 2;
 
@@ -40,6 +42,19 @@ pub struct FileEntry {
     /// `agentType` z `agent-*.meta.json` (jen soubory subagentů)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<String>,
+    /// součty započtených odpovědí souboru po modelu a pásmu (cena session, kolo 34 — `sess.rs`)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ses: Vec<sess::SesSum>,
+    /// čas první a poslední započtené odpovědi (ms; 0 = žádná)
+    #[serde(default, skip_serializing_if = "is_zero_span")]
+    pub span: (i64, i64),
+    /// soubor má odpovědi před začátkem okna (zahozené) → cena session je dolní odhad
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub partial: bool,
+}
+
+fn is_zero_span(s: &(i64, i64)) -> bool {
+    *s == (0, 0)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -269,9 +284,14 @@ impl Index {
                     e.cwd = parse::line_cwd(&line);
                 }
                 match self.add(&rec, e.cwd.as_deref(), w) {
-                    Some(true) => st.records += 1,
+                    Some(true) => {
+                        st.records += 1;
+                        let model = price::canonical(&rec.model);
+                        let tier = price::tier(&model, &rec.tokens, rec.fast, rec.geo_us);
+                        sess::note(&mut e.ses, &mut e.span, &model, tier, &rec);
+                    }
                     Some(false) => st.duplicates += 1,
-                    None => {}
+                    None => e.partial = true,
                 }
             } else if e.cwd.is_none() {
                 e.cwd = parse::line_cwd(&line);
@@ -600,6 +620,35 @@ mod tests {
         assert_eq!(get(today, "C:\\p\\a", "claude-opus-5-5"), Some(2));
         assert_eq!(get(today, "C:\\p\\b", "claude-opus-5-5"), Some(4));
         assert_eq!(get(today, "C:\\p\\b", "claude-sonnet-5-5"), Some(8), "model kanonicky bez data");
+    }
+
+    #[test]
+    fn session_cost_incremental_dedup_partial_and_roundtrip() {
+        let fx = Fx::new();
+        let a = rec_line("req_A", NOW - 3_600_000, r"C:\p", "claude-opus-5-5", 10);
+        let old = rec_line("req_O", NOW - 40 * DAY, r"C:\p", "claude-opus-5-5", 99);
+        fx.write("proj/s1.jsonl", &format!("{old}{a}"));
+        fx.write("proj/s1/subagents/agent-x.jsonl", &rec_line("req_S", NOW - 1000, r"C:\p", "claude-sonnet-5-5", 4));
+        fx.write("proj/s2.jsonl", &a); // resume kopie téže odpovědi: počítá se jen jednou
+        let mut ix = Index::default();
+        run(&mut ix, &fx.found(&|_| NOW), 30);
+        let v = sess::build(&ix);
+        let of = |id: &str| v.iter().find(|s| s.id == id).cloned();
+        let s1 = of("s1").unwrap();
+        assert_eq!((s1.requests, s1.partial), (2, true), "záznam před oknem se nepočítá, ale značí dolní odhad");
+        assert_eq!(s1.last_ms, NOW - 1000, "poslední odpověď včetně subagenta");
+        assert!(of("s2").is_none(), "duplikát nepatří druhé session");
+        // přírůstek: připsaná odpověď se přičte bez přepočtu zbytku
+        fx.append("proj/s1.jsonl", &rec_line("req_N", NOW - 500, r"C:\p", "claude-opus-5-5", 5));
+        let st = run(&mut ix, &fx.found(&|_| NOW + 1), 30);
+        assert_eq!(st.records, 1);
+        let s1 = sess::build(&ix).into_iter().find(|s| s.id == "s1").unwrap();
+        assert_eq!((s1.requests, s1.last_ms), (3, NOW - 500));
+        // uložení a načtení drží součty (jinak by cena po restartu zmizela)
+        let store = fx.path("store");
+        std::fs::create_dir_all(&store).unwrap();
+        save(&store, &ix).unwrap();
+        assert_eq!(sess::build(&load(&store)), sess::build(&ix));
     }
 
     #[test]

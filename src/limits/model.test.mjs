@@ -2,6 +2,7 @@
 //   node --experimental-strip-types --test src/limits/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { WARN_PCT } from "../charts/thresholds.ts";
 import { HINT_FROM_PCT, bar, left, level, otherDay, pctText, resetHint, winState } from "./model.ts";
 
 const NOW = 1_792_250_979_530;
@@ -37,18 +38,18 @@ test("odpočet do resetu zaokrouhlený nahoru na minutu", () => {
 
 test("pruh, barva a text procent", () => {
   assert.deepEqual([bar(-3), bar(42.5), bar(130)], [0, 42.5, 100]);
-  assert.deepEqual([level(0), level(69.9), level(70), level(89.9), level(90), level(100)], ["ok", "ok", "warn", "warn", "bad", "bad"]);
+  assert.deepEqual([level(0), level(74.9), level(75), level(89.9), level(90), level(100)], ["ok", "ok", "warn", "warn", "bad", "bad"]);
   assert.deepEqual([pctText(99.6), pctText(0), pctText(23.5)], ["99", "0", "23"]);
   assert.equal(otherDay(NOW, NOW + MIN), false);
   assert.equal(otherDay(NOW + 3 * 24 * 60 * MIN, NOW), true);
 });
 
-test("zvýraznění resetu: jen při 5h od 80 %, čerstvém vzorku a pracující session", () => {
+test("zvýraznění resetu: jen při 5h od 75 %, čerstvém vzorku a pracující session", () => {
   const w = (pct, resetsAt = NOW + 90 * MIN) => ({ pct, resetsAt });
   const R = NOW + 90 * MIN;
   const cases = [
-    ["79 %", w(79), NOW - MIN, true, null],
-    ["80 %", w(80), NOW - MIN, true, R],
+    ["74 %", w(74), NOW - MIN, true, null],
+    ["75 %", w(75), NOW - MIN, true, R],
     ["99,5 %", w(99.5), NOW - MIN, true, R],
     ["nikdo nepracuje", w(95), NOW - MIN, false, null],
     ["staré", w(95), NOW - 20 * MIN, true, null],
@@ -57,6 +58,6 @@ test("zvýraznění resetu: jen při 5h od 80 %, čerstvém vzorku a pracující
     ["bez okna", null, NOW - MIN, true, null],
     ["bez vzorku", w(95), null, true, null],
   ];
-  assert.equal(HINT_FROM_PCT, 80);
+  assert.equal(HINT_FROM_PCT, WARN_PCT);
   for (const [name, win, at, working, want] of cases) assert.equal(resetHint(win, at, NOW, STALE, working), want, name);
 });

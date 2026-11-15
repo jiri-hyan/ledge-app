@@ -56,3 +56,21 @@ export function previewSegments(strip: { items?: string[]; colors?: Record<strin
     .filter((id) => (sample[id] ?? "") !== "")
     .map((id) => ({ id, text: sample[id], color: strip.colors?.[id] ?? null, hidden: !busy && (strip.quiet ?? []).includes(id) }));
 }
+
+/** Monitor z Rustu (`stripset::MonitorInfo`): `id` = stabilní spec, který jde do `strip.monitor`. */
+export type MonitorInfo = { id: string; n: number; w: number; h: number; primary: boolean };
+
+/** Možnosti volby monitoru: Hlavní / Všechny / každý připojený (hodnota = stabilní id). Uložená hodnota, která
+ *  mezi nimi není (odpojený monitor, starý index), se přidá jako poslední, ať výběr neukazuje jiný monitor. */
+export function monitorOptions(
+  list: MonitorInfo[],
+  current: string,
+  lab: { primary: string; all: string; dev: (m: MonitorInfo) => string; gone: string },
+): { v: string; label: string }[] {
+  const opts = [
+    { v: "primary", label: lab.primary },
+    { v: "all", label: lab.all },
+    ...list.map((m) => ({ v: m.id, label: lab.dev(m) })),
+  ];
+  return current && !opts.some((o) => o.v === current) ? [...opts, { v: current, label: lab.gone }] : opts;
+}

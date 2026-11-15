@@ -1,6 +1,7 @@
 // Živá hrana vlastního zavřeného Ledge (kolo 28, `strip.compose.deco`) — zrcadlo Rust `looks::edgefx`
 // a `composedeco::Deco` (id hlídá test `edgefx::ts_mirror`): efekty hrany, délky linky, barevné sady (bez duhy),
 // stavy živé hrany a ořez configu. Náhled (`previews/EdgeFx.tsx`) i editor (`panels/ComposeEdge.tsx`) čtou odsud.
+import { clampInt as clamp } from "../pad.ts";
 
 export const COMPOSE_EDGES = ["none", "underline", "outline", "glow", "gradient", "flow", "dashes", "comet", "light", "breath", "outlineGradient", "sweep"] as const;
 export type ComposeEdge = (typeof COMPOSE_EDGES)[number];
@@ -48,10 +49,6 @@ export const hex = (s: unknown) => (isHex(s) ? s.trim().toLowerCase() : "");
 export const edgeColor = (s: unknown) => {
   const v = typeof s === "string" ? s.trim().toLowerCase() : "";
   return v === "claude" || (EDGE_SETS as readonly string[]).includes(v) ? v : hex(s) || "accent";
-};
-const clamp = (v: unknown, a: number, b: number, d: number) => {
-  const n = typeof v === "number" && Number.isFinite(v) ? Math.round(v) : d;
-  return Math.min(b, Math.max(a, n));
 };
 const pick = <T extends string>(list: readonly T[], v: unknown, dflt: T): T => (list.includes(v as T) ? (v as T) : dflt);
 

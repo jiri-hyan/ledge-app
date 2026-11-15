@@ -8,7 +8,8 @@
 import { For, Show, createEffect, createSignal, on, onCleanup } from "solid-js";
 import { lang, t } from "../../i18n";
 import type { Appearance, CustomTheme } from "../../types";
-import { THEMES, THEME_IDS } from "../../theme/themes";
+import { THEMES } from "../../theme/themes";
+import { THEME_GROUPS, themesIn } from "../../theme/themeGroups";
 import { accentPair, isHex } from "../../theme/appearance";
 import { scopeStyle } from "../../theme/apply";
 import { lbl } from "../../theme/label";
@@ -17,6 +18,8 @@ import {
   CUSTOM_KEYS, CUSTOM_TEXT_KEYS, MAX_CUSTOM_THEMES, MAX_NAME, addCustomTheme, customProblems, exportTheme, importTheme, themeOf, type Colors, type CustomKey,
 } from "../../theme/customThemes";
 import { dropThemeRefs } from "../../theme/pages";
+import { radioKeyDown, tabStop } from "../fields/radioKeys";
+import AppearanceAuto from "./AppearanceAuto";
 import { clearPeek, lit, peekOn, setThemeDraft, withThemeDraft, type Ap } from "./apUi";
 
 const ACCENTS: [string, string, string][] = [
@@ -142,30 +145,48 @@ export default function AppearanceThemes(q: { ap: Ap }) {
   return (
     <div class="card ap-top" id="f-appearance.theme" classList={{ hit: lit("appearance.theme") }}>
       <h4>{t("appearance.theme.colors", "Barvy")}</h4>
-      <div class="ap-themes" role="radiogroup" aria-label={t("appearance.theme.title", "Motiv")}>
-        <For each={THEME_IDS}>
-          {(id) => (
-            <button class="ap-tile" classList={{ on: !a().customTheme && a().theme === id }} role="radio" aria-checked={!a().customTheme && a().theme === id}
-              {...peekOn(() => ({ ...a(), theme: id, customTheme: "" }))} onClick={() => pickBuiltin(id)}>
-              <span class="ap-swatch theme-scope" style={scopeStyle({ ...view(), theme: id, customTheme: "", glass: { opacity: 1 } })}>
-                <i class="l1" /><i class="l2" /><i class="l3" /><i class="acc" />
-              </span>
-              <span class="ap-name">{lbl([THEMES[id].key, THEMES[id].cs])}</span>
-            </button>
-          )}
-        </For>
-        <For each={a().customThemes}>
-          {(c) => (
-            <button class="ap-tile" classList={{ on: a().customTheme === c.id }} role="radio" aria-checked={a().customTheme === c.id}
-              {...peekOn(() => ({ ...a(), customTheme: c.id }))} onClick={() => pickCustom(c.id)}>
-              <span class="ap-swatch theme-scope" style={scopeStyle({ ...view(), customTheme: c.id, glass: { opacity: 1 } })}>
-                <i class="l1" /><i class="l2" /><i class="l3" /><i class="acc" />
-              </span>
-              <span class="ap-name">{view().customThemes.find((x) => x.id === c.id)?.name ?? c.name}<small class="ap-own">{t("appearance.ct.own", "vlastní")}</small></span>
-            </button>
-          )}
-        </For>
-      </div>
+      <AppearanceAuto ap={q.ap} />
+      <For each={THEME_GROUPS}>
+        {(g) => {
+          const ids = themesIn(g.id);
+          const checked = () => (a().customTheme ? -1 : ids.indexOf(a().theme));
+          return (
+            <>
+              <h5 class="ap-grp" id={`ap-grp-${g.id}`}>{lbl([g.key, g.cs])}</h5>
+              <div class="ap-themes" role="radiogroup" aria-labelledby={`ap-grp-${g.id}`} onKeyDown={(e) => radioKeyDown(e, false)}>
+                <For each={ids}>
+                  {(id, i) => (
+                    <button class="ap-tile" classList={{ on: !a().customTheme && a().theme === id }} role="radio" aria-checked={!a().customTheme && a().theme === id} tabIndex={tabStop(i(), checked())}
+                      {...peekOn(() => ({ ...a(), theme: id, customTheme: "" }))} onClick={() => pickBuiltin(id)}>
+                      <span class="ap-swatch theme-scope" style={scopeStyle({ ...view(), theme: id, customTheme: "", glass: { opacity: 1 } })}>
+                        <i class="l1" /><i class="l2" /><i class="l3" /><i class="acc" />
+                      </span>
+                      <span class="ap-name">{lbl([THEMES[id].key, THEMES[id].cs])}</span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </>
+          );
+        }}
+      </For>
+      <Show when={a().customThemes.length}>
+        <h5 class="ap-grp" id="ap-grp-custom">{t("appearance.group.custom", "Vlastní")}</h5>
+        <div class="ap-themes" role="radiogroup" aria-labelledby="ap-grp-custom" onKeyDown={(e) => radioKeyDown(e, false)}>
+          <For each={a().customThemes}>
+            {(c, i) => (
+              <button class="ap-tile" classList={{ on: a().customTheme === c.id }} role="radio" aria-checked={a().customTheme === c.id}
+                tabIndex={tabStop(i(), a().customThemes.findIndex((x) => x.id === a().customTheme))}
+                {...peekOn(() => ({ ...a(), customTheme: c.id }))} onClick={() => pickCustom(c.id)}>
+                <span class="ap-swatch theme-scope" style={scopeStyle({ ...view(), customTheme: c.id, glass: { opacity: 1 } })}>
+                  <i class="l1" /><i class="l2" /><i class="l3" /><i class="acc" />
+                </span>
+                <span class="ap-name">{view().customThemes.find((x) => x.id === c.id)?.name ?? c.name}<small class="ap-own">{t("appearance.ct.own", "vlastní")}</small></span>
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
 
       <div class="ap-tbar">
         <button class="mini" disabled={full()} title={full() ? t("appearance.ct.full", "Už máš {n} vlastních motivů.", { n: MAX_CUSTOM_THEMES }) : undefined} onClick={create}>

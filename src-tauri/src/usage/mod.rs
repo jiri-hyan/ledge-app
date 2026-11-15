@@ -6,6 +6,7 @@ pub mod floor;
 pub mod index;
 pub mod parse;
 pub mod price;
+pub mod sess;
 pub mod view;
 
 /// Okno přehledu (dny včetně dneška).

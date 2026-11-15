@@ -215,6 +215,11 @@ pub struct Listing<T> {
 /// Jeden výpis složky bez rekurze: jen běžné soubory bez tečky na začátku, jejichž příponu `from_ext`
 /// přijme (vrátí `Some`); seřazeno podle jména, zbytek nad `max` se jen spočítá. Chybějící složka = prázdný výpis.
 pub fn list_files<T>(dir: &Path, from_ext: impl Fn(&str) -> Option<T>, max: usize) -> Listing<T> {
+    list_named(dir, |name| from_ext(Path::new(name).extension()?.to_str()?), max)
+}
+
+/// Jako `list_files`, jen o zařazení rozhoduje celé jméno souboru (např. přípona `.kit.json`).
+pub fn list_named<T>(dir: &Path, from_name: impl Fn(&str) -> Option<T>, max: usize) -> Listing<T> {
     let mut out = Listing { exists: false, error: None, skipped: 0, files: Vec::new() };
     let rd = match std::fs::read_dir(dir) {
         Ok(rd) => rd,
@@ -230,7 +235,7 @@ pub fn list_files<T>(dir: &Path, from_ext: impl Fn(&str) -> Option<T>, max: usiz
         .flatten()
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().into_owned();
-            let v = from_ext(Path::new(&name).extension()?.to_str()?)?;
+            let v = from_name(&name)?;
             let md = e.metadata().ok().filter(|m| m.is_file())?;
             (!name.starts_with('.')).then(|| (name, e.path(), v, md))
         })

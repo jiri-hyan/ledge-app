@@ -1,32 +1,28 @@
 // Karta Systém: CPU, paměť, volné místo na discích a rychlost sítě s malými grafy za posledních 60 vzorků.
 // Čte Rust (`sysmon/`, příkaz `system_view`) a NIC nepočítá sama: každé číslo je skutečný vzorek z WinAPI.
-// Vzorkuje se po 2 s JEN když je karta vidět a šuplík otevřený (zavřený = žádný časovač, žádné čtení).
+// Vzorkuje se po 2 s JEN když je karta vidět a šuplík otevřený (zavřený = žádný časovač, žádné čtení); smyčku sdílí
+// s lištou Systém (`sysview.ts`).
 // Kliknutí na CPU / paměť otevře Správce úloh. Kolo 25: jiný vzhled (`design`, `SystemDesign.tsx`) kreslí tentýž pohled;
 // vzorkování zůstává jen tady.
-import { createEffect, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import { num } from "../format";
 import { t } from "../i18n";
-import { drawerShown } from "../media/shown";
 import { sayError } from "../ui/toast";
-import { intApi, type SystemView } from "./api";
-import { diskLoad, diskUsed, fmtPct, fmtRate, fmtSize, loadOf, sparkPoints, type Load } from "./format";
+import { intApi } from "./api";
+import { diskLoad, diskUsed, fmtPct, fmtRate, fmtSize, loadOf, historyPoints, type Load } from "./format";
 import SystemDesign from "./SystemDesign";
+import { useSystemView } from "./sysview";
 import "./integrations.css";
 
-/** Odstup vzorků karty (Rust nevezme dva vzorky blíž než 1,5 s). */
-const EVERY_MS = 2000;
 const W = 118;
 const H = 26;
 /** Nejmenší strop osy grafu sítě: šum pod 50 KB/s nevypadá jako provoz. */
 const NET_FLOOR = 50_000;
 
-/** Poslední vzorek přežije přemontování karty (přepnutí záložky) — jinak by blikla prázdná. */
-const [view, setView] = createSignal<SystemView | null>(null);
-
 function Spark(p: { values: number[]; max?: number; floor?: number; load?: Load }) {
   return (
     <svg class="sys-spark" classList={{ "sys-warm": p.load === "warm", "sys-hot": p.load === "hot" }} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={sparkPoints(p.values, W, H, p.max, p.floor)} />
+      <polyline points={historyPoints(p.values, W, H, p.max, p.floor)} />
     </svg>
   );
 }
@@ -40,25 +36,7 @@ async function openTaskManager() {
 }
 
 export default function SystemCard(p: { menu?: JSX.Element; design?: string }) {
-  createEffect(() => {
-    if (!drawerShown()) return;
-    let alive = true;
-    let timer: number | undefined;
-    const tick = async () => {
-      try {
-        const v = await intApi.systemView();
-        if (alive && v) setView(v);
-      } catch {
-        /* jeden vzorek navíc nic neřeší — příště */
-      }
-      if (alive) timer = window.setTimeout(tick, EVERY_MS);
-    };
-    void tick();
-    onCleanup(() => {
-      alive = false;
-      if (timer !== undefined) window.clearTimeout(timer);
-    });
-  });
+  const view = useSystemView();
   const cpuLoad = () => loadOf(view()?.cpu);
   const gpuLoad = () => loadOf(view()?.gpu);
   const memLoad = () => loadOf(view()?.memPct);
@@ -111,8 +89,8 @@ export default function SystemCard(p: { menu?: JSX.Element; design?: string }) {
                 <span class="sys-up" title={t("cards.system.up", "Odesílání")}>↑ {fmtRate(v().tx, unit(), num)}</span>
               </span>
               <svg class="sys-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-                <polyline class="sys-line-rx" points={sparkPoints(v().rxHist, W, H, netMax())} />
-                <polyline class="sys-line-tx" points={sparkPoints(v().txHist, W, H, netMax())} />
+                <polyline class="sys-line-rx" points={historyPoints(v().rxHist, W, H, netMax())} />
+                <polyline class="sys-line-tx" points={historyPoints(v().txHist, W, H, netMax())} />
               </svg>
             </div>
           </div>

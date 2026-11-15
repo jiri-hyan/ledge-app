@@ -57,7 +57,7 @@ test("rozdělení dnešního Vzhledu: proužek, otevírání, vzhled šuplíku",
   const part = (k) => partOfBlock(blockOf(k, fp));
   const cases = [
     ["strip.look", "pruzek"], ["strip.opacity", "pruzek"], ["timer.strip", "pruzek"], ["appearance.strip", "pruzek"], ["appearance.strip.color", "pruzek"],
-    ["drawer.hover", "otevirani"], ["drawer.hoverExpandMs", "otevirani"], ["drawer.trigger", "otevirani"], ["hotkeys", "otevirani"], ["palette", "otevirani"],
+    ["drawer.hover", "otevirani"], ["drawer.hoverExpandMs", "otevirani"], ["drawer.dockCards", "otevirani"], ["drawer.trigger", "otevirani"], ["hotkeys", "otevirani"], ["palette", "otevirani"],
     ["appearance.style", "vzhled"], ["appearance.font", "vzhled"], ["appearance.motion", "vzhled"], ["drawer.width", "vzhled"], ["drawer.glass", "vzhled"],
     ["layout", "obsah"], ["modes", "obsah"], ["personal.weather.lat", "obsah"], ["accounts", "obsah"],
     ["claude.port", "claude"], ["mcp", "claude"], ["smart.approvalSound", "claude"],

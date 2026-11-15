@@ -42,7 +42,7 @@ const PROFILE_TEXT: Record<ProfileId, () => [string, string, string]> = {
   ai_builder: () => [t("settings.studio.prof.ai", "AI & Claude vývojář"), t("settings.studio.prof.ai.desc", "Claude + živá aktivita vedle sebe, projekty, repa a limity v proužku."), t("settings.studio.prof.ai.tag", "Claude · Aktivita · Repa")],
   power_hw: () => [t("settings.studio.prof.hw", "Výkon a hardware"), t("settings.studio.prof.hw.desc", "CPU, RAM a GPU s grafy v notchi, velká karta Systém, běžící servery a rychlé přepínače."), t("settings.studio.prof.hw.tag", "CPU · RAM · GPU · Servery")],
   focus_zen: () => [t("settings.studio.prof.zen", "Fokus a minimalismus"), t("settings.studio.prof.zen.desc", "Klidný ostrůvek, rozbalení jen na dění, časovač soustředění a jen 4 hlavní karty."), t("settings.studio.prof.zen.tag", "Klid · Časovač · Čistý šuplík")],
-  organizer: () => [t("settings.studio.prof.org", "Organizátor a schůzky"), t("settings.studio.prof.org.desc", "Přehled Dnes, Kalendář, Poznámky a rychlé akce v kompaktním náhledu."), t("settings.studio.prof.org.tag", "Dnes · Kalendář · Poznámky")],
+  organizer: () => [t("settings.studio.prof.org", "Organizátor a schůzky"), t("settings.studio.prof.org.desc", "Kalendář, Poznámky a rychlé akce v docku (střední panel) a v šuplíku."), t("settings.studio.prof.org.tag", "Kalendář · Poznámky · Akce")],
 };
 
 const TIP_TEXT: Record<string, () => [string, string]> = {

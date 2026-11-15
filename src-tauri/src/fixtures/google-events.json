@@ -7,7 +7,14 @@
       "start": { "dateTime": "2026-10-19T10:00:00+02:00", "timeZone": "Europe/Prague" },
       "end": { "dateTime": "2026-10-19T11:00:00+02:00", "timeZone": "Europe/Prague" },
       "hangoutLink": "https://meet.google.com/abc-defg-hij",
-      "conferenceData": { "entryPoints": [{ "entryPointType": "video", "uri": "https://meet.google.com/abc-defg-hij" }, { "entryPointType": "phone", "uri": "tel:+420-000" }] }
+      "conferenceData": { "entryPoints": [{ "entryPointType": "video", "uri": "https://meet.google.com/abc-defg-hij" }, { "entryPointType": "phone", "uri": "tel:+420-000" }] },
+      "attendees": [
+        { "email": "jana@example.com", "displayName": "Jana Nováková", "self": true, "responseStatus": "accepted" },
+        { "email": "Petr@Example.com", "responseStatus": "needsAction" },
+        { "email": "karel@example.com", "displayName": "Karel", "responseStatus": "declined" },
+        { "email": "room@resource.calendar.google.com", "displayName": "Zasedačka 2", "resource": true, "responseStatus": "accepted" },
+        { "email": "eva@example.com", "displayName": "Eva Černá", "responseStatus": "tentative" }
+      ]
     },
     {
       "status": "confirmed",

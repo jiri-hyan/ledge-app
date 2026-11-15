@@ -83,9 +83,11 @@ struct Live {
     tx: Option<Sender<Msg>>,
     /// UI záložku Osobní už ukázalo — po zapnutí karty v Nastavení se vlákno spustí hned
     wanted: bool,
+    /// `release` vlákno uvolnilo (karta už byla vidět) — další zobrazení karet ho vrátí (`resume`)
+    released: bool,
 }
 
-static LIVE: Mutex<Live> = Mutex::new(Live { tx: None, wanted: false });
+static LIVE: Mutex<Live> = Mutex::new(Live { tx: None, wanted: false, released: false });
 static VIEW: Mutex<Option<MediaView>> = Mutex::new(None);
 /// (klíč, data URL) posledního obalu
 static COVER: Mutex<Option<(String, String)>> = Mutex::new(None);
@@ -189,6 +191,11 @@ pub(crate) fn view() -> Option<MediaView> {
     VIEW.lock().clone()
 }
 
+/// Pro `/status.qa`: běží vlákno GSMTC a hraje něco? (jen paměť)
+pub(crate) fn qa_flags() -> (bool, bool) {
+    (LIVE.lock().tx.is_some(), VIEW.lock().as_ref().is_some_and(|v| v.status == "playing"))
+}
+
 /// Segment proužku z paměti (`mediaconf::strip_segment`).
 pub(crate) fn strip_now(cfg: &Config, now_ms: i64) -> Option<Segment> {
     crate::mediaconf::strip_segment(VIEW.lock().as_ref(), &cfg.media, now_ms)
@@ -205,10 +212,42 @@ pub(crate) fn ensure() {
     let ok = needed(&core().cfg.read(), true);
     let mut l = LIVE.lock();
     l.wanted = true;
+    l.released = false;
     if ok && l.tx.is_none() {
         l.tx = spawn();
     }
 }
+
+/// Dok (`drawer.hover = dock`) je schovaný dost dlouho: uvolnit vlákno SMTC a obal, když je nikdo nepotřebuje
+/// (`needed` bez `wanted`; položka proužku vlákno nechá). Další zobrazení docku zavolá `ensure`.
+pub(crate) fn release() {
+    // společný háček „schováno dost dlouho“ (vlákno `hover` volá jen `media::release_due`): index hledání poznámek (L211)
+    crate::commands::notes::release_search();
+    let mut l = LIVE.lock();
+    if l.wanted {
+        l.wanted = false;
+        l.released = true;
+        drop(l);
+        sync(&core().cfg.read());
+    }
+}
+
+/// Šuplík s kartami (Full / Mid) se znovu zobrazil mimo `dock` a `release` mezitím vlákno uvolnilo: pustit ho
+/// zpět (`MediaCard.onMount` se neopakuje, takže `personal_live` už nepřijde). Nikdy nespustí nic, co karta ještě neviděla.
+pub(crate) fn resume() {
+    if LIVE.lock().released {
+        ensure();
+    }
+}
+
+/// Má se po schování uvolnit? Dok schovaný ≥ 60 s (zobrazení volá `ensure`), ostatní režimy ≥ 120 s (shoda s dormantem
+/// WebView; zobrazení karet volá `resume`). Čistá funkce pro vlákno `hover` — žádný vlastní časovač.
+pub(crate) fn release_due(dock: bool, hidden_s: Option<u64>) -> bool {
+    hidden_s.is_some_and(|s| s >= if dock { RELEASE_AFTER_S } else { RELEASE_AFTER_CARDS_S })
+}
+
+const RELEASE_AFTER_S: u64 = 60;
+const RELEASE_AFTER_CARDS_S: u64 = 120;
 
 /// Při startu a po změně configu: nikdo data nepotřebuje = konec vlákna i odběrů; karta (už chtěná)
 /// nebo položka proužku = start.
@@ -275,6 +314,21 @@ macro_rules! wait {
         }) {
             Ok(()) => rx.recv_timeout(WAIT).ok().flatten(),
             Err(_) => None,
+        }
+    }};
+}
+
+/// Jako `wait!`, ale pro výsledky, které nejsou `Send` (proud, buffer): handler jen oznámí dokončení (s termínem `WAIT`),
+/// výsledek si vyzvedne volající vlákno přes `GetResults`.
+macro_rules! wait_done {
+    ($op:expr) => {{
+        let op = $op;
+        let (tx, rx) = mpsc::sync_channel(1);
+        match op.clone().when(move |_| {
+            let _ = tx.send(());
+        }) {
+            Ok(()) if rx.recv_timeout(WAIT).is_ok() => op.GetResults().ok(),
+            _ => None,
         }
     }};
 }
@@ -427,13 +481,13 @@ fn load_cover(sub: Option<&Sub>, key: &str) -> Option<String> {
         return None;
     }
     let p = props(&sub?.session)?;
-    let stream = p.Thumbnail().ok()?.OpenReadAsync().ok()?.join().ok()?;
+    let stream = wait_done!(p.Thumbnail().ok()?.OpenReadAsync().ok()?)?;
     let size = stream.Size().ok()?;
     if size == 0 || size > MAX_COVER_BYTES {
         return None;
     }
     let buf = Buffer::Create(size as u32).ok()?;
-    let filled = stream.ReadAsync(&buf, size as u32, InputStreamOptions::None).ok()?.join().ok()?;
+    let filled = wait_done!(stream.ReadAsync(&buf, size as u32, InputStreamOptions::None).ok()?)?;
     let reader = DataReader::FromBuffer(&filled).ok()?;
     let mut bytes = vec![0u8; reader.UnconsumedBufferLength().ok()? as usize];
     reader.ReadBytes(&mut bytes).ok()?;
@@ -511,6 +565,23 @@ fn run(rx: Receiver<Msg>, tx: Sender<Msg>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn release_due_table() {
+        for (dock, hidden, want) in [
+            (true, Some(60), true),
+            (true, Some(59), false),
+            (true, None, false),
+            (false, Some(9999), true),
+            (false, Some(120), true),
+            (false, Some(119), false),
+            (false, Some(60), false),
+            (false, None, false),
+            (true, Some(0), false),
+        ] {
+            assert_eq!(release_due(dock, hidden), want, "{dock} {hidden:?}");
+        }
+    }
 
     #[test]
     fn app_name_maps_aumid() {

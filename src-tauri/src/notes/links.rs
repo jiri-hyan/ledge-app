@@ -235,6 +235,8 @@ mod tests {
             cost: None,
             budget: None,
             model: None,
+            items: Default::default(),
+            due_ms: None,
         }
     }
 

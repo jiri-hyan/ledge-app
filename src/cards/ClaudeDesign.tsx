@@ -4,11 +4,13 @@
 // (`Snapshot.limits` / `costs` / `sessions`, logika `claudeLooks.ts`); chybí-li, prázdný stav s důvodem, ne jiné číslo.
 // Šířka: `container-type` na těle karty, úzká = podstatné, široká = detail (`claudeLooks.css`). Nic nepoběží v klidu.
 import LimitsSources from "../limits/LimitsSources";
-import { For, Match, Show, Switch, type JSX } from "solid-js";
+import { createMemo, For, Match, Show, Switch, type JSX } from "solid-js";
+import { minuteOf } from "../util/time";
 import { api, type SessionView, type Snapshot } from "../api";
 import { ago, fmtClock, num } from "../format";
 import { t } from "../i18n";
-import { say } from "../ui/toast";
+import { settingsPath } from "../settings/path";
+import { say, sayError } from "../ui/toast";
 import Bars from "../charts/Bars";
 import Gauge from "../charts/Gauge";
 import Rings from "../charts/Rings";
@@ -16,6 +18,7 @@ import { compact, usdDigits } from "../costs/model";
 import { leftText, resetClock } from "../limits/LimitsRow";
 import { bar, pctText } from "../limits/model";
 import { gotoSettingsPanel } from "../palette/goto";
+import { hooksMissing } from "../sessions/activity";
 import HeroCard from "../layout/HeroCard";
 import { heroFacts, limitsWhy, type ClaudePick } from "../layout/hero";
 import { cardName, tx } from "../layout/text";
@@ -24,15 +27,13 @@ import { DoneBody, WorkingBody } from "./ClaudeLiveBody";
 import "./claudeLooks.css";
 
 const HERO_PICK: Record<string, ClaudePick> = { hero: "5h", heroWeek: "week", heroSpend: "spend" };
-/** Vzhledy Claude, které kreslí tahle komponenta (klasický ne). */
-export const isClaudeDesign = (id: string | undefined): boolean => !!id && id !== "classic";
 
 type P = { s: Snapshot; now: number; design: string; menu?: JSX.Element; onSettings: () => void };
 
-const money = (v: number, priced: boolean): string => {
-  if (priced) return `${num(v, usdDigits(v))} $`;
-  const c = compact(v);
-  return `${num(c.v, c.digits)}${c.unit} ${t("cards.cd.tokens", "tokenů")}`;
+/** Částka dne / souhrnu; `lower` = dolní odhad („≥“, část tokenů bez ceny), cena není → tokeny. */
+const money = (v: number, priced: boolean, lower = false): string => {
+  const body = priced ? `${num(v, usdDigits(v))} $` : (() => { const c = compact(v); return `${num(c.v, c.digits)}${c.unit} ${t("cards.cd.tokens", "tokenů")}`; })();
+  return lower ? `≥ ${body}` : body;
 };
 
 /** Čas obnovy okna: „14:30 · za 2 h 10 min“. */
@@ -99,15 +100,15 @@ function SpendBody(p: { m: SpendModel }) {
       <Match when={m().state === "ok"}>
         <div class="cd-spend">
           <div class="cd-spend-top">
-            <span class="cd-big">{m().today != null ? money(m().today!, m().priced) : "—"}</span>
+            <span class="cd-big">{m().today != null ? money(m().today!, m().priced, m().todayLower) : "—"}</span>
             <span class="cd-cap">{m().today != null ? t("cards.hero.costToday", "Útrata dnes (odhad v cenách API)") : t("cards.cd.spend.noToday", "Dnešek zatím bez údaje (odhad v cenách API)")}</span>
           </div>
           <div class="cd-chart">
-            <Bars values={m().values} fluid h={44} hi={m().today != null ? -1 : -2} title={(i) => `${m().dates[i] ?? ""}: ${money(m().values[i] ?? 0, m().priced)}`} label={t("cards.cd.spend.chart", "Útrata po dnech, posledních 14 dní")} />
+            <Bars values={m().values} fluid h={44} hi={m().today != null ? -1 : -2} title={(i) => `${m().dates[i] ?? ""}: ${m().unknown[i] ? t("cards.cd.spend.noPrice", "— (tokeny bez ceny v ceníku)") : money(m().values[i] ?? 0, m().priced, m().lower[i])}`} label={t("cards.cd.spend.chart", "Útrata po dnech, posledních 14 dní")} />
           </div>
           <div class="cd-wide cd-stats">
-            <span>{t("cards.cd.spend.avg", "průměr {v}", { v: money(m().avg ?? 0, m().priced) })}</span>
-            <span>{t("cards.cd.spend.peak", "špička {v}", { v: money(m().peak, m().priced) })}</span>
+            <span title={t("cards.cd.spend.avgTip", "Průměr za {n} dokončených dní (bez dneška, včetně dnů bez útraty; dny s neznámou cenou se nepočítají).", { n: m().avgDays })}>{t("cards.cd.spend.avg", "průměr / den {v}", { v: m().avg != null ? money(m().avg!, m().priced, m().avgLower) : "—" })}</span>
+            <span title={t("cards.cd.spend.peakTip", "Nejvyšší den z posledních {n} dní (vč. dneška do teď).", { n: m().values.length })}>{t("cards.cd.spend.peak", "špička {v}", { v: money(m().peak, m().priced, m().peakLower) })}</span>
             <span>{t("cards.cd.spend.days", "{n} dní", { n: m().values.length })}</span>
           </div>
         </div>
@@ -115,7 +116,7 @@ function SpendBody(p: { m: SpendModel }) {
       <Match when={true}>
         <div class="cd-empty" role="status">
           <b>{m().state === "off" ? t("cards.cd.spend.off", "Útrata je vypnutá") : m().state === "computing" ? t("cards.cd.spend.computing", "Počítám útratu…") : t("cards.hero.noSpend", "Útrata dnes zatím není")}</b>
-          <small>{m().state === "off" ? t("cards.cd.spend.offWhy", "Zapni ji v Nastavení → Claude → Útrata.") : t("cards.hero.why.spend", "Přehled útraty ještě nemá dnešek s cenou — zapni a nech dopočítat v Nastavení → Claude → Útrata.")}</small>
+          <small>{m().state === "off" ? t("cards.cd.spend.offWhy", "Zapni ji v {path}.", { path: settingsPath("claude", "costs") }) : t("cards.hero.why.spend", "Přehled útraty ještě nemá dnešek s cenou — zapni a nech dopočítat v Nastavení → Claude → Hodnota v cenách API.")}</small>
         </div>
       </Match>
     </Switch>
@@ -135,7 +136,7 @@ function Tile(p: { ss: SessionView; now: number }) {
     try {
       await api.sessionOpen(p.ss.id);
     } catch (e) {
-      say(String(e), true);
+      sayError(e);
     }
   };
   const state = () => STATE[p.ss.status]();
@@ -150,11 +151,13 @@ function Tile(p: { ss: SessionView; now: number }) {
 
 export default function ClaudeDesign(p: P) {
   const lv = () => p.s.limits;
-  const five = () => winInfo(lv()?.fiveHour, lv(), p.now);
-  const week = () => winInfo(lv()?.sevenDay, lv(), p.now);
+  // limity, tempo, útrata a „před N min“ stačí po minutě; sekundy ukazuje jen WorkingBody („pracuje 1:23“) a ten drží `p.now`
+  const min = createMemo(() => minuteOf(p.now));
+  const five = createMemo(() => winInfo(lv()?.fiveHour, lv(), min()));
+  const week = createMemo(() => winInfo(lv()?.sevenDay, lv(), min()));
   const anyLimit = () => five().pct != null || week().pct != null;
-  const pace = () => paceLine(lv(), p.now);
-  const spend = () => spendModel(p.s.costs, p.now);
+  const pace = createMemo(() => paceLine(lv(), min()));
+  const spend = createMemo(() => spendModel(p.s.costs, min()));
   const n5 = () => t("cards.cd.name5h", "5 h");
   const nWeek = () => t("sessions.limits.week", "týden");
   const fix = () => {
@@ -167,13 +170,13 @@ export default function ClaudeDesign(p: P) {
         <SpendBody m={spend()} />
       </Match>
       <Match when={p.design === "sessions"}>
-        <SessionsBody s={p.s} now={p.now} five={five()} />
+        <SessionsBody s={p.s} now={min()} five={five()} onSettings={p.onSettings} />
       </Match>
       <Match when={p.design === "working"}>
         <WorkingBody s={p.s} now={p.now} />
       </Match>
       <Match when={p.design === "done"}>
-        <DoneBody s={p.s} now={p.now} />
+        <DoneBody s={p.s} now={min()} />
       </Match>
       <Match when={!anyLimit()}>
         <LimitsEmpty s={p.s} onSettings={p.onSettings} />
@@ -184,8 +187,8 @@ export default function ClaudeDesign(p: P) {
             <Rings
               label={t("cards.cd.rings.label", "Limity Claude: 5 h a týden")}
               rings={[
-                { frac: five().pct != null ? five().pct! / 100 : null, tone: five().tone, title: tipOf(n5(), five(), p.now) },
-                { frac: week().pct != null ? week().pct! / 100 : null, tone: week().tone, title: tipOf(nWeek(), week(), p.now) },
+                { frac: five().pct != null ? five().pct! / 100 : null, tone: five().tone, title: tipOf(n5(), five(), min()) },
+                { frac: week().pct != null ? week().pct! / 100 : null, tone: week().tone, title: tipOf(nWeek(), week(), min()) },
               ]}
             >
               <b class="cd-big">{five().pct != null ? `${pctText(five().pct!)} %` : "—"}</b>
@@ -193,35 +196,35 @@ export default function ClaudeDesign(p: P) {
             </Rings>
           </div>
           <div class="cd-legend">
-            <Track label={n5()} i={five()} now={p.now} />
-            <Track label={nWeek()} i={week()} now={p.now} />
-            <small class="cd-wide cd-cap">{resetText(five(), p.now) && `${n5()}: ${resetText(five(), p.now)}`}</small>
-            <small class="cd-wide cd-cap">{resetText(week(), p.now) && `${nWeek()}: ${resetText(week(), p.now)}`}</small>
+            <Track label={n5()} i={five()} now={min()} />
+            <Track label={nWeek()} i={week()} now={min()} />
+            <small class="cd-wide cd-cap">{resetText(five(), min()) && `${n5()}: ${resetText(five(), min())}`}</small>
+            <small class="cd-wide cd-cap">{resetText(week(), min()) && `${nWeek()}: ${resetText(week(), min())}`}</small>
           </div>
         </div>
       </Match>
       <Match when={p.design === "pace"}>
         <div class="cd-pace">
-          <Track label={n5()} i={five()} now={p.now} plan={pace()?.plan} />
+          <Track label={n5()} i={five()} now={min()} plan={pace()?.plan} />
           <p class="cd-sentence">{paceSentence(pace(), five())}</p>
           <small class="cd-wide cd-cap">
             <Show when={pace()?.plan != null}>{t("cards.cd.pace.plan", "ryska = kde bys měl být podle času ({n} %)", { n: pctText(pace()!.plan) })}</Show>
             <Show when={pace()?.kind === "runs-out"}> · {t("cards.cd.pace.slow", "do obnovy stačí tempo {n} %/h", { n: num(pace()!.slowTo ?? 0, 1) })}</Show>
           </small>
-          <div class="cd-wide"><Track label={nWeek()} i={week()} now={p.now} /></div>
+          <div class="cd-wide"><Track label={nWeek()} i={week()} now={min()} /></div>
         </div>
       </Match>
       <Match when={p.design === "gauge"}>
         <div class="cd-gauge">
           <div class="cd-gauge-fig">
-            <Gauge frac={five().pct != null ? five().pct! / 100 : null} plan={pace() ? pace()!.plan / 100 : null} tone={five().tone} title={tipOf(n5(), five(), p.now)} label={tipOf(n5(), five(), p.now)}>
+            <Gauge frac={five().pct != null ? five().pct! / 100 : null} plan={pace() ? pace()!.plan / 100 : null} tone={five().tone} title={tipOf(n5(), five(), min())} label={tipOf(n5(), five(), min())}>
               <b class="cd-big">{five().pct != null ? `${pctText(five().pct!)} %` : "—"}</b>
               <small class="cd-cap">{five().kind !== "reset" && five().resetsAt != null ? t("cards.cd.rings.reset", "obnova {when}", { when: fmtClock(new Date(five().resetsAt!)) }) : n5()}</small>
             </Gauge>
           </div>
           <div class="cd-gauge-side cd-wide">
             <p class="cd-sentence">{paceSentence(pace(), five())}</p>
-            <Track label={nWeek()} i={week()} now={p.now} />
+            <Track label={nWeek()} i={week()} now={min()} />
           </div>
         </div>
       </Match>
@@ -231,7 +234,7 @@ export default function ClaudeDesign(p: P) {
     <Show
       when={!HERO_PICK[p.design]}
       fallback={
-        <Show when={heroFacts("claude", p.s, p.now, HERO_PICK[p.design])}>
+        <Show when={heroFacts("claude", p.s, min(), HERO_PICK[p.design])}>
           {(f) => <HeroCard id="claude" facts={f()} menu={p.menu} onFix={f().empty && f().label[0] !== "cards.hero.costToday" ? fix : undefined} />}
         </Show>
       }
@@ -248,11 +251,17 @@ export default function ClaudeDesign(p: P) {
   );
 }
 
-function SessionsBody(p: { s: Snapshot; now: number; five: WinInfo }) {
+function SessionsBody(p: { s: Snapshot; now: number; five: WinInfo; onSettings: () => void }) {
   const tiles = () => sessionTiles(p.s.sessions, 6);
   return (
     <div class="cd-sessions">
-      <Show when={tiles().shown.length} fallback={<div class="cd-empty" role="status"><b>{t("sessions.empty", "Žádná běžící session Claude Code.")}</b></div>}>
+      <Show when={tiles().shown.length} fallback={<div class="cd-empty" role="status">
+        <b>{t("sessions.empty", "Žádná běžící session Claude Code.")}</b>
+        <Show when={hooksMissing(p.s.hooks)}>
+          <small>{t("cards.cd.noHooks", "Ledge nemá nainstalované hooky — session Claude Code se bez nich nezobrazí.")}</small>
+          <button class="mini" onClick={() => { p.onSettings(); gotoSettingsPanel("f-claude.hooks"); }}>{t("sessions.connectHooks", "Zapojit hooky pro schvalování a subagenty")}</button>
+        </Show>
+      </div>}>
         <div class="cd-tiles">
           <For each={tiles().shown}>{(ss) => <Tile ss={ss} now={p.now} />}</For>
         </div>

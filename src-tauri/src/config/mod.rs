@@ -108,6 +108,12 @@ pub struct Config {
     /// Oznámení (kolo 26, `notify/`): KDE (Notch v proužku / toast Windows, záložní toast) a JAK (doba,
     /// styl animace pro každou událost). ZDA rozhodují dál vypínače událostí (`claude.toast`, …).
     pub notify: crate::notify::NotifyConfig,
+    /// „Poslat do propojené aplikace“ (`connector/`): adresa MCP, webu a název propojené aplikace. Klíč je ve Správci pověření
+    /// Windows (`Ledge/connector`), nikdy tady. Bez klíče se nikam nic neposílá.
+    pub connector: crate::connector::ConnectorConfig,
+    /// Rozšíření (`ledge.exe --ext <id>`, `ext/`): ID povolených rozšíření (`wall`, …); výchozí `[]` = nic neběží.
+    /// Jejich vlastní nastavení je v `%LOCALAPPDATA%\Ledge\ext\<id>.json`, ne tady.
+    pub extensions: crate::ext::ExtConfig,
 }
 
 impl Default for Config {
@@ -147,6 +153,8 @@ impl Default for Config {
             smart: Default::default(),
             winquick: Default::default(),
             notify: Default::default(),
+            connector: Default::default(),
+            extensions: Default::default(),
         }
     }
 }

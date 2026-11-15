@@ -6,7 +6,7 @@ import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { api, type Snapshot } from "../api";
 import { ago, num } from "../format";
 import { t } from "../i18n";
-import { bars, compact, dayUnpriced, floorTrend, isLowerBound, pickRange, progressPct, share, usdDigits, type CostDay, type CostLine, type FloorRow } from "./model";
+import { costText, dayUnpriced, floorTrend, normalize, pickRange, priceSeries, priceStaleDays, progressPct, share, tokText, usdDigits, type CostDay, type CostLine, type FloorRow } from "./model";
 import "./costs.css";
 
 const OPEN_KEY = "ledge.costs.open";
@@ -33,9 +33,9 @@ export function usd(v: number | null | undefined): string {
   return t("sessions.costs.usd", "{v} $", { v: num(v, usdDigits(v)) });
 }
 
-/** Částka dne: při tokenech bez ceny „≥ X $“ (dolní odhad), nikdy vymyšlená cena. */
+/** Částka dne / řádku / rozsahu: při tokenech bez ceny „≥ X $“ (dolní odhad), nikdy vymyšlená cena; bez ceny „—“. */
 export function usdDay(d: Pick<CostDay, "cost" | "unpriced">): string {
-  return isLowerBound(d) && d.cost != null ? `≥ ${usd(d.cost)}` : usd(d.cost);
+  return costText(d.cost, d.unpriced, (v) => usd(v));
 }
 
 /** Tooltip dne / sloupce: datum, částka, tokeny a případně „+ N tok. bez ceny“. */
@@ -46,10 +46,7 @@ export function dayTip(d: CostDay): string {
 }
 
 /** „3,4 M“ tokenů */
-export function tok(n: number): string {
-  const c = compact(n);
-  return `${num(c.v, c.digits)}${c.unit ? ` ${c.unit}` : ""}`;
-}
+export const tok = (n: number): string => tokText(n, num);
 
 function Line(p: { l: CostLine; total: CostLine }) {
   const name = () => (p.l.other ? t("sessions.costs.other", "ostatní") : p.l.name || t("sessions.costs.noDir", "bez složky"));
@@ -58,7 +55,7 @@ function Line(p: { l: CostLine; total: CostLine }) {
       <span class="cost-name">{name()}</span>
       <span class="cost-track"><span class="cost-fill" style={{ width: `${share(p.l, p.total) * 100}%` }} /></span>
       <span class="cost-tok">{tok(p.l.tokens)}</span>
-      <span class="cost-usd">{usd(p.l.cost)}</span>
+      <span class="cost-usd">{usdDay(p.l)}</span>
     </div>
   );
 }
@@ -103,7 +100,8 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
   const range = () => pickRange(cv()?.summary?.ranges, days());
   const today = () => pickRange(cv()?.summary?.ranges, 1);
   const pct = () => progressPct(cv()?.progress);
-  const heights = () => bars(cv()?.summary?.days ?? []);
+  const series = () => priceSeries(cv()?.summary?.days);
+  const heights = () => normalize(series().values);
   const RANGES = () => [
     [1, t("sessions.costs.today", "Dnes")],
     [7, t("sessions.costs.week", "7 dní")],
@@ -116,7 +114,7 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
           <span class="cost-chev" classList={{ on: open() }}>›</span>
           <span class="cost-title" title={t("sessions.costs.tip", "Odhad podle ceníku API — při předplatném ji neplatíš.")}>{t("sessions.costs.title", "Hodnota v cenách API")}</span>
           <Show when={!open() && today()}>
-            <span class="cost-peek">{t("sessions.costs.todayShort", "dnes {v}", { v: usd(today()!.total.cost) })}</span>
+            <span class="cost-peek">{t("sessions.costs.todayShort", "dnes {v}", { v: usdDay(today()!.total) })}</span>
           </Show>
         </button>
         <Show when={open()}>
@@ -124,6 +122,9 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
             <div class="cost-tag" title={t("sessions.costs.tagTip", "Předplatné Pro/Max se po tokenech neúčtuje. Ceník API ověřen {date}: {src}", { date: cv()!.pricesVerified, src: cv()!.pricesSource })}>
               {t("sessions.costs.tag", "odhad v cenách API, ne účet")}
             </div>
+            <Show when={priceStaleDays(cv()!.pricesVerified, Date.now())}>
+              {(d) => <div class="cost-note bad">{t("sessions.costs.priceStale", "Ceník ověřen před {n} dny — odhad USD může být zastaralý.", { n: d() })}</div>}
+            </Show>
             <Show when={cv()!.state === "computing"}>
               <div class="cost-note">{pct() != null ? t("sessions.costs.computingPct", "počítám… {n} %", { n: pct()! }) : t("sessions.costs.computing", "počítám…")}</div>
             </Show>
@@ -137,8 +138,8 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
                     <For each={RANGES()}>{([d, label]) => <button class="cost-tab" classList={{ on: r().days === d }} onClick={() => pick(d)}>{label}</button>}</For>
                   </div>
                   <div class="cost-sum">
-                    <span class="cost-big">{usd(r().total.cost)}</span>
-                    <span class="cost-sub">{t("sessions.costs.tokens", "{n} tokenů", { n: tok(r().total.tokens) })}</span>
+                    <span class="cost-big">{usdDay(r().total)}</span>
+                    <span class="cost-sub" title={t("sessions.costs.tokensTip", "Tokeny = vstup + výstup + zápis cache + čtení cache (čtení cache bývá většina, ale je levné). Rozpad je pod číslem. Dnes / 7 dní = kalendářní dny včetně dneška.")}>{t("sessions.costs.tokens", "{n} tokenů", { n: tok(r().total.tokens) })}</span>
                   </div>
                   <div class="cost-split">
                     {t("sessions.costs.split", "vstup {i} · výstup {o} · zápis cache {w} · čtení cache {r}", { i: tok(r().split.input), o: tok(r().split.output), w: tok(r().split.cacheWrite), r: tok(r().split.cacheRead) })}
@@ -150,7 +151,7 @@ export default function CostsSection(p: { s: Snapshot; now: number }) {
                     <For each={cv()!.summary!.days}>
                       {(d, i) => (
                         <span class="cost-col" title={dayTip(d)}>
-                          <span class="cost-bar" classList={{ dim: cv()!.summary!.days.length - i() > r().days }} style={{ height: `${Math.max(heights()[i()] ?? 0, 0) * 100}%` }} />
+                          <span class="cost-bar" classList={{ dim: cv()!.summary!.days.length - i() > r().days, unk: series().unknown[i()] }} style={{ height: `${Math.max(heights()[i()] ?? 0, 0) * 100}%` }} />
                         </span>
                       )}
                     </For>

@@ -112,6 +112,9 @@ fn worker() {
         drop(s);
         if p.system {
             let _ = sysmon::poll(now, false, &sys);
+            // vzorek jde do proužku hned — GitHub níž může blokovat až `AUTO_TIMEOUT` (výpadek sítě)
+            mark_dirty();
+            crate::stripview::refresh_strip();
         }
         if p.github {
             let _ = github::refresh(&gh, Mode::Auto);

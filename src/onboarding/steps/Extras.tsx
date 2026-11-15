@@ -2,6 +2,7 @@
 import { createSignal, For } from "solid-js";
 import { api } from "../../api";
 import { t } from "../../i18n";
+import { settingsPath } from "../../settings/path";
 import { say } from "../../ui/toast";
 import { linkSuggestions, normalizeUrl } from "../logic";
 import { setWiz, wiz } from "../store";
@@ -25,7 +26,7 @@ export function LinksStep() {
     ...wiz.custom.map((c) => ({ key: c.url, name: c.label })),
   ];
   const where = () =>
-    t("onboarding.links.toActions", "Uloží se mezi odkazy — v kartě Odkazy a v Nastavení → Projekty, akce a odkazy.");
+    t("onboarding.links.toActions", "Uloží se mezi odkazy — v kartě Odkazy a v {path}.", { path: settingsPath("akce") });
   const focus = () => api.focusDrawer();
   return (
     <div class="ob-split">

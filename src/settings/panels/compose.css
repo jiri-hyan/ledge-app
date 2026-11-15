@@ -10,7 +10,7 @@
 .cx-cats { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--well); padding: 3px; border: 1px solid var(--line); border-radius: var(--r-pill); }
 .cx-cat { padding: 4px 10px; font-size: var(--fs-xs); font-weight: 500; border-radius: var(--r-pill); border: 0; background: transparent; color: var(--t2); transition: background var(--dur-1), color var(--dur-1); }
 .cx-cat:hover { color: var(--t0); }
-.cx-cat.on { background: var(--accent); color: #fff; font-weight: 600; }
+.cx-cat.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .cx-arrows { display: inline-flex; gap: 4px; }
 .cx-car { display: grid; grid-auto-flow: column; grid-auto-columns: 216px; gap: var(--s2); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
 .cx-pre { scroll-snap-align: start; }
@@ -21,7 +21,6 @@
 .cx-num thead th { color: var(--t3); }
 .cx-num input { width: 72px; }
 .cx-num tr.off { opacity: 0.5; }
-.cx-styles { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .cx-rack { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: var(--s2); margin: var(--s2) 0; align-items: start; }
 .cx-well { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 108px; padding: 30px 10px 10px; position: relative;
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--well); transition: border-color var(--dur-1), background var(--dur-1); }
@@ -49,7 +48,7 @@
 .cx-target { display: inline-flex; align-items: center; gap: 4px; background: var(--well); padding: 2px 4px 2px 8px; border: 1px solid var(--line); border-radius: var(--r-pill); }
 .cx-tbtn { padding: 3px 8px; font-size: var(--fs-2xs); font-weight: 500; border-radius: var(--r-pill); border: 0; background: transparent; color: var(--t2); transition: background var(--dur-1), color var(--dur-1); }
 .cx-tbtn:hover { color: var(--t0); }
-.cx-tbtn.on { background: var(--accent); color: #fff; font-weight: 600; }
+.cx-tbtn.on { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 .cx-tray { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 var(--s2); padding: 10px; background: var(--well); border: 1px dashed var(--line-2); border-radius: var(--r-lg); }
 .cx-tray .cx-cube { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; row-gap: 1px; align-items: center; text-align: left; padding: 6px 10px; border-radius: var(--r-md); }
 .cx-tray .cx-cube .cx-ci { grid-row: 1 / 3; width: 26px; height: 26px; border-radius: var(--r-xs); background: color-mix(in srgb, var(--accent) 15%, var(--card-2)); font-size: var(--fs-md); }

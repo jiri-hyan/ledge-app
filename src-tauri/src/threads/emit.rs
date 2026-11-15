@@ -59,14 +59,15 @@ fn deadlines(last_git: Instant) -> [Option<i64>; 13] {
 pub(crate) fn spawn_emit_thread() {
     std::thread::Builder::new()
         .name("emit".into())
-        .spawn(|| {
-            let mut last_emit = Instant::now() - Duration::from_secs(1);
+        .spawn(|| crate::guard::guarded("emit", crate::guard::FOREVER, || {
+            let mut last_emit = crate::guard::ago(Duration::from_secs(1));
             // L67: otisk naposledy odeslaného stavu (šuplík / Studio zvlášť), cena posledního snapshotu, čítač
             let (mut sent_drawer, mut sent_studio): (Option<u64>, Option<u64>) = (None, None);
             let mut gap = emitgate::min_gap(0);
+            let mut slow_streak = 0u32;
             let mut tally = Tally::default();
             // git hned po startu (za 10 s), pak co `GIT_EVERY`
-            let mut last_git = Instant::now() - GIT_EVERY + Duration::from_secs(10);
+            let mut last_git = crate::guard::ago(GIT_EVERY - Duration::from_secs(10));
             loop {
                 let c = core();
                 let wait = next_wake(now_ms(), deadlines(last_git));
@@ -76,6 +77,8 @@ pub(crate) fn spawn_emit_thread() {
                         c.wake.wait_for(&mut d, wait);
                     }
                 }
+                // probuzení z uspání / skok hodin → zdroje dat sítě začnou backoff znovu (`netstate.rs`, žádný časovač)
+                crate::netstate::note_tick(now_ms());
                 check_reminders();
                 // peek po konci hry + opakovaný puls čekající otázky Clauda (`attention.rs`)
                 crate::attention::catch_up();
@@ -95,8 +98,10 @@ pub(crate) fn spawn_emit_thread() {
                 crate::accounts::calsync::maybe_refresh(false);
                 crate::accounts::mail::maybe_refresh(false);
                 let since = last_emit.elapsed();
-                if since < gap {
-                    std::thread::sleep(gap - since);
+                // po otevření šuplíku (vstup uživatele) se bouřkový odstup nečeká — odezva ≤ 300 ms (L169)
+                let gap_now = emitgate::effective_gap(gap, emitgate::input_age_ms(now_ms()));
+                if since < gap_now {
+                    std::thread::sleep(gap_now - since);
                 }
                 let dirty = std::mem::replace(&mut *c.dirty.lock(), false);
                 // Ledge Studio (otevřené jen na výslovný klik) dostává stav i se zavřeným šuplíkem
@@ -141,7 +146,7 @@ pub(crate) fn spawn_emit_thread() {
                     } else if skipped {
                         tally.same += 1;
                     }
-                    gap = emitgate::min_gap(cost);
+                    gap = emitgate::next_gap(cost, &mut slow_streak);
                     last_emit = Instant::now();
                 } else if dirty {
                     // šuplík zavřený → poslat až při otevření (UiCmd::Show posílá vždy čerstvý)
@@ -171,7 +176,7 @@ pub(crate) fn spawn_emit_thread() {
                     crate::state::log(&line);
                 }
             }
-        })
+        }))
         .ok();
 }
 

@@ -34,5 +34,7 @@ export const SECTION_NAMES: Record<string, readonly [string, string]> = {
   smart: ["settings.section.smart", "Chytré funkce"],
   winquick: ["settings.section.winquick", "Rychlé přepínače Windows"],
   notify: ["settings.section.notify", "Oznámení"],
+  connector: ["settings.section.connector", "Propojená aplikace (adresa a název; klíč se nezálohuje)"],
   desk: ["settings.section.desk", "Plocha"],
+  extensions: ["settings.section.extensions", "Rozšíření"],
 };

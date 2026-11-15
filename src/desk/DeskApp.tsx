@@ -6,6 +6,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { on } from "../api";
 import { setLang, t, type Lang } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { initAppearance } from "../theme/apply";
 import { errorText, sayError, Toast } from "../ui/toast";
 import { PopCap, PopItem, PopMenu, PopSep, createMenu } from "../ui/Popover";
@@ -110,7 +111,7 @@ export default function DeskApp() {
                   <PopItem checked={wd().locked} onClick={() => void patch({ locked: !wd().locked })}>{t("cards.desk.lock", "Zamknout na místě")}</PopItem>
                   <PopItem
                     checked={wd().through}
-                    title={t("cards.desk.throughTip", "Klik projde na okno pod widgetem. Vypneš ho v Nastavení → Na ploše.")}
+                    title={t("cards.desk.throughTip", "Klik projde na okno pod widgetem. Vypneš ho v {path}.", { path: settingsPath("naplose") })}
                     onClick={run(() => patch({ through: !wd().through }))}
                   >
                     {t("cards.desk.through", "Průchozí (klik projde)")}

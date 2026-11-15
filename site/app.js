@@ -17,7 +17,7 @@
     "facts.telemetry": "Bez telemetrie a bez účtu", "facts.mit": "Licence MIT",
     "hero.note": "Skutečné rozhraní Ledge s ukázkovými daty (vymyšlené projekty). Vysune se, když se myší dotkneš horního okraje obrazovky.",
     "why.kicker": "Proč Ledge", "why.title": "Pořád po ruce. Nikdy v cestě.",
-    "why.lead": "Staví ho jeden vývojář pro svou každodenní práci na Windows s Claude Code — a sdílí ho jako open source, takže ho můžeš používat, jak je, doladit si ho, nebo forknout.",
+    "why.lead": "Je stavěný pro každodenní práci na Windows s Claude Code — a sdílí ho jako open source, takže ho můžeš používat, jak je, doladit si ho, nebo forknout.",
     "why1.t": "Neruší", "why1.p": "Tenký proužek u horního okraje, dokud ho nepotřebuješ. Nikdy ti nevezme klávesnici, při hře na celou obrazovku mlčí a v klidu má rozpočet procesoru pod 0,1 %.",
     "why2.t": "Claude Code konečně vidět i na Windows", "why2.p": "Všechny session na jeden pohled, schválení a odpovědi Claudovi přímo ze šuplíku a limity 5h i týdne — bez přepínání mezi terminály.",
     "why3.t": "Tvoje, lokální a otevřené", "why3.p": "Žádný účet, žádný cloud, žádná telemetrie. Poznámky jsou obyčejné soubory Markdown ve tvé složce, nastavení jeden JSON a zdroják je na GitHubu pod licencí MIT.",

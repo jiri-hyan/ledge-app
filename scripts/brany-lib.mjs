@@ -55,3 +55,38 @@ export function buildCommand(names, queued) {
   const inner = names.includes('tsc') ? 'corepack pnpm exec vite build' : 'corepack pnpm build'
   return queued(inner)
 }
+
+/** `--since <ref>` / `--since=<ref>` z argumentů (null = není; '' = chybí hodnota) a `--allow-empty` (J3). */
+export function parseSince(args) {
+  const i = args.findIndex((a) => a === '--since' || a.startsWith('--since='))
+  if (i < 0) return { since: null, allowEmpty: args.includes('--allow-empty') }
+  const a = args[i]
+  const val = a.includes('=') ? a.slice(a.indexOf('=') + 1) : args[i + 1] ?? ''
+  return { since: val.startsWith('--') ? '' : val, allowEmpty: args.includes('--allow-empty') }
+}
+
+/** `--changed` bez jediného souboru nic neověřil → nesmí tvrdit „vše prošlo“ (J3). Vrací varování, nebo null. */
+export function emptyChangedWarning(fileCount, allowEmpty) {
+  if (fileCount > 0 || allowEmpty) return null
+  return 'VAROVÁNÍ: --changed našel 0 změněných souborů — NIC SE NEOVĚŘILO. Použij --since <ref> (např. --since HEAD~1 po mergi), plný běh `node scripts/brany.mjs`, nebo --allow-empty, když je prázdná změna záměr.'
+}
+
+/** Linker „soubor je zamčený / používá jiný proces“ (LNK1104 apod.) — dva agenti linkují stejnou test binárku (J-linker). */
+export function isLinkLockError(text) {
+  return /LNK1104|LNK1201|error: linking with `link\.exe` failed[\s\S]{0,400}(cannot open file|being used by another process)|os error 32/.test(text)
+}
+
+/** Obsah zámku `.brany-cargo.lock` = `<pid>\n<čas ISO>\n<cwd>`; vrací pid, nebo null při nesmyslu. */
+export function lockOwnerPid(text) {
+  const n = Number(String(text).split(/\r?\n/)[0])
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+/** Zámek je opuštěný, když vlastník neběží, nebo je starší než maxMs (zabitý stroj / reuse pid). */
+export function lockIsStale(text, alive, nowMs, maxMs = 45 * 60_000) {
+  const pid = lockOwnerPid(text)
+  if (pid === null) return true
+  const when = Date.parse(String(text).split(/\r?\n/)[1] ?? '')
+  if (Number.isFinite(when) && nowMs - when > maxMs) return true
+  return !alive
+}

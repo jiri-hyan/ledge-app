@@ -12,5 +12,9 @@ fn main() {
     if std::env::args_os().nth(1).is_some_and(|a| a == "--mcp") {
         std::process::exit(ledge_lib::mcp_main());
     }
+    // `ledge.exe --ext <id>` = rozšíření (`ext/child.rs`): dítě hlavního Ledge, NDJSON po stdin/stdout, taky před Tauri
+    if std::env::args_os().nth(1).is_some_and(|a| a == "--ext") {
+        std::process::exit(ledge_lib::ext_main());
+    }
     ledge_lib::run()
 }

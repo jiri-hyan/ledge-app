@@ -56,6 +56,7 @@ pub(crate) fn apply_config(mut new: Config) {
     crate::calendar::live::on_config(&old, &new);
     crate::incidents::on_config(&old, &new);
     crate::limitsfetch::on_config(&old, &new);
+    crate::winlook::on_config(&old, &new);
     crate::accounts::calsync::on_config(&old, &new);
     crate::accounts::mail::on_config(&old, &new);
     if old.personal.links != new.personal.links {
@@ -71,6 +72,7 @@ pub(crate) fn apply_config(mut new: Config) {
     crate::widgets::live::on_config(&old, &new);
     // widgety na ploše: motiv a jazyk do jejich oken
     crate::desk::win::on_config(&old, &new);
+    crate::ext::on_config(&old, &new);
     crate::pins::win::on_config(&old, &new);
     if old.drawer.sections != new.drawer.sections || old.modes != new.modes {
         // právě hraje / hlasitost / baterie: vypnutá karta = konec odběrů (`media.rs` a spol.)
@@ -134,8 +136,13 @@ fn read_disk() -> Result<Config, String> {
         Load::Use(p) => {
             // vadná sekce nezahodí zbytek: běží na výchozích a banner řekne které (soubor se nemění)
             let warnings = config::recovery::range_warnings(&p.cfg);
+            let mut cfg = p.cfg;
+            // starý číselný `strip.monitor` → stabilní identita monitoru (L162); zpět na disk jen při celém, nepoškozeném configu
+            if crate::stripset::migrate_config(&mut cfg) && p.bad.is_empty() {
+                let _ = config::save(&path, &cfg);
+            }
             config::recovery::set_load(None, p.bad, warnings);
-            Ok(p.cfg)
+            Ok(cfg)
         }
         Load::Fresh => {
             // nový uživatel: žádné projekty, průvodce při prvním otevření šuplíku

@@ -33,6 +33,10 @@ pub struct Incident {
     pub impact: &'static str,
     /// kolik dalších probíhajících incidentů je kromě tohoto
     pub more: u32,
+    /// kdy se údaj NAPOSLEDY úspěšně stáhl (ms, `now_ms`); doplní `view` — `parse` dává 0
+    pub ok_ms: i64,
+    /// po kolika minutách od `ok_ms` se údaj skryje (doplní `view`; UI s ním skrývá i mezi snapshoty)
+    pub ttl_min: u32,
 }
 
 #[derive(Deserialize)]
@@ -100,7 +104,7 @@ pub(crate) fn parse(json: &str) -> Result<Option<Incident>, String> {
     let total = live.len() as u32;
     // nejzávažnější první, při shodě nejčerstvější (ISO čas se řadí jako text)
     live.sort_by(|a, b| impact_rank(&b.impact).0.cmp(&impact_rank(&a.impact).0).then_with(|| b.updated_at.cmp(&a.updated_at)));
-    Ok(live.first().map(|i| Incident { name: clean(&i.name), status: status_of(&i.status), impact: impact_rank(&i.impact).1, more: total - 1 }))
+    Ok(live.first().map(|i| Incident { name: clean(&i.name), status: status_of(&i.status), impact: impact_rank(&i.impact).1, more: total - 1, ok_ms: 0, ttl_min: 0 }))
 }
 
 /// Smí se přesměrování na tenhle host? Jen Anthropic (stránka stavu dnes vede na `status.claude.com`), https.
@@ -127,23 +131,40 @@ pub(crate) fn retry_floor_ok(now: i64, last_ms: Option<i64>) -> bool {
     last_ms.is_none_or(|l| now - l >= MIN_RETRY_MS)
 }
 
+/// Má se starý incident ještě ukázat? Jen když od posledního ÚSPĚŠNÉHO dotazu uplynulo nejvýš `2 × every_min`
+/// (jedno zameškané kolo se toleruje); po delším výpadku sítě / 5xx by to byla tichá nepravda („žádné divadlo“:
+/// incident mohl mezitím skončit). Čistá funkce.
+pub(crate) fn visible(now: i64, ok_ms: i64, every_min: u32) -> bool {
+    now - ok_ms <= ttl_min(every_min) as i64 * 60_000
+}
+
+/// Práh skrytí v minutách (`2 × every_min`).
+pub(crate) fn ttl_min(every_min: u32) -> u32 {
+    every_min.saturating_mul(2)
+}
+
 #[derive(Default)]
 struct State {
     incident: Option<Incident>,
+    /// čas posledního úspěšného dotazu (i toho, který incident nenašel)
+    ok_ms: Option<i64>,
     attempt_ms: Option<i64>,
     /// čas posledního pokusu; na rozdíl od `attempt_ms` se nenuluje změnou volby
     last_ms: Option<i64>,
     loading: bool,
 }
 
-static STATE: Mutex<State> = Mutex::new(State { incident: None, attempt_ms: None, last_ms: None, loading: false });
+static STATE: Mutex<State> = Mutex::new(State { incident: None, ok_ms: None, attempt_ms: None, last_ms: None, loading: false });
 
 /// Pro snapshot — jen paměť; vypnuto = nic.
-pub(crate) fn view(enabled: bool) -> Option<Incident> {
+pub(crate) fn view(enabled: bool, every_min: u32) -> Option<Incident> {
     if !enabled {
         return None;
     }
-    STATE.lock().incident.clone()
+    let st = STATE.lock();
+    let ok_ms = st.ok_ms?;
+    let inc = st.incident.clone()?;
+    visible(now_ms(), ok_ms, every_min).then(|| Incident { ok_ms, ttl_min: ttl_min(every_min), ..inc })
 }
 
 /// Je co aktualizovat? Zapnuto, šuplík naplno, na otevřené záložce karta Claude s řádkem limitů.
@@ -178,8 +199,11 @@ pub(crate) fn maybe_refresh(opening: bool) {
             }
             st.loading = false;
             match res {
-                Ok(inc) => st.incident = inc,
-                // chyba: starý údaj se nechá (je to naposledy známá pravda), do logu jen důvod
+                Ok(inc) => {
+                    st.incident = inc;
+                    st.ok_ms = Some(now_ms());
+                }
+                // chyba: starý údaj se nechá, ale `view` ho po `ttl_min` skryje a UI ukazuje jeho stáří (`ok_ms`)
                 Err(e) => log(&format!("incidenty: {e}")),
             }
         }
@@ -205,17 +229,15 @@ pub(crate) fn on_config(old: &crate::config::Config, new: &crate::config::Config
 }
 
 async fn fetch() -> Result<Option<Incident>, String> {
-    let policy = reqwest::redirect::Policy::custom(|a| {
-        let ok = a.previous().len() < 3 && redirect_ok(a.url().scheme(), a.url().host_str().unwrap_or(""));
-        if ok { a.follow() } else { a.stop() }
-    });
-    let client = reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .redirect(policy)
-        .user_agent(concat!("Ledge/", env!("CARGO_PKG_VERSION")))
-        .build()
-        .map_err(|e| e.to_string())?;
-    let mut resp = client.get(URL).header(reqwest::header::ACCEPT, "application/json").send().await.map_err(|e| e.to_string())?;
+    static CLIENT: crate::accounts::http::Slot = crate::accounts::http::Slot::new();
+    let client = crate::accounts::http::shared(&CLIENT, || {
+        reqwest::redirect::Policy::custom(|a| {
+            let ok = a.previous().len() < 3 && redirect_ok(a.url().scheme(), a.url().host_str().unwrap_or(""));
+            if ok { a.follow() } else { a.stop() }
+        })
+    })?;
+    let req = client.get(URL).timeout(TIMEOUT).header(reqwest::header::ACCEPT, "application/json");
+    let mut resp = crate::accounts::http::send(req).await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status().as_u16()));
     }
@@ -314,6 +336,18 @@ mod tests {
         for (name, now, attempt, loading, every, want) in cases {
             assert_eq!(due(now, attempt, loading, every), want, "{name}");
         }
+    }
+
+    #[test]
+    fn stale_incident_hides_after_two_intervals() {
+        let m = 60_000;
+        // (název, now, ok_ms, every_min, viditelný)
+        let cases = [("čerstvý", 5 * m, 5 * m, 10, true), ("zameškané kolo", 25 * m, 5 * m, 10, true), ("přesně na prahu", 25 * m, 5 * m, 10, true), ("po prahu", 26 * m, 5 * m, 10, false), ("dlouhý výpadek", 500 * m, 0, 5, false), ("krátký interval", 11 * m, 0, 5, false)];
+        for (name, now, ok, every, want) in cases {
+            assert_eq!(visible(now, ok, every), want, "{name}");
+        }
+        assert_eq!(ttl_min(10), 20);
+        assert_eq!(ttl_min(u32::MAX), u32::MAX);
     }
 
     #[test]

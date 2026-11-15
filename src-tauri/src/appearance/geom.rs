@@ -132,48 +132,49 @@ pub struct Palette {
     pub accent: [Rgba; 3],
 }
 
+/// Jediný zdroj barev motivů: `src/theme/palettes.json` (tělo a okraj nativního proužku, `light`, akcent;
+/// stejný soubor čte `src/theme/themes.ts`). Klíč = id motivu (serde `Theme`), třetí barva akcentu
+/// (konec linky) chybí = totéž co druhá. Bez řádku motivu `palette` vrátí paletu `dark` (hlídá test).
+const PALETTES: &str = include_str!("../../../src/theme/palettes.json");
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PaletteRow {
+    light: bool,
+    top: [f32; 3],
+    bottom: [f32; 3],
+    edge: [f32; 4],
+    edge_hot: [f32; 4],
+    accent: Vec<String>,
+}
+
+fn table() -> &'static std::collections::HashMap<Theme, Palette> {
+    static T: std::sync::OnceLock<std::collections::HashMap<Theme, Palette>> = std::sync::OnceLock::new();
+    T.get_or_init(|| {
+        let rows: std::collections::HashMap<String, PaletteRow> = serde_json::from_str(PALETTES).unwrap_or_default();
+        rows.into_iter()
+            .filter_map(|(id, r)| {
+                let theme: Theme = serde_json::from_value(serde_json::Value::String(id)).ok()?;
+                let hex = |i: usize| r.accent.get(i).or(r.accent.get(1)).and_then(|s| parse_hex(s)).unwrap_or(Rgba::DIM);
+                let rgb = |c: [f32; 3]| Rgba(c[0], c[1], c[2], 1.0);
+                let rgba = |c: [f32; 4]| Rgba(c[0], c[1], c[2], c[3]);
+                let accent = [hex(0), hex(1), hex(2)];
+                Some((theme, Palette { top: rgb(r.top), bottom: rgb(r.bottom), edge: rgba(r.edge), edge_hot: rgba(r.edge_hot), light: r.light, accent }))
+            })
+            .collect()
+    })
+}
+
 pub fn palette(theme: Theme) -> Palette {
-    let rgb = |r: f32, g: f32, b: f32| Rgba(r, g, b, 1.0);
-    let white = |a: f32| Rgba(1.0, 1.0, 1.0, a);
-    let (top, bottom, edge, edge_hot, light) = match theme {
-        Theme::Dark => (rgb(0.035, 0.040, 0.058), rgb(0.085, 0.094, 0.150), white(0.10), white(0.22), false),
-        Theme::Midnight => (rgb(0.020, 0.027, 0.063), rgb(0.051, 0.071, 0.161), white(0.10), white(0.24), false),
-        Theme::Graphite => (rgb(0.071, 0.071, 0.078), rgb(0.122, 0.122, 0.133), white(0.11), white(0.22), false),
-        Theme::Nord => (rgb(0.180, 0.204, 0.251), rgb(0.208, 0.235, 0.290), white(0.12), white(0.24), false),
-        Theme::Light => (rgb(0.973, 0.976, 0.988), rgb(0.910, 0.918, 0.945), Rgba(0.0, 0.0, 0.0, 0.14), Rgba(0.0, 0.0, 0.0, 0.28), true),
-        Theme::Contrast => (rgb(0.0, 0.0, 0.0), rgb(0.0, 0.0, 0.0), white(0.6), white(0.95), false),
-        Theme::Terminal => (rgb(0.0, 0.0, 0.0), rgb(0.012, 0.031, 0.016), Rgba(0.49, 1.0, 0.54, 0.35), Rgba(0.49, 1.0, 0.54, 0.7), false),
-        Theme::Paper => (rgb(0.984, 0.973, 0.949), rgb(0.937, 0.910, 0.863), Rgba(0.35, 0.24, 0.08, 0.18), Rgba(0.35, 0.24, 0.08, 0.34), true),
-        Theme::Neon => (rgb(0.043, 0.016, 0.094), rgb(0.090, 0.035, 0.170), Rgba(1.0, 0.25, 0.85, 0.45), Rgba(1.0, 0.35, 0.9, 0.85), false),
-        Theme::Brutal => (rgb(1.0, 1.0, 1.0), rgb(0.96, 0.96, 0.94), Rgba(0.0, 0.0, 0.0, 1.0), Rgba(0.0, 0.0, 0.0, 1.0), true),
-        Theme::Pastel => (rgb(0.914, 0.929, 0.961), rgb(0.875, 0.894, 0.937), Rgba(0.31, 0.37, 0.55, 0.16), Rgba(0.31, 0.37, 0.55, 0.3), true),
-        Theme::Aurora => (rgb(0.020, 0.040, 0.090), rgb(0.055, 0.090, 0.200), Rgba(0.55, 0.9, 1.0, 0.22), Rgba(0.55, 0.9, 1.0, 0.5), false),
-        Theme::Mono => (rgb(0.980, 0.980, 0.976), rgb(0.930, 0.930, 0.920), Rgba(0.0, 0.0, 0.0, 0.14), Rgba(0.0, 0.0, 0.0, 0.3), true),
-        Theme::Retro => (rgb(0.050, 0.030, 0.010), rgb(0.105, 0.062, 0.020), Rgba(1.0, 0.69, 0.0, 0.35), Rgba(1.0, 0.69, 0.0, 0.7), false),
-        Theme::Oled => (rgb(0.0, 0.0, 0.0), rgb(0.027, 0.031, 0.047), white(0.12), white(0.24), false),
-        Theme::Warm => (rgb(0.078, 0.067, 0.059), rgb(0.122, 0.102, 0.090), white(0.10), white(0.22), false),
-    };
-    let hex = |s: &str| parse_hex(s).unwrap_or(Rgba::DIM);
-    let accent = match theme {
-        // dnešní linka: fialová → modrá → (mizí do) tyrkysové
-        Theme::Dark => [Rgba::VIOLET, Rgba::BLUE, Rgba::TEAL],
-        Theme::Midnight => [hex("#818cf8"), hex("#38bdf8"), hex("#38bdf8")],
-        Theme::Graphite => [hex("#a1a1aa"), hex("#d4d4d8"), hex("#d4d4d8")],
-        Theme::Nord => [hex("#88c0d0"), hex("#81a1c1"), hex("#81a1c1")],
-        Theme::Light => [hex("#7c3aed"), hex("#2563eb"), hex("#2563eb")],
-        Theme::Contrast => [hex("#ffd400"), hex("#00e5ff"), hex("#00e5ff")],
-        Theme::Terminal => [hex("#7cff8a"), hex("#2dd4bf"), hex("#2dd4bf")],
-        Theme::Paper => [hex("#b5651d"), hex("#8c6d46"), hex("#8c6d46")],
-        Theme::Neon => [hex("#ff3fd8"), hex("#7a5cff"), hex("#7a5cff")],
-        Theme::Brutal => [hex("#ff3d7f"), hex("#ffe600"), hex("#ffe600")],
-        Theme::Pastel => [hex("#8b9cff"), hex("#f0a6ca"), hex("#f0a6ca")],
-        Theme::Aurora => [hex("#3ee0c0"), hex("#b480ff"), hex("#b480ff")],
-        Theme::Mono => [hex("#171717"), hex("#737373"), hex("#737373")],
-        Theme::Retro => [hex("#ffb000"), hex("#ff6a00"), hex("#ff6a00")],
-        Theme::Oled => [hex("#38bdf8"), hex("#8b5cf6"), hex("#8b5cf6")],
-        Theme::Warm => [hex("#f59e0b"), hex("#f97316"), hex("#f97316")],
-    };
-    Palette { top, bottom, edge, edge_hot, light, accent }
+    let t = table();
+    t.get(&theme).or_else(|| t.get(&Theme::Dark)).copied().unwrap_or(Palette {
+        top: Rgba(0.035, 0.040, 0.058, 1.0),
+        bottom: Rgba(0.085, 0.094, 0.150, 1.0),
+        edge: Rgba(1.0, 1.0, 1.0, 0.10),
+        edge_hot: Rgba(1.0, 1.0, 1.0, 0.22),
+        light: false,
+        accent: [Rgba::VIOLET, Rgba::BLUE, Rgba::TEAL],
+    })
 }
 
 /// Barva textu/tečky na těle proužku: na světlém motivu tmavá varianta (kontrast ≥ 4.5:1).
@@ -401,7 +402,7 @@ mod tests {
     #[test]
     fn strip_text_contrast_in_every_theme() {
         // texty proužku (stripview) ≥ 4.5:1 na obou koncích přechodu těla
-        for t in Theme::ALL {
+        for t in Theme::all() {
             let p = palette(t);
             for c in [Rgba::TEXT, Rgba::DIM, Rgba::AMBER] {
                 for bg in [p.top, p.bottom] {
@@ -439,13 +440,19 @@ mod tests {
     }
 
     #[test]
-    fn theme_accents_mirror_frontend() {
-        let ts = include_str!("../../../src/theme/themes.ts");
-        let hex = |c: Rgba| format!("#{:02x}{:02x}{:02x}", (c.0 * 255.0).round() as u8, (c.1 * 255.0).round() as u8, (c.2 * 255.0).round() as u8);
-        for t in Theme::ALL.into_iter().filter(|t| *t != Theme::Dark) {
+    fn palettes_json_is_the_single_source() {
+        // každý motiv (varianta enumu) má řádek v palettes.json a každý řádek má variantu; TS čte tentýž soubor
+        let rows: std::collections::HashMap<String, serde_json::Value> = serde_json::from_str(PALETTES).unwrap();
+        let all = Theme::all();
+        assert_eq!(rows.len(), all.len(), "počet řádků palettes.json ≠ počet motivů");
+        for t in all {
+            let id = serde_json::to_value(t).unwrap();
+            let id = id.as_str().unwrap();
+            assert!(rows.contains_key(id), "{id}: chybí v palettes.json");
             let p = palette(t);
-            let pair = format!("accent: \"{}\", \"accent-2\": \"{}\"", hex(p.accent[0]), hex(p.accent[1]));
-            assert!(ts.contains(&pair), "{t:?}: {pair} chybí v themes.ts");
+            assert_eq!(p.light, rows[id]["light"].as_bool().unwrap(), "{id}: light");
+            let hex = |c: Rgba| format!("#{:02x}{:02x}{:02x}", (c.0 * 255.0).round() as u8, (c.1 * 255.0).round() as u8, (c.2 * 255.0).round() as u8);
+            assert_eq!(hex(p.accent[0]), rows[id]["accent"][0].as_str().unwrap(), "{id}: akcent");
         }
     }
 }

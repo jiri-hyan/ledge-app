@@ -6,6 +6,7 @@
 // `mid`, nic se nemění. Testy `iconTone.test.mjs`.
 
 import { createEffect, createSignal } from "solid-js";
+import { lruGet, lruSet } from "./lru.ts";
 
 export type Tone = "dark" | "light" | "mid";
 
@@ -40,6 +41,8 @@ export function toneOf(px: ArrayLike<number>): Tone {
   return l < DARK ? "dark" : l > LIGHT ? "light" : "mid";
 }
 
+/** Strop cache: klíč je celá data URL, po každé změně ikony / loga by tu starý záznam zůstal navždy. */
+const TONE_CACHE_MAX = 64;
 const cache = new Map<string, Promise<Tone>>();
 
 /** Solid: signál tónu pro měnící se URL (bez `createResource` — žádné Suspense, žádné blikání). */
@@ -55,7 +58,7 @@ export function useTone(src: () => string | undefined): () => Tone {
 
 /** Tón obrázku z URL (data: z jádra) — jednou na URL; chyba / cizí původ = `mid` (beze změny). */
 export function measureTone(src: string): Promise<Tone> {
-  let p = cache.get(src);
+  let p = lruGet(cache, src);
   if (!p) {
     p = new Promise<Tone>((resolve) => {
       const img = new Image();
@@ -74,7 +77,7 @@ export function measureTone(src: string): Promise<Tone> {
       img.onerror = () => resolve("mid");
       img.src = src;
     });
-    cache.set(src, p);
+    lruSet(cache, src, p, TONE_CACHE_MAX);
   }
   return p;
 }

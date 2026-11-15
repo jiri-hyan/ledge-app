@@ -18,13 +18,15 @@ pub struct MemHost {
     pub note_writes: AtomicUsize,
     /// (cesta, připnout?) z `pin_note`
     pub pins: Mutex<Vec<(std::path::PathBuf, bool)>>,
+    /// surová data pro `live_state` (`Host::live_raw`)
+    pub live: Mutex<Value>,
 }
 
 impl MemHost {
     pub fn new(enabled: bool) -> Self {
         let mut cfg = Config::default();
         cfg.mcp.enabled = enabled;
-        Self { cfg: Mutex::new(cfg), saves: AtomicUsize::new(0), notes: Mutex::new(None), note_writes: AtomicUsize::new(0), pins: Mutex::new(Vec::new()) }
+        Self { cfg: Mutex::new(cfg), saves: AtomicUsize::new(0), notes: Mutex::new(None), note_writes: AtomicUsize::new(0), pins: Mutex::new(Vec::new()), live: Mutex::new(Value::Null) }
     }
 }
 
@@ -48,6 +50,9 @@ impl Host for MemHost {
     }
     fn open_drawer(&self, tab: Option<&str>) -> Result<String, String> {
         Ok(format!("open {}", tab.unwrap_or("")))
+    }
+    fn live_raw(&self) -> Value {
+        self.live.lock().clone()
     }
     fn notes_root(&self) -> Option<std::path::PathBuf> {
         self.notes.lock().clone()
@@ -180,7 +185,8 @@ fn tools_list_matches_contract() {
 /// REZERVU nad skutečností (kolo 28: 20 855 B), aby se nemusel zvedat v každé větvi — zvedání ve více větvích dělalo
 /// konflikty při slučování. Při překročení nejdřív zkrať popisy/schémata (nejtlustší nástroje tiskne hláška níže);
 /// strop zvedej JEN vědomě, v samostatném commitu: změň konstantu níže a napiš do commitu skutečnou velikost.
-const MAX_TOOLS_LIST_BYTES: usize = 22_000;
+// kolo 34 (H8): 22 000 → 23 000, nástroj `live_state` (zapnutý volbou) přidal ~0,5 kB (naměřeno 22 380 B se čtením, 21 9xx bez)
+const MAX_TOOLS_LIST_BYTES: usize = 23_000;
 #[test]
 fn tools_list_stays_small() {
     let srv = server();
@@ -456,4 +462,54 @@ fn refused_undo_keeps_entry() {
     assert!(!call(&srv, &host, "undo_last", json!({})).0);
     assert_eq!(srv.undo.lock().len(), 0, "úspěch záznam odebere");
     assert!(call(&srv, &host, "undo_last", json!({})).0, "prázdný zásobník = chyba");
+}
+
+/// `live_state` (H8): výchozí vypnuto = není v seznamu ani volatelný; zapnutý jen čte, zúžený povoleným seznamem,
+/// nic nezapisuje a nic nespouští; žádný nástroj schvalování.
+#[test]
+fn live_state_is_opt_in_read_only_and_narrow() {
+    let srv = server();
+    let host = MemHost::new(true);
+    *host.live.lock() = json!({
+        "sessions": [{ "id": "s1", "title": "tajný prompt", "cwd": "C:/x/atlas", "status": "working", "uncommitted": ["a"] }],
+        "approvals": { "pending": [{ "tool": "Bash", "summary": "rm -rf secrets", "cwd": "C:/x/atlas" }], "questions": 0 },
+        "devServers": [{ "id": "atlas", "phase": "failed", "errors": 1, "errorLines": ["Error: boom"], "cmd": "npm run dev" }],
+    });
+    let h = tools::Handler { srv: &srv, host: &host };
+    let names = |h: &tools::Handler| <tools::Handler as rpc::Tools>::list(h).as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert!(!names(&h).contains(&"live_state".to_string()), "výchozí vypnuto: nástroj není vidět");
+    let (err, text) = call(&srv, &host, "live_state", json!({}));
+    assert!(err && text.contains("vypnuté"), "{text}");
+    assert!(!text.contains("atlas"), "vypnuté nic neukáže");
+
+    host.cfg.lock().mcp.read_data = true;
+    let list = <tools::Handler as rpc::Tools>::list(&tools::Handler { srv: &srv, host: &host });
+    let t = list.as_array().unwrap().iter().find(|t| t["name"] == "live_state").expect("zapnuté: v seznamu");
+    assert_eq!(t["annotations"]["readOnlyHint"], true);
+    let before = host.cfg.lock().clone();
+    let (err, text) = call(&srv, &host, "live_state", json!({}));
+    assert!(!err, "{text}");
+    for secret in ["tajný", "rm -rf", "npm run dev", "C:/x", "cwd", "summary"] {
+        assert!(!text.contains(secret), "{secret}: {text}");
+    }
+    assert!(text.contains("Error: boom") && text.contains("\"folder\":\"atlas\"") && text.contains("\"uncommittedCount\":1"), "{text}");
+    let (err, text) = call(&srv, &host, "live_state", json!({ "part": "devServers" }));
+    assert!(!err && !text.contains("sessions"), "{text}");
+    assert!(call(&srv, &host, "live_state", json!({ "part": "notes" })).0, "neznámá část = chyba");
+    // jen čtení: config ani zápisy se nezměnily, nic se nezapsalo do Vrátit
+    assert_eq!(host.saves.load(Ordering::SeqCst), 0);
+    assert_eq!(*host.cfg.lock(), before);
+    assert!(srv.undo.lock().peek().is_none());
+    // schvalování přes MCP neexistuje (povolit akci Clauda smí jen člověk)
+    assert!(!super::tools::TOOLS.iter().any(|t| ["approve", "decide", "allow", "permit"].iter().any(|w| t.name.contains(w))));
+}
+
+/// Se zapnutým čtením zůstává `tools/list` pod stropem (nástroj je malý a schéma bez popisů).
+#[test]
+fn tools_list_with_read_stays_small() {
+    let srv = server();
+    let host = MemHost::new(true);
+    host.cfg.lock().mcp.read_data = true;
+    let size = serde_json::to_string(&<tools::Handler as rpc::Tools>::list(&tools::Handler { srv: &srv, host: &host })).unwrap().len();
+    assert!(size < MAX_TOOLS_LIST_BYTES, "{size}");
 }

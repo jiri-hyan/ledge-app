@@ -89,7 +89,7 @@ const RESTART_PORT_WAIT: Duration = Duration::from_secs(3);
 pub(crate) fn restart(id: String) -> Result<LaunchOutcome, String> {
     let c = core();
     let port = c.procs.snapshot().into_iter().find(|v| v.id == id).and_then(|v| v.port);
-    c.procs.stop(&id);
+    c.procs.stop_wait(&id); // aplikace: počká na zavření, ať Restart nepustí 2. instanci
     if let Some(port) = port {
         let t0 = Instant::now();
         while crate::ports::owner(port).is_some() && t0.elapsed() < RESTART_PORT_WAIT {
@@ -210,12 +210,61 @@ pub(crate) fn open_in(id: String, target: String) -> Result<(), String> {
     open_dir(&dir, &target)
 }
 
+/// Cesta z `@cesta` v poznámce → existující soubor UVNITŘ složky projektu (L9). Odmítne absolutní cesty,
+/// `..`, jednotku/UNC a cokoli, co po vyřešení (včetně junction/symlinku) vede mimo `dir`; složka není soubor.
+pub(crate) fn resolve_in_project(dir: &Path, rel: &str) -> Result<PathBuf, String> {
+    use std::path::Component;
+    let bad = || tr("Soubor je mimo složku projektu nebo neexistuje.", "The file is outside the project folder or doesn't exist.").to_string();
+    let rel = rel.trim().replace('/', "\\");
+    let p = Path::new(&rel);
+    if rel.is_empty() || !p.components().all(|c| matches!(c, Component::Normal(_) | Component::CurDir)) {
+        return Err(bad());
+    }
+    let root = dir.canonicalize().map_err(|_| bad())?;
+    let real = root.join(p).canonicalize().map_err(|_| bad())?;
+    (real.starts_with(&root) && real.is_file()).then_some(real).ok_or_else(bad)
+}
+
+/// Přípona souboru z `@cesta` smí do výchozí aplikace jen z allowlistu odkazů (`personal::FILE_ALLOW`, bez `.exe`):
+/// poznámku mohl napsat Claude přes MCP, takže `@x.bat`/`.lnk`/`.ps1` se po kliku nesmí spustit (N3).
+fn openable_ext(p: &Path) -> Result<(), String> {
+    let ext = p.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+    if crate::personal::FILE_ALLOW.contains(&ext.as_str()) {
+        return Ok(());
+    }
+    Err(if ext.is_empty() {
+        tr("Soubor bez přípony se z poznámky neotevírá — ukázán ve složce.", "A file without an extension isn't opened from a note — shown in its folder.").to_string()
+    } else {
+        trf!("Typ .{ext} se z poznámky neotevírá (jen dokumenty, obrázky, média, zip) — ukázán ve složce.", "Type .{ext} isn't opened from a note (only documents, images, media, zip) — shown in its folder.")
+    })
+}
+
+/// Klik na `@cesta` v náhledu poznámky: otevře soubor projektu výchozí aplikací (cesta musí zůstat ve složce
+/// projektu, `resolve_in_project`). Šuplík se schová jako u `note_open`; fokus bere až otevřená aplikace.
+#[tauri::command(async)]
+pub(crate) fn project_open_file(id: String, path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let c = core();
+    let p = find_project(&id)?;
+    let dir = c.project_dir(&p).ok_or_else(|| tr("Složka projektu nenalezena.", "Project folder not found."))?;
+    let real = crate::notes::strip_verbatim(&resolve_in_project(&dir, &path)?);
+    if let Err(why) = openable_ext(&real) {
+        // spustitelný / neznámý typ (`.bat`, `.lnk`, `.ps1`…) se nespouští — jen se ukáže v Průzkumníku (N3)
+        let _ = c.app.opener().reveal_item_in_dir(&real);
+        c.send_ui(UiCmd::Hide);
+        return Err(why);
+    }
+    c.app.opener().open_path(real.to_string_lossy(), None::<&str>).map_err(|e| crate::errors::any(tr("Soubor nejde otevřít", "Can't open the file"), &e))?;
+    c.send_ui(UiCmd::Hide);
+    Ok(())
+}
+
 /// Otevře `dir` v terminálu (`wt`, záložně `cmd`) nebo v Průzkumníku a schová šuplík. Sdílí karta
 /// projektů/Repa (`open_in`) a panel Git v kartě Claude (`commands/sessiongit.rs`).
 pub(crate) fn open_dir(dir: &Path, target: &str) -> Result<(), String> {
     let c = core();
     let detached = 0x0000_0008u32; // DETACHED_PROCESS
-    let no_window = 0x0800_0000u32;
+    let no_window = crate::procman::CREATE_NO_WINDOW;
     let res = match target {
         "terminal" => {
             let wt = std::process::Command::new("wt").arg("-d").arg(dir).creation_flags(detached).spawn();
@@ -307,6 +356,47 @@ pub(crate) fn clone_project(id: String) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolve_in_project_stays_inside() {
+        let t = tempfile::tempdir().unwrap();
+        let proj = t.path().join("proj");
+        std::fs::create_dir_all(proj.join("src")).unwrap();
+        std::fs::write(proj.join("src").join("a.ts"), "x").unwrap();
+        std::fs::write(t.path().join("tajne.txt"), "x").unwrap();
+        let abs_out = t.path().join("tajne.txt").to_string_lossy().to_string();
+        for (rel, ok) in [
+            ("src/a.ts", true),
+            ("src\\a.ts", true),
+            ("./src/a.ts", true),
+            (" src/a.ts ", true),
+            ("src/../src/a.ts", false),
+            ("../tajne.txt", false),
+            ("src/../../tajne.txt", false),
+            (abs_out.as_str(), false),
+            ("C:/Windows/notepad.exe", false),
+            ("//server/share/x", false),
+            ("src", false),
+            ("src/neni.ts", false),
+            ("", false),
+        ] {
+            let r = resolve_in_project(&proj, rel);
+            assert_eq!(r.is_ok(), ok, "{rel:?}: {r:?}");
+        }
+        assert!(resolve_in_project(&proj, "src/a.ts").unwrap().ends_with("src\\a.ts"));
+        assert!(resolve_in_project(&proj.join("neni"), "src/a.ts").is_err());
+    }
+
+    #[test]
+    fn openable_ext_allowlist() {
+        for (f, ok) in [
+            ("a.md", true), ("A.PDF", true), ("x.png", true), ("b.zip", true),
+            ("x.bat", false), ("x.cmd", false), ("x.lnk", false), ("x.ps1", false), ("x.exe", false),
+            ("x.vbs", false), ("x.js", false), ("x.url", false), ("x.hta", false), ("x.scr", false), ("Makefile", false), ("a.txt.bat", false),
+        ] {
+            assert_eq!(openable_ext(Path::new(f)).is_ok(), ok, "{f}");
+        }
+    }
 
     #[test]
     fn pull_message_reports_last_line_and_errors() {

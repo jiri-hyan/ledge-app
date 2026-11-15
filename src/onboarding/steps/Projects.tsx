@@ -2,6 +2,7 @@
 // zaškrtáváním; výchozí = 6 naposledy měněných. Náhled vpravo ukazuje dlaždice, které přibudou.
 import { For, Show } from "solid-js";
 import { t } from "../../i18n";
+import { settingsPath } from "../../settings/path";
 import type { FoundRepo } from "../../types";
 import { importable, since } from "../logic";
 import { addFolder, setWiz, wiz } from "../store";
@@ -79,7 +80,7 @@ export default function ProjectsStep() {
         title={t("onboarding.preview.title", "Náhled v šuplíku")}
         items={selected().map((r) => ({ key: r.path, name: r.name, src: wiz.icons[`repo:${r.path}`] }))}
         empty={t("onboarding.projects.previewEmpty", "Zatím nic — zaškrtni projekty vlevo.")}
-        note={t("onboarding.projects.note", "Příkaz, port i logo jde kdykoli upravit v Nastavení → Projekty, akce a odkazy.")}
+        note={t("onboarding.projects.note", "Příkaz, port i logo jde kdykoli upravit v {path}.", { path: settingsPath("akce") })}
       />
     </div>
   );

@@ -7,12 +7,11 @@ export type NotchSection = "player" | "days" | "system" | "volume";
 /** Pořadí sekcí zleva (obr. „široký notch“): přehrávač | dny a čas | systém | hlasitost. */
 export const SECTION_ORDER: readonly NotchSection[] = ["player", "days", "system", "volume"];
 
-/** Karta záložky → sekce lišty, které z ní vzniknou. Kalendář, Dnes a Týden zůstávají kartami (mají události),
- *  Rychlé přepínače taky (mikrofon, výstup). */
+/** Karta záložky → sekce lišty, které z ní vzniknou. Kalendář (i ve vzhledu Týden) zůstává kartou (má události),
+ *  Rychlé dlaždice Windows taky (mikrofon, výstup). Čas ve vzhledu Velké hodiny jde do téže sekce dnů. */
 export const NOTCH_OF: Readonly<Record<string, readonly NotchSection[]>> = {
   media: ["player", "volume"],
   clock: ["days"],
-  bigclock: ["days"],
   system: ["system"],
 };
 

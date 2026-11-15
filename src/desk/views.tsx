@@ -16,6 +16,10 @@ import type { DeskData, DeskWidget } from "../types";
 import { deskApi } from "./api";
 import { deskSnapshot, isScriptKind, waitMinutes } from "./model";
 import { sayError } from "../ui/toast";
+import { setKitHandlers } from "../widgetkit/click";
+
+// widgetkit: `drawer:<karta>` na ploše = otevřít šuplík; `action:<id>` plocha nezná (spouští se v šuplíku)
+setKitHandlers({ drawer: () => deskApi.openDrawer("drawer").then(() => undefined) });
 
 const open = (target: "waiting" | "settings" | "drawer") => () => void deskApi.openDrawer(target).catch(sayError);
 
@@ -97,7 +101,7 @@ export default function DeskBody(p: { w: DeskWidget; d: DeskData | null; title: 
         <Card title={p.title}><Waiting d={p.d} compact={p.w.compact} /></Card>
       </Match>
       <Match when={p.w.kind === "dev"}>
-        <Running s={s()} now={now()} />
+        <Running s={{ ...s(), procs: p.d?.procs ?? [] }} now={now()} />
       </Match>
       <Match when={p.w.kind === "agenda"}>
         <Show when={p.d?.calendar?.status !== "off"} fallback={<Card title={p.title}><div class="empty">{t("cards.desk.agenda.off", "Kalendář je v šuplíku skrytý — přidej kartu Kalendář (✎ → + Přidat kartu).")}</div></Card>}>

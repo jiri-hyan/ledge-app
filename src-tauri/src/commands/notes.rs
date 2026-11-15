@@ -56,6 +56,33 @@ pub(crate) fn note_query(q: notes::edit::NoteQuery) -> notes::edit::QueryResult 
     notes::edit::query(all, &q, notes::end_of_day_ms(&notes::now_local()))
 }
 
+/// Otevřené body napříč poznámkami + počty (po termínu / dnes / navržené / bez termínu) — z paměti, bez I/O.
+#[tauri::command]
+pub(crate) fn note_tasks(q: Option<notes::TaskQuery>) -> notes::TaskList {
+    let st = core().notes.lock();
+    let now = notes::now_local();
+    notes::taskindex::list(&st.all, &q.unwrap_or_default(), now.timestamp_millis(), notes::end_of_day_ms(&now))
+}
+
+/// Odložit / nastavit termín bodu (`YYYY-MM-DD` nebo `YYYY-MM-DD HH:MM`, prázdné = odebrat): mění jen token
+/// `⏰` na řádku `line` (těla od 0), s ochranou proti přepsání (otisk jako `note_toggle_task`).
+#[tauri::command(async)]
+pub(crate) fn note_task_snooze(path: String, line: usize, iso: String, expected_hash: String) -> Result<notes::edit::SaveOutcome, String> {
+    let root = notes_root().ok_or_else(off)?;
+    let out = saved_with_refs(notes::taskwrite::snooze(&root, Path::new(&path), line, &iso, &expected_hash, &notes::now_local())?);
+    if matches!(out, notes::edit::SaveOutcome::Saved { .. }) {
+        reload_notes();
+        send_sync(SyncMsg::Local);
+    }
+    Ok(out)
+}
+
+/// Rychlý úkol z věty („v 9:00 doktor !“): název, čas, priorita, řešitel a hotový řádek `- [ ] …`. Čistá funkce, nic nezapisuje.
+#[tauri::command]
+pub(crate) fn note_quick_parse(text: String) -> notes::taskquick::QuickTask {
+    notes::taskquick::parse_quick(&text, &notes::now_local())
+}
+
 /// Poznámka k úpravě v Ledge: tělo, otisk (ochrana proti přepsání) a obrázky jako data URL.
 #[tauri::command(async)]
 pub(crate) fn note_read(path: String) -> Result<notes::edit::NoteDetail, String> {
@@ -100,7 +127,10 @@ pub(crate) fn note_set_status(path: String, status: String) -> Result<notes::edi
 #[tauri::command(async)]
 pub(crate) fn note_answer(path: String, index: usize, answer: String) -> Result<notes::edit::NoteDetail, String> {
     let root = notes_root().ok_or_else(off)?;
-    notes::ops::answer_question(&root, Path::new(&path), index, &answer, &notes::now_local()).map(written)
+    let d = notes::ops::answer_question(&root, Path::new(&path), index, &answer, &notes::now_local()).map(written)?;
+    // volitelně (výchozí vypnuto): odpověď na poslední otázku zadání spustí další krok sama
+    super::brief::after_answer(&path);
+    Ok(d)
 }
 
 /// Stav bodu `open|proposed|done` (potvrzení `[~]` → `[x]` dělá jen člověk tady). Bod se hledá podle
@@ -196,6 +226,15 @@ pub(crate) fn note_suggest_remind(text: String) -> Option<notes::when::Suggest> 
 
 /// Index těla poznámek pro Ctrl+K — staví se líně při prvním hledání po změně poznámek (`rev`).
 static SEARCH: parking_lot::Mutex<Option<notes::search::Index>> = parking_lot::Mutex::new(None);
+
+/// Šuplík schovaný dost dlouho (volá `media::release` z vlákna `hover`, ~100 ms; bez indexu je to jen kontrola `None`):
+/// zahodit index (2× text všech poznámek, L211); další Ctrl+K ho postaví znovu.
+pub(crate) fn release_search() {
+    let mut idx = SEARCH.lock();
+    if idx.is_some() {
+        *idx = None;
+    }
+}
 
 /// Ctrl+K: poznámky, v jejichž titulku nebo těle jsou všechna slova dotazu (bez ohledu na velikost
 /// písmen a diakritiku), s úryvkem. Dotaz kratší než 2 znaky = nic. Hotové a archivované se nehledají.
@@ -307,7 +346,7 @@ pub(crate) fn note_open_with_apps() -> Vec<OpenWithApp> {
 #[tauri::command(async)]
 pub(crate) fn note_open_with(path: String, app: String) -> Result<(), String> {
     const DETACHED_PROCESS: u32 = 0x0000_0008;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    use crate::procman::CREATE_NO_WINDOW;
     let root = notes_root().ok_or_else(off)?;
     let real = notes::strip_verbatim(&notes::check_note_path(&root, Path::new(&path))?);
     let (_, name, cmd) = open_with_registry()

@@ -10,6 +10,12 @@ pub(crate) fn get_config() -> Config {
     core().cfg.read().clone()
 }
 
+/// Stav Windows pro motiv „Podle Windows“ (světlý / tmavý, akcent); změny chodí událostí `winlook`.
+#[tauri::command]
+pub(crate) fn win_look() -> crate::appearance::auto::WinLook {
+    crate::winlook::current()
+}
+
 /// Zápis z okna (šuplík / Studio): druhé okno dostane `config-changed`, ať se přenačte nebo ukáže konflikt.
 /// Samo volající okno ne (vlastní zápis by si přebíralo jako cizí).
 #[tauri::command]
@@ -55,7 +61,7 @@ pub(crate) fn open_config_file() -> Result<(), String> {
     let path = config::config_path();
     std::process::Command::new("cmd")
         .raw_arg(format!("/d /c start \"\" \"{}\"", path.display()))
-        .creation_flags(0x0800_0000)
+        .creation_flags(crate::procman::CREATE_NO_WINDOW)
         .spawn()
         .map(|_| ())
         .map_err(|e| crate::errors::spawn(crate::i18n::tr("Nastavení nejde otevřít", "Can't open the settings"), &e))

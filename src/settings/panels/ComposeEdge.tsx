@@ -42,7 +42,7 @@ const STATE_NAME: Record<Exclude<LiveState, "idle">, () => string> = {
   work: () => t("appearance.compose.live.work", "Pracuje"),
   wait: () => t("appearance.compose.live.wait", "Čeká na tebe"),
   done: () => t("appearance.compose.live.done", "Hotovo"),
-  limit: () => t("appearance.compose.live.limit", "Limit od 80 %"),
+  limit: () => t("appearance.compose.live.limit", "Limit od 75 %"),
 };
 const LIVE_ROWS = ["work", "wait", "done", "limit"] as const;
 /** Svit pod tělem (síla dává smysl). */

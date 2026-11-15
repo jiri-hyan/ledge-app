@@ -28,9 +28,7 @@ use tauri::AppHandle;
 pub(crate) fn log(msg: &str) {
     use std::io::Write;
     let path = config::config_dir().join("ledge.log");
-    if std::fs::metadata(&path).is_ok_and(|m| m.len() > 1 << 20) {
-        let _ = std::fs::remove_file(&path);
-    }
+    crate::guard::rotate_log(&path); // L226: nad 1 MB → `ledge.log.1`, ne smazat
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(f, "{} {msg}", local_hhmmss());
     }
@@ -65,6 +63,8 @@ pub(crate) enum UiCmd {
     Focus,
     /// odchod ze stránky „note“: opener zpět na hodnotu před `Focus`
     Release,
+    /// 📌 v docku: upevnit (`true`) / uvolnit (`false`) — `Drawer::pin`
+    Pin(bool),
 }
 
 pub(crate) struct Core {
@@ -85,7 +85,13 @@ pub(crate) struct Core {
     pub(crate) dirty: Mutex<bool>,
     pub(crate) wake: Condvar,
     pub(crate) flash: Mutex<Option<(Rgba, Instant)>>,
+    /// něco leží přes celou obrazovku NĚKDE (`threads/fswatch.rs`); pozadí a globální zkratky podle toho
     pub(crate) fullscreen: AtomicBool,
+    /// stav fullscreenu per monitor (`fswatch::FsMon`); povrchy UI podle toho (`dead_on`, `dead_surface`)
+    pub(crate) fs_mon: Mutex<Vec<crate::threads::fswatch::FsMon>>,
+    /// monitor (`handle`), na kterém je šuplík otevřený / se právě otevírá (L178); hover smyčka ho nastaví těsně
+    /// před `send_ui`, vlákno `ui` ho potvrdí při Show a smaže při schování (`threads/tracker.rs::choose_monitor`)
+    pub(crate) opened_on: Mutex<Option<isize>>,
     /// ruční herní režim (`gamemode.rs`) — Ledge mrtvý jako ve fullscreen, dokud se nevypne
     pub(crate) game_mode: AtomicBool,
     /// v popředí je „lištové“ okno (maximalizovaný prohlížeč na monitoru proužku, trigger "push")
@@ -124,6 +130,8 @@ pub(crate) struct WeatherState {
     pub(crate) attempt_ms: Option<i64>,
     pub(crate) error: Option<String>,
     pub(crate) loading: bool,
+    /// neúspěchy za sebou → backoff (`netstate`)
+    pub(crate) fails: crate::netstate::Fails,
 }
 
 pub(crate) static CORE: OnceLock<Arc<Core>> = OnceLock::new();
@@ -165,18 +173,54 @@ impl Core {
         crate::gamemode::is_dead(self.fullscreen.load(Ordering::Relaxed), self.game_mode.load(Ordering::SeqCst))
     }
 
-    /// Monitor proužku (`strip.monitor`) z cache `MonitorCache` — výčet nejvýš jednou za `MONITOR_TTL`.
-    pub(crate) fn monitor(&self) -> screen::Monitor {
-        let cfg = self.cfg.read();
-        self.monitors.lock().get(&cfg.strip.monitor, Instant::now(), pick_monitor)
+    /// Je povrch UI (okno, proužek, oznámení) na monitoru `handle` mrtvý? Fullscreen jen na něm, nebo herní
+    /// režim (`threads/fswatch.rs`). Práce na pozadí a zkratky se ptají `dead()` (kdekoli).
+    pub(crate) fn dead_on(&self, handle: isize) -> bool {
+        let any = self.fullscreen.load(Ordering::Relaxed);
+        let gm = self.game_mode.load(Ordering::SeqCst);
+        // bez fullscreenu a herního režimu žádný zámek ani výčet
+        (any || gm) && crate::threads::fswatch::dead_on(gm, any, &self.fs_mon.lock(), handle)
     }
 
-    /// Jako `monitor`, ale vždy čerstvý výčet (vlákno `hover` co 3 s — tím se pozná změna zobrazení).
-    pub(crate) fn monitor_fresh(&self) -> screen::Monitor {
+    /// Povrchy u proužku (šuplík, peek, oznámení, proužek, okna pod proužkem): mrtvé na monitoru proužku.
+    pub(crate) fn dead_surface(&self) -> bool {
+        if !self.dead() {
+            return false;
+        }
+        self.dead_on(self.monitor().handle)
+    }
+
+    /// Monitor bodu (levý horní roh okna) podle mapy fullscreenu; mimo všechny = monitor proužku.
+    pub(crate) fn handle_at(&self, x: i32, y: i32) -> isize {
+        crate::threads::fswatch::handle_at(&self.fs_mon.lock(), x, y).unwrap_or_else(|| self.monitor().handle)
+    }
+
+    /// Co leží přes monitor `handle` — pro lístky a widgety (`pins::pins_yield`).
+    pub(crate) fn fs_kind_on(&self, handle: isize) -> crate::pins::FsKind {
+        crate::threads::fswatch::kind_on(self.fullscreen.load(Ordering::Relaxed), &self.fs_mon.lock(), handle)
+    }
+
+    /// Monitor proužku (`strip.monitor`) z cache `MonitorCache` — výčet jen při změně specu, po události
+    /// zobrazení (`display_event`) nebo po pojistné lhůtě `MONITOR_TTL`.
+    pub(crate) fn monitor(&self) -> screen::Monitor {
         let cfg = self.cfg.read();
-        let mut cache = self.monitors.lock();
-        *cache = MonitorCache::default();
-        cache.get(&cfg.strip.monitor, Instant::now(), pick_monitor)
+        self.monitors.lock().get(&cfg.strip.monitor, Instant::now(), display_gen(), pick_monitor)
+    }
+
+    /// Monitor šuplíku: kde je otevřený (`opened_on`, jen mezi proužky: hlavní + tečky), jinak monitor proužku.
+    pub(crate) fn drawer_monitor(&self) -> screen::Monitor {
+        let main = self.monitor();
+        let Some(h) = *self.opened_on.lock() else { return main };
+        if h == main.handle {
+            return main;
+        }
+        let spec = self.cfg.read().strip.monitor.clone();
+        crate::stripset::secondary_monitors(&spec).into_iter().find(|m| m.handle == h).unwrap_or(main)
+    }
+
+    /// Mezera pod proužkem pro nová okna (`screen::below_strip`): monitor `mon`, odstup `margin` (logické px).
+    pub(crate) fn below_strip(&self, mon: &screen::Monitor, margin: f64) -> i32 {
+        screen::below_strip(mon.rect.top, mon.work.top, self.strip_logical(mon).1, margin, mon.dpi as f64 / 96.0)
     }
 
     /// Velikost proužku v logických px (výchozí tvar morfu šuplíku).
@@ -264,9 +308,24 @@ mod rescan_tests {
     }
 }
 
-/// Jak dlouho platí výčet monitorů v `MonitorCache`: připojení monitoru / změnu DPI jádro pozná
-/// nejpozději za tuto dobu (WM_DISPLAYCHANGE nikde nechytáme; `hover` navíc obnovuje co 3 s).
-pub(crate) const MONITOR_TTL: Duration = Duration::from_secs(3);
+/// Pojistka výčtu monitorů v `MonitorCache` a vlákna `hover`: změnu zobrazení hlásí okno proužku
+/// (WM_DISPLAYCHANGE / WM_DPICHANGED / WM_SETTINGCHANGE SPI_SETWORKAREA → `display_event`), takže tohle je jen
+/// záchrana pro zprávu, která nedorazí (dřív polling 3 s).
+pub(crate) const MONITOR_TTL: Duration = Duration::from_secs(60);
+
+/// Počítadlo událostí zobrazení: okno proužku ho zvyšuje (`display_event`), `MonitorCache` a vlákno `hover`
+/// porovnávají, jestli se od posledního čtení změnilo.
+static DISPLAY_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Změnilo se zobrazení (monitor, rozlišení, DPI, pracovní plocha): zneplatní cache monitorů a vlákno `hover`
+/// přepočítá proužek, šuplík a okna na ploše. Volá se z wndproc okna proužku — jen atomik, žádný zámek.
+pub(crate) fn display_event() {
+    DISPLAY_GEN.fetch_add(1, Ordering::Release);
+}
+
+pub(crate) fn display_gen() -> u64 {
+    DISPLAY_GEN.load(Ordering::Acquire)
+}
 
 /// Délka zeleného bliknutí proužku (`Core.flash`) po uložení poznámky / startu serveru.
 pub(crate) const FLASH: Duration = Duration::from_secs(4);
@@ -274,18 +333,19 @@ pub(crate) const FLASH: Duration = Duration::from_secs(4);
 /// Poslední výsledek `screen::pick` (EnumDisplayMonitors + DPI každého monitoru) pro daný spec.
 /// `refresh_strip` a vlákno `ui` se ptají při každém volání — výčet jen při změně specu nebo po TTL.
 #[derive(Default)]
-pub(crate) struct MonitorCache(Option<(String, Instant, screen::Monitor)>);
+pub(crate) struct MonitorCache(Option<(String, Instant, u64, screen::Monitor)>);
 
 impl MonitorCache {
-    pub(crate) fn get(&mut self, spec: &str, now: Instant, fetch: impl FnOnce(&str) -> screen::Monitor) -> screen::Monitor {
-        if let Some((s, at, m)) = &self.0
+    pub(crate) fn get(&mut self, spec: &str, now: Instant, gen_now: u64, fetch: impl FnOnce(&str) -> screen::Monitor) -> screen::Monitor {
+        if let Some((s, at, g, m)) = &self.0
             && s == spec
+            && *g == gen_now
             && now.saturating_duration_since(*at) < MONITOR_TTL
         {
             return *m;
         }
         let m = fetch(spec);
-        self.0 = Some((spec.to_string(), now, m));
+        self.0 = Some((spec.to_string(), now, gen_now, m));
         m
     }
 }
@@ -298,6 +358,7 @@ fn pick_monitor(spec: &str) -> screen::Monitor {
         work: windows::Win32::Foundation::RECT { left: 0, top: 0, right: 1920, bottom: 1080 },
         primary: true,
         dpi: 96,
+        device: [0; 32],
     })
 }
 
@@ -312,7 +373,7 @@ mod tests {
     use super::*;
 
     fn mon(handle: isize) -> screen::Monitor {
-        screen::Monitor { handle, rect: Default::default(), work: Default::default(), primary: true, dpi: 96 }
+        screen::Monitor { handle, rect: Default::default(), work: Default::default(), primary: true, dpi: 96, device: [0; 32] }
     }
 
     #[test]
@@ -320,22 +381,25 @@ mod tests {
         let t0 = Instant::now();
         let mut cache = MonitorCache::default();
         let mut fetches = 0;
-        // (spec, čas, co by vrátil výčet, čekaný výsledek)
+        // (spec, čas ms, generace události zobrazení, co by vrátil výčet, čekaný výsledek)
         let steps = [
-            ("primary", 0, 1, 1),    // prázdná cache → výčet
-            ("primary", 1_000, 2, 1), // v TTL → z cache
-            ("1", 1_500, 3, 3),       // jiný spec → výčet
-            ("1", 4_499, 4, 3),       // těsně před TTL
-            ("1", 4_500, 5, 5),       // TTL vypršelo → výčet
+            ("primary", 0, 0, 1, 1),         // prázdná cache → výčet
+            ("primary", 1_000, 0, 2, 1),     // v TTL → z cache
+            ("1", 1_500, 0, 3, 3),           // jiný spec → výčet
+            ("1", 61_499, 0, 4, 3),          // těsně před pojistkou
+            ("1", 61_500, 0, 5, 5),          // pojistná lhůta vypršela → výčet
+            ("1", 61_600, 0, 6, 5),          // z cache
+            ("1", 61_700, 1, 7, 7),          // událost zobrazení (nová generace) → výčet hned
+            ("1", 61_800, 1, 8, 7),          // tatáž generace → z cache
         ];
-        for (spec, at, fresh, want) in steps {
-            let got = cache.get(spec, t0 + Duration::from_millis(at), |_| {
+        for (spec, at, gen_now, fresh, want) in steps {
+            let got = cache.get(spec, t0 + Duration::from_millis(at), gen_now, |_| {
                 fetches += 1;
                 mon(fresh)
             });
             assert_eq!(got.handle, want, "{spec} @ {at} ms");
         }
-        assert_eq!(fetches, 3);
+        assert_eq!(fetches, 4);
     }
 
     /// Kolik stojí výčet monitorů proti zásahu cache (čte jen Win32 API, žádné okno).
@@ -353,7 +417,7 @@ mod tests {
         let now = Instant::now();
         let t = Instant::now();
         for _ in 0..N {
-            black_box(cache.get(black_box("primary"), now, pick_monitor));
+            black_box(cache.get(black_box("primary"), now, 0, pick_monitor));
         }
         let hit = t.elapsed() / N;
         println!("výčet monitorů {fetch:?}/volání, cache {hit:?}/volání");

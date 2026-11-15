@@ -1,4 +1,4 @@
-/* Karta Pošta (MailCard) a Nastavení → Účty (AccountsSettings). Tokeny ze styles.css; jen vlastní třídy
+/* Karta Pošta (MailCard) a Nastavení → Obsah karet → Pokročilé (AccountsSettings). Tokeny ze styles.css; jen vlastní třídy
    `mail-*` a `acc-*` (globální CSS — cizí třídy se tu nezmiňují, viz cssClasses.test.mjs). */
 .mail-row { width: 100%; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 6px 0; border-radius: var(--r-xs); }
 .mail-row:hover { background: var(--card-2); }
@@ -11,7 +11,7 @@
 .mail-foot { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s1); margin-top: 10px; }
 .mail-meta { font: var(--fs-xs) var(--mono); color: var(--t3); margin-left: auto; white-space: nowrap; }
 
-/* Nastavení → Účty */
+/* Nastavení → Obsah karet → Pokročilé */
 .acc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s2); width: 100%; }
 .acc-tile { display: flex; flex-direction: column; gap: 4px; text-align: left; background: var(--card-2); border: 1px solid transparent; border-radius: var(--r-sm); padding: 12px; color: var(--t1); font: inherit; cursor: pointer; transition: background var(--fast), border-color var(--fast); }
 .acc-tile:hover { background: var(--card-3); }

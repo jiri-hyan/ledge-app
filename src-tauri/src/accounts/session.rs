@@ -68,7 +68,7 @@ pub fn account(p: Provider) -> String {
     with(p, |a| a.stored.as_ref().map(|s| s.account.clone()).unwrap_or_default())
 }
 
-/// Stav účtu pro Nastavení → Účty. Žádné tajemství (ani refresh token, ani client secret).
+/// Stav účtu pro Nastavení → Obsah karet → Pokročilé. Žádné tajemství (ani refresh token, ani client secret).
 #[derive(Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountView {

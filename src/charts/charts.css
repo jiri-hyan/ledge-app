@@ -4,22 +4,14 @@
 .chart svg { display: block; overflow: visible; }
 .chart-fluid { display: block; width: 100%; }
 /* druh grafu (háček pro rodiče, např. barva jen sparklinu v kartě) */
-.chart-spark, .chart-bars, .chart-heat { overflow: visible; }
+.chart-spark, .chart-bars { overflow: visible; }
 .chart-ring { border-radius: 50%; }
 .chart-line { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .chart-area { fill: currentColor; opacity: 0.14; stroke: none; }
 .chart-dot { fill: currentColor; stroke: var(--k-base, var(--raised)); stroke-width: 1.5; }
 .chart-track { fill: none; stroke: var(--line-2); }
-.chart-arc { fill: none; stroke: currentColor; stroke-linecap: round; }
-.chart-ring-in { position: absolute; inset: 0; display: grid; place-items: center; line-height: 1; font: 700 var(--fs-xs) var(--sans); font-variant-numeric: tabular-nums; color: var(--t1); }
 .chart-bar { fill: currentColor; opacity: 0.45; }
 .chart-bar.chart-hi { opacity: 1; }
-.chart-cell { fill: currentColor; }
-.chart-cell[data-l="0"] { fill: var(--line-2); }
-.chart-cell[data-l="1"] { opacity: 0.35; }
-.chart-cell[data-l="2"] { opacity: 0.55; }
-.chart-cell[data-l="3"] { opacity: 0.78; }
-.chart-cell[data-l="4"] { opacity: 1; }
 /* číslo jako hrdina (Stat.tsx): 2,6 × tělo, tabulkové číslice, popisek malý a tlumený */
 .chart-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .chart-stat-top { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }

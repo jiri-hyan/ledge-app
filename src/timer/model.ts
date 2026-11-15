@@ -45,8 +45,9 @@ export function progress(c: Countdown, now: number): number {
 
 import { pad2 as p2 } from "../pad.ts";
 
-/** „m:ss“ / „h:mm:ss“. `up` = zaokrouhlit sekundy nahoru (odpočet: 0,4 s zbývá = 0:01, ne 0:00). */
-export function fmtDuration(ms: number, up = false): string {
+/** Čas časovače „m:ss“ / „h:mm:ss“. `up` = zaokrouhlit sekundy nahoru (odpočet: 0,4 s zbývá = 0:01, ne 0:00).
+ *  NENÍ to `media/timeline.ts` `fmtTrackTime` (čas skladby: vždy dolů, NaN → 0:00); sémantika se liší záměrně. */
+export function fmtTimer(ms: number, up = false): string {
   const total = Math.max(0, up ? Math.ceil(ms / 1000) : Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);

@@ -14,8 +14,19 @@ use std::time::{Duration, Instant};
 use tauri_plugin_opener::OpenerExt;
 
 /// Stáhne počasí, když je šuplík otevřený (`opening` = volající ho právě otevírá) na záložce s kartou
-/// Počasí (`layout::page_has`), místo je nastavené a data jsou stará (`weather::needs_fetch`). Výsledek přes `mark_dirty` → emit
+/// Počasí (`layout::page_has`), místo je nastavené a data jsou stará (`netstate::needs_fetch`). Výsledek přes `mark_dirty` → emit
 /// vlákno. Jinak nic — žádný poll.
+/// „Zkusit znovu“ na kartě Počasí: po selhání zruší odstup (`weather::RETRY_MS`) a hned stáhne.
+pub(crate) fn retry_weather() {
+    {
+        let mut st = core().weather.lock();
+        if st.error.is_some() && !st.loading {
+            st.attempt_ms = None;
+        }
+    }
+    maybe_refresh_weather(true);
+}
+
 pub(crate) fn maybe_refresh_weather(opening: bool) {
     let c = core();
     let place = {
@@ -24,7 +35,7 @@ pub(crate) fn maybe_refresh_weather(opening: bool) {
         let on_personal = crate::layout::page_has(&cfg.layout, &c.mode.lock(), "weather");
         let open = opening || c.drawer.view() == View::Full;
         // proužek počasí používá (trio / vlastní s dílem Počasí): stahuje se i bez karty a se zavřeným šuplíkem,
-        // jen ne za fullscreen hry (`dead`); `needs_fetch` drží ≥ 30 min a backoff, volá se z existujícího tiku
+        // jen ne za fullscreen hry (`dead`); `netstate::needs_fetch` drží ≥ 30 min a backoff, volá se z existujícího tiku
         let for_strip = weather::strip_wants_weather(&cfg) && !c.dead();
         match cfg.personal.weather.coords() {
             Some(p) if (on_personal && open) || for_strip => p,
@@ -41,12 +52,14 @@ pub(crate) fn maybe_refresh_weather(opening: bool) {
         if st.loading && !weather::loading_live(st.loading, st.attempt_ms, now) {
             st.loading = false;
             st.error = Some(weather::stuck().into());
+            st.fails.fail();
             log("počasí: pokus bez odpovědi, beru jako neúspěch");
             drop(st);
             mark_dirty();
             st = c.weather.lock();
         }
-        if !weather::needs_fetch(now, st.fetched_ms, st.attempt_ms, st.loading) {
+        let busy = weather::loading_live(st.loading, st.attempt_ms, now);
+        if !crate::netstate::needs_fetch(&weather::POLICY, busy, st.fetched_ms, st.attempt_ms, st.fails.count(), now) {
             return;
         }
         st.loading = true;
@@ -67,10 +80,12 @@ pub(crate) fn maybe_refresh_weather(opening: bool) {
                     st.data = Some(w);
                     st.fetched_ms = Some(now_ms());
                     st.error = None;
+                    st.fails.ok();
                 }
                 Err(e) => {
                     log(&format!("počasí: {e}"));
                     st.error = Some(e);
+                    st.fails.fail();
                 }
             }
         }
@@ -119,7 +134,7 @@ pub(crate) fn on_claude_change() {
     let pending = c.claude.attention();
     sync_approve_keys();
     match (pending, c.drawer.view()) {
-        (true, View::Hidden) if !c.dead() => c.send_ui(UiCmd::Show(View::Peek, Opener::Hover)),
+        (true, View::Hidden) if !c.dead_surface() => c.send_ui(UiCmd::Show(View::Peek, Opener::Hover)),
         // peek drží i připomínka po termínu
         (false, View::Peek) if c.notes.lock().due.is_empty() => c.send_ui(UiCmd::Hide),
         _ => {}

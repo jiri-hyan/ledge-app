@@ -6,7 +6,8 @@
 import { For, Show } from "solid-js";
 import { t } from "../../i18n";
 import type { PageLook } from "../../types";
-import { THEMES, THEME_IDS } from "../../theme/themes";
+import { THEMES } from "../../theme/themes";
+import { THEME_GROUPS, themesIn } from "../../theme/themeGroups";
 import { STYLES } from "../../theme/looks";
 import { isHex } from "../../theme/appearance";
 import { lbl } from "../../theme/label";
@@ -41,7 +42,7 @@ export default function AppearancePages(q: { ap: Ap }) {
                 <small>{t("appearance.pages.theme", "Motiv")}</small>
                 <select aria-label={t("appearance.pages.themeAria", "Motiv záložky {name}", { name: pageName(pg) })} onChange={(e) => put(pg.id, { theme: e.currentTarget.value })}>
                   <option value="" selected={!theme(pg.id)}>{t("appearance.pages.asWhole", "Jako celek")}</option>
-                  <For each={THEME_IDS}>{(id) => <option value={id} selected={theme(pg.id) === id}>{lbl([THEMES[id].key, THEMES[id].cs])}</option>}</For>
+                  <For each={THEME_GROUPS}>{(g) => <optgroup label={lbl([g.key, g.cs])}><For each={themesIn(g.id)}>{(id) => <option value={id} selected={theme(pg.id) === id}>{lbl([THEMES[id].key, THEMES[id].cs])}</option>}</For></optgroup>}</For>
                   <For each={a().customThemes}>{(c) => <option value={c.id} selected={theme(pg.id) === c.id}>{c.name} ({t("appearance.ct.own", "vlastní")})</option>}</For>
                 </select>
               </label>

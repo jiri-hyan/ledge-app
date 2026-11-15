@@ -5,9 +5,9 @@
 import { createSignal, For, onMount, Show } from "solid-js";
 import { api, type BriefStatus } from "../api";
 import { t } from "../i18n";
-import { say } from "../ui/toast";
+import { errorText, say } from "../ui/toast";
 import { hasKey, refreshKey } from "./apikey";
-import { briefAction, briefError, costText, logLines, parseQuestions, parseTasks, type BriefTask, type Question, type SendBlock } from "./brief";
+import { briefAction, briefError, completesBrief, costText, logLines, parseQuestions, parseTasks, type BriefTask, type Question, type ResumeBlock, type SendBlock } from "./brief";
 
 export const statusText = (s: BriefStatus): string =>
   ({
@@ -19,13 +19,16 @@ export const statusText = (s: BriefStatus): string =>
     done: t("notes.brief.status.done", "Hotovo"),
   })[s];
 
-const blockText = (b: SendBlock): string =>
+export const blockText = (b: SendBlock): string =>
   ({
     project: t("notes.brief.block.project", "Vyber projekt, ve kterém má session běžet."),
     goal: t("notes.brief.block.goal", "Napiš na první řádek, o co jde."),
     key: t("notes.brief.block.key", "Chybí API klíč — ulož ho v Nastavení → Claude."),
     state: t("notes.brief.block.state", "V tomhle stavu se zadání poslat nedá."),
   })[b];
+
+const resumeBlockText = (b: ResumeBlock): string =>
+  b === "review" ? t("notes.brief.block.review", "Nejdřív potvrď nebo vrať body ke kontrole.") : t("notes.brief.block.answers", "Nejdřív odpověz na všechny otázky.");
 
 /** Čip stavu a náklad (jen z reálných polí; bez nich nic) — sdílí editor i řádek karty. */
 export function BriefChip(p: { n: { status?: BriefStatus | null; cost?: number | null; budget?: number | null } }) {
@@ -58,7 +61,7 @@ export default function BriefPanel(p: { n: BriefNote; body: string; dirty: boole
       await f();
       if (ok) say(ok);
     } catch (e) {
-      say(briefError(e, t("notes.brief.oldCore", "Tuhle část Ledge ještě neumí — aktualizuj aplikaci.")), true);
+      say(briefError(e, t("notes.brief.oldCore", "Tuhle část Ledge ještě neumí — aktualizuj aplikaci."), errorText), true);
     } finally {
       setBusy(false);
     }
@@ -68,7 +71,16 @@ export default function BriefPanel(p: { n: BriefNote; body: string; dirty: boole
     const a = (answers()[q.index] ?? "").trim();
     if (a) void run(() => api.noteAnswer(p.n.path, q.index, a)).then(() => setAnswers({ ...answers(), [q.index]: "" }));
   };
-  const setState = (task: BriefTask, state: "open" | "done") => run(() => api.noteTaskSet(p.n.path, task.line, task.text, state, state === "done" ? task.evidence : null));
+  /** Potvrdit / Vrátit bod; poslední Potvrdit (všechny body `[x]`) zadání rovnou uzavře (`done`) — jediná cesta k `done`. */
+  const setState = (task: BriefTask, state: "open" | "done") =>
+    run(async () => {
+      const closes = state === "done" && completesBrief(p.n.status, tasks(), task.line);
+      await api.noteTaskSet(p.n.path, task.line, task.text, state, state === "done" ? task.evidence : null);
+      if (closes) {
+        await api.noteSetStatus(p.n.path, "done");
+        say(t("notes.brief.closed", "Zadání je hotové."));
+      }
+    });
 
   return (
     <div class="brief">
@@ -80,14 +92,14 @@ export default function BriefPanel(p: { n: BriefNote; body: string; dirty: boole
           if (a.kind === "send")
             return <button class="btn pri" disabled={busy() || a.block !== null} title={a.block ? blockText(a.block) : undefined} onClick={send}>{t("notes.brief.send", "Poslat orchestrátorovi")}</button>;
           if (a.kind === "resume")
-            return <button class="btn pri" disabled={busy() || a.block !== null} title={a.block ? t("notes.brief.block.answers", "Nejdřív odpověz na všechny otázky.") : undefined} onClick={() => run(() => api.briefResume(p.n.path))}>{t("notes.brief.resume", "Pokračovat")}</button>;
+            return <button class="btn pri" disabled={busy() || a.block !== null} title={a.block ? resumeBlockText(a.block) : undefined} onClick={() => run(() => api.briefResume(p.n.path))}>{t("notes.brief.resume", "Pokračovat")}</button>;
           if (a.kind === "stop") return <button class="btn" disabled={busy()} onClick={() => run(() => api.briefStop(p.n.path))}>{t("notes.brief.stop", "Zastavit")}</button>;
           return null;
         })()}
       </div>
       {(() => {
         const a = action();
-        return a.kind === "send" && a.block ? <div class="hint brief-why">{blockText(a.block)}</div> : null;
+        return a.kind === "send" && a.block ? <div class="hint brief-why">{blockText(a.block)}</div> : a.kind === "resume" && a.block === "review" ? <div class="hint brief-why">{resumeBlockText(a.block)}</div> : null;
       })()}
       <Show when={questions().length > 0}>
         <div class="brief-sec">{t("notes.brief.questions", "Otázky")}</div>

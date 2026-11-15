@@ -84,6 +84,7 @@ export const STYLE_NAME: Record<ItemStyle, () => string> = {
   chip: () => t("appearance.compose.style.chip", "Barevný podklad"),
   dotPct: () => t("appearance.compose.style.dotPct", "Tečka stavu + 5h %"),
   ring5h: () => t("appearance.compose.style.ring5h", "Prstenec 5h"),
+  ringText: () => t("appearance.compose.style.ringText", "Prstenec a hodnota"),
 };
 const SLOT_NAME: Record<Slot, () => string> = {
   left: () => t("appearance.compose.slot.left", "Vlevo"),

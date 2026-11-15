@@ -5,7 +5,8 @@ import { createResource, createSignal, For, Show } from "solid-js";
 import { api, type NoteView, type Snapshot } from "../api";
 import { quiet } from "../uiErrors";
 import ProjectPicker from "./ProjectPicker";
-import { NoteRow, Tabs, tabsOf } from "./NotesCard";
+import { NoteRow, Tabs, tabsOf, TASKS_TAB } from "./NotesCard";
+import TasksView from "./TasksView";
 import { pageArchive, pageProject, setPageArchive, setPageProject, setTab, tab } from "./store";
 import { t } from "../i18n";
 
@@ -23,8 +24,10 @@ export default function NotesPage(p: { s: Snapshot; now: number; onOpen: (n: Not
   };
   const project = () => (pageProject() === "*" ? null : pageProject() === "" ? "_obecne" : pageProject());
   const [failed, setFailed] = createSignal(false);
+  const kindTab = () => (pageArchive() || cur() === "all" || cur() === TASKS_TAB ? null : cur());
+  const tasksTab = () => cur() === TASKS_TAB && !pageArchive();
   const [res] = createResource(
-    () => ({ kind: pageArchive() || cur() === "all" ? null : cur(), project: project(), includeDone: withDone() || pageArchive(), archived: pageArchive(), rev: p.s.notesRev }),
+    () => (tasksTab() ? false : { kind: kindTab(), project: project(), includeDone: withDone() || pageArchive(), archived: pageArchive(), rev: p.s.notesRev }),
     async (q) => {
       const r = await quiet(api.noteQuery({ kind: q.kind, project: q.project, includeDone: q.includeDone, archived: q.archived, limit: PAGE_LIMIT }), false as const, "noteQuery");
       setFailed(r === false);
@@ -45,8 +48,10 @@ export default function NotesPage(p: { s: Snapshot; now: number; onOpen: (n: Not
         </div>
       </Show>
       <div class="note-bar">
-        <ProjectPicker projects={p.s.projects} value={pageProject()} onChange={setPageProject} all label={t("notes.project", "Projekt")} />
-        <Show when={!pageArchive()}>
+        <Show when={!tasksTab()}>
+          <ProjectPicker projects={p.s.projects} value={pageProject()} onChange={setPageProject} all label={t("notes.project", "Projekt")} />
+        </Show>
+        <Show when={!pageArchive() && !tasksTab()}>
           <button class="opt-inline" onClick={() => setWithDone(!withDone())} role="switch" aria-checked={withDone()}>
             <span class="switch" classList={{ on: withDone() }} /> {t("notes.page.withDone", "i hotové")}
           </button>
@@ -54,8 +59,9 @@ export default function NotesPage(p: { s: Snapshot; now: number; onOpen: (n: Not
         <button class="opt-inline" onClick={() => setPageArchive(!pageArchive())} role="switch" aria-checked={pageArchive()} title={t("notes.page.archiveToggle", "Ukázat archivované poznámky")}>
           <span class="switch" classList={{ on: pageArchive() }} /> {t("notes.page.archive", "Archiv")}
         </button>
-        <button class="mini push" onClick={() => p.onNew(pageArchive() || cur() === "all" ? undefined : cur())}>{t("notes.card.new", "+ Nová")}</button>
+        <button class="mini push" onClick={() => p.onNew(kindTab() ?? undefined)}>{t("notes.card.new", "+ Nová")}</button>
       </div>
+      <Show when={tasksTab()} fallback={<>
       <div class="notes-list">
         <For each={list()} fallback={<div class="empty">{res.loading ? t("notes.page.loading", "Načítám…") : failed() ? t("notes.page.loadFailed", "Poznámky se nepodařilo načíst.") : pageArchive() ? t("notes.page.archiveEmpty", "Archiv je prázdný — poznámku do něj pošleš přes ⋯ → Archivovat.") : t("notes.page.empty", "Nic tu není.")}</div>}>
           {(n) => <NoteRow s={p.s} n={n} now={p.now} onOpen={p.onOpen} archived={pageArchive()} />}
@@ -63,6 +69,9 @@ export default function NotesPage(p: { s: Snapshot; now: number; onOpen: (n: Not
       </div>
       <Show when={(res.latest?.total ?? 0) > list().length}>
         <div class="empty">{t("notes.page.limited", "Zobrazeno {shown} z {total} — zuž výběr záložkou nebo projektem.", { shown: list().length, total: res.latest!.total })}</div>
+      </Show>
+      </>}>
+        <TasksView s={p.s} now={p.now} onOpen={p.onOpen} />
       </Show>
     </div>
   );

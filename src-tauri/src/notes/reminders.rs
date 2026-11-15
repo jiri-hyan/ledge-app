@@ -6,11 +6,30 @@ use super::{NoteView, write_atomic};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
+/// Kdy se poznámka ozve: dřívější z `remind:` poznámky a nejbližšího termínu jejího otevřeného bodu
+/// (`⏰`, `taskline.rs`) — peek, chip i `next_due` jedou beze změny a bez nového časovače.
+pub fn eff_remind_ms(n: &NoteView) -> Option<i64> {
+    match (n.remind_ms, n.due_ms) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (a, b) => a.or(b),
+    }
+}
+
+/// Kopie s efektivním časem v `remind_ms` / `remind` (UI i `reminder_key` pak vidí skutečný termín).
+fn shown(n: &NoteView) -> NoteView {
+    let mut v = n.clone();
+    if let Some(e) = eff_remind_ms(n).filter(|e| Some(*e) != n.remind_ms) {
+        v.remind_ms = Some(e);
+        v.remind = chrono::DateTime::from_timestamp_millis(e).map(|d| super::iso(&d.with_timezone(&chrono::Local).fixed_offset()));
+    }
+    v
+}
+
 /// Připomínky po termínu (nehotové, nejstarší termín první) a nejbližší budoucí termín.
 pub fn due_split(notes: &[NoteView], now_ms: i64) -> (Vec<NoteView>, Option<i64>) {
-    let mut due: Vec<NoteView> = notes.iter().filter(|n| !n.done && n.remind_ms.is_some_and(|r| r <= now_ms)).cloned().collect();
+    let mut due: Vec<NoteView> = notes.iter().filter(|n| !n.done && eff_remind_ms(n).is_some_and(|r| r <= now_ms)).map(shown).collect();
     due.sort_by_key(|n| n.remind_ms);
-    let next = notes.iter().filter(|n| !n.done).filter_map(|n| n.remind_ms).filter(|&r| r > now_ms).min();
+    let next = notes.iter().filter(|n| !n.done).filter_map(eff_remind_ms).filter(|&r| r > now_ms).min();
     (due, next)
 }
 
@@ -27,9 +46,9 @@ pub fn card(notes: &[NoteView], today_end_ms: i64, max: usize) -> (Vec<NoteView>
 /// Jako [`card`] jen nad poznámkami, které projdou `keep` — bez kopie vyfiltrovaného seznamu
 /// (snapshot ji dělá při každém překreslení, a poznámek mohou být tisíce).
 pub fn card_where(notes: &[NoteView], keep: impl Fn(&NoteView) -> bool, today_end_ms: i64, max: usize) -> (Vec<NoteView>, usize) {
-    let is_today = |n: &NoteView| !n.done && n.remind_ms.is_some_and(|r| r < today_end_ms);
+    let is_today = |n: &NoteView| !n.done && eff_remind_ms(n).is_some_and(|r| r < today_end_ms);
     let mut today: Vec<&NoteView> = notes.iter().filter(|n| keep(n) && is_today(n)).collect();
-    today.sort_by_key(|n| n.remind_ms);
+    today.sort_by_key(|n| eff_remind_ms(n));
     let out: Vec<NoteView> = today.into_iter().chain(notes.iter().filter(|n| keep(n) && !is_today(n))).take(max).cloned().collect();
     let total = notes.iter().filter(|n| keep(n)).count();
     let more = total - out.len();
@@ -94,6 +113,8 @@ mod tests {
             cost: None,
             budget: None,
             model: None,
+            items: Default::default(),
+            due_ms: None,
         }
     }
 
@@ -115,6 +136,22 @@ mod tests {
         assert_eq!(due.len(), 4);
         assert_eq!(next, None);
         assert_eq!(due_split(&[], 0), (vec![], None));
+
+        // body s termínem: dřívější z remind: a nejbližšího termínu bodu; hotová poznámka se ignoruje
+        let with = |title: &str, remind: Option<i64>, due: Option<i64>, done: bool| NoteView { due_ms: due, ..nv(title, 1, remind, done) };
+        let notes = [
+            with("jen-bod", None, Some(100), false),
+            with("bod-dřív-než-remind", Some(900), Some(150), false),
+            with("remind-dřív-než-bod", Some(120), Some(900), false),
+            with("bod-budoucí", None, Some(500), false),
+            with("hotová-s-bodem", None, Some(10), true),
+        ];
+        let (due, next) = due_split(&notes, 200);
+        assert_eq!(due.iter().map(|n| (n.title.as_str(), n.remind_ms)).collect::<Vec<_>>(), vec![("jen-bod", Some(100)), ("remind-dřív-než-bod", Some(120)), ("bod-dřív-než-remind", Some(150))]);
+        assert!(due[0].remind.is_some(), "UI dostane čas i u poznámky bez remind:");
+        assert_eq!(next, Some(500));
+        assert_eq!(eff_remind_ms(&notes[1]), Some(150));
+        assert_eq!(eff_remind_ms(&nv("x", 1, None, false)), None);
     }
 
     #[test]

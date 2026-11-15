@@ -58,7 +58,7 @@ pub(crate) fn sync_settings() -> Option<(PathBuf, String, Duration)> {
 pub(crate) fn spawn_notes_sync(rx: mpsc::Receiver<SyncMsg>) {
     std::thread::Builder::new()
         .name("notes-sync".into())
-        .spawn(move || {
+        .spawn(move || crate::guard::guarded("notes-sync", crate::guard::CAP, || {
             let pc = notesync::sanitize_pc(&std::env::var("COMPUTERNAME").unwrap_or_default());
             let mut syncer = notesync::Syncer::default();
             let mut sched = notesync::Sched::default();
@@ -112,7 +112,7 @@ pub(crate) fn spawn_notes_sync(rx: mpsc::Receiver<SyncMsg>) {
                     let _ = r.send(notesync::outcome_text(&outcome));
                 }
             }
-        })
+        }))
         .ok();
 }
 

@@ -9,7 +9,8 @@ import { For, Match, Show, Switch, type JSX } from "solid-js";
 import type { Snapshot } from "../api";
 import { fmtClock } from "../format";
 import { t } from "../i18n";
-import { calState, todayLeft, weekStrip } from "./model";
+import { ago } from "../format";
+import { calAge, calState, todayLeft, weekStrip } from "./model";
 import { dowShort, monthShort } from "./text";
 import { AgendaBody, DialBody, MonthBody, TearoffBody, TimelineBody } from "./WeekViews";
 import { weekDesign } from "./weekDesigns";
@@ -33,6 +34,9 @@ export default function WeekCard(p: { s: Snapshot; now: number; menu?: JSX.Eleme
       </Match>
       <Match when={calState(cal()) === "loading"}>
         <div class="bd-note">{t("cards.board.week.loading", "Načítám kalendář…")}</div>
+      </Match>
+      <Match when={calAge(cal()) != null}>
+        <div class="bd-note" title={t("cards.board.week.staleTitle", "Kalendář se nepodařilo obnovit, nebo data jsou starší než 15 minut.")}>{t("cards.board.week.stale", "Kalendář staženo {ago}", { ago: ago(calAge(cal())!, p.now) })}</div>
       </Match>
       <Match when={calState(cal()) === "unavailable"}>
         <div class="bd-note">{t("cards.board.week.unavailable", "Kalendář teď není dostupný.")}</div>

@@ -1,0 +1,23 @@
+[
+  {"in":"- [ ] a","task":true,"indent":0,"marker":"-","state":"open","rest":"a"},
+  {"in":"* [ ] a","task":true,"indent":0,"marker":"*","state":"open","rest":"a"},
+  {"in":"+ [x] a","task":true,"indent":0,"marker":"+","state":"done","rest":"a"},
+  {"in":"1. [ ] a","task":true,"indent":0,"marker":"1.","state":"open","rest":"a"},
+  {"in":"12) [~] a","task":true,"indent":0,"marker":"12)","state":"proposed","rest":"a"},
+  {"in":"  - [ ] a","task":true,"indent":2,"marker":"-","state":"open","rest":"a"},
+  {"in":"\t- [X] a","task":true,"indent":1,"marker":"-","state":"done","rest":"a"},
+  {"in":"- [ ]","task":true,"indent":0,"marker":"-","state":"open","rest":""},
+  {"in":"- [ ] ","task":true,"indent":0,"marker":"-","state":"open","rest":""},
+  {"in":"- [ ]   a  b ","task":true,"indent":0,"marker":"-","state":"open","rest":"a  b "},
+  {"in":"-  [ ] a","task":false},
+  {"in":"- [ ]a","task":false},
+  {"in":"-[ ] a","task":false},
+  {"in":"- [] a","task":false},
+  {"in":"- [?] a","task":false},
+  {"in":"1.[ ] a","task":false},
+  {"in":"1234567890. [ ] a","task":false},
+  {"in":"a) [ ] a","task":false},
+  {"in":"- text","task":false},
+  {"in":"","task":false},
+  {"in":"- [ ] ⏰ 2026-11-14 !","task":true,"indent":0,"marker":"-","state":"open","rest":"⏰ 2026-11-14 !"}
+]

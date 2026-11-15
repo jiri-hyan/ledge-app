@@ -85,11 +85,41 @@ pub(super) fn setup_repo(dir: &Path, remote: &str, pc: &str) -> Result<(), Outco
     Ok(())
 }
 
+/// Text obsahuje celou sadu konfliktních značek gitu (`<<<<<<< `, `=======`, `>>>>>>> ` na začátku řádku).
+/// Takový soubor se nikdy necommituje: znamená nedokončené slučování (např. `--autostash` pop s konfliktem).
+pub(super) fn has_conflict_markers(text: &str) -> bool {
+    let (mut open, mut mid, mut close) = (false, false, false);
+    for l in text.lines() {
+        open |= l.starts_with("<<<<<<< ");
+        mid |= l.trim_end() == "=======";
+        close |= l.starts_with(">>>>>>> ");
+    }
+    open && mid && close
+}
+
+/// Poznámky (`.md`) připravené k commitu, které mají konfliktní značky; prázdné = čisté.
+fn staged_with_markers(dir: &Path, remote: &str) -> Result<Vec<String>, Outcome> {
+    let names = git(dir, remote, &["diff", "--cached", "--name-only", "--diff-filter=AM", "-z"], false).map_err(|f| local_fail("git diff", f))?;
+    Ok(nul_list(&names).into_iter().filter(|f| f.ends_with(".md") && std::fs::read(dir.join(f)).is_ok_and(|b| has_conflict_markers(&String::from_utf8_lossy(&b)))).collect())
+}
+
 pub(super) fn commit_all(dir: &Path, remote: &str, msg: &str) -> Result<bool, Outcome> {
     git(dir, remote, &["add", "-A"], false).map_err(|f| local_fail("git add", f))?;
     let st = git(dir, remote, &["status", "--porcelain", "-z"], false).map_err(|f| local_fail("git status", f))?;
     if st.is_empty() {
         return Ok(false);
+    }
+    let bad = staged_with_markers(dir, remote)?;
+    if !bad.is_empty() {
+        let _ = git(dir, remote, &["reset", "-q"], false); // nic se nezapíše do historie ani nepošle dál
+        return Err(Outcome::Konflikt {
+            files: bad,
+            message: crate::i18n::tr(
+                "V poznámce jsou konfliktní značky gitu (<<<<<<<) — nic se necommitlo ani neodeslalo. Oprav soubor (nech jednu verzi) a sync pojede dál.",
+                "A note contains git conflict markers (<<<<<<<) — nothing was committed or pushed. Fix the file (keep one version) and sync will continue.",
+            )
+            .into(),
+        });
     }
     // --no-verify: datové repo poznámek; globální hooky pro kód (commitlint…) by automatický commit odmítly
     git(dir, remote, &["commit", "-q", "--no-verify", "-m", msg], false).map_err(|f| local_fail("git commit", f))?;
@@ -99,6 +129,21 @@ pub(super) fn commit_all(dir: &Path, remote: &str, msg: &str) -> Result<bool, Ou
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conflict_markers_table() {
+        let cases = [
+            ("a\n<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> origin/main\nb\n", true),
+            ("a\r\n<<<<<<< Updated upstream\r\nx\r\n=======\r\ny\r\n>>>>>>> Stashed changes\r\n", true),
+            ("text bez značek\n", false),
+            ("Setext nadpis\n=======\ntext\n", false),
+            ("<<<<<<< jen začátek\n", false),
+            ("  <<<<<<< odsazené\n=======\n>>>>>>> x\n", false),
+        ];
+        for (t, want) in cases {
+            assert_eq!(has_conflict_markers(t), want, "{t:?}");
+        }
+    }
 
     #[test]
     fn nul_list_splits() {

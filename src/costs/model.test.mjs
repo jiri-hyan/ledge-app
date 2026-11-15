@@ -2,7 +2,7 @@
 //   node --experimental-strip-types --test src/costs/model.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bars, compact, dayUnpriced, isLowerBound, sumUnpriced, floorTrend, pickRange, progressPct, share, usdDigits } from "./model.ts";
+import { bars, compact, costText, normalize, priceAgeDays, priceStaleDays, priceSeries, tokText, dayUnpriced, isLowerBound, sumUnpriced, floorTrend, pickRange, progressPct, share, usdDigits } from "./model.ts";
 
 test("zkrácení tokenů", () => {
   const cases = [
@@ -71,4 +71,45 @@ test("nenacenéné tokeny dne: chybějící pole = 0, součet, dolní odhad", ()
   assert.equal(sumUnpriced([]), 0);
   assert.equal(isLowerBound({}), false);
   assert.equal(isLowerBound({ unpriced: 1 }), true);
+});
+
+test("priceSeries: jediná definice série (N5 / N7) — cena, jinak tokeny; den jen s nenacenými tokeny je „neznámý“", () => {
+  const d = (tokens, cost, unpriced) => ({ date: "2026-10-17", tokens, cost, unpriced });
+  assert.deepEqual(priceSeries([d(10, 1), d(0, null), d(40, 4)]), { mode: "cost", values: [1, 0, 4], unknown: [false, false, false] }, "den bez tokenů není neznámý");
+  assert.deepEqual(priceSeries([d(10, 1), d(50, null, 50), d(40, 4)]), { mode: "cost", values: [1, 0, 4], unknown: [false, true, false] }, "jen nenacené tokeny = neznámý, ne 0 $");
+  assert.deepEqual(priceSeries([d(10, null), d(40, null)]), { mode: "tokens", values: [10, 40], unknown: [false, false] }, "bez cen tokeny, nic není neznámé");
+  assert.deepEqual(priceSeries([d(1, 1), d(2, 2), d(3, 3)], 2).values, [2, 3], "posledních n dní");
+  assert.deepEqual(priceSeries(undefined), { mode: "tokens", values: [], unknown: [] });
+  assert.deepEqual(priceSeries([d(5, 0), d(0, 0)]).mode, "tokens", "samé nulové ceny = tokeny");
+});
+
+test("normalize: 0–1, prázdné a nulové bez NaN", () => {
+  assert.deepEqual(normalize([1, 2, 4]), [0.25, 0.5, 1]);
+  assert.deepEqual(normalize([0, 0]), [0, 0]);
+  assert.deepEqual(normalize([]), []);
+});
+
+test("costText: „—“ bez ceny, „≥“ u dolního odhadu, jinak číslo", () => {
+  const f = (v) => `${v} $`;
+  for (const [cost, unpriced, want] of [[null, 0, "—"], [null, 5, "—"], [1.5, 0, "1.5 $"], [1.5, undefined, "1.5 $"], [1.5, 3, "≥ 1.5 $"], [0, 3, "≥ 0 $"], [2, -1, "2 $"]]) assert.equal(costText(cost, unpriced, f), want, `${cost}/${unpriced}`);
+});
+
+test("tokText: jediný formátovač tokenů (toFixed výchozí, předaný formát pro UI)", () => {
+  for (const [n, w] of [[0, "0"], [999, "999"], [1500, "1.5 k"], [250_000, "250 k"], [3_400_000, "3.4 M"], [2_000_000_000, "2.0 G"]]) assert.equal(tokText(n), w, String(n));
+  assert.equal(tokText(3_400_000, (v, d) => v.toFixed(d).replace(".", ",")), "3,4 M");
+});
+
+test("L235: stáří ceníku a varování po 60 dnech", () => {
+  const d = (s) => Date.parse(s + "T12:00:00Z");
+  for (const [ver, now, age, stale] of [
+    ["2026-10-17", d("2026-10-17"), 0, null],
+    ["2026-10-17", d("2026-12-16"), 60, null],
+    ["2026-10-17", d("2026-12-17"), 61, 61],
+    ["2026-10-17", d("2026-10-01"), 0, null], // datum v budoucnu = 0, ne záporné
+    ["nesmysl", d("2027-01-01"), null, null],
+    [undefined, d("2027-01-01"), null, null],
+  ]) {
+    assert.equal(priceAgeDays(ver, now), age, `${ver}`);
+    assert.equal(priceStaleDays(ver, now), stale, `${ver}`);
+  }
 });

@@ -16,6 +16,7 @@ pub mod host;
 pub mod look;
 pub mod notes;
 pub mod proxy;
+pub mod read;
 pub mod round;
 pub mod rpc;
 pub mod schema;
@@ -46,12 +47,20 @@ pub struct McpConfig {
     /// `Ledge/mcp`): Claude smí číst a měnit nastavení Ledge, nic nespouští a nic neposílá ven.
     /// Výchozí vypnuto (pak `/mcp` vrací 404). Zapíná se v Nastavení → Claude.
     pub enabled: bool,
+    /// Nástroj `live_state` (jen čtení): sessions, limity, dnešní kalendář, čekající schválení, dev servery a jejich
+    /// chyby, počty čekajících zadání — zúžené povoleným seznamem polí (`read::ALLOW`), bez obsahu poznámek, e-mailů a
+    /// cest. Potřebuje i `enabled`. Výchozí vypnuto; zapíná se v Nastavení → Claude → Claude (MCP).
+    pub read_data: bool,
 }
 
 /// Co MCP potřebuje od běžícího Ledge (skutečný v `host.rs`, v testech v paměti).
 pub trait Host: Send + Sync {
     /// Aktuální config (v paměti Ledge).
     fn config(&self) -> Config;
+    /// Živá data pro `live_state` PŘED zúžením (`read::build` z nich nechá jen povolená pole). Výchozí = nic.
+    fn live_raw(&self) -> Value {
+        Value::Null
+    }
     /// Uložit STEJNOU cestou jako Nastavení (`save_config` → `apply_config`) + událost pro UI.
     fn save(&self, cfg: Config) -> Result<(), String>;
     /// Verze Ledge.

@@ -34,7 +34,7 @@ registerDict("en", {
   "appearance.compose.live.work": "Working",
   "appearance.compose.live.wait": "Waiting for you",
   "appearance.compose.live.done": "Done",
-  "appearance.compose.live.limit": "Limit from 80%",
+  "appearance.compose.live.limit": "Limit from 75%",
   "appearance.compose.live.base": "Just the steady edge",
   "appearance.compose.live.try": "Try it",
   "appearance.compose.live.trying": "Preview: {state}",

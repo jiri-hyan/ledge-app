@@ -58,11 +58,10 @@ export const TEMPLATES: readonly Template[] = [
     id: "work",
     icon: "💼",
     name: ["cards.bento.tpl.work", "Pracovní"],
-    desc: ["cards.bento.tpl.work.desc", "Claude a projekty velké, kolem dnešek, kalendář, poznámky, časovač a co běží."],
+    desc: ["cards.bento.tpl.work.desc", "Claude a projekty velké, kolem nich kalendář, poznámky, časovač a co běží."],
     cards: [
       { id: "claude", tile: "2x2", look: { surface: "layer" } },
       { id: "projects", tile: "2x2", look: { surface: "layer" } },
-      { id: "today", tile: "2x1", look: { surface: "layer" } },
       { id: "calendar", tile: "2x1", look: { surface: "layer" } },
       { id: "notes", tile: "2x1", look: { surface: "layer" } },
       { id: "running", tile: "1x1", look: { surface: "layer" } },
@@ -75,9 +74,9 @@ export const TEMPLATES: readonly Template[] = [
     name: ["cards.bento.tpl.minimal", "Minimal"],
     desc: ["cards.bento.tpl.minimal.desc", "Velké hodiny, limit Claude a počasí jako velká čísla, týden, poznámky a časovač. Šest klidných dlaždic."],
     cards: [
-      { id: "bigclock", tile: "2x2", look: { surface: "layer" } },
+      { id: "clock", tile: "2x2", look: { surface: "layer", design: "big" } },
       { id: "claude", tile: "2x1", look: { surface: "layer", hero: true } },
-      { id: "week", tile: "2x1", look: { surface: "layer" } },
+      { id: "calendar", tile: "2x1", look: { surface: "layer", design: "strip" } },
       { id: "notes", tile: "2x1", look: { surface: "layer" } },
       { id: "weather", tile: "1x1", look: { surface: "layer", hero: true } },
       { id: "timer", tile: "1x1", look: { surface: "layer" } },
@@ -91,7 +90,7 @@ export const TEMPLATES: readonly Template[] = [
     cards: [
       { id: "media", tile: "2x2", look: { surface: "glass", grain: true } },
       { id: "timer", tile: "2x1", look: { surface: "glass", grain: true } },
-      { id: "links", tile: "2x1", look: { surface: "glass", grain: true } },
+      { id: "actions", tile: "2x1", look: { surface: "glass", grain: true } },
       { id: "notes", tile: "2x1", look: { surface: "glass", grain: true } },
       { id: "calendar", tile: "2x1", look: { surface: "glass", grain: true } },
       { id: "clock", tile: "1x1", look: { surface: "glass", grain: true } },

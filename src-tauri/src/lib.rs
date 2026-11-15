@@ -58,10 +58,12 @@ mod drawer;
 mod drawerfit;
 mod edge;
 mod errors;
+mod ext;
 mod focusreturn;
 mod fsx;
 mod gamemode;
 mod gitinfo;
+mod guard;
 mod github;
 mod hooksetup;
 mod hotkeys;
@@ -76,8 +78,10 @@ mod notchbar;
 mod limitslive;
 mod limitsfetch;
 mod limitsrc;
+mod netstate;
 mod looks;
 mod mcp;
+mod connector;
 mod linkmigrate;
 mod media;
 mod mediaconf;
@@ -94,6 +98,7 @@ mod personal;
 mod pins;
 mod pkgctx;
 mod ports;
+mod qa;
 mod procman;
 mod projectdetect;
 mod rawpush;
@@ -113,10 +118,12 @@ mod statusline;
 mod statuslinesetup;
 mod strip;
 mod studio;
+mod stripclassic;
 mod stripconf;
 mod stripcompose;
 mod stripdraw;
 mod stripfx;
+mod stripset;
 mod stripview;
 mod subagents;
 mod suggest;
@@ -142,17 +149,27 @@ mod uilog;
 mod weather;
 mod weather_fc;
 mod webpanel;
+mod twoinst;
+mod webdata;
+mod widgetkit;
 mod widgets;
 mod winfocus;
 mod winquick;
+mod winlook;
 mod winquickwin;
 mod winsettings;
+mod winstyle;
 
 pub(crate) use state::{log, screen_glass_capable};
 
 /// `ledge.exe --statusline` (wrapper stavového řádku Claude Code) — volá `main.rs` místo `run()`.
 pub fn statusline_main() -> i32 {
     statusline::main()
+}
+
+/// `ledge.exe --ext <id>` (rozšíření: dítě Ledge, NDJSON po stdio, `ext/child.rs`) — volá `main.rs` místo `run()`.
+pub fn ext_main() -> i32 {
+    ext::child::main()
 }
 
 /// `ledge.exe --mcp` (stdio proxy MCP pro Claude Code / Desktop, `mcp/proxy.rs`) — volá `main.rs` místo `run()`.
@@ -183,6 +200,20 @@ use threads::{emit::spawn_emit_thread, hover::spawn_hover_thread, ui::spawn_ui_t
 
 // ---------- start ----------
 
+/// Jedna instance podle `identifier` (`app.ledge.desktop`). Verze se starším identifikátorem a Notch (jiný název)
+/// tím NEJSOU chycené — vedle sebe by se prály o port mostu 47800 (`claude.rs`, hooky v `~/.claude/settings.json`
+/// na něj míří, proto se nemění). Přes hranici verzí hlídá `twoinst` (start nové při běžící staré), starší verzi
+/// před startem Ledge zavři.
+fn single_instance<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        // druhé spuštění = otevři šuplík (v herním režimu ho vypne — `gamemode::decide`)
+        let _ = app;
+        if let Some(c) = CORE.get() {
+            gamemode::handle(gamemode::Trigger::Relaunch, || c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey)));
+        }
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Automatizace (testy, CI): žádné okno, nic na obrazovce. Bariéru nikdy neobcházet.
@@ -193,17 +224,11 @@ pub fn run() {
     // „Restartovat mimo“ (bublina MSIX, `pkgctx.rs`): počkat, až stará instance skončí — jinak by ji
     // single-instance chytil a tahle by hned skončila
     pkgctx::wait_for_predecessor();
-    tauri::Builder::default()
-        // Jedna instance podle `identifier` (`cz.hyan.ledge`). Starý Notch (`cz.hyan.notch`) tím NENÍ
-        // chycený — oba by běžely vedle sebe a pral by se o port mostu 47800 (`claude.rs`, hooky
-        // v `~/.claude/settings.json` na něj míří, proto se nemění). Starý Notch před startem Ledge zavři.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // druhé spuštění = otevři šuplík (v herním režimu ho vypne — `gamemode::decide`)
-            let _ = app;
-            if let Some(c) = CORE.get() {
-                gamemode::handle(gamemode::Trigger::Relaunch, || c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey)));
-            }
-        }))
+    guard::install_panic_hook(); // L225: pád vlákna do `ledge.log` (release nemá konzoli)
+    let builder = tauri::Builder::default();
+    // QA (`qa.rs`): izolovaná instance smí běžet vedle nainstalované, proto bez zámku jedné instance
+    let builder = if qa::isolated() { builder } else { builder.plugin(single_instance()) };
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
@@ -223,6 +248,24 @@ pub fn run() {
             }
             let cfg = load_or_seed();
             i18n::set_lang(cfg.ui.lang);
+            // jiná instance Ledge (starší identifikátor) drží port mostu: počkat, jinak skončit (`twoinst.rs`)
+            if !qa::isolated() && cfg.claude.enabled {
+                let (verdict, line) = twoinst::await_predecessor(cfg.claude.port);
+                line.iter().for_each(|l| log(l));
+                if verdict == twoinst::Verdict::Yield {
+                    // jinak by uživatel neviděl nic (toast nebere fokus; synchronně, protože hned končíme)
+                    toast::show_blocking(
+                        &app.config().identifier,
+                        "Ledge",
+                        i18n::tr("Běží starší verze Ledge. Zavři ji a spusť Ledge znovu.", "An older version of Ledge is running. Close it and start Ledge again."),
+                    );
+                    std::process::exit(0);
+                }
+            }
+            // profil WebView2 ze složky podle starého identifikátoru (kopie, nic se nemaže) — před prvním WebView
+            for line in webdata::at_startup(&app.config().identifier, env!("CARGO_PKG_VERSION")) {
+                log(&line);
+            }
             // bublina MSIX (Ledge spuštěný z Claude desktop): zalogovat; zbylé jednorázové úlohy uklidit
             log(&pkgctx::startup_line(pkgctx::ctx()));
             outside::cleanup_later();
@@ -255,6 +298,8 @@ pub fn run() {
                 wake: Condvar::new(),
                 flash: Mutex::new(None),
                 fullscreen: AtomicBool::new(false),
+                fs_mon: Default::default(),
+                opened_on: Default::default(),
                 game_mode: AtomicBool::new(gamemode::load(&config::config_dir())),
                 bar_window: AtomicBool::new(false),
                 approve_keys: AtomicBool::new(false),
@@ -281,14 +326,16 @@ pub fn run() {
             core_arc.drawer.set_on_blur(Arc::new(|| {
                 let c = core();
                 c.drawer.note_blur();
-                if c.drawer.view().covers_strip() && c.drawer.opener() == Opener::Hotkey && !focus_in_own_popup() {
+                if c.drawer.view().covers_strip() && hovermode::closes(c.drawer.opener(), hovermode::CloseCause::Blur) && !focus_in_own_popup() {
                     c.send_ui(UiCmd::Hide);
                 }
             }));
 
             sync_hotkeys();
             // ikona v oznamovací oblasti: důkaz, že Ledge běží, a cesta k ukončení (`tray.rs`)
-            tray::init(app.handle());
+            if !qa::isolated() {
+                tray::init(app.handle()); // izolovaná instance (QA) bez druhé ikony
+            }
             // nový uživatel: šuplík se jednou otevře sám s Vítej (bez fokusu, ne ve hře) — `onboarding/first_run.rs`
             onboarding::first_run::schedule();
             if cfg.claude.enabled {
@@ -300,7 +347,9 @@ pub fn run() {
             sessionlive::start(Arc::new(mark_dirty), Arc::new(|| core().drawer.view() == View::Full));
             spawn_ui_thread(rx);
             spawn_emit_thread();
-            spawn_hover_thread();
+            if !qa::isolated() {
+                spawn_hover_thread(); // QA: bez najíždění myší (šéfova myš by otevírala šuplík sandboxu) a bez globálního hooku
+            }
             watch_config();
             spawn_notes_watch(notes_rx, notes_tx);
             spawn_notes_sync(sync_rx);
@@ -316,10 +365,12 @@ pub fn run() {
             cliphist::sync(&clip);
             // widgety ze skriptů: vlákno jen, když je nějaký widget na záložce nebo v proužku
             widgets::live::wake_if_used(&core().cfg.read());
-            if let Err(e) = autostart::apply(cfg.autostart) {
+            if let Err(e) = autostart::apply(cfg.autostart) { // izolace: `autostart::gate` do registru nesahá
                 log(&format!("autostart: {e}"));
             }
             refresh_strip();
+            // rozšíření z configu (`extensions`, výchozí `[]` = nic) — `ext/`
+            ext::wire_up();
             // lístky na plochu z minula zpátky na místa (po předehřátí šuplíku — jeden proces WebView2)
             std::thread::spawn(|| {
                 std::thread::sleep(Duration::from_millis(2500));
@@ -350,6 +401,7 @@ pub fn run() {
             commands::projects::logs,
             commands::sessions::decide,
             commands::drawer::set_mode,
+            commands::drawer::retry_online,
             commands::drawer::set_game_mode,
             commands::drawer::report_size,
             commands::drawer::drawer_size,
@@ -360,14 +412,18 @@ pub fn run() {
             commands::settings::ui_log,
             commands::drawer::close_drawer,
             commands::drawer::focus_drawer,
+            commands::dictate::dictate_start,
             commands::drawer::expand_drawer,
             commands::drawer::release_focus,
+            commands::drawer::drawer_pin,
             commands::drawer::open_url,
             commands::projects::open_in,
+            commands::projects::project_open_file,
             commands::projects::git_pull,
             commands::projects::project_logo,
             commands::projects::clone_project,
             commands::config::get_config,
+            commands::config::win_look,
             commands::config::save_config,
             commands::config::open_config_file,
             commands::config::hotkeys_taken,
@@ -417,6 +473,9 @@ pub fn run() {
             commands::notes::note_set_status,
             commands::notes::note_answer,
             commands::notes::note_task_set,
+            commands::notes::note_tasks,
+            commands::notes::note_task_snooze,
+            commands::notes::note_quick_parse,
             commands::notes::project_files,
             commands::notes::note_draft_clear,
             commands::notes::notes_sync_now,
@@ -432,6 +491,7 @@ pub fn run() {
             commands::pins::pin_unpin,
             commands::pins::pin_edit_in_ledge,
             commands::pins::pin_hint_seen,
+            commands::pins::pin_activate,
             commands::pins::pin_open,
             commands::pins::pin_look_all,
             commands::pins::pin_hide,
@@ -499,6 +559,7 @@ pub fn run() {
             commands::winquick::wq_theme_toggle,
             notify::notify_preview,
             stripfx::edge_try,
+            stripset::monitors_list,
             commands::winquick::wq_radio_set,
             commands::winquick::wq_settings,
             commands::winquick::wq_output_set,
@@ -506,11 +567,14 @@ pub fn run() {
             commands::calendar::calendar_test,
             commands::geo::geo_search,
             commands::integrations::system_view,
+            commands::ext::ext_status,
+            commands::ext::ext_wall_bg,
             commands::integrations::system_taskmgr,
             commands::integrations::github_view,
             commands::integrations::github_open,
             commands::integrations::github_copy_login,
             commands::calendar::calendar_join,
+            commands::calendar::calendar_add,
             commands::calendar::calendar_outlook_probe,
             commands::calendar::calendar_outlook_load,
             commands::accounts::accounts_status,
@@ -567,6 +631,11 @@ pub fn run() {
             commands::mcp::mcp_set_enabled,
             commands::mcp::mcp_rotate_key,
             commands::mcp::mcp_reveal_key,
+            commands::connector::connector_state,
+            commands::connector::connector_set_key,
+            commands::connector::connector_clear_key,
+            commands::connector::connector_preview,
+            commands::connector::connector_send,
             commands::brief::brief_send,
             commands::brief::brief_resume,
             commands::brief::brief_stop,
@@ -575,7 +644,7 @@ pub fn run() {
             commands::brief::apikey_clear
         ])
         .build(tauri::generate_context!())
-        .expect("ledge: start selhal")
+        .unwrap_or_else(|e| guard::start_failed(&e.to_string())) // L227
         .run(|_app, ev| {
             // zavřené poslední okno (okno s webem, když šuplík úsporně neexistuje) Ledge neukončí;
             // výslovné `exit(kód)` (aktualizace) má kód a projde
@@ -587,6 +656,7 @@ pub fn run() {
             {
                 c.procs.stop_all();
                 briefrun::proc::stop_all();
+                ext::shutdown();
                 // poslední posun lístku mohl čekat na zpožděný zápis
                 pins::win::flush();
                 desk::save::flush();

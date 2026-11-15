@@ -278,6 +278,7 @@ s rolí (orchestrátor podle CLAUDE.md projektu; nejasnost → `notes_ask` a kon
   **Zastavit** (`brief_stop(path)`) zabije celý strom (Job Object s KILL_ON_JOB_CLOSE — i při ukončení Ledge).
 - **Odmítne s vysvětlením:** bez projektu, s vypnutým MCP („zapni MCP“), bez klíče, s vyčerpaným rozpočtem,
   a když je Claude Code jen jako `claude.cmd` (text z poznámky přes `cmd.exe` neposílá).
+- **Samo pokračovat** (`claude.brief.autoResume`, výchozí vypnuto): `note_answer` po poslední odpovědi (`plan::auto_ok`: `waiting`, žádná otevřená otázka) zavolá `launch(.., auto)`; strop $ hlídá `plan`. Z `review` jde Pokračovat po potvrzení / vrácení všech `[~]`; poslední Potvrdit nastaví `done` (UI, `noteSetStatus`). „Uložit a poslat“ v editoru = uložit + `brief_send`.
 - Config: `claude.brief.model` (výchozí `sonnet`), `claude.brief.budgetUsd` (výchozí `2.0`); poznámka je
   přebije `model:` / `budget:`. Náklad: CLI ≥ 2.1.277 hlásí s `--resume` součet session (nepřičítá se), starší
   jen běh (přičítá se); verze se čte jednou za běh Ledge (`claude --version`). Mapa: `docs/codemap/sessions.md`.

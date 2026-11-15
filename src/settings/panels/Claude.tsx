@@ -8,9 +8,11 @@ import { t } from "../../i18n";
 import { say, sayError } from "../../ui/toast";
 import { useSettings } from "../ctx";
 import { Confirm } from "../../ui/Confirm";
-import { Num, Seg, Slider, Toggle } from "../fields/controls";
+import { Num, Select, Seg, Slider, Toggle } from "../fields/controls";
+import { limitsSource, limitsWrites, type LimitsSource } from "../merged";
 import { Advanced } from "../fields/Advanced";
 import { Row, Section } from "../fields/Row";
+import { priceStaleDays } from "../../costs/model";
 import type { PanelProps } from "../types";
 import StatusLineSetup from "../../limits/StatusLineSetup";
 import { fieldLabel } from "../labels";
@@ -18,6 +20,7 @@ import QuestionsSection from "./Questions";
 import NotifySection from "./Notify";
 import { McpSettings } from "../../mcp/McpSettings";
 import ApiKeySetup from "./ApiKey";
+import { hasKey } from "../../notes/apikey";
 
 const HOOKS_TEXT: Record<HooksStatus["state"], [string, string]> = {
   full: ["settings.hooks.full", "Zapojené"],
@@ -101,9 +104,6 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.approvalTimeoutS" dim={!c.cfg.claude.enabled}>
           <Slider path="claude.approvalTimeoutS" min={5} max={550} step={5} label={fieldLabel("claude.approvalTimeoutS")} fmt={(v) => (v >= 60 ? `${Math.floor(v / 60)} min ${v % 60 ? `${v % 60} s` : ""}` : `${v} s`)} />
         </Row>
-        <Row id="claude.toast" dim={!c.cfg.claude.enabled}>
-          <Toggle path="claude.toast" label={fieldLabel("claude.toast")} />
-        </Row>
         <Row id="smart.approvalSound.enabled" dim={!c.cfg.claude.enabled}>
           <Toggle path="smart.approvalSound.enabled" label={fieldLabel("smart.approvalSound.enabled")} />
         </Row>
@@ -118,25 +118,36 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.apiKey" stack live>
           <ApiKeySetup />
         </Row>
+        <Row id="claude.brief.autoResume" dim={hasKey() === false}>
+          <Toggle path="claude.brief.autoResume" label={fieldLabel("claude.brief.autoResume")} />
+        </Row>
       </Section>
       <QuestionsSection s={p.s} />
       <Section title={t("settings.claude.limits", "Limity 5h / týden")}>
         <Row id="claude.statusLine" stack live>
           <StatusLineSetup />
         </Row>
-        <Row id="claude.limitsDesktop" stack>
-          <Toggle path="claude.limitsDesktop" label={fieldLabel("claude.limitsDesktop")} />
-          <small class="st-note">{t("settings.claude.limitsDesktop.sentence", "Pracuješ v aplikaci Claude? Ta si limity ukládá sama; Ledge je jen přečte (nic neposílá).")}</small>
-        </Row>
-        <Row id="claude.limitsFetch" stack>
-          <Toggle path="claude.limitsFetch" label={fieldLabel("claude.limitsFetch")} />
-          <small class="st-note">{t("settings.claude.limitsFetch.sentence", "Ledge se jednou za 10 min zeptá Anthropicu na tvé limity tvým přihlášením Claude Code; token nikam neukládá ani neposílá jinam. Jen když je karta s limity vidět nebo je ukazuje proužek, nikdy ve hře.")}</small>
+        <Row id="claude.limitsSource" stack>
+          <Select
+            value={limitsSource(c.cfg)}
+            onChange={(v: LimitsSource) => limitsWrites(v).forEach(([p, x]) => c.set(p, x))}
+            label={fieldLabel("claude.limitsSource")}
+            options={[
+              { v: "none", label: t("settings.claude.limitsSource.none", "Žádný (jen stavový řádek)") },
+              { v: "desktop", label: t("settings.claude.limitsSource.desktop", "Aplikace Claude") },
+              { v: "fetch", label: t("settings.claude.limitsSource.fetch", "Dotaz na Anthropic") },
+              { v: "both", label: t("settings.claude.limitsSource.both", "Aplikace Claude i Anthropic") },
+            ]}
+          />
+          <Show when={limitsSource(c.cfg) === "desktop" || limitsSource(c.cfg) === "both"}>
+            <small class="st-note">{t("settings.claude.limitsDesktop.sentence", "Pracuješ v aplikaci Claude? Ta si limity ukládá sama; Ledge je jen přečte (nic neposílá).")}</small>
+          </Show>
+          <Show when={limitsSource(c.cfg) === "fetch" || limitsSource(c.cfg) === "both"}>
+            <small class="st-note">{t("settings.claude.limitsFetch.sentence", "Ledge se jednou za 10 min zeptá Anthropicu na tvé limity tvým přihlášením Claude Code; token nikam neukládá ani neposílá jinam. Jen když je karta s limity vidět nebo je ukazuje proužek, nikdy ve hře.")}</small>
+          </Show>
         </Row>
         <Row id="claude.limitsReminder">
           <Toggle path="claude.limitsReminder" label={fieldLabel("claude.limitsReminder")} />
-        </Row>
-        <Row id="claude.limitsAlert">
-          <Toggle path="claude.limitsAlert" label={fieldLabel("claude.limitsAlert")} />
         </Row>
         <Row id="claude.limitsPace">
           <Toggle path="claude.limitsPace" label={fieldLabel("claude.limitsPace")} />
@@ -158,6 +169,9 @@ export default function ClaudePanel(p: PanelProps) {
         <Row id="claude.costs">
           <Toggle path="claude.costs" label={fieldLabel("claude.costs")} />
         </Row>
+        <Show when={priceStaleDays(c.s.costs?.pricesVerified, Date.now())}>
+          {(d) => <small class="st-note">{t("sessions.costs.priceStaleSettings", "Ceník modelů v Ledge byl naposledy ověřen před {n} dny — odhad USD může být zastaralý (nová verze Ledge ho obnoví).", { n: d() })}</small>}
+        </Show>
         <Row id="claude.contextBar">
           <Toggle path="claude.contextBar" label={fieldLabel("claude.contextBar")} />
         </Row>

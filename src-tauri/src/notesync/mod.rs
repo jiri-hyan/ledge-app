@@ -13,8 +13,9 @@
 //! | uvnitř cizího repa       | —           | `Refuse` — nic nedělat (do cizího repa necommitujeme)     |
 //!
 //! Cyklus: `add -A` → commit jen se změnami → `fetch` → `rebase --autostash` (jen když remote
-//! utekl) → `push` (jen když jsme napřed). Konflikt = `rebase --abort` (lokální commit zůstane,
-//! nic se neztratí) a stav `Konflikt`. Síť / přihlášení se rozliší ze stderr ([`classify`]).
+//! utekl) → `push` (jen když jsme napřed). Konflikt = `rebase --abort` + `merge` po souborech
+//! (`conflict.rs`: remote zůstane, lokální verze jako kopie „(konflikt Ledge …)“, sync jede dál); stav
+//! `Konflikt` jen když se to nepodaří (lokální commit zůstane, nic se neztratí). Síť / přihlášení se rozliší ze stderr ([`classify`]).
 //!
 //! Čisté rozhodování (plán, klasifikace chyb, plán slučování, plánovač, stav pro UI) je oddělené od
 //! I/O a testované tabulkami; integrační testy jedou proti bare repu v `temp_dir` (žádná síť).
@@ -24,6 +25,7 @@
 //! slučování, `cycle.rs` cyklus commit/fetch/rebase/push. Vlákno syncu žije v `lib.rs`.
 //! Mapa: `docs/codemap/notes.md`.
 
+mod conflict;
 mod cycle;
 mod git;
 mod init;
@@ -47,8 +49,9 @@ use std::time::{Duration, Instant};
 pub const IGNORE: [&str; 5] = [".draft/", ".state.json", "*.tmp", "PRESUNUTO-DO-LEDGE.txt", ".smazane/"];
 /// Žádné převody konců řádků: poznámka je na obou PC bajtově stejná (jinak falešné změny a konflikty).
 const ATTRIBUTES: &str = "* -text\n";
-const LOCAL_DEADLINE: Duration = Duration::from_secs(30);
-const NET_DEADLINE: Duration = Duration::from_secs(90);
+// V testech velkorysé: integrační test volá desítky gitů a pod zátěží stroje (fronta, AV) by 30 s dávalo falešné „Offline“.
+const LOCAL_DEADLINE: Duration = Duration::from_secs(if cfg!(test) { 240 } else { 30 });
+const NET_DEADLINE: Duration = Duration::from_secs(if cfg!(test) { 240 } else { 90 });
 /// Debounce lokální změny (jeden zápis = víc událostí, víc poznámek za sebou = jeden commit) …
 pub const LOCAL_DEBOUNCE: Duration = Duration::from_secs(10);
 /// … ale při nepřetržitých změnách nejpozději po minutě.
@@ -132,9 +135,9 @@ pub fn outcome_text(o: &Outcome) -> Result<String, String> {
             (_, false, true) => tr("Synchronizováno: odesláno.", "Synced: pushed.").into(),
             _ => tr("Synchronizováno, beze změn.", "Synced, no changes.").into(),
         }),
-        Outcome::Offline(m) => Err(format!("Offline: {m}")),
+        Outcome::Offline(m) => Err(trf!("Bez připojení: {m}. Poznámky zůstaly u tebe, zkus to později.", "No connection: {m}. Your notes stayed local, try again later.")),
         Outcome::Neprihlaseno(m) => Err(trf!("Nepřihlášeno: {m}", "Not logged in: {m}")),
-        Outcome::Konflikt { files, .. } => Err(trf!("Konflikt: {}", "Conflict: {}", files.join(", "))),
+        Outcome::Konflikt { files, .. } => Err(trf!("Poznámky se rozešly v: {}. Otevři složku poznámek a vyber verzi.", "Notes diverged in: {}. Open the notes folder and pick a version.", files.join(", "))),
         Outcome::Chyba(m) => Err(m.clone()),
     }
 }
@@ -241,7 +244,7 @@ impl Syncer {
             }
             self.prepared = Some(key);
         }
-        match cycle(ctx) {
+        match cycle(ctx, &mut self.notes) {
             Outcome::Ok { pulled, pushed, .. } => Outcome::Ok { pulled, pushed, swapped },
             // prohozené složky platí i při chybě cyklu (push dožene další běh)
             other => other,

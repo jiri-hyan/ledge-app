@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { bars, extent, finite, heat, heatLevel, ring, sparkPoints, sparkline, trend } from "./geom.ts";
+import { bars, extent, finite, ring, sparkPoints, sparkline, trend } from "./geom.ts";
 
 test("prázdný stav: méně než 2 konečná čísla = nic", () => {
   const empty = [[], [5], [NaN, 3], [null, undefined, 4], [Infinity, -Infinity]];
@@ -13,7 +13,6 @@ test("prázdný stav: méně než 2 konečná čísla = nic", () => {
     assert.equal(sparkline(v, 100, 20), null, JSON.stringify(v));
     assert.equal(sparkPoints(v, 100, 20), null);
     assert.deepEqual(bars(v, 100, 20), []);
-    assert.deepEqual(heat(v, 100, 20), []);
     assert.equal(trend(v), null);
   }
   // nesmyslné rozměry = nic
@@ -71,31 +70,6 @@ test("sloupce: výška podle maxima, mezery, záporné = 0, minH", () => {
   assert.deepEqual(bars([5, 10], 10, 10, { gap: 0, max: 20 }).map((b) => b.h), [2.5, 5]);
   assert.deepEqual(bars([0, 0], 10, 10).map((b) => b.h), [0, 0], "samé nuly = nulové sloupce, ne vymyšlené");
   assert.deepEqual(bars([1, 2, 3], 2, 10, { gap: 2 }), [], "nevejde se = nic");
-});
-
-test("pás: úrovně a mřížka po sloupcích", () => {
-  const levels = [
-    [0, 10, 4, 0],
-    [1, 10, 4, 1],
-    [2.5, 10, 4, 1],
-    [2.6, 10, 4, 2],
-    [10, 10, 4, 4],
-    [20, 10, 4, 4],
-    [-1, 10, 4, 0],
-    [5, 0, 4, 0],
-  ];
-  for (const [v, max, n, want] of levels) assert.equal(heatLevel(v, max, n), want, JSON.stringify([v, max, n]));
-  const row = heat([0, 5, 10], 32, 8, { gap: 1 });
-  assert.deepEqual(row.map((c) => [c.x, c.y, c.w, c.h, c.level]), [
-    [0, 0, 10, 8, 0],
-    [11, 0, 10, 8, 2],
-    [22, 0, 10, 8, 4],
-  ]);
-  // 7 řádků = týdny: 8 hodnot → 2 sloupce, 8. buňka nahoře ve 2. sloupci
-  const weeks = heat([1, 1, 1, 1, 1, 1, 1, 2], 20, 70, { rows: 7, gap: 0 });
-  assert.equal(weeks.length, 8);
-  assert.deepEqual([weeks[6].x, weeks[6].y], [0, 60]);
-  assert.deepEqual([weeks[7].x, weeks[7].y, weeks[7].level], [10, 0, 4]);
 });
 
 test("trend", () => {

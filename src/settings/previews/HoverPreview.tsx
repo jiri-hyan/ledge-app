@@ -1,8 +1,8 @@
-// HTML náhled jednoho chování po najetí myší (`drawer.hover`: celý šuplík / kompaktní náhled / roztažený
-// ostrůvek) pro galerii kroku Po najetí v panelu Vzhled. Barvy a písmo z rozpracovaného vzhledu
+// HTML náhled jednoho chování po najetí myší (`drawer.hover`: celý šuplík / roztažený
+// ostrůvek / dok) pro galerii kroku Po najetí v panelu Vzhled. Barvy a písmo z rozpracovaného vzhledu
 // (`.theme-scope`), data UKÁZKOVÁ podle přepínače „Co se děje“ — skutečná okna kreslí Ledge. Tlačítka jsou
 // jen obrázek (`span`), dlaždice sama je tlačítko.
-import { For, Show, type JSX } from "solid-js";
+import { For, type JSX } from "solid-js";
 import { t } from "../../i18n";
 import type { Appearance, HoverModeId } from "../../types";
 import { scopeStyle } from "../../theme/apply";
@@ -11,25 +11,6 @@ import { Dot, Glyph, sample } from "./StripLookPreview";
 import "./previews.css";
 
 const Btn = (q: { tone?: "ok" | "no"; children: JSX.Element }) => <span class="apv-btn" data-c={q.tone ?? ""}>{q.children}</span>;
-
-function compact(s: PreviewState) {
-  return (
-    <span class="apv-peek apv-compact">
-      <Show when={s === "wait"}>
-        <span class="apv-prow"><span><Glyph g="!" c="wait" /> <b>ledge</b> {t("appearance.sample.wantsEdit", "chce upravit soubor")}</span><span class="apv-btns"><Btn tone="ok">{t("appearance.sample.allow", "Povolit")}</Btn><Btn tone="no">{t("appearance.sample.deny", "Zamítnout")}</Btn></span></span>
-      </Show>
-      <span class="apv-prow"><span><Dot c={s === "done" ? "ok" : "run"} ring={s === "work"} /> ledge</span><span class="apv-dim">{s === "done" ? t("appearance.sample.doneLower", "hotovo") : t("appearance.sample.since", "pracuje 4 min")}</span></span>
-      <span class="apv-prow"><span><Dot c="ok" /> workspace</span><span class="apv-dim">{t("appearance.sample.doneLower", "hotovo")}</span></span>
-      <Show when={s === "music" || s === "idle"}>
-        <span class="apv-prow"><span><span class="apv-cover" /> {sample.music()}</span><span>⏮ ⏸ ⏭</span></span>
-      </Show>
-      <Show when={s === "timer"}>
-        <span class="apv-prow"><span><Glyph g="⏱" c="acc" /> {sample.timer()}</span><Btn>+5 min</Btn></span>
-      </Show>
-      <span class="apv-more">{t("appearance.sample.clickAll", "▾ klik = celý šuplík")}</span>
-    </span>
-  );
-}
 
 function island(s: PreviewState) {
   const body: Record<PreviewState, JSX.Element> = {
@@ -41,6 +22,16 @@ function island(s: PreviewState) {
     done: <><span><Glyph g="✓" c="ok" /> {sample.done()}</span><span class="apv-btns"><Btn>{t("appearance.sample.open", "Otevřít")}</Btn></span></>,
   };
   return <span class="apv-peek apv-island">{body[s]}</span>;
+}
+
+function dock() {
+  return (
+    <span class="apv-peek apv-island">
+      <span>{t("appearance.sample.dockNote", "📝 klikni a piš")}</span>
+      <span><span class="apv-cover" /> ⏮ ⏸ ⏭</span>
+      <span>📌</span>
+    </span>
+  );
 }
 
 function full(a: Appearance) {
@@ -56,7 +47,7 @@ export default function HoverPreview(q: { mode: HoverModeId; state: PreviewState
   return (
     <span class="apv-scr apv-tall theme-scope" style={scopeStyle(q.a)} data-pos={q.a.strip.position} aria-hidden="true">
       <span class="apv-win" />
-      {q.mode === "compact" ? compact(q.state) : q.mode === "island" ? island(q.state) : full(q.a)}
+      {q.mode === "island" ? island(q.state) : q.mode === "dock" ? dock() : full(q.a)}
     </span>
   );
 }

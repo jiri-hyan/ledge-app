@@ -205,7 +205,8 @@ mod tests {
 
     #[test]
     fn rotate_keeps_three_latest() {
-        let d = std::env::temp_dir().join(format!("ledge-rot-{}", std::process::id()));
+        let _tmp = tempfile::tempdir().unwrap(); // izolovaná složka, uklidí se i po pádu testu
+        let d = _tmp.path().to_path_buf();
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         let p = d.join("config.json");

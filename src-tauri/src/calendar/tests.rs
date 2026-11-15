@@ -283,3 +283,18 @@ fn multibyte_values_do_not_break_parsers() {
         let _ = ics::parse_dt(v, None, true); // `VALUE=DATE` bere první osmici znaků — jen nesmí spadnout
     }
 }
+
+#[test]
+fn attendees_survive_recurrence_expansion() {
+    // účastníci jedné události se přenesou do každého rozbaleného výskytu (L85); odmítnutý ne
+    let ics = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:r\nDTSTART:20261019T100000Z\nDTEND:20261019T103000Z\nRRULE:FREQ=DAILY;COUNT=2\nSUMMARY:Standup\nATTENDEE;CN=Eva;PARTSTAT=ACCEPTED:mailto:eva@firma.cz\nATTENDEE;CN=Karel;PARTSTAT=DECLINED:mailto:karel@firma.cz\nEND:VEVENT\nEND:VCALENDAR\n";
+    let p = collect(ics.as_bytes(), now(), &prague()).unwrap();
+    assert_eq!(p.occs.len(), 2);
+    for o in &p.occs {
+        assert_eq!(o.people.list.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["Eva"]);
+    }
+    // cache: stará bez `people` se načte, prázdní se neserializují
+    let json = serde_json::to_string(&Occ::default()).unwrap();
+    assert!(!json.contains("people"));
+    assert!(serde_json::from_str::<Occ>(&json).unwrap().people.is_empty());
+}

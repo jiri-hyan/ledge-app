@@ -1,10 +1,10 @@
 //! Zápisy zadání do poznámky (I/O nad čistými funkcemi z `brief` / `sections` / `frontmatter`):
 //! stav (`status:`), další metadata (`cost`, `session`…), odpověď na otázku, otázky, záznam do logu a
-//! stav bodu. Každý zápis: cesta ověřená přes `check_note_path`, zámek cesty, čtení → změna → kontrola,
-//! že soubor mezitím nezměnil sync (otisk) → atomický zápis. Mění se jen dotčené místo, `updated` se
+//! stav bodu. Každý zápis: cesta ověřená přes `check_note_path`, zámek cesty, čtení (jen platné UTF-8) →
+//! změna nad čerstvým obsahem → atomický zápis (bez otisku: UI nemá co porovnat, čte se vždy čerstvě). Mění se jen dotčené místo, `updated` se
 //! obnoví. Vrací čerstvý `NoteDetail` (UI / MCP z něj berou nový otisk).
 
-use super::edit::{NoteDetail, body_view, detail, hash, read_bytes, resolve};
+use super::edit::{NoteDetail, body_view, detail, read_bytes, resolve, utf8_text};
 use super::*;
 
 type Pairs<'a> = &'a [(&'a str, Option<&'a str>)];
@@ -23,18 +23,25 @@ fn modify(
     let lock = path_lock(&real);
     let _g = lock.lock();
     let bytes = read_bytes(&real)?;
-    let text = String::from_utf8_lossy(&bytes);
-    let (front, body) = split(&text);
+    let (front, body) = split(utf8_text(&bytes)?);
     let mut front = front.unwrap_or_default();
     let (lead, rest) = body_view(body);
     let new_rest = f(&mut front, rest)?;
     set(&mut front, "updated", &iso(now));
     let out = render(&front, &format!("{lead}{}", new_rest.as_deref().unwrap_or(rest)));
-    if hash(&read_bytes(&real)?) != hash(&bytes) {
-        return Err(tr("Poznámka se mezitím změnila na disku — načti ji znovu a zkus to znovu.", "The note changed on disk meanwhile — reload it and retry.").into());
-    }
     write_atomic(&real, out.as_bytes())?;
     Ok(detail(path, &real, &real_root, out.as_bytes()))
+}
+
+/// Obecný zápis pro moduly mimo `notes` (propojená aplikace: odkazy na úkoly): `f(front, tělo)` → nové tělo
+/// (`None` = beze změny), s týmiž pojistkami jako ostatní zápisy (zámek cesty, kontrola změny, atomicky).
+pub fn rewrite(
+    root: &Path,
+    path: &Path,
+    now: &DateTime<FixedOffset>,
+    f: impl FnOnce(&mut Vec<String>, &str) -> Result<Option<String>, String>,
+) -> Result<NoteDetail, String> {
+    modify(root, path, now, f)
 }
 
 /// Hodnota `status:` z textu UI / MCP; prázdná = odebrat klíč.
@@ -123,6 +130,18 @@ mod tests {
     }
 
     const NOTE: &str = "---\ncreated: 2026-11-11T10:00:00+01:00\nx-vlastni: ahoj\ndone: false\n---\n\n# Cíl\n- [ ] první\n  ![snímek](./a.png)\n- [ ] druhý\n";
+
+    #[test]
+    fn modify_refuses_non_utf8_note_and_keeps_bytes() {
+        let root = tempfile::tempdir().unwrap();
+        let p = root.path().join("2026-11-11-100000-cp.md");
+        // CP1250 „část“ (0xE8 0xE1 = č á), neplatné UTF-8
+        let bytes: Vec<u8> = b"---\ncreated: 2026-11-11T10:00:00+01:00\n---\n\n- [ ] \xE8\xE1st\n".to_vec();
+        std::fs::write(&p, &bytes).unwrap();
+        let now = at("2026-11-11T12:00:00+01:00");
+        assert!(set_status(root.path(), &p, "running", &now).is_err());
+        assert_eq!(std::fs::read(&p).unwrap(), bytes);
+    }
 
     #[test]
     fn status_and_meta_roundtrip_keep_unknown_keys_and_body() {

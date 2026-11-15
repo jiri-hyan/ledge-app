@@ -347,7 +347,7 @@ pub fn snapshot_views(cfg: &ScriptsConfig) -> Vec<ScriptView> {
 /// Skript `id` čerstvě z disku (spuštění): soubor se přečte a zahashuje vždy znovu, ne z cache.
 pub fn fresh(cfg: &ScriptsConfig, id: &str) -> Result<(Script, Interp), String> {
     if !cfg.enabled {
-        return Err(tr("Skripty jsou vypnuté (Nastavení → Projekty a akce).", "Scripts are off (Settings → Projects and actions).").into());
+        return Err(tr("Skripty jsou vypnuté (Nastavení → Projekty, odkazy a akce).", "Scripts are off (Settings → Projects, links and actions).").into());
     }
     let dir = resolve_dir(cfg)?;
     let file = id.strip_prefix("script:").filter(|f| !f.is_empty() && !f.contains(['\\', '/', ':'])).ok_or_else(|| tr("Neznámý skript.", "Unknown script."))?;

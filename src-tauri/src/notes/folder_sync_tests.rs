@@ -418,7 +418,7 @@ fn junctions_are_never_followed() {
     let outside = f.folder.parent().unwrap().join("outside");
     put(&outside.join("tajne.md"), "mimo složku\n");
     let junction = |link: &Path, target: &Path| {
-        let ok = std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(link).arg(target).creation_flags(0x0800_0000).output().is_ok_and(|o| o.status.success());
+        let ok = std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(link).arg(target).creation_flags(crate::procman::CREATE_NO_WINDOW).output().is_ok_and(|o| o.status.success());
         assert!(ok, "mklink /J");
     };
     junction(&f.folder.join("odkaz"), &outside);
@@ -622,7 +622,7 @@ fn paired_folder_turned_junction_is_frozen_not_deleted() {
     f.go(Dir::Both, true);
     assert!(f.root.join("_obecne/Pod.md").exists());
     std::fs::remove_dir_all(f.folder.join("sub")).unwrap();
-    let ok = std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(f.folder.join("sub")).arg(&outside).creation_flags(0x0800_0000).output().is_ok_and(|o| o.status.success());
+    let ok = std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(f.folder.join("sub")).arg(&outside).creation_flags(crate::procman::CREATE_NO_WINDOW).output().is_ok_and(|o| o.status.success());
     assert!(ok, "mklink /J");
     let s = scan(&f.folder.canonicalize().unwrap(), Kind::Ext, &Prev::new()).unwrap();
     assert_eq!((s.links, s.frozen.clone()), (1, vec!["sub".to_string()]));

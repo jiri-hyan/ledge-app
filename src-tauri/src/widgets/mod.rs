@@ -19,6 +19,8 @@ pub mod plan;
 pub mod run;
 pub mod templates;
 
+use crate::widgetkit::spec::{self as kitspec, Spec};
+
 use crate::i18n::tr;
 use crate::scripts::meta as smeta;
 use meta::{Kind, WidgetMeta};
@@ -98,6 +100,8 @@ pub struct Widget {
     pub sha: String,
     /// začátek skriptu (u programu jeho hlavička) pro potvrzení
     pub head: String,
+    /// `*.kit.json`: ověřená šablona (`widgetkit::spec`); jen u `Kind::Kit`
+    pub kit: Option<Spec>,
 }
 
 impl Widget {
@@ -228,8 +232,26 @@ fn stamp_of(path: &Path, md: &std::fs::Metadata, kind: Kind) -> Stamp {
     (md.modified().ok(), md.len(), side)
 }
 
+/// Šablona `*.kit.json`: přečte nejvýš `MAX_BYTES` + 1 bajtů a ověří; chyba = `Err` (karta „problém“).
+fn load_kit(path: &Path) -> (Result<WidgetMeta, String>, Option<Spec>) {
+    let text = std::fs::File::open(path).and_then(|f| {
+        let mut buf = Vec::new();
+        f.take(kitspec::MAX_BYTES as u64 + 1).read_to_end(&mut buf)?;
+        Ok(String::from_utf8_lossy(&buf).into_owned())
+    });
+    let parsed = text.map_err(|e| vec![crate::errors::io(tr("Soubor nejde přečíst", "Can't read the file"), &e)]).and_then(|t| kitspec::parse(&t));
+    match parsed {
+        Ok(s) => (Ok(meta::kit_meta(&s)), Some(s)),
+        Err(notes) => (Err(notes.join("; ")), None),
+    }
+}
+
 fn widget(name: &str, path: &Path, kind: Kind, size: u64) -> Option<Widget> {
-    let mk = |meta, sha, head| Widget { id: format!("{}{name}", plan::PREFIX), file: name.to_string(), path: path.to_path_buf(), kind, meta, sha, head };
+    let mk = |meta, sha, head| Widget { id: format!("{}{name}", plan::PREFIX), file: name.to_string(), path: path.to_path_buf(), kind, meta, sha, head, kit: None };
+    if kind == Kind::Kit {
+        let (meta, kit) = load_kit(path);
+        return Some(Widget { kit, ..mk(meta, String::new(), String::new()) });
+    }
     match load_one(path, kind, size) {
         Ok(None) => None,
         Ok(Some((m, sha, head))) => Some(mk(m, sha, head)),
@@ -240,7 +262,7 @@ fn widget(name: &str, path: &Path, kind: Kind, size: u64) -> Option<Widget> {
 /// Projde složku: jeden výpis, čte jen změněné soubory (proti `prev`). Bez rekurze a skrytých.
 pub fn scan_dir(dir: &Path, prev: Option<&Scan>) -> Scan {
     let mut out = Scan { dir: dir.to_path_buf(), ..Default::default() };
-    let l = crate::fsx::list_files(dir, Kind::from_ext, MAX_WIDGETS);
+    let l = crate::fsx::list_named(dir, Kind::from_name, MAX_WIDGETS);
     (out.exists, out.error, out.skipped) = (l.exists, l.error, l.skipped);
     let prev = prev.filter(|p| p.dir == dir);
     let found = l.files;
@@ -263,13 +285,16 @@ pub fn scan_dir(dir: &Path, prev: Option<&Scan>) -> Scan {
 pub fn fresh(dir: &Path, id: &str) -> Result<Widget, String> {
     let file = plan::file_of(id).ok_or_else(|| tr("Neznámý widget.", "Unknown widget."))?;
     let path = dir.join(file);
-    let kind = Path::new(file).extension().and_then(|e| e.to_str()).and_then(Kind::from_ext).ok_or_else(|| tr("Neznámý widget.", "Unknown widget."))?;
+    let kind = Kind::from_name(file).ok_or_else(|| tr("Neznámý widget.", "Unknown widget."))?;
     let md = std::fs::metadata(&path).ok().filter(|m| m.is_file()).ok_or_else(|| trf!("Widget {file} už ve složce není.", "The widget {file} is no longer in the folder."))?;
     widget(file, &path, kind, md.len()).ok_or_else(|| trf!("{file} už nemá hlavičku @ledge.widget.", "{file} no longer has an @ledge.widget header."))
 }
 
 /// Proč widget nejde spustit (hlavička, interpret, cesta), jinak `None`. `path_var` = PATH.
 pub fn problem(w: &Widget, path_var: &std::ffi::OsStr) -> Option<String> {
+    if w.kind == Kind::Kit {
+        return w.meta.as_ref().err().cloned();
+    }
     let m = match &w.meta {
         Err(e) => return Some(e.clone()),
         Ok(m) => m,

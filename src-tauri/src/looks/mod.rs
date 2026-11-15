@@ -745,7 +745,7 @@ pub fn show(look: Look, f: &Facts) -> Show {
             }
             let mut right = Vec::new();
             if let Some(p) = f.limit5h {
-                right.push(format!("5h {:.0} %", p.floor()));
+                right.push(format!("5h {}", crate::util::pct_floor_text(p)));
             }
             if !f.clock.is_empty() {
                 right.push(f.clock.clone());
@@ -755,7 +755,7 @@ pub fn show(look: Look, f: &Facts) -> Show {
             }
         }
         Look::Progress => {
-            let limit = f.limit5h.map(|p| ((p / 100.0).clamp(0.0, 1.0) as f32, format!("{:.0} %", p.floor())));
+            let limit = f.limit5h.map(|p| ((p / 100.0).clamp(0.0, 1.0) as f32, crate::util::pct_floor_text(p)));
             let (left, right, bar): (Part, Option<String>, Option<(f32, Rgba)>) = match st {
                 State::Idle => match &limit {
                     Some((x, t)) => (text(tr("Limit 5h", "5h limit"), Rgba::TEXT), Some(t.clone()), Some((*x, f.accent))),

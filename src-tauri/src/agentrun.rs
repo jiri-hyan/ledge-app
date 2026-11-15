@@ -18,7 +18,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
 
-const NO_WINDOW: u32 = 0x0800_0000;
+use crate::procman::CREATE_NO_WINDOW as NO_WINDOW;
 const DETACHED: u32 = 0x0000_0008;
 /// Jak dlouho po skončení procesu ještě dočíst rouru.
 const DRAIN: Duration = Duration::from_millis(500);
@@ -165,7 +165,8 @@ mod tests {
     /// s metaznaky se do dávky vůbec nedostane, žádný příkaz z textu se nespustí.
     #[test]
     fn batch_command_line_is_safe() {
-        let dir = std::env::temp_dir().join(format!("ledge-l1-{}", std::process::id()));
+        let _tmp = tempfile::tempdir().unwrap(); // izolovaná složka, uklidí se i po pádu testu
+        let dir = _tmp.path().to_path_buf();
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let probe = dir.join("claude.cmd");

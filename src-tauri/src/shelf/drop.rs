@@ -167,7 +167,7 @@ unsafe fn run() {
         let class = w!("LedgeShelfDrop");
         let wc = WNDCLASSW { lpfnWndProc: Some(wndproc), hInstance: hinst.into(), lpszClassName: class, ..Default::default() };
         RegisterClassW(&wc);
-        let ex = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST;
+        let ex = WS_EX_LAYERED | WS_EX_TOPMOST | crate::winstyle::no_activate_ex();
         let Ok(hwnd) = CreateWindowExW(ex, class, w!("Ledge shelf"), WS_POPUP, 0, 0, 1, 1, None, None, Some(hinst.into()), None) else {
             return;
         };

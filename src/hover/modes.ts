@@ -1,9 +1,8 @@
-// Režimy „co se stane po najetí myší“ (`drawer.hover`, Rust `hovermode.rs` `HoverMode`). Id `full|compact|island`
-// jsou kontrakt (config, výběr v Nastavení → Vzhled → Po najetí). `cs` / `en` = název, `desc` = popis
-// v jazyce UI (přeloží se až při čtení, ne při importu modulu).
-import { t } from "../i18n.ts";
+// Režimy „co se stane po najetí myší“ (`drawer.hover`, Rust `hovermode.rs` `HoverMode`). Id `full|island|dock`
+// jsou kontrakt (config, výběr v Nastavení → Vzhled → Po najetí). `cs` / `en` = název; popis řádku v Nastavení má
+// `AppearanceHover.tsx` `DESC` (jediné místo, dřív tu byl druhý přepis `desc`).
 
-export type HoverModeId = "full" | "compact" | "island";
+export type HoverModeId = "full" | "island" | "dock";
 
 export interface HoverMode {
   id: HoverModeId;
@@ -11,8 +10,6 @@ export interface HoverMode {
   key: string;
   cs: string;
   en: string;
-  /** popis jednou větou v jazyce UI */
-  readonly desc: string;
 }
 
 export const HOVER_MODES: readonly HoverMode[] = [
@@ -21,27 +18,18 @@ export const HOVER_MODES: readonly HoverMode[] = [
     key: "cards.hover.mode.full",
     cs: "Rovnou celý šuplík",
     en: "Full drawer right away",
-    get desc() {
-      return t("cards.hover.mode.full.desc", "Dnešní chování: najetí otevře celý šuplík.");
-    },
-  },
-  {
-    id: "compact",
-    key: "cards.hover.mode.compact",
-    cs: "Kompaktní náhled",
-    en: "Compact preview",
-    get desc() {
-      return t("cards.hover.mode.compact.desc", "Malý panel s tím nejdůležitějším: schválení, session Clauda, hudba, čas a limit. Kliknutím se rozbalí celý šuplík.");
-    },
   },
   {
     id: "island",
     key: "cards.hover.mode.island",
     cs: "Roztažený ostrůvek",
     en: "Expanded island",
-    get desc() {
-      return t("cards.hover.mode.island.desc", "Pod proužkem se roztáhne kapsle a ukáže jen to, co se právě děje, s tlačítky. Nejméně rušivé.");
-    },
+  },
+  {
+    id: "dock",
+    key: "cards.hover.mode.dock",
+    cs: "Dok",
+    en: "Dock",
   },
 ];
 

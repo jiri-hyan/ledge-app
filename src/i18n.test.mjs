@@ -9,23 +9,27 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { KEY, areaKey, boldCount, scanSource, varsOf } from "./i18nScan.ts";
+import { CZECH, KEY, areaKey, boldCount, scanSource, varsOf } from "./i18nScan.ts";
+import { HOVER_MODES } from "./hover/modes.ts";
+import { STRIP_LOOKS } from "./strip/looks.ts";
 import { lang, loadDict, plural, pluralForm, registerDict, setDictLoader, setLang, t, tp } from "./i18n.ts";
 import { ago, fmtDate, num } from "./format.ts";
 
 // Soubory (nebo složky `x/`), kde natvrdo česky psané texty ještě zůstaly — kontrola d je přeskočí,
-// a–c platí i tady. Teď prázdné: celé UI jde přes t(); nový nepřeložený modul sem jen dočasně.
+// a–c platí i tady. Zastaralá položka (bez zbytků češtiny) test shodí. Celé UI jde přes t(); nový nepřeložený modul sem jen dočasně.
 const PENDING = [
-  // w7: dočasné kontrakty s workery I/J (`{ id, cs, en }` — přeložené daty, ne t()); lead při merge vezme jejich verzi
-  "strip/looks.ts",
-  "hover/modes.ts",
   // nástroj pro snímky (kolo 24): ukázková data a popisky scény jsou záměrně česky, do aplikace se nedostanou
   "showcase/",
 ];
 
 // Záměrně česky i v angličtině (kontrola d): soubor, přesný text, proč.
 const ALLOW_CZECH = [
+  // tapeta wall: vlastní tabulky dnů/měsíců cs+en (stránka běží bez i18n slovníku Ledge, jazyk z init.lang)
+  ...["NEDĚLE", "PONDĚLÍ", "ÚTERÝ", "STŘEDA", "ČTVRTEK", "PÁTEK", "ÚNORA", "BŘEZNA", "KVĚTNA", "ČERVNA", "ČERVENCE", "ZÁŘÍ", "ŘÍJNA"].map((text) => ({
+    file: "ext/wall/model.ts", text, why: "název dne/měsíce v české větvi tabulky scény wall (en větev vedle); stránka nemá slovník Ledge",
+  })),
   { file: "notes/brief.ts", text: " — důkaz: ", why: "značka formátu zadání v souboru poznámky (stejná v Rustu i v MCP), ne text pro uživatele" },
+  { file: "notes/taskline.ts", text: "důkaz", why: "klíčové slovo formátu řádku úkolu v souboru poznámky (zrcadlo Rustu `taskline.rs`), ne text pro uživatele" },
   { file: "notes/brief.ts", text: "Otázky", why: "název sekce `## Otázky` ve formátu zadání v souboru poznámky" },
   { file: "onboarding/steps/Basics.tsx", text: "Čeština", why: "název jazyka ve volbě jazyka se píše v tom jazyce" },
   { file: "onboarding/steps/Basics.tsx", text: "Ahoj! Nastavíme si Ledge.", why: "ukázka češtiny u volby jazyka" },
@@ -63,6 +67,8 @@ const DYNAMIC = [
   { file: "settings/catalog.ts", key: "p.kw[0]", why: "klíčová slova panelu — " + PAIRS },
   { file: "settings/labels.ts", key: "`settings.f.${id}`", why: TABLE },
   { file: "settings/labels.ts", key: "`settings.f.${id}.hint`", why: TABLE },
+  { file: "settings/path.ts", key: "m.key", why: "název stránky z registry.ts — " + PAIRS },
+  { file: "settings/path.ts", key: "SECTIONS[s].key", why: "název sekce z registry.ts `SECTIONS` — " + PAIRS },
   { file: "settings/labels.ts", key: "`settings.f.${id}.kw`", why: TABLE },
   { file: "studio/Home.tsx", key: "x.key", why: "vzhledy proužku STRIP_LOOKS a režimy po najetí HOVER_MODES (Rychle) — " + PAIRS },
   { file: "studio/Studio.tsx", key: "x[0]", why: "popisek hodnoty v časové ose (studio/named.ts: styly, motivy, rozložení, šířky, vzhled proužku, najetí) — " + PAIRS },
@@ -73,7 +79,6 @@ const DYNAMIC = [
   { file: "settings/panels/Backup.tsx", key: "n[0]", why: "názvy sekcí SECTION_NAMES — " + PAIRS },
   { file: "settings/panels/Claude.tsx", key: "...HOOKS_TEXT[h().state]", why: PAIRS },
   { file: "settings/panels/Notify.tsx", key: "s.key", why: PAIRS },
-  { file: "settings/panels/Notify.tsx", key: "...SOURCE[k]", why: PAIRS },
   { file: "settings/panels/StripSettings.tsx", key: "x.key", why: "položky proužku STRIP_ITEMS — " + PAIRS },
   { file: "settings/panels/Notes.tsx", key: "...(SYNC_TEXT[st().state] ?? [\"\", st().state])", why: PAIRS },
 ];
@@ -271,12 +276,24 @@ test("(d) v přeložených souborech nezbyl natvrdo český text", () => {
   }
   assert.deepEqual(left, [], "převeď na t(\"oblast.klic\", \"čeština\") — nebo výjimku do ALLOW_CZECH s důvodem");
   assert.deepEqual(ALLOW_CZECH.filter((a) => !used.has(a)).map((a) => `${a.file} ${a.text}`), [], "výjimka už neplatí — smaž ji");
+  // zastaralá PENDING položka (soubor/složka bez zbytků češtiny, nebo neexistuje) vypíná kontrolu zbytečně
+  const stale = PENDING.filter((p) => !FILES.some(({ file, scan }) => (p.endsWith("/") ? file.startsWith(p) : file === p) && scan.leftovers.length > 0));
+  assert.deepEqual(stale, [], "PENDING položka už nemá český text — smaž ji");
+});
+
+test("en slovník: hodnota není prázdná a nemá českou diakritiku", () => {
+  const bad = [...EN].filter(([, e]) => e.value.trim() === "" || CZECH.test(e.value)).map(([k, e]) => `${e.file} ${k}`);
+  assert.deepEqual(bad, []);
+});
+
+test("data hover/modes.ts a strip/looks.ts: pole en sedí se slovníkem", () => {
+  const bad = [...HOVER_MODES, ...STRIP_LOOKS].filter((x) => EN.get(x.key)?.value !== x.en).map((x) => `${x.key}: data "${x.en}" × slovník "${EN.get(x.key)?.value}"`);
+  assert.deepEqual(bad, []);
 });
 
 test("žádné osiřelé anglické klíče", () => {
   const used = new Set(CALLS.filter((c) => c.key !== null).flatMap(enKeys));
-  const prefixes = CALLS.map((c) => c.prefix).filter(Boolean);
-  const orphan = [...EN.keys()].filter((k) => !used.has(k) && !prefixes.some((p) => k.startsWith(p)));
+  const orphan = [...EN.keys()].filter((k) => !used.has(k));
   assert.deepEqual(orphan, [], "klíč už v kódu není — smaž ho ze slovníku (nebo je překlep)");
 });
 

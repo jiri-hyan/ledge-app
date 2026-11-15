@@ -210,8 +210,8 @@ pub fn peek(cfg: &GithubConfig) -> GithubView {
     view(&STATE.lock(), cfg, crate::state::now_ms())
 }
 
-/// Tři dotazy `gh` souběžně (každý s vlastním termínem). Blokuje volající vlákno nejvýš `run::TIMEOUT`.
-fn fetch(cfg: &GithubConfig) -> Fetched {
+/// Tři dotazy `gh` souběžně (každý s vlastním termínem). Blokuje volající vlákno nejvýš `timeout` (`timeout_for`).
+fn fetch(cfg: &GithubConfig, timeout: std::time::Duration) -> Fetched {
     const SEARCH_FIELDS: &str = "number,title,url,repository,author,updatedAt,isDraft";
     const MINE_QUERY: &str = "query($n:Int!){viewer{pullRequests(first:$n,states:OPEN,orderBy:{field:UPDATED_AT,direction:DESC}){totalCount nodes{number title url isDraft updatedAt repository{nameWithOwner} reviewDecision commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}";
     let odd = || GhErr::Other(crate::i18n::tr("gh vrátilo neočekávanou odpověď.", "gh returned an unexpected response.").into());
@@ -222,16 +222,16 @@ fn fetch(cfg: &GithubConfig) -> Fetched {
         let review = cfg.review.then(|| {
             s.spawn(|| {
                 let args = ["search", "prs", "--review-requested=@me", "--state=open", "--sort", "updated", "--order", "desc", "--limit", limit.as_str(), "--json", SEARCH_FIELDS];
-                run::run(&args).and_then(|o| parse::parse_search(&o).ok_or_else(odd))
+                run::run(&args, timeout).and_then(|o| parse::parse_search(&o).ok_or_else(odd))
             })
         });
         let mine = cfg.mine.then(|| {
             s.spawn(|| {
                 let q = format!("query={MINE_QUERY}");
-                run::run(&["api", "graphql", "-f", q.as_str(), "-F", n_arg.as_str()]).and_then(|o| parse::parse_mine(&o).ok_or_else(odd))
+                run::run(&["api", "graphql", "-f", q.as_str(), "-F", n_arg.as_str()], timeout).and_then(|o| parse::parse_mine(&o).ok_or_else(odd))
             })
         });
-        let notifs = cfg.notifications.then(|| s.spawn(|| run::run(&["api", notif_path.as_str()]).and_then(|o| parse::parse_notifications(&o).ok_or_else(odd))));
+        let notifs = cfg.notifications.then(|| s.spawn(|| run::run(&["api", notif_path.as_str()], timeout).and_then(|o| parse::parse_notifications(&o).ok_or_else(odd))));
         let crashed = || GhErr::Other(crate::i18n::tr("interní chyba", "internal error").into());
         Fetched {
             review: review.map(|h| h.join().unwrap_or_else(|_| Err(crashed()))),
@@ -241,7 +241,12 @@ fn fetch(cfg: &GithubConfig) -> Fetched {
     })
 }
 
-/// Obnoví data (blokuje až `run::TIMEOUT`), pokud to `mode` a stav dovolí, a vrátí aktuální pohled.
+/// Termín dotazů `gh`: plánovač proužku (`Mode::Auto`) kratší, ať při výpadku sítě nezdržuje vzorkování Systému.
+pub fn timeout_for(mode: Mode) -> std::time::Duration {
+    if mode == Mode::Auto { run::AUTO_TIMEOUT } else { run::TIMEOUT }
+}
+
+/// Obnoví data (blokuje až `timeout_for(mode)`), pokud to `mode` a stav dovolí, a vrátí aktuální pohled.
 /// Běžící dotaz druhý nespustí (vrátí pohled s `loading`).
 pub fn refresh(cfg: &GithubConfig, mode: Mode) -> GithubView {
     let now = crate::state::now_ms();
@@ -259,7 +264,7 @@ pub fn refresh(cfg: &GithubConfig, mode: Mode) -> GithubView {
         st.loading = true;
         st.attempt_at = Some(now);
     }
-    let fetched = fetch(cfg);
+    let fetched = fetch(cfg, timeout_for(mode));
     let mut st = STATE.lock();
     let (status, err) = apply(&mut st.data, fetched);
     if matches!(status, Status::NoGh | Status::Login) {
@@ -354,6 +359,12 @@ mod tests {
     }
 
     #[test]
+    fn auto_mode_has_shorter_timeout() {
+        assert!(timeout_for(Mode::Auto) < timeout_for(Mode::Card));
+        assert_eq!(timeout_for(Mode::Force), run::TIMEOUT);
+    }
+
+    #[test]
     fn due_table() {
         let min = 120_000;
         let cases = [
@@ -430,7 +441,7 @@ mod tests {
     #[ignore = "sahá na síť a vyžaduje přihlášené gh"]
     fn live_gh_smoke() {
         let cfg = GithubConfig { enabled: true, ..Default::default() };
-        let f = fetch(&cfg);
+        let f = fetch(&cfg, run::TIMEOUT);
         let review = f.review.expect("požadováno").map(|v| v.len());
         let mine = f.mine.expect("požadováno").map(|(n, v)| (n, v.len()));
         let notifs = f.notifs.expect("požadováno").map(|(n, v)| (n, v.len()));

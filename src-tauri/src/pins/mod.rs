@@ -11,6 +11,7 @@
 //! velikost = vnitřní v LOGICKÝCH px — po přesunu na monitor s jiným DPI zůstane lístek stejně velký.
 
 pub(crate) mod home;
+pub(crate) mod unhide;
 pub(crate) mod win;
 
 use crate::webpanel::Area;
@@ -463,8 +464,6 @@ pub(crate) enum FsKind {
     Exclusive,
     /// přes monitor leží okno prohlížeče (F11)
     CoverBrowser,
-    /// přes monitor leží okno Ledge / lístku
-    CoverOwn,
     /// přes monitor leží jiné okno (hra v okně bez rámu, video)
     CoverOther,
 }
@@ -478,19 +477,41 @@ pub(crate) fn is_browser_exe(exe: &str) -> bool {
     BROWSERS.iter().any(|b| stem.eq_ignore_ascii_case(b))
 }
 
-/// Co leží přes celý monitor: okno Ledge / lístku (`own`), prohlížeč, nebo něco jiného.
-pub(crate) fn cover_kind(own: bool, exe: &str) -> FsKind {
-    if own {
-        FsKind::CoverOwn
-    } else if is_browser_exe(exe) {
+/// Co leží přes celý monitor: prohlížeč, nebo něco jiného (vlastní okno Ledge se do určení fullscreenu
+/// nedostane — `screen::foreground_window` ho vyřadí).
+pub(crate) fn cover_kind(exe: &str) -> FsKind {
+    if is_browser_exe(exe) {
         FsKind::CoverBrowser
     } else {
         FsKind::CoverOther
     }
 }
 
+/// Ustupuje hře okno na monitoru `handle` (lístek i widget; `None` = monitor proužku)? Herní režim, D3D,
+/// borderless okno jiné aplikace ano, prohlížeč ve F11 ne. Bez fullscreenu a herního režimu levný early-out.
+pub(crate) fn yielding_at(c: &crate::state::Core, handle: Option<isize>) -> bool {
+    use std::sync::atomic::Ordering;
+    let gm = c.game_mode.load(Ordering::SeqCst);
+    if !gm && !c.fullscreen.load(Ordering::Relaxed) {
+        return false;
+    }
+    pins_yield(gm, c.fs_kind_on(handle.unwrap_or_else(|| c.monitor().handle)))
+}
+
+/// Zapíše do seznamu `list`, že okno `label` ustupuje / už ne; vrací, jestli se to změnilo.
+pub(crate) fn mark_yield(list: &parking_lot::Mutex<Vec<String>>, label: &str, y: bool) -> bool {
+    let mut g = list.lock();
+    let was = g.iter().any(|l| l == label);
+    match (was, y) {
+        (false, true) => g.push(label.to_string()),
+        (true, false) => g.retain(|l| l != label),
+        _ => {}
+    }
+    was != y
+}
+
 /// Mají lístky „Vždy navrchu“ ustoupit? Hře (herní režim, D3D, borderless okno jiné aplikace) ano,
-/// prohlížeči ve F11 a vlastnímu oknu ne.
+/// prohlížeči ve F11 ne.
 pub(crate) fn pins_yield(game_mode: bool, fs: FsKind) -> bool {
     game_mode || matches!(fs, FsKind::Exclusive | FsKind::CoverOther)
 }
@@ -498,14 +519,12 @@ pub(crate) fn pins_yield(game_mode: bool, fs: FsKind) -> bool {
 /// Co udělat při změně fullscreenu / herního režimu (`win::sync_dead`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DeadPlan {
-    /// přepnout oknům „vždy navrchu“ (jen při skutečné změně)
-    pub retop: bool,
     /// spustit odloženou obnovu po startu — i BEZ změny stavu (start ve hře: `DEAD` začíná na false)
     pub restore: bool,
 }
 
-pub(crate) fn dead_plan(was_dead: bool, dead: bool, restore_pending: bool) -> DeadPlan {
-    DeadPlan { retop: was_dead != dead, restore: !dead && restore_pending }
+pub(crate) fn dead_plan(restore_pending: bool, dead: bool) -> DeadPlan {
+    DeadPlan { restore: !dead && restore_pending }
 }
 
 #[cfg(test)]
@@ -520,12 +539,10 @@ mod tests {
             (false, None, false),
             (false, Exclusive, true),
             (false, CoverBrowser, false),
-            (false, CoverOwn, false),
             (false, CoverOther, true),
             (true, None, true),
             (true, Exclusive, true),
             (true, CoverBrowser, true),
-            (true, CoverOwn, true),
             (true, CoverOther, true),
         ];
         for (gm, fs, want) in cases {
@@ -535,18 +552,10 @@ mod tests {
 
     #[test]
     fn dead_plan_table() {
-        // (dřív ustupovaly, teď ustupují, čeká obnova) → (přepnout navrchu, obnovit)
-        let cases = [
-            (false, false, false, false, false),
-            // start v herním režimu: obnova čekala, `DEAD` se nezměnil (false → false) — dřív se nespustila
-            (false, false, true, false, true),
-            (true, false, true, true, true),
-            (true, false, false, true, false),
-            (false, true, true, true, false),
-            (true, true, true, false, false),
-        ];
-        for (was, dead, pending, retop, restore) in cases {
-            assert_eq!(dead_plan(was, dead, pending), DeadPlan { retop, restore }, "{was} {dead} {pending}");
+        // (čeká obnova, lístky na monitoru proužku ustupují) → obnovit? (i bez změny stavu: start ve hře)
+        let cases = [(false, false, false), (true, false, true), (true, true, false), (false, true, false)];
+        for (pending, dead, restore) in cases {
+            assert_eq!(dead_plan(pending, dead), DeadPlan { restore }, "{pending} {dead}");
         }
     }
 
@@ -558,10 +567,9 @@ mod tests {
         for exe in ["", "game.exe", "chromedriver.exe", "notchrome.exe", "chrome.dll", "vlc.exe"] {
             assert!(!is_browser_exe(exe), "{exe}");
         }
-        assert_eq!(cover_kind(true, "chrome.exe"), FsKind::CoverOwn);
-        assert_eq!(cover_kind(false, "msedge.exe"), FsKind::CoverBrowser);
-        assert_eq!(cover_kind(false, "game.exe"), FsKind::CoverOther);
-        assert_eq!(cover_kind(false, ""), FsKind::CoverOther);
+        assert_eq!(cover_kind("msedge.exe"), FsKind::CoverBrowser);
+        assert_eq!(cover_kind("game.exe"), FsKind::CoverOther);
+        assert_eq!(cover_kind(""), FsKind::CoverOther);
     }
 
     const FHD: Area = Area { l: 0, t: 0, r: 1920, b: 1040 };

@@ -7,6 +7,7 @@
 import { For, Show, type JSX } from "solid-js";
 import { t } from "../../i18n";
 import type { PreviewState } from "../appearanceModel";
+import { heatHex } from "../../notch/look";
 import { type ComposeItem, type Piece, type StripCompose, SIZE_MULT, SPACE_MULT, drawKind, normCompose } from "../../strip/compose";
 import type { LiveState } from "../../strip/edgefx";
 import { EdgeLayer, edgeLook, liveOf } from "./EdgeFx";
@@ -14,7 +15,7 @@ import { EdgeLayer, edgeLook, liveOf } from "./EdgeFx";
 const TONE: Record<Tone, string> = { run: "var(--blue)", wait: "var(--amber)", ok: "var(--green)", acc: "var(--accent)", music: "var(--amber)", off: "var(--t3)" };
 /** Ukázková historie CPU / paměti pro „průběh“ (0–100). */
 const SPARK = [18, 26, 22, 35, 30, 44, 38, 29, 33, 23];
-const cssColor = (c: string | undefined) => (!c ? undefined : c === "accent" ? "var(--accent)" : c);
+const cssColor = (c: string | undefined, pct?: number) => (!c ? undefined : c === "accent" ? "var(--accent)" : c === "heat" ? (pct === undefined ? undefined : heatHex(pct)) : c);
 import "./previews.css";
 
 type Tone = "run" | "wait" | "ok" | "acc" | "music" | "off";
@@ -99,6 +100,8 @@ export function PieceView(q: { piece: Piece; state: PreviewState }): JSX.Element
           case "ring":
             if (claude && q.piece.style === "ring5h") return <i class="apv-ring2" data-c={x.ev ? x.c : "acc"} style={{ "--p": "42%" }} />;
             return <i class="apv-ring2" data-c={x.c} classList={{ "apv-ring-spin": q.state === "work" }} style={{ "--p": `${x.p ?? 0}%` }} />;
+          case "ringText":
+            return <><i class="apv-ring2" data-c={x.c} style={{ "--p": `${x.p ?? 0}%` }} /><span class="apv-ct">{`${q.piece.item === "limitWeek" ? "7d " : ""}${(q.piece.item === "limitWeek" || q.piece.item === "limit5h" ? Math.floor : Math.round)(x.p ?? 0)} %`}</span></>;
           case "meter":
             return <span class="apv-meter" data-c={x.c}><i style={{ width: `${x.p}%` }} /></span>;
           default: return icon(x, false);
@@ -119,7 +122,7 @@ function PieceBox(q: { piece: Piece; state: PreviewState }) {
   const zoom = () => (q.piece.size && q.piece.size !== "normal" ? SIZE_MULT[q.piece.size] : undefined);
   return (
     <Show when={v()}>
-      <span class="apv-pc" classList={{ pcol: !!q.piece.color }} data-chip={chip() ? "" : undefined} style={{ "--pcol": cssColor(q.piece.color), "--chip": chip(), color: cssColor(q.piece.ink), zoom: zoom() }}>
+      <span class="apv-pc" classList={{ pcol: !!cssColor(q.piece.color, v()?.p) }} data-chip={chip() ? "" : undefined} style={{ "--pcol": cssColor(q.piece.color, v()?.p), "--chip": chip(), color: cssColor(q.piece.ink), zoom: zoom() }}>
         <PieceView piece={q.piece} state={q.state} />
       </span>
     </Show>
@@ -153,6 +156,7 @@ function estContentW(c: StripCompose, s: PreviewState): number {
   const pw = (p: Piece) => {
     const base =
       p.style === "dot" ? 14 :
+      p.style === "ringText" ? 56 :
       p.style === "icon" || p.style === "ring" || p.style === "ring5h" || p.style === "badge" ? 28 :
       p.style === "graph" ? 36 :
       p.style === "spark" ? 82 :

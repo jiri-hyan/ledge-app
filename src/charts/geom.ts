@@ -77,35 +77,6 @@ export function bars(values: readonly (number | null | undefined)[], w: number, 
   });
 }
 
-export type HeatOpts = { rows?: number; gap?: number; levels?: number; max?: number };
-export type HeatCell = Rect & { level: number; i: number };
-
-/** Úroveň 0…`levels` (0 = nula / nic, nejvyšší = maximum). */
-export function heatLevel(v: number, max: number, levels = 4): number {
-  if (!(v > 0) || !(max > 0)) return 0;
-  return Math.max(1, Math.min(levels, Math.ceil(clamp01(v / max) * levels)));
-}
-
-/** Pás (heat): buňky po sloupcích shora dolů (`rows` = 1 → jeden řádek; 7 → týdny jako u GitHubu).
- *  < 2 čísla = prázdné pole. Hodnota se nikdy nevymýšlí — chybějící číslo buňku vynechá (pořadí zůstává). */
-export function heat(values: readonly (number | null | undefined)[], w: number, h: number, opts: HeatOpts = {}): HeatCell[] {
-  const v = finite(values).map((x) => Math.max(0, x));
-  if (v.length < 2 || !(w > 0) || !(h > 0)) return [];
-  const rows = Math.max(1, Math.floor(opts.rows ?? 1));
-  const cols = Math.ceil(v.length / rows);
-  const gap = opts.gap ?? 2;
-  const levels = Math.max(1, Math.floor(opts.levels ?? 4));
-  const cw = (w - gap * (cols - 1)) / cols;
-  const ch = (h - gap * (rows - 1)) / rows;
-  if (cw <= 0 || ch <= 0) return [];
-  const top = opts.max ?? Math.max(...v);
-  return v.map((x, i) => {
-    const col = Math.floor(i / rows);
-    const row = i % rows;
-    return { i, x: r2(col * (cw + gap)), y: r2(row * (ch + gap)), w: r2(cw), h: r2(ch), level: heatLevel(x, top, levels) };
-  });
-}
-
 /** Trend posledního bodu vůči předposlednímu: znaménko a rozdíl (< 2 čísla = `null`). Pro šipku u velkého čísla. */
 export function trend(values: readonly (number | null | undefined)[], minDelta = 0): { dir: -1 | 0 | 1; delta: number } | null {
   const v = finite(values);

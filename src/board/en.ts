@@ -21,12 +21,6 @@ registerDict("en", {
   // katalog
   "cards.layout.card.usage": "Claude today",
   "cards.layout.desc.usage": "Spend and tokens today and over 7 days plus today's timeline by project (estimate from transcripts). Reads the local Claude Code logs on this computer.",
-  "cards.layout.card.week": "Week",
-  "cards.layout.desc.week": "Big month and time, a strip of days with today and today's calendar events",
-  "cards.layout.card.bigclock": "Big clock",
-  "cards.layout.desc.bigclock": "The time in huge digits with the date below",
-  "cards.layout.card.toggles": "Quick toggles",
-  "cards.layout.desc.toggles": "Mute sound and microphone, volume − / + and battery",
   // plocha
   "cards.desk.kind.week": "Week",
   "cards.desk.kind.clock": "Big clock",
@@ -61,7 +55,7 @@ registerDict("en", {
   "cards.board.mon.dec": "Dec",
   // Claude dnes
   "cards.board.usage.title": "Claude today",
-  "cards.board.usage.off": "Claude spend is off (Settings → Claude → Spend).",
+  "cards.board.usage.off": "Claude spend is off ({path}).",
   "cards.board.usage.error": "The recount failed.",
   "cards.board.usage.todayTok": "today · {n} tokens",
   "cards.board.usage.stale": "today not counted yet",
@@ -76,6 +70,8 @@ registerDict("en", {
   "cards.board.week.connect": "Connect",
   "cards.board.week.loading": "Loading the calendar…",
   "cards.board.week.unavailable": "The calendar is not available right now.",
+  "cards.board.week.stale": "Calendar fetched {ago}",
+  "cards.board.week.staleTitle": "The calendar could not be refreshed, or the data is older than 15 minutes.",
   "cards.board.week.nothing": "Nothing for today",
   "cards.board.week.untitled": "(untitled)",
   // Velké hodiny

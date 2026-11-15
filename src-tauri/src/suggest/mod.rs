@@ -70,7 +70,10 @@ pub(crate) fn view(cfg: &crate::config::Config) -> SuggestView {
     } else {
         GithubRefs::default()
     };
-    SuggestView { on: cfg.suggest.clone(), github }
+    // UI dostane už rozhodnutou hodnotu přehledu (`digest_on`), ne `None`
+    let mut on = cfg.suggest.clone();
+    on.digest = Some(on.digest_on());
+    SuggestView { on, github }
 }
 
 /// GitHub se právě načetl (volá `github::refresh` po uvolnění zámku): snapshot musí znát nová data.
@@ -125,6 +128,6 @@ mod tests {
         let cfg = crate::config::Config::default();
         let v = view(&cfg);
         assert_eq!(v.github, GithubRefs::default(), "výchozí GitHub je vypnutý");
-        assert!(v.on.dev_server && v.on.github && v.on.reminders && !v.on.clipboard, "výchozí zdroje");
+        assert!(v.on.dev_server && v.on.github && v.on.reminders && v.on.digest == Some(true) && !v.on.clipboard, "výchozí zdroje");
     }
 }

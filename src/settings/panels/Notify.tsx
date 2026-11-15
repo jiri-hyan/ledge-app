@@ -1,7 +1,8 @@
 // Sekce „Oznámení“ na stránce Claude (kolo 26, Rust `notify/`): KDE (Notch v proužku / toast Windows,
-// záložní toast) a JAK (doba, styl pro každou událost). ZDA se událost hlásí, zapínají dnešní vypínače
-// (`claude.toast`, `claude.limitsAlert`, `timer.toast`, `remindToast` u kalendáře) — tady se jen ukazuje jejich
-// stav. „Vyzkoušet“ = `notify_preview` → ukázka v proužku hned (smyšlený obsah, tlačítko jen zavře).
+// záložní toast) a JAK (doba, styl pro každou událost). Od kola 33 je vypínač události (`claude.toast`,
+// `claude.toastDone`, `claude.limitsAlert`, `timer.toast`) sloučený se stylem do JEDNOHO Selectu
+// (Vypnuto / styl; `merged.ts`, config na disku se nemění). Schůzka vypínač nemá — zapíná se u každého kalendáře
+// (`remindToast`). „Vyzkoušet“ = `notify_preview` → ukázka v proužku hned (smyšlený obsah, tlačítko jen zavře).
 import { For, Show } from "solid-js";
 import { api } from "../../api";
 import { t } from "../../i18n";
@@ -10,6 +11,7 @@ import { useSettings } from "../ctx";
 import { Select, Seg, Slider, Toggle } from "../fields/controls";
 import { Row, Section } from "../fields/Row";
 import { fieldLabel } from "../labels";
+import { notifyChoice, notifyOn, notifyWrites, type NotifyChoice } from "../merged";
 import { NOTIFY_DEFAULT, type NotchStyle, type NotifyKind } from "../../types/notify";
 
 const STYLES: { v: NotchStyle; key: string; cs: string }[] = [
@@ -21,30 +23,6 @@ const STYLES: { v: NotchStyle; key: string; cs: string }[] = [
 ];
 
 const KINDS: NotifyKind[] = ["waiting", "done", "meeting", "limit", "timer"];
-
-/** Zapíná událost dnešní vypínač? (null = rozhoduje každý kalendář zvlášť) */
-function sourceOn(cfg: any, k: NotifyKind): boolean | null {
-  switch (k) {
-    case "waiting":
-      return !!cfg.claude?.enabled && !!cfg.claude?.toast;
-    case "done":
-      return !!cfg.claude?.enabled && (cfg.claude?.toastDone ?? !!cfg.claude?.toast);
-    case "limit":
-      return !!cfg.claude?.limitsAlert;
-    case "timer":
-      return cfg.timer?.toast !== false;
-    case "meeting":
-      return null;
-  }
-}
-
-const SOURCE: Record<NotifyKind, [string, string]> = {
-  waiting: ["settings.notify.src.claude", "Zapíná „Claude čeká“ v sekci Claude výš."],
-  done: ["settings.notify.src.claudeDone", "Zapíná přepínač výše; dokud ho nezměníš, řídí se „Claude čeká“."],
-  limit: ["settings.notify.src.limit", "Zapíná „Upozornit na 80 % a 90 % limitu“ v Limitech výš."],
-  timer: ["settings.notify.src.timer", "Zapíná „Oznámení po doběhnutí“ v Obsahu karet → Časovač."],
-  meeting: ["settings.notify.src.meeting", "Zapíná se u každého kalendáře (Obsah karet → Kalendář → připomínka)."],
-};
 
 export default function NotifySection() {
   const c = useSettings();
@@ -72,39 +50,39 @@ export default function NotifySection() {
         <Row id="notify.durationS" nested>
           <Slider path="notify.durationS" min={2} max={30} step={1} label={fieldLabel("notify.durationS")} fmt={(v) => `${v} s`} />
         </Row>
-        <For each={KINDS}>
-          {(k) => {
-            const id = `notify.style.${k}`;
-            const on = () => sourceOn(c.cfg, k);
-            return (
-              <>
-              <Show when={k === "done"}>
-                <Row id="claude.toastDone" dim={!c.cfg.claude?.enabled}>
-                  <Toggle value={on() === true} onChange={(v) => c.set("claude.toastDone", v)} label={fieldLabel("claude.toastDone")} />
-                </Row>
-              </Show>
-              <Row id={`notify.style.${k}`} stack>
-                <Select path={id} label={fieldLabel(id)} options={STYLES.map((s) => ({ v: s.v, label: t(s.key, s.cs) }))} />
-                <div class="st-actions">
-                  <button type="button" class="mini" onClick={() => tryIt(k)}>
-                    {t("settings.notify.try", "Vyzkoušet")}
-                  </button>
-                  <Show when={styleOf(k) !== NOTIFY_DEFAULT.style[k]}>
-                    <button type="button" class="mini" onClick={() => c.set(id, NOTIFY_DEFAULT.style[k])}>
-                      {t("settings.notify.reset", "Vrátit")}
-                    </button>
-                  </Show>
-                  <small class="st-note">
-                    <Show when={on() === false}>{t("settings.notify.off", "Teď vypnuto.")} </Show>
-                    {t(...SOURCE[k])}
-                  </small>
-                </div>
-              </Row>
-              </>
-            );
-          }}
-        </For>
       </Show>
+      <For each={KINDS}>
+        {(k) => {
+          const id = `notify.style.${k}`;
+          const switchable = () => notifyOn(c.cfg, k) !== null;
+          const options = (): { v: NotifyChoice; label: string }[] => [
+            ...(switchable() ? [{ v: "off" as NotifyChoice, label: t("settings.notify.choice.off", "Vypnuto") }] : []),
+            ...(notch() ? STYLES.map((s) => ({ v: s.v as NotifyChoice, label: t(s.key, s.cs) })) : [{ v: "on" as NotifyChoice, label: t("settings.notify.choice.on", "Zapnuto (oznámení Windows)") }]),
+          ];
+          return (
+            <Show when={notch() || switchable()}>
+              <Row id={`notify.style.${k}`} stack dim={(k === "waiting" || k === "done") && !c.cfg.claude?.enabled}>
+                <Select value={notifyChoice(c.cfg, k, notch())} onChange={(v: NotifyChoice) => notifyWrites(k, v).forEach(([p, x]) => c.set(p, x))} label={fieldLabel(id)} options={options()} />
+                <Show when={notch()}>
+                  <div class="st-actions">
+                    <button type="button" class="mini" onClick={() => tryIt(k)}>
+                      {t("settings.notify.try", "Vyzkoušet")}
+                    </button>
+                    <Show when={styleOf(k) !== NOTIFY_DEFAULT.style[k]}>
+                      <button type="button" class="mini" onClick={() => c.set(id, NOTIFY_DEFAULT.style[k])}>
+                        {t("settings.notify.reset", "Vrátit")}
+                      </button>
+                    </Show>
+                    <Show when={k === "meeting"}>
+                      <small class="st-note">{t("settings.notify.src.meeting", "Zapíná se u každého kalendáře (Obsah karet → Kalendář → připomínka).")}</small>
+                    </Show>
+                  </div>
+                </Show>
+              </Row>
+            </Show>
+          );
+        }}
+      </For>
     </Section>
   );
 }

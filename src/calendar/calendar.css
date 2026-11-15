@@ -52,3 +52,12 @@
 .cal-src-d { font-size: var(--fs-xs); color: var(--t3); }
 .cal-src-info { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); font-size: var(--fs-sm); color: var(--t2); }
 .cal-src-note { font-size: var(--fs-xs); color: var(--t3); }
+
+/* kolo 33 (L85): délka schůzky a avatary účastníků */
+.cal-span { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: var(--fs-xs) var(--mono); color: var(--t3); margin-top: 2px; }
+.cal-span-run { color: var(--green); }
+.cal-people { display: inline-flex; align-items: center; }
+.cal-av { width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font: 600 var(--fs-2xs) var(--display); color: #0b1220; box-shadow: 0 0 0 1.5px var(--card); }
+.cal-av + .cal-av { margin-left: -5px; }
+.cal-av-tent { opacity: 0.55; }
+.cal-av-more { background: var(--card-3); color: var(--t2); font-weight: 500; }

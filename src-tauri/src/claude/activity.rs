@@ -197,6 +197,13 @@ fn next_raw(prev: Option<&Activity>, ev: &str, body: &Value, now: u64) -> Option
     }
 }
 
+/// `reason` z hooku `SessionEnd` očištěné pro UI: malá písmena, jen `a-z`, `_`, `-`, nejvýš 32 znaků; prázdné = `None`.
+/// Nic se nehádá — Claude Code posílá `clear`, `resume`, `logout`, `prompt_input_exit`, `bypass_permissions_disabled`, `other`.
+pub fn end_reason(raw: &str) -> Option<String> {
+    let r: String = raw.trim().to_lowercase().chars().take(32).collect();
+    (!r.is_empty() && r.chars().all(|c| c.is_ascii_lowercase() || c == '_' || c == '-')).then_some(r)
+}
+
 /// Poslal hook `Stop` text Clauda sám (`last_assistant_message`)? Pak se přepis nečte.
 pub fn hook_has_message(body: &Value) -> bool {
     body.get("last_assistant_message").and_then(Value::as_str).and_then(clean_message).is_some()

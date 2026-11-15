@@ -107,7 +107,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
         return Err(fe("update.intervalH", tr("update.intervalH musí být 1–48 (hodin).", "update.intervalH must be 1–48 (hours).")));
     }
     if !valid_repo(&cfg.update.repo) {
-        return Err(fe("update.repo", trf!("update.repo „{}“ musí mít tvar owner/name (např. jiri-hyan/ledge-app).", "update.repo “{}” must have the form owner/name (e.g. jiri-hyan/ledge-app).", cfg.update.repo)));
+        return Err(fe("update.repo", trf!("update.repo „{}“ musí mít tvar owner/name (např. acme/ledge-app).", "update.repo “{}” must have the form owner/name (e.g. acme/ledge-app).", cfg.update.repo)));
     }
     if !(0.1..=100.0).contains(&cfg.claude.brief.budget_usd) {
         return Err(fe("claude.brief.budgetUsd", tr("claude.brief.budgetUsd musí být 0,1–100.", "claude.brief.budgetUsd must be 0.1–100.")));
@@ -140,6 +140,7 @@ pub fn validate_field(cfg: &Config) -> Result<(), FieldError> {
     crate::sysmon::conf::validate(&cfg.system)?;
     crate::layout::validate(&cfg.layout)?;
     crate::accounts::conf::validate(&cfg.accounts)?;
+    crate::connector::validate(&cfg.connector)?;
     crate::tilelook::validate(cfg)?;
     Ok(())
 }

@@ -59,7 +59,174 @@ FunctionEnd
 Function LedgeNoop
 FunctionEnd
 
+; ---- přechod na jiného vydavatele (klíč výrobce) a nový identifikátor ----
+; Šablona Tauri skládá klíče z vydavatele: MANUPRODUCTKEY = Software\<vydavatel>\Ledge (tam si instalátor pamatuje
+; složku instalace pro RestorePreviousInstallLocation). Starší vydání mělo jiného vydavatele, proto:
+;   - nový instalátor tenhle klíč nenajde a nabídl by výchozí složku → druhá kopie, kdo instaloval jinam;
+;   - starý klíč zůstane osiřelý.
+; Starého vydavatele NEZADÁVÁME jménem: hledá se podklíč `Software\*\Ledge` s výchozí hodnotou = složka, kde leží
+; ledge.exe (jiný produkt takový klíč mít nemůže). Co se NEnajde, se nemění — čistý stroj / už uklizeno = beze změny.
+Var LedgeIdx
+Var LedgeTmp
+Var LedgeDir
+Var LedgeOldKey
+Var LedgeOldDir
+Var LedgeFind
+Var LedgePagesRan
+Var LedgeLen
+Var LedgeOk
+Var LedgeMid
+Var LedgeI
+Var LedgeJ
+Var LedgeCh
+Var LedgeCa
+Var LedgeHit
+
+; sada: $LedgeOldKey = jméno podklíče vydavatele a $LedgeOldDir = složka, nebo obojí prázdné
+!macro LEDGE_FIND_OLD_MAKER
+  StrCpy $LedgeOldKey ""
+  StrCpy $LedgeOldDir ""
+  StrCpy $LedgeIdx 0
+  ${Do}
+    EnumRegKey $LedgeTmp SHCTX "Software" $LedgeIdx
+    ${If} $LedgeTmp == ""
+      ${Break}
+    ${EndIf}
+    IntOp $LedgeIdx $LedgeIdx + 1
+    ${If} $LedgeTmp != "${MANUFACTURER}"
+      ReadRegStr $LedgeDir SHCTX "Software\$LedgeTmp\${PRODUCTNAME}" ""
+      ${If} $LedgeDir != ""
+      ${AndIf} ${FileExists} "$LedgeDir\${MAINBINARYNAME}.exe"
+        StrCpy $LedgeOldKey $LedgeTmp
+        StrCpy $LedgeOldDir $LedgeDir
+        ${Break}
+      ${EndIf}
+    ${EndIf}
+  ${Loop}
+!macroend
+
+; osiřelý klíč starého vydavatele pryč (rodič jen když je prázdný)
+!macro LEDGE_DROP_OLD_MAKER
+  !insertmacro LEDGE_FIND_OLD_MAKER
+  ${If} $LedgeOldKey != ""
+    DeleteRegKey SHCTX "Software\$LedgeOldKey\${PRODUCTNAME}"
+    DeleteRegKey /ifempty SHCTX "Software\$LedgeOldKey"
+  ${EndIf}
+!macroend
+
+; složka dat WebView2 starého identifikátoru: maska cz.*.ledge, jen když obsahuje EBWebView a není to nový identifikátor.
+; Prostřední segment musí splnit stejné pravidlo jako `is_legacy_name` ve webdata.rs: neprázdný, jen a-z 0-9 - .
+; (znak se hledá v povolené sadě; porovnání NSIS nerozlišuje velikost písmen). Maska FindFirst je volnější (mezera aj.).
+!macro LEDGE_RM_OLD_PROFILES
+  FindFirst $LedgeFind $LedgeTmp "$LOCALAPPDATA\cz.*.ledge"
+  ${DoWhile} $LedgeTmp != ""
+    StrCpy $LedgeOk 0
+    StrLen $LedgeLen $LedgeTmp
+    ${If} $LedgeLen > 9
+      StrCpy $LedgeOk 1
+      StrCpy $LedgeMid $LedgeTmp -6 3
+      StrLen $LedgeLen $LedgeMid
+      StrCpy $LedgeI 0
+      ${While} $LedgeI < $LedgeLen
+        StrCpy $LedgeCh $LedgeMid 1 $LedgeI
+        StrCpy $LedgeHit 0
+        StrCpy $LedgeJ 0
+        ${While} $LedgeJ < 38
+          StrCpy $LedgeCa "abcdefghijklmnopqrstuvwxyz0123456789-." 1 $LedgeJ
+          ${If} $LedgeCh == $LedgeCa
+            StrCpy $LedgeHit 1
+            ${Break}
+          ${EndIf}
+          IntOp $LedgeJ $LedgeJ + 1
+        ${EndWhile}
+        ${If} $LedgeHit = 0
+          StrCpy $LedgeOk 0
+          ${Break}
+        ${EndIf}
+        IntOp $LedgeI $LedgeI + 1
+      ${EndWhile}
+    ${EndIf}
+    ${If} $LedgeOk = 1
+    ${AndIf} $LedgeTmp != "${BUNDLEID}"
+    ${AndIf} ${FileExists} "$LOCALAPPDATA\$LedgeTmp\EBWebView\*.*"
+      RmDir /r "$LOCALAPPDATA\$LedgeTmp"
+    ${EndIf}
+    FindNext $LedgeFind $LedgeTmp
+  ${Loop}
+  FindClose $LedgeFind
+!macroend
+
+; $LedgeDir = složka dřívější instalace, kde opravdu leží ledge.exe, jinak "": nejdřív Uninstall\Ledge\InstallLocation
+; (v uvozovkách; zapisuje ho šablona, sdílí ho staré i nové vydání), pak starý klíč vydavatele.
+!macro LEDGE_RESOLVE_OLD_DIR
+  ReadRegStr $LedgeDir SHCTX "${UNINSTKEY}" "InstallLocation"
+  StrLen $LedgeLen $LedgeDir
+  StrCpy $LedgeTmp $LedgeDir 1
+  ${If} $LedgeTmp == '"'
+  ${AndIf} $LedgeLen > 2
+    IntOp $LedgeLen $LedgeLen - 2
+    StrCpy $LedgeDir $LedgeDir $LedgeLen 1
+  ${EndIf}
+  ${If} $LedgeDir == ""
+  ${OrIfNot} ${FileExists} "$LedgeDir\${MAINBINARYNAME}.exe"
+    !insertmacro LEDGE_FIND_OLD_MAKER
+    StrCpy $LedgeDir $LedgeOldDir
+  ${EndIf}
+!macroend
+
+; ÚVODNÍ STRÁNKA (první stránka průvodce; vlastní PRE funkce, dělá i to, co SkipIfPassive ze šablony): nový klíč
+; výrobce chybí, ale dřívější vydání je nainstalované → zapsat ho s dřívější složkou a nabídnout ji jako výchozí.
+; Proč: krok „odinstalovat před instalací“ (PageLeaveReinstall v šabloně) bere složku pro starý odinstalátor (`_?=`)
+; PRÁVĚ z ${MANUPRODUCTKEY}; bez něj dostane prázdnou cestu a ledge.exe nesmaže. Běží dřív než stránka Složka, takže
+; cokoli tam uživatel zvolí, už se nepřepisuje (PREINSTALL níž je jen pro tichou instalaci bez stránek).
+!macroundef MUI_PAGE_WELCOME
+!macro MUI_PAGE_WELCOME
+  !verbose push
+  !verbose ${MUI_VERBOSE}
+  !insertmacro MUI_PAGE_INIT
+  !undef MUI_PAGE_CUSTOMFUNCTION_PRE
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE LedgeWelcomePre
+  !insertmacro MUI_PAGEDECLARATION_WELCOME
+  !verbose pop
+
+  ; funkce uvnitř makra: ${MANUPRODUCTKEY} a spol. se definují až v šabloně, makro se rozvine za nimi
+  Function LedgeWelcomePre
+    StrCpy $LedgePagesRan 1
+    ReadRegStr $LedgeDir SHCTX "${MANUPRODUCTKEY}" ""
+    ${If} $LedgeDir == ""
+      !insertmacro LEDGE_RESOLVE_OLD_DIR
+      ${If} $LedgeDir != ""
+        WriteRegStr SHCTX "${MANUPRODUCTKEY}" "" $LedgeDir
+        StrCpy $INSTDIR $LedgeDir
+      ${EndIf}
+    ${EndIf}
+    ${If} $PassiveMode = 1
+      Abort
+    ${EndIf}
+  FunctionEnd
+!macroend
+
+; PREINSTALL běží hned po `SetOutPath $INSTDIR` a PŘED CheckIfAppIsRunning / kopírováním (installer.nsi, Section Install).
+; Jen když neproběhla úvodní stránka (tichá instalace /S, /UPDATE): složka se nezměnila (INSTDIR = výchozí) a nový klíč
+; chybí → dřívější složka. V průvodci to řeší LedgeWelcomePre dřív, takže výběr na stránce Složka stojí.
+!macro NSIS_HOOK_PREINSTALL
+  ${If} $LedgePagesRan != 1
+  ${AndIf} $INSTDIR == "$LOCALAPPDATA\${PRODUCTNAME}"
+    ReadRegStr $LedgeDir SHCTX "${MANUPRODUCTKEY}" ""
+    ${If} $LedgeDir == ""
+      !insertmacro LEDGE_RESOLVE_OLD_DIR
+      ${If} $LedgeDir != ""
+      ${AndIf} $LedgeDir != $INSTDIR
+        StrCpy $INSTDIR $LedgeDir
+        SetOutPath $INSTDIR
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+!macroend
+
 !macro NSIS_HOOK_POSTINSTALL
+  ; osiřelý klíč starého vydavatele (nový klíč už šablona zapsala)
+  !insertmacro LEDGE_DROP_OLD_MAKER
   ; stav pro stránku Dokončení — jen v průvodci (tichá aktualizace nic nečte ani nemění)
   ${IfNot} ${Silent}
   ${AndIf} $PassiveMode <> 1
@@ -68,8 +235,13 @@ FunctionEnd
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
-  ; „Ponechat nastavení“ odškrtnuto: šablona už smazala %APPDATA% a %LOCALAPPDATA%\cz.hyan.ledge (jen cache
-  ; WebView2); Ledge má svoje data pod jménem produktu. Poznámky (%USERPROFILE%\Ledge) se nemažou nikdy.
+  ; „Ponechat nastavení“ odškrtnuto: šablona už smazala %APPDATA% a CELOU %LOCALAPPDATA%\<nový identifikátor> (profil
+  ; WebView2: localStorage, cookies oken „web“, cache; uvnitř ní zakládá migrace `webdata.rs` i rozdělanou kopii
+  ; EBWebView.migrating, značky .migrated-from / .migrate-deferred a odsunutý čistý profil EBWebView.clean-*, takže je
+  ; netřeba mazat zvlášť); my navíc profil starého identifikátoru (maska, ponechává ho
+  ; migrace kvůli návratu na starší verzi). Klíč starého vydavatele tu nehledáme: hledání se opírá o ledge.exe, který
+  ; šablona už smazala; osiřelý klíč uklízí POSTINSTALL. Ledge má svoje data
+  ; pod jménem produktu. Poznámky (%USERPROFILE%\Ledge) se nemažou nikdy.
   ${If} $DeleteAppDataCheckboxState = 1
   ${AndIf} $UpdateMode <> 1
     SetShellVarContext current
@@ -78,6 +250,7 @@ FunctionEnd
     ${EndIf}
     ${If} $LOCALAPPDATA != ""
       RmDir /r "$LOCALAPPDATA\${PRODUCTNAME}"
+      !insertmacro LEDGE_RM_OLD_PROFILES
     ${EndIf}
   ${EndIf}
 !macroend

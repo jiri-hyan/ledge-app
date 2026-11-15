@@ -4,6 +4,7 @@
 // `../claudeSetup.ts`. Nic nespouští — zapnutí je výslovný klik a jde vypnout i v Nastavení → Claude (MCP).
 import { onMount, Show } from "solid-js";
 import { t } from "../../i18n";
+import { settingsPath } from "../../settings/path";
 import { assist, chooseClaude, copy, disableMcp, loadMcp, promptText } from "../assist";
 import { setupView } from "../claudeSetup";
 import { installHooks, wiz } from "../store";
@@ -69,7 +70,7 @@ export function ClaudeStep() {
             <Show when={wiz.claude?.exe}>
               <li>{wiz.claude?.exe}</li>
             </Show>
-            <li>{t("onboarding.assist.allowed", "Claude smí číst a měnit nastavení Ledge (zástupce, akce, rozložení, vzhled). Nic nespouští a nic neposílá ven. Připojení jde kdykoli vypnout v Nastavení → Claude (MCP).")}</li>
+            <li>{t("onboarding.assist.allowed", "Claude smí číst a měnit nastavení Ledge (zástupce, akce, rozložení, vzhled). Nic nespouští a nic neposílá ven. Připojení jde kdykoli vypnout v {path}.", { path: settingsPath("claude", "mcp") })}</li>
           </ul>
           <Show when={view() === "connect"}>
             <Connect />

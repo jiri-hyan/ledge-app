@@ -11,9 +11,11 @@
 .sg-chip[data-kind="ghReview"] .sg-ico { color: var(--violet); }
 .sg-chip[data-kind="dev"] .sg-ico { color: var(--green); }
 .sg-chip[data-kind="clip"] .sg-ico { color: var(--accent); }
+.sg-chip[data-kind="claudeSince"] .sg-ico { color: var(--green); }
+.sg-chip[data-kind="briefWaiting"] .sg-ico { color: var(--amber); }
 .sg-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sg-more { flex-shrink: 0; font: var(--fs-2xs) var(--mono); color: var(--t3); }
 .sg-act { flex-shrink: 0; color: var(--t0); }
-.sg-x { flex-shrink: 0; width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--t3); font-size: 15px; line-height: 1; transition: background var(--fast), color var(--fast); }
+.sg-x { flex-shrink: 0; width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--r-sm); color: var(--t3); font-size: 15px; line-height: 1; transition: background var(--fast), color var(--fast); }
 .sg-x:hover { background: var(--card-2); color: var(--t1); }
 .sg-x:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }

@@ -6,7 +6,7 @@
 import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { api, type EditPreview, type GitFileView, type GitView, type SessionView } from "../api";
 import { t, tp } from "../i18n";
-import { say } from "../ui/toast";
+import { errorText, say, sayError } from "../ui/toast";
 import { Confirm } from "../ui/Confirm";
 import DiffPreview from "./DiffPreview";
 import { badge, canPush, commitReady, defaultPicked, diffModes, hiddenFiles, messageKey, togglePicked } from "./git";
@@ -38,7 +38,7 @@ export default function GitPanel(p: { id: string; status: SessionView["status"] 
       setLoadErr(null);
       if (v) setPicked(picked().filter((x) => v.files.some((f) => f.path === x)));
     } catch (e) {
-      setLoadErr(String(e));
+      setLoadErr(errorText(e));
     }
   }
   void load();
@@ -62,8 +62,8 @@ export default function GitPanel(p: { id: string; status: SessionView["status"] 
       say(typeof out === "string" && out ? out : done);
       after?.();
     } catch (e) {
-      setErr(String(e));
-      say(String(e).split("\n")[0], true);
+      setErr(errorText(e));
+      sayError(e);
     } finally {
       setBusy(false);
       await load();
@@ -80,7 +80,7 @@ export default function GitPanel(p: { id: string; status: SessionView["status"] 
       if (cur?.path === f.path && cur.staged === staged) setDiff({ path: f.path, staged, pv: pv ?? null });
     } catch (e) {
       setDiff(null);
-      say(String(e), true);
+      sayError(e);
     }
   }
 
@@ -115,7 +115,7 @@ export default function GitPanel(p: { id: string; status: SessionView["status"] 
     else if (c.kind === "discard") void run(() => api.sessionGitDiscard(p.id, c.path), t("sessions.git.discarded", "Změny zahozené"), () => diff()?.path === c.path && setDiff(null));
     else void run(() => api.sessionGitRemoveWorktree(p.id), t("sessions.git.removed", "Worktree odstraněn"));
   }
-  const open = (target: "terminal" | "folder") => api.sessionGitOpen(p.id, target).catch((e) => say(String(e), true));
+  const open = (target: "terminal" | "folder") => api.sessionGitOpen(p.id, target).catch((e) => sayError(e));
 
   return (
     <div class="sess-git">

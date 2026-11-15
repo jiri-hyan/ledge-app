@@ -32,6 +32,14 @@ pub mod preview;
 mod questions;
 pub mod rules;
 pub mod unseen;
+/// Id jediné čekající žádosti; při žádné nebo více `None` (zkratka nesmí hádat, kterou má člověk na mysli).
+pub(crate) fn sole_id(ids: &[u64]) -> Option<u64> {
+    match ids {
+        [id] => Some(*id),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod activity_tests;
 #[cfg(test)]
@@ -117,6 +125,8 @@ pub struct Session {
     pub unpushed: u32,
     /// Session skončila (`SessionEnd`), ale drží se v seznamu, protože práci nedokončila.
     pub ended: bool,
+    /// proč session skončila: `reason` z hooku `SessionEnd` (`clear`, `logout`, `prompt_input_exit`, `other`…); jen u ended, jinak `None`
+    pub end_reason: Option<String>,
     /// běžící a nedávno dokončení subagenti (hooky `SubagentStart` / `SubagentStop`)
     pub subagents: Subagents,
     /// `transcript_path` z posledního hooku (kontext session čte `ctxsize`, jen na žádost UI)
@@ -128,7 +138,7 @@ pub struct Session {
 
 impl Session {
     fn new(id: &str, cwd: &str, state: SessionState, now: u64) -> Self {
-        Self { id: id.to_string(), cwd: cwd.to_string(), state, title: None, updated_at: now, uncommitted: vec![], unpushed: 0, ended: false, subagents: Subagents::default(), activity: None, transcript: None }
+        Self { id: id.to_string(), cwd: cwd.to_string(), state, title: None, updated_at: now, uncommitted: vec![], unpushed: 0, ended: false, end_reason: None, subagents: Subagents::default(), activity: None, transcript: None }
     }
 
     /// Nedokončená práce: nezacommitované vlastní soubory nebo nepushnuté vlastní commity.
@@ -281,6 +291,13 @@ impl Claude {
         self.decide_by(id, |_| Some(d))
     }
 
+    /// Zkratka schválit/zamítnout (L237): rozhodne jen když čeká právě jedna žádost — víc žádostí = člověk by schválil
+    /// něco jiného, než má před očima (karta v ostrůvku se vybírá podle události, ne podle pořadí). Vrací, zda se rozhodlo.
+    pub fn decide_sole(&self, d: Decision) -> bool {
+        let ids: Vec<u64> = self.inner.lock().pending.iter().map(|(p, _)| p.id).collect();
+        sole_id(&ids).is_some_and(|id| self.decide(Some(id), d))
+    }
+
     /// Klik s doplňkem (`decide(id, allow, extra?)`): „Vždy povolit“ do cíle / důvod zamítnutí. Pravidlo
     /// bere z čekající žádosti (to, co karta ukázala), nikdy z IPC. „Vždy“ jen pro konkrétní `id`.
     /// U plánu rozhoduje `plan::resolve` (režim / připomínka; „Vždy“ ne), jinde režim nedává smysl.
@@ -298,6 +315,10 @@ impl Claude {
 
     /// `f` z čekající žádosti udělá rozhodnutí; `None` = nic se nerozhodne, žádost čeká dál.
     fn decide_by(&self, id: Option<u64>, f: impl FnOnce(&Pending) -> Option<Decision>) -> bool {
+        // izolovaná instance (QA, `qa.rs`): CDP umí klikat, rozhodnout o akci Clauda smí jen člověk
+        if crate::qa::approvals_blocked() {
+            return false;
+        }
         let mut g = self.inner.lock();
         let idx = match id {
             Some(id) => g.pending.iter().position(|(p, _)| p.id == id),
@@ -459,6 +480,7 @@ impl Claude {
             }
             // resume pod stejným session_id → už není ukončená
             sess.ended = ev == "SessionEnd";
+            sess.end_reason = if sess.ended { activity::end_reason(&s(body, "reason")) } else { None };
             match ev.as_str() {
                 "UserPromptSubmit" => {
                     sess.state = SessionState::Working;
@@ -562,6 +584,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn sole_id_table() {
+        for (ids, want) in [(&[][..], None), (&[7][..], Some(7)), (&[7, 8][..], None)] {
+            assert_eq!(sole_id(ids), want, "{ids:?}");
+        }
+    }
+
+    #[test]
     fn same_request_table() {
         let card = |tool: &str, summary: &str, use_id: Option<&str>, plan: Option<plan::Plan>| Pending { id: 1, session_id: "s".into(), cwd: "C:/x".into(), tool: tool.into(), summary: summary.into(), created_at: 0, expires_at: 0, always: None, preview: None, plan, via: plan::Via::Permission, tool_use_id: use_id.map(str::to_string) };
         let a_plan = || plan::for_request(&json!({"plan": "# Plán A"}), "C:/x");
@@ -627,6 +656,27 @@ mod tests {
             assert!(c.decide(Some(p.id), Decision::Deny));
             assert_eq!(h.join().unwrap(), Decision::Deny);
         }
+    }
+
+    /// Izolovaná instance (QA, L295): žádná cesta rozhodnutí (klik, zkratka, plán) žádost nevyřídí ani neodpoví na otázku;
+    /// bez izolace pak rozhodnutí projde jako dřív.
+    #[test]
+    fn isolated_instance_never_decides() {
+        let c = Claude::new(Arc::new(|| {}), Duration::from_secs(5));
+        let c2 = c.clone();
+        let h = std::thread::spawn(move || c2.handle_permission(&json!({"session_id": "s", "cwd": "C:/p", "tool_name": "Bash", "tool_input": {"command": "ls"}})));
+        let p = wait_pending(&c);
+        crate::qa::with_isolated(|| {
+            assert!(!c.decide(Some(p.id), Decision::Allow));
+            assert!(!c.decide(None, Decision::Allow));
+            assert!(!c.decide_sole(Decision::Allow));
+            assert!(!c.decide_with(Some(p.id), true, &rules::Extra::default()));
+            let e = c.answer_question(1, &[]).unwrap_err();
+            assert!(e.contains("QA"), "{e}");
+        });
+        assert_eq!(c.pending().len(), 1, "žádost dál čeká na člověka");
+        assert!(c.decide(Some(p.id), Decision::Deny));
+        assert_eq!(h.join().unwrap(), Decision::Deny);
     }
 
     /// Čeká, až `handle_permission` ve vlákně vystaví žádost.

@@ -166,15 +166,15 @@ pub fn state(w: Window, at: i64, now: i64) -> State {
 // ---------- proužek ----------
 
 /// Text segmentu proužku: „5h 42 % · týden 59 %“; u okna ≥ 90 % i čas resetu („5h 100 % → 14:30“).
-/// Staré ani obnovené okno se nehlásí (neznáme ho). `clock` = ms → „HH:MM“ místního času.
+/// Staré okno (`State::Stale`) se nehlásí (procento neznáme); obnovené (`State::Reset`) ukáže „5h obnoveno“. `clock` = ms → „HH:MM“ místního času.
 pub fn strip_text(s: &Sample, now: i64, clock: &dyn Fn(i64) -> String) -> Option<String> {
     let mut parts = Vec::new();
     for (k, name) in [(Kind::FiveHour, "5h"), (Kind::SevenDay, crate::i18n::tr("týden", "week"))] {
         let Some(w) = s.window(k) else { continue };
         match state(w, s.at, now) {
             State::Fresh(p) => {
-                let mut t = format!("{name} {:.0} %", p.floor());
-                if p >= 90.0
+                let mut t = format!("{name} {}", crate::util::pct_floor_text(p));
+                if p >= crate::looks::capsule::FULL_PCT
                     && let Some(r) = w.resets_at
                 {
                     t.push_str(&format!(" → {}", clock(r)));
@@ -244,6 +244,8 @@ pub fn next_reset(armed: &Armed) -> Option<i64> {
 
 /// Prahy upozornění v procentech, vzestupně.
 pub const ALERT_LEVELS: [u8; 2] = [80, 90];
+/// O kolik procentních bodů musí `pct` klesnout pod ohlášený práh, aby se okno bez `resetsAt` považovalo za obnovené.
+const REARM_DROP: f64 = 5.0;
 
 /// Co už se v kterém okně ohlásilo: (okno, konec okna nebo 0, nejvyšší ohlášený práh).
 pub type Alerted = Vec<(Kind, i64, u8)>;
@@ -256,7 +258,11 @@ pub fn alerts_due(done: &mut Alerted, s: &Sample) -> Vec<(Kind, u8, f64)> {
     for k in [Kind::FiveHour, Kind::SevenDay] {
         let Some(w) = s.window(k) else { continue };
         let reset = w.resets_at.unwrap_or(0);
-        let had = done.iter().find(|&&(dk, dr, _)| dk == k && dr == reset).map_or(0, |&(_, _, l)| l);
+        let mut had = done.iter().find(|&&(dk, dr, _)| dk == k && dr == reset).map_or(0, |&(_, _, l)| l);
+        // L237: bez `resetsAt` (Desktop zdroj) nepoznáme nové okno podle času — výrazný pokles pod ohlášený práh ho znovu odjistí
+        if w.resets_at.is_none() && w.pct < f64::from(had) - REARM_DROP {
+            had = 0;
+        }
         let level = ALERT_LEVELS.iter().rev().copied().find(|&l| w.pct >= f64::from(l)).unwrap_or(0);
         if level > had {
             out.push((k, level, w.pct));
@@ -288,6 +294,36 @@ pub fn push_hist(h: &mut Vec<(i64, f64)>, at: i64, pct: f64) -> bool {
     true
 }
 
+// ---------- odhad „dojde za ~N min“ (volba `claude.limitsAlert`, zrcadlo `limits/pace.ts` `rate5h` + `eta5h`) ----------
+
+/// Odhad dojde-li 5h okno 100 % před obnovou (≤ tolik ms) → upozornění.
+pub const ETA_ALERT_MS: i64 = 45 * 60_000;
+/// Tempo se bere z posledních 30 min historie, aspoň ze 3 vzorků s rozpětím ≥ 10 min (jinak nic — žádný průměr okna, žádné divadlo).
+const ETA_WINDOW_MS: i64 = 30 * 60_000;
+const ETA_MIN_SPAN_MS: i64 = 10 * 60_000;
+const ETA_MIN_POINTS: usize = 3;
+
+/// Za kolik ms dosáhne 5h okno 100 %, když tempo z posledních vzorků vydrží, a to ještě před obnovou (`resets_at`);
+/// `None` = málo vzorků, žádné čerpání, okno bez obnovy nebo vydrží do obnovy. Čistá funkce.
+pub fn eta_runs_out(hist: &[(i64, f64)], used: f64, resets_at: Option<i64>, now: i64) -> Option<i64> {
+    let reset = resets_at.filter(|&r| r > now)?;
+    let pts: Vec<&(i64, f64)> = hist.iter().filter(|&&(at, _)| at >= now - ETA_WINDOW_MS && at <= now).collect();
+    if pts.len() < ETA_MIN_POINTS {
+        return None;
+    }
+    let (a, p0) = *pts[0];
+    let (b, p1) = *pts[pts.len() - 1];
+    if b - a < ETA_MIN_SPAN_MS {
+        return None;
+    }
+    let per_ms = (p1 - p0) / (b - a) as f64;
+    if per_ms.is_nan() || per_ms <= 0.0 {
+        return None;
+    }
+    let left = ((100.0 - used) / per_ms).max(0.0) as i64;
+    (now + left < reset).then_some(left)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -297,6 +333,24 @@ mod tests {
 
     fn w(pct: f64, r: Option<i64>) -> Option<Window> {
         Some(Window { pct, resets_at: r })
+    }
+
+    #[test]
+    fn eta_runs_out_table() {
+        let m = 60_000;
+        // [(minut zpět, pct)]: 10 % → 40 % za 30 min = 1 %/min
+        let h = |v: &[(i64, f64)]| v.iter().map(|&(a, p)| (NOW - a * m, p)).collect::<Vec<_>>();
+        let steady = h(&[(30, 10.0), (20, 20.0), (10, 30.0), (0, 40.0)]);
+        let reset = Some(NOW + 120 * m);
+        assert_eq!(eta_runs_out(&steady, 40.0, reset, NOW), Some(60 * m), "60 % při 1 %/min = 60 min");
+        assert_eq!(eta_runs_out(&steady, 40.0, Some(NOW + 50 * m), NOW), None, "obnova dřív = vydrží");
+        assert_eq!(eta_runs_out(&steady, 40.0, None, NOW), None, "bez času obnovy nic");
+        assert_eq!(eta_runs_out(&steady, 40.0, Some(NOW - 1), NOW), None, "po obnově nic");
+        assert_eq!(eta_runs_out(&h(&[(20, 10.0), (0, 40.0)]), 40.0, reset, NOW), None, "2 vzorky = málo");
+        assert_eq!(eta_runs_out(&h(&[(5, 30.0), (3, 32.0), (0, 40.0)]), 40.0, reset, NOW), None, "rozpětí < 10 min");
+        assert_eq!(eta_runs_out(&h(&[(30, 40.0), (20, 40.0), (0, 40.0)]), 40.0, reset, NOW), None, "bez čerpání");
+        assert_eq!(eta_runs_out(&h(&[(90, 10.0), (80, 20.0), (70, 30.0)]), 30.0, reset, NOW), None, "starý vzorek mimo okno");
+        assert_eq!(eta_runs_out(&steady, 100.0, reset, NOW), Some(0), "už 100 %");
     }
 
     #[test]
@@ -527,6 +581,24 @@ mod tests {
         ];
         for (i, (smp, want)) in steps.into_iter().enumerate() {
             let got: Vec<_> = alerts_due(&mut done, &smp).into_iter().map(|(k, l, _)| (k, l)).collect();
+            assert_eq!(got, want, "krok {i}");
+        }
+    }
+
+    /// L237: okno bez `resetsAt` (klíč 0) se po výrazném poklesu znovu odjistí; šum těsně pod prahem ne.
+    #[test]
+    fn alerts_rearm_without_reset_time() {
+        let sample = |five: f64| Sample { at: NOW, five_hour: w(five, None), seven_day: None, source: Source::Desktop };
+        let mut done = Alerted::new();
+        let steps: Vec<(f64, Vec<(Kind, u8)>)> = vec![
+            (85.0, vec![(Kind::FiveHour, 80)]),
+            (78.0, vec![]), // šum pod prahem, hystereze
+            (82.0, vec![]),
+            (20.0, vec![]), // nové okno
+            (81.0, vec![(Kind::FiveHour, 80)]),
+        ];
+        for (i, (pct, want)) in steps.into_iter().enumerate() {
+            let got: Vec<_> = alerts_due(&mut done, &sample(pct)).into_iter().map(|(k, l, _)| (k, l)).collect();
             assert_eq!(got, want, "krok {i}");
         }
     }

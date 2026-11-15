@@ -18,13 +18,16 @@ pub struct DrawerConfig {
     pub dwell_delay_ms: u64,
     /// Za jak dlouho (ms) se šuplík zavře, když z něj myš odjede.
     pub close_delay_ms: u64,
-    /// Co se stane po najetí myší: "full" = rovnou celý šuplík (výchozí), "compact" = kompaktní náhled
-    /// (schválení, session Clauda, právě hraje, čas a limit 5h), "island" = roztažený ostrůvek (jedno
-    /// nejdůležitější dění s tlačítky). Z náhledu otevře celý šuplík klik nebo setrvání myši.
+    /// Co se stane po najetí myší: "full" = rovnou celý šuplík (výchozí), "island" = roztažený ostrůvek
+    /// (jedno nejdůležitější dění s tlačítky), "dock" = dok (klik / setrvání → střední panel s kartami). Starý "compact"
+    /// (kompaktní náhled, zrušen v kole 34) se načte jako "dock". Z náhledu otevře celý šuplík klik nebo setrvání myši.
     pub hover: crate::hovermode::HoverMode,
-    /// Náhled po najetí ("compact" / "island"): po kolika ms setrvání myši se rozbalí celý šuplík.
+    /// Náhled po najetí ("island" / "dock"): po kolika ms setrvání myši se rozbalí celý šuplík.
     /// 0 = jen klikem; jinak 400–10000 (oříznuto). Nad tlačítky a s čekajícím schválením se neodpočítává.
     pub hover_expand_ms: u64,
+    /// Dok (`hover` = "dock"): karty středního panelu, který dok otevře klikem / setrváním (až 3 id vestavěných karet,
+    /// např. "notes", "calendar", "claude"). Neznámá id se vynechají, prázdné = výchozí tři (`hovermode::dock_cards`).
+    pub dock_cards: Vec<String>,
     /// Šířka šuplíku v logických px.
     pub width: u32,
     /// "acrylic" = rozmazaná plocha za šuplíkem (Win11), "solid" = tmavé matné pozadí.
@@ -93,6 +96,7 @@ impl Default for DrawerConfig {
             close_delay_ms: 350,
             hover: crate::hovermode::HoverMode::Full,
             hover_expand_ms: crate::hovermode::EXPAND_MS,
+            dock_cards: crate::hovermode::DOCK_CARDS_DEFAULT.iter().map(|s| s.to_string()).collect(),
             width: 1080,
             glass: Glass::Solid,
             sections: Sections::default(),

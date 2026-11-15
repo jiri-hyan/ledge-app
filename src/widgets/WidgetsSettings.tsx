@@ -14,7 +14,7 @@ import { loadWidgets, widgetsListing } from "./registry";
 import { intervalText, WidgetConsent } from "./WidgetCard";
 import "./widgets.css";
 
-const KIND_NAME: Record<string, string> = { powershell: "PowerShell", cmd: "cmd", python: "Python", node: "Node.js", exe: ".exe" };
+const KIND_NAME: Record<string, string> = { powershell: "PowerShell", cmd: "cmd", python: "Python", node: "Node.js", exe: ".exe", kit: ".kit.json" };
 
 function statusText(w: WidgetView, now: number): string {
   switch (w.status) {
@@ -82,7 +82,7 @@ export default function WidgetsSettings() {
         }
       >
         <Row id="widgets.enabled">
-          <Toggle path="widgets.enabled" label={t("settings.f.widgets.enabled", "Widgety ze skriptů")} />
+          <Toggle path="widgets.enabled" label={t("settings.f.widgets.enabled", "Zapnout widgety ze skriptů")} />
         </Row>
         <Row id="widgets.dir" stack>
           <PathPick path="widgets.dir" kind="folder" nullable label={t("settings.f.widgets.dir", "Složka widgetů")} placeholder={list()?.dir || "%USERPROFILE%\\Ledge\\widgets"} />

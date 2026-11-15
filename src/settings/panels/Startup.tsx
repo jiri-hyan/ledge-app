@@ -1,6 +1,6 @@
 // Stránka „Spouštění a hry“ (sekce Aplikace, kolo 21; dřív konec stránky Otevírání a klávesy): jak Ledge
 // běží jako aplikace — spouštění po startu Windows s upozorněním na bublinu MSIX (`pkgctx/BubbleNotice.tsx`),
-// „Šetřit paměť“ (`drawer.keepWarmS`: uvolnění paměti WebView po minutě zavřeného šuplíku, s animacemi
+// „Šetřit paměť“, blok Rozšíření (`ext/ExtBlock.tsx`: stav a živě změřená RAM/CPU) (`drawer.keepWarmS`: uvolnění paměti WebView po minutě zavřeného šuplíku, s animacemi
 // nesouvisí), hry a video přes celou obrazovku a herní režim. Zkratka herního režimu zůstává u ostatních
 // zkratek (Otevírání a klávesy). Jako všechny stránky mění jen draft — zapíše společná lišta.
 import { Show } from "solid-js";
@@ -9,9 +9,10 @@ import { t } from "../../i18n";
 import { useSettings } from "../ctx";
 import { Toggle } from "../fields/controls";
 import { Row, Section } from "../fields/Row";
-import { fieldLabel } from "../labels";
+import { fieldHint, fieldLabel } from "../labels";
 import type { PanelProps } from "../types";
 import BubbleNotice, { bubble } from "../../pkgctx/BubbleNotice";
+import ExtBlock from "../../ext/ExtBlock";
 
 export default function StartupPanel(_p: PanelProps) {
   const c = useSettings();
@@ -42,6 +43,9 @@ export default function StartupPanel(_p: PanelProps) {
           </Row>
         </Section>
       </div>
+      <Section id="extensions" title={fieldLabel("extensions")} desc={fieldHint("extensions")}>
+        <ExtBlock />
+      </Section>
     </>
   );
 }

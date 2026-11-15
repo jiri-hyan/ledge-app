@@ -43,8 +43,8 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
     `calendar_join` otevře jen ověřený odkaz známé služby).
   - **Připomínka:** `remindMin` (výchozí `5`, `0` = vypnuto, nejvýš `120`) minut před začátkem časové
     události proužek ukáže „📅 Název za 5 min“ (modře, i s vypnutým proužkem; priorita mezi „čeká na
-    tebe“ a „hotovo“), blikne a pulsne; `remindToast: true` (výchozí `false`) navíc pošle toast Windows
-    s tlačítkem Připojit. Budík jen na čas připomínky, nic se kvůli ní nestahuje (data z posledního
+    tebe“ a „hotovo“), blikne a pulsne; `remindToast` (výchozí `true`) navíc pošle toast Windows
+    s tlačítkem Připojit — jen u schůzky s ověřeným odkazem (bez odkazu jen proužek). Budík jen na čas připomínky, nic se kvůli ní nestahuje (data z posledního
     načtení / cache). Ve fullscreen hře / herním režimu nic, toast ani při „nerušit“ nebo otevřeném šuplíku.
 - **Účty Microsoft a Google (OAuth)** — sekce `accounts` (Nastavení → Šuplík a karty → Obsah karet → Kalendáře → Pokročilé; kód `src-tauri/src/accounts/`,
   mapa `docs/codemap/accounts.md`, návod pro uživatele `docs/ucty.md`). Výchozí = nic nepřihlášeno, žádná síť.
@@ -69,13 +69,13 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   Claude dosáhl 100 %, v čase resetu krátký peek (viz „Limity Claude 5h / týden“).
 - **Útrata Claude (odhad)** — `claude.costs` (výchozí `true`): sekce dole v kartě Claude s tokeny a odhadem
   ceny v cenách API podle projektu a dne (viz „Útrata Claude (odhad)“); `false` = sekce zmizí, nic se nečte.
-- **Tempo čerpání limitů** — `claude.limitsPace` (výchozí `false`): v pruzích 5h / týden v kartě Claude ryska plánu
+- **Tempo čerpání limitů** — `claude.limitsPace` (výchozí `true` jen pro NOVOU instalaci bez config.json; klíč chybějící ve starém configu = `false`, existující config se nemění — per-field `serde(default = "no")` v `config/claude.rs`): v pruzích 5h / týden v kartě Claude ryska plánu
   (uplynulý podíl okna), část výplně nad plánem obarvená (pozor do +5 b., přes nad); 5h pruh i při tempu, které dojde před
   obnovou (tempo z posledních 30 min, jinak průměr okna). Čísla v tooltipu; bez `resetsAt` / se starým vzorkem nic.
-- **Upozornění na 80 % / 90 % limitu** — `claude.limitsAlert` (výchozí `false`): jeden toast (přes `attention::signal`,
+- **Upozornění na 80 % / 90 % limitu** — `claude.limitsAlert` (výchozí `true` jen pro novou instalaci, starý config bez klíče = `false`; v Nastavení je to volba „Vypnuto“ v Oznámení: limit): jeden toast (přes `attention::signal`,
   tedy ne ve hře / herním režimu) při prvním dosažení 80 % a 90 % okna 5h nebo týden, jednou za okno
-  (`limits::alerts_due`, čerstvý vzorek ze stavového řádku); vypnuto = nic se nepamatuje.
-- **Limity z aplikace Claude** — `claude.limitsDesktop` (výchozí `false`): Ledge čte `plan-usage-history.json`, který si
+  (`limits::alerts_due`, čerstvý vzorek ze stavového řádku); vypnuto = nic se nepamatuje. Navíc jednou za 5h okno „dojde za ~N min“ (`limits::eta_runs_out`: tempo z posledních 30 min, aspoň 3 vzorky s rozpětím ≥ 10 min, dojde před obnovou a do 45 min; jen když zrovna nepřišel práh; počítá se při příchodu vzorku, žádný časovač). Historie vzorků se sbírá s `limitsPace` NEBO `limitsAlert`.
+- **Limity z aplikace Claude** — `claude.limitsDesktop` (výchozí `false`; v Nastavení jediná volba „Zdroj limitů“ spolu s `limitsFetch`, config se nemění): Ledge čte `plan-usage-history.json`, který si
   aplikace Claude (desktop, karta Code) sama ukládá (`%LOCALAPPDATA%\Claude-Data\<balíček>\`, u klasické instalace
   `%APPDATA%\Claude\`); jen procenta, čas obnovy z jiného zdroje, jen když jeho okno ještě běží. Nic neposílá (`limitsrc.rs`).
 - **Ptát se Anthropicu na limity** — `claude.limitsFetch` (výchozí `false`): 1× za 10 min `GET https://api.anthropic.com/api/oauth/usage`
@@ -86,5 +86,5 @@ Součást návodu pro agenty — index je v [`AGENTS.md`](../../AGENTS.md). Obsa
   `false` = nic se nečte.
 - **Zadání přes API** — `claude.brief.model` (výchozí `"sonnet"`; `sonnet`/`opus`/`haiku` nebo id modelu) a
   `claude.brief.budgetUsd` (výchozí `2.0`, 0,1–100): model a strop útraty jednoho zadání z poznámky („Poslat
-  orchestrátorovi“). Poznámka je přebije vlastním `model:` / `budget:`. Platí se z API klíče ve Správci pověření
+  orchestrátorovi“). Poznámka je přebije vlastním `model:` / `budget:`. `claude.brief.autoResume` (výchozí `false`, Nastavení → Claude → API klíč pro zadání): po odpovědi na POSLEDNÍ otázku zadání (`waiting`) samo pokračuje, jen v mezích stropu `budgetUsd`, nic neschvaluje; do `## Log` zapíše „Pokračuje samo po odpovědi“. Platí se z API klíče ve Správci pověření
   (`Ledge/anthropic`), ne z předplatného; viz [sessions.md](sessions.md) → „Zadání z poznámky přes API“.

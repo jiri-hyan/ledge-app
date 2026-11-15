@@ -1,6 +1,8 @@
 // --- appearance ---
 // Zrcadlo `AppearanceConfig` (src-tauri/src/appearance.rs) — `config.appearance`, událost `appearance`.
-export type ThemeId = "dark" | "midnight" | "graphite" | "nord" | "light" | "contrast" | "terminal" | "paper" | "neon" | "brutal" | "pastel" | "aurora" | "mono" | "retro" | "oled" | "warm";
+/** id motivů = klíče `theme/palettes.json` (jediný seznam; Rust `Theme` v `appearance.rs` je jeho zrcadlo, hlídá test) */
+import PAL from "../theme/palettes.json" with { type: "json" };
+export type ThemeId = keyof typeof PAL;
 export type MotionStyle = "spring" | "smooth" | "snappy" | "bounce" | "fade" | "notch" | "drop" | "unfold" | "liquid" | "none";
 export type StripPosition = "center" | "left" | "right";
 export type StripStyle = "pill" | "line" | "dot" | "term" | "tag" | "glow" | "block" | "drop";
@@ -68,7 +70,11 @@ export interface Appearance {
   /** hlavička a přepínač záložek (kolo 27); chybí = dnešní vzhled */
   head?: HeadLook;
   tabs?: TabsLook;
+  /** motiv „Podle Windows“ (kolo 34, `theme/auto.ts`); chybí = vypnuto */
+  auto?: AutoLook;
 }
+/** `appearance.auto` (zrcadlo `appearance::auto::AutoLook`): dvojice motivů podle Windows + akcent Windows */
+export interface AutoLook { on: boolean; light: ThemeId; dark: ThemeId; accent: boolean }
 /** Druh gradientu (zrcadlo `appearance::backdrop::KINDS`). */
 export type GradKind = "linear" | "radial" | "conic" | "mesh";
 export interface GradStop { c: string; p: number }

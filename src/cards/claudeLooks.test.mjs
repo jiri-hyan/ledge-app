@@ -70,3 +70,26 @@ test("sessionTiles: pořadí, strop, počet zbytku", () => {
   assert.deepEqual(sessionTiles([], 3), { shown: [], more: 0, working: 0 });
   assert.equal(sessionTiles(list, 0).more, 5);
 });
+
+test("spendModel: den jen s nenacenými tokeny není 0 $, průměr jen z dokončených dnů, dolní odhady (N4–N6)", () => {
+  const mk = (costs, unpriced = []) => days(costs).map((d, i) => ({ ...d, unpriced: unpriced[i] ?? 0 }));
+  // dnešek (poslední) má jen nenacené tokeny → today null, ne 0
+  const u = spendModel({ state: "ok", summary: { days: mk([2, 4, null], [0, 0, 300]) } }, NOW);
+  assert.deepEqual([u.today, u.unknown, u.values], [null, [false, false, true], [2, 4, 0]]);
+  // průměr bez nedokončeného dneška (poslední), nulové dny se počítají
+  const a = spendModel({ state: "ok", summary: { days: mk([2, 0, 4, 100]) } }, NOW);
+  assert.deepEqual([a.avg, a.avgDays, a.peak, a.today], [2, 3, 100, 100]);
+  // starý přehled (poslední den není dnes): všechny dny jsou dokončené
+  const old = spendModel({ state: "ok", summary: { days: days([2, 4], 1) } }, NOW);
+  assert.deepEqual([old.avg, old.avgDays, old.today], [3, 2, null]);
+  // den s neznámou cenou se do průměru nepočítá
+  const k = spendModel({ state: "ok", summary: { days: mk([2, null, 6, 9], [0, 50, 0, 0]) } }, NOW);
+  assert.deepEqual([k.avg, k.avgDays], [4, 2]);
+  // dolní odhady: den s částí nenacených tokenů
+  const l = spendModel({ state: "ok", summary: { days: mk([2, 4, 3], [0, 10, 5]) } }, NOW);
+  assert.deepEqual([l.lower, l.todayLower, l.avgLower, l.peakLower, l.today], [[false, true, true], true, true, true, 3]);
+  const exact = spendModel({ state: "ok", summary: { days: mk([2, 4, 3]) } }, NOW);
+  assert.deepEqual([exact.todayLower, exact.avgLower, exact.peakLower], [false, false, false]);
+  // jediný dnešní den: průměr není z čeho
+  assert.deepEqual([spendModel({ state: "ok", summary: { days: mk([5]) } }, NOW).avg], [null]);
+});

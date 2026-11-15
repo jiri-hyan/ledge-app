@@ -1,7 +1,7 @@
 // Lístky na plochu — čistá logika (`model.ts`): přidání bodu / textu, barvy, připnutí ze snapshotu.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anyThrough, appendLine, caretFromText, isPinned, isTaskLine, pinColors, pinSuggestVisible, pointLine, remindAskText, samePath, TEXT_MIN } from "./model.ts";
+import { anyThrough, appendLine, backAt, hiddenUntil, caretFromText, isPinned, isTaskLine, pinColors, pinSuggestVisible, pointLine, remindAskText, samePath, TEXT_MIN } from "./model.ts";
 
 test("appendLine: bod pod bod, jinak nový odstavec, prázdné nic", () => {
   const cases = [
@@ -60,6 +60,18 @@ test("připnutí ze snapshotu: cesty bez ohledu na velikost a lomítka", () => {
   assert.ok(anyThrough(pins));
   assert.ok(!anyThrough({ open: [pins.open[0]], key: "" }));
   assert.ok(!anyThrough(null));
+});
+
+test("schovaný lístek ze snapshotu: čas návratu a popisek dnes / jindy", () => {
+  const until = new Date(2026, 10, 14, 15, 5).getTime();
+  const pins = { open: [], hidden: [{ path: "C:/n/h.md", until }], key: "" };
+  assert.equal(hiddenUntil(pins, "c:/n/H.md"), until);
+  assert.equal(hiddenUntil(pins, "C:/n/x.md"), null);
+  assert.equal(hiddenUntil({ open: [], key: "" }, "C:/n/h.md"), null);
+  assert.equal(hiddenUntil(undefined, "C:/n/h.md"), null);
+  assert.ok(!isPinned(pins, "C:/n/h.md"), "schovaný není na ploše");
+  assert.deepEqual(backAt(until, new Date(2026, 10, 14, 9, 0).getTime()), { today: true, d: 14, m: 11, time: "15:05" });
+  assert.deepEqual(backAt(new Date(2026, 10, 15, 8, 0).getTime(), new Date(2026, 10, 14, 9, 0).getTime()), { today: false, d: 15, m: 11, time: "8:00" });
 });
 
 test("caretFromText: dvojklik do vykresleného textu → pozice v těle", () => {

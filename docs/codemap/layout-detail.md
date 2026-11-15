@@ -80,6 +80,7 @@ Rozložení šuplíku). Cituj symbolem, ne číslem řádku.
 
 ## Toky
 
+- **Střední panel docku** (L147): `MainPage` s `mid` = `ids.map(card)` místo `Deck` (bez úprav, bez ⋯, bez Tour); karty jsou tytéž (`cardBody`), stránka záložky se nemění.
 - **Vykreslení**: `MainPage` → `normalizeLayout(s.layout)` (memo podle obsahu) → `pageOf(mode)` → `Deck`
   (`For` podle id karty — nový snapshot ani změna velikosti kartu nepřestaví). Karty bez dat (`shownCards`:
   Běží bez procesů, akce na Práci bez akcí, prázdná přihrádka, Právě hraje bez dat, vypnuté poznámky) se
@@ -147,12 +148,17 @@ Rozložení šuplíku). Cituj symbolem, ne číslem řádku.
 - Nová karta = id do `layout::CARDS` + `model.ts` `CARD_IDS`/`CARD_INFO` + případně pole `sections!`
   v `config/*` (+ `SECTION_KEYS`) + větev v `MainPage` `card`. Nová část = `PARTS` v obou + pole `sections!`.
 - Vzhled karet (barvy, rohy, šířky podle stylu) patří stylům; `layout.css` drží jen mechaniku mřížky a ovládání úprav.
-- Kolo 22: karty `usage`, `week`, `bigclock`, `toggles` (`src/board/`, [board.md](board.md)) jsou jen v katalogu; `week` se
-  počítá jako čtenář kalendáře (`section_on("calendar")`, `page_has_calendar`), `toggles` zapíná zvuk a baterii
-  (`volume::allowed`, `battery::allowed`), `usage` útratu (`costslive::wanted`). Id karet jen malými písmeny (test zrcadla).
+- Kolo 22: karta `usage` (`src/board/`, [board.md](board.md)) je jen v katalogu a zapíná útratu (`costslive::wanted`). Id karet jen malými písmeny (test zrcadla).
+- **Kolo 34, 22 → 18 karet (sloučení):** `bigclock` → `clock` (`look.design` `big`), `week` → `calendar` (vlastní vzhled týdne, jinak `strip`;
+  výchozí vzhled Kalendáře je `list`), `links` → `actions` (Odkazy a akce ukazují odkazy samy, `skipLinks` zrušen; nepřevedené `personal.links` kreslí
+  `ActionsCard` postaru), `toggles` → `winquick` (`toggles`). Převod starého souboru: `layout::MERGED_CARDS` + `merge_cards` (volá `upgrade_loaded` po
+  `drop_removed`; velikost, výška, `look` zůstanou, je-li nástupce na záložce už, stará karta zmizí) a zrcadlo `model.ts` `MERGED_CARDS` / `mergeCards`
+  (`normalizeLayout`); `drawer.dockCards` převádí `hovermode::dock_cards` / `midCards.ts` `dockCardsOf` (bez vzhledu — dok ho nenese). Testy:
+  `layout::tests::merged_cards_are_converted_on_load`, `model.test.mjs` „kolo 34“, `hovermode::dock_cards_table`. Nová logika karet = nový vzhled,
+  ne nová karta (rozpočet složitosti).
 - Výchozí rozložení nového configu je záměrně malé (`clean_default`); karta bez zdroje (Kalendář, Pošta, GitHub, Počasí bez místa) nebo
-  duplicitní (Rychlé akce vedle Odkazů) v něm není a katalog ji nabídne. `Sections::default()` se z něj odvozuje (`section_in_default`, bez serde —
-  `serde(default)` by se zacyklil), takže `Config::default()` sedí s načteným. Karta Dnes (`today`) je také jen v katalogu a nekreslí se bez řádků (`Facts.today`; [suggest.md](suggest.md)). Karta `OPT_IN` (GitHub, Systém, Pošta) = id i v `layout::OPT_IN` (hlásí ji MCP). Detail [integrations.md](integrations.md).
+  v něm není a katalog ji nabídne (Osobní má Odkazy a akce). `Sections::default()` se z něj odvozuje (`section_in_default`, bez serde —
+  `serde(default)` by se zacyklil), takže `Config::default()` sedí s načteným. Karta Dnes (`today`) je od kola 33 smazaná (má ji záložka Úkoly); `layout::REMOVED_CARDS` + `drop_removed` ji z uloženého souboru tiše vynechají, `normalizeLayout` ji zahodí jako neznámou. Karta `OPT_IN` (GitHub, Systém, Pošta) = id i v `layout::OPT_IN` (hlásí ji MCP). Detail [integrations.md](integrations.md).
 - Vzhled karet (barvy, rohy, šířky podle stylu) patří stylům; `layout.css` drží mechaniku mřížky, ovládání úprav a
   jen PŘEBITÍ stylu pro jednu kartu z `look` (`data-cl-*`) — bez atributu se pravidla neuplatní.
 - Akce dlaždice projektu jsou UVNITŘ dlaždice (`.acts` absolutně dole přes název a větev) — nikdy přes kartu

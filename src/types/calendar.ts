@@ -13,6 +13,8 @@ export interface CalendarItem {
   tzGuess: boolean;
   /** odkaz Připojit (Rust `calendar::meeting::Join`); null / starý snapshot bez pole = žádný */
   join?: CalendarJoin | null;
+  /** účastníci (Rust `calendar::people::Crowd`); chybí = zdroj je nevrací → avatary se nekreslí */
+  people?: { list: { name: string; email: string; resp: "pending" | "accepted" | "tentative" }[]; more: number };
 }
 
 /** Odkaz na schůzku (ověřený Rustem: jen https známé služby). */
@@ -45,7 +47,7 @@ export interface CalendarInfo {
   error: string | null;
   fetchedMs: number | null;
   events: number;
-  /** zdroj z přihlášeného účtu (Nastavení → Účty); chybí = odkaz ICS z `personal.calendars` */
+  /** zdroj z přihlášeného účtu (Nastavení → Obsah karet → Pokročilé); chybí = odkaz ICS z `personal.calendars` */
   account?: "microsoft" | "google";
 }
 

@@ -8,9 +8,12 @@ import { For, Show, type JSX } from "solid-js";
 import type { Snapshot } from "../types";
 import { isBusy, lastResult } from "../actions/api";
 import { runAny } from "../actions/scripts";
-import { isLink, visibleGroups } from "../actions/model";
+import { visibleGroups } from "../actions/model";
 import { ActionIcon, ConfirmAction, LastOutput, askConfirm } from "../actions/ui";
 import { gotoSettingsPanel } from "../palette/goto";
+import { api } from "../api";
+import { sayError } from "../ui/toast";
+import "./personal.css";
 import { t } from "../i18n";
 import type { ActionView } from "../types";
 import type { CardView } from "../layout/look";
@@ -32,10 +35,10 @@ export function actionLookMenu(e: MouseEvent, a: ActionView, cfgError: string | 
 export const openActionLook = (a: ActionView, cfgError: string | null) => !a.script && openLook({ kind: "action", id: a.id, name: a.label, initial: a.look }, cfgError);
 export const actionAuto = (a: ActionView) => ({ src: actionIconSrc(a), mono: a.monogram, color: a.color, plate: false });
 
-export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean; skipLinks?: boolean; view?: CardView; menu?: JSX.Element }) {
-  /** `skipLinks`: na záložce je i karta Odkazy → weby, složky a soubory jsou jen tam (žádné dvojí dlaždice) */
-  const own = () => (p.skipLinks ? (p.s.actions ?? []).filter((a) => !isLink(a)) : (p.s.actions ?? []));
-  const rawGroups = () => visibleGroups([...own(), ...(p.s.scripts ?? [])], p.s.mode);
+export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wide?: boolean; view?: CardView; menu?: JSX.Element }) {
+  const rawGroups = () => visibleGroups([...(p.s.actions ?? []), ...(p.s.scripts ?? [])], p.s.mode);
+  /** starší odkazy `personal.links`, které Rust nepřevedl na akce (`linkmigrate.rs`) — dřív je ukazovala karta Odkazy */
+  const legacy = () => p.s.personal.links;
   const groups = () => {
     const list = rawGroups();
     if (!isFrecencySort("act") || editing()) return list;
@@ -54,12 +57,12 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
     gotoSettingsPanel("akce");
   };
   return (
-    <Show when={ids().length > 0 || p.s.mode !== "prace" || scriptOut()}>
+    <Show when={ids().length > 0 || legacy().length > 0 || p.s.mode !== "prace" || scriptOut()}>
       <div class="card act-card" classList={{ wide: !!p.wide }} data-anim data-view={p.view ?? "tiles"} data-edit={editing() ? "" : undefined}>
         <h4>
           <span class="ic" style="background:var(--teal)" />
           {t("actions.card.title", "Odkazy a akce")}
-          <span class="n">{ids().length || ""}</span>
+          <span class="n">{ids().length + legacy().length || ""}</span>
           <Show when={ids().length > 1}>
             <button
               class="mini"
@@ -75,10 +78,10 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
           {p.menu}
         </h4>
         <For each={groups()} fallback={
-          <Show when={!scriptOut()}>
+          <Show when={!scriptOut() && legacy().length === 0}>
             <div class="empty">
               {t("actions.card.empty", "Weby, složky, aplikace i příkazy na jedno kliknutí.")}
-              <button class="mini" onClick={edit}>{t("actions.card.add", "Přidat akci")}</button>
+              <button class="mini" onClick={() => { p.onSettings(); gotoSettingsPanel("f-actions.add"); }}>{t("actions.card.add", "Přidat akci")}</button>
             </div>
           </Show>
         }>
@@ -112,6 +115,17 @@ export default function ActionsCard(p: { s: Snapshot; onSettings: () => void; wi
                 </For>
               </div>
             </>
+          )}
+        </For>
+        <For each={legacy()}>
+          {(l, i) => (
+            <button class="row link-row" classList={{ bad: l.kind === "invalid", wait: l.kind === "pending" }} disabled={l.kind === "invalid" || l.kind === "pending"} title={l.problem ? `${l.target}\n${l.problem}` : l.target} onClick={() => api.openLink(i(), l.target).catch(sayError)}>
+              <span class="lmono">{l.monogram}</span>
+              <div class="grow">
+                <div class="name">{l.name || l.target}</div>
+                <div class="sub">{l.problem ?? (l.kind === "pending" ? t("cards.links.checking", "ověřuji…") : l.target)}</div>
+              </div>
+            </button>
           )}
         </For>
         <Show when={lookTarget()?.kind === "action" ? groups().flatMap((g) => g.items).find((a) => a.id === lookTarget()!.id) : null} keyed>

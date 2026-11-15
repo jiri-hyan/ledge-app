@@ -3,6 +3,7 @@
 // dynamické karty: widgety ze skriptů ve složce widgetů (`widgets_list` při otevření katalogu).
 import { For, onMount, Show } from "solid-js";
 import { t } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { change, editPage, setCatalogOpen } from "./edit";
 import { addCard, catalog, pageOf, type Layout } from "./model";
 import { cardDesc, cardName, pageName } from "./text";
@@ -39,7 +40,7 @@ export default function Catalog(p: { layout: Layout }) {
       <div class="lay-cat-group">{t("cards.layout.catalog.widgets", "Widgety ze skriptů")}</div>
       <For
         each={widgets()}
-        fallback={<div class="empty">{t("cards.layout.catalog.noWidgets", "Žádný další widget. Příklady (kurz ČNB, Docker, GitHub CI, disk…) přidáš v Nastavení → Projekty, akce a odkazy → Widgety.")}</div>}
+        fallback={<div class="empty">{t("cards.layout.catalog.noWidgets", "Žádný další widget. Příklady (kurz ČNB, Docker, GitHub CI, disk…) přidáš v {path}.", { path: settingsPath("akce", "widgets") })}</div>}
       >
         {(x) => (
           <button class="row lay-cat-row" onClick={() => change((l) => addCard(l, editPage(), x.id))} title={t("cards.layout.catalog.addTitle", "Přidat na tuhle záložku")}>

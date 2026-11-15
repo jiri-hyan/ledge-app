@@ -33,7 +33,7 @@ function Section(p: { s: Snapshot; now: number; sec: BarSection }) {
       <Match when={p.sec.id === "system"}><System sec={p.sec} design={design()} /></Match>
       <Match when={p.sec.id === "volume"}><Volume s={p.s} sec={p.sec} design={design()} /></Match>
       <Match when={p.sec.id === "limits"}><Limits s={p.s} now={p.now} sec={p.sec} design={design()} /></Match>
-      <Match when={p.sec.id === "weather"}><WeatherSec s={p.s} sec={p.sec} design={design()} /></Match>
+      <Match when={p.sec.id === "weather"}><WeatherSec s={p.s} now={p.now} sec={p.sec} design={design()} /></Match>
       <Match when={p.sec.id === "meeting"}><Meeting s={p.s} now={p.now} sec={p.sec} design={design()} /></Match>
     </Switch>
   );

@@ -4,9 +4,11 @@
 
 pub(crate) mod emit;
 pub(crate) mod emitgate;
+pub(crate) mod fswatch;
 pub(crate) mod hover;
 pub(crate) mod notes_folder;
 pub(crate) mod notes_sync;
 pub(crate) mod notes_watch;
 pub(crate) mod pointer;
+pub(crate) mod tracker;
 pub(crate) mod ui;

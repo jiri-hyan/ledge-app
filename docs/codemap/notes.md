@@ -16,6 +16,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src-tauri/src/notes/md.rs` | Markdown → bezpečné HTML, úkoly … | `to_html` |
 | `src-tauri/src/notes/md_list.rs` | zásobník seznamů pro `to_html` … | `Lists` |
 | `src-tauri/src/notes/brief.rs` | zadání v těle (čisté): body se třemi stavy, důkaz, snímky, odkazy `@` … | `scan_body` |
+| `src-tauri/src/notes/taskline.rs` · `taskindex.rs` · `briefwait.rs` | gramatika úkolu · index bodů · `briefWaiting` … | `parse_tail` |
 | `src-tauri/src/notes/sections.rs` | sekce `## Otázky` (`- ❓` / `  - ↳`) a `## Log` (jen … | `Question` |
 | `src-tauri/src/notes/attach.rs` | vstup snímků a skládání těla se snímkem pod bodem … | `ImageIn` |
 | `src-tauri/src/notes/ops.rs` | I/O zápisy zadání pod zámkem cesty s kontrolou otisku … | `set_status` |
@@ -30,7 +31,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src-tauri/src/commands/noteslife.rs` | příkazy `note_archive` `note_unarchive` … | `settle` |
 | `src-tauri/src/notesync/mod.rs` | sync gitem: výsledek a stav pro UI … | `Outcome` |
 | `src-tauri/src/notesync/plan.rs` | čisté rozhodování (tabulkové testy) | `plan_init` |
-| `src-tauri/src/notesync/git.rs` · `init.rs` · `cycle.rs` | git s termínem a bez promptu · první … | `git` |
+| `src-tauri/src/notesync/git.rs` · `init.rs` · `cycle.rs` · `conflict.rs` | git s termínem a bez promptu · první … | `git` |
 | `src-tauri/src/notes/folder_sync.rs` | Propojit se složkou … | `LinkRun` |
 | `src-tauri/src/notes/folder_sync_plan.rs` | čisté rozhodování propojení (tabulkové … | `plan` |
 | `src-tauri/src/notes/folder_sync_scan.rs` | sken a bezpečné cesty (I/O) … | `scan` |
@@ -38,7 +39,7 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src-tauri/src/notes/folder_sync_tests.rs` | testy propojení: tabulky plánu, jména … |  |
 | `src-tauri/src/threads/notes_folder.rs` · `commands/notefolder.rs` | vlákno `notes-folder` (spí na kanálu … | `spawn_notes_folder` |
 | `src/notes/FolderLinkSection.tsx` · `folderlink.ts` · `en-folder.ts` | sekce „Propojit se složkou“ v Nastavení … | `linkCfg` |
-| `src-tauri/src/config/notes.rs` | `notes.kinds` (výchozí sada, validace) | `NotesConfig` |
+| `src-tauri/src/config/notes.rs` | `notes.kinds` | `NotesConfig` |
 | `src-tauri/src/commands/notes.rs`, `threads/notes_watch.rs`, `snapshot.rs` | tenké příkazy + stav v paměti | `note_create` |
 | `src-tauri/src/commands/notelinks.rs` | příkazy Lístků 2.0: barva / štítky … | `note_set_meta` |
 | `src/notes/store.ts` | sdílený stav: preset, `editPath` … | `tagFilter` |
@@ -48,6 +49,8 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src/notes/lifecycle.ts` · `lifeactions.ts` · `lifelabels.tsx` · `lifeicons.tsx` | Splnit · Archivovat · Smazat … | `completeNote` |
 | `src/notes/RowMenu.tsx` · `UndoBar.tsx` | ⋯ řádku (společné menu `ui/Popover.tsx` … | `runAction` |
 | `src/notes/NoteEditor.tsx` | stránka „note“ (nová i úprava) … |  |
+| `src/notes/QuickNote.tsx` `quick.ts` `quicksave.ts` `pinafter.ts` `commands/dictate.rs` | rychlá poznámka · klávesy · 🎤 | `saveDraft` |
+
 | `src/notes/lists.ts` · `listkeys.ts` | chytré seznamy v textarea (editor i … | `onEnter` |
 | `src/notes/brief.ts` · `brief.test.mjs` | zadání pro Claude Code (čisté): body, otázky, log, akce … | `parseTasks` |
 | `src/notes/BriefPanel.tsx` · `apikey.ts` | panel zadání v editoru (čip stavu + náklad, Poslat … | `BriefPanel` |
@@ -63,8 +66,8 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src/notes/ProjectPicker.tsx` · `RemindPicker.tsx` · `kinds.tsx` | výběry (projekt, připomínka, kategorie … |  |
 | `src/notes/RemindSuggest.tsx` · `suggest.ts` | chip „⏰ Připomenout zítra 10:00?“ pod … | `RemindSuggest` |
 | `src/notes/remind.ts` | čisté funkce času (rychlé volby, mřížka … | `quickPicks` |
-| `src/notes/popup.ts` · `Markdown.tsx` · `notes.css` · `mdtask.css` (úkoly `.md`, sdílí šuplík i lístek) | panely výběrů v toku stránky … | `usePopup` |
-| `src-tauri/src/pins/mod.rs` | lístky na plochu — čisté … | `Pin` |
+| `src/notes/popup.ts` · `Markdown.tsx` · `notes.css` · `mdtask.css` (úkoly `.md`) | panely výběrů v toku stránky … | `usePopup` |
+| `src-tauri/src/pins/{mod.rs,unhide.rs}` | lístky na plochu — čisté … | `Pin` |
 | `src-tauri/src/pins/win.rs` | okna `note-<klíč>`: vznik bez fokusu … | `open` |
 | `src-tauri/src/commands/pins.rs` | příkazy: šuplík (`pin_toggle` `pin_new` … | `PinInit` |
 | `pin.html` · `src/pin/main.tsx` · `PinApp.tsx` · `pin.css` · `src/pin/icons.tsx` · `en.ts` | okno lístku (vlastní vstup Vite, jen … |  |
@@ -74,6 +77,5 @@ Detail (toky, invarianty, testy, co nečíst, historie): [notes-detail.md](notes
 | `src/notes/pins.ts` | šuplík: připnout / odepnout, nový … | `togglePin` |
 
 Další soubory (podrobnosti v detailu):
-`src-tauri/src/commands/{notefolder.rs,notelinks.rs,notes.rs,pins.rs}` · `src-tauri/src/pins/home.rs` · `src-tauri/src/config/notes.rs` · `src-tauri/src/notes/{edit.rs,folder_sync.rs,folder_sync_apply.rs,folder_sync_plan.rs,folder_sync_scan.rs,lifecycle.rs,recycle.rs}` · `src-tauri/src/notesync/{cycle.rs,git.rs,init.rs,plan.rs}` · `src-tauri/src/threads/notes_folder.rs`
-`src/notes/{FolderLinkSection.tsx,NoteEditor.tsx,NoteMenu.tsx,NotesCard.tsx,NotesPage.tsx,ProjectPicker.tsx,RemindPicker.tsx,RemindSuggest.tsx,RowMenu.tsx,UndoBar.tsx,WikiLinks.tsx,api.ts,bento.ts,draft.ts,editdraft.ts,en-folder.ts,exportActions.ts,folderlink.ts,kinds.tsx,lifeactions.ts,lifecycle.ts,lifeicons.tsx,lifelabels.tsx,listkeys.ts,lists.ts,meta.ts,pins.ts,popup.ts,remind.ts,store.ts,suggest.ts,wiki.ts}`
-`src/pin/{PinApp.tsx,PinMenu.tsx,StyleGallery.tsx,hide.ts,icons.tsx,main.tsx,pinmeta.ts,styles.ts}`
+`src-tauri/src/commands/{notefolder.rs,notelinks.rs,notes.rs,pins.rs}` · `src-tauri/src/pins/home.rs` · `src-tauri/src/config/notes.rs` · `src-tauri/src/notes/{edit.rs,taskquick.rs,taskwrite.rs,folder_sync.rs,folder_sync_apply.rs,folder_sync_plan.rs,folder_sync_scan.rs,lifecycle.rs,recycle.rs}` · `src-tauri/src/notesync/{conflict.rs,cycle.rs,git.rs,init.rs,plan.rs}` · `src-tauri/src/threads/notes_folder.rs`
+`src/notes/{taskline,quicktask,agenda,tasksact}.ts` · `src/notes/TasksView.tsx` (Úkoly) · `src/pin/{PinApp.tsx,PinMenu.tsx,StyleGallery.tsx,hide.ts,icons.tsx,main.tsx,pinmeta.ts,styles.ts}`

@@ -3,28 +3,20 @@
 // Jedním příkazem a idempotentně:  node scripts/showcase/shoot.mjs [--only id,id] [--list] [--no-pack]
 // Vyžaduje playwright-core (devDependency; jinak PLAYWRIGHT_CORE=<složka>) a nainstalovaný Edge (`channel: "msedge"`).
 // Fronta:  node %USERPROFILE%\.devtools\fronta.mjs --auto -- node scripts/showcase/shoot.mjs
-import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, readdirSync, copyFileSync, statSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SHOTS } from "./shots.mjs";
+import { loadPlaywright } from "./pw.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const args = process.argv.slice(2);
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1].split(",") : null;
 if (args.includes("--list")) { console.log(SHOTS.map((s) => `${s.id}\t${s.kind}`).join("\n")); process.exit(0); }
 
-const require = createRequire(join(ROOT, "package.json"));
-function loadPlaywright() {
-  const tries = [process.env.PLAYWRIGHT_CORE, ""].filter((x) => x !== undefined);
-  for (const dir of tries) {
-    try { return require(dir ? join(dir, "playwright-core") : "playwright-core"); } catch { /* další */ }
-  }
-  throw new Error("playwright-core nenalezen: pnpm install, nebo PLAYWRIGHT_CORE=<složka s node_modules>");
-}
-const { chromium } = loadPlaywright();
+const { chromium } = loadPlaywright(ROOT);
 
 const TMP = process.env.SHOWCASE_TMP || join(tmpdir(), "ledge-showcase");
 rmSync(TMP, { recursive: true, force: true });

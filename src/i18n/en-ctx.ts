@@ -4,7 +4,7 @@ import { registerDict } from "../i18n";
 
 registerDict("en", {
   "sessions.ctx.aria": "Session context: {n} tokens",
-  "sessions.ctx.tip": "Context of the last call: {n} tokens (input + cache write + cache read). Marks: 250 k and 350 k.",
+  "sessions.ctx.tip": "Context of the last call: {n} tokens (input + cache write + cache read). The marks at 250 k and 350 k are fixed Ledge thresholds, not the model window; a full bar = 400 k.",
   "sessions.ctx.each": "every turn now reads ~{n} tokens",
   "sessions.ctx.ratio": "{r}× more than at the start",
   "sessions.ctx.advice": "A big context makes every turn pricier — consider a handoff and a fresh session",

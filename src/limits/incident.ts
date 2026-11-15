@@ -27,5 +27,15 @@ export function severity(impact: string): "bad" | "warn" | "info" {
   return impact === "critical" || impact === "major" ? "bad" : impact === "minor" ? "warn" : "info";
 }
 
-/** Zobrazit řádek? Jen pro skutečný incident s neprázdným názvem. */
-export const shown = (i: Incident | undefined | null): i is Incident => !!i && i.name.trim().length > 0;
+/** Stáří údaje v celých minutách od posledního úspěšného dotazu (nikdy záporné). */
+export const ageMin = (i: Incident, now: number): number => Math.max(0, Math.floor((now - i.okMs) / 60000));
+
+/** Zobrazit řádek? Skutečný incident s neprázdným názvem a údaj ne starší než `ttlMin` (poctivost: po výpadku sítě
+ *  nevydávat starý incident za aktuální; jádro skrývá totéž při přestavbě snapshotu, UI i mezi nimi). */
+export const shown = (i: Incident | undefined | null, now: number): i is Incident => !!i && i.name.trim().length > 0 && ageMin(i, now) <= i.ttlMin;
+
+/** Poznámka o stáří: ukáže se, až když je údaj starší než jeden dotazovací odstup (`ttlMin / 2`); jinak `null`. */
+export const staleMin = (i: Incident, now: number): number | null => {
+  const a = ageMin(i, now);
+  return a > i.ttlMin / 2 ? a : null;
+};

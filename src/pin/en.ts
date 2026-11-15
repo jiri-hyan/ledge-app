@@ -45,6 +45,11 @@ registerDict("en", {
   "notes.pin.throughBadge": "click-through · {key} turns off",
   "notes.pin.throughBadgeNoKey": "click-through · turn off in Ledge (Ctrl+K)",
   // šuplík: karta Poznámky, editor, ⋯
+  "notes.pin.backToday": "back at {time}",
+  "notes.pin.backDay": "back on {d}/{m} at {time}",
+  "notes.pin.hiddenTitle": "The sticky is hidden — {back}. Click = show it now.",
+  "notes.pin.shownNow": "Hidden sticky shown now — the planned return ({back}) is cancelled.",
+  "palette.pin.showNow": "Show the hidden sticky now: {name}",
   "notes.pin.rowPin": "Pin to the desktop — a sticky over other windows",
   "notes.pin.rowUnpin": "Unpin from the desktop",
   "notes.pin.editorPin": "Pin to the desktop — a sticky over other windows (saved version)",

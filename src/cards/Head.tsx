@@ -11,6 +11,7 @@ import { editPath } from "../notes/store";
 import type { Page } from "../nav";
 import type { HeadPart } from "../types.ts";
 import { t, tp } from "../i18n";
+import { settingsPath } from "../settings/path";
 import { rich } from "../ui/rich";
 import { bubble } from "../pkgctx/BubbleNotice";
 import { gotoSettingsPanel } from "../palette/goto";
@@ -23,7 +24,7 @@ import RunningPill from "../projects/RunningPill";
 import DirtyPill from "./DirtyPill";
 import ChipsRow from "./ChipsRow";
 import HeadClock from "./HeadClock";
-import { fmtDuration, leftMs } from "../timer/model";
+import { fmtTimer, leftMs } from "../timer/model";
 import { timerDo } from "../timer/TimerCard";
 import "./head.css";
 
@@ -98,14 +99,14 @@ export default function Head(p: { s: Snapshot; now: number; page: Page; onNote: 
                           >
                             <span class="d" />
                             <span class="ic">🎯</span>
-                            <b class="lbl">{fmtDuration(leftMs(c(), p.now), true)}</b>
-                            <b class="cnt">{fmtDuration(leftMs(c(), p.now), true)}</b>
+                            <b class="lbl">{fmtTimer(leftMs(c(), p.now), true)}</b>
+                            <b class="cnt">{fmtTimer(leftMs(c(), p.now), true)}</b>
                           </button>
                         )}
                       </Show>
                       <Show when={bubble()}>
                         {(b) => (
-                          <button class="chip dim" data-prio="6" title={t("cards.pkg.chipTitle", "Ledge běží uvnitř aplikace {app} (balíček MSIX): nastavení, data a spouštění po startu jdou do její izolované kopie. Klik = Nastavení → Restartovat mimo.", { app: b().app })} onClick={() => { p.onSettings(); gotoSettingsPanel("f-autostart"); }}>
+                          <button class="chip dim" data-prio="6" title={t("cards.pkg.chipTitle", "Ledge běží uvnitř aplikace {app} (balíček MSIX): nastavení, data a spouštění po startu jdou do její izolované kopie. Klik = {path}.", { app: b().app, path: settingsPath("spousteni", "restart") })} onClick={() => { p.onSettings(); gotoSettingsPanel("f-autostart"); }}>
                             <span class="d" /><span class="ic">◌</span>{t("cards.pkg.chip", "V bublině {app}", { app: b().app })}
                           </button>
                         )}

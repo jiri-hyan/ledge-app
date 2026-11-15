@@ -1,7 +1,9 @@
 // Stránky Nastavení bez komponent (levný import i pro paletu): id (kotva, hledání, skok odjinud), název
-// a klíčová slova. Komponenty k nim přiřadí `catalog.ts`, do sekcí je roztřídí `structure.ts` (kolo 21:
-// Doporučené · Vzhled · Šuplík a karty · Claude · Projekty a akce · Poznámky a lístky · Na ploše · Aplikace).
-// Nová stránka = záznam tady + komponenta v `catalog.ts` + místo v `structure.ts` (hlídá `structure.test.mjs`).
+// a klíčová slova. Komponenty k nim přiřadí `catalog.ts`; pořadí zde = pořadí v navigaci a paletě (plochý seznam,
+// žádný `structure.ts`: ten po kole 21 zanikl; skládání do částí je `studio/parts.ts` + `parts.test.mjs`).
+// Cesty do hlášek („Nastavení → Obsah karet → Kalendáře“) skládá `path.ts` `settingsPath` z těchto názvů;
+// `path.test.mjs` hlídá, že žádný text neodkazuje na neexistující stránku.
+// Nová stránka = záznam tady + komponenta v `catalog.ts` (hlídá `settings.test.mjs`).
 // Klíčová slova nesou i STARÉ názvy panelů a voleb, ať je hledání najde („okna s taby“, „uvolnit paměť“,
 // „otázky“, „rychlé akce“, „Osobní“, „Chování“…). Pořadí tady = pořadí v paletě.
 
@@ -35,3 +37,18 @@ export const PANEL_ALIASES: Record<string, string> = {
   plocha: "naplose",
   widgety: "naplose",
 };
+
+/** Sekce uvnitř stránky: `panel` = kam patří, `key` + `cs` = název (anglicky ve slovníku pod `key`),
+ *  `anchor` = klíč skutečného nadpisu (`t("anchor", …)` nebo popisek v `FIELDS`), který test najde ve zdrojích. */
+export const SECTIONS = {
+  calendars: { panel: "osobni", key: "settings.f.personal.calendars", cs: "Kalendáře", anchor: "personal.calendars" },
+  accounts: { panel: "osobni", key: "settings.path.adv", cs: "Pokročilé", anchor: "settings.accounts.adv" },
+  costs: { panel: "claude", key: "settings.claude.costs", cs: "Hodnota v cenách API", anchor: "settings.claude.costs" },
+  apikey: { panel: "claude", key: "settings.claude.apikey", cs: "API klíč pro zadání", anchor: "settings.claude.apikey" },
+  mcp: { panel: "claude", key: "settings.mcp.title", cs: "Claude (MCP)", anchor: "settings.mcp.title" },
+  widgets: { panel: "akce", key: "settings.widgets.title", cs: "Widgety ze skriptů", anchor: "settings.widgets.title" },
+  updates: { panel: "aplikace", key: "settings.about.updates", cs: "Aktualizace", anchor: "settings.about.updates" },
+  restart: { panel: "spousteni", key: "settings.pkg.restart", cs: "Restartovat mimo", anchor: "settings.pkg.restart" },
+  keys: { panel: "zaciname", key: "ui.keys.title", cs: "Klávesy a gesta", anchor: "ui.keys.title" },
+} as const;
+export type SectionId = keyof typeof SECTIONS;

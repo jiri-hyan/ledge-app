@@ -12,8 +12,8 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ledge-wt-test-'))
 const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.com', ...a], { cwd, encoding: 'utf8', windowsHide: true }).trim()
 
 test('planNames: tabulka', () => {
-  assert.deepEqual(planNames('proces', 29), { branch: 'k29/proces', dirName: 'ledge-wt-proces' })
-  assert.deepEqual(planNames('acl-ui', '30'), { branch: 'k30/acl-ui', dirName: 'ledge-wt-acl-ui' })
+  assert.deepEqual(planNames('proces', 29), { branch: 'k29/proces', dirName: 'proces' })
+  assert.deepEqual(planNames('acl-ui', '30'), { branch: 'k30/acl-ui', dirName: 'acl-ui' })
   for (const [o, k] of [['', 1], ['A', 1], ['../x', 1], ['a b', 1], ['ok', ''], ['ok', 'x'], ['ok', '1;rm']]) assert.throws(() => planNames(o, k), o + '/' + k)
 })
 
@@ -52,7 +52,7 @@ test('new + rm v dočasném repu: junction, dist, rerere; rm nesmaže cíl junct
     fs.mkdirSync(path.join(main, 'dist')); fs.writeFileSync(path.join(main, 'dist', 'index.html'), 'h')
     const r = newWorktree(main, 'abc', 5)
     assert.equal(r.branch, 'k5/abc')
-    assert.equal(r.wt, path.join(d, 'ledge-wt-abc'))
+    assert.equal(r.wt, path.join(main, '.claude', 'worktrees', 'abc'))
     assert.ok(isLink(path.join(r.wt, 'node_modules')))
     assert.equal(fs.readFileSync(path.join(r.wt, 'node_modules', 'pkg', 'i.js'), 'utf8'), 'z')
     assert.ok(!isLink(path.join(r.wt, 'dist')))

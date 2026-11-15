@@ -270,7 +270,7 @@ fn ts_mirror() {
     use super::composedeco::{FillDir, FillKind, Sep};
     let styles = [
         PieceStyle::Icon, PieceStyle::Badge, PieceStyle::Text, PieceStyle::Ring, PieceStyle::Graph, PieceStyle::Dot, PieceStyle::IconText, PieceStyle::Bar,
-        PieceStyle::Spark, PieceStyle::Chip, PieceStyle::DotPct, PieceStyle::Ring5h,
+        PieceStyle::Spark, PieceStyle::Chip, PieceStyle::DotPct, PieceStyle::Ring5h, PieceStyle::RingText,
     ];
     let j = |v: Vec<serde_json::Value>| ids(v.into_iter().map(ser).collect());
     let jv = |v: Vec<serde_json::Value>| j(v);
@@ -467,3 +467,51 @@ fn only_active_hides_calm_pieces() {
     assert_eq!(json_true.get("onlyActive"), Some(&serde_json::json!(true)));
 }
 
+
+#[test]
+fn ring_text_ring_and_value_heat_color() {
+    use PieceItem::*;
+    let f = Facts { limit5h: Some(42.0), limit7d: Some(92.0), cpu: Some(23.0), ..facts(State::Idle) };
+    // prstenec + hodnota vedle; týden s popiskem 7d; bez dat jen prázdná dráha (žádné vymyšlené %)
+    for (item, fa, want) in [
+        (Limit5h, &f, "◯42:acc 42 %"),
+        (LimitWeek, &f, "◯92:red 7d 92 %"),
+        (Cpu, &f, "◯23:text CPU 23 %"),
+        (LimitWeek, &facts(State::Idle), "◯:idle"),
+        (Time, &f, "[clock:text]"),
+    ] {
+        let got = parts_sig(&compose::parts(pc(item, PieceStyle::RingText), fa));
+        assert_eq!(got, want, "{item:?}");
+    }
+    // `heat`: prstenec i číslo v barvě podle hodnoty; bez podílu beze změny
+    let heat = |item, fa: &Facts| compose::parts(Piece { color: "heat".into(), ..pc(item, PieceStyle::RingText) }, fa);
+    let low = heat(Limit5h, &f);
+    assert!(matches!(low[0], Part::Ring { color, .. } if color == capsule::heat(42.0)));
+    assert!(matches!(&low[1], Part::Text { color, .. } if *color == capsule::heat(42.0)));
+    assert!(matches!(heat(LimitWeek, &f)[0], Part::Ring { color, .. } if color == Rgba::RED));
+    assert_eq!(parts_sig(&heat(LimitWeek, &facts(State::Idle))), "◯:idle");
+    // N3: limit se zaokrouhluje dolů (99,6 % není „100“), zátěž (CPU) zůstává zaokrouhlená
+    let near = Facts { limit5h: Some(99.6), limit7d: Some(41.9), cpu: Some(99.6), ..facts(State::Idle) };
+    for (item, want) in [(Limit5h, " 99 %"), (LimitWeek, " 7d 41 %"), (Cpu, " CPU 100 %")] {
+        let sig = parts_sig(&compose::parts(pc(item, PieceStyle::RingText), &near));
+        assert!(sig.ends_with(want), "{item:?}: {sig}");
+    }
+    // N2: směr škály podle druhu — baterie opačně (nabitá zelená, vybitá červená, nabíjí zelená), hudba / časovač beze změny
+    let bat = |percent, charging| Facts { battery: Some(crate::looks::BatteryFact { percent, charging }), ..facts(State::Idle) };
+    let ring_color = |item, fa: &Facts| match compose::parts(Piece { color: "heat".into(), ..pc(item, PieceStyle::Ring) }, fa).first() {
+        Some(Part::Ring { color, .. }) => Some(*color),
+        _ => None,
+    };
+    assert_eq!(ring_color(Battery, &bat(100, false)), Some(capsule::heat(0.0)), "plná baterie = zelená");
+    assert_eq!(ring_color(Battery, &bat(5, false)), Some(capsule::heat(95.0)), "skoro vybitá = červená");
+    assert_eq!(ring_color(Battery, &bat(30, true)), Some(capsule::heat(0.0)), "nabíjí = zelená");
+    assert_eq!(compose::heat_pct(Cpu, &f, 80.0), Some(80.0));
+    for item in [Music, Timer, Time, Date, Weather, Servers, Repos, Claude] {
+        assert_eq!(compose::heat_pct(item, &f, 100.0), None, "{item:?} nemá škálu podle hodnoty");
+    }
+    // starý config bez `ringText` / `heat` se načte stejně; `heat` projde normalizací jen u barvy dílu
+    let c: Compose = serde_json::from_str(r#"{"shape":"capsule","width":300,"height":30,"round":55,"left":[{"item":"limit5h","style":"ringText","color":"heat"}],"center":[],"right":[{"item":"limitWeek","style":"ring","bg":"heat"}]}"#).unwrap();
+    let n = c.norm();
+    assert_eq!((n.left[0].style, n.left[0].color.as_str()), (PieceStyle::RingText, "heat"));
+    assert_eq!(n.right[0].bg, "");
+}

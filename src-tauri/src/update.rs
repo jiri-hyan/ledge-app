@@ -60,7 +60,7 @@ fn auth_hint() -> &'static str {
     crate::i18n::tr("spusť v terminálu `gh auth login`", "run `gh auth login` in a terminal")
 }
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+use crate::procman::CREATE_NO_WINDOW;
 const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
@@ -316,12 +316,16 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 }
 
 /// Nejnovější vydání: veřejné API, při chybě `gh` (když je nainstalované). Obě chyby poctivě spolu.
-pub(crate) fn fetch_release(repo: &str) -> Result<String, String> {
+/// Chyba nese `net` = API neodpovědělo (spojení / termín), ne HTTP verdikt serveru (L267).
+pub(crate) fn fetch_release(repo: &str) -> Result<String, updatenet::GetErr> {
     updatenet::latest(repo).or_else(|api| {
+        let transport = api.transport;
+        let api = api.msg;
         if gh_exe().is_none() {
-            return Err(api);
+            return Err(updatenet::GetErr { msg: api, transport });
         }
-        gh(&["release", "view", "--repo", repo, "--json", "tagName,name,body,assets,publishedAt"], VIEW_TIMEOUT).map_err(|g| trf!("{api}; záloha přes gh: {g}", "{api}; fallback via gh: {g}"))
+        gh(&["release", "view", "--repo", repo, "--json", "tagName,name,body,assets,publishedAt"], VIEW_TIMEOUT)
+            .map_err(|g| updatenet::GetErr { msg: trf!("{api}; záloha přes gh: {g}", "{api}; fallback via gh: {g}"), transport })
     })
 }
 
@@ -415,6 +419,26 @@ pub const OUTSIDE_ARGS: &str = "/S /R";
 /// Podsložka `<local>` (`%LOCALAPPDATA%\Ledge`), do které se instalátor těsně před spuštěním zkopíruje.
 const RUN_DIR: &str = "run-upd";
 
+/// Jméno a podpis instalátoru z manifestu vedle `setup`; verze i jméno souboru musí sedět (viz [`stage_verified`]).
+fn manifest_sig(setup: &Path, version: &str) -> Result<(String, String), String> {
+    let name = setup.file_name().and_then(|n| n.to_str()).filter(|n| safe_asset(n)).ok_or_else(|| crate::i18n::tr("Instalátor má nepovolené jméno.", "The installer has a disallowed name.").to_string())?;
+    let dir = setup.parent().ok_or_else(|| crate::i18n::tr("Instalátor nemá složku.", "The installer has no folder.").to_string())?;
+    let m = std::fs::read_to_string(dir.join(updcache::MANIFEST))
+        .ok()
+        .and_then(|s| serde_json::from_str::<updcache::Manifest>(&s).ok())
+        .filter(|m| m.asset == name && m.version == version)
+        .ok_or_else(|| crate::i18n::tr("Instalátor v cache nemá odpovídající záznam.", "The cached installer has no matching record.").to_string())?;
+    let sig = m.signature.ok_or_else(|| crate::i18n::tr("Instalátor v cache není podepsaný.", "The cached installer isn't signed.").to_string())?;
+    Ok((name.to_string(), sig))
+}
+
+/// Podpis (minisign) nad souborem přímo na místě, bez kopie — pro větev MSIX, kde se instalátor spouští z fyzické
+/// kopie cache (Plánovač úloh). Volá se těsně před spuštěním, aby okno po ověření bylo co nejmenší (N5).
+pub(crate) fn verify_in_place(setup: &Path, version: &str) -> Result<(), String> {
+    let (name, sig) = manifest_sig(setup, version)?;
+    updsign::verify_release_file(setup, &sig, &name, version)
+}
+
 /// Okno mezi „ověřeno“ a „spuštěno“ zmenšíme tím, že ověřený instalátor zkopírujeme do nově vytvořené složky
 /// s náhodným jménem (`create_dir` ji vytvoří přímo a selže, kdyby už existovala; jméno je z CSPRNG, takže
 /// ho nikdo předem nezná) a **podpis se ověří nad touto kopií** — spustí se přesně ten soubor, který prošel.
@@ -424,14 +448,8 @@ const RUN_DIR: &str = "run-upd";
 /// (CreateProcess potřebuje číst soubor) a kopie je jednoduchá a nezávislá na tom, kdo startuje proces.
 /// Zbytky po minulém spuštění (`base`) se smažou předem. Vrací cestu ke kopii.
 pub(crate) fn stage_verified(setup: &Path, version: &str, base: &Path) -> Result<PathBuf, String> {
-    let name = setup.file_name().and_then(|n| n.to_str()).filter(|n| safe_asset(n)).ok_or_else(|| crate::i18n::tr("Instalátor má nepovolené jméno.", "The installer has a disallowed name.").to_string())?;
-    let dir = setup.parent().ok_or_else(|| crate::i18n::tr("Instalátor nemá složku.", "The installer has no folder.").to_string())?;
-    let m = std::fs::read_to_string(dir.join(updcache::MANIFEST))
-        .ok()
-        .and_then(|s| serde_json::from_str::<updcache::Manifest>(&s).ok())
-        .filter(|m| m.asset == name && m.version == version)
-        .ok_or_else(|| crate::i18n::tr("Instalátor v cache nemá odpovídající záznam.", "The cached installer has no matching record.").to_string())?;
-    let sig = m.signature.as_deref().ok_or_else(|| crate::i18n::tr("Instalátor v cache není podepsaný.", "The cached installer isn't signed.").to_string())?;
+    let (name, sig) = manifest_sig(setup, version)?;
+    let (name, sig) = (name.as_str(), sig.as_str());
     let _ = std::fs::remove_dir_all(base);
     std::fs::create_dir_all(base).map_err(|e| crate::errors::io(&base.display().to_string(), &e))?;
     let random = crate::accounts::pkce::random(16)?;
@@ -459,6 +477,7 @@ pub(crate) fn launch_installer(setup: &Path, exe: &Path, version: &str) -> Resul
         // cache v %LOCALAPPDATA% je v bublině virtualizovaná — mimo ni platí fyzická kopie
         let setup = &crate::pkgctx::relaunch_target(setup, crate::pkgctx::twin_of(setup), |p| p.is_file());
         let dir = setup.parent().unwrap_or(Path::new(""));
+        verify_in_place(setup, version)?;
         return crate::outside::run_task(crate::outside::TASK_UPDATE, setup, OUTSIDE_ARGS, dir, crate::outside::After::Keep)
             .map_err(|e| {
                 let why = crate::errors::any(crate::i18n::tr("Instalátor nejde spustit mimo balíček", "Can't run the installer outside the package"), &e);
@@ -539,12 +558,12 @@ mod tests {
         let Verdict::Available(api) = evaluate(API_FIXTURE, "0.2.0") else { panic!("čekám dostupnou verzi") };
         let Verdict::Available(gh) = evaluate(FIXTURE, "0.2.0") else { panic!() };
         assert_eq!((&api.tag, &api.sha256, &api.digest, &api.notes, &api.published), (&gh.tag, &gh.sha256, &gh.digest, &gh.notes, &gh.published));
-        let repo = "jiri-hyan/ledge-app";
+        let repo = "acme/ledge-app";
         for r in [&api, &gh] {
             assert!(updatenet::download_ok(r.download_url.as_deref().unwrap(), repo, &r.tag, &r.asset), "{:?}", r.download_url);
             assert!(updatenet::download_ok(r.sig_url.as_deref().unwrap(), repo, &r.tag, &updsign::sig_asset(&r.asset)), "{:?}", r.sig_url);
         }
-        assert!(!updatenet::download_ok("https://api.github.com/repos/jiri-hyan/ledge-app/releases/assets/1", repo, &api.tag, &api.asset));
+        assert!(!updatenet::download_ok("https://api.github.com/repos/acme/ledge-app/releases/assets/1", repo, &api.tag, &api.asset));
         assert_eq!(evaluate(API_FIXTURE, "0.2.14"), Verdict::Current);
         // body: null (vydání bez poznámek) → nejde ověřit, ne pád
         let no_body = API_FIXTURE.replacen("\"body\": \"SHA256", "\"body\": null, \"x\": \"SHA256", 1);
@@ -708,5 +727,27 @@ mod tests {
         std::fs::write(&setup, data).unwrap();
         updcache::write_manifest(&cache, &updcache::Manifest { signature: None, ..signed }).unwrap();
         assert!(stage_verified(&setup, "0.7.0", &base).is_err());
+    }
+
+    /// N5: větev MSIX ověří soubor na místě těsně před spuštěním — shoda, jiná verze, vyměněný obsah, bez podpisu.
+    #[test]
+    fn verify_in_place_table() {
+        use sha2::{Digest, Sha256};
+        let data: &[u8] = include_bytes!("fixtures/sign-payload.bin");
+        let sig = include_str!("fixtures/sign-payload.bin.sig").to_string();
+        let asset = "App_0.7.0_x64-setup.exe";
+        let rel = Release { tag: "v0.7.0".into(), version: "0.7.0".into(), notes: String::new(), published: String::new(), asset: asset.into(), sha256: format!("{:x}", Sha256::digest(data)), digest: None, download_url: None, sig_url: None };
+        let tmp = tempfile::tempdir().unwrap();
+        let setup = tmp.path().join(asset);
+        std::fs::write(&setup, data).unwrap();
+        let signed = updcache::Manifest { signature: Some(sig), ..updcache::Manifest::of(&rel) };
+        updcache::write_manifest(tmp.path(), &signed).unwrap();
+        assert!(verify_in_place(&setup, "0.7.0").is_ok());
+        assert!(verify_in_place(&setup, "0.8.0").is_err(), "jiná verze");
+        std::fs::write(&setup, "jiny obsah").unwrap();
+        assert!(verify_in_place(&setup, "0.7.0").is_err(), "vyměněný obsah");
+        std::fs::write(&setup, data).unwrap();
+        updcache::write_manifest(tmp.path(), &updcache::Manifest { signature: None, ..signed }).unwrap();
+        assert!(verify_in_place(&setup, "0.7.0").is_err(), "bez podpisu");
     }
 }

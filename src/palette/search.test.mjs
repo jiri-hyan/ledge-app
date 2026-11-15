@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fold, score, segments, rank, pushRecent } from "./search.ts";
-import { slugId, moveItem, isLink, linkActions, onPage, visibleGroups, cleanAction, draftError } from "../actions/model.ts";
+import { slugId, moveItem, isLink, onPage, visibleGroups, cleanAction, draftError } from "../actions/model.ts";
 
 test("fold: bez diakritiky, malá písmena, stejná délka", () => {
   for (const [a, b] of [["Příliš žluťoučký", "prilis zlutoucky"], ["ÚČTY", "ucty"], ["abc", "abc"], ["Ř-ž_ů", "r-z_u"]]) {
@@ -87,13 +87,12 @@ test("model: moveItem přesune a nemění vstup", () => {
   assert.deepEqual(src, ["a", "b", "c", "d"]);
 });
 
-test("model: odkaz = akce, která jen otevírá; karta Odkazy v pořadí akcí podle záložky", () => {
+test("model: odkaz = akce, která jen otevírá; odkazy v kartě Odkazy a akce podle záložky", () => {
   const v = (id, kind, showOn = "both", script = false) => ({ id, kind, showOn, group: null, script });
   const list = [v("mapy", "url"), v("build", "command"), v("fotky", "folder", "personal"), v("prace", "url", "work"), v("calc", "app"), v("panel", "web"), v("doc", "file", "work"), v("skript", "url", "both", true)];
   assert.deepEqual(list.filter(isLink).map((a) => a.id), ["mapy", "fotky", "prace", "panel", "doc"]);
-  assert.deepEqual(linkActions(list, "osobni").map((a) => a.id), ["mapy", "fotky", "panel"]);
-  assert.deepEqual(linkActions(list, "prace").map((a) => a.id), ["mapy", "prace", "panel", "doc"]);
-  assert.deepEqual(linkActions(list, "vlastni-1").map((a) => a.id), ["mapy", "fotky", "prace", "panel", "doc"]);
+  assert.deepEqual(visibleGroups(list.filter(isLink), "osobni").flatMap((g) => g.items.map((a) => a.id)), ["mapy", "fotky", "panel"]);
+  assert.deepEqual(visibleGroups(list.filter(isLink), "prace").flatMap((g) => g.items.map((a) => a.id)), ["mapy", "prace", "panel", "doc"]);
   assert.equal(onPage({ showOn: "work" }, "osobni"), false);
   assert.equal(onPage({ showOn: "work" }, "moje"), true);
 });

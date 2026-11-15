@@ -49,6 +49,8 @@ pub(crate) struct Snapshot {
     mode: String,
     personal_enabled: bool,
     view: View,
+    /// kdy se šuplík naposledy schoval (wall-clock ms), `None` = od startu ještě ne — základ chipu „Claude od posledně“
+    drawer_hidden_at: Option<u64>,
     cfg_error: Option<String>,
     /// kopie rozbitého configu (Obnovit) a varování o hodnotách mimo rozsah; chybí = nic
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -102,6 +104,10 @@ pub(crate) struct Snapshot {
     /// kategorie poznámek z configu (záložky, výběr) a počty nehotových podle `kind`
     note_kinds: Vec<config::NoteKind>,
     notes_kind_counts: std::collections::BTreeMap<String, usize>,
+    /// otevřené body s termínem do konce dneška: po termínu a dnes (štítek záložky Úkoly; `taskindex::due_counts`)
+    notes_task_counts: notes::DueCounts,
+    /// zadání čekající na člověka (`status: waiting|review`, `notes/briefwait.rs`) — chip „zadání čeká“
+    brief_waiting: notes::briefwait::BriefWaiting,
     /// roste s každým přenačtením poznámek — UI podle něj obnoví výběr záložky (`note_query`)
     notes_rev: u64,
     /// kolik poznámek je v archivu (`_archiv`) — odkaz „Archiv“ v kartě se ukáže jen s nimi
@@ -251,11 +257,19 @@ pub(crate) fn snapshot_timed() -> (Snapshot, [(&'static str, u64); 3]) {
     } else {
         ((Vec::new(), 0), Vec::new(), 0, (Vec::new(), 0))
     };
+    let notes_task_counts = if cfg.notes.enabled {
+        let now = notes::now_local();
+        notes::taskindex::due_counts(&c.notes.lock().all, now.timestamp_millis(), notes::end_of_day_ms(&now))
+    } else {
+        notes::DueCounts::default()
+    };
+    let brief_waiting = if cfg.notes.enabled { notes::briefwait::brief_waiting(&c.notes.lock().all) } else { notes::briefwait::BriefWaiting::default() };
     let personal = personal_view(&cfg, personal_notes);
     let snap = Snapshot {
         mode: crate::layout::page_id(&cfg.layout, &mode),
         personal_enabled: cfg.modes.personal_enabled,
         view: c.drawer.view(),
+        drawer_hidden_at: c.drawer.hidden_at_ms(),
         cfg_error: crate::config::recovery::shown_error(c.cfg_error.lock().clone(), c.bridge_error.lock().clone()),
         config_notice: crate::config::recovery::view(),
         sections: cfg.drawer.sections.clone(),
@@ -273,7 +287,7 @@ pub(crate) fn snapshot_timed() -> (Snapshot, [(&'static str, u64); 3]) {
         limits: crate::limitslive::view(),
         timer: crate::timer::view(&cfg.timer),
         costs: crate::costslive::view(),
-        incident: crate::incidents::view(cfg.smart.incidents.enabled),
+        incident: crate::incidents::view(cfg.smart.incidents.enabled, cfg.smart.incidents.every_min),
         smart: crate::smartconf::view(&cfg.smart),
         notes_enabled: cfg.notes.enabled,
         palette_compact: cfg.palette.compact,
@@ -285,6 +299,8 @@ pub(crate) fn snapshot_timed() -> (Snapshot, [(&'static str, u64); 3]) {
         reminders_count,
         note_kinds: cfg.notes.kinds.clone(),
         notes_kind_counts,
+        notes_task_counts,
+        brief_waiting,
         notes_rev,
         notes_archived,
         pins: crate::pins::win::view(&cfg.hotkeys.note_passthrough),

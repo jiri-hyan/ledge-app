@@ -27,6 +27,7 @@ test("skok z hledání: krok a Pokročilé", () => {
     ["strip.items", "closed", false],
     ["strip.monitor", "closed", false],
     ["drawer.hover", "hover", false],
+    ["drawer.dockCards", "hover", false],
     ["drawer.hoverExpandMs", "hover", true],
     ["appearance.style", "open", false],
     ["appearance.density", "open", false],

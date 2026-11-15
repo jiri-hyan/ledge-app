@@ -10,11 +10,11 @@ test("co jde připnout z které karty", () => {
   const cases = [
     ["claude", ["limits", "waiting"]],
     ["running", ["dev"]],
-    ["calendar", ["agenda"]],
-    ["week", ["week"]],
-    ["bigclock", ["clock"]],
+    ["calendar", ["agenda", "week"]],
     ["usage", ["usage"]],
-    ["clock", []],
+    ["clock", ["clock"]],
+    ["week", []],
+    ["bigclock", []],
     ["widget:docker.ps1", ["widget:docker.ps1"]],
     ["widget:", []],
     ["projects", []],
@@ -52,7 +52,8 @@ test("průhlednost, jméno profilu, minuty čekání", () => {
 
 test("data widgetu ve tvaru snapshotu: co chybí, je prázdné", () => {
   const empty = deskSnapshot(null);
-  assert.deepEqual([empty.procs, empty.projects, empty.widgets, empty.sessions], [[], [], [], []]);
+  assert.deepEqual([empty.projects, empty.widgets, empty.sessions], [[], [], []]);
+  assert.equal(empty.procs, undefined, "bez dat žádné procs (kit ukáže „—“, ne 0)");
   assert.equal(empty.cfgError, null);
   assert.equal(empty.personal.calendar, undefined);
   const d = { now: 60_000, cfgError: "x", claudeEnabled: true, working: true, procs: [{ id: "app", phase: "ready" }, { id: "app-v2", phase: "failed" }], projects: [{ id: "app", name: "App" }] };

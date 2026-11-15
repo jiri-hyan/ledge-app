@@ -25,6 +25,7 @@ const NO_EDITOR = {
   "ui.tips": "odklepnuté tipy a prohlídka; zapisuje je šuplík sám (smazáním se tip ukáže znovu)",
   "onboarding.done": "průvodce prvním spuštěním ho zapíše po dokončení; znovu spustit jde tlačítkem v Jazyk a průvodce",
   winquick: "karta Rychlé dlaždice se upravuje přímo na kartě (✎ Upravit dlaždice); volby zapisuje karta",
+  "connector.appUrl": "adresa webu propojené aplikace pro odkaz na úkol v poznámce; bez ní se řádek zapíše bez odkazu; ručně v config.json",
   "gitAlerts.read": "„přečteno“ u upozornění na neuloženou práci; zapisuje ho čip v hlavičce šuplíku",
 };
 
@@ -85,6 +86,7 @@ test("placeOf: nejdelší prefix, vnořené cesty, neznámé = null", () => {
     ["strip.opacity", "vzhled", "advanced"],
     ["notes.folderLink.path", "poznamky", "basic"],
     ["notes.folderLink.propagateDeletes", "poznamky", "advanced"],
+    ["drawer.dockCards", "vzhled", "basic"],
     ["drawer.hoverExpandMs", "vzhled", "advanced"],
     ["drawer.keepWarmS", "spousteni", "basic"],
   ];
@@ -155,4 +157,13 @@ test("úroveň Pokročilé sedí s tím, kde panel volbu kreslí", () => {
   assert.ok(checked > 100, `ověřeno ${checked} voleb`);
   assert.deepEqual(bad, []);
   for (const a of ADVANCED_ANCHORS) assert.ok(fields.some((f) => f.id === a), `ADVANCED_ANCHORS ${a} je v labels.ts`);
+});
+
+// Rozpočet složitosti (šéf 11. 11., L108): počet voleb = záznamů `FIELDS` v labels.ts (jediný zdroj popisků).
+// Práh = stav po kole 33. Nová volba shodí test; buď něco uber / slouč, nebo (po výslovném souhlasu) práh zvedni s důvodem.
+const MAX_FIELDS = 186; // k35: +1 `connector.name` (název propojené aplikace v menu a dialogu; adresa už nemá výchozí hodnotu); 185: L193 (texty, kolo 34): +1 `suggest.digest` (přehled: zadání čeká, ranní shrnutí, Dnes, Claude od posledně; dřív sdílené s `suggest.reminders`); 184: H8 (kolo 34): +1 `mcp.readData` (čtecí nástroj `live_state`, výchozí vypnuto); 183: V2 (kolo 34): +1 `claude.brief.autoResume` (výchozí vypnuto); 182: L147 (kolo 34): +1 Karty středního panelu (`drawer.dockCards`); 181: L109 (kolo 33): vypínače oznámení sloučené se styly (−4), quickKeys vždy zapnuto (−1), Zdroj limitů (−1); 180 voleb
+test("rozpočet složitosti: počet voleb v Nastavení nepřeroste práh", () => {
+  const n = [...read("./labels.ts").matchAll(/^\s*"?[A-Za-z0-9_.]+"?:\s*\{\s*panel:/gm)].length;
+  assert.ok(n <= MAX_FIELDS, `rozpočet složitosti: uber nebo slouč — voleb ${n} > ${MAX_FIELDS}`);
+  assert.ok(n > 100, `voleb je podezřele málo (${n}) — regex neodpovídá labels.ts?`); // dolní mez MAX_FIELDS-10 zrušena (k34): nutila každého workera měnit tentýž řádek
 });

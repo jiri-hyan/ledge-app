@@ -6,9 +6,9 @@
 //! |---|---|---|
 //! | `ics` (výchozí) | tajný odkaz ICS (Google, Outlook na webu) | `live.rs` `fetch_parse` |
 //! | `outlook-local` | klasický Outlook v tomto PC přes COM, bez přihlášení | `outlook.rs` |
-//! | `graph` / `google` | účet Microsoft / Google (OAuth, přihlášení v Nastavení → Účty) | `graph.rs` / `google.rs` přes `adapter` |
+//! | `graph` / `google` | účet Microsoft / Google (OAuth, přihlášení v Nastavení → Obsah karet → Pokročilé) | `graph.rs` / `google.rs` přes `adapter` |
 //!
-//! Kalendář účtu jde do karty i bez řádku v `personal.calendars` — přepínač v Nastavení → Účty
+//! Kalendář účtu jde do karty i bez řádku v `personal.calendars` — přepínač v Nastavení → Obsah karet → Pokročilé
 //! (`accounts::calsync`, trait `Source`); má-li `personal.calendars` zapnutý zdroj téhož druhu, vyhraje
 //! ten (připomínky, barva) a `calsync` ho vynechá.
 //!
@@ -87,7 +87,7 @@ pub struct SourceInfo {
     pub color: Option<String>,
 }
 
-/// Zdroj účtu pro `accounts::calsync` (kalendář zapnutý v Nastavení → Účty). `events` blokuje (síť) —
+/// Zdroj účtu pro `accounts::calsync` (kalendář zapnutý v Nastavení → Obsah karet → Pokročilé). `events` blokuje (síť) —
 /// volat z vlákna mimo async runtime nebo ze `spawn_blocking`.
 pub trait Source: Send + Sync {
     fn info(&self) -> SourceInfo;

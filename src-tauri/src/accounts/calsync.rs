@@ -5,7 +5,7 @@
 
 use super::{Provider, session};
 use crate::calendar::Occ;
-use crate::calendar::live::{CalInfo, feed_status, is_old, needs_fetch};
+use crate::calendar::live::{CalInfo, POLICY, feed_status, is_old};
 use crate::calendar::source::{Source, SourceInfo, SourceKind, Window};
 use crate::config::Config;
 use crate::drawer::View;
@@ -26,6 +26,8 @@ struct St {
     account: String,
     /// název a barva zdroje (`Source::info`)
     info: Option<SourceInfo>,
+    /// neúspěchy za sebou → backoff (`netstate`)
+    fails: crate::netstate::Fails,
 }
 
 static S: Mutex<[Option<St>; 2]> = Mutex::new([None, None]);
@@ -79,7 +81,7 @@ pub(crate) fn maybe_refresh(opening: bool) {
             let mut g = S.lock();
             let st = g[ix(p)].get_or_insert_with(St::default);
             let stuck = st.loading && !loading_live(st, now);
-            let go = needs_fetch(now, st.fetched_ms, st.attempt_ms, st.loading && !stuck);
+            let go = crate::netstate::needs_fetch(&POLICY, st.loading && !stuck, st.fetched_ms, st.attempt_ms, st.fails.count(), now);
             if go {
                 (st.loading, st.attempt_ms) = (true, Some(now));
             }
@@ -104,8 +106,12 @@ pub(crate) fn maybe_refresh(opening: bool) {
                 Ok(evs) => {
                     st.occs = evs;
                     (st.fetched_ms, st.error) = (Some(now_ms()), None);
+                    st.fails.ok();
                 }
-                Err(e) => st.error = Some(e),
+                Err(e) => {
+                    st.error = Some(e);
+                    st.fails.fail();
+                }
             }
             drop(g);
             mark_dirty();
@@ -209,8 +215,9 @@ mod tests {
     fn policy_shared_with_ics_and_stuck() {
         let now = 10_000_000_000;
         // stejná politika jako ICS: stažení se nezkouší častěji než jednou za RETRY_MS
-        assert!(!needs_fetch(now, None, Some(now - RETRY_MS + 1), false));
-        assert!(needs_fetch(now, Some(now - MAX_AGE_MS), Some(now - MAX_AGE_MS), false));
+        let needs_fetch = |ok, at| crate::netstate::needs_fetch(&POLICY, false, ok, at, 0, now);
+        assert!(!needs_fetch(None, Some(now - RETRY_MS + 1)));
+        assert!(needs_fetch(Some(now - MAX_AGE_MS), Some(now - MAX_AGE_MS)));
         let st = St { loading: true, attempt_ms: Some(now - 1000), ..Default::default() };
         assert!(loading_live(&st, now));
         let st = St { loading: true, attempt_ms: Some(now - STUCK_MS), ..Default::default() };

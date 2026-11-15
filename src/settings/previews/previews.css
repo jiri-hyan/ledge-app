@@ -77,7 +77,6 @@
 .apv-full { --c: 4; width: 86%; height: 104px; display: grid; grid-template-columns: repeat(var(--c), minmax(0, 1fr)); gap: 5px; padding: 8px; border-radius: 0 0 12px 12px; }
 .apv-pcard { border-radius: 6px; background: var(--m-card-bg, var(--card)); border: var(--m-card-bd, 1px solid var(--line)); }
 .apv-pcard.apv-wide { grid-column: span 2; }
-.apv-compact { flex-direction: column; width: min(78%, 260px); padding: 4px 10px 6px; }
 .apv-prow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .apv-prow > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 4px; }
 .apv-more { margin-top: 3px; text-align: center; color: var(--t3); font-size: var(--fs-2xs); }

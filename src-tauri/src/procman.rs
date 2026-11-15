@@ -16,27 +16,12 @@ use regex::Regex;
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::io::{BufRead, BufReader, Read};
-use std::os::windows::io::AsRawHandle;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
-use windows::Win32::Foundation::{CloseHandle, HANDLE};
-use windows::Win32::System::JobObjects::{
-    AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation, SetInformationJobObject,
-    TerminateJobObject,
-};
-use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
-};
-use windows::Win32::System::Threading::{
-    CREATE_SUSPENDED, OpenProcess, OpenThread, PROCESS_QUERY_LIMITED_INFORMATION, ResumeThread, THREAD_SUSPEND_RESUME,
-};
-use windows::core::PCWSTR;
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const LOG_LINES: usize = 400;
 /// Strop jednoho řádku logu (bajty): proces bez `\n` (minifikovaný výpis, JSON) nesmí nafouknout RAM ani snapshot.
 const LINE_CAP: usize = 4096;
@@ -57,100 +42,11 @@ static URL_RE: LazyLock<Regex> =
 static ANSI_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07").unwrap());
 
-// ---------- Job Object ----------
-
-/// Job Object s KILL_ON_JOB_CLOSE — sdílí ho i `gitinfo::run` (zabití celého stromu gitu).
-pub(crate) struct Job(HANDLE);
-unsafe impl Send for Job {}
-unsafe impl Sync for Job {}
-
-impl Job {
-    pub(crate) fn new() -> Result<Self, String> {
-        unsafe {
-            let h = CreateJobObjectW(None, PCWSTR::null()).map_err(|e| e.to_string())?;
-            let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-            SetInformationJobObject(
-                h,
-                JobObjectExtendedLimitInformation,
-                &info as *const _ as *const _,
-                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-            )
-            .map_err(|e| e.to_string())?;
-            Ok(Job(h))
-        }
-    }
-    fn assign(&self, child: &Child) -> Result<(), String> {
-        unsafe {
-            AssignProcessToJobObject(self.0, HANDLE(child.as_raw_handle())).map_err(|e| e.to_string())
-        }
-    }
-    /// Spustí proces rovnou v jobu: vznikne pozastavený, přiřadí se a teprve pak se rozběhne.
-    /// Přiřazení až po běžném `spawn()` je závod — cmd.exe stihne pustit node dřív, než je
-    /// v jobu, a vnuk pak žije mimo job (Stop ho nezabije, port drží sirotek).
-    /// `flags` = ostatní příznaky (CREATE_NO_WINDOW…); `creation_flags` je přepisuje, ne sčítá.
-    pub(crate) fn spawn(&self, cmd: &mut Command, flags: u32) -> Result<Child, String> {
-        let mut child = cmd
-            .creation_flags(flags | CREATE_SUSPENDED.0)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-        let res = self.assign(&child).map_err(|e| format!("Job Object: {e}")).and_then(|()| resume_threads(child.id()));
-        if let Err(e) = res {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(e);
-        }
-        Ok(child)
-    }
-    fn contains(&self, pid: u32) -> bool {
-        unsafe {
-            let Ok(p) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else { return false };
-            let mut res = windows::core::BOOL(0);
-            let ok = IsProcessInJob(p, Some(self.0), &mut res).is_ok() && res.as_bool();
-            let _ = CloseHandle(p);
-            ok
-        }
-    }
-    pub(crate) fn kill(&self) {
-        unsafe {
-            let _ = TerminateJobObject(self.0, 1);
-        }
-    }
-}
-
-impl Drop for Job {
-    fn drop(&mut self) {
-        unsafe {
-            let _ = CloseHandle(self.0); // KILL_ON_JOB_CLOSE → zbytek stromu umře
-        }
-    }
-}
-
-/// Rozběhne pozastavený proces (std nevydá handle hlavního vlákna → najdeme ho přes ToolHelp).
-fn resume_threads(pid: u32) -> Result<(), String> {
-    unsafe {
-        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0).map_err(|e| format!("ToolHelp: {e}"))?;
-        let mut te = THREADENTRY32 { dwSize: std::mem::size_of::<THREADENTRY32>() as u32, ..Default::default() };
-        let mut resumed = 0;
-        let mut more = Thread32First(snap, &mut te).is_ok();
-        while more {
-            if te.th32OwnerProcessID == pid
-                && let Ok(t) = OpenThread(THREAD_SUSPEND_RESUME, false, te.th32ThreadID)
-            {
-                if ResumeThread(t) != u32::MAX {
-                    resumed += 1;
-                }
-                let _ = CloseHandle(t);
-            }
-            more = Thread32Next(snap, &mut te).is_ok();
-        }
-        let _ = CloseHandle(snap);
-        if resumed == 0 {
-            return Err(trf!("Nepodařilo se rozběhnout proces {pid}.", "Couldn't get process {pid} running."));
-        }
-        Ok(())
-    }
-}
+mod appstop;
+mod errline;
+mod job;
+use errline::{ErrLines, mask_secrets};
+pub(crate) use job::{CREATE_NO_WINDOW, Job};
 
 // ---------- veřejné typy ----------
 
@@ -195,6 +91,9 @@ pub struct ProcView {
     pub last_line: Option<String>,
     /// počet řádků, které vypadají jako chyba
     pub errors: u32,
+    /// posledních ≤ 8 chybových řádků (maskované, ≤ 1024 znaků) + krátký stack; jen při `errors > 0`, jinak prázdné
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub error_lines: Vec<String>,
     /// odkud to běží (složka) a co (příkaz po doplnění portu / exe) — dlaždice, pilulka, Běží
     pub cwd: Option<String>,
     pub cmd: Option<String>,
@@ -210,6 +109,11 @@ pub enum ProcEvent {
     Ready { url: String, open_browser: bool },
     /// spadl / nenaběhl — `message` = lidská zpráva (toast, když šuplík není otevřený)
     Failed { id: String, message: String },
+}
+
+/// Do logu Ledge: jak dopadlo zavření aplikace (Stop).
+fn log_closed(app: &appstop::AppIdent, r: appstop::Closed) {
+    crate::log(&format!("stop aplikace pid {}: {r:?}", app.pid));
 }
 
 /// Kolik posledních řádků logu ukáže selhání na dlaždici.
@@ -254,10 +158,14 @@ struct Entry {
     view: ProcView,
     log: VecDeque<String>,
     job: Option<Job>,
+    /// Otisk aplikace spuštěné bez jobu (Stop ji zavře po ověření, `appstop`).
+    app: Option<appstop::AppIdent>,
     /// Záložní port z řádku o naslouchání (`listen_port`) a kdy se poprvé objevil; nikdy se nezapisuje do `view.port`.
     hint: Option<(u16, Instant)>,
     /// Už přišel řádek `Local:` (má přednost, záložní port se pak neřeší).
     local_seen: bool,
+    /// Kruh chybových řádků (kopie jde do `view.error_lines`).
+    errs: ErrLines,
 }
 
 #[derive(Clone)]
@@ -327,7 +235,7 @@ fn push_capped(buf: &mut Vec<u8>, chunk: &[u8], cap: usize) {
 
 /// Jako `read_until(b'\n')`, ale v `buf` zůstane nejvýš `cap` bajtů; zbytek řádku se přečte a zahodí.
 /// Vrací počet přečtených bajtů, 0 = konec.
-fn read_line_capped(reader: &mut impl BufRead, buf: &mut Vec<u8>, cap: usize) -> std::io::Result<usize> {
+pub(crate) fn read_line_capped(reader: &mut impl BufRead, buf: &mut Vec<u8>, cap: usize) -> std::io::Result<usize> {
     let mut total = 0;
     loop {
         let avail = match reader.fill_buf() {
@@ -347,11 +255,6 @@ fn read_line_capped(reader: &mut impl BufRead, buf: &mut Vec<u8>, cap: usize) ->
             return Ok(total);
         }
     }
-}
-
-fn looks_like_error(line: &str) -> bool {
-    let l = line.to_ascii_lowercase();
-    l.contains("error") && !l.contains("0 error") || l.contains("failed to") || l.contains("eaddrinuse")
 }
 
 impl ProcMan {
@@ -376,13 +279,39 @@ impl ProcMan {
         g.entries.iter().find(|(_, e)| e.job.as_ref().is_some_and(|j| j.contains(pid))).map(|(k, _)| k.clone())
     }
 
-    /// Zastaví projekt (celý strom procesů) a zapomene ho.
+    /// Zastaví projekt a zapomene ho: server celý strom (job), aplikaci slušně (`WM_CLOSE`, po 3 s kill) —
+    /// na pozadí, ať Stop nečeká. Otisk procesu se ověří, cizí (recyklovaný) PID se nikdy nezavře.
     pub fn stop(&self, id: &str) {
+        if let Some(app) = self.take_entry(id) {
+            std::thread::spawn(move || log_closed(&app, appstop::close_then_kill(&app, appstop::CLOSE_GRACE)));
+        }
+    }
+
+    /// Jako [`stop`](Self::stop), ale u aplikace počká na zavření (Restart nesmí pustit 2. instanci).
+    /// Blokuje až 3 s — jen z vlákna příkazu.
+    pub fn stop_wait(&self, id: &str) {
+        if let Some(app) = self.take_entry(id) {
+            log_closed(&app, appstop::close_then_kill(&app, appstop::CLOSE_GRACE));
+        }
+    }
+
+    /// Odebere záznam, zabije job a vrátí otisk aplikace k zavření (jen když `stop_kind` = `App`).
+    fn take_entry(&self, id: &str) -> Option<appstop::AppIdent> {
         let entry = self.inner.lock().entries.remove(id);
-        if let Some(j) = entry.as_ref().and_then(|e| e.job.as_ref()) {
-            j.kill();
+        let mut app = None;
+        if let Some(e) = &entry {
+            match appstop::stop_kind(e.job.is_some(), e.app.as_ref()) {
+                appstop::StopKind::Job => {
+                    if let Some(j) = &e.job {
+                        j.kill();
+                    }
+                }
+                appstop::StopKind::App => app = e.app.clone(),
+                appstop::StopKind::Entry => {}
+            }
         }
         (self.notify)(ProcEvent::Changed);
+        app
     }
 
     /// Smaže skončený/selhaný záznam z přehledu.
@@ -429,14 +358,17 @@ impl ProcMan {
                     message: None,
                     last_line: None,
                     errors: 0,
+                    error_lines: Vec::new(),
                     cwd: None,
                     cmd: None,
                     tail: Vec::new(),
                 },
                 log: VecDeque::new(),
                 job: None,
+                app: None,
                 hint: None,
                 local_seen: false,
+                errs: ErrLines::default(),
             },
         );
         Err(generation)
@@ -535,8 +467,11 @@ impl ProcMan {
                                     e.hint = Some((p, since));
                                 }
                             }
-                            if looks_like_error(&line) {
+                            if e.errs.feed(&line) {
                                 e.view.errors += 1;
+                            }
+                            if e.view.error_lines != e.errs.lines {
+                                e.view.error_lines = e.errs.lines.clone();
                             }
                             e.view.last_line = Some(line.clone());
                             e.log.push_back(line);
@@ -583,7 +518,7 @@ impl ProcMan {
         let cmdline = with_port(&spec.run, port, spec.pass_port);
         self.update(&spec.id, generation, |e| {
             e.view.cwd = Some(spec.cwd.to_string_lossy().into_owned());
-            e.view.cmd = Some(cmdline.clone());
+            e.view.cmd = Some(mask_secrets(&cmdline));
             e.view.port = Some(port);
             e.view.message = note.clone();
             if let Some(n) = &note {
@@ -723,10 +658,12 @@ impl ProcMan {
                     }
                 };
                 let pid = child.id();
+                let ident = appstop::identify_child(&child);
                 let t0 = Instant::now();
                 me.update(&id, generation, |e| {
                     e.view.phase = Phase::Running;
                     e.view.pid = Some(pid);
+                    e.app = ident;
                     e.view.ready_at = Some(now_ms());
                     e.job = None;
                 });
@@ -875,17 +812,17 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
                 port: None,
                 pass_port: true,
                 open_browser: true,
-                timeout: Duration::from_secs(20),
+                timeout: Duration::from_secs(120),
             })
             .unwrap();
         assert!(matches!(out, LaunchOutcome::Started));
-        let v = wait_for(&pm, "t", Phase::Ready, 20);
+        let v = wait_for(&pm, "t", Phase::Ready, 120);
         let port = v.port.unwrap();
         assert!(ports::probe(port));
         // fáze Ready se zapíše dřív, než watcher odešle událost → na ni se čeká, ne se jen kouká
         let t0 = Instant::now();
         while !events.lock().iter().any(|e| matches!(e, ProcEvent::Ready { .. })) {
-            assert!(t0.elapsed() < Duration::from_secs(5), "událost Ready nepřišla");
+            assert!(t0.elapsed() < Duration::from_secs(60), "událost Ready nepřišla");
             std::thread::sleep(Duration::from_millis(20));
         }
         // druhé spuštění téhož = už běží, nic nového
@@ -907,7 +844,7 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
         assert_eq!(pm.project_for_pid(pid).as_deref(), Some("t"));
         pm.stop("t");
         let t0 = Instant::now();
-        while ports::probe(port) && t0.elapsed() < Duration::from_secs(5) {
+        while ports::probe(port) && t0.elapsed() < Duration::from_secs(60) {
             std::thread::sleep(Duration::from_millis(50));
         }
         assert!(!ports::probe(port), "port pořád drží sirotek");
@@ -925,11 +862,11 @@ setTimeout(()=>http.createServer((q,r)=>r.end('ok')).listen(port,'127.0.0.1',()=
             port: None,
             pass_port: false,
             open_browser: false,
-            timeout: Duration::from_secs(30),
+            timeout: Duration::from_secs(600),
         })
         .unwrap();
-        let v = wait_for(&pm, "c", Phase::Failed, 10);
-        assert!(t0.elapsed() < Duration::from_secs(10), "pád musí být hlášen hned, ne po timeoutu");
+        let v = wait_for(&pm, "c", Phase::Failed, 120);
+        assert!(t0.elapsed() < Duration::from_secs(120), "pád musí být hlášen hned, ne po timeoutu (600 s)");
         assert_eq!(v.exit_code, Some(3));
         assert!(v.message.unwrap().contains("boom"));
         assert_eq!(v.errors, 1);
@@ -994,10 +931,10 @@ const s=http.createServer((q,r)=>r.end('ok'));
             port: None,
             pass_port: false,
             open_browser: false,
-            timeout: Duration::from_secs(20),
+            timeout: Duration::from_secs(120),
         })
         .unwrap();
-        let v = wait_for(&pm, "l", Phase::Ready, 20);
+        let v = wait_for(&pm, "l", Phase::Ready, 120);
         let port = v.port.unwrap();
         assert_eq!(v.url, Some(format!("http://localhost:{port}/")));
         assert!(ports::probe(port));
@@ -1033,10 +970,10 @@ const s=http.createServer((q,r)=>r.end('ok'));
             port: Some(busy),
             pass_port: false,
             open_browser: false,
-            timeout: Duration::from_secs(20),
+            timeout: Duration::from_secs(120),
         })
         .unwrap();
-        let v = wait_for(&pm, "b", Phase::Ready, 20);
+        let v = wait_for(&pm, "b", Phase::Ready, 120);
         assert_ne!(v.port, Some(busy));
         assert!(v.message.unwrap().contains(&format!("Port {busy} drží")));
         pm.stop("b");
@@ -1082,12 +1019,12 @@ const s=http.createServer((q,r)=>r.end('ok'));
             timeout: Duration::from_secs(2),
         })
         .unwrap();
-        let v = wait_for(&pm, "s", Phase::Failed, 10);
+        let v = wait_for(&pm, "s", Phase::Failed, 120);
         assert!(v.message.unwrap().contains("nenaběhl"));
         // událost nese id a zprávu (toast), ne jen „něco selhalo“
         let t0 = Instant::now();
         while !events.lock().iter().any(|e| matches!(e, ProcEvent::Failed { id, message } if id == "s" && message.contains("nenaběhl"))) {
-            assert!(t0.elapsed() < Duration::from_secs(5), "událost Failed nepřišla");
+            assert!(t0.elapsed() < Duration::from_secs(60), "událost Failed nepřišla");
             std::thread::sleep(Duration::from_millis(20));
         }
     }

@@ -12,7 +12,7 @@ export function fullLayout() {
       {
         id: "osobni",
         name: "",
-        cards: [c("projects", "xl"), c("clock", "s"), c("timer", "s"), c("weather", "s"), c("calendar", "s"), c("media", "m"), c("links", "m"), c("actions", "xl"), c("shelf", "xl"), c("notes", "xl")],
+        cards: [c("projects", "xl"), c("clock", "s"), c("timer", "s"), c("weather", "s"), c("calendar", "s"), c("media", "m"), c("actions", "xl"), c("shelf", "xl"), c("notes", "xl")],
       },
     ],
     hiddenParts: [],

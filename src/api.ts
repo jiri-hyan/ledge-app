@@ -3,13 +3,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { WqState } from "./winquick/model";
-import type { AppInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
+import type { AppInfo, MonitorInfo, DecideExtra, DetectedProject, FieldError, ImportPreview, PickKind, RepoCandidate } from "./types";
 import type { StatusLineStatus, TimerOp, TimerState } from "./types";
 import type { EditPreview, GitView } from "./types";
 import type { CtxView } from "./sessions/ctx";
 import type { CalendarTest, OutlookProbe } from "./types";
 import type { MediaAction } from "./types";
-import type { Deleted, Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, SaveNote, SaveOutcome, Snapshot, View } from "./types";
+import type { Deleted, Draft, DraftMeta, EditDraft, HooksStatus, InstallOutcome, NewNote, NoteDetail, NoteQuery, NoteView, QueryResult, QuickTask, SaveNote, SaveOutcome, Snapshot, TaskList, TaskQuery, View } from "./types";
 import type { BriefStatus, PinInit, PinPrefs } from "./types";
 import type { FolderCandidates, PortHolder } from "./types";
 
@@ -70,10 +70,14 @@ export const api = {
   close: () => call("close_drawer"),
   /** Jen na výslovný klik do poznámky: okno otevřené najetím aktivuje (jinak by nešlo psát). */
   focusDrawer: () => drawerOnly(() => call("focus_drawer")),
-  /** Náhled po najetí (Compact / Island) → celý šuplík: klik do náhledu nebo jeho setrvání. Fokus nebere. */
-  expandDrawer: () => call("expand_drawer"),
+  /** 🎤 Win+H do pole rychlé poznámky: Rust pošle klávesy jen když je popředí okno Ledge a pole má fokus (`false` = nic). */
+  dictateStart: (fieldFocused: boolean) => drawerOnly(() => call<boolean>("dictate_start", { fieldFocused })),
+  /** Náhled po najetí o krok víc (jádro `hovermode::expand_target`: dok → střední panel, jinak celý šuplík; `toFull` = rovnou celý): klik do náhledu nebo jeho setrvání. Fokus nebere. */
+  expandDrawer: (toFull?: boolean) => call("expand_drawer", { toFull: toFull ?? null }),
   /** Odchod ze stránky poznámky: šuplík otevřený najetím zase zavře odjetí myší. */
   releaseFocus: () => drawerOnly(() => call("release_focus")),
+  /** 📌 v docku (`drawer.hover = "dock"`): upevnit okno (neodjede, nezavře blur) / uvolnit. Jen výslovný klik. */
+  drawerPin: (on: boolean) => drawerOnly(() => call<void>("drawer_pin", { on })),
   uiReady: () => call("ui_ready"),
   animAck: (kind: "prepared" | "closed") => call("anim_ack", { kind }),
   animStats: (stats: { kind: string; frames: number; avgMs: number; worstMs: number; durationMs: number }) => call("anim_stats", { stats }),
@@ -81,10 +85,13 @@ export const api = {
   uiLog: (kind: "error" | "promise" | "render", msg: string) => call<void>("ui_log", { kind, msg }),
   openUrl: (url: string) => call("open_url", { url }),
   openIn: (id: string, target: "terminal" | "folder") => call("open_in", { id, target }),
+  projectOpenFile: (id: string, path: string) => call("project_open_file", { id, path }),
   gitPull: (id: string) => call<string>("git_pull", { id }),
   projectLogo: (id: string) => call<string | null>("project_logo", { id }),
   cloneProject: (id: string) => call<string>("clone_project", { id }),
   getConfig: () => call<any>("get_config"),
+  /** stav Windows pro motiv „Podle Windows“ (`theme/auto.ts`); změny chodí událostí `winlook` */
+  winLook: () => call<{ light: boolean | null; accent: string | null }>("win_look"),
   saveConfig: (cfg: any) => call("save_config", { cfg }),
   openConfigFile: () => call("open_config_file"),
   /** zkratky, které systém neregistroval (drží je jiná aplikace), s návrhem jiné */
@@ -113,6 +120,12 @@ export const api = {
   // --- zadání pro Claude Code (kolo 19): `note_*` z jádra poznámek, `brief_*` / `apikey_*` ze spouštění session ---
   noteSetStatus: (path: string, status: BriefStatus) => call<NoteDetail>("note_set_status", { path, status }),
   noteAnswer: (path: string, index: number, answer: string) => call<NoteDetail>("note_answer", { path, index, answer }),
+  /** Otevřené body napříč poznámkami + počty (z paměti, bez I/O). */
+  noteTasks: (q: TaskQuery = {}) => call<TaskList>("note_tasks", { q }),
+  /** Termín bodu: `YYYY-MM-DD` / `YYYY-MM-DD HH:MM`, "" = odebrat; mění jen token ⏰, otisk jako noteToggleTask. */
+  noteTaskSnooze: (path: string, line: number, iso: string, expectedHash: string) => call<SaveOutcome>("note_task_snooze", { path, line, iso, expectedHash }),
+  /** Rychlý úkol z věty („v 9:00 doktor !“): název, čas, priorita, řešitel a hotový řádek; nic nezapisuje. */
+  noteQuickParse: (text: string) => call<QuickTask>("note_quick_parse", { text }),
   noteTaskSet: (path: string, line: number, text: string, state: "open" | "proposed" | "done", evidence?: string | null) => call<NoteDetail>("note_task_set", { path, line, text, state, evidence }),
   projectFiles: (projectId: string, query: string) => call<string[]>("project_files", { projectId, query }),
   briefSend: (path: string) => call("brief_send", { path }),
@@ -195,6 +208,8 @@ export const api = {
   statuslineRemove: () => call<StatusLineStatus>("statusline_remove"),
   /** Útrata Claude: přepočet indexu na pozadí (Rust ho pustí nejvýš 1× / 60 s); výsledek ve snapshotu. */
   costsRefresh: () => call("costs_refresh"),
+  /** „Zkusit znovu“ u Počasí a Kalendáře po selhání (jádro vynuluje odstup mezi pokusy a stáhne hned). */
+  retryOnline: () => call("retry_online"),
   /** Export útrat a limitů do CSV / Markdownu (dialog Uložit jako v jádře); vrací cestu, `null` = zrušeno. */
   exportUsage: (format: "csv" | "md") => call<string | null>("export_usage", { format }),
   /** Časovač: akce (`{ op: "start", minutes: 25 }`, pause, resume, cancel, add, swStart, swPause, swReset) → nový stav. */
@@ -260,6 +275,8 @@ export const api = {
   reposRescan: () => call<number>("repos_rescan"),
   logoPreview: (project: any) => call<string | null>("logo_preview", { project }),
   appInfo: () => call<AppInfo>("app_info"),
+  /** Připojené monitory pro volbu `strip.monitor` (Hlavní / Všechny / konkrétní; `id` = stabilní spec). */
+  monitorsList: () => call<MonitorInfo[]>("monitors_list"),
   openAppFile: (which: "log" | "dir") => call("open_app_file", { which }),
 };
 

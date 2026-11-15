@@ -41,14 +41,15 @@ test("labelFrom: host, složka, soubor, exe", () => {
 
 test("visibility: kdy se nová akce na záložce ukáže a kterou kartu nabídnout", () => {
   const cases = [
-    ["odkaz, je karta Odkazy", ["projects", "links"], "url", { visible: true }],
-    ["odkaz, jsou jen Rychlé akce", ["actions"], "folder", { visible: true }],
-    ["odkaz, žádná karta", ["projects", "notes"], "file", { visible: false, add: "links" }],
-    ["aplikace, jen Odkazy → neukáže", ["links"], "app", { visible: false, add: "actions" }],
-    ["aplikace, Rychlé akce", ["actions"], "app", { visible: true }],
+    ["odkaz, je karta Odkazy a akce", ["projects", "actions"], "url", { visible: true }],
+    ["odkaz, jen Odkazy a akce", ["actions"], "folder", { visible: true }],
+    ["odkaz, žádná karta", ["projects", "notes"], "file", { visible: false, add: "actions" }],
+    ["aplikace, žádná karta", ["notes"], "app", { visible: false, add: "actions" }],
+    ["aplikace, Odkazy a akce", ["actions"], "app", { visible: true }],
   ];
   for (const [name, cards, kind, want] of cases) assert.deepEqual(visibility(cards, kind), want, name);
   assert.deepEqual(hostCards("app"), ["actions"]);
+  assert.deepEqual(hostCards("url"), ["actions"], "odkazy mají od kola 34 jedinou kartu");
 });
 
 test("zapojení: událost drop-shortcut v App, panel v MainPage, nic se neukládá bez potvrzení", () => {

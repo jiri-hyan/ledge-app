@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+use crate::procman::CREATE_NO_WINDOW;
 const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 const DETACHED_PROCESS: u32 = 0x0000_0008;
 /// Kolik řádků / znaků výstupu jde do hlášky (celý konec je v logu).

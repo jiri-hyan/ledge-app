@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn decide_table() {
-        let now = Instant::now();
+        let now = Instant::now() + Duration::from_secs(3600); // po čerstvém bootu by `now - 600 s` podteklo (L227 AB8)
         let min = Duration::from_secs(60);
         let slot = |id: &str, ready: bool, running: bool, force: bool, ago: Option<u64>| Slot {
             id: s(id),

@@ -9,6 +9,7 @@
 //! polí níž, ta zůstávají přebitelná („Upravit detaily“). Rust z nových polí potřebuje jen šířku
 //! (`width`, `geom::drawer_width_for`) a tvar proužku (`stripdeco`). Starý config = styl `classic`.
 
+pub mod auto;
 pub mod backdrop;
 pub mod geom;
 pub mod head;
@@ -18,6 +19,7 @@ pub mod pages;
 pub mod size;
 pub mod stripdeco;
 
+pub use auto::AutoLook;
 pub use backdrop::BackdropConfig;
 pub use look::{FontLook, Layout, Material, WidthPreset};
 pub use head::{HeadLook, TabsLook};
@@ -36,7 +38,7 @@ pub struct AppearanceConfig {
     /// do nich zapíše, „Obnovit styl“ je vrátí). Neznámé jméno frontend bere jako `classic`.
     pub style: String,
     /// Barevný motiv: `dark` (výchozí), `midnight`, `graphite`, `nord`, `light`, `contrast`, barvy stylů
-    /// (`terminal`, `paper`, `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`, `oled`, `warm`).
+    /// (`terminal`, `paper`, `neon`, `brutal`, `pastel`, `aurora`, `mono`, `retro`, `oled`, `warm`), palety kola 34 (`sunset`, `forest`, `ocean`, `rose`, `dusk`, `cyber`, `sand`, `mint`, `slate`, `contrastLight`).
     pub theme: Theme,
     /// Barva akcentu `#rrggbb` (podpisová linka, záře, fokus). Prázdné = výchozí fialovo-modrá Ledge.
     pub accent: String,
@@ -98,6 +100,10 @@ pub struct AppearanceConfig {
     #[schemars(skip)]
     #[serde(skip_serializing_if = "TabsLook::is_default")]
     pub tabs: TabsLook,
+    /// Motiv „Podle Windows“ (kolo 34, `auto::AutoLook`): světlý / tmavý motiv podle Windows a volitelně akcent Windows.
+    #[schemars(skip)]
+    #[serde(skip_serializing_if = "AutoLook::is_default")]
+    pub auto: AutoLook,
 }
 
 impl Default for AppearanceConfig {
@@ -125,11 +131,12 @@ impl Default for AppearanceConfig {
             accent_from_backdrop: false,
             head: HeadLook::default(),
             tabs: TabsLook::default(),
+            auto: AutoLook::default(),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum Theme {
     /// tmavě modrošedý (dnešní vzhled)
@@ -165,29 +172,49 @@ pub enum Theme {
     Oled,
     /// teplé espresso a jantarové tóny (styl Teplý)
     Warm,
+    /// tmavá růžovo-oranžová (západ slunce) (kolo 34)
+    Sunset,
+    /// tmavá lesní zeleň (kolo 34)
+    Forest,
+    /// tmavá oceánská modř (kolo 34)
+    Ocean,
+    /// tmavá růžová (kolo 34)
+    Rose,
+    /// tmavý fialový soumrak (kolo 34)
+    Dusk,
+    /// tmavá tyrkysová s růžovým akcentem (kolo 34)
+    Cyber,
+    /// světlý písek (kolo 34)
+    Sand,
+    /// světlá máta (kolo 34)
+    Mint,
+    /// světlá břidlice (kolo 34)
+    Slate,
+    /// světlý vysoký kontrast (kolo 34)
+    ContrastLight,
 }
 
 #[cfg(test)]
 impl Theme {
-    /// Všechny motivy (testy kontrastu a zrcadel TS).
-    pub const ALL: [Theme; 16] = [
-        Theme::Dark,
-        Theme::Midnight,
-        Theme::Graphite,
-        Theme::Nord,
-        Theme::Light,
-        Theme::Contrast,
-        Theme::Terminal,
-        Theme::Paper,
-        Theme::Neon,
-        Theme::Brutal,
-        Theme::Pastel,
-        Theme::Aurora,
-        Theme::Mono,
-        Theme::Retro,
-        Theme::Oled,
-        Theme::Warm,
-    ];
+    /// Všechny motivy (testy kontrastu a zrcadel TS) — z JSON schématu enumu, takže nový motiv
+    /// nepřibývá do druhého seznamu (barvy: `src/theme/palettes.json`).
+    pub fn all() -> Vec<Theme> {
+        fn consts(v: &serde_json::Value, out: &mut Vec<String>) {
+            match v {
+                serde_json::Value::Object(m) => {
+                    if let Some(serde_json::Value::String(c)) = m.get("const") {
+                        out.push(c.clone());
+                    }
+                    m.values().for_each(|x| consts(x, out));
+                }
+                serde_json::Value::Array(a) => a.iter().for_each(|x| consts(x, out)),
+                _ => {}
+            }
+        }
+        let mut ids = Vec::new();
+        consts(&serde_json::to_value(schemars::schema_for!(Theme)).unwrap(), &mut ids);
+        ids.into_iter().filter_map(|id| serde_json::from_value(serde_json::Value::String(id)).ok()).collect()
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]

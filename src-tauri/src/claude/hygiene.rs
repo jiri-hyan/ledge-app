@@ -134,7 +134,7 @@ impl Claude {
                 }
             }
         }
-        // ukončená a čistá → pryč (šéf už nemá koho honit)
+        // ukončená a čistá → pryč (uživatel už nemá koho honit)
         if g.sessions.get(sid).is_some_and(|x| x.ended && !x.unfinished()) {
             g.sessions.remove(sid);
             g.track.remove(sid);
@@ -144,7 +144,7 @@ impl Claude {
         reply
     }
 
-    /// Levný recheck ukončených nedokončených session (šéf mohl commitnout ručně). Volá se z
+    /// Levný recheck ukončených nedokončených session (uživatel mohl commitnout ručně). Volá se z
     /// periodického refreshe gitu; blokuje volající vlákno (git), proto jen z pozadí.
     pub fn recheck_ended(&self) {
         let mode = *self.enforce.lock();
@@ -181,7 +181,7 @@ pub enum FileVerdict {
     Clean,
     /// neuložený a otisk sedí na poslední úpravu session → její nezacommitovaná práce
     Own,
-    /// neuložený, ale od její úpravy ho měnil někdo jiný (šéf, jiná session) → nepřipisovat
+    /// neuložený, ale od její úpravy ho měnil někdo jiný (uživatel, jiná session) → nepřipisovat
     Foreign,
 }
 
@@ -255,7 +255,7 @@ struct Hygiene {
 ///
 /// Nepushnuto = `git rev-list --count <baseline>..HEAD --not --remotes -- <soubory session>`
 /// (pathspecy přes stdin): commity přibyté od startu session, které nejsou na ŽÁDNÉM remote-tracking
-/// refu a sahají na soubory session — ne šéfovy commity jiných souborů ani commity stažené pullem.
+/// refu a sahají na soubory session — ne uživatelovy commity jiných souborů ani commity stažené pullem.
 /// Počítá se JEN když větev má upstream (`@{u}`): bez remote/upstreamu by push byl nesplnitelný
 /// a hlídač by session honil donekonečna → 0.
 fn git_hygiene(repo: &str, baseline: Option<&str>, files: &[TrackedFile], budget: Duration) -> Hygiene {
@@ -401,29 +401,30 @@ mod tests {
 
     #[test]
     fn hygiene_counts_only_own_files_and_commits() {
+    // Deterministické pod zátěží: `patient()` = termíny gitu 60 s a `capture` nezahazuje výstup gitu (L334).
         let (repo, _remote) = temp_repo_upstream();
         let dir = repo.path();
         let cwd = dir.to_string_lossy().to_string();
         let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1)).inline().patient();
         c.handle_event(&ev("UserPromptSubmit", "a", &cwd, json!({"prompt":"uprav"})));
-        // šéfova ruční rozdělaná práce — nepočítá se
+        // uživatelova ruční rozdělaná práce — nepočítá se
         std::fs::write(dir.join("sefova.txt"), "moje").unwrap();
-        std::fs::write(dir.join("base.txt"), "šéf změnil").unwrap();
+        std::fs::write(dir.join("base.txt"), "uživatel změnil").unwrap();
         // session zapíše soubor; Bash se nesleduje
         std::fs::create_dir_all(dir.join("nova dir")).unwrap();
         write_tool(&c, "a", &cwd, &dir.join("nova dir").join("a b.rs"), "x");
         std::fs::write(dir.join("bash.txt"), "x").unwrap();
         c.handle_event(&ev("PostToolUse", "a", &cwd, json!({"tool_name":"Bash","tool_input":{"command":"echo x > bash.txt"}})));
-        // sdílený soubor: session ho upraví, pak na něj sáhne šéf → už není „její“
+        // sdílený soubor: session ho upraví, pak na něj sáhne uživatel → už není „její“
         write_tool(&c, "a", &cwd, &dir.join("spolecny.txt"), "session");
-        std::fs::write(dir.join("spolecny.txt"), "šéf to přepsal jinak").unwrap();
+        std::fs::write(dir.join("spolecny.txt"), "uživatel to přepsal jinak").unwrap();
         let reply = c.handle_event(&ev("Stop", "a", &cwd, json!({"stop_hook_active": false})));
         assert_eq!(reply, None, "notify neblokuje");
         let s = sess(&c, "a");
         assert_eq!(s.uncommitted, vec!["nova dir/a b.rs"]);
         assert_eq!(s.unpushed, 0);
 
-        // šéf commitne svou práci → session to nepřipisuje
+        // uživatel commitne svou práci → session to nepřipisuje
         git(dir, &["add", "sefova.txt"]);
         git(dir, &["commit", "-q", "-m", "sef"]);
         c.handle_event(&ev("Stop", "a", &cwd, json!({})));
@@ -453,7 +454,7 @@ mod tests {
         c.handle_event(&ev("SessionEnd", "a", &cwd, json!({})));
         assert!(sess(&c, "a").ended);
 
-        // šéf pushne ručně → recheck ukončené session ji odebere
+        // uživatel pushne ručně → recheck ukončené session ji odebere
         c.recheck_ended();
         assert!(sess(&c, "a").ended, "bez pushe zůstává");
         git(dir, &["push", "-q", "origin", "HEAD:main"]);
@@ -540,6 +541,7 @@ mod tests {
 
     #[test]
     fn notify_computes_in_background() {
+    // Deterministické pod zátěží: `patient()` = termíny gitu 60 s a `capture` nezahazuje výstup gitu (L334).
         let repo = temp_repo();
         let cwd = repo.path().to_string_lossy().to_string();
         let c = Claude::new(Arc::new(|| {}), Duration::from_secs(1)).patient();

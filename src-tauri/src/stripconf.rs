@@ -21,7 +21,10 @@ pub struct StripConfig {
     pub items: Vec<StripItem>,
     /// Neprůhlednost pozadí proužku 0–1.
     pub opacity: f32,
-    /// Monitor: "primary" nebo index od 0 (pořadí z Windows).
+    /// Monitor: "primary" (Hlavní), "all" (plný proužek na hlavním + tečka na každém dalším monitoru, `stripset.rs`)
+    /// nebo stabilní `dev:<zařízení>;<š>x<v>@<x>,<y>` (`screen::stable_spec`, konkrétní monitor). Starý číselný index
+    /// se při načtení configu přepíše na stabilní spec a uloží (`stripset::migrate_config`).
+    /// Nepřipojený / neplatný = hlavní monitor se záznamem do logu.
     pub monitor: String,
     /// Text položky `custom`: krátký text a/nebo emoji, nejvýš 24 znaků. Prázdný = položka nic neukáže.
     pub custom: String,
@@ -485,7 +488,7 @@ mod tests {
     #[test]
     fn every_preset_readable_in_every_theme() {
         // barva na položku nesmí rozbít kontrast textu proužku (≥ 4.5:1 na obou koncích přechodu)
-        for t in Theme::ALL {
+        for t in Theme::all() {
             let p = palette(t);
             for c in StripColor::ALL {
                 let x = crate::appearance::geom::readable(c.base(p.accent[0]), &p);

@@ -1,6 +1,8 @@
 // Hlavička poznámky složená automaticky: „Projekt · Název · 26. 10.“ — projekt jen když je, datum = vytvoření.
 // Čistá logika bez DOM (testy `headline.test.mjs`); projekt a datum se do názvu nepíšou ručně.
 
+import { taskLineOf } from "./taskline.ts";
+
 /** Krátké datum vytvoření: česky „26. 10.“, anglicky „10/26“. Neplatný čas = prázdný řetězec. */
 export function shortDate(ms: number, lang: "cs" | "en" = "cs"): string {
   if (!Number.isFinite(ms) || ms <= 0) return "";
@@ -22,7 +24,8 @@ export function firstLine(body: string): string {
   for (const raw of body.split(/\r?\n/)) {
     const l = raw.trim();
     if (!l || l.startsWith("![") || l.startsWith("```") || l.startsWith("~~~")) continue;
-    const plain = l.replace(/^#{1,6}\s+/, "").replace(/^[-*+]\s+(\[[ xX]\]\s+)?/, "").replace(/^\d+[.)]\s+/, "").replace(/[*_`]/g, "").trim();
+    const tl = taskLineOf(l);
+    const plain = (tl ? tl.rest : l.replace(/^#{1,6}\s+/, "").replace(/^[-*+]\s+/, "").replace(/^\d+[.)]\s+/, "")).replace(/[*_`]/g, "").trim();
     if (plain) return plain.length > 80 ? `${plain.slice(0, 79)}…` : plain;
   }
   return "";

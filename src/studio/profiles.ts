@@ -12,13 +12,13 @@ export type PersonalProfile = {
   id: ProfileId;
   icon: string;
   design: DesignId;
-  hover: "full" | "compact" | "island";
+  hover: "full" | "island" | "dock";
   buildLayout: () => Layout;
 };
 
 export const PROFILE_IDS: readonly ProfileId[] = ["ai_builder", "power_hw", "focus_zen", "organizer"];
 
-const mkCard = (id: CardId, size: CardSize) => ({ id, size });
+const mkCard = (id: CardId, size: CardSize, design?: string) => (design ? { id, size, look: { design } } : { id, size });
 
 export const PROFILES: readonly PersonalProfile[] = [
   {
@@ -47,7 +47,7 @@ export const PROFILES: readonly PersonalProfile[] = [
             mkCard("usage", "m"),
             mkCard("system", "m"),
             mkCard("media", "m"),
-            mkCard("links", "m"),
+            mkCard("actions", "m"),
           ],
         },
       ],
@@ -79,9 +79,9 @@ export const PROFILES: readonly PersonalProfile[] = [
           name: "",
           cards: [
             mkCard("media", "l"),
-            mkCard("toggles", "s"),
+            mkCard("winquick", "s", "toggles"),
             mkCard("notes", "m"),
-            mkCard("links", "m"),
+            mkCard("actions", "m"),
           ],
         },
       ],
@@ -110,7 +110,7 @@ export const PROFILES: readonly PersonalProfile[] = [
           id: PERSONAL,
           name: "",
           cards: [
-            mkCard("bigclock", "m"),
+            mkCard("clock", "m", "big"),
             mkCard("weather", "m"),
             mkCard("media", "xl"),
           ],
@@ -124,14 +124,13 @@ export const PROFILES: readonly PersonalProfile[] = [
     id: "organizer",
     icon: "📅",
     design: "islands",
-    hover: "compact",
+    hover: "dock",
     buildLayout: (): Layout => ({
       pages: [
         {
           id: WORK,
           name: "",
           cards: [
-            mkCard("today", "m"),
             mkCard("calendar", "m"),
             mkCard("notes", "l"),
             mkCard("timer", "s"),
@@ -143,9 +142,9 @@ export const PROFILES: readonly PersonalProfile[] = [
           id: PERSONAL,
           name: "",
           cards: [
-            mkCard("week", "l"),
+            mkCard("calendar", "l", "strip"),
             mkCard("weather", "s"),
-            mkCard("links", "m"),
+            mkCard("actions", "m"),
             mkCard("media", "m"),
           ],
         },

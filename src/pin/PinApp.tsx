@@ -11,7 +11,7 @@ import { api, on, type ImageIn, type NoteDetail, type PinInit, type PinPrefs } f
 import Markdown from "../notes/Markdown";
 import { b64Of, pasteImages } from "../notes/draft";
 import { anchorAt, cleanCaption, imageIn, parseTasks, resolveAnchor, type Anchor } from "../notes/brief";
-import { copyRef } from "../notes/store";
+import { openRef } from "../notes/store";
 import { trimBody } from "../notes/editdraft";
 import { listKey } from "../notes/listkeys";
 import { fromMs } from "../notes/remind";
@@ -384,7 +384,8 @@ export default function PinApp() {
       if (r) setNote(r);
       else await load();
     } catch (e) {
-      say(/not found/i.test(String(e)) ? t("notes.brief.oldCore", "Tuhle část Ledge ještě neumí — aktualizuj aplikaci.") : String(e), true);
+      const m = errorText(e);
+      say(/not found/i.test(m) ? t("notes.brief.oldCore", "Tuhle část Ledge ještě neumí — aktualizuj aplikaci.") : m, true);
     }
   }
 
@@ -477,10 +478,14 @@ export default function PinApp() {
     };
     // klik jinam = rozepsané hned do poznámky (nečekat na pauzu v psaní)
     const blur = () => void flush();
+    // lístek vzniká bez aktivace (NOACTIVATE); výslovný klik = úmysl psát → okno smí přijmout klávesnici
+    const activate = () => void notesApi.pinActivate().catch(() => {});
+    window.addEventListener("pointerdown", activate, true);
     window.addEventListener("keydown", key);
     window.addEventListener("blur", blur);
     document.addEventListener("paste", paste);
     onCleanup(() => {
+      window.removeEventListener("pointerdown", activate, true);
       window.removeEventListener("keydown", key);
       window.removeEventListener("blur", blur);
       document.removeEventListener("paste", paste);
@@ -545,7 +550,7 @@ export default function PinApp() {
             {(n) => (
               <Show when={editing()} fallback={
                 <div class="pin-md" onDblClick={(e) => !(e.target as HTMLElement).closest(".md-check, .md-link, .md-wiki, .md-at") && startEdit(caretAt(e))}>
-                  <Markdown body={n().body} images={n().imageData} onToggle={toggle} onWiki={(name) => !through() && void wiki.follow(name)} onRef={copyRef} />
+                  <Markdown body={n().body} images={n().imageData} onToggle={toggle} onWiki={(name) => !through() && void wiki.follow(name)} onRef={(p, l) => void openRef(n().project, p, l)} />
                 </div>
               }>
                 <textarea

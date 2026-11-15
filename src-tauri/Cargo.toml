@@ -2,7 +2,7 @@
 name = "ledge"
 version = "0.2.0"
 description = "Ledge — šuplík u horního okraje obrazovky: projekty, servery, schvalování pro Claude Code"
-authors = ["Jiří Hyan"]
+authors = ["Ledge"]
 edition = "2024"
 
 [lib]
@@ -94,9 +94,15 @@ features = [
   "Win32_System_Diagnostics_Debug",
   "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_JobObjects",
+  # měření rozšíření (`ext/measure.rs`): private bytes procesů v Jobu (GetProcessMemoryInfo)
+  "Win32_System_ProcessStatus",
   "Win32_System_LibraryLoader",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
+  # tapeta (`ext/wall/diag.rs`): SetWinEventHook pro `--diag` (události oken, žádný poll)
+  "Win32_UI_Accessibility",
+  # živá zkouška tapety (`ext/wall/live.rs`, jen testy): ochrana před zamčenou stanicí
+  "Win32_System_StationsAndDesktops",
   "Win32_UI_HiDpi",
   "Win32_UI_Input",
   "Win32_UI_Input_KeyboardAndMouse",
@@ -124,6 +130,10 @@ features = [
 
 [dev-dependencies]
 tempfile = "3"
+
+[profile.dev]
+# vlastní kód jen s tabulkami řádků (backtrace/panic mají soubor:řádek): pdb testovacích exe ~−70 %, rychlejší linkování; ladění proměnných v debuggeru tím odpadá
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2

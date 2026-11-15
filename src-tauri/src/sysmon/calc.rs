@@ -127,11 +127,15 @@ pub enum Level {
     Hot,
 }
 
+/// Hranice úrovně v % (nejvyšší z CPU / RAM): od `WARM_PCT` Warm, od `HOT_PCT` Hot.
+pub const WARM_PCT: f32 = 75.0;
+pub const HOT_PCT: f32 = 90.0;
+
 pub fn level(cpu: Option<f32>, mem: f32) -> Level {
     let top = cpu.unwrap_or(0.0).max(mem);
-    if top >= 90.0 {
+    if top >= HOT_PCT {
         Level::Hot
-    } else if top >= 75.0 {
+    } else if top >= WARM_PCT {
         Level::Warm
     } else {
         Level::Calm

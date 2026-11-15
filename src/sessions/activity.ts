@@ -1,7 +1,8 @@
 // Karta „Claude aktivita“ (kolo 23, id `activity`): čistá logika bez DOM — které session ukázat, v jakém
 // pořadí, jméno fáze (bez kroku: fáze je odhad). Data jsou jen z Rustu (`claude/activity.rs` → `SessionView.activity`):
 // fáze je ODHAD podle posledního nástroje, soubor z `tool_input`, zpráva z hooku Stop / konce přepisu.
-// Bez importů za běhu kromě typů (`activity.test.mjs`).
+// Bez importů za běhu kromě typů a čisté `util/path.ts` (`activity.test.mjs`).
+import { baseName } from "../util/path.ts";
 import type { ActivityPhase, SessionActivity } from "../types/claude.ts";
 
 /** Co karta potřebuje ze session (podmnožina `SessionView`). */
@@ -14,10 +15,8 @@ export interface ActRow {
 
 export const PHASES: readonly ActivityPhase[] = ["reading", "editing", "testing", "working", "done", "error"];
 
-/** „C:\r\src\main.rs“ → „main.rs“ (Rust `activity::base_name`). */
-export function baseName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-}
+/** Zdroj je `util/path.ts` (Rust `activity::base_name`); re-export kvůli stávajícím importům a testu. */
+export { baseName };
 
 /** Ukázat session v kartě? Skončené ne; ostatní jen s aktivitou z hooků nebo čekající na tebe. */
 export function shown(r: ActRow, waitingIds: ReadonlySet<string>): boolean {

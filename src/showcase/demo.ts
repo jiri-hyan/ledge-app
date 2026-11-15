@@ -60,7 +60,7 @@ export function installShowcase() {
   snap.hooks = { state: "full", missing: [], error: null, path: "", hint: null };
   snap.update = { ...snap.update, state: "aktualni", current: "0.11.0" };
   snap.notesEnabled = true;
-  snap.smart = { quickKeys: false, dropShortcut: false, tabWheel: true };
+  snap.smart = { dropShortcut: false, tabWheel: true };
   snap.personal = { ...snap.personal, mediaLook: { variant: data.mediaVariant, stripTime: "auto", equalizer: true } };
   if (q.get("nopending")) snap.pending = [];
   // `morechips=1`: i pád a nedokončená session, ať má hlavička 6 štítků (přehlídka hlavičky)

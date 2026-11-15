@@ -35,7 +35,7 @@ fn key_decision(approve: bool, deny: bool, dead: bool) -> Option<Decision> {
 /// Srovná approve/deny se stavem; volá se při změně žádostí a při přechodu do hry a z ní (`attention::catch_up`).
 pub(crate) fn sync_approve_keys() {
     let c = core();
-    let want = approve_keys_wanted(!c.claude.pending().is_empty(), c.dead());
+    let want = !crate::qa::isolated() && approve_keys_wanted(!c.claude.pending().is_empty(), c.dead());
     if c.approve_keys.swap(want, Ordering::SeqCst) == want {
         return;
     }
@@ -47,10 +47,11 @@ pub(crate) fn sync_approve_keys() {
 /// dvou zkratek tak nikdy neskončí bez registrace. Chyby (obsazená zkratka, nečitelný zápis) do logu.
 pub(crate) fn sync_hotkeys() {
     let c = core();
-    // lístek na ploše = i zkratka průchozího režimu (`pins/`), i s vypnutými zkratkami
-    let pins_open = crate::pins::win::any_open();
-    let new = config::active_hotkeys_pins(&c.cfg.read(), c.approve_keys.load(Ordering::SeqCst), pins_open);
+    // zámek první: souběžná `sync_hotkeys` (vlákno lístků × config) čtou stav v pořadí, v jakém zapisují
     let mut reg = c.hotkeys.lock();
+    // zkratka průchozího režimu lístků (`pins/`): s vypnutými zkratkami jen dokud je nějaký lístek průchozí
+    let (pins_open, pins_through) = (crate::pins::win::any_open(), crate::pins::win::any_through());
+    let new = config::active_hotkeys_pins(&c.cfg.read(), c.approve_keys.load(Ordering::SeqCst), pins_open, pins_through);
     let (unreg, regs) = config::rebind_plan(&reg, &new);
     let gs = c.app.global_shortcut();
     for k in unreg {
@@ -96,8 +97,8 @@ pub(crate) fn is_registered(k: &str) -> bool {
 pub(crate) fn on_shortcut(sc: &Shortcut) {
     let c = core();
     let hk = c.cfg.read().hotkeys.clone();
-    // průchozí režim lístků: platí i s vypnutými zkratkami a v herním režimu (cesta ven z průchozího)
-    if parse_shortcut(&hk.note_passthrough).as_ref() == Some(sc) && crate::pins::win::any_open() {
+    // průchozí režim lístků: s vypnutými zkratkami jen při průchozím lístku; platí i v herním režimu (cesta ven)
+    if parse_shortcut(&hk.note_passthrough).as_ref() == Some(sc) && config::passthrough_key_live(hk.enabled, crate::pins::win::any_open(), crate::pins::win::any_through()) {
         crate::pins::win::toggle_through_all();
         return;
     }
@@ -127,7 +128,10 @@ pub(crate) fn on_shortcut(sc: &Shortcut) {
         }
         gamemode::handle(Trigger::NoteKey, || c.send_ui(UiCmd::Note));
     } else if let Some(d) = key_decision(parse_shortcut(&hk.approve).as_ref() == Some(sc), parse_shortcut(&hk.deny).as_ref() == Some(sc), c.dead()) {
-        c.claude.decide(None, d);
+        // L237: víc čekajících žádostí = zkratka nehádá, jen otevře šuplík, ať člověk vybere
+        if !c.claude.decide_sole(d) && !c.claude.pending().is_empty() {
+            c.send_ui(UiCmd::Show(View::Full, Opener::Hotkey));
+        }
     }
 }
 

@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<title>Ledge wall</title>
+<!--
+  Scéna živé tapety (E3, F8 a/b). ZDROJ: src/ext/wall/scene.html + model.ts; `node scripts/wall-build.mjs` z nich
+  složí src-tauri/src/ext/wall/wall.html (neupravuj ručně — test v model.test.mjs hlídá aktuálnost).
+  Kontrakt se stránkou:
+    Rust -> stránka  window.chrome.webview.addEventListener('message', e => e.data)
+        {t:'init', cfg, lang, paused, eco} po {t:'ready'} ze stránky
+        {t:'bg', url}                      pozadí z fotky (data:image/jpeg) nebo null = přechod; po init a při změně
+        {t:'eco', on}                      úsporný režim (baterie): bez rozostření a bez animace průběhu
+        {t:'data', topic:'media', rev, d}  při změně tématu (a po init poslední známá hodnota); d = MediaView
+        {t:'cmd', name:'cover', args:{key,url}}  obal alba (PNG max 128 px) k vyžádanému klíči
+    stránka -> Rust  window.chrome.webview.postMessage(obj)
+        {t:'ready'}                        stránka poslouchá, pošli init + data
+        {t:'req', what:'media', do:'toggle'|'next'|'prev'}
+        {t:'req', what:'cover', key}       obal k MediaView.coverKey (odpověď přijde jako cmd cover)
+        {t:'active'} | {t:'log', msg}
+  Pauza (hra / zamčeno) = document.visibilityState 'hidden': žádné časovače, animace průběhu stojí.
+  Vývoj bez buildu Rustu: LEDGE_WALL_HTML=<soubor>; náhled v prohlížeči: window.__wallMsg({t:'init',...}) (jen bez WebView2).
+-->
+<style>
+  :root { --ink: 255,255,255; --scrim: 0; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a1212; color: rgb(var(--ink));
+    font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; font-weight: 300;
+    -webkit-font-smoothing: antialiased; user-select: none; cursor: default; }
+  .stage { position: absolute; inset: 0; }
+  /* fotka (cover) + černá vrstva pro kontrast textu; obojí statické, žádná animace */
+  .photo { position: absolute; inset: 0; background: center / cover no-repeat; }
+  .photo[hidden], .dim[hidden] { display: none; }
+  .dim { position: absolute; inset: 0; background: #000; opacity: 0; }
+  .center { position: absolute; left: 0; right: 0; top: 20vh; text-align: center;
+    text-shadow: 0 .1em .6em rgba(0,0,0,calc(.15 + var(--scrim) * .5)); }
+  /* tracking přidá mezeru i za posledním písmenem — záporný margin ji vyrovná, aby text ležel opticky uprostřed */
+  .day { font-size: clamp(28px, 5.4vw, 140px); font-weight: 200; letter-spacing: .55em; margin-right: -.55em; line-height: 1; }
+  .date { font-size: clamp(10px, .95vw, 26px); font-weight: 400; letter-spacing: .42em; margin: 1.6em -.42em 0 0; opacity: .85; }
+  .time { font-size: clamp(10px, .85vw, 22px); font-weight: 400; letter-spacing: .3em; margin: .9em -.3em 0 0; opacity: .7;
+    font-variant-numeric: tabular-nums; }
+
+  .player { position: absolute; left: 50%; top: 52vh; transform: translateX(-50%); box-sizing: border-box;
+    width: clamp(200px, 16vw, 420px); padding: .8vw; display: grid; grid-template-columns: auto 1fr; gap: .2vw .8vw;
+    align-items: center; border-radius: clamp(10px, .9vw, 22px);
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25); backdrop-filter: blur(22px) saturate(1.25);
+    box-shadow: 0 .6vw 2vw rgba(0,0,0,.25); font-size: clamp(10px, .8vw, 20px); }
+  .player[hidden] { display: none; }
+  .cover { grid-row: 1 / 3; width: 3.6em; height: 3.6em; border-radius: .6em; display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.06)); }
+  .cover svg { width: 1.5em; height: 1.5em; opacity: .7; }
+  .cover img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: none; }
+  .cover.has img { display: block; }
+  .cover.has svg { display: none; }
+  /* úspora (baterie): bez rozostření pozadí, nejdražší věc pro GPU; sklo nahradí plnější průhledná plocha */
+  :root[data-eco] .player { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(20,28,28,.55); }
+  .meta { min-width: 0; align-self: end; }
+  .title { font-weight: 600; font-size: 1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .artist { font-size: .85em; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.2em; }
+  .bar { grid-column: 1 / 3; height: 2px; margin: .5em .1em .1em; background: rgba(255,255,255,.22); border-radius: 1px;
+    overflow: hidden; }
+  .bar[hidden] { visibility: hidden; }
+  .fill { height: 100%; width: 100%; background: rgba(var(--ink), .9); transform-origin: left center; transform: scaleX(0); }
+  .btns { grid-column: 1 / 3; display: flex; justify-content: center; gap: 1.4em; margin-top: .1em; }
+  .btn { all: unset; width: 2em; height: 2em; display: grid; place-items: center; border-radius: 50%; opacity: .9; }
+  .btn svg { width: 1.1em; height: 1.1em; fill: currentColor; }
+  .btn:hover { background: rgba(255,255,255,.14); }
+  .btn[disabled] { opacity: .3; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="photo" id="photo" hidden></div>
+  <div class="dim" id="dim" hidden></div>
+  <div class="center">
+    <div class="day" id="day"></div>
+    <div class="date" id="date"></div>
+    <div class="time" id="time"></div>
+  </div>
+  <div class="player" id="player" hidden>
+    <div class="cover" id="cover" aria-hidden="true"><img id="coverImg" alt=""><svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 3v11.6A3.5 3.5 0 1 0 11 18V8h6V3H9z"/></svg></div>
+    <div class="meta"><div class="title" id="title"></div><div class="artist" id="artist"></div></div>
+    <div class="bar" id="bar" hidden><div class="fill" id="fill"></div></div>
+    <div class="btns">
+      <button class="btn" id="prev" aria-label="prev"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="btn" id="toggle" aria-label="play/pause"><svg viewBox="0 0 24 24"><path id="ico" d="M7 4.5v15L19 12z"/></svg></button>
+      <button class="btn" id="next" aria-label="next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+/*@MODEL@*/
+
+  const wv = window.chrome && window.chrome.webview;
+  const $ = id => document.getElementById(id);
+  const PLAY = 'M7 4.5v15L19 12z', PAUSE = 'M6 5h4v14H6zM14 5h4v14h-4z';
+  let lang = 'cs', media = null, timer = 0, view = null, eco = false, coverKey = null;
+
+  // pozadí: statický přechod (žádná animace); barva textu z kontrastu vůči průměru přechodu
+  const ink = pickInk(avgRgb(BG_STOPS));
+  document.body.style.background = bgCss(BG_STOPS);
+  document.documentElement.style.setProperty('--ink', ink.rgb.join(','));
+  document.documentElement.style.setProperty('--scrim', String(ink.scrim));
+
+  function renderClock() {
+    const d = new Date();
+    $('day').textContent = formatDay(d, lang);
+    $('date').textContent = formatDate(d, lang);
+    $('time').textContent = formatTime(d);
+  }
+
+  // jediný časovač: probuzení na hranici minuty, jen když je stránka vidět
+  function tick() {
+    clearTimeout(timer);
+    timer = 0;
+    if (document.visibilityState === 'hidden') return;
+    renderClock();
+    timer = setTimeout(tick, msToNextMinute(Date.now()));
+  }
+
+  // průběh: jedna lineární CSS animace do konce skladby (žádný tik po sekundě); pauza = stojí
+  function renderBar() {
+    const fill = $('fill'), bar = $('bar');
+    // úspora: bez animace i bez zastaralého stavu lišty (nic nevymýšlíme)
+    const plan = view && media && !eco ? barPlan(media.timeline, media.status, Date.now()) : null;
+    bar.hidden = !plan;
+    fill.style.transition = 'none';
+    if (!plan) { fill.style.transform = 'scaleX(0)'; return; }
+    fill.style.transform = 'scaleX(' + (plan.startPct / 100) + ')';
+    if (plan.animMs > 0 && document.visibilityState !== 'hidden') {
+      void fill.offsetWidth; // reflow: ať se počáteční hodnota nepřehraje animací
+      fill.style.transition = 'transform ' + plan.animMs + 'ms linear';
+      fill.style.transform = 'scaleX(1)';
+    }
+  }
+
+  function renderPlayer() {
+    view = playerView(media);
+    $('player').hidden = !view;
+    if (view) {
+      $('title').textContent = view.title;
+      $('artist').textContent = view.artist;
+      $('ico').setAttribute('d', view.playing ? PAUSE : PLAY);
+      $('toggle').disabled = !view.canToggle;
+      $('prev').disabled = !view.canPrev;
+      $('next').disabled = !view.canNext;
+    }
+    renderBar();
+    renderCover();
+  }
+
+  // obal: klíč z MediaView; nový klíč = jeden požadavek (odpověď přijde jako cmd cover), bez klíče se smaže
+  function setCover(url) {
+    const ok = isImageUrl(url, 'png', 400000);
+    $('coverImg').src = ok ? url : '';
+    $('cover').classList.toggle('has', ok);
+  }
+  function renderCover() {
+    const key = view && media && media.coverKey ? media.coverKey : null;
+    const act = coverPlan(coverKey, key);
+    if (act === 'keep') return;
+    coverKey = key;
+    setCover(null);
+    if (act === 'request' && wv) wv.postMessage({ t: 'req', what: 'cover', key });
+  }
+
+  // pozadí z fotky: vzorky barev z malého náhledu → nejmenší ztmavení s kontrastem textu >= 4,5
+  function setPhoto(url) {
+    const photo = $('photo'), dim = $('dim');
+    if (!isImageUrl(url, 'jpeg', 9000000)) {
+      photo.hidden = true; dim.hidden = true; photo.style.backgroundImage = '';
+      document.body.style.background = bgCss(BG_STOPS);
+      document.documentElement.style.setProperty('--ink', ink.rgb.join(','));
+      document.documentElement.style.setProperty('--scrim', String(ink.scrim));
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = 32; c.height = 18;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0, 32, 18);
+      const plan = photoPlan(rgbSamples(g.getImageData(0, 0, 32, 18).data));
+      c.width = 0;
+      photo.style.backgroundImage = 'url(' + url + ')';
+      photo.hidden = false;
+      dim.style.opacity = String(plan.dim);
+      dim.hidden = false;
+      document.documentElement.style.setProperty('--ink', '255,255,255');
+      document.documentElement.style.setProperty('--scrim', '0');
+    };
+    img.onerror = () => setPhoto(null);
+    img.src = url;
+  }
+
+  function req(doWhat) { if (wv) wv.postMessage({ t: 'req', what: 'media', do: doWhat }); }
+  $('toggle').addEventListener('click', () => req('toggle'));
+  $('prev').addEventListener('click', () => req('prev'));
+  $('next').addEventListener('click', () => req('next'));
+
+  document.addEventListener('visibilitychange', () => { tick(); renderBar(); });
+
+  function setEco(on) {
+    if (on === eco) return;
+    eco = on;
+    document.documentElement.toggleAttribute('data-eco', on);
+    renderBar();
+  }
+
+  function onMessage(m) {
+    if (!m) return;
+    if (m.t === 'init') {
+      lang = normLang(m.lang);
+      document.documentElement.lang = lang;
+      setEco(!!m.eco);
+      tick();
+    } else if (m.t === 'data' && m.topic === 'media') {
+      media = m.d || null;
+      renderPlayer();
+    } else if (m.t === 'bg') {
+      setPhoto(m.url);
+    } else if (m.t === 'eco') {
+      setEco(!!m.on);
+    } else if (m.t === 'cmd' && m.name === 'cover' && m.args && m.args.key === coverKey) {
+      setCover(m.args.url);
+    }
+  }
+
+  if (wv) {
+    wv.addEventListener('message', e => onMessage(e.data));
+    wv.postMessage({ t: 'ready' });
+  } else {
+    // náhled mimo WebView2 (built-in prohlížeč): zprávy podle kontraktu se podvrhnou přes window.__wallMsg(obj)
+    window.__wallMsg = onMessage;
+  }
+  tick();
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-//! Příkazy Nastavení → Účty: stav, připojení (přihlášení v systémovém prohlížeči), zrušení čekání,
+//! Příkazy Nastavení → Obsah karet → Pokročilé: stav, připojení (přihlášení v systémovém prohlížeči), zrušení čekání,
 //! odhlášení, seznam kalendářů Google. Logika v `accounts/*`; tajemství do UI nejdou.
 
 use crate::accounts::{Provider, session};

@@ -1,20 +1,8 @@
-/* Náhled po najetí (`src/hover/*`): kompaktní panel v barvách motivu a černý ostrůvek. Pohyb (pulz tečky)
+/* Náhled po najetí (`src/hover/*`): ostrůvek, dok a střední panel. Pohyb (pulz tečky)
    vypíná globální „omezit pohyb“ / appearance.motion.style = none ze styles.css. */
 .hov { padding: var(--s2) var(--s4) var(--s3); cursor: default; }
-.hov-approval { margin: 0 calc(-1 * var(--s4)) var(--s1); border-bottom: 1px solid var(--line); }
-/* schválení v úzkém panelu: text přes celou šířku, tlačítka pod ním (`Approval stack`) */
-.hov-stack { flex-wrap: wrap; justify-content: flex-end; row-gap: var(--s2); }
-.hov-stack > :nth-child(2) { flex: 1 1 calc(100% - 56px); }
-.hov-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line-soft, var(--line)); font-size: var(--fs-sm); min-width: 0; }
-.hov-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t1); }
-.hov-row .meta { color: var(--t3); white-space: nowrap; font-size: var(--fs-xs); }
-.hov-media .grow { display: flex; flex-direction: column; line-height: 1.25; }
-.hov-title { overflow: hidden; text-overflow: ellipsis; }
-.hov-sub { color: var(--t3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; }
-.hov-empty { color: var(--t3); font-size: var(--fs-sm); padding: 8px 0; }
-.hov-foot { display: flex; align-items: center; gap: 10px; padding-top: 8px; font-size: var(--fs-xs); color: var(--t3); }
-.hov-clock { font: 600 var(--fs-sm) var(--mono); color: var(--t2); }
-.hov-more { margin-left: auto; color: var(--t3); font-size: var(--fs-xs); padding: 2px 6px; border-radius: var(--r-sm); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.hov-more { margin-left: auto; color: var(--t3); font-size: var(--fs-xs); padding: 2px 6px; min-height: 24px; border-radius: var(--r-sm); }
 .hov-more:hover { color: var(--t1); background: var(--card-2); }
 .hov-lim { font: 600 var(--fs-xs) var(--mono); color: var(--t2); white-space: nowrap; }
 .hov-lim-warn { color: var(--amber); }
@@ -26,9 +14,6 @@
 .hov-dot-wait { background: var(--amber); }
 .hov-dot-ok { background: var(--green); }
 .hov-dot-bad { background: var(--red); }
-/* servery z Ledge: ■ Stop (proužek je průchozí, zastavuje se tady) */
-.hov-stop { flex-shrink: 0; width: 24px; height: 22px; border-radius: var(--r-xs); color: var(--red); background: var(--card); border: 1px solid var(--line); font-size: var(--fs-xs); }
-.hov-stop:hover { background: var(--card-2); }
 .hov-pulse { animation: hov-pulse 1.6s ease-in-out infinite; }
 @keyframes hov-pulse { 50% { opacity: 0.4; } }
 
@@ -51,3 +36,31 @@
 .isl-sub { color: var(--t3); font-size: var(--fs-xs); }
 .isl-act { display: flex; align-items: center; gap: var(--s2); flex-shrink: 0; }
 .isl-time { font: 600 calc(26px * var(--fz, 1)) var(--display, var(--sans)); letter-spacing: -0.02em; }
+
+/* Dok (`Dock.tsx`, `DockMusic.tsx`): řada slotů v téže černé kapsli; slot hudby se smršťuje, poznámka při psaní roste */
+.isl-dock { gap: 8px 10px; padding: 8px 14px 10px; min-width: 0; flex-wrap: wrap; }
+.isl-slot { display: flex; align-items: center; gap: 8px; min-width: 0; border-radius: var(--r-md); }
+.isl-note-btn { flex-shrink: 0; padding: 6px 12px; background: var(--card); border: 1px solid var(--line); color: var(--t1); font-size: var(--fs-sm); cursor: text; }
+.isl-note-btn:hover { background: var(--card-2); }
+.isl-note { flex: 1; align-items: stretch; }
+.isl-note > * { flex: 1; min-width: 0; }
+.isl-music { flex: 1 1 220px; min-width: 180px; padding: 2px 6px; outline: none; }
+.isl-music:focus-visible { box-shadow: 0 0 0 1px var(--line-2); }
+.isl-music .isl-tx { flex: 1 1 100px; min-width: 100px; }  /* název skladby má vždy místo (L148); interpret je v tooltipu */
+.isl-timer b { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.isl-timer { flex-shrink: 0; font-size: var(--fs-sm); }
+.isl-chip { margin-left: auto; flex-shrink: 0; color: var(--t3); font: 600 var(--fs-xs) var(--mono); }
+.isl-vol { flex-shrink: 0; display: flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--t2); }
+.isl-vol-off { opacity: 0.7; }
+.isl-pin { flex-shrink: 0; opacity: 0.75; filter: grayscale(1); }
+.isl-pin:hover, .isl-pin-on { opacity: 1; filter: none; }
+
+/* Střední panel z docku (`Mid.tsx`): hlavička s „▾ celý šuplík“ a 📌, pod ní až 3 karty vedle sebe / pod sebou
+   (mřížka se zalomí podle šířky okna: ~1/3 monitoru). Posuv jen v těle, ať hlavička zůstane. */
+.mid { gap: var(--s2); }
+.mid-head { display: flex; align-items: center; justify-content: space-between; }
+.mid-deck { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--s3); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.mid > .mid-deck { flex-shrink: 1; }
+.mid-item { min-width: 0; display: flex; flex-direction: column; }
+.mid-item > * { flex: 1; margin-bottom: 0; }
+.mid .isl-pin { color: var(--t1); }

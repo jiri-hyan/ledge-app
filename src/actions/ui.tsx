@@ -30,18 +30,21 @@ export function ActionIcon(p: { a: Pick<ActionView, "id" | "iconKey" | "monogram
   );
 }
 
-type Pending = { a: ActionView; where: string; resolve: (ok: boolean) => void };
+type Pending = { a: ActionView; where: string; at: number; resolve: (ok: boolean) => void };
 const [pending, setPending] = createSignal<Pending | null>(null);
 
 /** `ask` pro `runAction`: potvrzení se ukáže v komponentě `<ConfirmAction where={…} />`. */
 export const askConfirm = (where: string) => (a: ActionView) =>
   new Promise<boolean>((resolve) => {
     pending()?.resolve(false);
-    setPending({ a, where, resolve });
+    setPending({ a, where, at: Date.now(), resolve });
   });
 
 /** Čeká potvrzení na tomhle místě? (paleta podle toho mapuje Enter/Esc) */
 export const confirmPending = (where: string) => pending()?.where === where;
+
+/** Kdy se čekající potvrzení na tomhle místě ukázalo (ms, `Date.now()`); jinak `null`. */
+export const confirmShownAt = (where: string) => (pending()?.where === where ? pending()!.at : null);
 
 export function answerConfirm(ok: boolean) {
   const p = pending();
